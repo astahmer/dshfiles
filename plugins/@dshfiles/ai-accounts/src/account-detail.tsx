@@ -33,6 +33,7 @@ import { ModelCuration } from './model-curation.js'
 import { ProviderGlyph } from './panel-primitives.js'
 import { QuotaSection } from './quota-section.js'
 import { AccountUsageSlot } from './account-usage-view.js'
+import { UsageMovedNotice, useUsageRedirect } from './usage-redirect.js'
 import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
@@ -58,6 +59,7 @@ export const AccountDetail = (props: {
   const connect = (): void => {
     if (selected !== null && !dirty && !saving) props.onConnectAccount(selected.instanceId)
   }
+  const usageRedirect = useUsageRedirect({ accountId: draft.instanceId, displayName: draft.displayName || draft.instanceId })
   const requestRemove = (): void => {
     if (selected !== null) sendRemove({ type: 'request', target: { instanceId: selected.instanceId, displayName: selected.displayName } })
   }
@@ -146,6 +148,8 @@ export const AccountDetail = (props: {
       <Tabs
         className="dshx:min-w-0 dshx:gap-0"
         onValueChange={section => {
+          // Usage lives in Observe › Usage › Quota while usage runs: the tab opens it there.
+          if (section === 'usage' && usageRedirect.open()) return
           if (section === 'models' || section === 'settings' || section === 'usage') props.onSectionChange(section)
         }}
         value={props.activeSection}
@@ -189,17 +193,23 @@ export const AccountDetail = (props: {
           <AccountSettings draft={draft} file={props.file} state={props.state} folderPicker={props.folderPicker} onConnect={connect} />
         </TabsContent>
         <TabsContent className="dshx:min-w-0 dshx:space-y-4 dshx:p-4" value="usage">
-          <AccountUsageSlot accountId={draft.instanceId} displayName={draft.displayName} onOpenUsageHistory={props.onOpenUsageHistory} />
-          <details className="dshx:rounded-lg dshx:border dshx:bg-card dshx:p-4">
-            <summary className="dshx:cursor-pointer dshx:text-sm dshx:font-semibold">Subscription quota & history</summary>
-            <p className="dshx:my-3 dshx:text-xs dshx:text-muted-foreground">
-              Provider-reported subscription allowance is separate from recorded requests and list-price estimates.
-            </p>
-            <QuotaSection state={props.state} />
-            <Button className="dshx:mt-3" onClick={props.onOpenUsageHistory} size="sm" type="button" variant="outline">
-              Usage history
-            </Button>
-          </details>
+          {usageRedirect.active ? (
+            <UsageMovedNotice onOpen={usageRedirect.open} />
+          ) : (
+            <>
+              <AccountUsageSlot accountId={draft.instanceId} displayName={draft.displayName} onOpenUsageHistory={props.onOpenUsageHistory} />
+              <details className="dshx:rounded-lg dshx:border dshx:bg-card dshx:p-4">
+                <summary className="dshx:cursor-pointer dshx:text-sm dshx:font-semibold">Subscription quota & history</summary>
+                <p className="dshx:my-3 dshx:text-xs dshx:text-muted-foreground">
+                  Provider-reported subscription allowance is separate from recorded requests and list-price estimates.
+                </p>
+                <QuotaSection state={props.state} />
+                <Button className="dshx:mt-3" onClick={props.onOpenUsageHistory} size="sm" type="button" variant="outline">
+                  Usage history
+                </Button>
+              </details>
+            </>
+          )}
         </TabsContent>
       </Tabs>
       <footer className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:px-5 dshx:py-2.5">

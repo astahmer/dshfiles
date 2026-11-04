@@ -153,7 +153,7 @@ describe('MovedToDialog', () => {
     act(() => MovedTo.open())
     expect(screen.getByRole('heading', { name: 'Where did a page go?' })).toBeTruthy()
     expect(screen.getAllByText('Not installed').length).toBeGreaterThan(0)
-    fireEvent.click(screen.getByRole('button', { name: 'Open Observe › Usage' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Usage: Analytics in Observe › Usage' }))
     expect(openEntry).toHaveBeenCalledWith(expect.objectContaining({ entry: 'Usage: Analytics', panelId: 'dshfiles-usage', destination: 'observe' }))
     expect(screen.queryByRole('heading', { name: 'Where did a page go?' })).toBeNull()
   })

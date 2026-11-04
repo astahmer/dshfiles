@@ -91,6 +91,8 @@ When('recorded session logs and a price catalog are seeded', async ({ page }: { 
 When('the Usage analytics panel is opened on the range since {string}', async ({ page }: { page: Page }, from: string) => {
   await openGlobalPanel(page, 'Usage: Analytics')
   await expect(page.getByRole('heading', { name: 'Usage', exact: true, level: 1 })).toBeVisible()
+  // Cost is the first tab (Phase 5: Cost · Quota · Requests · Tools); the log is Requests.
+  await page.getByRole('tab', { name: 'Requests', exact: true }).click()
   await page.getByRole('radio', { name: 'Custom', exact: true }).click()
   await page.getByLabel('From date', { exact: true }).fill(from)
   await page.getByRole('button', { name: 'Re-index thread logs', exact: true }).click()
@@ -156,7 +158,7 @@ Then('a failed request opens the thread that made it', async ({ page }: { page: 
 })
 
 When('the Charts tab is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('tab', { name: 'Charts', exact: true }).click()
+  await page.getByRole('tab', { name: 'Cost', exact: true }).click()
   try {
     await expect(page.getByText('Cost over time', { exact: true })).toBeVisible()
   } catch (error) {
@@ -221,7 +223,7 @@ Then('selecting a model in the sortable usage table shows its requests in the lo
 })
 
 When('the Tools & Jev tab is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('tab', { name: 'Tools & Jev', exact: true }).click()
+  await page.getByRole('tab', { name: 'Tools', exact: true }).click()
   try {
     await expect(page.getByRole('heading', { name: 'Tool calls over time', exact: true })).toBeVisible()
   } catch (error) {
@@ -242,5 +244,32 @@ Then('the tool execution report and Jev call report are visible', async ({ page 
     await expect(page.getByText(/Arguments, outputs, commands, paths and raw errors are never copied/u)).toBeVisible()
   })
   await captureUsageEvidence(page, 'tools')
+  await finishJourneyAssertions(page)
+})
+
+When('the Usage page is opened on its Quota tab', async ({ page }: { page: Page }) => {
+  await openGlobalPanel(page, 'Usage: Analytics')
+  await expect(page.getByRole('heading', { name: 'Usage', exact: true, level: 1 })).toBeVisible()
+  await page.getByRole('tab', { name: 'Quota', exact: true }).click()
+})
+
+Then('the Quota tab offers the accounts, history and forecast views of AI Accounts', async ({ page }: { page: Page }) => {
+  // The quota views are one segmented control above the view; Forecast has its own below it, so the first wins.
+  const view = (name: string) => page.getByRole('radio', { name, exact: true }).first()
+  await recordAssertion(page, 'usage-quota-tab-hosts-account-views', async () => {
+    await expect(view('Accounts')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('Add an account to see its quota and usage here.', { exact: true })).toBeVisible()
+  })
+  await view('History').click()
+  await recordAssertion(page, 'usage-quota-tab-hosts-history', async () => {
+    await expect(page.getByRole('heading', { name: 'Quota history', exact: true })).toBeVisible()
+    await expect(page.getByText('Add an account to start collecting usage history.', { exact: true })).toBeVisible()
+  })
+  await view('Forecast').click()
+  await recordAssertion(page, 'usage-quota-tab-hosts-forecast', async () => {
+    await expect(page.getByText('Enable an account with quota to see where it is heading.', { exact: true })).toBeVisible()
+    await expect(page.getByRole('radio', { name: 'Hand-off', exact: true })).toBeVisible()
+  })
+  await captureUsageEvidence(page, 'quota-tab')
   await finishJourneyAssertions(page)
 })

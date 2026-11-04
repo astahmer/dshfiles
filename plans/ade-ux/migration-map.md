@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-366 features from 84 plugins.
+368 features from 84 plugins.
 
 ## Counts
 
@@ -17,13 +17,13 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Land |  |  | 1 |  | 6 | 2 | 1 |  | 4 |  |  |  |  |  | 14 |
 | Work |  |  | 1 |  | 7 | 2 | 1 |  | 5 |  |  |  |  |  | 16 |
 | Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  |  | 5 |
-| Observe |  |  |  |  | 19 | 1 |  |  | 2 |  |  |  |  |  | 22 |
+| Observe |  |  |  |  | 20 | 1 |  |  | 2 |  |  |  |  |  | 23 |
 | Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  |  | 6 |
 | Settings |  |  |  |  |  |  |  |  | 1 |  | 40 |  |  |  | 41 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 21 |  | 21 |
 | Composer |  |  |  | 51 |  |  |  |  |  |  |  |  |  |  | 51 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 17 | 17 |
-| No place of its own | 19 |  | 16 |  |  |  |  | 89 |  |  |  | 7 |  |  | 131 |
+| No place of its own | 19 |  | 17 |  |  |  |  | 89 |  |  |  | 7 |  |  | 132 |
 
 ## By current left-nav entry
 
@@ -64,7 +64,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | Region today | Features | Destinations |
 | --- | ---: | --- |
 | agent tool | 23 | No place of its own 18, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
-| agent tools and Host watcher; no UI | 1 | No place of its own 1 |
+| agent tools | 1 | No place of its own 1 |
 | client | 10 | No place of its own 10 |
 | composer | 52 | Composer 49, Thread panel 2, Settings 1 |
 | composer and transcript | 1 | Threads 1 |
@@ -76,7 +76,8 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | keyboard | 3 | No place of its own 3 |
 | left-nav | 87 | Observe 21, Work 15, Land 13, Inbox 12, Settings 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 10 | No place of its own 7, Thread panel 2, Settings 1 |
-| palette | 12 | No place of its own 12 |
+| observe | 1 | Observe 1 |
+| palette | 13 | No place of its own 13 |
 | plugins-page | 2 | No place of its own 1, Settings 1 |
 | right-pane | 7 | Thread panel 5, No place of its own 2 |
 | settings | 22 | Settings 20, No place of its own 2 |
@@ -207,7 +208,7 @@ rail destination; 5 features.
 
 ### Observe
 
-rail destination; 22 features.
+rail destination; 23 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -228,6 +229,7 @@ rail destination; 22 features.
 | usage/usage-activity-report: Tool and skill analytics | destinationSection | left-nav: Usage: Analytics › Tools & Jev |
 | usage/usage-charts: Usage charts | destinationSection | left-nav: Usage: Analytics › Charts |
 | usage/usage-jev-card: Jev API usage card | destinationSection | left-nav: Usage: Analytics › Charts › Jev |
+| usage/usage-quota-tab: Usage › Quota: account quota, history and forecast in the Usage page | destinationSection | observe: Usage › Quota |
 | usage/usage-request-log: Request log | destinationSection | left-nav: Usage: Analytics › Requests |
 | worktree-memory/memory-board: Process memory and Node origins | destinationSection | left-nav: Worktree Memory: RAM |
 | multi-host/host-settings: Weight Auto placement and fetch before new threads | detail | left-nav: Hosts › Edit host |
@@ -407,7 +409,7 @@ cards inline in the active thread; 17 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 131 features.
+palette commands, status items, agent tools, infrastructure; 132 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -423,7 +425,7 @@ palette commands, status items, agent tools, infrastructure; 131 features.
 | html-render/page-screenshot: Agent screenshot of its own published page | agentToolOnly | agent tool: html_render_screenshot |
 | memory/memory-tools: Search, read and note memory from any agent | agentToolOnly | agent tool: memory_search / memory_read / memory_note |
 | multi-host/remote-delegation: Delegate a task to another machine | agentToolOnly | agent tool: multi_host_delegate |
-| pull-requests/github-pull-request-links: Link and watch GitHub pull requests from DSH threads | agentToolOnly | agent tools and Host watcher; no UI |
+| pull-requests/github-pull-request-links: Link and watch GitHub pull requests from DSH threads | agentToolOnly | agent tools: pull_request_link, pull_request_watch, pull_request_list |
 | secret-catalog/metadata-only-agent-tools: Expose safe secret catalog tools to agents | agentToolOnly | agent tool: secret_list / secret_get / secret_reference_status |
 | session-controller/thread-local-model: Guarded thread-local model selection | agentToolOnly | agent tool: thread_local_model_state / thread_select_local_model |
 | thread-sidebar/navigation-counter: Count destination and section opens | agentToolOnly | agent tool: shell_navigation_counts / shell_navigation_reset |
@@ -439,6 +441,7 @@ palette commands, status items, agent tools, infrastructure; 131 features.
 | command-palette/palette-search: Search threads and workspace files | command | palette: Threads / Files search |
 | main-tabs/new-tab-page: Open a new tab with suggestions of what to show | command | main-tabs: New tab |
 | main-tabs/tab-keyboard: Jump between tabs from the keyboard | command | keyboard: tab jumps |
+| pull-requests/github-pull-request-create: Create a GitHub pull request from a thread | command | palette: Create pull request from this thread (dialog) |
 | shortcuts/panel-selection-chords: Select native panels with keyboard shortcuts | command | keyboard: Mod+N / Mod+, |
 | shortcuts/sidebar-toggle-chord: Toggle the sidebar with the platform primary chord | command | keyboard: Mod+B |
 | thread-sidebar/footer-more-menu: Reach Settings, sidebar pages, and hidden footer actions from both More menus | command | sidebar-footer: More menu |

@@ -21,6 +21,10 @@ import { QuotaStatusItem } from './quota-status-item.js'
 import { ThreadAccountSurface } from './thread-account-dialog.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
 import { QuotaForecastPanel } from './quota-forecast-panel.js'
+import { QuotaAccountsView } from './quota-accounts-view.js'
+import { AccountQuotaViews, UsageNavigation, type QuotaViewProps, type UsageQuotaTarget, type UsageQuotaView } from './quota-views.js'
+import { useEffect } from 'react'
+import { useContract } from '@dshfiles/dshx/client'
 import { EdgeUsageWidget } from './edge-usage.js'
 import { ModelsPageAccounts } from './models-page-accounts.js'
 import { SessionCostDockEntry } from './session-cost.js'
@@ -84,12 +88,18 @@ export default defineClientPlugin({
     api.ui.register({ name: 'shell.overlay', id: 'ai-accounts-setup', order: 20, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, SetupOverlayView)
     const translate = ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)
     const label = (): string => translate('aiAccountsPanel')
-    const historyLabel = (): string => translate('aiAccountsUsageHistory')
-    const forecastLabel = (): string => translate('aiAccountsQuotaForecast')
     // SAFETY: This id is registered as a main-panel slot below.
     const openAccounts = (): void => ctx.layout.selectPanel(PANEL_ID as MainPanelId)
-    // SAFETY: This id is registered as a main-panel slot below.
-    const openUsageHistory = (): void => ctx.layout.selectPanel(USAGE_PANEL_ID as MainPanelId)
+    // Usage and quota live on one page now, Observe › Usage › Quota (plans/ade-ux §6), owned by @dshfiles/usage. Without
+    // usage, the former Usage history and Quota forecast pages below still open, so nothing is lost.
+    const usageNavigation = api.use(UsageNavigation)
+    const openQuota = (target: UsageQuotaTarget, fallback: string): void => {
+      const navigation = usageNavigation.get()
+      if (navigation.status === 'active') navigation.value.openQuota(target)
+      // SAFETY: Both fallback ids are registered as main-panel slots below.
+      else ctx.layout.selectPanel(fallback as MainPanelId)
+    }
+    const openUsageHistory = (): void => openQuota({ view: 'history' }, USAGE_PANEL_ID)
     // Every slot shares the bundle's query client, so the footer, edge widget
     // and panels read one usage cache instead of polling side by side.
     const AccountsPanelView = (): JSX.Element => (
@@ -103,16 +113,49 @@ export default defineClientPlugin({
         />
       </PluginQueryProvider>
     )
+    // A saved tab of a former page redirects to its view in Usage › Quota while usage runs; otherwise it is the page.
+    const QuotaRedirect = (props: { readonly view: UsageQuotaView; readonly children: JSX.Element }): JSX.Element | null => {
+      const active = useContract(UsageNavigation).status === 'active'
+      useEffect(() => {
+        if (active) openQuota({ view: props.view }, '')
+      }, [active, props.view])
+      return active ? null : props.children
+    }
     const UsageHistoryPanelView = (): JSX.Element => (
-      <PluginQueryProvider>
-        <UsageHistoryPanel onBack={openAccounts} />
-      </PluginQueryProvider>
+      <QuotaRedirect view="history">
+        <PluginQueryProvider>
+          <UsageHistoryPanel onBack={openAccounts} />
+        </PluginQueryProvider>
+      </QuotaRedirect>
     )
     const QuotaForecastPanelView = (): JSX.Element => (
+      <QuotaRedirect view="forecast">
+        <PluginQueryProvider>
+          <QuotaForecastPanel onBack={openAccounts} />
+        </PluginQueryProvider>
+      </QuotaRedirect>
+    )
+    // The quota views Usage › Quota draws; bound so their hooks read this plugin's API and query cache.
+    const QuotaAccountsSection = (props: QuotaViewProps): JSX.Element => (
       <PluginQueryProvider>
-        <QuotaForecastPanel onBack={openAccounts} />
+        <QuotaAccountsView {...props} onOpenAccounts={openAccounts} onOpenHistory={accountId => openQuota({ view: 'history', accountId }, USAGE_PANEL_ID)} />
       </PluginQueryProvider>
     )
+    const QuotaHistorySection = (props: QuotaViewProps): JSX.Element => (
+      <PluginQueryProvider>
+        <UsageHistoryPanel embedded onBack={openAccounts} {...(props.accountId === undefined ? {} : { accountId: props.accountId })} />
+      </PluginQueryProvider>
+    )
+    const QuotaForecastSection = (): JSX.Element => (
+      <PluginQueryProvider>
+        <QuotaForecastPanel embedded onBack={openAccounts} />
+      </PluginQueryProvider>
+    )
+    api.provide(AccountQuotaViews, {
+      Accounts: api.bind(QuotaAccountsSection),
+      History: api.bind(QuotaHistorySection),
+      Forecast: api.bind(QuotaForecastSection),
+    })
     const ConnectedQuotaStrip = (props: { readonly useSessions: UseServingAccountSessions }): JSX.Element => {
       const serving = useServingAccount(props.useSessions)
       return (
@@ -246,26 +289,31 @@ export default defineClientPlugin({
       },
       PanelGlyph,
     )
-    api.ui.register(
-      {
-        name: 'sidebar.panellist',
-        id: USAGE_PANEL_ID,
-        order: 2,
-        label: () => `AI Accounts: ${historyLabel()}`,
-        locale: AI_ACCOUNTS_LOCALE_NAMESPACE,
-      },
-      UsageHistoryGlyph,
-    )
     api.ui.register({ name: 'main', key: PANEL_ID, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, AccountsPanelView)
-    api.ui.register(
-      {
-        name: 'sidebar.panellist',
-        id: FORECAST_PANEL_ID,
-        order: 3,
-        label: () => `AI Accounts: ${forecastLabel()}`,
-        locale: AI_ACCOUNTS_LOCALE_NAMESPACE,
+    // Usage history and Quota forecast are views of Observe › Usage › Quota while @dshfiles/usage runs. Without it
+    // (compositions that leave usage out) they keep their own navigation entries, so nothing becomes unreachable.
+    const historyLabel = (): string => translate('aiAccountsUsageHistory')
+    const forecastLabel = (): string => translate('aiAccountsQuotaForecast')
+    api.keyed(
+      usageNavigation,
+      (live, scope) => {
+        if (live.status === 'active') return
+        const slots = ctx.slots
+        const entries = [
+          { id: USAGE_PANEL_ID, order: 2, label: () => `AI Accounts: ${historyLabel()}`, glyph: UsageHistoryGlyph },
+          { id: FORECAST_PANEL_ID, order: 3, label: () => `AI Accounts: ${forecastLabel()}`, glyph: QuotaForecastGlyph },
+        ]
+        for (const entry of entries) {
+          const dispose = slots.inject('sidebar.panellist', () =>
+            slots.register(
+              { name: 'sidebar.panellist', id: entry.id, order: entry.order, label: entry.label, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
+              entry.glyph,
+            ),
+          )
+          if (typeof dispose === 'function') scope.onDispose(() => void dispose())
+        }
       },
-      QuotaForecastGlyph,
+      { equals: (left, right) => (left.status === 'active') === (right.status === 'active') },
     )
     api.ui.register({ name: 'main', key: USAGE_PANEL_ID, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, UsageHistoryPanelView)
     api.ui.register({ name: 'main', key: FORECAST_PANEL_ID, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, QuotaForecastPanelView)

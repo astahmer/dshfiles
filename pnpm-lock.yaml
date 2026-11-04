@@ -7157,6 +7157,9 @@ importers:
       '@dshfiles/ai-accounts':
         specifier: workspace:*
         version: link:../ai-accounts
+      '@dshfiles/command-palette':
+        specifier: workspace:*
+        version: link:../command-palette
       '@dshfiles/credential-port':
         specifier: workspace:*
         version: link:../credential-port

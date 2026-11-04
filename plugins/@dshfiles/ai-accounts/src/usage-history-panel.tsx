@@ -3,7 +3,7 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
-import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
@@ -22,6 +22,7 @@ import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { UsageOverviewModel } from './usage-overview-model.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
+import { QuotaViewFrame } from './quota-view-frame.js'
 
 const RANGE_OPTIONS = [1, 3, 7, 14, 30, 90, 180, 365] as const
 const INTERVAL_OPTIONS = Array.from({ length: 60 }, (_, index) => index + 1)
@@ -50,7 +51,7 @@ const formatForecast = (forecast: ReturnType<typeof QuotaHistoryAnalysis.forecas
   }
 }
 
-const CurrentQuota = (props: { accountId: string; usage: AccountsUsage | null }): JSX.Element => {
+export const CurrentQuota = (props: { accountId: string; usage: AccountsUsage | null }): JSX.Element => {
   const card = props.usage?.cards.find(value => value.instanceId === props.accountId)?.usage
   if (card === undefined) return <p className="dshx:text-xs dshx:text-muted-foreground">Current provider usage is not available for this account.</p>
   if (card.status !== 'ok') {
@@ -103,7 +104,7 @@ const HistoryCard = (props: { readonly heading: string; readonly description: st
   </Card>
 )
 
-const LabelledSelect = (props: {
+export const LabelledSelect = (props: {
   readonly label: string
   readonly ariaLabel?: string
   readonly value: string
@@ -133,12 +134,16 @@ const LabelledSelect = (props: {
   )
 }
 
-export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.Element => {
+/**
+ * Quota history for one account. `onBack` opens the accounts page; `embedded` draws it inside Observe › Usage › Quota
+ * (no back action, the Usage page owns the header), and `accountId` preselects an account there.
+ */
+export const UsageHistoryPanel = (props: { readonly onBack: () => void; readonly embedded?: boolean; readonly accountId?: string }): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
   const queryClient = useQueryClient()
   const { usageRefreshMs } = usePreferences()
   const { usage, refresh: refreshUsage } = useAccountsUsage()
-  const [chosenId, setChosenId] = useState('')
+  const [chosenId, setChosenId] = useState(props.accountId ?? '')
   const [days, setDays] = useState(7)
   const [notice, setNotice] = useState<string | null>(null)
   const [mountedAt] = useState(() => Date.now())
@@ -221,12 +226,12 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
   const resetCount = points.at(-1)?.bankedResets ?? 0
 
   return (
-    <Page
-      scroll
-      heading="Usage history"
+    <QuotaViewFrame
+      embedded={props.embedded === true}
+      heading={props.embedded === true ? 'Quota history' : 'Usage history'}
       description="Quota snapshots, observed depletion pace, and banked reset changes for each configured account."
       actions={[
-        { id: 'back', label: 'Accounts', icon: <ChevronLeftIcon aria-hidden />, onSelect: props.onBack },
+        ...(props.embedded === true ? [] : [{ id: 'back', label: 'Accounts', icon: <ChevronLeftIcon aria-hidden />, onSelect: props.onBack }]),
         {
           id: 'record',
           label: recordNow.isPending ? 'Recording…' : 'Record now',
@@ -415,6 +420,6 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
           </HistoryCard>
         </>
       )}
-    </Page>
+    </QuotaViewFrame>
   )
 }

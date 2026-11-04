@@ -1,15 +1,18 @@
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
-import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { AccountUsageView, type AccountUsageViewProps } from '@dshfiles/ai-accounts/account-usage-view'
+import { UsageNavigation, type UsageQuotaTarget } from '@dshfiles/ai-accounts/quota-views'
+import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { AccountUsageDashboard } from './account-usage-dashboard.js'
 import type { OpenThread } from './format.js'
-import { UsagePanel } from './panel.js'
+import { UsagePanel, UsageTabs } from './panel.js'
+import { UsageQuota } from './quota-tab.js'
 
 const PANEL_ID = 'dshfiles-usage'
 
@@ -30,7 +33,7 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 
 export default defineClient({
   name: '@dshfiles/usage',
-  inject: ['slots', 'sessions', 'uiWorkspace'],
+  inject: ['slots', 'sessions', 'uiWorkspace', 'layout'],
   setup(ctx, decorate, metadata) {
     const plugin = metadata?.plugin
     if (plugin !== undefined) {
@@ -40,6 +43,39 @@ export default defineClient({
         </PluginQueryProvider>
       )
       plugin.provide(AccountUsageView, { Dashboard: plugin.bind(Dashboard) })
+      // Observe › Usage › Quota is where ai-accounts' quota views live now (plans/ade-ux §6); its old entry points and
+      // saved tabs open it through this contract.
+      const openQuota = (target?: UsageQuotaTarget): void => {
+        UsageQuota.go(target)
+        UsageTabs.show('quota')
+        // SAFETY: PANEL_ID is registered as a main-panel slot below.
+        ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+      }
+      plugin.provide(UsageNavigation, { openQuota })
+      // The former pages keep their names in the palette and land on their view.
+      const quotaRows = [
+        { id: 'quota', label: 'Observe › Usage › Quota', aliases: ['Quota', 'Account quota', 'Account usage'], target: { view: 'accounts' } },
+        {
+          id: 'quota-history',
+          label: 'Observe › Usage › Quota history',
+          aliases: ['Usage history', 'Quota history'],
+          target: { view: 'history' },
+        },
+        {
+          id: 'quota-forecast',
+          label: 'Observe › Usage › Quota forecast',
+          aliases: ['Quota forecast'],
+          target: { view: 'forecast' },
+        },
+      ] as const satisfies readonly { id: string; label: string; aliases: readonly string[]; target: UsageQuotaTarget }[]
+      for (const row of quotaRows)
+        plugin.add(PaletteActions, {
+          id: `@dshfiles/usage/${row.id}`,
+          group: 'destination',
+          label: row.label,
+          aliases: row.aliases,
+          run: () => openQuota(row.target),
+        })
     }
     /**
      * Open the thread a request belongs to. A subagent's own session is not

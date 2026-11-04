@@ -36,6 +36,10 @@
       "types": "./src/account-usage-view.tsx",
       "default": "./dist/account-usage-view.js"
     },
+    "./quota-views": {
+      "types": "./src/quota-views.tsx",
+      "default": "./dist/quota-views.js"
+    },
     "./model-fast-mode-api": {
       "types": "./src/model-fast-mode-api.ts",
       "default": "./dist/model-fast-mode-api.js"

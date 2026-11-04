@@ -1,5 +1,5 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { ChevronLeftIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery } from '@dshfiles/plugin-ui/query'
@@ -15,6 +15,7 @@ import { QuotaPaceModel } from './quota-pace-model.js'
 import { QuotaForecastModel } from './quota-forecast-model.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
+import { QuotaViewFrame } from './quota-view-frame.js'
 
 type View = 'forecast' | 'pace' | 'table' | 'coverage' | 'handoff'
 
@@ -25,7 +26,7 @@ type View = 'forecast' | 'pace' | 'table' | 'coverage' | 'handoff'
  * read the stored quota snapshots, so the forecast needs the collector to have
  * run for a while before it says anything.
  */
-export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.Element => {
+export const QuotaForecastPanel = (props: { readonly onBack: () => void; readonly embedded?: boolean }): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
   const { usageRefreshMs, workHours } = usePreferences()
   const { usage, refresh, refreshing } = useAccountsUsage()
@@ -74,12 +75,12 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.
   ]
 
   return (
-    <Page
-      scroll
+    <QuotaViewFrame
+      embedded={props.embedded === true}
       heading={headline.title}
       description={headline.subtitle}
       actions={[
-        { id: 'back', label: 'Accounts', icon: <ChevronLeftIcon aria-hidden />, onSelect: props.onBack },
+        ...(props.embedded === true ? [] : [{ id: 'back', label: 'Accounts', icon: <ChevronLeftIcon aria-hidden />, onSelect: props.onBack }]),
         { id: 'refresh', label: 'Refresh', icon: <RefreshCwIcon aria-hidden />, pending: refreshing, onSelect: () => void refresh() },
       ]}
       tabs={{
@@ -110,6 +111,6 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.
       ) : (
         <HandoffBoardView.Board now={now} plans={plans} workHours={workHours} />
       )}
-    </Page>
+    </QuotaViewFrame>
   )
 }

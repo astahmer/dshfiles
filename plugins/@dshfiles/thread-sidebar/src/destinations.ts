@@ -75,9 +75,18 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
   { panelId: 'dshfiles-agents', destination: 'agents', label: 'Directory', description: 'Configured agents and their threads.', order: 1, formerLabels: ['Agents: Directory', 'Agents'] },
   { panelId: 'agent-communication', destination: 'agents', label: 'Messages', description: 'What agents sent each other.', order: 2, formerLabels: ['Agent Communication: Messages', 'Messages'] },
   { panelId: 'dshfiles-agent-toolkit', destination: 'agents', label: 'Capabilities', description: 'Tools, skills and MCP servers an agent can use.', order: 3, formerLabels: ['Agent Toolkit: Capabilities'] },
-  { panelId: 'dshfiles-usage', destination: 'observe', label: 'Usage', description: 'Cost, tokens and requests.', order: 1, formerLabels: ['Usage: Analytics'] },
-  { panelId: 'ai-accounts-usage', destination: 'observe', label: 'Quota history', description: 'Account quota over time.', order: 2, formerLabels: ['AI Accounts: Usage history'] },
-  { panelId: 'ai-accounts-forecast', destination: 'observe', label: 'Quota forecast', description: 'When each account runs out.', order: 3, formerLabels: ['AI Accounts: Quota forecast'] },
+  // Phase 5: one Usage page (Cost · Quota · Requests · Tools); quota history and forecast are views of its Quota tab.
+  {
+    panelId: 'dshfiles-usage',
+    destination: 'observe',
+    label: 'Usage',
+    description: 'Cost, quota, requests and tools.',
+    order: 1,
+    formerLabels: ['Usage: Analytics', 'AI Accounts: Usage history', 'AI Accounts: Quota forecast', 'Quota history', 'Quota forecast'],
+  },
+  // Listed only in compositions without @dshfiles/usage, where ai-accounts keeps these pages of its own.
+  { panelId: 'ai-accounts-usage', destination: 'observe', label: 'Quota history', description: 'Account quota over time.', order: 2 },
+  { panelId: 'ai-accounts-forecast', destination: 'observe', label: 'Quota forecast', description: 'When each account runs out.', order: 3 },
   { panelId: 'activity-timeline', destination: 'observe', label: 'Activity', description: 'What happened, thread by thread.', order: 4, formerLabels: ['Activity Timeline: Activity'] },
   { panelId: 'traces', destination: 'observe', label: 'Traces', description: 'Spans, logs, metrics and alerts.', order: 5, formerLabels: ['Traces: Explorer'] },
   { panelId: 'dshfiles-background-jobs', destination: 'observe', label: 'Jobs', description: 'Background jobs on this host.', order: 6, formerLabels: ['Background Jobs: Jobs'] },

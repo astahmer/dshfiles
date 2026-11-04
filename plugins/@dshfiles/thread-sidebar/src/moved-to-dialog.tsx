@@ -2,6 +2,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { useSyncExternalStore } from 'react'
 import { DESTINATIONS, KNOWN_SECTIONS, type DestinationId, type DestinationPanel } from './destinations.js'
+import { FORMER_NAVIGATION } from './moved-to.generated.js'
 
 export interface MovedEntry {
   /** What the left-nav entry was called. */
@@ -20,19 +21,21 @@ const destinationLabel = (id: DestinationId): string => DESTINATIONS.find(destin
  * One row per re-homed page, under the name users knew longest. The migration map's list of former entries
  * (`FORMER_NAVIGATION`) is what the sections must cover; the destinations test pins that.
  */
+const formerEntries = new Set(FORMER_NAVIGATION.map(former => former.entry))
+
+/** A section that absorbed several former pages (Usage took Quota history and forecast) lists a row for each. */
 const entries = (panels: readonly DestinationPanel[]): readonly MovedEntry[] =>
   KNOWN_SECTIONS.flatMap(section => {
-    const entry = section.formerLabels?.[0]
-    if (entry === undefined) return []
-    return [
+    const named = (section.formerLabels ?? []).filter((label, index) => index === 0 || formerEntries.has(label))
+    return named.map(entry => (
       {
         entry,
         location: `${destinationLabel(section.destination)} › ${section.label}`,
         destination: section.destination,
         panelId: section.panelId,
         available: panels.some(panel => panel.id === section.panelId),
-      },
-    ]
+      }
+    ))
   }).sort((left, right) => left.entry.localeCompare(right.entry))
 
 let open = false
@@ -80,7 +83,7 @@ export const MovedToDialog = (props: {
                       <Button
                         size="sm"
                         variant="ghost"
-                        aria-label={`Open ${row.location}`}
+                        aria-label={`Open ${row.entry} in ${row.location}`}
                         onClick={() => {
                           setOpen(false)
                           props.openEntry(row)

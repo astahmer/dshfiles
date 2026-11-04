@@ -56,6 +56,7 @@
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__ai-accounts.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__chat.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__command-palette.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__frame-layout.sha256",
@@ -75,6 +76,8 @@
         "$TURBO_ROOT$/plugins/@dshfiles/ai-accounts/src/inert-codex-login.fixture.ts",
         "$TURBO_ROOT$/plugins/@dshfiles/chat/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/chat/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/command-palette/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/command-palette/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/frame-layout/cordis.patch.yml",
@@ -128,6 +131,7 @@
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__ai-accounts.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__chat.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__command-palette.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__frame-layout.sha256",
@@ -147,6 +151,8 @@
         "$TURBO_ROOT$/plugins/@dshfiles/ai-accounts/src/inert-codex-login.fixture.ts",
         "$TURBO_ROOT$/plugins/@dshfiles/chat/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/chat/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/command-palette/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/command-palette/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/frame-layout/cordis.patch.yml",

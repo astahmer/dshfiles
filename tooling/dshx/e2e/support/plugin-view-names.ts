@@ -34,8 +34,9 @@ const withoutPluginPrefix = (label: string): string => {
  */
 export const viewNames = (fixtureName: string): readonly string[] => {
   const qualified = reusableViewName(fixtureName)
+  const sections = (alternatives.get(qualified) ?? []).map(location => location.section)
   const section = railLocations.get(qualified)?.section
-  return [...new Set([qualified, withoutPluginPrefix(qualified), ...(section === undefined ? [] : [section])])]
+  return [...new Set([qualified, withoutPluginPrefix(qualified), ...(section === undefined ? [] : [section]), ...sections])]
 }
 
 /** An exact-name pattern for a view, optionally inside an accessible name such as `Close <view>`. */
@@ -80,8 +81,6 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   ['Agent Communication: Messages', { destination: 'Agents', section: 'Messages' }],
   ['Agent Toolkit: Capabilities', { destination: 'Agents', section: 'Capabilities' }],
   ['Usage: Analytics', { destination: 'Observe', section: 'Usage' }],
-  ['AI Accounts: Usage history', { destination: 'Observe', section: 'Quota history' }],
-  ['AI Accounts: Quota forecast', { destination: 'Observe', section: 'Quota forecast' }],
   ['Activity Timeline: Activity', { destination: 'Observe', section: 'Activity' }],
   ['Traces: Explorer', { destination: 'Observe', section: 'Traces' }],
   ['Background Jobs: Jobs', { destination: 'Observe', section: 'Jobs' }],
@@ -106,14 +105,75 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   ['Source control', { destination: 'Land', section: 'Source control' }],
 ])
 
+/**
+ * Pages merged into another page in Phase 5 (plans/ade-ux §6): Usage took Quota history and forecast as views of its
+ * Quota tab. Each lists where the page is when the merged page's owner runs, then where it stays without it
+ * (compositions that leave usage out keep the standalone page).
+ */
+interface RailLocation {
+  readonly destination: string
+  readonly section: string
+  /** A Page tab of the section's page. */
+  readonly tab?: string
+  /** A segmented view inside that tab. */
+  readonly view?: string
+}
+
+const alternatives = new Map<string, readonly RailLocation[]>([
+  [
+    'AI Accounts: Usage history',
+    [
+      { destination: 'Observe', section: 'Usage', tab: 'Quota', view: 'History' },
+      { destination: 'Observe', section: 'Quota history' },
+    ],
+  ],
+  [
+    'AI Accounts: Quota forecast',
+    [
+      { destination: 'Observe', section: 'Usage', tab: 'Quota', view: 'Forecast' },
+      { destination: 'Observe', section: 'Quota forecast' },
+    ],
+  ],
+])
+
 const destinationTabs = (page: Page): Locator => page.getByRole('tablist', { name: 'Destinations', exact: true })
+
+const sectionButton = (page: Page, location: RailLocation): Locator =>
+  page.getByRole('navigation', { name: `${location.destination} pages`, exact: true }).getByRole('button', { name: location.section, exact: true })
+
+/** Open a merged page's location: the first candidate whose section is listed, then its tab and view when present. */
+const openAlternative = async (page: Page, candidates: readonly RailLocation[]): Promise<void> => {
+  const first = candidates[0]
+  if (first === undefined) return
+  await destinationTabs(page).getByRole('tab', { name: first.destination, exact: true }).click()
+  const any = candidates.map(candidate => sectionButton(page, candidate)).reduce((left, right) => left.or(right))
+  await any.first().waitFor({ state: 'visible' })
+  for (const candidate of candidates) {
+    const button = sectionButton(page, candidate)
+    if (!(await button.isVisible())) continue
+    await button.click()
+    if (candidate.tab !== undefined) {
+      const tab = page.getByRole('tab', { name: candidate.tab, exact: true })
+      if (
+        await tab
+          .first()
+          .isVisible()
+          .catch(() => false)
+      )
+        await tab.first().click()
+    }
+    if (candidate.view !== undefined) await page.getByRole('radio', { name: candidate.view, exact: true }).click()
+    return
+  }
+}
 
 /**
  * Where a former left-nav page starts: its rail destination tab in the fixed layout, else its docked or native link.
  * Use it to assert navigation is available without opening the page.
  */
 export const globalPanelEntryPoint = (page: Page, fixtureName: string): Locator => {
-  const rail = railLocations.get(reusableViewName(fixtureName))
+  const merged = alternatives.get(reusableViewName(fixtureName))?.[0]
+  const rail = merged ?? railLocations.get(reusableViewName(fixtureName))
   const link = globalPanelLink(page, fixtureName)
   return rail === undefined ? link : destinationTabs(page).getByRole('tab', { name: rail.destination, exact: true }).or(link).first()
 }
@@ -123,8 +183,15 @@ export const globalPanelEntryPoint = (page: Page, fixtureName: string): Locator 
  * is shown, else the docked or native link.
  */
 export const globalPanelEntry = (page: Page, fixtureName: string): Locator => {
-  const rail = railLocations.get(reusableViewName(fixtureName))
+  const merged = alternatives.get(reusableViewName(fixtureName))
   const link = globalPanelLink(page, fixtureName)
+  if (merged !== undefined)
+    return merged
+      .map(candidate => sectionButton(page, candidate))
+      .reduce((left, right) => left.or(right))
+      .or(link)
+      .first()
+  const rail = railLocations.get(reusableViewName(fixtureName))
   if (rail === undefined) return link
   return page
     .getByRole('navigation', { name: `${rail.destination} pages`, exact: true })
@@ -135,7 +202,8 @@ export const globalPanelEntry = (page: Page, fixtureName: string): Locator => {
 
 /** Whether openGlobalPanel can reach this page right now (rail or link), without opening it. */
 export const canOpenGlobalPanel = async (page: Page, fixtureName: string): Promise<boolean> =>
-  (railLocations.has(reusableViewName(fixtureName)) && (await destinationTabs(page).isVisible())) || (await globalPanelLink(page, fixtureName).isVisible())
+  ((railLocations.has(reusableViewName(fixtureName)) || alternatives.has(reusableViewName(fixtureName))) && (await destinationTabs(page).isVisible())) ||
+  (await globalPanelLink(page, fixtureName).isVisible())
 
 /**
  * Opens a sidebar destination as a user would: through the rail when the fixed layout shows it, else its icon when
@@ -143,6 +211,11 @@ export const canOpenGlobalPanel = async (page: Page, fixtureName: string): Promi
  * moved out of the row.
  */
 export const openGlobalPanel = async (page: Page, fixtureName: string): Promise<void> => {
+  const merged = alternatives.get(reusableViewName(fixtureName))
+  if (merged !== undefined && (await destinationTabs(page).isVisible())) {
+    await openAlternative(page, merged)
+    return
+  }
   const rail = railLocations.get(reusableViewName(fixtureName))
   if (rail !== undefined && (await destinationTabs(page).isVisible())) {
     await destinationTabs(page).getByRole('tab', { name: rail.destination, exact: true }).click()

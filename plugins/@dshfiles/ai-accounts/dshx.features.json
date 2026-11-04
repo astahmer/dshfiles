@@ -424,7 +424,7 @@
         }
       ],
       "title": "Manage account Models, Settings and Usage",
-      "summary": "Reference-faithful account rail and tabbed detail with inline rename, observed connection state, model reasoning/visibility/inheritance, same-provider priority, confirmed scoped sign-out, and real exact-account request analytics.",
+      "summary": "Reference-faithful account rail and tabbed detail with inline rename, observed connection state, model reasoning/visibility/inheritance, same-provider priority, confirmed scoped sign-out, and real exact-account request analytics. While @dshfiles/usage runs, the account Usage tab is an alias of Observe › Usage › Quota › Accounts for that account (selecting it opens Usage there); account management itself stays in Settings.",
       "reach": [
         "seed tool-call-thread",
         "click tab \"Settings\"",
@@ -907,7 +907,7 @@
     {
       "id": "usage-history-and-pricing",
       "title": "Review usage history and cost forecasts",
-      "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, apply explicit price overrides, and estimate composer and completed-turn costs without persisting provider response payloads.",
+      "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, apply explicit price overrides, and estimate composer and completed-turn costs without persisting provider response payloads. The history view is Observe › Usage › Quota › History while @dshfiles/usage runs (ai-accounts provides it through the `quota-views` contract, and saved tabs of the former Usage history page redirect there); without usage it stays the AI Accounts: Usage history page.",
       "surfaces": [
         "client",
         "host",
@@ -1005,17 +1005,25 @@
           "kind": "automatic",
           "source": "api-dispatch"
         }
+      ],
+      "reach": [
+        "click tab \"Observe\"",
+        "click button \"Usage\"",
+        "click tab \"Quota\"",
+        "click radio \"History\"",
+        "expect text \"Quota history\""
       ]
     },
     {
       "id": "quota-forecast",
       "title": "Forecast when each account runs out, whether a kind kept an account free, and the order to use them in",
-      "summary": "The AI Accounts: Quota forecast view projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace. Hand-off plans the coming week per kind: each hour goes to the free account that resets soonest, showing when to hand off and when the kind runs dry. Pace overlays every account's current window on one start-to-reset axis against even pace, with past windows for the selected account.",
+      "summary": "Observe › Usage › Quota › Forecast (the former AI Accounts: Quota forecast page, still its own page when @dshfiles/usage is not loaded) projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace. Hand-off plans the coming week per kind: each hour goes to the free account that resets soonest, showing when to hand off and when the kind runs dry. Pace overlays every account's current window on one start-to-reset axis against even pace, with past windows for the selected account.",
       "reach": [
         "click tab \"Observe\"",
-        "click button \"Quota forecast\"",
-        "expect tab \"Forecast\"",
-        "click tab \"Hand-off\"",
+        "click button \"Usage\"",
+        "click tab \"Quota\"",
+        "click radio \"Forecast\"",
+        "click radio \"Hand-off\"",
         "expect text \"Enable an account with quota to see where it is heading.\""
       ],
       "surfaces": [

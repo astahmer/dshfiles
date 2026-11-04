@@ -10,6 +10,7 @@ import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { nativeProviderStatus } from './native-providers-list.js'
 import type { AccountSection } from './account-connection-status.js'
 import { AccountUsageSlot } from './account-usage-view.js'
+import { UsageMovedNotice, useUsageRedirect } from './usage-redirect.js'
 
 export const NativeProviderDetail = (props: {
   readonly entryId: string
@@ -22,6 +23,10 @@ export const NativeProviderDetail = (props: {
   const query = useQuery(aiAccountsQueries.nativeProviders(api))
   const provider = query.data?.providers.find(row => row.entryId === props.entryId)
   const [route, setRoute] = useState<string | null>(null)
+  const firstRoute = provider === undefined ? undefined : route !== null && provider.routes.includes(route) ? route : provider.routes[0]
+  const usageRedirect = useUsageRedirect(
+    firstRoute === undefined || provider === undefined ? undefined : { accountId: firstRoute, displayName: provider.label },
+  )
   const toggle = useMutation({
     mutationFn: (enabled: boolean) => api.setNativeProviderEnabled({ entryId: props.entryId, enabled }),
     onSuccess: next => client.setQueryData(aiAccountsKeys.nativeProviders, next),
@@ -54,6 +59,7 @@ export const NativeProviderDetail = (props: {
       </header>
       <Tabs
         onValueChange={value => {
+          if (value === 'usage' && usageRedirect.open()) return
           if (value === 'models' || value === 'settings' || value === 'usage') props.onSectionChange(value)
         }}
         value={props.section}
@@ -96,7 +102,9 @@ export const NativeProviderDetail = (props: {
           </p>
         </TabsContent>
         <TabsContent className="dshx:min-w-0 dshx:border-t dshx:p-4" value="usage">
-          {provider.routes.length > 1 ? (
+          {usageRedirect.active ? (
+            <UsageMovedNotice onOpen={usageRedirect.open} />
+          ) : provider.routes.length > 1 ? (
             <div className="dshx:mb-4">
               <Combobox
                 label="Provider route"
@@ -106,7 +114,7 @@ export const NativeProviderDetail = (props: {
               />
             </div>
           ) : null}
-          {activeRoute === undefined ? (
+          {usageRedirect.active ? null : activeRoute === undefined ? (
             <p className="dshx:text-sm dshx:text-muted-foreground">Usage cannot be attributed without a provider route.</p>
           ) : (
             <AccountUsageSlot accountId={activeRoute} displayName={provider.label} onOpenUsageHistory={props.onOpenUsageHistory} />
