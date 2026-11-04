@@ -119,7 +119,7 @@ Automated verification uses fake CLI/device responses and a loopback provider. I
 | Kind           | Login                                                                                                                                                    | Model route | Quota                                                                                                                       |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Codex          | **Continue with Codex** in quick setup (official CLI device approval); existing CLI login remains supported                                              | yes         | 5-hour and weekly windows, banked resets                                                                                    |
-| Claude         | `claude auth login` under the account's `CLAUDE_CONFIG_DIR`; an optional `claude setup-token` in DSH credentials or the Host environment serves requests | yes         | 5-hour, weekly, weekly Opus/Sonnet (`/api/oauth/usage`)                                                                     |
+| Claude         | `claude auth login` under the account's `CLAUDE_CONFIG_DIR`; an optional `claude setup-token` in DSH credentials or the Host environment serves requests | yes         | 5-hour, weekly, weekly Opus/Sonnet, extra usage spend vs monthly cap (`/api/oauth/usage`)                                   |
 | OpenCode Go    | key in DSH credentials or the Host environment                                                                                                           | yes         | rolling, weekly and monthly windows                                                                                         |
 | Command Code   | key in DSH credentials or the Host environment, or `cmd login`                                                                                           | yes         | 5-hour and weekly window limits (`/alpha/billing/credits`)                                                                  |
 | GitHub Copilot | GitHub device-code OAuth; grant and refresh token stay in DSH credentials                                                                                | yes         | premium requests and chat, from GitHub's internal `copilot_internal/user` (what GitHub's Copilot clients read; best effort) |
@@ -132,7 +132,27 @@ through pi-ai and offers the Copilot models returned for that subscription.
 
 The plugin reads Claude Code's login but never refreshes it. When that token
 expires, run Claude Code once on the account. Quota needs the interactive
-login, because a setup token cannot read usage. Cursor publishes no usage API,
+login, because a setup token cannot read usage.
+
+### Claude extra usage
+
+![Claude extra usage under the plan windows](docs/screenshots/claude-extra-usage.png)
+
+When Claude reports `extra_usage`, the Claude card shows an **Extra usage** meter
+under its plan windows: what pay-as-you-go spend used this month against the
+monthly cap (for example `$12.34 of $50.00`), the percent of the cap, and the
+reset date when Anthropic reports one (it currently does not, so the card says
+"monthly, no reset date reported"). Amounts arrive in cents and are shown in the
+reported currency (USD when none). A reached cap says to raise it in Claude
+settings → Usage; a disabled one shows **Extra usage off**. Enterprise
+spend-only accounts with no plan windows show only this meter instead of
+"Quota unavailable". An absent or malformed block is ignored and the plan
+windows still show. The same `extraUsage` object (`enabled`, `used`,
+`monthlyLimit`, `currency`, `percentUsed`, `resetsAt`) is in the
+`ai_accounts_quota` agent tool output and in each recorded quota history point
+(`ai_accounts_history`).
+
+Cursor publishes no usage API,
 so the plugin reads the dashboard's own endpoint. If Cursor changes that
 endpoint, the card reports "unsupported" instead of a guessed number.
 
