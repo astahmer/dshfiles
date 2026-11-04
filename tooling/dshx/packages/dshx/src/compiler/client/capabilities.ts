@@ -45,24 +45,14 @@ interface ClientDefinitionSourceAnalysis extends ClientSetupServiceAnalysis {
   readonly reexports: readonly string[]
 }
 
-async function sourceFile(specifier: string, importer: string): Promise<string | undefined> {
+/** Candidate source paths for a relative import, in the order the bundler would try them. */
+const sourceCandidates = (specifier: string, importer: string): readonly string[] => {
   const target = resolve(importer, '..', specifier)
   const extension = extname(target)
-  if (extension !== '' && !SOURCE_EXTENSIONS.some(candidate => candidate === extension)) return undefined
-  if (extension !== '' && !SOURCE_EXTENSIONS.some(item => item === extension)) return undefined
-  const candidates =
-    extension === ''
-      ? [...SOURCE_EXTENSIONS.map(item => `${target}${item}`), ...SOURCE_EXTENSIONS.map(item => resolve(target, `index${item}`))]
-      : [target, ...(extension === '.js' ? SOURCE_EXTENSIONS.slice(0, 3).map(item => `${target.slice(0, -3)}${item}`) : [])]
-  for (const candidate of candidates) {
-    try {
-      await readFile(candidate, 'utf8')
-      return candidate
-    } catch {
-      // Try the next TypeScript/JavaScript source form.
-    }
-  }
-  return undefined
+  if (extension !== '' && !SOURCE_EXTENSIONS.some(candidate => candidate === extension)) return []
+  return extension === ''
+    ? [...SOURCE_EXTENSIONS.map(item => `${target}${item}`), ...SOURCE_EXTENSIONS.map(item => resolve(target, `index${item}`))]
+    : [target, ...(extension === '.js' ? SOURCE_EXTENSIONS.slice(0, 3).map(item => `${target.slice(0, -3)}${item}`) : [])]
 }
 
 const nameOf = (property: ObjectProperty): string | undefined =>
@@ -147,8 +137,69 @@ const sourceBindings = ({ source, file }: { source: string; file: string }) => {
   return { program, named, namespaces, initializers, imports, reexports, unknownReexport, defaultExpression, importedName, resolveExpression, resolveFunction }
 }
 
-const sourceCapabilities = (source: string, file: string): SourceCapabilityAnalysis => {
-  const bindings = sourceBindings({ source, file })
+type SourceBindings = ReturnType<typeof sourceBindings>
+
+/**
+ * One build generation's view of the client sources: each file is read once, parsed once and its capability walk runs
+ * once, however many capability questions the generation asks. Create one per `buildClient`, per watch rebuild and per
+ * `dshx check`; never keep one across generations, because it does not watch the files it read.
+ */
+export class ClientAnalysisSession {
+  readonly #sources = new Map<string, Promise<string | undefined>>()
+  readonly #resolved = new Map<string, Promise<string | undefined>>()
+  readonly #bindings = new Map<string, SourceBindings>()
+  readonly #capabilities = new Map<string, SourceCapabilityAnalysis>()
+  /** Actual file reads and parses, for tests and build phase reports. */
+  readonly counts = { reads: 0, parses: 0 }
+
+  source(file: string): Promise<string | undefined> {
+    let pending = this.#sources.get(file)
+    if (pending === undefined) {
+      this.counts.reads += 1
+      pending = readFile(file, 'utf8').catch(() => undefined)
+      this.#sources.set(file, pending)
+    }
+    return pending
+  }
+
+  /** The first candidate that reads; its bytes stay in the session for the traversal that follows. */
+  resolve(specifier: string, importer: string): Promise<string | undefined> {
+    const key = `${importer}\0${specifier}`
+    let pending = this.#resolved.get(key)
+    if (pending === undefined) {
+      pending = (async () => {
+        for (const candidate of sourceCandidates(specifier, importer)) if ((await this.source(candidate)) !== undefined) return candidate
+        return undefined
+      })()
+      this.#resolved.set(key, pending)
+    }
+    return pending
+  }
+
+  async bindings(file: string): Promise<SourceBindings | undefined> {
+    const cached = this.#bindings.get(file)
+    if (cached !== undefined) return cached
+    const source = await this.source(file)
+    if (source === undefined) return undefined
+    this.counts.parses += 1
+    const bindings = sourceBindings({ source, file })
+    this.#bindings.set(file, bindings)
+    return bindings
+  }
+
+  async capabilities(file: string): Promise<SourceCapabilityAnalysis | undefined> {
+    const cached = this.#capabilities.get(file)
+    if (cached !== undefined) return cached
+    const bindings = await this.bindings(file)
+    if (bindings === undefined) return undefined
+    const analysis = sourceCapabilities(bindings)
+    this.#capabilities.set(file, analysis)
+    return analysis
+  }
+}
+
+/** Settings and API hook use in one walk, so both questions share it. */
+const sourceCapabilities = (bindings: SourceBindings): SourceCapabilityAnalysis => {
   let settings = false
   let api = false
   SourceSyntax.visit({
@@ -165,8 +216,7 @@ const sourceCapabilities = (source: string, file: string): SourceCapabilityAnaly
   return { settings, api, imports: bindings.imports }
 }
 
-const declarativeClientDefinition = (source: string, file: string, field: 'conversations' | 'locales'): ConversationDefinitionAnalysis => {
-  const bindings = sourceBindings({ source, file })
+const declarativeClientDefinition = (bindings: SourceBindings, field: 'conversations' | 'locales'): ConversationDefinitionAnalysis => {
   const inspect = (input: Expression, seen = new Set<string>()): boolean => {
     const expression = SourceSyntax.unwrapExpression(input)
     if (expression.type === 'Identifier') {
@@ -206,22 +256,20 @@ const destructuresService = (parameter: ParamPattern, service: string): boolean 
   return parameter.properties.some(property => property.type === 'Property' && SourceSyntax.propertyName(property.key) === service)
 }
 
-const functionUsesSetupService = ({
-  program,
-  declaration,
-  service,
-}: {
-  program: Program
-  declaration: SetupFunction
-  service: keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES
-}): boolean => {
+type SetupService = keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES
+// SAFETY: Object.keys of this module-level const map yields exactly its declared keys.
+const SETUP_SERVICES = Object.keys(CLIENT_SETUP_SERVICE_CAPABILITIES) as SetupService[]
+const isSetupService = (name: unknown): name is SetupService => typeof name === 'string' && Object.hasOwn(CLIENT_SETUP_SERVICE_CAPABILITIES, name)
+
+/** Every setup service the function reads from its context parameter, found in one walk of the program. */
+const setupServicesUsed = ({ program, declaration }: { program: Program; declaration: SetupFunction }): ReadonlySet<SetupService> => {
+  const used = new Set<SetupService>()
   const parameter = declaration.params[0]
-  if (parameter === undefined) return false
-  if (destructuresService(parameter, service)) return true
-  if (parameter.type !== 'Identifier') return false
+  if (parameter === undefined) return used
+  for (const service of SETUP_SERVICES) if (destructuresService(parameter, service)) used.add(service)
+  if (parameter.type !== 'Identifier') return used
   const contextName = parameter.name
   const activeScopes: boolean[] = []
-  let used = false
   const enter = (node: SetupFunction): void => {
     if (node === declaration) {
       activeScopes.push(true)
@@ -243,24 +291,21 @@ const functionUsesSetupService = ({
       'ArrowFunctionExpression:exit': leave,
       MemberExpression(node) {
         if (!activeScopes.at(-1) || node.object.type !== 'Identifier' || node.object.name !== contextName) return
-        if (
-          (!node.computed && SourceSyntax.propertyName(node.property) === service) ||
-          (node.computed && node.property.type === 'Literal' && node.property.value === service)
-        )
-          used = true
+        const name = node.computed ? (node.property.type === 'Literal' ? node.property.value : undefined) : SourceSyntax.propertyName(node.property)
+        if (isSetupService(name)) used.add(name)
       },
       VariableDeclarator(node) {
         if (!activeScopes.at(-1) || node.init === null) return
         const initializer = SourceSyntax.unwrapExpression(node.init)
-        if (initializer.type === 'Identifier' && initializer.name === contextName && destructuresService(node.id, service)) used = true
+        if (initializer.type !== 'Identifier' || initializer.name !== contextName) return
+        for (const service of SETUP_SERVICES) if (destructuresService(node.id, service)) used.add(service)
       },
     },
   })
   return used
 }
 
-const clientSetupServicesInSource = (source: string, file: string): ClientDefinitionSourceAnalysis => {
-  const bindings = sourceBindings({ source, file })
+const clientSetupServicesInSource = (bindings: SourceBindings, file: string): ClientDefinitionSourceAnalysis => {
   const absent = {
     services: [],
     inject: undefined,
@@ -324,10 +369,8 @@ const clientSetupServicesInSource = (source: string, file: string): ClientDefini
   }
   const setupProperty = propertyAt('setup')
   const setup = setupProperty === undefined ? undefined : bindings.resolveFunction(setupProperty.value)
-  // SAFETY: Object.keys of this module-level const map yields exactly its declared keys.
-  const services = (Object.keys(CLIENT_SETUP_SERVICE_CAPABILITIES) as Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES>).filter(
-    service => setup !== undefined && functionUsesSetupService({ program: bindings.program, declaration: setup, service }),
-  )
+  const used = setup === undefined ? new Set<SetupService>() : setupServicesUsed({ program: bindings.program, declaration: setup })
+  const services = SETUP_SERVICES.filter(service => used.has(service))
   const runtimeInject = setup !== undefined && inject?.length === 0 ? CLIENT_DEFAULT_SERVICES : []
   const result: ClientDefinitionSourceAnalysis = {
     services,
@@ -342,127 +385,90 @@ const clientSetupServicesInSource = (source: string, file: string): ClientDefini
   return result
 }
 
-/** Conservative source-level capability preview; the post-tree-shake build check is authoritative. */
-const clientUsesSettings = async (entry: string, root: string): Promise<boolean> => {
+/**
+ * Walk the relative import graph (or only default re-exports) from the entry until `visit` answers. Each file is read
+ * and parsed at most once per session.
+ */
+const walk = async <Answer>(
+  session: ClientAnalysisSession,
+  entry: string,
+  root: string,
+  visit: (file: string) => Promise<{ readonly answer: Answer | undefined; readonly next: readonly string[] } | undefined>,
+): Promise<Answer | undefined> => {
   const pending = [resolve(root, entry)]
   const visited = new Set<string>()
   while (pending.length > 0) {
     const file = pending.pop()
     if (file === undefined || visited.has(file)) continue
     visited.add(file)
-    let source: string
-    try {
-      source = await readFile(file, 'utf8')
-    } catch {
-      continue
-    }
-    const analysis = sourceCapabilities(source, file)
-    if (analysis.settings) return true
-    for (const request of analysis.imports) {
-      const target = await sourceFile(request, file)
+    const step = await visit(file)
+    if (step === undefined) continue
+    if (step.answer !== undefined) return step.answer
+    for (const request of step.next) {
+      const target = await session.resolve(request, file)
       if (target !== undefined && !visited.has(target)) pending.push(target)
     }
   }
-  return false
+  return undefined
+}
+
+const freshSession = (session: ClientAnalysisSession | undefined): ClientAnalysisSession => session ?? new ClientAnalysisSession()
+
+/** Conservative source-level capability preview; the post-tree-shake build check is authoritative. */
+const clientUsesSettings = async (entry: string, root: string, session?: ClientAnalysisSession): Promise<boolean> => {
+  const analyses = freshSession(session)
+  return (
+    (await walk(analyses, entry, root, async file => {
+      const analysis = await analyses.capabilities(file)
+      return analysis === undefined ? undefined : { answer: analysis.settings ? true : undefined, next: analysis.imports }
+    })) ?? false
+  )
 }
 
 /** Conservative source-level preview for retained API hook capability. */
-const clientUsesApi = async (entry: string, root: string): Promise<boolean> => {
-  const pending = [resolve(root, entry)]
-  const visited = new Set<string>()
-  while (pending.length > 0) {
-    const file = pending.pop()
-    if (file === undefined || visited.has(file)) continue
-    visited.add(file)
-    let source: string
-    try {
-      source = await readFile(file, 'utf8')
-    } catch {
-      continue
-    }
-    const analysis = sourceCapabilities(source, file)
-    if (analysis.api) return true
-    for (const request of analysis.imports) {
-      const target = await sourceFile(request, file)
-      if (target !== undefined && !visited.has(target)) pending.push(target)
-    }
-  }
-  return false
+const clientUsesApi = async (entry: string, root: string, session?: ClientAnalysisSession): Promise<boolean> => {
+  const analyses = freshSession(session)
+  return (
+    (await walk(analyses, entry, root, async file => {
+      const analysis = await analyses.capabilities(file)
+      return analysis === undefined ? undefined : { answer: analysis.api ? true : undefined, next: analysis.imports }
+    })) ?? false
+  )
+}
+
+const usesDeclarativeField = async (field: 'conversations' | 'locales', entry: string, root: string, session?: ClientAnalysisSession): Promise<boolean> => {
+  const analyses = freshSession(session)
+  return (
+    (await walk(analyses, entry, root, async file => {
+      const bindings = await analyses.bindings(file)
+      if (bindings === undefined) return undefined
+      const analysis = declarativeClientDefinition(bindings, field)
+      return { answer: analysis.uses ? true : undefined, next: analysis.reexports }
+    })) ?? false
+  )
 }
 
 /** Conservative preview of an explicit defineClient({ conversations }) contribution. */
-const clientUsesConversationComponents = async (entry: string, root: string): Promise<boolean> => {
-  const pending = [resolve(root, entry)]
-  const visited = new Set<string>()
-  while (pending.length > 0) {
-    const file = pending.pop()
-    if (file === undefined || visited.has(file)) continue
-    visited.add(file)
-    let source: string
-    try {
-      source = await readFile(file, 'utf8')
-    } catch {
-      continue
-    }
-    const analysis = declarativeClientDefinition(source, file, 'conversations')
-    if (analysis.uses) return true
-    for (const request of analysis.reexports) {
-      const target = await sourceFile(request, file)
-      if (target !== undefined && !visited.has(target)) pending.push(target)
-    }
-  }
-  return false
-}
+const clientUsesConversationComponents = (entry: string, root: string, session?: ClientAnalysisSession): Promise<boolean> =>
+  usesDeclarativeField('conversations', entry, root, session)
 
 /** Conservative preview of an explicit defineClient({ locales }) contribution. */
-const clientUsesLocales = async (entry: string, root: string): Promise<boolean> => {
-  const pending = [resolve(root, entry)]
-  const visited = new Set<string>()
-  while (pending.length > 0) {
-    const file = pending.pop()
-    if (file === undefined || visited.has(file)) continue
-    visited.add(file)
-    let source: string
-    try {
-      source = await readFile(file, 'utf8')
-    } catch {
-      continue
-    }
-    const analysis = declarativeClientDefinition(source, file, 'locales')
-    if (analysis.uses) return true
-    for (const request of analysis.reexports) {
-      const target = await sourceFile(request, file)
-      if (target !== undefined && !visited.has(target)) pending.push(target)
-    }
-  }
-  return false
-}
+const clientUsesLocales = (entry: string, root: string, session?: ClientAnalysisSession): Promise<boolean> =>
+  usesDeclarativeField('locales', entry, root, session)
 
 /** Inspect direct optional Cordis-service use in defineClient({ setup(ctx) }). */
-const clientSetupServices = async (entry: string, root: string): Promise<ClientSetupServiceAnalysis> => {
-  const pending = [resolve(root, entry)]
-  const visited = new Set<string>()
-  while (pending.length > 0) {
-    const file = pending.pop()
-    if (file === undefined || visited.has(file)) continue
-    visited.add(file)
-    let source: string
-    try {
-      source = await readFile(file, 'utf8')
-    } catch {
-      continue
-    }
-    const analysis = clientSetupServicesInSource(source, file)
-    if (analysis.sourceFile !== undefined) return analysis
-    for (const request of analysis.reexports) {
-      const target = await sourceFile(request, file)
-      if (target !== undefined && !visited.has(target)) pending.push(target)
-    }
-  }
-  return { services: [], inject: undefined, autoInject: [], runtimeInject: [], localeNamespaces: undefined, sourceFile: undefined }
+const clientSetupServices = async (entry: string, root: string, session?: ClientAnalysisSession): Promise<ClientSetupServiceAnalysis> => {
+  const analyses = freshSession(session)
+  const found = await walk<ClientSetupServiceAnalysis>(analyses, entry, root, async file => {
+    const bindings = await analyses.bindings(file)
+    if (bindings === undefined) return undefined
+    const analysis = clientSetupServicesInSource(bindings, file)
+    return { answer: analysis.sourceFile === undefined ? undefined : analysis, next: analysis.reexports }
+  })
+  return found ?? { services: [], inject: undefined, autoInject: [], runtimeInject: [], localeNamespaces: undefined, sourceFile: undefined }
 }
 
-const localeNamespace = ({ expression, bindings }: { expression: Expression; bindings: ReturnType<typeof sourceBindings> }): string | undefined => {
+const localeNamespace = ({ expression, bindings }: { expression: Expression; bindings: SourceBindings }): string | undefined => {
   const call = bindings.resolveExpression(expression)
   if (call?.type !== 'CallExpression' || call.callee.type === 'Super') return undefined
   const factory = bindings.importedName(call.callee)
@@ -472,33 +478,25 @@ const localeNamespace = ({ expression, bindings }: { expression: Expression; bin
   return SourceSyntax.stringValue(bindings.resolveExpression(argument) ?? argument)
 }
 
-const clientLocaleNamespaces = async (entry: string, root: string): Promise<readonly string[] | undefined> => {
-  const analysis = await clientSetupServices(entry, root)
+const clientLocaleNamespaces = async (entry: string, root: string, session?: ClientAnalysisSession): Promise<readonly string[] | undefined> => {
+  const analyses = freshSession(session)
+  const analysis = await clientSetupServices(entry, root, analyses)
   if (analysis.localeNamespaces !== undefined) return analysis.localeNamespaces
-  const pending = [resolve(root, entry)]
-  const visited = new Set<string>()
-  while (pending.length > 0) {
-    const file = pending.pop()
-    if (file === undefined || visited.has(file)) continue
-    visited.add(file)
-    const source = await readFile(file, 'utf8').catch(() => undefined)
-    if (source === undefined) continue
-    const bindings = sourceBindings({ source, file })
+  return walk<readonly string[]>(analyses, entry, root, async file => {
+    const bindings = await analyses.bindings(file)
+    if (bindings === undefined) return undefined
     const claimed: string[] = []
     for (const initializer of bindings.initializers.values()) {
       const namespace = localeNamespace({ expression: initializer, bindings })
       if (namespace !== undefined) claimed.push(namespace)
     }
-    if (claimed.length > 0) return claimed
-    for (const request of bindings.imports) {
-      const target = await sourceFile(request, file)
-      if (target !== undefined && !visited.has(target)) pending.push(target)
-    }
-  }
-  return undefined
+    return { answer: claimed.length > 0 ? claimed : undefined, next: bindings.imports }
+  })
 }
 
 export class ClientCapabilityAnalysis {
+  /** A fresh read/parse cache for one build generation; pass it to every question that generation asks. */
+  static readonly session = (): ClientAnalysisSession => new ClientAnalysisSession()
   static readonly usesSettings = clientUsesSettings
   static readonly usesApi = clientUsesApi
   static readonly usesConversationComponents = clientUsesConversationComponents

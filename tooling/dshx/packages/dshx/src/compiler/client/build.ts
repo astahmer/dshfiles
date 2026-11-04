@@ -11,7 +11,7 @@ import { CompilerKernel } from '../kernel.js'
 import type { BuildReport, BuildWatcher, ViteExtensionOptions } from '../types.js'
 import { clientCssPlugin } from './css.js'
 import { SharedRuntime } from './shared-runtime.js'
-import { CLIENT_SDK_PROVIDERS, CLIENT_SETUP_SERVICE_CAPABILITIES, ClientCapabilityAnalysis } from './capabilities.js'
+import { CLIENT_SDK_PROVIDERS, CLIENT_SETUP_SERVICE_CAPABILITIES, ClientCapabilityAnalysis, type ClientAnalysisSession } from './capabilities.js'
 import { installedLocaleNamespaces } from './installed.js'
 import { LocaleNamespaceOwnershipModel } from './locale-ownership.js'
 import { profilePackages } from './profile-scan.js'
@@ -320,8 +320,12 @@ function clientCapabilitiesPlugin(options: BuildClientOptions): Plugin {
   }
 }
 
-async function validateConversationProviderEdges(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions): Promise<void> {
-  if (!(await ClientCapabilityAnalysis.usesConversationComponents(paths.entry, paths.root))) return
+async function validateConversationProviderEdges(
+  paths: Awaited<ReturnType<typeof resolveOptions>>,
+  options: BuildClientOptions,
+  session: ClientAnalysisSession,
+): Promise<void> {
+  if (!(await ClientCapabilityAnalysis.usesConversationComponents(paths.entry, paths.root, session))) return
   const missing = CONVERSATION_PROVIDER_PACKAGES.filter(packageName => !(options.inject ?? []).includes(packageName))
   if (missing.length === 0) return
   throw new DshxError('DSHX1203', 'Conversation components require the official Conversation UI package edge.', {
@@ -330,8 +334,12 @@ async function validateConversationProviderEdges(paths: Awaited<ReturnType<typeo
   })
 }
 
-async function validateLocaleProviderEdge(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions): Promise<void> {
-  if (!(await ClientCapabilityAnalysis.usesLocales(paths.entry, paths.root)) || (options.inject ?? []).includes(LOCALE_PROVIDER_PACKAGE)) return
+async function validateLocaleProviderEdge(
+  paths: Awaited<ReturnType<typeof resolveOptions>>,
+  options: BuildClientOptions,
+  session: ClientAnalysisSession,
+): Promise<void> {
+  if (!(await ClientCapabilityAnalysis.usesLocales(paths.entry, paths.root, session)) || (options.inject ?? []).includes(LOCALE_PROVIDER_PACKAGE)) return
   throw new DshxError('DSHX1203', 'defineLocale() contributions require the official Locale provider package edge.', {
     file: paths.entry,
     hint: `Add ${JSON.stringify(LOCALE_PROVIDER_PACKAGE)} to package.json dsh.client.inject, then rebuild.`,
@@ -426,8 +434,12 @@ async function validateSlotOccupancy(paths: Awaited<ReturnType<typeof resolveOpt
   )
 }
 
-async function validateSetupServiceEdges(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions): Promise<void> {
-  const analysis = await ClientCapabilityAnalysis.setupServices(paths.entry, paths.root)
+async function validateSetupServiceEdges(
+  paths: Awaited<ReturnType<typeof resolveOptions>>,
+  options: BuildClientOptions,
+  session: ClientAnalysisSession,
+): Promise<void> {
+  const analysis = await ClientCapabilityAnalysis.setupServices(paths.entry, paths.root, session)
   for (const capability of analysis.sdk?.uses ?? []) {
     if (!Object.hasOwn(CLIENT_SDK_PROVIDERS, capability))
       throw new DshxError('DSHX1205', `Unknown Client SDK capability ${JSON.stringify(capability)}.`, {
@@ -475,8 +487,9 @@ async function validateLocaleNamespaceOwnership(
   paths: Awaited<ReturnType<typeof resolveOptions>>,
   options: BuildClientOptions,
   siblings: ReadonlyMap<string, readonly string[]>,
+  session: ClientAnalysisSession,
 ): Promise<void> {
-  const claimed = await ClientCapabilityAnalysis.localeNamespaces(paths.entry, paths.root)
+  const claimed = await ClientCapabilityAnalysis.localeNamespaces(paths.entry, paths.root, session)
   if (claimed === undefined || claimed.length === 0) return
   const ownership = LocaleNamespaceOwnershipModel.build(options.packageId)
   for (const [packageId, namespaces] of siblings) LocaleNamespaceOwnershipModel.claim(ownership, packageId, namespaces)
@@ -506,9 +519,11 @@ function clientSetupServiceGuardPlugin(paths: Awaited<ReturnType<typeof resolveO
   return {
     name: 'dshx-client-setup-service-guard',
     async buildStart() {
-      await validateSetupServiceEdges(paths, options)
-      await validateLocaleProviderEdge(paths, options)
-      await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options))
+      // Every watch rebuild is a new generation: it reads the edited sources again.
+      const session = ClientCapabilityAnalysis.session()
+      await validateSetupServiceEdges(paths, options, session)
+      await validateLocaleProviderEdge(paths, options, session)
+      await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options), session)
     },
   }
 }
@@ -658,10 +673,11 @@ export async function watchClient(options: BuildClientOptions): Promise<BuildWat
   const paths = await resolveOptions(options)
   await validateSlotOccupancy(paths)
   await validateInjectPackages(paths, options)
-  await validateSetupServiceEdges(paths, options)
-  await validateLocaleProviderEdge(paths, options)
-  await validateConversationProviderEdges(paths, options)
-  await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options))
+  const session = ClientCapabilityAnalysis.session()
+  await validateSetupServiceEdges(paths, options, session)
+  await validateLocaleProviderEdge(paths, options, session)
+  await validateConversationProviderEdges(paths, options, session)
+  await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options), session)
   const config = await clientConfig(paths, options, true)
   return CompilerKernel.buildWatcher(
     await build({
@@ -678,10 +694,11 @@ export async function buildClient(options: BuildClientOptions): Promise<ClientBu
   const paths = await resolveOptions(options)
   await validateSlotOccupancy(paths)
   await validateInjectPackages(paths, options)
-  await validateSetupServiceEdges(paths, options)
-  await validateLocaleProviderEdge(paths, options)
-  await validateConversationProviderEdges(paths, options)
-  await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options))
+  const session = ClientCapabilityAnalysis.session()
+  await validateSetupServiceEdges(paths, options, session)
+  await validateLocaleProviderEdge(paths, options, session)
+  await validateConversationProviderEdges(paths, options, session)
+  await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options), session)
   const config = await clientConfig(paths, options, false)
   const declarations = options.declarations ?? true
   return CompilerKernel.buildReport(await build(config).catch(CompilerKernel.surfaceGuardError), 'client', 'client.js', paths.outDir, declarations, 'DSHX1103')

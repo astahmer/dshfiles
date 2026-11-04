@@ -212,7 +212,8 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
     changed = addMissing(client, 'inject', []) || changed
     changed = addMissing(client, 'external', []) || changed
     changed = addMissing(client, 'immediately', false) || changed
-    const analysis = await ClientCapabilityAnalysis.setupServices(config.clientEntry, config.root)
+    const session = ClientCapabilityAnalysis.session()
+    const analysis = await ClientCapabilityAnalysis.setupServices(config.clientEntry, config.root, session)
     const providers = new Set(
       (analysis.sdk?.uses ?? []).flatMap(capability => (Object.hasOwn(CLIENT_SDK_PROVIDERS, capability) ? CLIENT_SDK_PROVIDERS[capability]! : [])),
     )
@@ -220,10 +221,10 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
       const descriptor = CLIENT_SETUP_SERVICE_CAPABILITIES[service]
       if (descriptor.availability === 'optional' && !analysis.autoInject.includes(service)) providers.add(descriptor.packageName)
     }
-    if (await ClientCapabilityAnalysis.usesApi(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-connection')
-    if (await ClientCapabilityAnalysis.usesSettings(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-ui-settings')
-    if (await ClientCapabilityAnalysis.usesLocales(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-locale')
-    const localeNamespaces = await ClientCapabilityAnalysis.localeNamespaces(config.clientEntry, config.root)
+    if (await ClientCapabilityAnalysis.usesApi(config.clientEntry, config.root, session)) providers.add('@deepseek-ai/dsh-client-connection')
+    if (await ClientCapabilityAnalysis.usesSettings(config.clientEntry, config.root, session)) providers.add('@deepseek-ai/dsh-client-ui-settings')
+    if (await ClientCapabilityAnalysis.usesLocales(config.clientEntry, config.root, session)) providers.add('@deepseek-ai/dsh-client-locale')
+    const localeNamespaces = await ClientCapabilityAnalysis.localeNamespaces(config.clientEntry, config.root, session)
     if (localeNamespaces !== undefined && localeNamespaces.length > 0) {
       const declared = new Set(Array.isArray(client.locales) ? client.locales.filter((value): value is string => typeof value === 'string') : [])
       if (!localeNamespaces.every(namespace => declared.has(namespace))) {

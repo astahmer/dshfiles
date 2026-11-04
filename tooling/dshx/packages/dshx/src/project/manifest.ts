@@ -5,7 +5,12 @@ import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { parse } from 'yaml'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import type { DshCompatibility } from '../compat/types.js'
-import { CLIENT_SETUP_SERVICE_CAPABILITIES, CLIENT_SDK_PROVIDERS, ClientCapabilityAnalysis } from '../compiler/client/capabilities.js'
+import {
+  CLIENT_SETUP_SERVICE_CAPABILITIES,
+  CLIENT_SDK_PROVIDERS,
+  ClientCapabilityAnalysis,
+  type ClientAnalysisSession,
+} from '../compiler/client/capabilities.js'
 import { LocaleNamespaceOwnershipModel } from '../compiler/client/locale-ownership.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic, DshxDiagnosticSeverity } from '../diagnostics.js'
@@ -287,8 +292,13 @@ function checkClient(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, 
   }
 }
 
-async function checkSettingsCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: JsonObject): Promise<void> {
-  if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesSettings(config.clientEntry, config.root))) return
+async function checkSettingsCapability(
+  diagnostics: DshxDiagnostic[],
+  config: ResolvedDshxConfig,
+  manifest: JsonObject,
+  session: ClientAnalysisSession,
+): Promise<void> {
+  if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesSettings(config.clientEntry, config.root, session))) return
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
   const inject = Array.isArray(client?.inject) ? client.inject : []
@@ -304,8 +314,13 @@ async function checkSettingsCapability(diagnostics: DshxDiagnostic[], config: Re
   )
 }
 
-async function checkApiCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: JsonObject): Promise<void> {
-  if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesApi(config.clientEntry, config.root))) return
+async function checkApiCapability(
+  diagnostics: DshxDiagnostic[],
+  config: ResolvedDshxConfig,
+  manifest: JsonObject,
+  session: ClientAnalysisSession,
+): Promise<void> {
+  if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesApi(config.clientEntry, config.root, session))) return
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
   const inject = Array.isArray(client?.inject) ? client.inject : []
@@ -321,8 +336,13 @@ async function checkApiCapability(diagnostics: DshxDiagnostic[], config: Resolve
   )
 }
 
-async function checkConversationCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: JsonObject): Promise<void> {
-  if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesConversationComponents(config.clientEntry, config.root))) return
+async function checkConversationCapability(
+  diagnostics: DshxDiagnostic[],
+  config: ResolvedDshxConfig,
+  manifest: JsonObject,
+  session: ClientAnalysisSession,
+): Promise<void> {
+  if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesConversationComponents(config.clientEntry, config.root, session))) return
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
   const inject = Array.isArray(client?.inject) ? client.inject : []
@@ -340,8 +360,13 @@ async function checkConversationCapability(diagnostics: DshxDiagnostic[], config
   )
 }
 
-async function checkLocaleCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: JsonObject): Promise<void> {
-  if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesLocales(config.clientEntry, config.root))) return
+async function checkLocaleCapability(
+  diagnostics: DshxDiagnostic[],
+  config: ResolvedDshxConfig,
+  manifest: JsonObject,
+  session: ClientAnalysisSession,
+): Promise<void> {
+  if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesLocales(config.clientEntry, config.root, session))) return
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
   const inject = Array.isArray(client?.inject) ? client.inject : []
@@ -357,9 +382,14 @@ async function checkLocaleCapability(diagnostics: DshxDiagnostic[], config: Reso
   )
 }
 
-async function checkSetupServiceCapabilities(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: JsonObject): Promise<void> {
+async function checkSetupServiceCapabilities(
+  diagnostics: DshxDiagnostic[],
+  config: ResolvedDshxConfig,
+  manifest: JsonObject,
+  session: ClientAnalysisSession,
+): Promise<void> {
   if (config.clientEntry === undefined) return
-  const analysis = await ClientCapabilityAnalysis.setupServices(config.clientEntry, config.root)
+  const analysis = await ClientCapabilityAnalysis.setupServices(config.clientEntry, config.root, session)
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
   const packageInject = Array.isArray(client?.inject) ? client.inject : []
@@ -609,11 +639,13 @@ export async function checkProjectManifest(config: ResolvedDshxConfig, options: 
   }
   await checkPatch(diagnostics, config.root, config.packageFile)
   checkClient(diagnostics, config, manifest, options.compatibility ?? DEFAULT_COMPATIBILITY)
-  await checkSettingsCapability(diagnostics, config, manifest)
-  await checkApiCapability(diagnostics, config, manifest)
-  await checkConversationCapability(diagnostics, config, manifest)
-  await checkLocaleCapability(diagnostics, config, manifest)
-  await checkSetupServiceCapabilities(diagnostics, config, manifest)
+  // One read and parse per client source for all five capability checks.
+  const session = ClientCapabilityAnalysis.session()
+  await checkSettingsCapability(diagnostics, config, manifest, session)
+  await checkApiCapability(diagnostics, config, manifest, session)
+  await checkConversationCapability(diagnostics, config, manifest, session)
+  await checkLocaleCapability(diagnostics, config, manifest, session)
+  await checkSetupServiceCapabilities(diagnostics, config, manifest, session)
   checkPublishingHints(diagnostics, manifest, config.packageFile)
   return diagnostics
 }
