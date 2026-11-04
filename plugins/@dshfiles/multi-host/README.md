@@ -177,13 +177,18 @@ title}` for threads started here, so the sidebar and view can list them.
 | --------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------ |
 | Transport                         | enrolled daemon, WebSocket to server                    | `ssh -L` to `t3 serve`                                     | `ssh -L` to `dsh web` (BatchMode, strict host keys)                |
 | Add host                          | enroll key + `curl \| sh` command, poll until connected | Settings → Connections, ssh config/known_hosts suggestions | chip → Add host…, same suggestions, Find + stepwise Test           |
-| Provision remote server           | install script                                          | release archive, checksum, lock, `nohup serve`             | not done: the host's DSH is managed separately                     |
+| Provision remote server           | install script                                          | automatic on SSH connect: release archive, lock, serve     | stepwise opt-in `multi_host_provision` (node → runtime), `doctor`  |
 | Persistent connection / reconnect | heartbeat 5 s, backoff 1–30 s                           | supervisor, backoff 2 s–5 min                              | pooled tunnel, lazy reconnect, ping on menu open, manual Reconnect |
 | Remote folders / branches         | `host.browse_directory`, `list_branch_options`          | env `filesystem.browse`, `vcs.listRefs`                    | host's multi-host listing, host's jj-integration                   |
 | Run and follow a thread           | RPC + event upload                                      | per-environment WebSocket                                  | create + prompt over the native API, transcript polled             |
 | Sidebar                           | "By machine" grouping                                   | machine icon on foreign threads                            | Remote section with host badges                                    |
 | Offline send                      | queued                                                  | blocked with toast                                         | blocked with Reconnect                                             |
 | Credentials                       | hostKey file 0600                                       | system ssh + askpass, safeStorage                          | system ssh agent/keys only; no password prompt                     |
+| Pairing without SSH               | —                                                       | `t3 pair` token/QR, Tailscale routes, T3 Connect relay     | none                                                               |
+| Automatic placement               | —                                                       | Auto balance (cpu × free memory, 15 s freshness)           | Auto: lowest max(load/cores, memory used)                          |
+| Remote approvals, terminal, diffs | —                                                       | native: each environment is a full server connection       | open the host's own DSH (Host UI)                                  |
+| Fleet update                      | —                                                       | Update Everything dialog, version-mismatch banner          | per host: `checkout_sync`, `provision`; no UI                      |
+| Delegate across machines          | —                                                       | `delegate_task` with `target.environmentId`                | none: subagents run locally                                        |
 
 ## Limits
 
