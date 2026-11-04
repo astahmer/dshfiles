@@ -8,7 +8,6 @@
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-communication.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agents.sha256",
-        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__input-trigger.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__plugin-ui.sha256",
@@ -17,8 +16,6 @@
         "$TURBO_ROOT$/plugins/@dshfiles/agent-communication/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agents/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/agents/package.json",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/input-trigger/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/input-trigger/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/cordis.patch.yml",
@@ -44,7 +41,6 @@
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-communication.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agents.sha256",
-        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__input-trigger.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__plugin-ui.sha256",
@@ -54,8 +50,6 @@
         "$TURBO_ROOT$/plugins/@dshfiles/agent-communication/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agents/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/agents/package.json",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/input-trigger/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/input-trigger/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/cordis.patch.yml",

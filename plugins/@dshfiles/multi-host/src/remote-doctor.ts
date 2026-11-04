@@ -1,7 +1,7 @@
 import * as Schema from 'effect/Schema'
-import { MultiHostSchema } from './schema.js'
-import { GatewayUnavailableError } from './connectors/gateway.js'
-import { SshConnector, shellQuote } from './connectors/ssh.js'
+import { Effect } from 'effect'
+import { SshCommandFailed, SshTimedOut } from './errors.js'
+import { Ssh, shellQuote } from './ssh.js'
 
 const probeTimeoutMs = 25_000
 
@@ -122,7 +122,7 @@ const parseRemoteFacts = ({
     const value = line.slice(separator + 1)
     if (key === 'fnm_node') {
       const [version, path] = value.split('|')
-      if (version !== undefined && path !== undefined) fnmNodes.push(MultiHostSchema.decode(fnmNodeSchema, { version, path }))
+      if (version !== undefined && path !== undefined) fnmNodes.push({ version, path })
       continue
     }
     const current = values.get(key) ?? []
@@ -274,24 +274,21 @@ const diagnoseRemote = ({
   return diagnostics
 }
 
-const readRemoteFacts = async ({
-  sshTarget,
-  profile,
-  checkoutPath,
-  signal,
-}: {
+const readRemoteFacts = Effect.fn('remote facts read')(function* (input: {
   readonly sshTarget: string
   readonly profile: string
   readonly checkoutPath?: string | undefined
-  readonly signal?: AbortSignal | undefined
-}): Promise<RemoteFacts> => {
-  const result = await SshConnector.run({ sshTarget, command: probeScript({ profile, checkoutPath }), timeoutMs: probeTimeoutMs, signal })
-  if (result.timedOut) throw new GatewayUnavailableError('ssh-timeout', 'The remote probe exceeded its time limit.')
-  if (result.code !== 0) {
-    throw new GatewayUnavailableError('ssh-command-failed', result.stderr.trim() || 'The remote probe failed.')
-  }
-  return parseRemoteFacts({ output: result.stdout, profile, checkoutPath })
-}
+}) {
+  const ssh = yield* Ssh
+  const result = yield* ssh.run({
+    sshTarget: input.sshTarget,
+    command: probeScript({ profile: input.profile, checkoutPath: input.checkoutPath }),
+    timeout: probeTimeoutMs,
+  })
+  if (result.timedOut) return yield* new SshTimedOut({ timeoutMs: probeTimeoutMs })
+  if (result.code !== 0) return yield* new SshCommandFailed({ exitCode: result.code, stderrTail: result.stderr.trim() || 'The remote probe failed.' })
+  return parseRemoteFacts({ output: result.stdout, profile: input.profile, checkoutPath: input.checkoutPath })
+})
 
 export class RemoteDoctor {
   static readonly readFacts = readRemoteFacts

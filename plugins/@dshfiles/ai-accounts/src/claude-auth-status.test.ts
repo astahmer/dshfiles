@@ -1,28 +1,36 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { ClaudeAccountModel } from './claude-account.js'
-import { verifyClaudeAuthStatus, type ClaudeAuthStatusRunner } from './claude-auth-status.js'
+import { createClaudeAuthStatusRunner, verifyClaudeAuthStatus, type ClaudeAuthStatusExec, type ClaudeAuthStatusRunner } from './claude-auth-status.js'
 
-const processFake = vi.hoisted(() => ({ execFile: vi.fn((_file, _args, _options, callback) => callback(null, '{"loggedIn":true,"authMethod":"claude.ai"}')) }))
-vi.mock('node:child_process', () => processFake)
-vi.mock('node:os', () => ({ homedir: () => '/synthetic', tmpdir: () => '/synthetic/tmp' }))
-vi.mock('node:fs', () => ({ mkdtempSync: vi.fn(() => '/synthetic/tmp/dsh-claude-status-fake'), rmSync: vi.fn() }))
+/** The official CLI, a neutral directory and its cleanup are the only things outside this module. */
+const claudeCli = (
+  answer: (callback: (error: Error | null, stdout: string) => void) => void = callback => callback(null, '{"loggedIn":true,"authMethod":"claude.ai"}'),
+) => {
+  const exec = vi.fn<ClaudeAuthStatusExec>((_input, callback) => answer(callback))
+  const removeDirectory = vi.fn()
+  return {
+    exec,
+    removeDirectory,
+    run: createClaudeAuthStatusRunner({ exec, makeNeutralDirectory: () => '/synthetic/tmp/dsh-claude-status-fake', removeDirectory }),
+  }
+}
+/** The CLI's own default login directory: the module compares against the real home, not a mock. */
+const DEFAULT_CLAUDE_CONFIG_DIR = join(homedir(), '.claude')
 const base = () => ({ configDir: '/synthetic/.claude', signal: new AbortController().signal, environment: { PATH: '/synthetic/bin', HOME: '/synthetic' } })
 type StatusFixture = { readonly loggedIn?: boolean | string | number; readonly authMethod?: string }
 const status = (body: StatusFixture, exitCode = 0): ClaudeAuthStatusRunner => vi.fn(async () => ({ exitCode, stdout: JSON.stringify(body) }))
-afterEach(() => {
-  vi.useRealTimers()
-  vi.clearAllMocks()
-})
 
 describe('official Claude CLI authenticated configuration (not remote validation)', () => {
   it('records a claude auth status span until the subprocess callback without configuration or output', async () => {
     using recorder = recordSpans()
     let finish: (() => void) | undefined
-    processFake.execFile.mockImplementationOnce((_file, _args, _options, callback) => {
+    const cli = claudeCli(callback => {
       finish = () => callback(null, '{"loggedIn":true,"authMethod":"private-auth-method"}')
     })
-    const pending = verifyClaudeAuthStatus({ ...base(), environment: { CLAUDE_CODE_OAUTH_TOKEN: 'private-token' } })
+    const pending = verifyClaudeAuthStatus({ ...base(), run: cli.run, environment: { CLAUDE_CODE_OAUTH_TOKEN: 'private-token' } })
     expect(recorder.named('claude auth status')).toHaveLength(0)
     expect(finish).toBeDefined()
     finish?.()
@@ -35,28 +43,25 @@ describe('official Claude CLI authenticated configuration (not remote validation
 
   it('redacts subprocess failure details from the claude auth status span', async () => {
     using recorder = recordSpans()
-    processFake.execFile.mockImplementationOnce((_file, _args, _options, callback) => callback(new Error('private-token-and-output'), 'private-stdout'))
-    await expect(verifyClaudeAuthStatus(base())).rejects.toThrow('did not confirm')
+    const cli = claudeCli(callback => callback(new Error('private-token-and-output'), 'private-stdout'))
+    await expect(verifyClaudeAuthStatus({ ...base(), run: cli.run })).rejects.toThrow('did not confirm')
     const span = recorder.span('claude auth status')
     expect(span.status).toEqual({ code: 'error', message: 'Error' })
     expect(JSON.stringify({ attributes: span.attributes, status: span.status })).not.toContain('private')
   })
-  it('runs only the official bounded status command without a shell or credential argument', async () => {
-    await verifyClaudeAuthStatus(base())
-    expect(processFake.execFile).toHaveBeenCalledWith(
-      'claude',
-      ['--setting-sources', '', 'auth', 'status', '--json'],
-      expect.objectContaining({
+  it('runs only the official bounded status command, in a neutral directory it removes afterwards', async () => {
+    const cli = claudeCli()
+    await verifyClaudeAuthStatus({ ...base(), run: cli.run })
+    expect(cli.exec).toHaveBeenCalledWith(
+      {
+        args: ['--setting-sources', '', 'auth', 'status', '--json'],
         cwd: '/synthetic/tmp/dsh-claude-status-fake',
-        timeout: 5_000,
-        maxBuffer: 64 * 1024,
-        killSignal: 'SIGKILL',
+        environment: { ...base().environment, CLAUDE_CONFIG_DIR: '/synthetic/.claude' },
         signal: expect.any(AbortSignal),
-        env: base().environment,
-      }),
+      },
       expect.any(Function),
     )
-    expect(processFake.execFile.mock.calls[0]?.[2]).not.toHaveProperty('shell')
+    expect(cli.removeDirectory).toHaveBeenCalledWith('/synthetic/tmp/dsh-claude-status-fake')
   })
 
   it('preserves the native CLI environment, including its OAuth token and configured directory', async () => {
@@ -90,6 +95,7 @@ describe('official Claude CLI authenticated configuration (not remote validation
     const run = status({ loggedIn: true })
     await verifyClaudeAuthStatus({
       ...base(),
+      configDir: DEFAULT_CLAUDE_CONFIG_DIR,
       run,
       environment: { CLAUDE_CONFIG_DIR: '/synthetic/inherited', CLAUDE_SECURESTORAGE_CONFIG_DIR: '/synthetic/inherited' },
     })
@@ -149,20 +155,24 @@ describe('official Claude CLI authenticated configuration (not remote validation
 
   it('bounds a runner ignoring cancellation and clears all timers', async () => {
     vi.useFakeTimers()
-    let childSignal: AbortSignal | undefined
-    const run: ClaudeAuthStatusRunner = async input => {
-      childSignal = input.signal
-      return new Promise(() => {})
+    try {
+      let childSignal: AbortSignal | undefined
+      const run: ClaudeAuthStatusRunner = async input => {
+        childSignal = input.signal
+        return new Promise(() => {})
+      }
+      const pending = expect(verifyClaudeAuthStatus({ ...base(), run })).rejects.toThrow('did not confirm')
+      await vi.advanceTimersByTimeAsync(5_000)
+      await pending
+      expect(childSignal?.aborted).toBe(true)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
     }
-    const pending = expect(verifyClaudeAuthStatus({ ...base(), run })).rejects.toThrow('did not confirm')
-    await vi.advanceTimersByTimeAsync(5_000)
-    await pending
-    expect(childSignal?.aborted).toBe(true)
-    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('signs in to the default login without CLAUDE_CONFIG_DIR, which would create a separate keychain item', () => {
-    expect(ClaudeAccountModel.claudeLoginHint('/synthetic/.claude')).toBe('claude auth login')
+    expect(ClaudeAccountModel.claudeLoginHint(DEFAULT_CLAUDE_CONFIG_DIR)).toBe('claude auth login')
     expect(ClaudeAccountModel.claudeLoginHint('/synthetic/.claude-work')).toBe("CLAUDE_CONFIG_DIR='/synthetic/.claude-work' claude auth login")
   })
 

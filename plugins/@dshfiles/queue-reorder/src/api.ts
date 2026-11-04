@@ -9,7 +9,7 @@ import * as Schema from 'effect/Schema'
  * different behaviour.
  */
 
-const moveDirectionSchema = Schema.Literals(['up', 'down'])
+export const moveDirectionSchema = Schema.Literals(['up', 'down'])
 
 const queueMoveInputSchema = Schema.Struct({
   sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
@@ -17,7 +17,7 @@ const queueMoveInputSchema = Schema.Struct({
   direction: moveDirectionSchema,
 })
 
-const queuePositionSchema = Schema.Struct({
+export const queuePositionSchema = Schema.Struct({
   sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
   itemId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
   index: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),

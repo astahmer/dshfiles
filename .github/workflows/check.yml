@@ -1,3 +1,28 @@
+# Merge gate. One logical gate, seven parallel jobs.
+#
+# Branch protection matches the single `gate` job below (displayed as "Required checks / gate"). It `needs:` every
+# job and asserts they all passed, so the required check name stays stable when a job is added, renamed or sharded —
+# never make an individual job the required check.
+#
+# Why it is split: the old single `pnpm check` job took 2006s, and its long poles ran strictly one after another —
+# plugins build 260s, plugins typecheck 113s, plugins tests 655s, boot 521s, e2e smoke 256s. Each job below runs one
+# pole on its own 4 vCPU / 16 GB runner, so the gate costs the slowest pole instead of their sum.
+#
+# Measured after the split (whole run, created → gate green): 465-490s on a warm turbo cache, 786s on a cold one. The
+# spread comes from the e2e-smoke shards (300-770s): journeys are far more variable than unit suites, and one shard
+# that owns a shared jj/multi-host journey can double. Shard counts were measured, not guessed: units 4 × build+test
+# beat 3 × build+typecheck+test, balancing the unit shards by test bytes measured no better than round-robin (487s vs
+# 465s) so round-robin stayed, and boot went from 3 to 4 shards after it became the pole at 469s.
+#
+# Job → local command (`pnpm check` is unchanged and still runs all of them in one process):
+#   lint      pnpm run lint + pnpm run fmt:check
+#   types     pnpm run typecheck:scripts, plugin contract, the whole plugin typecheck, dshx typecheck
+#   units     4 shards of the plugins build+test (`scripts/ci/plugin-shard.mjs unit`); typecheck runs once in `types`
+#   dshx      pnpm run check:dshx
+#   repo      check:cycles, check:native-forks, test:scripts, verify:web-profile-contract, check:repo,
+#             check:effect-native, knip, check:screenshots
+#   boot      4 shards of pnpm run check:plugin-boot (`scripts/ci/plugin-shard.mjs boot`)
+#   e2e-smoke pnpm run check:e2e:smoke
 name: Required checks
 
 on:
@@ -13,36 +38,146 @@ concurrency:
   group: check-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Turbo's default is ten concurrent tasks per job. Two keeps a plugin suite (real jj, git, node and Chromium
+  # children) inside 16 GB and is safe now that each job has its own runner: the old job ran every suite on one
+  # machine and OOM-killed the vitest fork that mounts a real Host. fff-search still limits itself to a single fork.
+  TURBO_CONCURRENCY: '2'
+
 jobs:
-  pnpm-check:
-    name: pnpm check
+  lint:
+    name: lint
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 12.5.1
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-      - name: Install jj
+      - uses: ./.github/actions/setup
+      - name: Run the lint gates
         run: |
-          curl -fsSL https://github.com/jj-vcs/jj/releases/download/v0.46.0/jj-v0.46.0-x86_64-unknown-linux-musl.tar.gz | tar -xz -C "$RUNNER_TEMP" ./jj
-          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-      - name: Install ffmpeg
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
-      - name: Start a systemd user manager for subprocess scopes
-        run: |
-          sudo loginctl enable-linger "$USER"
-          runtime="/run/user/$(id -u)"
-          for attempt in $(seq 1 50); do [ -S "$runtime/bus" ] && break; sleep 0.2; done
-          echo "XDG_RUNTIME_DIR=$runtime" >> "$GITHUB_ENV"
-          echo "DBUS_SESSION_BUS_ADDRESS=unix:path=$runtime/bus" >> "$GITHUB_ENV"
-          XDG_RUNTIME_DIR="$runtime" systemd-run --user --scope --quiet true
-      - run: pnpm install:all
-      - name: Install Playwright Chromium
-        run: pnpm --dir tooling/dshx exec playwright install --with-deps --only-shell chromium
-      - run: pnpm check
+          pnpm run lint
+          pnpm run fmt:check
+
+  types:
+    name: types
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      # The workspace contract is a manifest rule, so it rides with the compiler pass that reads the same manifests.
+      - run: pnpm run typecheck:scripts
+      - run: pnpm --dir plugins run contract
+      # The whole plugin typecheck runs here, once, instead of in every units shard; the units shards then only build
+      # and test their slice, which is what makes four of them cheaper than three of all three tasks.
+      - run: pnpm --dir plugins run typecheck
+      - run: pnpm --dir tooling/dshx run typecheck
+
+  units:
+    name: units (${{ matrix.shard }}/4)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          jj: 'true'
+          ffmpeg: 'true'
+          # @dshfiles/preview's suite launches the real headless shell and every bundle boots in a real Host.
+          browsers: 'true'
+          systemd-scope: 'true'
+      - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 4 unit
+
+  dshx:
+    name: dshx
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          jj: 'true'
+          browsers: 'true'
+      - run: pnpm run check:dshx
+
+  repo:
+    name: repo
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          jj: 'true'
+      # `check:repo` and `check:screenshots` run the dshx CLI and read the feature catalogs it validates.
+      - run: pnpm --dir tooling/dshx run build
+      - run: pnpm run check:cycles
+      - run: pnpm run check:native-forks
+      - run: pnpm run test:scripts
+      - run: pnpm run verify:web-profile-contract
+      - run: pnpm run check:repo
+      - run: pnpm run check:effect-native
+      - run: pnpm run knip
+      - run: pnpm run check:screenshots
+
+  boot:
+    name: boot (${{ matrix.shard }}/4)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          jj: 'true'
+          browsers: 'true'
+          systemd-scope: 'true'
+      # Every bundle's own boot lands in exactly one shard, and the composed web-profile boot in shard 0 only.
+      # Boots stay serial inside a shard: two at once on a 4 vCPU runner left expected Client entries `pending` past
+      # their settle window (workbench, agent-preset) although both pass alone and on a 10-core workstation. The
+      # parallelism is the three shards, not concurrency inside one.
+      - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 4 boot
+
+  e2e-smoke:
+    name: e2e-smoke (${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          jj: 'true'
+          ffmpeg: 'true'
+          browsers: 'true'
+          systemd-scope: 'true'
+      # Smoke journeys were the whole critical path after the split (446s, one serial owner at a time); two shards halve
+      # it and each still runs whole owners, so a journey never depends on another shard's order.
+      - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 2 smoke
+
+  gate:
+    name: gate
+    if: always()
+    needs: [lint, types, units, dshx, repo, boot, e2e-smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      # `if: always()` keeps the gate reporting when a dependency fails, and the explicit failure step turns a
+      # skipped or cancelled dependency into a red gate: without it a job that never started would leave it green.
+      - name: Report every job result
+        if: always()
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: echo "$NEEDS"
+      - name: Fail when a required job did not pass
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: exit 1

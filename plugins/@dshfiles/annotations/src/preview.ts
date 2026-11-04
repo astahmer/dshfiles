@@ -1,6 +1,5 @@
-import { readFile, stat } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
-import { withSpan } from '@dshfiles/dshx/tracing'
+import { Effect, FileSystem, Option } from 'effect'
 
 const MAX_PREVIEW_BYTES = 2 * 1024 * 1024
 const ALLOWED = /\.html?$/i
@@ -11,16 +10,19 @@ export type PreviewResult =
   | { readonly ok: true; readonly value: { readonly path: string; readonly html: string; readonly truncated: boolean } }
   | { readonly ok: false; readonly error: PreviewFailure }
 
-export const readPreview = async ({ root, path }: { readonly root: string; readonly path: string }): Promise<PreviewResult> =>
-  withSpan('annotations read preview', async () => {
-    const absolute = resolve(root, path)
-    const relativePath = relative(root, absolute)
-    if (relativePath.startsWith('..') || relativePath.length === 0) return { ok: false, error: 'outside-workspace' }
-    if (!ALLOWED.test(absolute)) return { ok: false, error: 'unsupported' }
-    const info = await stat(absolute).catch(() => undefined)
-    if (info === undefined || !info.isFile()) return { ok: false, error: 'missing' }
-    if (info.size > MAX_PREVIEW_BYTES) return { ok: false, error: 'too-large' }
-    const html = await readFile(absolute, 'utf8').catch(() => undefined)
-    if (html === undefined) return { ok: false, error: 'missing' }
-    return { ok: true, value: { path: relativePath, html, truncated: false } }
-  })
+const refused = (error: PreviewFailure): PreviewResult => ({ ok: false, error })
+
+/** One HTML file inside `root`, for the preview pane; anything outside the workspace or too large is refused. */
+export const readPreview = Effect.fn('annotations read preview')(function* (input: { readonly root: string; readonly path: string }) {
+  const absolute = resolve(input.root, input.path)
+  const relativePath = relative(input.root, absolute)
+  if (relativePath.startsWith('..') || relativePath.length === 0) return refused('outside-workspace')
+  if (!ALLOWED.test(absolute)) return refused('unsupported')
+  const fileSystem = yield* FileSystem.FileSystem
+  const info = yield* fileSystem.stat(absolute).pipe(Effect.option)
+  if (Option.isNone(info) || info.value.type !== 'File') return refused('missing')
+  if (info.value.size > MAX_PREVIEW_BYTES) return refused('too-large')
+  const html = yield* fileSystem.readFileString(absolute).pipe(Effect.option)
+  if (Option.isNone(html)) return refused('missing')
+  return { ok: true, value: { path: relativePath, html: html.value, truncated: false } } satisfies PreviewResult
+})

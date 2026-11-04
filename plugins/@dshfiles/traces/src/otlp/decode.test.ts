@@ -1,5 +1,5 @@
+import { Effect, Schema } from 'effect'
 import { describe, expect, test } from 'vitest'
-import { TracesSchema } from '../schema.js'
 import { OtlpBody } from './decode.js'
 import { otlpTraceRequestSchema, type OtlpSpan } from './json-schema.js'
 import { SPAN_BOUNDS, SpanNormalizer } from './normalize.js'
@@ -13,8 +13,14 @@ const byName = <Span extends { readonly name: string }>(spans: readonly Span[]) 
 describe('OTLP trace decoding', () => {
   test('decodes a protobuf body from the official SDK serializer into the same spans as its JSON body', async () => {
     const fixture = await SdkFixtures.traces()
-    const fromProtobuf = SpanNormalizer.normalizeTraces(OtlpBody.decodeTraces({ body: Buffer.from(fixture.protobuf), wire: 'protobuf' }), REDACT)
-    const fromJson = SpanNormalizer.normalizeTraces(OtlpBody.decodeTraces({ body: Buffer.from(JSON.stringify(fixture.json)), wire: 'json' }), REDACT)
+    const fromProtobuf = SpanNormalizer.normalizeTraces(
+      Effect.runSync(OtlpBody.decodeTraces({ body: Buffer.from(fixture.protobuf), wire: 'protobuf' })),
+      REDACT,
+    )
+    const fromJson = SpanNormalizer.normalizeTraces(
+      Effect.runSync(OtlpBody.decodeTraces({ body: Buffer.from(JSON.stringify(fixture.json)), wire: 'json' })),
+      REDACT,
+    )
     expect(fromProtobuf.rejected).toBe(0)
     expect(fromProtobuf.spans).toHaveLength(2)
     expect(fromProtobuf.spans).toEqual(fromJson.spans)
@@ -58,7 +64,9 @@ describe('OTLP trace decoding', () => {
   test('rejects a truncated protobuf body', async () => {
     const fixture = await SdkFixtures.traces()
     expect(() => OtlpProtobuf.decodeTraces(fixture.protobuf.subarray(0, fixture.protobuf.length - 7))).toThrow(ProtobufDecodeError)
-    expect(() => OtlpBody.decodeTraces({ body: Buffer.from(fixture.protobuf.subarray(0, 20)), wire: 'protobuf' })).toThrow(/Truncated|wire type|varint/)
+    expect(() => Effect.runSync(OtlpBody.decodeTraces({ body: Buffer.from(fixture.protobuf.subarray(0, 20)), wire: 'protobuf' }))).toThrow(
+      /Truncated|wire type|varint/,
+    )
   })
 
   test('skips unknown protobuf fields', () => {
@@ -74,13 +82,13 @@ describe('OTLP trace decoding', () => {
   })
 
   test('rejects JSON that is not an export request', () => {
-    expect(() => OtlpBody.decodeTraces({ body: Buffer.from('{not json'), wire: 'json' })).toThrow(/could not be parsed/)
-    expect(() => OtlpBody.decodeTraces({ body: Buffer.from('{"resourceSpans":"nope"}'), wire: 'json' })).toThrow(/not an OTLP/)
+    expect(() => Effect.runSync(OtlpBody.decodeTraces({ body: Buffer.from('{not json'), wire: 'json' }))).toThrow(/could not be parsed/)
+    expect(() => Effect.runSync(OtlpBody.decodeTraces({ body: Buffer.from('{"resourceSpans":"nope"}'), wire: 'json' }))).toThrow(/not an OTLP/)
   })
 })
 
 const jsonRequest = (span: OtlpSpan) =>
-  TracesSchema.decode(otlpTraceRequestSchema, {
+  Schema.decodeUnknownSync(otlpTraceRequestSchema)({
     resourceSpans: [
       { resource: { attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }] }, scopeSpans: [{ scope: { name: 'scope' }, spans: [span] }] },
     ],
@@ -149,7 +157,7 @@ describe('span normalization', () => {
 
   test('accepts base64 ids, string enums and a missing service, and rejects spans without valid ids or start', () => {
     const result = SpanNormalizer.normalizeTraces(
-      TracesSchema.decode(otlpTraceRequestSchema, {
+      Schema.decodeUnknownSync(otlpTraceRequestSchema)({
         resourceSpans: [
           {
             scopeSpans: [

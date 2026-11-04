@@ -25,3 +25,10 @@ export const renderScopeReport = (review: OkReview): string => {
   }
   return lines.join('\n')
 }
+
+/** The one report text `/pulls` and `pulls_review` show for any review result. */
+export const reviewReportText = (result: ReviewResult): string => {
+  if (result.status === 'failed') return result.message
+  if (result.fileCount === 0) return `pulls.review · ${result.range} — no changes yet.`
+  return renderScopeReport(result)
+}

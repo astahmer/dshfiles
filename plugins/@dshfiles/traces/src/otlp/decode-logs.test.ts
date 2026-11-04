@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { describe, expect, test } from 'vitest'
 import { OtlpBody } from './decode.js'
 import { SpanNormalizer } from './normalize.js'
@@ -9,8 +10,11 @@ const REDACT = { redactContent: true }
 describe('OTLP log decoding', () => {
   test('decodes SDK log records from protobuf into the same records as from JSON', async () => {
     const fixture = await SdkFixtures.logs()
-    const fromProtobuf = SpanNormalizer.normalizeLogs(OtlpBody.decodeLogs({ body: Buffer.from(fixture.protobuf), wire: 'protobuf' }), REDACT)
-    const fromJson = SpanNormalizer.normalizeLogs(OtlpBody.decodeLogs({ body: Buffer.from(JSON.stringify(fixture.json)), wire: 'json' }), REDACT)
+    const fromProtobuf = SpanNormalizer.normalizeLogs(Effect.runSync(OtlpBody.decodeLogs({ body: Buffer.from(fixture.protobuf), wire: 'protobuf' })), REDACT)
+    const fromJson = SpanNormalizer.normalizeLogs(
+      Effect.runSync(OtlpBody.decodeLogs({ body: Buffer.from(JSON.stringify(fixture.json)), wire: 'json' })),
+      REDACT,
+    )
     expect(fromProtobuf.rejected).toBe(0)
     expect(fromProtobuf.logs).toHaveLength(3)
     expect(fromProtobuf.logs).toEqual(fromJson.logs)
@@ -43,6 +47,6 @@ describe('OTLP log decoding', () => {
   })
 
   test('rejects JSON that is not a logs export request', () => {
-    expect(() => OtlpBody.decodeLogs({ body: Buffer.from('{"resourceLogs":"nope"}'), wire: 'json' })).toThrow(/ExportLogsServiceRequest/)
+    expect(() => Effect.runSync(OtlpBody.decodeLogs({ body: Buffer.from('{"resourceLogs":"nope"}'), wire: 'json' }))).toThrow(/ExportLogsServiceRequest/)
   })
 })

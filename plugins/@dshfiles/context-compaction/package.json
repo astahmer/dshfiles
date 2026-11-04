@@ -44,6 +44,7 @@
     "@deepseek-ai/dsh-token-meter": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "oxfmt": "0.71.0",
     "oxlint": "1.86.0",

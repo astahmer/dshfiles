@@ -2,7 +2,6 @@ import { Context } from '@deepseek-ai/cordis'
 import { createSnapshotStore, type ObservableSnapshot, type SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { DockPaneActions } from '@dshfiles/frame-layout/regions'
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { Schema } from 'effect'
 import { act, useSyncExternalStore } from 'react'
@@ -46,7 +45,7 @@ function fixture(workbench = true, copy = en) {
   const sessionC = 'retained-session-c' as SessionId
   const mode = createSnapshotStore(workbench)
   const shortcuts = createSnapshotStore<readonly []>([])
-  const visibility = createStoredValue({ key: 'header-right-pane', schema: zodSchemaFromEffect(Schema.NullOr(Schema.Boolean)), fallback: null })
+  const visibility = createStoredValue({ key: 'header-right-pane', schema: Schema.NullOr(Schema.Boolean), fallback: null })
   // Exercise the real Workbench factory through its explicit StoredValue injection seam.
   const dock = createDockPaneActions(visibility)
   const unsubscribe = vi.fn()
@@ -176,9 +175,7 @@ it('keeps native expand-only semantics and localized accessible copy without dri
 
 it('resolves current dock actions on click and never falls back to hidden native expansion', () => {
   const f = fixture()
-  const replacement = createDockPaneActions(
-    createStoredValue({ key: 'replacement-pane', schema: zodSchemaFromEffect(Schema.NullOr(Schema.Boolean)), fallback: null }),
-  )
+  const replacement = createDockPaneActions(createStoredValue({ key: 'replacement-pane', schema: Schema.NullOr(Schema.Boolean), fallback: null }))
   f.replaceDock(replacement)
   act(() => f.button()?.click())
   expect(replacement.isOpen()).toBe(true)

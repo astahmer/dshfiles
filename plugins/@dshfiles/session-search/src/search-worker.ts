@@ -2,165 +2,147 @@
  * The worker entry point. It owns the FTS5 index and every byte of decode, parse, and insert work, so the Host event
  * loop never performs index maintenance — not during a first full build and not during an ordinary search.
  *
- * Requests arrive over `parentPort`; the ingest loop runs between messages and yields to them, which is what keeps a
- * search answerable while the corpus is still being indexed.
+ * Requests arrive as RPCs; the ingest loop is one fiber that yields between sessions, which is what keeps a search
+ * answerable while the corpus is still being indexed.
  */
-import { parentPort, workerData } from 'node:worker_threads'
-import * as Schema from 'effect/Schema'
-import * as Option from 'effect/Option'
+import { workerData } from 'node:worker_threads'
+
+import * as NodeRuntime from '@effect/platform-node/NodeRuntime'
+import * as NodeWorkerRunner from '@effect/platform-node/NodeWorkerRunner'
+import { Clock, Duration, Effect, FiberHandle, Layer, Queue, Ref, Schema } from 'effect'
+import { RpcServer } from 'effect/rpc'
+
 import { SearchIndex } from './index-db.js'
 import { runIngestPass } from './ingest.js'
-import type { JsonValue } from './protocol.js'
-import { workerRequestSchema, type IndexHealth, type WorkerReply } from './protocol.js'
+import { SearchWorkerFailed, SearchWorkerRpcs, workerConfigSchema, type IndexHealth } from './protocol.js'
 
-const workerConfigSchema = Schema.Struct({
-  indexPath: Schema.String.check(Schema.isMinLength(1)),
-  // Each window is decoded, parsed and committed in one synchronous step that searches wait behind.
-  windowBytes: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))),
-})
-const parsedConfig = Schema.decodeUnknownSync(workerConfigSchema)(workerData)
-const config = { indexPath: parsedConfig.indexPath, windowBytes: parsedConfig.windowBytes ?? 2 * 1024 * 1024 }
-
-const IDLE_SLEEP_MS = 5_000
-const BUSY_SLEEP_MS = 50
-
+const IDLE_SLEEP = Duration.seconds(5)
+const BUSY_SLEEP = Duration.millis(50)
 const BACKFILL_ROWIDS = 2_000
 
-interface WorkerState {
-  index: SearchIndex | undefined
-  root: string | undefined
-  ingesting: boolean
-  stopped: boolean
-  lastIngestMs: number
-  slowestIngestMs: number
-  lastSearchMs: number
-  slowestSearchMs: number
-  lastError: string | null
-  behindSessions: number
-  behindBytes: number
+type Progress = {
+  readonly root: string | undefined
+  readonly ingesting: boolean
+  readonly lastIngestMs: number
+  readonly slowestIngestMs: number
+  readonly lastSearchMs: number
+  readonly slowestSearchMs: number
+  readonly lastError: string | null
+  readonly behindSessions: number
+  readonly behindBytes: number
 }
 
-const state: WorkerState = {
-  index: undefined,
-  root: undefined,
-  ingesting: false,
-  stopped: false,
-  lastIngestMs: 0,
-  slowestIngestMs: 0,
-  lastSearchMs: 0,
-  slowestSearchMs: 0,
-  lastError: null,
-  behindSessions: 0,
-  behindBytes: 0,
-}
+const describeError = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 500)
 
-const requireIndex = (): SearchIndex => {
-  state.index ??= new SearchIndex(config.indexPath)
-  return state.index
-}
+const indexFailure = (cause: unknown) => new SearchWorkerFailed({ code: 'session-search-index-failed', reason: describeError(cause), cause })
 
-const health = (): IndexHealth =>
-  requireIndex().health({
-    behindSessions: state.behindSessions,
-    behindBytes: state.behindBytes,
-    ingesting: state.ingesting,
-    lastIngestMs: state.lastIngestMs,
-    slowestIngestMs: state.slowestIngestMs,
-    lastSearchMs: state.lastSearchMs,
-    slowestSearchMs: state.slowestSearchMs,
-    lastError: state.lastError,
-  })
+const Handlers = SearchWorkerRpcs.toLayer(
+  Effect.gen(function* () {
+    const config = yield* Schema.decodeUnknownEffect(workerConfigSchema)(workerData)
+    const windowBytes = config.windowBytes ?? 2 * 1024 * 1024
+    const index = yield* Effect.acquireRelease(
+      Effect.sync(() => new SearchIndex(config.indexPath)),
+      opened => Effect.sync(() => opened.close()),
+    )
+    const progress = yield* Ref.make<Progress>({
+      root: undefined,
+      ingesting: false,
+      lastIngestMs: 0,
+      slowestIngestMs: 0,
+      lastSearchMs: 0,
+      slowestSearchMs: 0,
+      lastError: null,
+      behindSessions: 0,
+      behindBytes: 0,
+    })
+    // A committed session event cuts the loop's sleep short, so fresh content is searchable without waiting out the idle delay.
+    const wake = yield* Queue.dropping<void>(1)
+    const loop = yield* FiberHandle.make<never, never>()
 
-const describe = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 500)
+    const health = Effect.flatMap(Ref.get(progress), (current): Effect.Effect<IndexHealth, SearchWorkerFailed> =>
+      Effect.try({
+        try: () =>
+          index.health({
+            behindSessions: current.behindSessions,
+            behindBytes: current.behindBytes,
+            ingesting: current.ingesting,
+            lastIngestMs: current.lastIngestMs,
+            slowestIngestMs: current.slowestIngestMs,
+            lastSearchMs: current.lastSearchMs,
+            slowestSearchMs: current.slowestSearchMs,
+            lastError: current.lastError,
+          }),
+        catch: indexFailure,
+      }),
+    )
 
-let wake: (() => void) | undefined
+    const pause = (duration: Duration.Duration) => Effect.raceFirst(Effect.sleep(duration), Effect.asVoid(Queue.take(wake)))
 
-/** Sleep that a committed session event can cut short, so fresh content is searchable without waiting out the idle delay. */
-const wait = (ms: number): Promise<void> =>
-  new Promise(resolve => {
-    const timer = setTimeout(() => {
-      wake = undefined
-      resolve()
-    }, ms)
-    wake = () => {
-      clearTimeout(timer)
-      wake = undefined
-      resolve()
+    const pass = (root: string) =>
+      Effect.gen(function* () {
+        const startedAt = yield* Clock.currentTimeMillis
+        yield* Ref.update(progress, current => ({ ...current, ingesting: true }))
+        const outcome = yield* Effect.tryPromise(async () => {
+          // One bounded step per loop, so searches still run between steps while an older index gains its conversation table.
+          const backfilled = index.backfillConversation(BACKFILL_ROWIDS) && index.backfillRowMap(BACKFILL_ROWIDS)
+          const result = await runIngestPass({ index, root, budgetMs: 1_000, windowBytes, now: Date.now })
+          return { backfilled, result }
+        }).pipe(Effect.result)
+        const elapsed = (yield* Clock.currentTimeMillis) - startedAt
+        if (outcome._tag === 'Failure') {
+          yield* Ref.update(progress, current => ({ ...current, ingesting: false, lastIngestMs: elapsed, lastError: describeError(outcome.failure.cause) }))
+          return IDLE_SLEEP
+        }
+        const result = outcome.success.result
+        yield* Ref.update(progress, current => ({
+          ...current,
+          ingesting: false,
+          behindSessions: result.behindSessions,
+          behindBytes: result.behindBytes,
+          lastError: null,
+          lastIngestMs: elapsed,
+          slowestIngestMs: Math.max(current.slowestIngestMs, elapsed),
+        }))
+        return outcome.success.backfilled && result.complete && result.ingested === 0 ? IDLE_SLEEP : BUSY_SLEEP
+      })
+
+    const ingestLoop = Effect.forever(
+      Effect.gen(function* () {
+        const root = (yield* Ref.get(progress)).root
+        if (root === undefined) return yield* Effect.asVoid(Queue.take(wake))
+        yield* pause(yield* pass(root))
+      }),
+    )
+
+    const timedSearch = <A>(search: () => A) =>
+      Effect.gen(function* () {
+        const startedAt = performance.now()
+        const result = yield* Effect.try({ try: search, catch: indexFailure })
+        const elapsed = Math.round(performance.now() - startedAt)
+        yield* Ref.update(progress, current => ({ ...current, lastSearchMs: elapsed, slowestSearchMs: Math.max(current.slowestSearchMs, elapsed) }))
+        return result
+      })
+
+    return {
+      SearchSessions: request => timedSearch(() => index.searchSessions(request)),
+      SearchEvents: request => timedSearch(() => ({ sessionId: request.sessionId, ...index.searchEvents(request) })),
+      Health: () => health,
+      Nudge: () => Effect.andThen(Queue.offer(wake, undefined), health),
+      StartIngest: request =>
+        Effect.gen(function* () {
+          yield* Ref.update(progress, current => ({ ...current, root: request.root }))
+          yield* FiberHandle.run(loop, ingestLoop, { onlyIfMissing: true })
+          yield* Queue.offer(wake, undefined)
+          return yield* health
+        }),
     }
-  })
+  }),
+)
 
-let ingestRunning = false
+const WorkerServer = RpcServer.layer(SearchWorkerRpcs).pipe(
+  Layer.provide(Handlers),
+  Layer.provide(RpcServer.layerProtocolWorkerRunner),
+  Layer.provide(NodeWorkerRunner.layer),
+)
 
-const startIngest = (): void => {
-  if (ingestRunning || state.root === undefined) return
-  ingestRunning = true
-  void (async () => {
-    while (!state.stopped) {
-      const root = state.root
-      if (root === undefined) break
-      const startedAt = Date.now()
-      state.ingesting = true
-      try {
-        // One bounded step per loop, so searches still run between steps while an older index gains its conversation table.
-        const backfilled = requireIndex().backfillConversation(BACKFILL_ROWIDS) && requireIndex().backfillRowMap(BACKFILL_ROWIDS)
-        const result = await runIngestPass({ index: requireIndex(), root, budgetMs: 1_000, windowBytes: config.windowBytes, now: Date.now })
-        state.behindSessions = result.behindSessions
-        state.behindBytes = result.behindBytes
-        state.lastError = null
-        state.lastIngestMs = Date.now() - startedAt
-        state.slowestIngestMs = Math.max(state.slowestIngestMs, state.lastIngestMs)
-        parentPort?.postMessage({ kind: 'progress', health: health() } satisfies WorkerReply)
-        await wait(backfilled && result.complete && result.ingested === 0 ? IDLE_SLEEP_MS : BUSY_SLEEP_MS)
-      } catch (error) {
-        state.lastError = describe(error)
-        state.lastIngestMs = Date.now() - startedAt
-        parentPort?.postMessage({ kind: 'progress', health: health() } satisfies WorkerReply)
-        await wait(IDLE_SLEEP_MS)
-      } finally {
-        state.ingesting = false
-      }
-    }
-    ingestRunning = false
-  })()
-}
-
-const respond = <Value>(id: number, operation: () => Value): void => {
-  try {
-    // SAFETY: every answer this worker sends is a JSON-shaped value (health counters or schema-decoded rows); the port serializes it with JSON.
-    parentPort?.postMessage({ id, ok: true, value: operation() as JsonValue } satisfies WorkerReply)
-  } catch (error) {
-    parentPort?.postMessage({ id, ok: false, code: 'session-search-index-failed', message: describe(error) } satisfies WorkerReply)
-  }
-}
-
-parentPort?.on('message', raw => {
-  const parsed = Schema.decodeUnknownOption(workerRequestSchema)(raw)
-  if (Option.isNone(parsed)) return
-  const request = parsed.value
-  if (request.kind === 'close') {
-    state.stopped = true
-    state.index?.close()
-    state.index = undefined
-    process.exit(0)
-  }
-  if (request.kind === 'nudge') {
-    wake?.()
-    respond(request.id, () => health())
-    return
-  }
-  if (request.kind === 'health') {
-    respond(request.id, () => health())
-    return
-  }
-  if (request.kind === 'ingest') {
-    state.root = request.root
-    startIngest()
-    respond(request.id, () => health())
-    return
-  }
-  const startedAt = performance.now()
-  if (request.kind === 'search-sessions') respond(request.id, () => requireIndex().searchSessions(request.request))
-  else respond(request.id, () => ({ sessionId: request.request.sessionId, ...requireIndex().searchEvents(request.request) }))
-  state.lastSearchMs = Math.round(performance.now() - startedAt)
-  state.slowestSearchMs = Math.max(state.slowestSearchMs, state.lastSearchMs)
-})
+NodeRuntime.runMain(Layer.launch(WorkerServer))

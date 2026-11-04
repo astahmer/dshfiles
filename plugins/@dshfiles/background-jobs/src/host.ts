@@ -1,151 +1,89 @@
-import type { Context } from '@deepseek-ai/cordis'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import type {} from '@deepseek-ai/dsh-jobs'
-import { defineHost } from '@dshfiles/dshx/host'
-import { DshxEffect } from '@dshfiles/dshx/effect'
-import { Cause, Context as EffectContext, Duration, Effect, Layer, Queue, Schedule, Schema, Scope } from 'effect'
+import type {} from '@deepseek-ai/dsh-session-persistence'
+import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
+import { NodeFileSystem, NodePath } from '@effect/platform-node'
+import { Duration, Effect, Layer, Option, Schedule, Schema, Stream } from 'effect'
 import { backgroundJobsApi } from './api.js'
-import { HistoryIndex } from './history.js'
+import { HistoryConfig, HistoryIndex } from './history.js'
+import { JobRegistry, LiveJobs } from './live.js'
 import { JobsBoard } from './service.js'
 
-const INDEX_INTERVAL_MS = 30_000
-const CATCH_UP_DELAY_MS = 1_000
-const DEFAULT_FILES_PER_PASS = 120
-const DEFAULT_BUDGET_MS = 8_000
-const CHANGE_EVENT_INTERVAL_MS = 1_000
+const INDEX_INTERVAL = Duration.seconds(30)
+const CATCH_UP_DELAY = Duration.seconds(1)
+const CHANGE_EVENT_INTERVAL = Duration.seconds(1)
 
-const persistenceConfigSchema = Schema.Struct({ config: Schema.Struct({ root: Schema.String.check(Schema.isMinLength(1)) }) })
+const decodePersistence = Schema.decodeUnknownOption(Schema.Struct({ config: Schema.Struct({ root: Schema.String.check(Schema.isMinLength(1)) }) }))
 
-interface JobsRuntime {
-  readonly board: JobsBoard
-  readonly history: HistoryIndex
-  readonly changes: Queue.Queue<void>
-}
-
-class BackgroundJobs extends EffectContext.Service<BackgroundJobs, JobsRuntime>()('dshfiles/background-jobs/BackgroundJobs') {}
-
-export class JobNotFound extends Schema.TaggedError<JobNotFound>()('JobNotFound', {
-  message: Schema.String,
-}) {}
-
-const makeLayer = (context: Context): Layer.Layer<BackgroundJobs, never, never> =>
-  Layer.effect(
-    BackgroundJobs,
-    Effect.gen(function* () {
-      const changes = yield* Queue.dropping<void>(1)
-      const persistence = context.get('sessionPersistence')
-      const parsed = Schema.is(persistenceConfigSchema)(persistence) ? persistence : null
-      const history = new HistoryIndex({
-        root: parsed?.config.root ?? dshHomePath('sessions'),
-        statePath: dshHomePath('runtime', 'dshfiles', 'background-jobs', 'state.json'),
-        filesPerPass: DEFAULT_FILES_PER_PASS,
-        budgetMs: DEFAULT_BUDGET_MS,
-      })
-      const board = new JobsBoard({
-        history,
-        onChange: () => Queue.offerUnsafe(changes, undefined),
-      })
-      return { board, history, changes }
-    }),
-  )
-
-const reportFailure = (context: Context, step: string, error: unknown): void => {
-  context.logger.warn('background-jobs: %s failed: %s', step, error instanceof Error ? error.message : String(error))
-}
-
-const runPass = (active: JobsRuntime) =>
-  Effect.tryPromise({
-    try: () => active.history.pass().then(() => active.board.invalidate()),
-    catch: error => error,
-  })
-
-const indexingSchedule = (active: JobsRuntime) =>
-  Schedule.spaced(CATCH_UP_DELAY_MS).pipe(
-    Schedule.modifyDelay(() => Effect.sync(() => Duration.millis(active.history.indexing.caughtUp ? INDEX_INTERVAL_MS : CATCH_UP_DELAY_MS))),
-  )
-
-const indexingLoop = (active: JobsRuntime, context: Context) =>
+const HistoryConfigLive = Layer.unwrap(
   Effect.gen(function* () {
-    yield* Effect.tryPromise({ try: () => active.history.load(), catch: error => error })
-    yield* runPass(active).pipe(
-      Effect.catchCause(cause => Effect.sync(() => reportFailure(context, 'history indexing step', Cause.squash(cause)))),
-      Effect.repeat(indexingSchedule(active)),
+    const persistence = yield* Effect.option(hostService('sessionPersistence'))
+    const root = Option.getOrElse(
+      Option.map(Option.flatMap(persistence, decodePersistence), persisted => persisted.config.root),
+      () => dshHomePath('sessions'),
     )
-  })
+    return HistoryConfig.layer({
+      root,
+      statePath: dshHomePath('runtime', 'dshfiles', 'background-jobs', 'state.json'),
+      filesPerPass: 120,
+      budgetMs: 8_000,
+    })
+  }),
+)
 
-const changeEvents = (active: JobsRuntime, context: Context) =>
-  Effect.forever(
-    Effect.gen(function* () {
-      yield* Queue.take(active.changes)
-      yield* Effect.sleep(Duration.millis(CHANGE_EVENT_INTERVAL_MS))
-      yield* DshxEffect.publish(context, backgroundJobsApi, 'changed', {}).pipe(
-        Effect.catchCause(cause => Effect.sync(() => reportFailure(context, 'board change event', Cause.squash(cause)))),
-      )
-    }),
-  )
+/** Index right away, then every second while catching up and every 30 seconds once caught up. */
+const IndexingLoop = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const history = yield* HistoryIndex
+    yield* history.pass.pipe(
+      Effect.map(indexing => indexing.caughtUp),
+      Effect.catchCause(cause => Effect.as(Effect.logError('background-jobs: history indexing failed', cause), false)),
+      Effect.repeat(
+        Schedule.spaced(CATCH_UP_DELAY).pipe(
+          Schedule.setInputType<boolean>(),
+          Schedule.modifyDelay(step => Effect.succeed(step.input ? INDEX_INTERVAL : CATCH_UP_DELAY)),
+        ),
+      ),
+      DshxPlugin.detached,
+      Effect.forkScoped,
+    )
+  }),
+)
 
-const { hostApi, ...plugin } = DshxEffect.plugin({
-  layer: makeLayer,
-  setup: (context: Context): Effect.Effect<void, never, BackgroundJobs | Scope.Scope> =>
-    Effect.gen(function* () {
-      const active = yield* BackgroundJobs
-      yield* Effect.sync(() => {
-        context.inject(['jobs'], scoped => {
-          const registry = scoped.get('jobs')
-          if (registry === undefined) return
-          scoped.effect(() => {
-            active.board.attachLive(registry)
-            return () => active.board.detachLive()
-          }, 'background-jobs: live job tracking')
-        })
-      })
-      yield* indexingLoop(active, context).pipe(
-        Effect.catchCause(cause => Effect.sync(() => reportFailure(context, 'history indexing startup', Cause.squash(cause)))),
-        Effect.forkScoped,
-      )
-      yield* changeEvents(active, context).pipe(Effect.forkScoped)
-    }),
-})
+/** Tell browsers to read the board again: at most once a second, a second after the first change. */
+const ChangeEvents = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const board = yield* JobsBoard
+    yield* board.changes.pipe(
+      Stream.groupedWithin(Number.MAX_SAFE_INTEGER, CHANGE_EVENT_INTERVAL),
+      Stream.runForEach(() =>
+        Api.publish({ contract: backgroundJobsApi, event: 'changed', payload: {} }).pipe(
+          Effect.catchTag('PublishEventError', error => Effect.logWarning('background-jobs: board change event refused', error.message)),
+        ),
+      ),
+      DshxPlugin.detached,
+      Effect.forkScoped,
+    )
+  }),
+)
 
-const missingJob = (error: unknown): JobNotFound =>
-  new JobNotFound({ message: error instanceof Error ? error.message : 'No such job is retained on this Host.' })
+const BackgroundJobsLive = Layer.mergeAll(IndexingLoop, ChangeEvents).pipe(
+  Layer.provideMerge(JobsBoard.layer),
+  Layer.provideMerge(LiveJobs.layer),
+  Layer.provideMerge(HistoryIndex.layer),
+  Layer.provide([HistoryConfigLive, JobRegistry.layer, NodeFileSystem.layer, NodePath.layer]),
+)
 
-export default defineHost({
-  ...plugin,
+export default DshxPlugin.make({
   name: '@dshfiles/background-jobs',
+  layer: BackgroundJobsLive,
   apis: [
-    hostApi(backgroundJobsApi, {
-      board: Effect.fn('background-jobs board')(({ input }) =>
-        Effect.gen(function* () {
-          const active = yield* BackgroundJobs
-          return active.board.board(input)
-        }),
-      ),
-      output: Effect.fn('background-jobs output')(({ input }) =>
-        Effect.gen(function* () {
-          const active = yield* BackgroundJobs
-          return active.board.output({ jobId: input.jobId, from: input.from ?? 0 })
-        }),
-      ),
-      kill: Effect.fn('background-jobs kill')(({ input }) =>
-        Effect.gen(function* () {
-          const active = yield* BackgroundJobs
-          return yield* Effect.try({ try: () => active.board.kill({ jobId: input.jobId }), catch: missingJob })
-        }),
-      ),
-      wait: Effect.fn('background-jobs wait')(({ input }) =>
-        Effect.gen(function* () {
-          const active = yield* BackgroundJobs
-          return yield* active.board.wait(input)
-        }),
-      ),
-      refresh: Effect.fn('background-jobs refresh')(({ input: _input }) =>
-        Effect.gen(function* () {
-          const active = yield* BackgroundJobs
-          yield* runPass(active)
-          return active.board.indexing()
-        }),
-      ),
+    Api.bind(backgroundJobsApi, {
+      board: input => JobsBoard.use(board => board.board(input)),
+      output: input => JobsBoard.use(board => board.output({ jobId: input.jobId, from: input.from ?? 0 })),
+      kill: input => JobsBoard.use(board => board.kill({ jobId: input.jobId })),
+      wait: input => JobsBoard.use(board => board.wait(input)),
+      refresh: () => JobsBoard.use(board => board.refresh),
     }),
   ],
 })

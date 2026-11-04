@@ -1,150 +1,50 @@
-import { execFile } from 'node:child_process'
-import { createReadStream } from 'node:fs'
-import { mkdtemp, mkdir, rm, stat, writeFile } from 'node:fs/promises'
-import { createServer } from 'node:http'
-import { tmpdir } from 'node:os'
-import { join, resolve, sep } from 'node:path'
-import { AttachmentId, type AttachmentStore, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import { recordSpans } from '@dshfiles/dshx/tracing'
-import { describe, expect, it } from 'vitest'
-import * as Schema from 'effect/Schema'
-import { TweetContextModel, TweetContextService } from '../src/tweet-context.js'
+import { tracerLayer } from '@dshfiles/dshx/effect'
+import { recordSpans, type SpanRecorder } from '@dshfiles/dshx/tracing'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, FileSystem, Layer } from 'effect'
+import { FrameSampler, type SampleRequest } from '../src/frame-sampler.js'
+import { TweetContext } from '../src/tweet-context.js'
+import { TweetContextModel } from '../src/tweet-model.js'
+import {
+  changingVideo,
+  frameColor,
+  ffmpegLayer,
+  missingFfmpeg,
+  platformLayer,
+  recordingAttachments,
+  requestUrl,
+  samplerLayer,
+  sceneVideo,
+  scratch,
+  solidVideo,
+  tweetContextLayer,
+} from './test-layers.js'
 
-const createFixtureVideo = async (input: { readonly videoPath: string; readonly dimensions?: string; readonly durationSeconds?: number }): Promise<void> =>
-  new Promise<void>((resolveExecution, rejectExecution) => {
-    const dimensions = input.dimensions ?? '320x240'
-    const durationSeconds = input.durationSeconds ?? 2
-    execFile(
-      'ffmpeg',
-      [
-        '-nostdin',
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        '-f',
-        'lavfi',
-        '-i',
-        `color=c=red:s=${dimensions}:d=${String(durationSeconds)}`,
-        '-c:v',
-        'mpeg4',
-        '-pix_fmt',
-        'yuv420p',
-        '-t',
-        String(durationSeconds),
-        '-y',
-        input.videoPath,
-      ],
-      { timeout: 15_000, maxBuffer: 1_000_000, windowsHide: true },
-      error => {
-        if (error !== null) {
-          rejectExecution(new Error('ffmpeg could not create the local video fixture.'))
-          return
-        }
-        resolveExecution()
-      },
-    )
-  })
-
-const createChangingFixtureVideo = async (input: { readonly videoPath: string; readonly durationSeconds: number; readonly rate: number }): Promise<void> =>
-  new Promise<void>((resolveExecution, rejectExecution) => {
-    execFile(
-      'ffmpeg',
-      [
-        '-nostdin',
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        '-f',
-        'lavfi',
-        '-i',
-        `color=black:s=32x32:r=${String(input.rate)}:d=${String(input.durationSeconds)}`,
-        '-vf',
-        "geq=r='min(N*5,250)':g=0:b=0",
-        '-c:v',
-        'mpeg4',
-        '-pix_fmt',
-        'yuv420p',
-        '-y',
-        input.videoPath,
-      ],
-      { timeout: 15_000, maxBuffer: 1_000_000, windowsHide: true },
-      error => (error === null ? resolveExecution() : rejectExecution(error)),
-    )
-  })
-
-const createSceneFixtureVideo = async (videoPath: string): Promise<void> =>
-  new Promise<void>((resolveExecution, rejectExecution) => {
-    execFile(
-      'ffmpeg',
-      [
-        '-nostdin',
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        '-f',
-        'lavfi',
-        '-i',
-        'color=c=red:s=320x240:r=10:d=2',
-        '-f',
-        'lavfi',
-        '-i',
-        'color=c=blue:s=320x240:r=10:d=2',
-        '-f',
-        'lavfi',
-        '-i',
-        'color=c=green:s=320x240:r=10:d=2',
-        '-filter_complex',
-        '[0:v][1:v][2:v]concat=n=3:v=1:a=0,format=yuv420p',
-        '-c:v',
-        'mpeg4',
-        '-y',
-        videoPath,
-      ],
-      { timeout: 15_000, maxBuffer: 1_000_000, windowsHide: true },
-      error => (error === null ? resolveExecution() : rejectExecution(error)),
-    )
-  })
-
-const readFrameColor = async (path: string): Promise<readonly number[]> =>
-  new Promise<readonly number[]>((resolveExecution, rejectExecution) => {
-    execFile(
-      'ffmpeg',
-      ['-nostdin', '-hide_banner', '-loglevel', 'error', '-i', path, '-vf', 'scale=1:1:flags=area,format=rgb24', '-frames:v', '1', '-f', 'rawvideo', '-'],
-      { encoding: 'buffer', timeout: 15_000 },
-      (error, stdout) => {
-        if (error !== null) return rejectExecution(error)
-        if (stdout.length < 3) return rejectExecution(new Error('Fixture frame contained no RGB pixel.'))
-        resolveExecution([stdout[0] ?? 0, stdout[1] ?? 0, stdout[2] ?? 0])
-      },
-    )
-  })
-
-const createTestTempDirectory = async (): Promise<{ readonly path: string; readonly target: string }> => {
-  const path = await mkdtemp(join(tmpdir(), 'dsh-tweet-context-test-'))
-  const root = resolve(tmpdir())
-  const target = resolve(path)
-  if (!target.startsWith(`${root}${sep}`)) throw new Error('Refusing to use a test path outside the temporary directory.')
-  return { path, target }
-}
-
-const serverAddressSchema = Schema.Struct({ port: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535)) })
+const sample = (request: SampleRequest) => FrameSampler.use(sampler => sampler.sample(request))
+const isJpeg = (data: Uint8Array) => data[0] === 0xff && data[1] === 0xd8
+const stopRecording = (recorder: SpanRecorder) => Effect.sync(() => recorder.stop())
 
 describe('tweet context URL parsing', () => {
-  it('normalizes status links and drops tracking parameters', () => {
-    expect(TweetContextModel.parseTweetUrl('https://x.com/preetsuthar17/status/2111694212857266430?ref=share#video')).toEqual({
-      id: '2111694212857266430',
-      url: 'https://x.com/i/status/2111694212857266430',
-    })
-  })
+  it.effect('normalizes status links and drops tracking parameters', () =>
+    Effect.gen(function* () {
+      expect(yield* TweetContextModel.parseTweetUrl('https://x.com/preetsuthar17/status/2111694212857266430?ref=share#video')).toEqual({
+        id: '2111694212857266430',
+        url: 'https://x.com/i/status/2111694212857266430',
+      })
+    }),
+  )
 
-  it.each([
+  it.effect.each([
     'http://x.com/user/status/123',
     'https://x.com.evil.example/user/status/123',
     'https://example.com/user/status/123',
     'https://x.com/user/likes/123',
-  ])('rejects unsupported URL %s', url => {
-    expect(() => TweetContextModel.parseTweetUrl(url)).toThrow('Provide an HTTPS X/Twitter post URL')
-  })
+  ])('rejects unsupported URL %s', url =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(TweetContextModel.parseTweetUrl(url))
+      expect(error.message).toContain('Provide an HTTPS X/Twitter post URL')
+    }),
+  )
 })
 
 describe('tweet context output rendering', () => {
@@ -171,390 +71,288 @@ describe('tweet context output rendering', () => {
 })
 
 describe('tweet video variant selection', () => {
-  it('chooses the highest-bitrate MP4 under the bounded download size', () => {
-    const video = {
-      duration: 30,
-      formats: [
-        { url: 'https://video.twimg.com/clip/playlist.m3u8', container: 'm3u8' },
-        { url: 'https://video.twimg.com/clip/320.mp4', container: 'mp4', bitrate: 632_000, codec: 'h264' },
-        { url: 'https://video.twimg.com/clip/720.mp4', container: 'mp4', bitrate: 2_176_000, codec: 'h264' },
-        { url: 'https://video.twimg.com/clip/1080.mp4', container: 'mp4', bitrate: 10_368_000, codec: 'h264' },
-      ],
-    }
-
-    expect(TweetContextModel.selectVideoFormat(video).url).toBe('https://video.twimg.com/clip/720.mp4')
-  })
-
-  it('rejects posts without a size-limited MP4 variant', () => {
-    expect(() =>
-      TweetContextModel.selectVideoFormat({
+  it.effect('chooses the highest-bitrate MP4 under the bounded download size', () =>
+    Effect.gen(function* () {
+      const video = {
         duration: 30,
-        formats: [{ url: 'https://video.twimg.com/clip/playlist.m3u8', container: 'm3u8' }],
-      }),
-    ).toThrow('No size-limited MP4 video variant')
-  })
+        formats: [
+          { url: 'https://video.twimg.com/clip/playlist.m3u8', container: 'm3u8' },
+          { url: 'https://video.twimg.com/clip/320.mp4', container: 'mp4', bitrate: 632_000, codec: 'h264' },
+          { url: 'https://video.twimg.com/clip/720.mp4', container: 'mp4', bitrate: 2_176_000, codec: 'h264' },
+          { url: 'https://video.twimg.com/clip/1080.mp4', container: 'mp4', bitrate: 10_368_000, codec: 'h264' },
+        ],
+      }
+      expect((yield* TweetContextModel.selectVideoFormat(video)).url).toBe('https://video.twimg.com/clip/720.mp4')
+    }),
+  )
+
+  it.effect('rejects posts without a size-limited MP4 variant', () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(
+        TweetContextModel.selectVideoFormat({ duration: 30, formats: [{ url: 'https://video.twimg.com/clip/playlist.m3u8', container: 'm3u8' }] }),
+      )
+      expect(error.message).toContain('No size-limited MP4 video variant')
+    }),
+  )
 })
 
 describe('sampled video frames', () => {
-  it('uses ffmpeg to create real JPEG frames from a local MP4', async () => {
-    const temp = await createTestTempDirectory()
-    try {
-      const frameDirectory = join(temp.path, 'frames')
-      const videoPath = join(temp.path, 'fixture.mp4')
-      await mkdir(frameDirectory)
-      await createFixtureVideo({ videoPath })
+  it.effect(
+    'uses ffmpeg to create real JPEG frames from a local MP4',
+    () =>
+      Effect.gen(function* () {
+        const temp = yield* scratch
+        yield* solidVideo({ videoPath: temp.file('fixture.mp4') })
+        const frames = yield* sample({ videoPath: temp.file('fixture.mp4'), frameDirectory: temp.frameDirectory, durationSeconds: 2 })
+        expect(frames).toHaveLength(1)
+        expect(frames.every(frame => isJpeg(frame.data))).toBe(true)
+      }).pipe(Effect.provide(samplerLayer)),
+    30_000,
+  )
 
-      const frames = await TweetContextModel.sampleVideoFrames({
-        videoPath,
-        frameDirectory,
-        durationSeconds: 2,
-        signal: AbortSignal.timeout(15_000),
-      })
-      expect(frames).toHaveLength(1)
-      const firstFrame = frames[0]
-      if (firstFrame === undefined) throw new Error('ffmpeg did not return a sampled frame.')
-      expect(Array.from(firstFrame.data.slice(0, 2))).toEqual([0xff, 0xd8])
-    } finally {
-      await rm(temp.target, { recursive: true, force: true })
-    }
-  }, 30_000)
+  it.effect(
+    'spreads selected frames across temporal bins and returns valid JPEGs',
+    () =>
+      Effect.gen(function* () {
+        const temp = yield* scratch
+        yield* changingVideo({ videoPath: temp.file('fixture.mp4'), durationSeconds: 8, rate: 5 })
+        const frames = yield* sample({ videoPath: temp.file('fixture.mp4'), frameDirectory: temp.frameDirectory, durationSeconds: 8 })
+        expect(frames.length).toBeGreaterThan(1)
+        expect(frames.length).toBeLessThanOrEqual(12)
+        expect(frames[0]?.atSeconds).toBeLessThan(2)
+        expect(frames.at(-1)?.atSeconds).toBeGreaterThan(6)
+        expect(frames.every(frame => isJpeg(frame.data))).toBe(true)
+      }).pipe(Effect.provide(samplerLayer)),
+    30_000,
+  )
 
-  it('spreads selected frames across temporal bins and returns valid JPEGs', async () => {
-    const temp = await createTestTempDirectory()
-    try {
-      const frameDirectory = join(temp.path, 'frames')
-      const videoPath = join(temp.path, 'fixture.mp4')
-      await mkdir(frameDirectory)
-      await createChangingFixtureVideo({ videoPath, durationSeconds: 8, rate: 5 })
-      const frames = await TweetContextModel.sampleVideoFrames({ videoPath, frameDirectory, durationSeconds: 8, signal: AbortSignal.timeout(15_000) })
-      expect(frames.length).toBeGreaterThan(1)
-      expect(frames.length).toBeLessThanOrEqual(12)
-      expect(frames[0]?.atSeconds).toBeLessThan(2)
-      expect(frames.at(-1)?.atSeconds).toBeGreaterThan(6)
-      for (const frame of frames) expect(Array.from(frame.data.slice(0, 2))).toEqual([0xff, 0xd8])
-    } finally {
-      await rm(temp.target, { recursive: true, force: true })
-    }
-  }, 30_000)
+  it.effect(
+    'matches reported timestamps to sampled scene colors in a non-zero window',
+    () =>
+      Effect.gen(function* () {
+        const temp = yield* scratch
+        const fs = yield* FileSystem.FileSystem
+        yield* sceneVideo(temp.file('scenes.mp4'))
+        const frames = yield* sample({
+          videoPath: temp.file('scenes.mp4'),
+          frameDirectory: temp.frameDirectory,
+          durationSeconds: 6,
+          maxFrames: 8,
+          startSeconds: 1,
+          endSeconds: 5,
+        })
+        expect(frames.length).toBeGreaterThanOrEqual(3)
+        const sampled = yield* Effect.forEach(frames, (frame, index) =>
+          Effect.gen(function* () {
+            const jpeg = temp.file(`sample-${String(index)}.jpg`)
+            yield* fs.writeFile(jpeg, frame.data)
+            return { atSeconds: frame.atSeconds, color: yield* frameColor({ jpeg, pixel: temp.file(`pixel-${String(index)}.rgb`) }) }
+          }),
+        )
+        for (const frame of sampled) {
+          if (frame.atSeconds < 2) expect(frame.color.red).toBeGreaterThan(frame.color.blue)
+          else if (frame.atSeconds < 4) expect(frame.color.blue).toBeGreaterThan(frame.color.red)
+          else expect(frame.color.green).toBeGreaterThan(frame.color.red)
+        }
+        expect(sampled.some(frame => frame.atSeconds < 2)).toBe(true)
+        expect(sampled.some(frame => frame.atSeconds >= 2 && frame.atSeconds < 4)).toBe(true)
+        expect(sampled.some(frame => frame.atSeconds >= 4)).toBe(true)
+      }).pipe(Effect.provide(samplerLayer)),
+    30_000,
+  )
 
-  it('matches reported timestamps to sampled scene colors in a non-zero window', async () => {
-    const temp = await createTestTempDirectory()
-    try {
-      const frameDirectory = join(temp.path, 'frames')
-      const videoPath = join(temp.path, 'scenes.mp4')
-      await mkdir(frameDirectory)
-      await createSceneFixtureVideo(videoPath)
-      const frames = await TweetContextModel.sampleVideoFrames({
-        videoPath,
-        frameDirectory,
-        durationSeconds: 6,
-        maxFrames: 8,
-        startSeconds: 1,
-        endSeconds: 5,
-        signal: AbortSignal.timeout(15_000),
-      })
-      expect(frames.length).toBeGreaterThanOrEqual(3)
-      const sampled = await Promise.all(
-        frames.map(async (frame, index) => {
-          const path = join(temp.path, `sample-${String(index)}.jpg`)
-          await writeFile(path, frame.data)
-          return { atSeconds: frame.atSeconds, color: await readFrameColor(path) }
-        }),
-      )
-      for (const frame of sampled) {
-        const red = frame.color[0] ?? 0
-        const green = frame.color[1] ?? 0
-        const blue = frame.color[2] ?? 0
-        if (frame.atSeconds < 2) expect(red).toBeGreaterThan(blue)
-        else if (frame.atSeconds < 4) expect(blue).toBeGreaterThan(red)
-        else expect(green).toBeGreaterThan(red)
-      }
-      expect(sampled.some(frame => frame.atSeconds < 2)).toBe(true)
-      expect(sampled.some(frame => frame.atSeconds >= 2 && frame.atSeconds < 4)).toBe(true)
-      expect(sampled.some(frame => frame.atSeconds >= 4)).toBe(true)
-    } finally {
-      await rm(temp.target, { recursive: true, force: true })
-    }
-  }, 30_000)
+  it.effect(
+    'keeps multiple informative frames from a short changing clip',
+    () =>
+      Effect.gen(function* () {
+        const temp = yield* scratch
+        yield* changingVideo({ videoPath: temp.file('fixture.mp4'), durationSeconds: 2, rate: 30 })
+        const frames = yield* sample({ videoPath: temp.file('fixture.mp4'), frameDirectory: temp.frameDirectory, durationSeconds: 2, maxFrames: 12 })
+        expect(frames.length).toBeGreaterThan(1)
+        expect(frames.length).toBeLessThanOrEqual(4)
+      }).pipe(Effect.provide(samplerLayer)),
+    30_000,
+  )
 
-  it('keeps multiple informative frames from a short changing clip', async () => {
-    const temp = await createTestTempDirectory()
-    try {
-      const frameDirectory = join(temp.path, 'frames')
-      const videoPath = join(temp.path, 'fixture.mp4')
-      await mkdir(frameDirectory)
-      await createChangingFixtureVideo({ videoPath, durationSeconds: 2, rate: 30 })
-      const frames = await TweetContextModel.sampleVideoFrames({
-        videoPath,
-        frameDirectory,
-        durationSeconds: 2,
-        maxFrames: 12,
-        signal: AbortSignal.timeout(15_000),
-      })
-      expect(frames.length).toBeGreaterThan(1)
-      expect(frames.length).toBeLessThanOrEqual(4)
-    } finally {
-      await rm(temp.target, { recursive: true, force: true })
-    }
-  }, 30_000)
+  it.effect(
+    'honors an explicit time window and maxFrames',
+    () =>
+      Effect.gen(function* () {
+        const temp = yield* scratch
+        yield* changingVideo({ videoPath: temp.file('fixture.mp4'), durationSeconds: 8, rate: 5 })
+        const frames = yield* sample({
+          videoPath: temp.file('fixture.mp4'),
+          frameDirectory: temp.frameDirectory,
+          durationSeconds: 8,
+          maxFrames: 3,
+          startSeconds: 2,
+          endSeconds: 4,
+        })
+        expect(frames.length).toBeGreaterThan(0)
+        expect(frames.length).toBeLessThanOrEqual(3)
+        expect(frames.every(frame => frame.atSeconds >= 2 && frame.atSeconds < 4)).toBe(true)
+      }).pipe(Effect.provide(samplerLayer)),
+    30_000,
+  )
 
-  it('honors an explicit time window and maxFrames', async () => {
-    const temp = await createTestTempDirectory()
-    try {
-      const frameDirectory = join(temp.path, 'frames')
-      const videoPath = join(temp.path, 'fixture.mp4')
-      await mkdir(frameDirectory)
-      await createChangingFixtureVideo({ videoPath, durationSeconds: 8, rate: 5 })
-      const frames = await TweetContextModel.sampleVideoFrames({
-        videoPath,
-        frameDirectory,
-        durationSeconds: 8,
-        maxFrames: 3,
-        startSeconds: 2,
-        endSeconds: 4,
-        signal: AbortSignal.timeout(15_000),
-      })
-      expect(frames.length).toBeGreaterThan(0)
-      expect(frames.length).toBeLessThanOrEqual(3)
-      expect(frames.every(frame => frame.atSeconds >= 2 && frame.atSeconds < 4)).toBe(true)
-    } finally {
-      await rm(temp.target, { recursive: true, force: true })
-    }
-  }, 30_000)
+  it.effect(
+    'keeps a frame from a sub-second single-frame clip',
+    () =>
+      Effect.gen(function* () {
+        const temp = yield* scratch
+        yield* changingVideo({ videoPath: temp.file('fixture.mp4'), durationSeconds: 0.2, rate: 5 })
+        const frames = yield* sample({ videoPath: temp.file('fixture.mp4'), frameDirectory: temp.frameDirectory, durationSeconds: 0.2 })
+        expect(frames).toHaveLength(1)
+        expect(frames[0]?.atSeconds).toBeCloseTo(0, 1)
+      }).pipe(Effect.provide(samplerLayer)),
+    30_000,
+  )
 
-  it('keeps a frame from a sub-second single-frame clip', async () => {
-    const temp = await createTestTempDirectory()
-    try {
-      const frameDirectory = join(temp.path, 'frames')
-      const videoPath = join(temp.path, 'fixture.mp4')
-      await mkdir(frameDirectory)
-      await createChangingFixtureVideo({ videoPath, durationSeconds: 0.2, rate: 5 })
-      const frames = await TweetContextModel.sampleVideoFrames({ videoPath, frameDirectory, durationSeconds: 0.2, signal: AbortSignal.timeout(15_000) })
-      expect(frames).toHaveLength(1)
-      expect(frames[0]?.atSeconds).toBeCloseTo(0, 1)
-    } finally {
-      await rm(temp.target, { recursive: true, force: true })
-    }
-  }, 30_000)
-
-  it('caps long video samples at 24 frames', async () => {
-    const temp = await createTestTempDirectory()
-    try {
-      const frameDirectory = join(temp.path, 'frames')
-      const videoPath = join(temp.path, 'fixture.mp4')
-      await mkdir(frameDirectory)
-      await createChangingFixtureVideo({ videoPath, durationSeconds: 100, rate: 1 })
-      const frames = await TweetContextModel.sampleVideoFrames({ videoPath, frameDirectory, durationSeconds: 100, signal: AbortSignal.timeout(15_000) })
-      expect(frames.length).toBeGreaterThan(0)
-      expect(frames.length).toBeLessThanOrEqual(24)
-      expect(frames.at(-1)?.atSeconds).toBeLessThanOrEqual(60)
-      expect(frames[0]?.atSeconds).toBeLessThan(8)
-      const limitedDirectory = join(temp.path, 'limited')
-      await mkdir(limitedDirectory)
-      const limited = await TweetContextModel.sampleVideoFrames({
-        videoPath,
-        frameDirectory: limitedDirectory,
-        durationSeconds: 100,
-        maxFrames: 3,
-        signal: AbortSignal.timeout(15_000),
-      })
-      expect(limited.length).toBeGreaterThan(0)
-      expect(limited.length).toBeLessThanOrEqual(3)
-      expect(limited.at(-1)?.atSeconds).toBeLessThanOrEqual(60)
-      const customWindowDirectory = join(temp.path, 'custom-window')
-      await mkdir(customWindowDirectory)
-      const customWindow = await TweetContextModel.sampleVideoFrames({
-        videoPath,
-        frameDirectory: customWindowDirectory,
-        durationSeconds: 100,
-        maxFrames: 3,
-        startSeconds: 10,
-        endSeconds: 100,
-        signal: AbortSignal.timeout(15_000),
-      })
-      expect(customWindow.length).toBeGreaterThan(0)
-      expect(customWindow.length).toBeLessThanOrEqual(3)
-      expect(customWindow[0]?.atSeconds).toBeGreaterThanOrEqual(10)
-      expect(customWindow.at(-1)?.atSeconds).toBeLessThan(100)
-      expect(
-        await TweetContextModel.sampleVideoFrames({
+  it.effect(
+    'caps long video samples at 24 frames',
+    () =>
+      Effect.gen(function* () {
+        const temp = yield* scratch
+        const fs = yield* FileSystem.FileSystem
+        const videoPath = temp.file('fixture.mp4')
+        yield* changingVideo({ videoPath, durationSeconds: 100, rate: 1 })
+        const frames = yield* sample({ videoPath, frameDirectory: temp.frameDirectory, durationSeconds: 100 })
+        expect(frames.length).toBeGreaterThan(0)
+        expect(frames.length).toBeLessThanOrEqual(24)
+        expect(frames.at(-1)?.atSeconds).toBeLessThanOrEqual(60)
+        expect(frames[0]?.atSeconds).toBeLessThan(8)
+        const limitedDirectory = temp.file('limited')
+        yield* fs.makeDirectory(limitedDirectory)
+        const limited = yield* sample({ videoPath, frameDirectory: limitedDirectory, durationSeconds: 100, maxFrames: 3 })
+        expect(limited.length).toBeGreaterThan(0)
+        expect(limited.length).toBeLessThanOrEqual(3)
+        expect(limited.at(-1)?.atSeconds).toBeLessThanOrEqual(60)
+        const customWindowDirectory = temp.file('custom-window')
+        yield* fs.makeDirectory(customWindowDirectory)
+        const customWindow = yield* sample({
           videoPath,
-          frameDirectory: limitedDirectory,
+          frameDirectory: customWindowDirectory,
           durationSeconds: 100,
-          maxFrames: 0,
-          signal: AbortSignal.timeout(15_000),
-        }),
-      ).toEqual([])
-    } finally {
-      await rm(temp.target, { recursive: true, force: true })
-    }
-  }, 30_000)
+          maxFrames: 3,
+          startSeconds: 10,
+          endSeconds: 100,
+        })
+        expect(customWindow.length).toBeGreaterThan(0)
+        expect(customWindow.length).toBeLessThanOrEqual(3)
+        expect(customWindow[0]?.atSeconds).toBeGreaterThanOrEqual(10)
+        expect(customWindow.at(-1)?.atSeconds).toBeLessThan(100)
+        expect(yield* sample({ videoPath, frameDirectory: limitedDirectory, durationSeconds: 100, maxFrames: 0 })).toEqual([])
+      }).pipe(Effect.provide(samplerLayer)),
+    30_000,
+  )
 
-  it('records an ffmpeg sample span with the requested frame count', async () => {
-    using recorder = recordSpans()
-    const temp = await createTestTempDirectory()
-    try {
-      const frameDirectory = join(temp.path, 'frames')
-      const videoPath = join(temp.path, 'fixture.mp4')
-      await mkdir(frameDirectory)
-      await createFixtureVideo({ videoPath })
-      await TweetContextModel.sampleVideoFrames({ videoPath, frameDirectory, durationSeconds: 2, signal: AbortSignal.timeout(15_000) })
-      const span = recorder.span('ffmpeg sample')
-      expect(span.attributes['process.executable.name']).toBe('ffmpeg')
-      expect(JSON.stringify(span.attributes)).not.toContain(temp.path)
-      const scanSpan = recorder.span('ffmpeg scan')
-      expect(scanSpan.attributes['process.executable.name']).toBe('ffmpeg')
-      expect(scanSpan.attributes['dshx.tweet-context.candidate_limit']).toBe(120)
-      expect(JSON.stringify(scanSpan.attributes)).not.toContain(temp.path)
-    } finally {
-      await rm(temp.target, { recursive: true, force: true })
-    }
-  }, 30_000)
+  it.effect(
+    'records an ffmpeg sample span with the requested frame count',
+    () =>
+      Effect.gen(function* () {
+        const recorder = yield* Effect.acquireRelease(
+          Effect.sync(() => recordSpans()),
+          stopRecording,
+        )
+        const temp = yield* scratch
+        yield* solidVideo({ videoPath: temp.file('fixture.mp4') })
+        yield* sample({ videoPath: temp.file('fixture.mp4'), frameDirectory: temp.frameDirectory, durationSeconds: 2 }).pipe(Effect.provide(tracerLayer))
+        const span = recorder.span('ffmpeg sample')
+        expect(span.attributes['process.executable.name']).toBe('ffmpeg')
+        expect(span.attributes['dshx.tweet-context.frames']).toBe(1)
+        expect(JSON.stringify(span.attributes)).not.toContain(temp.directory)
+        const scanSpan = recorder.span('ffmpeg scan')
+        expect(scanSpan.attributes['process.executable.name']).toBe('ffmpeg')
+        expect(scanSpan.attributes['dshx.tweet-context.candidate_limit']).toBe(120)
+        expect(JSON.stringify(scanSpan.attributes)).not.toContain(temp.directory)
+      }).pipe(Effect.provide(samplerLayer)),
+    30_000,
+  )
 
-  it('rejects decoded frames above the ffmpeg pixel budget', async () => {
-    const temp = await createTestTempDirectory()
-    try {
-      const frameDirectory = join(temp.path, 'frames')
-      const videoPath = join(temp.path, 'large-frame.mp4')
-      await mkdir(frameDirectory)
-      await createFixtureVideo({ videoPath, dimensions: '4096x4096', durationSeconds: 1 })
+  it.effect(
+    'rejects decoded frames above the ffmpeg pixel budget',
+    () =>
+      Effect.gen(function* () {
+        const temp = yield* scratch
+        yield* solidVideo({ videoPath: temp.file('large-frame.mp4'), dimensions: '4096x4096', durationSeconds: 1 })
+        const error = yield* Effect.flip(sample({ videoPath: temp.file('large-frame.mp4'), frameDirectory: temp.frameDirectory, durationSeconds: 1 }))
+        expect(error).toMatchObject({ _tag: 'FrameSamplingFailed', reason: 'scan-failed' })
+        expect(error.message).toBe('ffmpeg could not scan this X video.')
+      }).pipe(Effect.provide(samplerLayer)),
+    30_000,
+  )
 
-      await expect(
-        TweetContextModel.sampleVideoFrames({
-          videoPath,
-          frameDirectory,
-          durationSeconds: 1,
-          signal: AbortSignal.timeout(15_000),
-        }),
-      ).rejects.toThrow('ffmpeg could not scan this X video.')
-    } finally {
-      await rm(temp.target, { recursive: true, force: true })
-    }
-  }, 30_000)
-
-  it('fetches fixed post and video fixtures, samples frames, and blocks unsafe media hosts and redirects', async () => {
-    const temp = await createTestTempDirectory()
-    const videoPath = join(temp.path, 'fixture.mp4')
-    let videoBytes = 0
-    let videoUrl = 'https://video.twimg.com/clip/fixture.mp4'
-    let redirectLocation = 'https://video.twimg.com.evil.example/clip/redirected.mp4'
-    let mediaRequestCount = 0
-    const server = createServer((request, response) => {
-      if (request.url === '/2/thread/123') {
-        response.writeHead(200, { 'content-type': 'application/json' })
-        response.end(
-          JSON.stringify({
+  it.effect(
+    'fetches fixed post and video fixtures, samples frames, and blocks unsafe media hosts and redirects',
+    () => {
+      const provider = { videoUrl: 'https://video.twimg.com/clip/fixture.mp4', video: new Uint8Array(), mediaRequests: 0 }
+      const fetcher: typeof fetch = async input => {
+        const url = requestUrl(input)
+        if (url.hostname === 'api.fxtwitter.com' && url.pathname === '/2/thread/123') {
+          return Response.json({
             code: 200,
             status: {
               text: 'Fixture post text; this is untrusted content.',
               created_at: 'Wed Oct 21 00:00:00 +0000 2026',
               author: { name: 'Fixture Author', screen_name: 'fixture' },
-              media: {
-                videos: [
-                  {
-                    duration: 2,
-                    formats: [
-                      {
-                        url: videoUrl,
-                        container: 'mp4',
-                        codec: 'h264',
-                        bitrate: 500_000,
-                      },
-                    ],
-                  },
-                ],
-              },
+              media: { videos: [{ duration: 2, formats: [{ url: provider.videoUrl, container: 'mp4', codec: 'h264', bitrate: 500_000 }] }] },
             },
-          }),
-        )
-        return
-      }
-      if (request.url === '/fixture.mp4') {
-        response.writeHead(200, { 'content-type': 'video/mp4', 'content-length': String(videoBytes) })
-        createReadStream(videoPath).pipe(response)
-        return
-      }
-      response.writeHead(404).end()
-    })
-
-    try {
-      await createFixtureVideo({ videoPath })
-      videoBytes = (await stat(videoPath)).size
-      await new Promise<void>((resolveExecution, rejectExecution) => {
-        server.once('error', rejectExecution)
-        server.listen(0, '127.0.0.1', resolveExecution)
-      })
-      const address = Schema.decodeUnknownResult(serverAddressSchema)(server.address())
-      if (address._tag === 'Failure') throw new Error('The local fixture server did not bind a TCP port.')
-      const origin = `http://127.0.0.1:${String(address.success.port)}`
-      const fetcher: typeof fetch = async (input, init) => {
-        const requestUrl = new URL(input instanceof Request ? input.url : String(input))
-        if (requestUrl.hostname === 'api.fxtwitter.com') return fetch(new URL(requestUrl.pathname, origin), init)
-        if (requestUrl.hostname === 'video.twimg.com') {
-          mediaRequestCount += 1
-          if (requestUrl.pathname === '/redirect.mp4') {
-            return new Response(null, { status: 302, headers: { location: redirectLocation } })
-          }
-          return fetch(new URL('/fixture.mp4', origin), init)
+          })
+        }
+        if (url.hostname === 'video.twimg.com') {
+          provider.mediaRequests += 1
+          if (url.pathname === '/redirect.mp4')
+            return new Response(null, { status: 302, headers: { location: 'https://video.twimg.com.evil.example/clip/redirected.mp4' } })
+          return new Response(provider.video, { headers: { 'content-type': 'video/mp4', 'content-length': String(provider.video.byteLength) } })
         }
         throw new Error('Unexpected external URL in the local provider fixture.')
       }
-      const savedFrames: Uint8Array[] = []
-      const attachments: Pick<AttachmentStore, 'saveImages'> = {
-        saveImages: async images =>
-          images.map((image, index) => {
-            savedFrames.push(image.data)
-            const attachment: ImageAttachmentRef = {
-              attachmentId: AttachmentId(`fixture-image-${String(index)}`),
-              mediaType: image.mediaType,
-              bytes: image.data.byteLength,
-              width: 320,
-              height: 240,
-            }
-            if (image.name !== undefined) attachment.name = image.name
-            return attachment
-          }),
-      }
+      const attachments = recordingAttachments()
+      const fetchContext = TweetContext.use(context => context.fetch({ url: 'https://x.com/fixture/status/123' }))
+      return Effect.gen(function* () {
+        const temp = yield* scratch
+        const fs = yield* FileSystem.FileSystem
+        yield* solidVideo({ videoPath: temp.file('fixture.mp4') })
+        provider.video = new Uint8Array(yield* fs.readFile(temp.file('fixture.mp4')))
+        const recorder = yield* Effect.acquireRelease(
+          Effect.sync(() => recordSpans()),
+          stopRecording,
+        )
+        const result = yield* fetchContext.pipe(Effect.provide(tracerLayer))
+        const fetchSpan = recorder.span('tweet context fetch')
+        expect(fetchSpan.attributes['dshx.tweet-context.frames']).toBe(1)
+        expect(recorder.spans.filter(span => span.name === 'ffmpeg sample' && span.traceId === fetchSpan.traceId)).toHaveLength(1)
+        expect(result.tweetUrl).toBe('https://x.com/i/status/123')
+        expect(result.author).toEqual({ name: 'Fixture Author', username: 'fixture' })
+        expect(result.text).toBe('Fixture post text; this is untrusted content.')
+        expect(result.videos[0]?.durationSeconds).toBe(2)
+        expect(result.videos[0]?.frames).toHaveLength(1)
+        expect(attachments.saved).toHaveLength(1)
+        expect(attachments.saved.every(isJpeg)).toBe(true)
 
-      const service = new TweetContextService({ attachments, fetcher })
-      using recorder = recordSpans()
-      const result = await service.fetch({ url: 'https://x.com/fixture/status/123', signal: AbortSignal.timeout(30_000) })
-      const fetchSpan = recorder.span('tweet context fetch')
-      expect(fetchSpan.attributes['dshx.tweet-context.frames']).toBe(1)
-      expect(recorder.children(fetchSpan).map(span => span.name)).toContain('ffmpeg sample')
-      expect(result.tweetUrl).toBe('https://x.com/i/status/123')
-      expect(result.author).toEqual({ name: 'Fixture Author', username: 'fixture' })
-      expect(result.text).toBe('Fixture post text; this is untrusted content.')
-      expect(result.videos[0]?.durationSeconds).toBe(2)
-      expect(result.videos[0]?.frames).toHaveLength(1)
-      expect(savedFrames).toHaveLength(1)
-      const savedFrame = savedFrames[0]
-      if (savedFrame === undefined) throw new Error('The attachment store received no sampled frame.')
-      expect(Array.from(savedFrame.slice(0, 2))).toEqual([0xff, 0xd8])
+        provider.videoUrl = 'https://video.twimg.com.evil.example/clip/fixture.mp4'
+        const unsafe = yield* fetchContext
+        expect(unsafe.text).toBe('Fixture post text; this is untrusted content.')
+        expect(unsafe.warnings).toContain('Video unavailable: The post service returned an unsupported video URL.')
+        expect(provider.mediaRequests).toBe(1)
 
-      videoUrl = 'https://video.twimg.com.evil.example/clip/fixture.mp4'
-      const unsafe = await service.fetch({ url: 'https://x.com/fixture/status/123', signal: AbortSignal.timeout(30_000) })
-      expect(unsafe.text).toBe('Fixture post text; this is untrusted content.')
-      expect(unsafe.warnings).toContain('Video unavailable: The post service returned an unsupported video URL.')
-      expect(mediaRequestCount).toBe(1)
+        provider.videoUrl = 'https://video.twimg.com/redirect.mp4'
+        const redirected = yield* fetchContext
+        expect(redirected.warnings).toContain('Video unavailable: Could not fetch the X video from video.twimg.com.')
+        expect(provider.mediaRequests).toBe(2)
+      }).pipe(Effect.provide(Layer.mergeAll(tweetContextLayer({ fetcher, attachments: attachments.layer }), ffmpegLayer)))
+    },
+    30_000,
+  )
 
-      videoUrl = 'https://video.twimg.com/redirect.mp4'
-      const redirected = await service.fetch({ url: 'https://x.com/fixture/status/123', signal: AbortSignal.timeout(30_000) })
-      expect(redirected.warnings).toContain('Video unavailable: Could not fetch the X video from video.twimg.com.')
-      expect(mediaRequestCount).toBe(2)
-    } finally {
-      if (server.listening) {
-        await new Promise<void>((resolveExecution, rejectExecution) => {
-          server.close(error => {
-            if (error !== undefined) {
-              rejectExecution(error)
-              return
-            }
-            resolveExecution()
-          })
-        })
-      }
-      await rm(temp.target, { recursive: true, force: true })
-    }
-  }, 30_000)
+  it.effect(
+    'reports a missing ffmpeg binary instead of a decode failure',
+    () =>
+      Effect.gen(function* () {
+        const temp = yield* scratch
+        const error = yield* Effect.flip(sample({ videoPath: temp.file('absent.mp4'), frameDirectory: temp.frameDirectory, durationSeconds: 2 }))
+        expect(error).toMatchObject({ _tag: 'FrameSamplingFailed', reason: 'ffmpeg-missing' })
+      }).pipe(Effect.provide(FrameSampler.layer.pipe(Layer.provideMerge(Layer.mergeAll(missingFfmpeg, platformLayer))))),
+    30_000,
+  )
 })

@@ -344,9 +344,9 @@
         "expect text \"2 selected\"",
         "expect button \"Start thread\"",
         "rightclick row \"Item b:2\"",
-        "click menuitem \"Start thread (2)…\"",
+        "click menuitem \"Start thread (2)\u2026\"",
         "expect dialog \"Start thread\"",
-        "expect text \"· 2 items*\"",
+        "expect text \"\u00b7 2 items*\"",
         "click button \"Cancel\"",
         "expect text \"First selection item\""
       ],
@@ -450,12 +450,12 @@
         "click checkbox \"Select b:1\"",
         "click checkbox \"Select b:2\"",
         "rightclick row \"Item b:2\"",
-        "expect menuitem \"Start thread (2)…\"",
+        "expect menuitem \"Start thread (2)\u2026\"",
         "expect menuitem \"Copy item IDs (2)\"",
         "expect menuitem \"Copy item links (2)\"",
         "expect menuitem \"Status (2)\"",
         "expect menuitem \"Pin items (2)\"",
-        "expect menuitem \"Delete permanently (2)…\""
+        "expect menuitem \"Delete permanently (2)\u2026\""
       ],
       "surfaces": ["client"],
       "configuration": [],
@@ -576,9 +576,9 @@
         },
         {
           "kind": "custom",
-          "span": "jev classify",
-          "file": "plugins/@dshfiles/backlog/src/jev-client.test.ts",
-          "testName": "records a jev classify span with status and token counts, never the key or text"
+          "span": "backlog triage pass",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "records one bounded backlog triage pass span with the item id"
         },
         {
           "kind": "automatic",
@@ -674,9 +674,9 @@
         },
         {
           "kind": "custom",
-          "span": "jev classify",
-          "file": "plugins/@dshfiles/backlog/src/jev-client.test.ts",
-          "testName": "records a jev classify span with status and token counts, never the key or text"
+          "span": "backlog triage pass",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "records one bounded backlog triage pass span with the item id"
         },
         {
           "kind": "automatic",
@@ -832,15 +832,15 @@
         {
           "kind": "custom",
           "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/backlog/src/jj-runner.test.ts",
-          "testName": "records a jj log span with flag names only and the exit code"
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         }
       ]
     },
     {
       "id": "backlog-mentions",
       "title": "Mention backlog items with @",
-      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; …)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text.",
+      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; \u2026)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text.",
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["listed", "inserted", "sent", "rendered"],
@@ -900,7 +900,7 @@
         "press Enter",
         "expect button \"Backlog item b:1\"",
         "click button \"Backlog item b:1\"",
-        "expect text \"Backlog · b:1\"",
+        "expect text \"Backlog \u00b7 b:1\"",
         "expect text \"Ship the backlog reference preview\"",
         "expect img \"red.png\"",
         "click button \"Open red.png\"",
@@ -1472,12 +1472,12 @@
         "expect text \"Start a thread from b:1\"",
         "click button \"Feed\"",
         "rightclick article \"Item b:1\"",
-        "expect menuitem \"Start thread…\"",
+        "expect menuitem \"Start thread\u2026\"",
         "expect menuitem \"Status\"",
         "expect menuitem \"Project\"",
         "expect menuitem \"Copy item ID\"",
         "expect menuitem \"Copy item link\"",
-        "click menuitem \"Start thread…\"",
+        "click menuitem \"Start thread\u2026\"",
         "expect dialog \"Start thread\"",
         "click button \"Cancel\"",
         "click button \"Board\"",
@@ -1638,8 +1638,8 @@
         {
           "kind": "unit-test",
           "id": "backlog.jev-secret-setup-status",
-          "file": "plugins/@dshfiles/backlog/src/jev-setup-status.test.ts",
-          "testName": "suggests setup when the key is missing or its reference cannot resolve"
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "reports that Jev needs its key when it is on without one"
         }
       ],
       "telemetry": [
@@ -1706,12 +1706,18 @@
         }
       ],
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
         {
           "kind": "custom",
           "span": "backlog tweet import",
-          "file": "plugins/@dshfiles/backlog/src/backlog-tweet-context.test.ts",
+          "file": "plugins/@dshfiles/backlog/src/tweet-import.test.ts",
           "testName": "records one bounded span for the import work unit"
         }
       ]

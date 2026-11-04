@@ -1,15 +1,9 @@
 import type {} from '@deepseek-ai/cordis'
 
-export {
-  DEFAULT_SECRET_ENVIRONMENT,
-  formatSecretReference,
-  parseSecretReference,
-  SecretReferenceResolver,
-  type SecretCatalogValues,
-  type SecretReference,
-  type SecretReferenceResolution,
-  type ResolvedSecretCredential,
-} from './secret-reference.js'
+export { DEFAULT_SECRET_ENVIRONMENT, formatSecretReference, parseSecretReference, type SecretReference } from './grammar.js'
+export type { ResolvedSecretCredential } from './resolve.js'
+export type { SecretCatalogValues, SecretReferenceResolution } from './secret-reference.js'
+export { SecretReferenceResolver } from './secret-reference-promise.js'
 
 /**
  * The port a secrets catalog provides on the Cordis Context and credential consumers call. It lives in its own package

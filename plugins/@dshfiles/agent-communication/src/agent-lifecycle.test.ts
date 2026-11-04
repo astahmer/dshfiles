@@ -1,12 +1,17 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createCommunicationService } from '@dshfiles/dshx/communication'
-import { AgentCommunicationLifecycle } from './agent-lifecycle.js'
+import { createCommunicationService, type CommunicationService } from '@dshfiles/dshx/communication'
+import { Effect, Exit } from 'effect'
+import { cleanupInactiveWorkspaceChannels, initializeCommunicationAgent, registerCommunicationAgent } from './agent-lifecycle.js'
+import { CommunicationHub } from './communication-hub-promise.js'
 import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 
 const temporaryRoots: string[] = []
+
+const withHub = <A, E>(service: CommunicationService, effect: Effect.Effect<A, E, CommunicationHub>) =>
+  Effect.runPromise(effect.pipe(Effect.provide(CommunicationHub.fromService(service))))
 
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
@@ -22,8 +27,8 @@ describe('communication Agent initialization', () => {
 
     await Promise.all(
       agents.flatMap(agent => [
-        AgentCommunicationLifecycle.initializeCommunicationAgent({ service, agentId: agent.id, workspaceCwd: agent.workspaceCwd }),
-        AgentCommunicationLifecycle.initializeCommunicationAgent({ service, agentId: agent.id, workspaceCwd: agent.workspaceCwd }),
+        withHub(service, initializeCommunicationAgent({ agentId: agent.id, workspaceCwd: agent.workspaceCwd })),
+        withHub(service, initializeCommunicationAgent({ agentId: agent.id, workspaceCwd: agent.workspaceCwd })),
       ]),
     )
 
@@ -51,15 +56,9 @@ describe('communication Agent initialization', () => {
     await service.ensureSubscription({ kind: 'agent', id: 'session-workspace' }, { topic: workspaceTopic, delivery: 'passive' })
     currentTime += 25 * 60 * 60 * 1000
 
-    await expect(
-      AgentCommunicationLifecycle.cleanupInactiveWorkspaceChannels({ service, sessionCwds: [workspaceCwd], liveAgentCwds: [], now: currentTime }),
-    ).resolves.toBe(0)
-    await expect(
-      AgentCommunicationLifecycle.cleanupInactiveWorkspaceChannels({ service, sessionCwds: [], liveAgentCwds: [workspaceCwd], now: currentTime }),
-    ).resolves.toBe(0)
-    await expect(AgentCommunicationLifecycle.cleanupInactiveWorkspaceChannels({ service, sessionCwds: [], liveAgentCwds: [], now: currentTime })).resolves.toBe(
-      1,
-    )
+    await expect(withHub(service, cleanupInactiveWorkspaceChannels({ sessionCwds: [workspaceCwd], liveAgentCwds: [], now: currentTime }))).resolves.toBe(0)
+    await expect(withHub(service, cleanupInactiveWorkspaceChannels({ sessionCwds: [], liveAgentCwds: [workspaceCwd], now: currentTime }))).resolves.toBe(0)
+    await expect(withHub(service, cleanupInactiveWorkspaceChannels({ sessionCwds: [], liveAgentCwds: [], now: currentTime }))).resolves.toBe(1)
     expect(await service.listTopics()).toEqual([])
   })
 
@@ -68,7 +67,7 @@ describe('communication Agent initialization', () => {
     temporaryRoots.push(root)
     const service = createCommunicationService({ statePath: join(root, 'state.json') })
 
-    await AgentCommunicationLifecycle.initializeCommunicationAgent({ service, agentId: 'session-no-cwd', workspaceCwd: undefined })
+    await withHub(service, initializeCommunicationAgent({ agentId: 'session-no-cwd', workspaceCwd: undefined }))
 
     expect(await service.listTopics()).toEqual([])
     expect(await service.diagnostics({ agents: [{ id: 'session-no-cwd', workspaceTopic: null }] })).toMatchObject({
@@ -78,18 +77,19 @@ describe('communication Agent initialization', () => {
   })
 
   it('reports a registration failure instead of failing the Agent that is being created', async () => {
-    const failures: unknown[] = []
+    const root = await mkdtemp(join(tmpdir(), 'agent-communication-lifecycle-'))
+    temporaryRoots.push(root)
+    const unreadable = join(root, 'not-a-directory')
+    await writeFile(unreadable, '')
+    const service = createCommunicationService({ statePath: join(unreadable, 'state.json') })
 
-    await AgentCommunicationLifecycle.registerCommunicationAgent({
-      service: () => {
-        throw new Error('communication state is unreadable')
-      },
-      agentId: 'session-broken',
-      workspaceCwd: undefined,
-      onFailure: error => failures.push(error),
+    const exit = await withHub(service, Effect.exit(registerCommunicationAgent({ agentId: 'session-broken', workspaceCwd: join(root, 'workspace') })))
+
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(
+      await withHub(service, Effect.exit(initializeCommunicationAgent({ agentId: 'session-broken', workspaceCwd: join(root, 'workspace') }))),
+    ).toMatchObject({
+      _tag: 'Failure',
     })
-
-    expect(failures).toHaveLength(1)
-    expect(failures[0]).toBeInstanceOf(Error)
   })
 })

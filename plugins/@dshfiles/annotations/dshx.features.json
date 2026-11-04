@@ -1,16 +1,6 @@
 {
   "schemaVersion": 1,
   "kind": "bundle",
-  "ioDelegation": [
-    {
-      "file": "src/chrome-cdp.ts",
-      "reason": "Production CDP listing, focus lookup and picking run only inside the awaited chromeStatus/chromeLaunch/chromeStop/chromePick API handlers; their automatic dispatch spans cover the entire request. Standalone integration tests call the same helpers directly."
-    },
-    {
-      "file": "src/host.ts",
-      "reason": "The direct network request is chromeState's bounded version probe, awaited only by chromeStatus/chromeLaunch/chromeStop API handlers under their automatic dispatch spans; no startup effect calls that probe."
-    }
-  ],
   "features": [
     {
       "id": "pick-element",
@@ -277,7 +267,7 @@
     {
       "id": "chrome-picker",
       "title": "Pick on any page in a DSH-owned Chrome",
-      "summary": "Launch a Chrome profile with a loopback debugging port, open a configured start URL, and inject the same bounded picker over the DevTools protocol \u2014 on the focused tab by default, or on a listed tab.",
+      "summary": "Launch a Chrome profile with a loopback debugging port, open a configured start URL, and inject the same bounded picker over the DevTools protocol — on the focused tab by default, or on a listed tab.",
       "surfaces": ["client", "host", "api"],
       "configuration": [
         {
@@ -381,12 +371,6 @@
           "testName": "records the cdp list span when the endpoint is refused"
         }
       ]
-    }
-  ],
-  "ioDelegation": [
-    {
-      "file": "src/host.ts",
-      "reason": "chromeState probes the loopback /json/version endpoint only from the chromeStatus, chromeLaunch, chromeStop and chromePick API methods, so every request runs inside that call's automatic api-dispatch span."
     }
   ]
 }

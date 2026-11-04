@@ -1,11 +1,12 @@
-import { Duration, Effect } from 'effect'
 import { JobId } from '@deepseek-ai/dsh-jobs/brand'
 import type { JobView } from '@deepseek-ai/dsh-jobs'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { Clock, Context, Effect, Layer, Option, Ref, Stream } from 'effect'
 import { boundedLabel, clampText, MAX_DETAIL_LENGTH, MAX_KIND_LENGTH, MAX_PROGRESS_LENGTH, MAX_SPILL_PATHS, MAX_SPILL_PATH_LENGTH } from './bounds.js'
 import { classifyJob, type JobCategory } from './classify.js'
-import type { JobHistorySource } from './history.js'
-import { LiveJobs, type JobRegistrySurface } from './live.js'
+import { JobKillFailed, JobNotFound } from './errors.js'
+import { HistoryIndex, type HistorySnapshot } from './history.js'
+import { LiveJobs, type LiveJobsState } from './live.js'
 import type { HistoryJob, JobBoard, JobBoardFilter, JobIndexing, JobKill, JobOutput, JobRow, JobSession, JobWait, JobWaitInput } from './types.js'
 
 const DEFAULT_LIMIT = 100
@@ -13,7 +14,6 @@ const MAX_LIMIT = 200
 const MAX_OUTPUT_CHUNK = 20_000
 const MAX_OUTPUT_CHUNKS = 200
 const KILL_REASON = 'stopped from the Background jobs board'
-const WAIT_POLL_MS = 500
 const WAIT_DEFAULT_TIMEOUT_MS = 300_000
 
 type CategoryCounts = Record<JobCategory, number>
@@ -42,13 +42,6 @@ const isLiveStatus = (status: JobRow['status']): boolean => status === 'running'
 const isTerminalStatus = (status: JobRow['status']): boolean => status === 'completed' || status === 'killed' || status === 'failed'
 
 const boundedText = (text: string): string => (text.length > MAX_OUTPUT_CHUNK ? text.slice(0, MAX_OUTPUT_CHUNK) : text)
-
-export interface JobsBoardOptions {
-  readonly history: JobHistorySource
-  readonly now?: () => number
-  /** Called whenever the merged rows are dropped, so the Host can tell browsers to read again. */
-  readonly onChange?: () => void
-}
 
 interface RankedRow {
   readonly row: JobRow
@@ -124,210 +117,210 @@ const rowFromLive = (view: JobView): JobRow => {
   }
 }
 
-export class JobsBoard {
-  private readonly history: JobHistorySource
-  private readonly now: () => number
-  private readonly onChange: (() => void) | undefined
-  private registry: JobRegistrySurface | null = null
-  private live: LiveJobs | null = null
-  private cachedRows: readonly JobRow[] | null = null
+interface MergedRows {
+  readonly historyJobs: ReadonlyMap<string, HistoryJob>
+  readonly liveViews: ReadonlyMap<string, JobView>
+  readonly rows: readonly JobRow[]
+}
 
-  constructor(options: JobsBoardOptions) {
-    this.history = options.history
-    this.now = options.now ?? (() => Date.now())
-    this.onChange = options.onChange
-  }
+const rowOf = (input: { readonly history: HistorySnapshot; readonly live: LiveJobsState; readonly jobId: string }): JobRow | undefined => {
+  const view = input.live.views.get(input.jobId)
+  if (view !== undefined) return rowFromLive(view)
+  const job = input.history.jobs.get(input.jobId)
+  return job === undefined ? undefined : rowFromHistory(job)
+}
 
-  attachLive(registry: JobRegistrySurface): void {
-    this.live?.dispose()
-    this.registry = registry
-    this.live = new LiveJobs({ registry, onChange: () => this.invalidate() })
-    this.live.start()
-    this.invalidate()
-  }
-
-  detachLive(): void {
-    this.live?.dispose()
-    this.live = null
-    this.registry = null
-    this.invalidate()
-  }
-
-  /** Drop the merged rows; the next read rebuilds them from history and live state. */
-  invalidate(): void {
-    this.cachedRows = null
-    this.onChange?.()
-  }
-
-  get liveAvailable(): boolean {
-    return this.live !== null
-  }
-
-  indexing(): JobIndexing {
-    return this.history.indexing
-  }
-
-  /** Every row this Host can describe: this process's live jobs plus what the logs recorded. */
-  rows(): readonly JobRow[] {
-    if (this.cachedRows !== null) return this.cachedRows
-    const merged = new Map<string, JobRow>()
-    for (const job of this.history.historyRows) merged.set(job.id, rowFromHistory(job))
-    for (const view of this.live?.values() ?? []) merged.set(view.id, rowFromLive(view))
-    this.cachedRows = [...merged.values()]
-    return this.cachedRows
-  }
-
-  board(filter: JobBoardFilter): JobBoard {
-    const limit = Math.min(filter.limit ?? DEFAULT_LIMIT, MAX_LIMIT)
-    const needle = filter.search?.toLowerCase() ?? null
-    const categories = filter.categories === undefined || filter.categories.length === 0 ? null : new Set<JobCategory>(filter.categories)
-    const base = this.rows().filter(row => {
-      if (filter.sessionId !== undefined && row.owner !== filter.sessionId) return false
-      if (needle !== null && !matchesSearch(row, needle)) return false
-      return true
-    })
-    const categoryCounts = emptyCounts()
-    for (const row of base) categoryCounts[row.category] += 1
-    const scopedByCategory = categories === null ? base : base.filter(row => categories.has(row.category))
-    const runningCount = scopedByCategory.filter(row => isLiveStatus(row.status)).length
-    const finishedCount = scopedByCategory.filter(row => isTerminalStatus(row.status)).length
-    const inScope = scopedByCategory.filter(row => {
-      if (filter.scope === 'running') return isLiveStatus(row.status)
-      if (filter.scope === 'finished') return isTerminalStatus(row.status)
-      return true
-    })
-    const ranked = inScope
-      .map((row): RankedRow => ({ row, rank: isLiveStatus(row.status) ? 0 : 1 }))
-      .sort((left, right) =>
-        left.rank === right.rank
-          ? right.row.startedAt - left.row.startedAt || (left.row.id < right.row.id ? -1 : left.row.id > right.row.id ? 1 : 0)
-          : left.rank - right.rank,
-      )
-    const cursor = filter.cursor === undefined ? null : parseCursor(filter.cursor)
-    const remaining = cursor === null ? ranked : ranked.filter(entry => isAfterCursor(entry, cursor))
-    const page = remaining.slice(0, limit)
-    const hasMore = remaining.length > page.length
-    const lastPageEntry = page[page.length - 1]
-    return {
-      rows: page.map(entry => entry.row),
-      total: inScope.length,
-      hasMore,
-      nextCursor: hasMore && lastPageEntry !== undefined ? cursorOf(lastPageEntry) : null,
-      categoryCounts,
-      runningCount,
-      finishedCount,
-      sessions: this.sessionsOf(base),
-      indexing: this.indexing(),
-      liveAvailable: this.liveAvailable,
-      generatedAt: this.now(),
-    }
-  }
-
-  private sessionsOf(rows: readonly JobRow[]): JobSession[] {
-    const counts = new Map<string, number>()
-    for (const row of rows) {
-      if (row.owner === null) continue
-      counts.set(row.owner, (counts.get(row.owner) ?? 0) + 1)
-    }
-    return [...counts.entries()]
-      .sort((left, right) => right[1] - left[1])
-      .slice(0, 200)
-      .map(([id]) => this.history.sessionOf(id) ?? { id, title: null, cwd: null, project: null })
-  }
-
-  output({ jobId, from }: { readonly jobId: string; readonly from: number }): JobOutput {
-    const row = this.rows().find(candidate => candidate.id === jobId)
-    if (row === undefined) {
-      return { jobId, available: false, reason: 'No such job is retained on this Host.', chunks: [], next: from, lossy: false, spilled: [] }
-    }
-    const registry = this.registry
-    if (registry === null || !row.live) {
-      return {
-        jobId,
-        available: false,
-        reason: 'This job ran in an earlier DSH process; only its lifecycle record was retained.',
-        chunks: [],
-        next: 0,
-        lossy: false,
-        spilled: row.spillPaths,
-      }
-    }
-    const owner = row.owner === null ? undefined : SessionId(row.owner)
-    const read = registry.readAt(JobId(jobId), from, owner)
+const waitTargetsOf = (input: { readonly history: HistorySnapshot; readonly live: LiveJobsState; readonly targets: readonly string[] }): JobWait['jobs'] =>
+  input.targets.map(jobId => {
+    const row = rowOf({ history: input.history, live: input.live, jobId })
     return {
       jobId,
-      available: true,
-      reason: null,
-      chunks: read.chunks.slice(0, MAX_OUTPUT_CHUNKS).map(chunk => ({
-        at: chunk.at,
-        channel: chunk.channel ?? null,
-        text: boundedText(chunk.text),
-      })),
-      next: read.next,
-      lossy: read.lossy,
-      spilled: row.spillPaths,
+      status: row?.status ?? null,
+      settled: row === undefined || !isLiveStatus(row.status),
+      label: row?.label ?? null,
+      category: row?.category ?? null,
     }
-  }
+  })
 
-  kill({ jobId }: { readonly jobId: string }): JobKill {
-    const row = this.rows().find(candidate => candidate.id === jobId)
-    if (row === undefined) throw new Error('No such job is retained on this Host.')
-    const registry = this.registry
-    if (registry === null || !row.live) return { jobId, outcome: 'already-finished' }
-    return { jobId, outcome: registry.kill(JobId(jobId), row.owner === null ? undefined : SessionId(row.owner), KILL_REASON) }
+export class JobsBoard extends Context.Service<
+  JobsBoard,
+  {
+    readonly board: (filter: JobBoardFilter) => Effect.Effect<JobBoard>
+    readonly output: (input: { readonly jobId: string; readonly from: number }) => Effect.Effect<JobOutput>
+    readonly kill: (input: { readonly jobId: string }) => Effect.Effect<JobKill, JobNotFound | JobKillFailed>
+    /**
+     * Block on job settlement instead of making the model poll: what it replaces is a model turn per
+     * `job_output` call, which one week measured at 293 identical back-to-back calls in 74 Sessions.
+     */
+    readonly wait: (input: JobWaitInput) => Effect.Effect<JobWait>
+    readonly refresh: Effect.Effect<JobIndexing>
+    /** One element per change of the live jobs or the indexed history, without the current state. */
+    readonly changes: Stream.Stream<void>
   }
+>()('@dshfiles/background-jobs/JobsBoard') {
+  static readonly layer = Layer.effect(
+    JobsBoard,
+    Effect.gen(function* () {
+      const history = yield* HistoryIndex
+      const live = yield* LiveJobs
+      const merged = yield* Ref.make<Option.Option<MergedRows>>(Option.none())
 
-  /**
-   * Block on job settlement instead of making the model poll. The poll here is
-   * in-process and cheap; what it replaces is a model turn per `job_output`
-   * call, which the last week measured at 293 identical back-to-back calls in
-   * 74 Sessions.
-   */
-  wait(input: JobWaitInput): Effect.Effect<JobWait> {
-    const currentRows = () => this.rows()
-    const now = this.now
-    const until = input.until ?? 'settled'
-    const timeoutMs = input.timeoutMs ?? WAIT_DEFAULT_TIMEOUT_MS
-    const startedAt = now()
-    const deadline = startedAt + timeoutMs
-    const requested = input.jobIds ?? []
-    const targets =
-      requested.length > 0
-        ? [...new Set(requested)]
-        : currentRows()
-            .filter(row => isLiveStatus(row.status))
-            .map(row => row.id)
-    const snapshot = (): JobWait['jobs'] => {
-      const byId = new Map(currentRows().map(row => [row.id, row]))
-      return targets.map(jobId => {
-        const row = byId.get(jobId)
+      const states = Effect.all({ history: history.snapshot, live: live.state })
+
+      const rowsOf = Effect.fnUntraced(function* (input: { readonly history: HistorySnapshot; readonly live: LiveJobsState }) {
+        const cached = yield* Ref.get(merged)
+        if (Option.isSome(cached) && cached.value.historyJobs === input.history.jobs && cached.value.liveViews === input.live.views) return cached.value.rows
+        const byId = new Map<string, JobRow>()
+        for (const job of input.history.jobs.values()) byId.set(job.id, rowFromHistory(job))
+        for (const view of input.live.views.values()) byId.set(view.id, rowFromLive(view))
+        const rows = [...byId.values()]
+        yield* Ref.set(merged, Option.some({ historyJobs: input.history.jobs, liveViews: input.live.views, rows }))
+        return rows
+      })
+
+      const sessionsOf = (input: { readonly history: HistorySnapshot; readonly rows: readonly JobRow[] }): JobSession[] => {
+        const counts = new Map<string, number>()
+        for (const row of input.rows) {
+          if (row.owner === null) continue
+          counts.set(row.owner, (counts.get(row.owner) ?? 0) + 1)
+        }
+        return [...counts.entries()]
+          .sort((left, right) => right[1] - left[1])
+          .slice(0, 200)
+          .map(([id]) => input.history.sessions.get(id) ?? { id, title: null, cwd: null, project: null })
+      }
+
+      const board = Effect.fn('background-jobs board')(function* (filter: JobBoardFilter) {
+        const current = yield* states
+        const limit = Math.min(filter.limit ?? DEFAULT_LIMIT, MAX_LIMIT)
+        const needle = filter.search?.toLowerCase() ?? null
+        const categories = filter.categories === undefined || filter.categories.length === 0 ? null : new Set<JobCategory>(filter.categories)
+        const base = (yield* rowsOf(current)).filter(row => {
+          if (filter.sessionId !== undefined && row.owner !== filter.sessionId) return false
+          return needle === null || matchesSearch(row, needle)
+        })
+        const categoryCounts = emptyCounts()
+        for (const row of base) categoryCounts[row.category] += 1
+        const scopedByCategory = categories === null ? base : base.filter(row => categories.has(row.category))
+        const inScope = scopedByCategory.filter(row => {
+          if (filter.scope === 'running') return isLiveStatus(row.status)
+          if (filter.scope === 'finished') return isTerminalStatus(row.status)
+          return true
+        })
+        const ranked = inScope
+          .map((row): RankedRow => ({ row, rank: isLiveStatus(row.status) ? 0 : 1 }))
+          .sort((left, right) =>
+            left.rank === right.rank
+              ? right.row.startedAt - left.row.startedAt || (left.row.id < right.row.id ? -1 : left.row.id > right.row.id ? 1 : 0)
+              : left.rank - right.rank,
+          )
+        const cursor = filter.cursor === undefined ? null : parseCursor(filter.cursor)
+        const remaining = cursor === null ? ranked : ranked.filter(entry => isAfterCursor(entry, cursor))
+        const page = remaining.slice(0, limit)
+        const hasMore = remaining.length > page.length
+        const lastPageEntry = page.at(-1)
         return {
-          jobId,
-          status: row?.status ?? null,
-          settled: row === undefined || !isLiveStatus(row.status),
-          label: row?.label ?? null,
-          category: row?.category ?? null,
+          rows: page.map(entry => entry.row),
+          total: inScope.length,
+          hasMore,
+          nextCursor: hasMore && lastPageEntry !== undefined ? cursorOf(lastPageEntry) : null,
+          categoryCounts,
+          runningCount: scopedByCategory.filter(row => isLiveStatus(row.status)).length,
+          finishedCount: scopedByCategory.filter(row => isTerminalStatus(row.status)).length,
+          sessions: sessionsOf({ history: current.history, rows: base }),
+          indexing: current.history.indexing,
+          liveAvailable: Option.isSome(current.live.registry),
+          generatedAt: yield* Clock.currentTimeMillis,
         }
       })
-    }
-    const settled = (jobs: JobWait['jobs']) => (until === 'any-settled' ? jobs.some(job => job.settled) : jobs.every(job => job.settled))
-    return Effect.gen(function* () {
-      let jobs = snapshot()
-      while (targets.length > 0 && !settled(jobs)) {
-        const remaining = deadline - now()
-        if (remaining <= 0) break
-        yield* Effect.sleep(Duration.millis(Math.min(WAIT_POLL_MS, remaining)))
-        jobs = snapshot()
-      }
-      return {
-        startedAt,
-        waitedMs: Math.max(0, now() - startedAt),
-        timeoutMs,
-        until,
-        timedOut: targets.length > 0 && !settled(jobs),
-        jobs,
-        running: jobs.filter(job => !job.settled).map(job => job.jobId),
-      }
-    })
-  }
+
+      const output = Effect.fn('background-jobs output')(function* (input: { readonly jobId: string; readonly from: number }) {
+        const current = yield* states
+        const row = rowOf({ ...current, jobId: input.jobId })
+        if (row === undefined) {
+          return {
+            jobId: input.jobId,
+            available: false,
+            reason: 'No such job is retained on this Host.',
+            chunks: [],
+            next: input.from,
+            lossy: false,
+            spilled: [],
+          }
+        }
+        if (Option.isNone(current.live.registry) || !row.live) {
+          return {
+            jobId: input.jobId,
+            available: false,
+            reason: 'This job ran in an earlier DSH process; only its lifecycle record was retained.',
+            chunks: [],
+            next: 0,
+            lossy: false,
+            spilled: row.spillPaths,
+          }
+        }
+        const registry = current.live.registry.value
+        const read = registry.readAt(JobId(input.jobId), input.from, row.owner === null ? undefined : SessionId(row.owner))
+        return {
+          jobId: input.jobId,
+          available: true,
+          reason: null,
+          chunks: read.chunks.slice(0, MAX_OUTPUT_CHUNKS).map(chunk => ({ at: chunk.at, channel: chunk.channel ?? null, text: boundedText(chunk.text) })),
+          next: read.next,
+          lossy: read.lossy,
+          spilled: row.spillPaths,
+        }
+      })
+
+      const kill = Effect.fn('background-jobs kill')(function* (input: { readonly jobId: string }) {
+        const current = yield* states
+        const row = rowOf({ ...current, jobId: input.jobId })
+        if (row === undefined) return yield* new JobNotFound({ jobId: input.jobId })
+        if (Option.isNone(current.live.registry) || !row.live) return { jobId: input.jobId, outcome: 'already-finished' } satisfies JobKill
+        const registry = current.live.registry.value
+        const outcome = yield* Effect.try({
+          try: () => registry.kill(JobId(input.jobId), row.owner === null ? undefined : SessionId(row.owner), KILL_REASON),
+          catch: cause => new JobKillFailed({ jobId: input.jobId, cause }),
+        })
+        return { jobId: input.jobId, outcome } satisfies JobKill
+      })
+
+      const updates = Stream.merge(Stream.as(history.changes, undefined), Stream.as(live.changes, undefined))
+      const changed = Stream.merge(history.changes.pipe(Stream.drop(1), Stream.as(undefined)), live.changes.pipe(Stream.drop(1), Stream.as(undefined)))
+
+      const wait = Effect.fn('background-jobs wait')(function* (input: JobWaitInput) {
+        const until = input.until ?? 'settled'
+        const timeoutMs = input.timeoutMs ?? WAIT_DEFAULT_TIMEOUT_MS
+        const startedAt = yield* Clock.currentTimeMillis
+        const requested = input.jobIds ?? []
+        const targets =
+          requested.length > 0 ? [...new Set(requested)] : (yield* rowsOf(yield* states)).filter(row => isLiveStatus(row.status)).map(row => row.id)
+        const isSettled = (jobs: JobWait['jobs']) => (until === 'any-settled' ? jobs.some(job => job.settled) : jobs.every(job => job.settled))
+        const snapshot = Effect.map(states, current => waitTargetsOf({ ...current, targets }))
+        const reached =
+          targets.length === 0
+            ? Option.none<JobWait['jobs']>()
+            : Option.flatten(
+                yield* updates.pipe(
+                  Stream.mapEffect(() => snapshot),
+                  Stream.filter(isSettled),
+                  Stream.runHead,
+                  Effect.timeoutOption(timeoutMs),
+                ),
+              )
+        const jobs = Option.isSome(reached) ? reached.value : yield* snapshot
+        return {
+          startedAt,
+          waitedMs: Math.max(0, (yield* Clock.currentTimeMillis) - startedAt),
+          timeoutMs,
+          until,
+          timedOut: targets.length > 0 && !isSettled(jobs),
+          jobs,
+          running: jobs.filter(job => !job.settled).map(job => job.jobId),
+        }
+      })
+
+      return JobsBoard.of({ board, output, kill, wait, refresh: history.pass, changes: changed })
+    }),
+  )
 }

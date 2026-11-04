@@ -37,6 +37,7 @@
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "effect": "catalog:",
     "execa": "catalog:",
     "semver": "catalog:"
@@ -52,6 +53,7 @@
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@testing-library/dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/node": "22.20.5",

@@ -1,46 +1,61 @@
-import { withSpan } from '@dshfiles/dshx/tracing'
+import { pluginAttributes } from '@dshfiles/dshx/tracing'
+import { Clock, Context, Effect, FiberHandle, Layer, Ref } from 'effect'
+import { HostDirectory } from './host-edge-promise.js'
 import type { KnownSession } from './process-table.js'
 
 const SUCCESS_TTL_MS = 30_000
 const FAILURE_TTL_MS = 45_000
 
-export interface SessionMetadataCache {
-  read(refresh: () => Promise<readonly KnownSession[] | undefined>): readonly KnownSession[]
-  refresh(refresh: () => Promise<readonly KnownSession[] | undefined>): Promise<void>
+interface CachedSessions {
+  readonly value: readonly KnownSession[]
+  readonly refreshAt: number
 }
 
-export const createSessionMetadataCache = (now: () => number = Date.now): SessionMetadataCache => {
-  let value: readonly KnownSession[] = []
-  let refreshAt = 0
-  let pending: Promise<void> | null = null
-
-  const refreshSessions = (load: () => Promise<readonly KnownSession[] | undefined>): Promise<void> => {
-    if (pending !== null) return pending
-    if (now() < refreshAt) return Promise.resolve()
-
-    pending = withSpan('worktree-memory list sessions', { kind: 'internal' }, () => Promise.resolve().then(load))
-      .then(sessions => {
-        if (sessions === undefined) {
-          refreshAt = now() + FAILURE_TTL_MS
-          return
-        }
-        value = sessions
-        refreshAt = now() + SUCCESS_TTL_MS
-      })
-      .catch(() => {
-        refreshAt = now() + FAILURE_TTL_MS
-      })
-      .finally(() => {
-        pending = null
-      })
-    return pending
+/**
+ * The Host's Sessions, served stale while one refresh runs in the background, so a memory probe never waits on the
+ * Session list. A failed refresh keeps the last good value and backs off longer than a successful one.
+ */
+export class SessionMetadata extends Context.Service<
+  SessionMetadata,
+  {
+    readonly current: Effect.Effect<readonly KnownSession[]>
+    /** Refresh now unless a refresh is running or not yet due, and wait for it. */
+    readonly refresh: Effect.Effect<void>
   }
+>()('@dshfiles/worktree-memory/SessionMetadata') {
+  static readonly layer = Layer.effect(
+    SessionMetadata,
+    Effect.gen(function* () {
+      const directory = yield* HostDirectory
+      const cached = yield* Ref.make<CachedSessions>({ value: [], refreshAt: 0 })
+      const running = yield* FiberHandle.make<void, never>()
 
-  return {
-    read: load => {
-      void refreshSessions(load)
-      return value
-    },
-    refresh: refreshSessions,
-  }
+      const load = Effect.gen(function* () {
+        const sessions = yield* directory.sessions
+        yield* Effect.annotateCurrentSpan(
+          pluginAttributes({ plugin: 'worktree-memory', attributes: { loaded: sessions !== undefined, sessions: sessions?.length ?? 0 } }),
+        )
+        const now = yield* Clock.currentTimeMillis
+        yield* Ref.update(cached, current =>
+          sessions === undefined ? { ...current, refreshAt: now + FAILURE_TTL_MS } : { value: sessions, refreshAt: now + SUCCESS_TTL_MS },
+        )
+      }).pipe(Effect.withSpan('worktree-memory list sessions'))
+
+      const start = Effect.gen(function* () {
+        const now = yield* Clock.currentTimeMillis
+        if (now < (yield* Ref.get(cached)).refreshAt) return
+        yield* FiberHandle.run(running, load, { onlyIfMissing: true })
+      })
+
+      const refresh = Effect.andThen(start, FiberHandle.awaitEmpty(running))
+
+      return SessionMetadata.of({
+        current: Effect.andThen(
+          start,
+          Effect.map(Ref.get(cached), current => current.value),
+        ),
+        refresh,
+      })
+    }),
+  )
 }

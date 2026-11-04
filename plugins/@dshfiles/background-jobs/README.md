@@ -81,6 +81,7 @@ for example against a Host whose dshx predates API events.
 | ------------------------- | ------------------ | --------------------------------- |
 | `background_jobs_board`   | read-only          | `board`                           |
 | `background_jobs_output`  | read-only          | `output`                          |
+| `background_jobs_wait`    | read-only          | `wait`                            |
 | `background_jobs_refresh` | write              | `refresh`                         |
 | `background_jobs_kill`    | write, destructive | `kill` (requires `confirm: true`) |
 

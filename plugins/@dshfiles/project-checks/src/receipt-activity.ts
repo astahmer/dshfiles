@@ -1,4 +1,4 @@
-import { Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { receiptExecutorSchema, receiptRemoteFailureSchema } from './api.js'
 import type { StoredReceipt } from './store.js'
 
@@ -35,11 +35,11 @@ export const projectChecksActivityEventSchema = Schema.Struct({
 
 export type ProjectChecksActivityEvent = typeof projectChecksActivityEventSchema.Type
 
-const projectChecksActivityEvent = (receipt: StoredReceipt): ProjectChecksActivityEvent => {
+const activityEventInput = (receipt: StoredReceipt) => {
   const summaryExtras: { -readonly [Key in keyof ProjectChecksActivityEvent['value']]?: ProjectChecksActivityEvent['value'][Key] } = {}
   if (receipt.executor !== undefined) summaryExtras.executor = receipt.executor
   if (receipt.remoteFailure !== undefined) summaryExtras.remoteFailure = receipt.remoteFailure
-  return Schema.decodeUnknownSync(projectChecksActivityEventSchema)({
+  return {
     kind: 'verification-receipt',
     version: 1,
     value: {
@@ -65,28 +65,27 @@ const projectChecksActivityEvent = (receipt: StoredReceipt): ProjectChecksActivi
       sourceRevisionAfter: receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter,
       ...summaryExtras,
     },
-  })
-}
-
-const emitProjectChecksActivity = (receipt: StoredReceipt, emit: (event: ProjectChecksActivityEvent) => void): void => {
-  try {
-    emit(projectChecksActivityEvent(receipt))
-  } catch {
-    return
   }
 }
 
-const persistReceiptAndEmitActivity = async (input: {
+const projectChecksActivityEvent = (receipt: StoredReceipt): ProjectChecksActivityEvent =>
+  Schema.decodeUnknownSync(projectChecksActivityEventSchema)(activityEventInput(receipt))
+
+const activityEventOf = (receipt: StoredReceipt): Option.Option<ProjectChecksActivityEvent> =>
+  Schema.decodeUnknownOption(projectChecksActivityEventSchema)(activityEventInput(receipt))
+
+/** Publish a receipt only after it is durable; a receipt the timeline cannot summarize is not published. */
+const persistReceiptAndEmitActivity = <E, R>(input: {
   readonly receipt: StoredReceipt
-  readonly persist: () => Promise<void>
-  readonly emit: (event: ProjectChecksActivityEvent) => void
-}): Promise<void> => {
-  await input.persist()
-  emitProjectChecksActivity(input.receipt, input.emit)
-}
+  readonly persist: Effect.Effect<void, E, R>
+  readonly emit: (event: ProjectChecksActivityEvent) => Effect.Effect<void>
+}): Effect.Effect<void, E, R> => Effect.andThen(input.persist, publishActivity(input))
+
+const publishActivity = (input: { readonly receipt: StoredReceipt; readonly emit: (event: ProjectChecksActivityEvent) => Effect.Effect<void> }) =>
+  Effect.suspend(() => Option.match(activityEventOf(input.receipt), { onNone: () => Effect.void, onSome: input.emit }))
 
 export class ProjectChecksActivityModel {
   static readonly event = projectChecksActivityEvent
-  static readonly emit = emitProjectChecksActivity
+  static readonly publish = publishActivity
   static readonly persistAndEmit = persistReceiptAndEmitActivity
 }

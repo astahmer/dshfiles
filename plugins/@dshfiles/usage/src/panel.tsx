@@ -7,7 +7,6 @@ import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Effect, Option } from 'effect'
 import type * as SchemaTypes from 'effect/Schema'
@@ -43,7 +42,7 @@ type UsageDateRange = { readonly from: number; readonly to: number }
 
 const storedPreferences = createStoredValue({
   key: 'dshfiles-usage:view.v1',
-  schema: zodSchemaFromEffect(preferencesSchema),
+  schema: preferencesSchema,
   fallback: DEFAULT_PREFERENCES,
 })
 

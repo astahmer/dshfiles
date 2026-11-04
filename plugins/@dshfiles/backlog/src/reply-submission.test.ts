@@ -1,35 +1,13 @@
+import { ManagedRuntime } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { MutationObserver, QueryClient } from '@dshfiles/plugin-ui/query'
 
 import type { AgentDispatchOutcome } from './agent-dispatch.js'
 import { fileInput, type ComposerFile } from './composer-files.js'
-import type { BacklogItem } from './item.js'
 import { submitReply } from './reply-submission.js'
-import { BacklogModel, type BacklogActor, type BacklogFileRecord } from './store.js'
+import { BacklogStore, type BacklogActor } from './store.js'
+import { backlogStoreLayer } from './test-support.js'
 import { commentMutation } from './use-backlog-actions.js'
-
-const memoryTable = <Value>() => {
-  const rows = new Map<string, Value>()
-  return {
-    get: (key: string) => rows.get(key),
-    entries: () => rows.entries(),
-    keys: () => rows.keys(),
-    get size() {
-      return rows.size
-    },
-    put: async (key: string, value: Value) => {
-      rows.set(key, value)
-    },
-    delete: async (key: string) => rows.delete(key),
-    update: async (key: string, change: (current: Value) => Value) => {
-      const current = rows.get(key)
-      if (current === undefined) throw new Error('missing row')
-      const next = change(current)
-      rows.set(key, next)
-      return next
-    },
-  }
-}
 
 const deferred = <Value>() => {
   let resolve: (value: Value) => void = () => {}
@@ -55,8 +33,10 @@ const screenshot: ComposerFile = {
 const user: BacklogActor = { kind: 'user' }
 
 const setup = async () => {
-  const store = BacklogModel.createStore({ files: memoryTable<BacklogFileRecord>(), items: memoryTable<BacklogItem>(), now: () => 1 })
-  const created = await store.capture({ text: 'Fix the flaky test', actor: user })
+  // The panel talks to the store through a Promise API client, so this test drives the real store from that edge.
+  const runtime = ManagedRuntime.make(backlogStoreLayer())
+  const store = await runtime.runPromise(BacklogStore)
+  const created = await runtime.runPromise(store.capture({ text: 'Fix the flaky test', actor: user }))
   const id = created.item.id
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   const key = ['dshfiles-backlog', 'item', id]
@@ -68,7 +48,7 @@ const setup = async () => {
       client,
       send: async request => {
         await saveGate.promise
-        return store.comment({ ...request, actor: user })
+        return runtime.runPromise(store.comment({ ...request, actor: user }))
       },
     }),
   )
@@ -76,8 +56,8 @@ const setup = async () => {
     const data = client.getQueryData<{ readonly ok: boolean; readonly value: typeof created }>(key)
     return (data?.value.item.events ?? []).filter(event => event.kind === 'commented')
   }
-  const storedComments = () => {
-    const stored = store.get(id)
+  const storedComments = async () => {
+    const stored = await runtime.runPromise(store.get(id))
     return stored.ok ? stored.value.item.events.filter(event => event.kind === 'commented') : []
   }
   const failures: string[] = []
@@ -95,7 +75,8 @@ const setup = async () => {
       view.failures.push(message)
     },
   }
-  return { id, store, client, storedComments, saveGate, mutation, cachedComments, view, viewPort }
+  const readStoredFile = (attachmentId: string) => runtime.runPromise(store.readFile({ id, attachmentId }))
+  return { id, readStoredFile, client, storedComments, saveGate, mutation, cachedComments, view, viewPort }
 }
 
 const dispatchPort = (outcome: Promise<AgentDispatchOutcome>) => ({
@@ -133,7 +114,7 @@ describe('submitReply', () => {
     context.saveGate.resolve()
     await expect.poll(() => dispatchStarted).toBe(true)
     expect(context.cachedComments()).toHaveLength(1)
-    expect(context.storedComments()).toHaveLength(1)
+    expect(await context.storedComments()).toHaveLength(1)
 
     dispatched.resolve({ kind: 'dispatched' })
     await submitted
@@ -147,7 +128,7 @@ describe('submitReply', () => {
     const readFile = () =>
       context.client.fetchQuery({
         queryKey: attachmentKey,
-        queryFn: () => context.store.readFile({ id: context.id, attachmentId: screenshot.id }),
+        queryFn: () => context.readStoredFile(screenshot.id),
         staleTime: Infinity,
       })
 
@@ -180,7 +161,7 @@ describe('submitReply', () => {
       view: context.viewPort,
     })
 
-    expect(context.storedComments()).toMatchObject([{ detail: '', attachments: [{ name: 'screenshot.png' }] }])
+    expect(await context.storedComments()).toMatchObject([{ detail: '', attachments: [{ name: 'screenshot.png' }] }])
     expect(dispatchStarted).toBe(false)
     expect(context.view.failures).toEqual([])
   })
@@ -272,7 +253,7 @@ describe('submitReply', () => {
       view: context.viewPort,
     })
 
-    expect(context.storedComments().map(event => event.detail)).toEqual([submittedText])
+    expect((await context.storedComments()).map(event => event.detail)).toEqual([submittedText])
     expect(dispatchTexts).toEqual([submittedText])
     expect(answerTexts).toEqual([submittedText])
   })
@@ -290,7 +271,7 @@ describe('submitReply', () => {
       view: context.viewPort,
     })
 
-    expect(context.storedComments()).toHaveLength(1)
+    expect(await context.storedComments()).toHaveLength(1)
     expect(context.view.files).toEqual([])
     expect(context.view.failures).toEqual(['Your reply was saved, but no thread started: No project to start in.'])
   })

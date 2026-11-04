@@ -4,13 +4,11 @@ import { defineSettings } from '@dshfiles/dshx/settings'
 import {
   ATTENTION_COLOR_OPTIONS,
   DEFAULT_PREFERENCES,
-  type AutoSettlePolicy,
   PROJECT_COLOR_PALETTES,
   SIDEBAR_ORDER_SECTIONS,
   SIDEBAR_SECTIONS,
   THREAD_ROW_ACTIONS,
 } from './organization.js'
-import { SettledThreadsModel, type SettledStatus } from './settled-threads.js'
 import { THREAD_DELAYS } from './thread-delays.js'
 import { THREAD_NOTIFICATION_PLACEMENTS, threadNotificationCategoriesSchema } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS } from './thread-view-preferences.js'
@@ -182,134 +180,3 @@ export const threadSidebarSettings = defineSettings({
   }),
   applies: 'live',
 })
-
-let readSettledStatus: (() => SettledStatus) | undefined
-let readParkedSessionIds: (() => readonly string[]) | undefined
-let readResumeAfterRestart: (() => boolean) | undefined
-let writeSettledStatus: ((next: SettledStatus, parkedSessionIds?: readonly string[]) => Promise<void>) | undefined
-let readPolicy: (() => AutoSettlePolicy) | undefined
-const settingsListeners = new Set<() => void>()
-
-/**
- * The Host half of the namespace. It remembers its live scope so the settled-thread gate and the Agent's
- * settle verbs read and write the same values the sidebar shows, instead of a second copy of the status.
- */
-export const threadSidebarHostSettings = threadSidebarSettings.host({
-  setup: scope => {
-    const read = (): SettledStatus => ({ settledSessionIds: scope.get().settledSessionIds, settledAt: scope.get().settledAt })
-    const readParked = (): readonly string[] => scope.get().parkedSessionIds
-    const write = async (next: SettledStatus, parkedSessionIds?: readonly string[]): Promise<void> => {
-      await scope.update({
-        settledSessionIds: [...next.settledSessionIds],
-        settledAt: { ...next.settledAt },
-        ...(parkedSessionIds === undefined ? undefined : { parkedSessionIds: [...parkedSessionIds] }),
-      })
-    }
-    const readResume = (): boolean => scope.get().resumeAfterRestart
-    const policy = (): AutoSettlePolicy => {
-      const value = scope.get()
-      return {
-        autoSettleEnabled: value.autoSettleEnabled,
-        autoSettleSessionIds: [...value.autoSettleSessionIds],
-        autoSettleDisabledSessionIds: [...value.autoSettleDisabledSessionIds],
-        parkedSessionIds: [...value.parkedSessionIds],
-        excludedSessionIds: [...value.excludedSessionIds],
-        excludedWorkspaceIds: [...value.excludedWorkspaceIds],
-        idleMinutes: value.idleMinutes,
-        rebasedThreadSettleDelay: value.rebasedThreadSettleDelay,
-        scanIntervalMinutes: value.scanIntervalMinutes,
-      }
-    }
-    readSettledStatus = read
-    readParkedSessionIds = readParked
-    writeSettledStatus = write
-    readResumeAfterRestart = readResume
-    readPolicy = policy
-    const stopWatching = scope.watch(() => {
-      for (const listener of settingsListeners) listener()
-    })
-    return () => {
-      stopWatching()
-      if (readResumeAfterRestart === readResume) readResumeAfterRestart = undefined
-      if (readPolicy === policy) readPolicy = undefined
-      if (readSettledStatus !== read) return
-      readSettledStatus = undefined
-      readParkedSessionIds = undefined
-      writeSettledStatus = undefined
-    }
-  },
-})
-
-export class RestartResumeSetting {
-  /** Whether threads cut off by the previous Host process resume on their own; on until the setting says otherwise. */
-  static enabled(): boolean {
-    try {
-      return readResumeAfterRestart?.() ?? true
-    } catch {
-      return true
-    }
-  }
-}
-
-/** Settled Session ids on this Host; empty while the namespace is unregistered (desktop shells, older builds). */
-export const settledSessionIdsFromHost = (): readonly string[] => {
-  try {
-    return readSettledStatus?.().settledSessionIds ?? []
-  } catch {
-    return []
-  }
-}
-
-/** The auto-settle policy this Host's sidebar settings hold, or undefined while the namespace is unregistered. */
-const autoSettlePolicyFromHost = (): AutoSettlePolicy | undefined => {
-  try {
-    return readPolicy?.()
-  } catch {
-    return undefined
-  }
-}
-
-/** Call `listener` after every write to the sidebar settings, until the returned function runs. */
-const onSidebarSettingsChanged = (listener: () => void): (() => void) => {
-  settingsListeners.add(listener)
-  return () => {
-    settingsListeners.delete(listener)
-  }
-}
-
-/** Settle several threads in one settings write, keeping the first settle instant of each. */
-const settleSessionIds = async (sessionIds: readonly string[], now: number): Promise<void> => {
-  if (readSettledStatus === undefined || readParkedSessionIds === undefined || writeSettledStatus === undefined) {
-    throw new Error('The thread-sidebar settings namespace is unavailable on this Host.')
-  }
-  const next = SettledThreadsModel.settleAndUnpark({ status: readSettledStatus(), parkedSessionIds: readParkedSessionIds(), sessionIds, now })
-  await writeSettledStatus(next, next.parkedSessionIds)
-}
-
-/** What the Host auto-settle scan reads from and writes to the sidebar settings. */
-export class AutoSettleSettings {
-  static readonly policy = autoSettlePolicyFromHost
-  static readonly onChanged = onSidebarSettingsChanged
-  static readonly settle = settleSessionIds
-}
-
-/** Add or drop one settled Session id, returning the ids the Host now holds. */
-export const setSessionSettled = async (sessionId: string, settled: boolean): Promise<readonly string[]> => {
-  if (readSettledStatus === undefined || readParkedSessionIds === undefined || writeSettledStatus === undefined) {
-    throw new Error('The thread-sidebar settings namespace is unavailable on this Host.')
-  }
-  const current = readSettledStatus()
-  if (!settled) {
-    const next = SettledThreadsModel.unsettle(current, [sessionId])
-    await writeSettledStatus(next)
-    return next.settledSessionIds
-  }
-  const next = SettledThreadsModel.settleAndUnpark({
-    status: current,
-    parkedSessionIds: readParkedSessionIds(),
-    sessionIds: [sessionId],
-    now: Date.now(),
-  })
-  await writeSettledStatus(next, next.parkedSessionIds)
-  return next.settledSessionIds
-}

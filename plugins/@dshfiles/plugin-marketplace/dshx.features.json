@@ -79,7 +79,7 @@
         {
           "kind": "unit-test",
           "id": "plugin-marketplace.catalog-browse-unit-host-list-search",
-          "file": "plugins/@dshfiles/plugin-marketplace/tests/host-service.test.ts",
+          "file": "plugins/@dshfiles/plugin-marketplace/tests/marketplace-service.spec.ts",
           "testName": "forwards search and sort and exposes author, avatar, stars, update date and total"
         }
       ],
@@ -134,14 +134,14 @@
         {
           "kind": "unit-test",
           "id": "plugin-marketplace.guarded-plugin-install-unit-verified-install",
-          "file": "plugins/@dshfiles/plugin-marketplace/tests/host-service.test.ts",
-          "testName": "installs a community plugin with the verified spec and verifies activation"
+          "file": "plugins/@dshfiles/plugin-marketplace/tests/marketplace-service.spec.ts",
+          "testName": "installs a verified target and verifies activation"
         },
         {
           "kind": "unit-test",
           "id": "plugin-marketplace.guarded-plugin-install-unit-inactive-bundle-rejected",
-          "file": "plugins/@dshfiles/plugin-marketplace/tests/host-service.test.ts",
-          "testName": "rejects a zero exit when the bundle was not activated"
+          "file": "plugins/@dshfiles/plugin-marketplace/tests/marketplace-service.spec.ts",
+          "testName": "rejects inactive, mismatched, mutable and unverifiable targets"
         }
       ],
       "telemetry": [

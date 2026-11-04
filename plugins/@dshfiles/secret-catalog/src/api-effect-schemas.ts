@@ -3,10 +3,7 @@ import { Schema } from 'effect'
 import { createMetadataFields, updateMetadataFields } from './secret-arguments-effect.js'
 import { secretMetadataSchema } from './secret-metadata.js'
 
-/**
- * The Secret Catalog API contracts. They are plain Effect schemas; `api.ts` publishes them through `standardSchema`
- * (closed objects, excess-property rejection) so the Host boundary and the agent tool see one contract.
- */
+/** The Secret Catalog API contracts; dshx publishes them as closed, strictly decoded schemas. */
 
 const cwdSchema = Schema.NullOr(Schema.String.check(Schema.isMaxLength(4096)))
 

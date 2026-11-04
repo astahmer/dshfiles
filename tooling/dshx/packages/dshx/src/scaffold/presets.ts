@@ -200,8 +200,7 @@ const apiFiles = (options: PresetOptions): readonly PresetFile[] => {
   return [
     {
       path: `src/api/${apiId}.ts`,
-      content: `import * as Schema from 'effect/Schema'
-import '@dshfiles/dshx/effect'
+      content: `import { Schema } from 'effect'
 import { defineApi, method } from '@dshfiles/dshx/api'
 
 /**

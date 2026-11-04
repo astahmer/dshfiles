@@ -1,6 +1,10 @@
+import { Effect } from 'effect'
 import { describe, expect, test } from 'vitest'
+import { sshLayer } from './fixtures/ssh-runtime.js'
 import type { RemoteFacts } from '../src/remote-doctor.js'
 import { RemoteProvision, type ProvisionOptions } from '../src/remote-provision.js'
+
+const runEffect = <A, E>(effect: Effect.Effect<A, E, import('../src/ssh.js').Ssh>) => Effect.runPromise(Effect.provide(effect, sshLayer))
 
 const options: ProvisionOptions = {
   remoteHome: '/Users/me/.dsh',
@@ -110,40 +114,46 @@ describe('provision planning', () => {
 
 describe('provision runs', () => {
   test('dryRun executes nothing and returns the steps that still need work', async () => {
-    const run = await RemoteProvision.run({
-      sshTarget: 'example',
-      facts: factsOf(),
-      options,
-      steps: ['node', 'checkout', 'install'],
-      confirm: 'all',
-      dryRun: true,
-    })
+    const run = await runEffect(
+      RemoteProvision.run({
+        sshTarget: 'example',
+        facts: factsOf(),
+        options,
+        steps: ['node', 'checkout', 'install'],
+        confirm: 'all',
+        dryRun: true,
+      }),
+    )
     expect(run.executed).toEqual([])
     expect(run.remaining).toEqual(['node', 'checkout', 'install'])
   })
 
   test('an already-satisfied step is skipped rather than run', async () => {
-    const run = await RemoteProvision.run({
-      sshTarget: 'example',
-      facts: readyFacts(),
-      options,
-      steps: ['runtime'],
-      confirm: 'all',
-      dryRun: false,
-    })
+    const run = await runEffect(
+      RemoteProvision.run({
+        sshTarget: 'example',
+        facts: readyFacts(),
+        options,
+        steps: ['runtime'],
+        confirm: 'all',
+        dryRun: false,
+      }),
+    )
     expect(run.executed).toEqual([{ id: 'runtime', ok: true, state: 'skipped', detail: expect.any(String), stdout: '', stderr: '' }])
     expect(run.remaining).toEqual([])
   })
 
   test('a blocked step stops the run before any command is attempted', async () => {
-    const run = await RemoteProvision.run({
-      sshTarget: 'example',
-      facts: factsOf(),
-      options,
-      steps: ['install'],
-      confirm: 'all',
-      dryRun: false,
-    })
+    const run = await runEffect(
+      RemoteProvision.run({
+        sshTarget: 'example',
+        facts: factsOf(),
+        options,
+        steps: ['install'],
+        confirm: 'all',
+        dryRun: false,
+      }),
+    )
     expect(run.executed.map(result => result.state)).toEqual(['blocked'])
     expect(run.executed[0]?.detail).toBe('the checkout is missing')
   })

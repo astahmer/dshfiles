@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { McpOAuthModel, type OAuthGrant, type PendingAuthorization } from './oauth.js'
 
 type OAuthResponseFixture = Readonly<Record<string, string | number | readonly string[]>>
@@ -9,8 +9,18 @@ type OAuthResponseTable = Readonly<Record<string, OAuthResponseFixture>>
 const json = (body: OAuthResponseFixture, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
+/** A fetcher that records every request it answers. */
+const recording = (answer: (url: string, init: RequestInit) => Promise<Response>) => {
+  const calls: Array<readonly [string, RequestInit]> = []
+  const fetcher = async (url: string, init: RequestInit): Promise<Response> => {
+    calls.push([url, init])
+    return answer(url, init)
+  }
+  return Object.assign(fetcher, { calls })
+}
+
 const routes = (table: OAuthResponseTable) =>
-  vi.fn(async (url: string, _init: RequestInit) => {
+  recording(async (url: string, _init: RequestInit) => {
     const body = table[url]
     return body === undefined ? new Response('missing', { status: 404 }) : json(body)
   })
@@ -44,13 +54,13 @@ describe('MCP OAuth discovery', () => {
       'https://meta.example.test/prm': { resource: 'https://mcp.example.test/mcp', authorization_servers: ['https://auth.example.test'] },
       'https://auth.example.test/.well-known/oauth-authorization-server': authorizationServer,
     })
-    const fetcher = vi.fn(async (url: string, init: RequestInit) =>
+    const fetcher = recording(async (url: string, init: RequestInit) =>
       url === 'https://mcp.example.test/mcp'
         ? new Response(null, { status: 401, headers: { 'www-authenticate': 'Bearer resource_metadata="https://meta.example.test/prm"' } })
         : table(url, init),
     )
     expect((await McpOAuthModel.discover({ serverUrl: 'https://mcp.example.test/mcp', fetcher })).authorizationServer.issuer).toBe('https://auth.example.test')
-    expect(fetcher.mock.calls.map(([url]) => url)).not.toContain('https://mcp.example.test/.well-known/oauth-protected-resource/mcp')
+    expect(fetcher.calls.map(([url]) => url)).not.toContain('https://mcp.example.test/.well-known/oauth-protected-resource/mcp')
   })
 
   it('appends the OpenID discovery suffix after the issuer path', async () => {
@@ -111,7 +121,7 @@ describe('MCP OAuth authorization code flow', () => {
   }
 
   it('registers a public client and builds a PKCE authorization URL', async () => {
-    const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+    const fetcher = recording(async (_url: string, init: RequestInit) => {
       expect(decodeJson(jsonValueSchema, String(init.body))).toMatchObject({ redirect_uris: ['http://127.0.0.1:4100/cb'], token_endpoint_auth_method: 'none' })
       return json({ client_id: 'client-1' }, 201)
     })
@@ -139,7 +149,7 @@ describe('MCP OAuth authorization code flow', () => {
   })
 
   it('exchanges the code with the verifier and records expiry', async () => {
-    const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+    const fetcher = recording(async (_url: string, init: RequestInit) => {
       const form = new URLSearchParams(String(init.body))
       expect(form.get('code_verifier')).toBe('verifier-1')
       expect(form.get('grant_type')).toBe('authorization_code')
@@ -160,10 +170,10 @@ describe('MCP OAuth authorization code flow', () => {
   })
 
   it('rejects a callback from another issuer before exchanging the code', async () => {
-    const fetcher = vi.fn(async () => json({}))
+    const fetcher = recording(async () => json({}))
     const callback = new URLSearchParams({ code: 'code-1', state: 'state-1', iss: 'https://evil.example.test' })
     await expect(McpOAuthModel.exchangeCode({ pending, callbackParameters: callback, fetcher })).rejects.toThrow('issuer')
-    expect(fetcher).not.toHaveBeenCalled()
+    expect(fetcher.calls).toEqual([])
   })
 
   it('refreshes near expiry, keeps the refresh token, and reports a failed refresh as sign-in needed', async () => {
@@ -185,7 +195,7 @@ describe('MCP OAuth authorization code flow', () => {
     })
     expect(refreshed).toMatchObject({ accessToken: 'new', refreshToken: 'refresh-1', expiresAt: 65_000, issuedAt: 5_000 })
     expect(await McpOAuthModel.refreshGrant({ grant, fetcher: async () => json({ error: 'invalid_grant' }, 400) })).toBeUndefined()
-    expect(await McpOAuthModel.refreshGrant({ grant: { ...grant, refreshToken: undefined } })).toBeUndefined()
+    expect(await McpOAuthModel.refreshGrant({ grant: { ...grant, refreshToken: undefined }, fetcher: async () => json({}) })).toBeUndefined()
   })
 
   it('accepts only a bare HTTP(S) origin for the callback', () => {

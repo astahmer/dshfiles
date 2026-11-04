@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Result } from 'effect'
 import { onTestFinished, test } from 'vitest'
 import { JujutsuMutationModel } from './core.ts'
 
@@ -34,7 +35,7 @@ test('set bookmark creates a name and moves an existing bookmark to any visible 
   const nextCommit = jjAt(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@', '--template', 'commit_id']).trim()
 
   const setBookmark = (commitId: string): void => {
-    const argv = JujutsuMutationModel.buildMutationArgv({ kind: 'bookmark-set', bookmark: 'feature/test', destinationId: commitId })
+    const argv = Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'bookmark-set', bookmark: 'feature/test', destinationId: commitId }))
     jjAt(repo, home, argv)
   }
 

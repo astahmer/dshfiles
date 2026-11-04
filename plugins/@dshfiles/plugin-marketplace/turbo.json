@@ -6,13 +6,10 @@
     "test:boot": {
       "dependsOn": [],
       "inputs": [
-        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__plugin-marketplace.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__plugin-ui.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__shared-runtime.sha256",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-marketplace/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-marketplace/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/cordis.patch.yml",
@@ -36,14 +33,11 @@
     "test:e2e": {
       "dependsOn": [],
       "inputs": [
-        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__plugin-marketplace.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__plugin-ui.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__shared-runtime.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__ui-styles.sha256",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-marketplace/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-marketplace/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/cordis.patch.yml",

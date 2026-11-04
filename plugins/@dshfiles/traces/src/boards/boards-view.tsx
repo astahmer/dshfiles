@@ -11,7 +11,7 @@ import type { TracesAlertsKey, TracesAlertsTranslate } from '../alerts/alerts-lo
 import { alertsOwnerMissing } from '../alerts/alerts-queries.js'
 import { TraceFormat } from '../format.js'
 import { BUILTIN_BOARDS, SLOW_TOOLS_BOARD, type BoardColumn, type BuiltinBoard } from './board-definitions.js'
-import { createStoredValue } from '../stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { tracesBoardsApi, type BreakdownRow } from './boards-api.js'
 
 type BoardsClient = typeof tracesBoardsApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never

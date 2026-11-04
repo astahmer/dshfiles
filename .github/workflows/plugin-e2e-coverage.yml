@@ -56,6 +56,12 @@ jobs:
         run: pnpm run features:report > "$RUNNER_TEMP/plugin-feature-coverage.md" 2>&1
         working-directory: tooling/dshx
 
+      - name: Build the owned bundles the step files import
+        # Gherkin steps import plugin source, and that source imports sibling packages through their built dist
+        # (@dshfiles/sqlite-store, @dshfiles/jev, @dshfiles/jj-cli …). Without this build the discovery fails with
+        # ERR_MODULE_NOT_FOUND on a cold checkout.
+        run: pnpm exec turbo run build --filter='./plugins/@dshfiles/*' --output-logs=errors-only
+
       - name: Generate and list Gherkin browser tests
         run: |
           pnpm run test:e2e:gen

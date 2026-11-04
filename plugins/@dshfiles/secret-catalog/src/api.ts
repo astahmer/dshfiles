@@ -1,5 +1,4 @@
-import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
-import { defineApi, method as defineMethod } from '@dshfiles/dshx/api'
+import { defineApi, method } from '@dshfiles/dshx/api'
 import { Schema } from 'effect'
 import {
   createInputSchema,
@@ -13,15 +12,6 @@ import {
   updateInputSchema,
 } from './api-effect-schemas.js'
 import { secretReferenceStatusSchema } from './secret-reference-status-schema.js'
-import { standardSchema, strictStandardSchema } from './schema.js'
-
-const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Output extends Schema.ConstraintDecoder<unknown>>(
-  options: Omit<ApiMethodOptions<Input, Output>, 'input' | 'output' | 'tool'> & {
-    readonly input: Input
-    readonly output: Output
-    readonly tool?: ApiToolExposure<Output['Type']>
-  },
-) => defineMethod({ ...options, input: standardSchema(options.input), output: standardSchema(options.output) })
 
 const createdOutputSchema = Schema.Struct({ created: Schema.Literal(true) })
 const copiedOutputSchema = Schema.Struct({ copied: Schema.Literal(true) })
@@ -35,12 +25,12 @@ export const secretCatalogApi = defineApi({
   methods: {
     list: method({ input: listInputSchema, output: listOutputSchema }),
     reveal: method({ input: revealInputSchema, output: Schema.String.check(Schema.isMaxLength(1_000_000)) }),
-    copy: defineMethod({ input: standardSchema(revealInputSchema), output: standardSchema(copiedOutputSchema) }),
+    copy: method({ input: revealInputSchema, output: copiedOutputSchema }),
     machine: method({ input: Schema.Struct({}), output: machineOutputSchema }),
-    create: defineMethod({ input: standardSchema(createInputSchema), output: standardSchema(createdOutputSchema) }),
-    update: defineMethod({ input: standardSchema(updateInputSchema), output: standardSchema(updatedOutputSchema) }),
-    removeAlias: defineMethod({ input: standardSchema(removeAliasInputSchema), output: standardSchema(removedOutputSchema) }),
-    deleteItem: defineMethod({ input: standardSchema(deleteItemInputSchema), output: standardSchema(deletedOutputSchema) }),
+    create: method({ input: createInputSchema, output: createdOutputSchema }),
+    update: method({ input: updateInputSchema, output: updatedOutputSchema }),
+    removeAlias: method({ input: removeAliasInputSchema, output: removedOutputSchema }),
+    deleteItem: method({ input: deleteItemInputSchema, output: deletedOutputSchema }),
   },
 })
 
@@ -54,14 +44,14 @@ export const secretSetupApi = defineApi({
       output: listOutputSchema,
       description: 'List alias metadata for a setup picker; never returns secret values.',
     }),
-    create: defineMethod({
-      input: standardSchema(createInputSchema),
-      output: standardSchema(createdOutputSchema),
+    create: method({
+      input: createInputSchema,
+      output: createdOutputSchema,
       description: 'Store a Secret Catalog alias for an explicit setup flow; manual values never return to the Client.',
     }),
-    referenceStatus: defineMethod({
-      input: strictStandardSchema(referenceStatusInputSchema),
-      output: standardSchema(secretReferenceStatusSchema),
+    referenceStatus: method({
+      input: referenceStatusInputSchema,
+      output: secretReferenceStatusSchema,
       description:
         'Check whether one secret:ALIAS[@env] reference resolves on this Host and, when it does not, name the reason (alias missing from every scope or only in a project, environment missing, several scopes, unreadable or empty vault value, secret CLI missing, timed out or failing) and whether a global write would land in a symlinked (e.g. Nix-managed) config. Reads the value on the Host to prove it, never returns it. Read-only.',
       tool: {

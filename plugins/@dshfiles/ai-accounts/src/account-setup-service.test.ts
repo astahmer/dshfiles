@@ -1,3 +1,4 @@
+import { AccountProfilesModel } from './account-store.js'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -42,7 +43,9 @@ const harness = async (
   mkdirSync(join(root, 'plugins', 'ai-accounts'), { recursive: true })
   vi.stubEnv('DSH_HOME', root)
   vi.resetModules()
-  const { accountStoreService: store } = await import('./account-store.js')
+  const { AccountHomePolicy } = await import('./account-home-policy.js')
+  const { openAccountStore } = await import('./fixtures/account-store.js')
+  const store = await openAccountStore(AccountHomePolicy.filePath())
   const keys = new Map<string, string>()
   const saveKey = vi.fn(async (ref: string, _owner: string, value: string) => {
     keys.set(ref, value)
@@ -166,8 +169,8 @@ describe('Host-owned provisional account lifecycle', () => {
     await service.prepare({ kind: 'codex', requestId })
     const file = await store.readAccountFile()
     expect(file.accounts).toEqual([])
-    expect((await store.buildAccountsFile(file, [])).accounts).toEqual([])
-    expect(store.readAccountFileSync().accounts).toEqual([])
+    expect((await AccountProfilesModel.buildAccountsFile(file, [])).accounts).toEqual([])
+    expect(store.current().accounts).toEqual([])
   })
 
   it('cancels before verification settles and rejects the late success without adopting or publishing', async () => {

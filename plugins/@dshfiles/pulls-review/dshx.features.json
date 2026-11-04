@@ -99,10 +99,8 @@
           "source": "api-dispatch"
         },
         {
-          "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/pulls-review/src/jj.test.ts",
-          "testName": "records a jj diff span with flag names only"
+          "kind": "automatic",
+          "source": "jj"
         },
         {
           "kind": "custom",

@@ -1,8 +1,7 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createPrivacyControlsService } from '../src/controls.js'
+import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, FileSystem, Layer, Ref } from 'effect'
+import { type LoaderRow, PrivacyControls, PrivacyProfile } from '../src/controls.js'
 import { privacyFeatures } from '../src/features.js'
 import { readManagedOverrides } from '../src/profile-patch.js'
 
@@ -12,79 +11,102 @@ const originalPatch = `# Keep this user-owned row unchanged.
     keep: true
 `
 
-interface FakeRow {
-  options: { id: string; name: string }
-  disabled: boolean
-  fiber: object | undefined
-}
+const defaultRows = (): LoaderRow[] =>
+  privacyFeatures.flatMap(feature => feature.rows.map(row => ({ options: { id: row.patchId }, disabled: !feature.defaultEnabled })))
 
-let directory = ''
-let patchPath = ''
-let rows: FakeRow[] = []
-
-const host = () => ({ patchPath, entries: () => rows, hmr: undefined })
-
-beforeEach(async () => {
-  directory = await mkdtemp(join(tmpdir(), 'privacy-controls-'))
-  patchPath = join(directory, 'cordis.patch.yml')
-  await writeFile(patchPath, originalPatch)
-  rows = privacyFeatures.flatMap(feature =>
-    feature.rows.map(row => ({
-      options: { id: row.patchId, name: row.patchId },
-      disabled: !feature.defaultEnabled,
-      fiber: undefined,
-    })),
-  )
-})
-
-afterEach(async () => {
-  await rm(directory, { recursive: true, force: true })
-})
+const profileFixture = (rows: ReadonlyArray<LoaderRow>) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const directory = yield* fs.makeTempDirectoryScoped({ prefix: 'privacy-controls-' })
+    const patchPath = `${directory}/cordis.patch.yml`
+    yield* fs.writeFileString(patchPath, originalPatch)
+    const loaderRows = yield* Ref.make(rows)
+    const profile = Layer.succeed(PrivacyProfile, PrivacyProfile.of({ patchPath, entries: Ref.get(loaderRows), liveReload: false, exclusive: write => write }))
+    const controls = yield* Effect.provide(PrivacyControls.use(Effect.succeed), PrivacyControls.layer.pipe(Layer.provide(profile)))
+    return { controls, patchPath, readPatch: fs.readFileString(patchPath) }
+  })
 
 describe('privacy controls Host operations', () => {
-  it('reads independent defaults with session-log download still enabled', async () => {
-    const snapshot = await createPrivacyControlsService(host()).read()
-    expect(snapshot.available).toBe(true)
-    expect(snapshot.features.map(feature => [feature.feature, feature.enabled])).toEqual([
-      ['answer-feedback-ui', false],
-      ['session-feedback-capture', false],
-      ['otel-session-upload', false],
-      ['deepseek-session-log-upload', false],
-      ['session-log-download', true],
-    ])
-  })
+  it.layer(nodeFileSystemLayer)(layer => {
+    layer.effect('reads independent defaults with session-log download still enabled', () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { controls } = yield* profileFixture(defaultRows())
+          const snapshot = yield* controls.read
+          expect(snapshot.available).toBe(true)
+          expect(snapshot.features.map(feature => [feature.feature, feature.enabled])).toEqual([
+            ['answer-feedback-ui', false],
+            ['session-feedback-capture', false],
+            ['otel-session-upload', false],
+            ['deepseek-session-log-upload', false],
+            ['session-log-download', true],
+          ])
+        }),
+      ),
+    )
 
-  it('enforces the feedback Remote dependency without changing the patch on rejection', async () => {
-    const controls = createPrivacyControlsService(host())
-    await expect(controls.setFeature({ feature: 'answer-feedback-ui', enabled: true })).rejects.toThrow(/sessionFeedback Remote/)
+    layer.effect('enforces the feedback Remote dependency without changing the patch on rejection', () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { controls, readPatch } = yield* profileFixture(defaultRows())
+          const refused = yield* Effect.flip(controls.setFeature({ feature: 'answer-feedback-ui', enabled: true }))
+          expect(refused._tag).toBe('PrivacyFeatureDependency')
+          expect(refused.message).toMatch(/sessionFeedback Remote/)
 
-    await controls.setFeature({ feature: 'session-feedback-capture', enabled: true })
-    await controls.setFeature({ feature: 'answer-feedback-ui', enabled: true })
-    const beforeRejectedWrite = await readFile(patchPath, 'utf8')
-    await expect(controls.setFeature({ feature: 'session-feedback-capture', enabled: false })).rejects.toThrow(/sessionFeedback Remote/)
-    expect(await readFile(patchPath, 'utf8')).toBe(beforeRejectedWrite)
+          yield* controls.setFeature({ feature: 'session-feedback-capture', enabled: true })
+          yield* controls.setFeature({ feature: 'answer-feedback-ui', enabled: true })
+          const beforeRejectedWrite = yield* readPatch
+          const rejected = yield* Effect.flip(controls.setFeature({ feature: 'session-feedback-capture', enabled: false }))
+          expect(rejected._tag).toBe('PrivacyFeatureDependency')
+          expect(yield* readPatch).toBe(beforeRejectedWrite)
 
-    await controls.setFeature({ feature: 'answer-feedback-ui', enabled: false })
-    const afterUiDisabled = await controls.setFeature({ feature: 'session-feedback-capture', enabled: false })
-    expect(afterUiDisabled.features.find(feature => feature.feature === 'answer-feedback-ui')?.enabled).toBe(false)
-    expect(afterUiDisabled.features.find(feature => feature.feature === 'session-feedback-capture')?.enabled).toBe(false)
-  })
+          yield* controls.setFeature({ feature: 'answer-feedback-ui', enabled: false })
+          const afterUiDisabled = yield* controls.setFeature({ feature: 'session-feedback-capture', enabled: false })
+          expect(afterUiDisabled.features.find(feature => feature.feature === 'answer-feedback-ui')?.enabled).toBe(false)
+          expect(afterUiDisabled.features.find(feature => feature.feature === 'session-feedback-capture')?.enabled).toBe(false)
+        }),
+      ),
+    )
 
-  it('master action updates all four feedback/upload features but never download', async () => {
-    const controls = createPrivacyControlsService(host())
-    const enabled = await controls.setAll(true)
-    expect(enabled.features.filter(feature => feature.feature !== 'session-log-download').every(feature => feature.enabled)).toBe(true)
-    expect(enabled.features.find(feature => feature.feature === 'session-log-download')?.enabled).toBe(true)
+    layer.effect('master action updates all four feedback/upload features but never download', () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { controls, readPatch } = yield* profileFixture(defaultRows())
+          const enabled = yield* controls.setAll(true)
+          expect(enabled.features.filter(feature => feature.feature !== 'session-log-download').every(feature => feature.enabled)).toBe(true)
+          expect(enabled.features.find(feature => feature.feature === 'session-log-download')?.enabled).toBe(true)
 
-    const disabled = await controls.setAll(false)
-    expect(disabled.features.filter(feature => feature.feature !== 'session-log-download').every(feature => !feature.enabled)).toBe(true)
-    expect(disabled.features.find(feature => feature.feature === 'session-log-download')?.enabled).toBe(true)
-    expect(await readFile(patchPath, 'utf8')).toContain(originalPatch)
-    expect(readManagedOverrides(await readFile(patchPath, 'utf8')).has('session-log-download:session-log-download')).toBe(false)
-  })
+          const disabled = yield* controls.setAll(false)
+          expect(disabled.features.filter(feature => feature.feature !== 'session-log-download').every(feature => !feature.enabled)).toBe(true)
+          expect(disabled.features.find(feature => feature.feature === 'session-log-download')?.enabled).toBe(true)
+          const patch = yield* readPatch
+          expect(patch).toContain(originalPatch)
+          expect(readManagedOverrides(patch).has('session-log-download:session-log-download')).toBe(false)
+        }),
+      ),
+    )
 
-  it('refuses to mutate a feature when its Loader row is missing', async () => {
-    rows = rows.filter(row => row.options.id !== 'session-log-deepseek')
-    await expect(createPrivacyControlsService(host()).setFeature({ feature: 'deepseek-session-log-upload', enabled: true })).rejects.toThrow(/not present/)
+    layer.effect('refuses to mutate a feature when its Loader row is missing', () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { controls } = yield* profileFixture(defaultRows().filter(row => row.options.id !== 'session-log-deepseek'))
+          const refused = yield* Effect.flip(controls.setFeature({ feature: 'deepseek-session-log-upload', enabled: true }))
+          expect(refused).toMatchObject({ _tag: 'PrivacyFeatureUnavailable', feature: 'deepseek-session-log-upload' })
+          expect(refused.message).toMatch(/not present/)
+        }),
+      ),
+    )
+
+    layer.effect('reports an unavailable profile without a Cordis patch', () =>
+      Effect.gen(function* () {
+        const profile = Layer.succeed(
+          PrivacyProfile,
+          PrivacyProfile.of({ patchPath: undefined, entries: Effect.succeed(undefined), liveReload: false, exclusive: write => write }),
+        )
+        const controls = yield* Effect.provide(PrivacyControls.use(Effect.succeed), PrivacyControls.layer.pipe(Layer.provide(profile)))
+        expect((yield* controls.read).available).toBe(false)
+        expect(yield* Effect.flip(controls.setAll(true))).toMatchObject({ _tag: 'PrivacyControlsUnavailable' })
+      }),
+    )
   })
 })

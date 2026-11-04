@@ -2,7 +2,7 @@
 
 ![Navigate image previews](docs/screenshots/image-gallery-navigation.png)
 
-Owned port of DSH's native attachment presentation plugin. It keeps the stock composer drop target, mixed image/file rail, upload progress and retry behavior, and image rendering in messages, trajectory records, and image-bearing tool calls. Image previews add left/right keyboard navigation, side controls, and a selectable thumbnail strip.
+Owned port of DSH's native attachment presentation plugin. It keeps the stock composer drop target, mixed image/file rail, upload progress and retry behavior, and image rendering in messages, trajectory records, and image-bearing tool calls. Image previews add left/right keyboard navigation, side controls, and a selectable thumbnail strip; the images of one message (its attachment row and its inline `[Image N]` references) open as a single gallery, and older Chat builds that hand over one image at a time keep previewing that image alone.
 
 ## Upstream and license
 

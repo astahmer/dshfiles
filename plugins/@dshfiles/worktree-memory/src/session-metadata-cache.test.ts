@@ -1,7 +1,11 @@
+import { tracerLayer } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import { describe, expect, it } from 'vitest'
-import { createSessionMetadataCache } from './session-metadata-cache.js'
+import { describe, expect, it } from '@effect/vitest'
+import { Context, Deferred, Effect, Layer, Ref } from 'effect'
+import { TestClock } from 'effect/testing'
+import { HostDirectory } from './host-edge-promise.js'
 import type { KnownSession } from './process-table.js'
+import { SessionMetadata } from './session-metadata-cache.js'
 
 const session: KnownSession = {
   sessionId: 'session-1',
@@ -11,65 +15,78 @@ const session: KnownSession = {
   title: 'Cached thread',
 }
 
-const deferred = <Value>() => {
-  let resolvePromise: (value: Value) => void = () => undefined
-  const promise = new Promise<Value>(resolve => {
-    resolvePromise = resolve
-  })
-  return { promise, resolve: resolvePromise }
-}
-
-describe('session metadata cache', () => {
-  it('returns the current value without waiting and coalesces a refresh', async () => {
-    using recorder = recordSpans()
-    const cache = createSessionMetadataCache(() => 1)
-    const pending = deferred<readonly KnownSession[] | undefined>()
-    let loads = 0
-    const load = (): Promise<readonly KnownSession[] | undefined> => {
-      loads += 1
-      return pending.promise
-    }
-
-    expect(cache.read(load)).toEqual([])
-    expect(cache.read(load)).toEqual([])
-    expect(loads).toBe(0)
-
-    pending.resolve([session])
-    await cache.refresh(load)
-
-    expect(cache.read(load)).toEqual([session])
-    expect(loads).toBe(1)
-    expect(recorder.span('worktree-memory list sessions')).toBeDefined()
+/** The Host Session controller is external to the plugin; each test scripts what its list answers. */
+const directoryAnswering = (answer: Effect.Effect<readonly KnownSession[] | undefined>) =>
+  Effect.gen(function* () {
+    const loads = yield* Ref.make(0)
+    const directory = Layer.succeed(
+      HostDirectory,
+      HostDirectory.of({
+        sessions: Effect.andThen(
+          Ref.update(loads, count => count + 1),
+          answer,
+        ),
+        workspaces: Effect.succeed([]),
+      }),
+    )
+    const metadata = Context.get(yield* Layer.build(SessionMetadata.layer.pipe(Layer.provide(directory))), SessionMetadata)
+    return { metadata, loads: Ref.get(loads) }
   })
 
-  it('keeps the last good value and backs off a failed refresh', async () => {
-    let now = 1
-    const cache = createSessionMetadataCache(() => now)
-    let loads = 0
-    const load = async (): Promise<readonly KnownSession[] | undefined> => {
-      loads += 1
-      return [session]
-    }
+describe('SessionMetadata', () => {
+  it.effect('returns the current value without waiting and coalesces a refresh', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(1)
+        const pending = yield* Deferred.make<readonly KnownSession[] | undefined>()
+        const { metadata, loads } = yield* directoryAnswering(Deferred.await(pending))
 
-    expect(cache.read(load)).toEqual([])
-    await cache.refresh(load)
-    expect(cache.read(load)).toEqual([session])
-    expect(loads).toBe(1)
+        const recorder = yield* Effect.acquireRelease(
+          Effect.sync(() => recordSpans()),
+          spans => Effect.sync(() => spans.stop()),
+        )
+        expect(yield* metadata.current.pipe(Effect.provide(tracerLayer))).toEqual([])
+        expect(yield* metadata.current).toEqual([])
 
-    now += 30_000
-    const failedLoad = async (): Promise<readonly KnownSession[] | undefined> => {
-      loads += 1
-      return undefined
-    }
-    expect(cache.read(failedLoad)).toEqual([session])
-    await cache.refresh(failedLoad)
+        yield* Deferred.succeed(pending, [session])
+        yield* metadata.refresh
+        expect(recorder.named('worktree-memory list sessions')).toHaveLength(1)
+        expect(recorder.span('worktree-memory list sessions').attributes).toEqual({
+          'dshx.worktree-memory.loaded': true,
+          'dshx.worktree-memory.sessions': 1,
+        })
 
-    now += 44_999
-    expect(cache.read(load)).toEqual([session])
-    expect(loads).toBe(2)
-    now += 1
-    expect(cache.read(load)).toEqual([session])
-    await cache.refresh(load)
-    expect(loads).toBe(3)
-  })
+        expect(yield* metadata.current).toEqual([session])
+        expect(yield* loads).toBe(1)
+      }),
+    ),
+  )
+
+  it.effect('keeps the last good value and backs off a failed refresh', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(1)
+        const answer = yield* Ref.make<readonly KnownSession[] | undefined>([session])
+        const { metadata, loads } = yield* directoryAnswering(Ref.get(answer))
+
+        yield* metadata.refresh
+        expect(yield* metadata.current).toEqual([session])
+        expect(yield* loads).toBe(1)
+
+        yield* TestClock.adjust(30_000)
+        yield* Ref.set(answer, undefined)
+        yield* metadata.refresh
+        expect(yield* metadata.current).toEqual([session])
+        expect(yield* loads).toBe(2)
+
+        yield* Ref.set(answer, [session])
+        yield* TestClock.adjust(44_999)
+        yield* metadata.refresh
+        expect(yield* loads).toBe(2)
+        yield* TestClock.adjust(1)
+        yield* metadata.refresh
+        expect(yield* loads).toBe(3)
+      }),
+    ),
+  )
 })

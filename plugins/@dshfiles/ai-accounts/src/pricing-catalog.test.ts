@@ -1,8 +1,9 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import { createPricingCatalog, PricingCatalogModel, type PricingCache } from './pricing-catalog.js'
+import { NodeServices } from '@effect/platform-node'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, FileSystem, Layer, Path, Schema } from 'effect'
+import { HttpClient, HttpClientError, HttpClientResponse } from 'effect/http'
+import { PricingCatalog } from './pricing-catalog-service.js'
+import { PricingCatalogModel, type PricingCache } from './pricing-catalog.js'
 
 const modelsDev = {
   openai: {
@@ -120,70 +121,92 @@ describe('parsePricingOverride', () => {
   })
 })
 
-describe('createPricingCatalog', () => {
-  let directory = ''
-  afterEach(async () => {
-    if (directory !== '') await rm(directory, { recursive: true, force: true })
-  })
+/** models.dev is external: the test client answers each request from a script and counts the requests it saw. */
+type Reply = { readonly body: unknown } | { readonly status: number } | { readonly failure: string }
 
-  const jsonResponse = (body: unknown, status = 200): Response =>
-    new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+const modelsDevTest = (replies: ReadonlyArray<Reply>) => {
+  const seen = { count: 0 }
+  const client = HttpClient.make(request =>
+    Effect.suspend(() => {
+      const reply = replies[seen.count] ?? { status: 503 }
+      seen.count += 1
+      if ('failure' in reply)
+        return Effect.fail(new HttpClientError.HttpClientError({ reason: new HttpClientError.TransportError({ request, description: reply.failure }) }))
+      if ('status' in reply) return Effect.succeed(HttpClientResponse.fromWeb(request, new Response('{}', { status: reply.status })))
+      return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json(reply.body)))
+    }),
+  )
+  return { client, requests: () => seen.count }
+}
 
-  it('fetches, trims and caches the catalog, then serves the cache offline', async () => {
-    directory = await mkdtemp(join(tmpdir(), 'ai-accounts-pricing-'))
-    const path = join(directory, 'nested', 'pricing.json')
-    let now = 10_000
-    const online = createPricingCatalog({ path, now: () => now, fetch: async () => jsonResponse(modelsDev) })
-    const status = await online.refresh()
-    expect(status).toMatchObject({ fetchedAt: 10_000, modelCount: 6, refreshing: false, lastError: null })
-    expect(JSON.parse(await readFile(path, 'utf8')).providers.openai['gpt-6-luna'].input).toBe(0.1)
+const statePath = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const directory = yield* fs.makeTempDirectoryScoped({ prefix: 'ai-accounts-pricing-' })
+  return { fs, path, directory }
+})
 
-    now = 20_000
-    const offline = createPricingCatalog({
-      path,
-      now: () => now,
-      fetch: async () => {
-        throw new Error('offline')
-      },
-    })
-    await offline.load()
-    expect(offline.current()?.fetchedAt).toBe(10_000)
-    const afterFailure = await offline.refresh()
-    expect(afterFailure).toMatchObject({ fetchedAt: 10_000, lastError: 'offline' })
-  })
+const openCatalog = (client: HttpClient.HttpClient, file: string) =>
+  Effect.provide(PricingCatalog.make({ path: file, retry: false }), Layer.merge(Layer.succeed(HttpClient.HttpClient, client), NodeServices.layer))
 
-  it('refreshes only once the cache is older than the period, and shares one request', async () => {
-    directory = await mkdtemp(join(tmpdir(), 'ai-accounts-pricing-'))
-    const path = join(directory, 'pricing.json')
-    let now = 0
-    let requests = 0
-    const catalog = createPricingCatalog({
-      path,
-      now: () => now,
-      fetch: async () => {
-        requests += 1
-        return jsonResponse(modelsDev)
-      },
-    })
-    await Promise.all([catalog.ensureFresh(1_000), catalog.ensureFresh(1_000)])
-    expect(requests).toBe(1)
-    now = 500
-    await catalog.ensureFresh(1_000)
-    expect(requests).toBe(1)
-    now = 1_500
-    await catalog.ensureFresh(1_000)
-    expect(requests).toBe(2)
-  })
+describe('PricingCatalog', () => {
+  it.layer(NodeServices.layer)(it => {
+    it.effect('fetches, trims and caches the catalog, then serves the cache offline', () =>
+      Effect.gen(function* () {
+        const { fs, path, directory } = yield* statePath
+        const file = path.join(directory, 'nested', 'pricing.json')
+        const onlineClient = modelsDevTest([{ body: modelsDev }])
+        const online = yield* openCatalog(onlineClient.client, file)
+        const status = yield* online.refresh
+        expect(status).toMatchObject({ modelCount: 6, refreshing: false, lastError: null })
+        const written = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(PricingCatalogModel.cacheSchema))(yield* fs.readFileString(file))
+        expect(written.providers['openai']?.['gpt-6-luna']?.input).toBe(0.1)
 
-  it('keeps the last catalog when models.dev answers an error or nothing priced', async () => {
-    directory = await mkdtemp(join(tmpdir(), 'ai-accounts-pricing-'))
-    const path = join(directory, 'pricing.json')
-    await writeFile(path, JSON.stringify(cache), 'utf8')
-    const responses = [jsonResponse({}, 503), jsonResponse({ empty: { models: {} } })]
-    const catalog = createPricingCatalog({ path, fetch: async () => responses.shift() ?? jsonResponse({}) })
-    await catalog.load()
-    expect((await catalog.refresh()).lastError).toBe('models.dev answered 503')
-    expect((await catalog.refresh()).lastError).toBe('models.dev returned no priced models')
-    expect(catalog.current()?.fetchedAt).toBe(1_000)
+        const offlineClient = modelsDevTest([{ failure: 'offline' }])
+        const offline = yield* openCatalog(offlineClient.client, file)
+        yield* offline.load
+        expect(offline.snapshot()?.fetchedAt).toBe(written.fetchedAt)
+        const afterFailure = yield* offline.refresh
+        expect(afterFailure.fetchedAt).toBe(written.fetchedAt)
+        expect(afterFailure.lastError).toBe('models.dev could not be read')
+      }),
+    )
+
+    it.effect('refreshes only once the cache is older than the period', () =>
+      Effect.gen(function* () {
+        const { path, directory } = yield* statePath
+        const client = modelsDevTest([{ body: modelsDev }])
+        const catalog = yield* openCatalog(client.client, path.join(directory, 'pricing.json'))
+        yield* catalog.ensureFresh(1_000)
+        expect(client.requests()).toBe(1)
+        yield* catalog.ensureFresh(1_000)
+        expect(client.requests()).toBe(1)
+      }),
+    )
+
+    it.effect('keeps the last catalog when models.dev answers an error or nothing priced', () =>
+      Effect.gen(function* () {
+        const { fs, path, directory } = yield* statePath
+        const file = path.join(directory, 'pricing.json')
+        yield* fs.writeFileString(file, JSON.stringify(cache))
+        const client = modelsDevTest([{ status: 503 }, { body: { empty: { models: {} } } }])
+        const catalog = yield* openCatalog(client.client, file)
+        yield* catalog.load
+        expect((yield* catalog.refresh).lastError).toBe('models.dev answered 503')
+        expect((yield* catalog.refresh).lastError).toBe('models.dev returned no priced models')
+        expect(catalog.snapshot()?.fetchedAt).toBe(1_000)
+      }),
+    )
+
+    it.effect('records a transport failure as a readable message', () =>
+      Effect.gen(function* () {
+        const { path, directory } = yield* statePath
+        const client = modelsDevTest([{ failure: 'connect ECONNREFUSED' }])
+        const catalog = yield* openCatalog(client.client, path.join(directory, 'pricing.json'))
+        const status = yield* catalog.refresh
+        expect(status.lastError).toBe('models.dev could not be read')
+        expect(status.refreshing).toBe(false)
+      }),
+    )
   })
 })

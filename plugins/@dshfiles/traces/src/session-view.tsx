@@ -9,7 +9,7 @@ import { ArrowLeftIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useInfiniteQuery, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useState } from 'react'
-import type { Mutable } from './schema.js'
+import type { Types } from 'effect'
 import { tracesApi, type LogsInput } from './api.js'
 import type { OpenThread } from './open-thread.js'
 import { ThreadLinks } from './thread-links.js'
@@ -139,7 +139,7 @@ export const SessionTracesView = (
   })
   const traceQuery = useQuery({ ...tracesQueries.trace(client, traceId ?? ''), enabled: traceId !== null })
   // dshx API payloads refuse undefined values, so absent filters are omitted rather than sent as undefined.
-  const logFilters: Mutable<Omit<LogsInput, 'cursor'>> = { sessionId: props.sessionId, limit: 50 }
+  const logFilters: Types.Mutable<Omit<LogsInput, 'cursor'>> = { sessionId: props.sessionId, limit: 50 }
   if (correlation !== null) {
     logFilters.traceId = correlation.traceId
     if (correlation.spanId !== null) logFilters.spanId = correlation.spanId

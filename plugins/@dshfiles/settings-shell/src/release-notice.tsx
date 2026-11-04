@@ -6,7 +6,6 @@ import { ChevronDownIcon, ChevronUpIcon, ExternalLinkIcon } from '@dshfiles/plug
 import { useState } from 'react'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import * as Schema from 'effect/Schema'
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { settingsShellApi } from './shell-api.js'
 import type { DshReleaseStatus } from './release-status.js'
 import type { ShellTranslate } from './native/locales.js'
@@ -16,7 +15,7 @@ const RELEASE_STATUS_QUERY_KEY = ['settings-shell', 'release-status'] as const
 const RELEASE_STATUS_REFRESH_MS = 6 * 60 * 60 * 1000
 const dismissedRelease = createStoredValue({
   key: 'dshfiles.settings-shell.dismissed-release.v1',
-  schema: zodSchemaFromEffect(Schema.String.check(Schema.isMaxLength(100))),
+  schema: Schema.String.check(Schema.isMaxLength(100)),
   fallback: '',
 })
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MessageImagesProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { LoaderCircleIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import type { MessageImageGallery } from '@dshfiles/chat/message-images'
 import { ImageLightbox, type ImageLightboxLabels, type LightboxImage } from '@dshfiles/plugin-ui/components/image-lightbox'
 import styles from './MessageImage.module.css'
 
@@ -139,6 +140,7 @@ export function ImageGallery({
   compact = false,
   thumbnail = false,
   labels,
+  gallery,
 }: {
   images: readonly MessageImageSource[]
   load: MessageImageLoader
@@ -146,42 +148,73 @@ export function ImageGallery({
   compact?: boolean
   thumbnail?: boolean
   labels: ImageLabels
+  gallery?: MessageImageGallery
 }) {
+  // A position of a larger message gallery: its own tile plus the whole group
+  // the preview opens, so every image of the message stays reachable.
+  const group = gallery !== undefined && gallery.images.length > 0 ? gallery.images : images
+  const groupOffset = gallery === undefined ? 0 : gallery.index
   const [loadedUrls, setLoadedUrls] = useState<Readonly<Record<string, string>>>({})
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
+  const pendingLoads = useRef(new Set<string>())
   const recordLoaded = useCallback((key: string, url: string) => {
     setLoadedUrls(previous => (previous[key] === url ? previous : { ...previous, [key]: url }))
   }, [])
-  const variant: ImageVariant = thumbnail ? 'thumbnail' : compact || images.length > 1 ? 'tile' : 'single'
+  const variant: ImageVariant = thumbnail ? 'thumbnail' : compact || group.length > 1 ? 'tile' : 'single'
   const lightboxImages = useMemo<readonly LightboxImage[]>(
     () =>
-      images.map((image, index) => {
+      group.map((image, index) => {
         const src = 'preview' in image ? image.preview.url : (loadedUrls[sourceKey(image, index)] ?? load.peek?.(image.attachment))
         const alt = sourceLabel(image, labels.image)
         return src === undefined ? { alt } : { src, alt }
       }),
-    [images, labels.image, load, loadedUrls],
+    [group, labels.image, load, loadedUrls],
   )
+
+  useEffect(() => {
+    if (previewIndex === null) return
+    let live = true
+    group.forEach((image, index) => {
+      if (!('attachment' in image)) return
+      const key = sourceKey(image, index)
+      if (loadedUrls[key] !== undefined || pendingLoads.current.has(key)) return
+      pendingLoads.current.add(key)
+      void load(image.attachment)
+        .then(url => {
+          if (live) recordLoaded(key, url)
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          pendingLoads.current.delete(key)
+        })
+    })
+    return () => {
+      live = false
+    }
+  }, [group, load, loadedUrls, previewIndex, recordLoaded])
 
   if (images.length === 0) return null
   return (
     <>
       <div className={`${styles.gallery} dshx-root`} data-align={align}>
-        {images.map((image, index) => (
-          <MessageImage
-            key={sourceKey(image, index)}
-            image={image}
-            load={load}
-            variant={variant}
-            labels={labels}
-            onLoaded={url => {
-              recordLoaded(sourceKey(image, index), url)
-            }}
-            onPreview={() => {
-              setPreviewIndex(index)
-            }}
-          />
-        ))}
+        {images.map((image, index) => {
+          const groupIndex = groupOffset + index
+          return (
+            <MessageImage
+              key={sourceKey(image, groupIndex)}
+              image={image}
+              load={load}
+              variant={variant}
+              labels={labels}
+              onLoaded={url => {
+                recordLoaded(sourceKey(image, groupIndex), url)
+              }}
+              onPreview={() => {
+                setPreviewIndex(groupIndex)
+              }}
+            />
+          )
+        })}
       </div>
       {previewIndex !== null && lightboxImages[previewIndex] !== undefined && (
         <ImageLightbox

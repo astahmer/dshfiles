@@ -90,20 +90,46 @@ export const summarizeInputSchema = Schema.Struct({
   model: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))),
 })
 
+const reviewInputSchema = Schema.Struct({
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)).annotate({ description: 'Absolute path of the workspace to review.' }),
+  base: Schema.optional(
+    Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)).annotate({
+      description: 'Base bookmark or revision; defaults to the first of main, master or trunk.',
+    }),
+  ),
+  fromChangeId: Schema.optional(
+    Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)).annotate({
+      description: 'Persistent JJ change ID for the saved range base; requires toChangeId and path set to the owning repository root.',
+    }),
+  ),
+  toChangeId: Schema.optional(
+    Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)).annotate({
+      description: 'Persistent JJ change ID for the saved range head; requires fromChangeId and path set to the owning repository root.',
+    }),
+  ),
+})
+
 export const pullsReviewApi = defineApi({
   id: 'pulls-review',
   owner: '@dshfiles/pulls-review',
   version: 1,
   methods: {
     review: method({
-      input: Schema.Struct({
-        path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
-        base: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))),
-        fromChangeId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
-        toChangeId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
-      }),
+      input: reviewInputSchema,
       output: reviewResultSchema,
       description: "Read a workspace's changes since a base bookmark, or an exact saved change-ID range, and group the changed files into review scopes.",
+    }),
+    report: method({
+      input: reviewInputSchema,
+      output: Schema.Struct({ text: Schema.String }),
+      description: "The review of a workspace's changes as the report text `/pulls` prints, for agents.",
+      tool: {
+        name: 'pulls_review',
+        description:
+          "Read a workspace's changes against a base bookmark, or an exact saved range of persistent JJ change IDs, and return pulls.review scopes with per-scope file and line counts.",
+        readOnly: true,
+        render: report => report.text,
+      },
     }),
     summarize: method({
       input: summarizeInputSchema,

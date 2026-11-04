@@ -7,7 +7,8 @@
     "jsx": "react-jsx",
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node", "react", "@dshfiles/dshx/client/env"]
+    "types": ["node", "react", "@dshfiles/dshx/client/env"],
+    "allowImportingTsExtensions": true
   },
   "include": ["src"]
 }

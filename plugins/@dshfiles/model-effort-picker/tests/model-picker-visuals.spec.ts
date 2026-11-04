@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ACCOUNT_HUES, accountColor } from '../src/account-color.js'
-import { effortGlyph } from '../src/effort-levels.js'
+import { EFFORT_BAR_COUNT, effortGlyph } from '../src/effort-levels.js'
 import { ModelPickerModel } from '../src/model-picker-model.js'
 
 describe('model brand marks', () => {
@@ -31,15 +31,28 @@ describe('account colours', () => {
   })
 })
 
+describe('account tags', () => {
+  it('drops the service name when the remainder still identifies the account', () => {
+    expect(ModelPickerModel.accountTag({ name: 'OpenCode Go Alex', provider: 'OpenCode Go' })).toBe('Alex')
+    expect(ModelPickerModel.accountTag({ name: 'Codex Alex2', provider: 'Codex' })).toBe('Alex2')
+    expect(ModelPickerModel.accountTag({ name: 'ClaudeWork', provider: 'Claude' })).toBe('ClaudeWork')
+  })
+
+  it('keeps the account identifiable when the service prefix leaves an ordinal', () => {
+    expect(ModelPickerModel.accountTag({ name: 'GitHub Copilot 1', provider: 'GitHub Copilot' })).toBe('#1')
+    expect(ModelPickerModel.accountTag({ name: 'Any Account', provider: undefined })).toBe('Any Account')
+  })
+})
+
 describe('effort glyphs', () => {
   it('fills more bars and warms the hue as effort rises', () => {
-    expect(effortGlyph({ index: 0, total: 5 })).toEqual({ filled: 1, tone: 'muted' })
-    expect(effortGlyph({ index: 2, total: 5 })).toEqual({ filled: 3, tone: 'success' })
-    expect(effortGlyph({ index: 4, total: 5 })).toEqual({ filled: 4, tone: 'warning' })
+    expect(effortGlyph({ index: 0, total: 6 })).toEqual({ filled: 1, tone: 'muted' })
+    expect(effortGlyph({ index: 3, total: 6 })).toEqual({ filled: 4, tone: 'success' })
+    expect(effortGlyph({ index: 5, total: 6 })).toEqual({ filled: 6, tone: 'warning' })
   })
 
   it('never asks for more bars than the glyph has, and stays neutral without levels', () => {
-    expect(effortGlyph({ index: 9, total: 3 }).filled).toBeLessThanOrEqual(4)
+    expect(effortGlyph({ index: 9, total: 3 }).filled).toBeLessThanOrEqual(EFFORT_BAR_COUNT)
     expect(effortGlyph({ index: 0, total: 0 })).toEqual({ filled: 0, tone: 'muted' })
   })
 })

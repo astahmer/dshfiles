@@ -4,7 +4,7 @@ import { SessionQueryEngine } from '@deepseek-ai/dsh-session-query'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { afterEach, expect, it, vi } from 'vitest'
 import { SessionSearchEngine } from './engine.js'
-import { SearchWorkerClient } from './worker-client.js'
+import { openSearchWorker } from './worker-port-promise.js'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -23,7 +23,7 @@ it('folds a Session title once until that Session appends an event', async () =>
   })
   const ctx = new Context()
   await ctx.plugin(SessionStore)
-  const engine = new SessionSearchEngine(ctx, { client: new SearchWorkerClient({ indexPath: ':memory:' }) })
+  const engine = new SessionSearchEngine(ctx, { client: openSearchWorker({ indexPath: ':memory:' }).port })
   const first = SessionId('first')
   const second = SessionId('second')
 

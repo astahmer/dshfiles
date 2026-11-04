@@ -5,7 +5,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { digestSession, type SessionDigest } from '@dshfiles/dshx/platform/session-digest'
 import { Redaction, Utf8 } from '@dshfiles/optmem-core'
 
-import type { IndexedMessage, ThreadDigest } from './store.ts'
+import type { IndexedMessage, ThreadDigest } from './memory-repo.ts'
 
 export type ThreadHeader = {
   readonly id: string

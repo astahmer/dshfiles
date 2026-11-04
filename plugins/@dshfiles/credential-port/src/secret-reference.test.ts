@@ -1,7 +1,9 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { secretReferenceTextSchemaEffect } from './effect.js'
-import { formatSecretReference, parseSecretReference, SecretReferenceResolver, type SecretReferenceResolution } from './secret-reference.js'
+import { formatSecretReference, parseSecretReference } from './grammar.js'
+import type { SecretReferenceResolution } from './secret-reference.js'
+import { SecretReferenceResolver } from './secret-reference-promise.js'
 
 describe('secret references', () => {
   it('parses an alias and defaults its environment to prod', () => {

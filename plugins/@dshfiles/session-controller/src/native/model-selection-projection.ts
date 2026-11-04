@@ -3,27 +3,28 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
-import * as Schema from 'effect/Schema'
-import type { ModelSelection, ModelSelectionProjection, ModelSelectionProjectionState } from './types.ts'
+import { z } from 'zod'
+import type {
+  ModelSelection,
+  ModelSelectionProjection,
+  ModelSelectionProjectionState,
+} from './types.ts'
 
-/**
- * `ProjectionDefinition` types `stateSchema`/`viewSchema` as `ZodType`; the Effect schemas stay the source of truth and
- * `zodSchemaFromEffect` carries them across that native boundary.
- */
-const modelSelectionSchema = Schema.Struct({
-  provider: Schema.String.check(Schema.isMinLength(1)),
-  model: Schema.String.check(Schema.isMinLength(1)),
-  reasoningEffort: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
-})
+const modelSelectionSchema = z.object({
+  provider: z.string().min(1),
+  model: z.string().min(1),
+  reasoningEffort: z.string().min(1).optional(),
+}) as unknown as z.ZodType<ModelSelection>
 
-const modelSelectionProjectionStateSchema = zodSchemaFromEffect(
-  Schema.Struct({ lastUsed: Schema.NullOr(modelSelectionSchema), pending: Schema.NullOr(modelSelectionSchema) }),
-)
+const modelSelectionProjectionStateSchema = z.object({
+  lastUsed: modelSelectionSchema.nullable(),
+  pending: modelSelectionSchema.nullable(),
+}) as z.ZodType<ModelSelectionProjectionState>
 
-const modelSelectionProjectionSchema = zodSchemaFromEffect(
-  Schema.Struct({ lastUsed: Schema.NullOr(modelSelectionSchema), next: Schema.NullOr(modelSelectionSchema) }),
-)
+const modelSelectionProjectionSchema = z.object({
+  lastUsed: modelSelectionSchema.nullable(),
+  next: modelSelectionSchema.nullable(),
+}) as z.ZodType<ModelSelectionProjection>
 
 /**
  * Advance durable model-selection state by one Session event.

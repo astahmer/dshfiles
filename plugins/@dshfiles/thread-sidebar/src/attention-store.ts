@@ -1,6 +1,7 @@
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
-import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
-import * as Schema from 'effect/Schema'
+import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
+import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
+import { Clock, Context, Effect, Layer, Option, Schema, SynchronizedRef } from 'effect'
 import {
   MAX_ATTENTION_SESSIONS,
   threadAttentionViewSchema,
@@ -9,7 +10,7 @@ import {
   type ThreadAttentionSnapshot,
   type ThreadAttentionView,
 } from './attention-api.js'
-import { SchemaHelpers } from './schema-helpers.js'
+import { AttentionStorageFailed } from './sidebar-errors.js'
 
 export const threadAttentionDomain = defineDomain({
   name: 'thread_attention',
@@ -18,8 +19,6 @@ export const threadAttentionDomain = defineDomain({
     sessions: { valueSchema: zodSchemaFromEffect(threadAttentionViewSchema), __key: 'sessions' },
   },
 })
-
-export type AttentionTable = KvTable<string, ThreadAttentionView>
 
 const turnEndEventSchema = Schema.Struct({
   type: Schema.Literal('turn/end'),
@@ -30,6 +29,8 @@ const turnEndEventSchema = Schema.Struct({
     }),
   }),
 })
+
+const decodeTurnEnd = Schema.decodeUnknownOption(turnEndEventSchema)
 
 /**
  * Turn ends that ask the user for something. `forked` closes a fork's
@@ -45,9 +46,9 @@ const finishReasonByKind: Readonly<Record<string, AttentionFinishReason>> = {
 }
 
 const finishReasonFromEvent = (event: unknown): AttentionFinishReason | null => {
-  const parsed = SchemaHelpers.decodeUnknownSafe(turnEndEventSchema, event)
-  if (!parsed.success) return null
-  const reason = parsed.data.data.reason
+  const parsed = decodeTurnEnd(event)
+  if (Option.isNone(parsed)) return null
+  const reason = parsed.value.data.reason
   // The Host shutting down disposes a running Agent: that turn resumes after the restart, it was not stopped by anyone.
   if (reason.kind === 'aborted' && reason.reason?.kind === 'disposed') return null
   return finishReasonByKind[reason.kind] ?? null
@@ -77,154 +78,184 @@ const legacyAttentionRecord = (entry: ThreadAttentionMigrationEntry, version: nu
         manuallyUnread: entry.manuallyUnread,
       }
 
-export interface AttentionStore {
-  snapshot(): ThreadAttentionSnapshot
-  recordFinish(input: { readonly sessionId: string; readonly seq: number; readonly time: number; readonly reason: AttentionFinishReason }): void
-  acknowledge(input: { readonly sessionId: string; readonly version: number }): Promise<ThreadAttentionSnapshot>
-  clearUnread(input: { readonly sessionId: string; readonly version: number }): Promise<ThreadAttentionSnapshot>
-  clearUnreadMany(entries: readonly { readonly sessionId: string; readonly version: number }[]): Promise<ThreadAttentionSnapshot>
-  markUnread(input: { readonly sessionId: string }): Promise<ThreadAttentionSnapshot>
-  markUnreadMany(sessionIds: readonly string[]): Promise<ThreadAttentionSnapshot>
-  migrate(entries: readonly ThreadAttentionMigrationEntry[]): Promise<ThreadAttentionSnapshot>
-  flush(): Promise<void>
-}
-
-/**
- * The Host's durable record of threads the user has not acknowledged. Only
- * unacknowledged threads are stored, so acknowledging deletes a row instead of
- * keeping a comparison value that could drift from the session log.
- */
-export const createAttentionStore = ({
-  table,
-  now = Date.now,
-  reportError = error => console.error('Thread attention write failed', { error: error instanceof Error ? error.message.slice(0, 200) : typeof error }),
-}: {
-  readonly table: AttentionTable
-  readonly now?: () => number
-  readonly reportError?: (error: unknown) => void
-}): AttentionStore => {
-  const records = new Map<string, ThreadAttentionView>(table.entries())
-  let revision = Math.max(now(), ...[...records.values()].map(record => record.version))
-  let writes: Promise<void> = Promise.resolve()
-
-  const enqueue = (operation: () => Promise<unknown>): Promise<void> => {
-    const result = writes.then(operation).then(() => undefined)
-    writes = result.catch(() => undefined)
-    return result
-  }
-
-  const trim = (): void => {
-    for (const sessionId of attentionKeysToTrim([...records.values()])) {
-      records.delete(sessionId)
-      void enqueue(() => table.delete(sessionId)).catch(reportError)
-    }
-  }
-
-  const put = (record: ThreadAttentionView): Promise<void> => {
-    records.set(record.sessionId, record)
-    trim()
-    return enqueue(() => table.put(record.sessionId, record))
-  }
-
-  const snapshot = (): ThreadAttentionSnapshot => ({
-    revision,
-    sessions: [...records.values()].sort((left, right) => (right.finishedAt ?? 0) - (left.finishedAt ?? 0) || byVersionAscending(left, right)),
-  })
-
-  const takeVersion = (): number => {
-    revision = nextAttentionVersion(revision, now())
-    return revision
-  }
-
-  return {
-    snapshot,
-    recordFinish: ({ sessionId, seq, time, reason }) => {
-      const existing = records.get(sessionId)
-      void put({
-        sessionId,
-        version: takeVersion(),
-        finishedAt: time,
-        finishedSeq: seq,
-        finishedReason: reason,
-        manuallyUnread: existing?.manuallyUnread ?? false,
-      }).catch(reportError)
-    },
-    acknowledge: async ({ sessionId, version }) => {
-      const record = records.get(sessionId)
-      if (record !== undefined && record.version <= version) {
-        if (record.manuallyUnread) {
-          await put({ sessionId, version: takeVersion(), finishedAt: null, finishedSeq: null, finishedReason: null, manuallyUnread: true })
-        } else {
-          records.delete(sessionId)
-          await enqueue(() => table.delete(sessionId))
-        }
-      }
-      return snapshot()
-    },
-    clearUnread: async ({ sessionId, version }) => {
-      const record = records.get(sessionId)
-      if (record !== undefined && record.version <= version) {
-        records.delete(sessionId)
-        await enqueue(() => table.delete(sessionId))
-      }
-      return snapshot()
-    },
-    clearUnreadMany: async entries => {
-      const sessionIds = entries.flatMap(({ sessionId, version }) => {
-        const record = records.get(sessionId)
-        if (record === undefined || record.version > version) return []
-        records.delete(sessionId)
-        return [sessionId]
-      })
-      if (sessionIds.length > 0) await enqueue(() => Promise.all(sessionIds.map(sessionId => table.delete(sessionId))))
-      return snapshot()
-    },
-    markUnread: async ({ sessionId }) => {
-      const existing = records.get(sessionId)
-      await put({
-        sessionId,
-        version: takeVersion(),
-        finishedAt: existing?.finishedAt ?? null,
-        finishedSeq: existing?.finishedSeq ?? null,
-        finishedReason: existing?.finishedReason ?? null,
-        manuallyUnread: true,
-      })
-      return snapshot()
-    },
-    markUnreadMany: async sessionIds => {
-      const marked = sessionIds.map(sessionId => {
-        const existing = records.get(sessionId)
-        return {
-          sessionId,
-          version: takeVersion(),
-          finishedAt: existing?.finishedAt ?? null,
-          finishedSeq: existing?.finishedSeq ?? null,
-          finishedReason: existing?.finishedReason ?? null,
-          manuallyUnread: true,
-        }
-      })
-      for (const record of marked) {
-        records.set(record.sessionId, record)
-      }
-      trim()
-      if (marked.length > 0) await enqueue(() => Promise.all(marked.map(record => table.put(record.sessionId, record))))
-      return snapshot()
-    },
-    migrate: async entries => {
-      for (const entry of entries) {
-        if (records.has(entry.sessionId)) continue
-        const record = legacyAttentionRecord(entry, takeVersion())
-        if (record !== null) await put(record)
-      }
-      return snapshot()
-    },
-    flush: () => writes,
-  }
-}
-
 export class ThreadAttentionStoreModel {
   static readonly finishReasonFromEvent = finishReasonFromEvent
   static readonly nextVersion = nextAttentionVersion
   static readonly keysToTrim = attentionKeysToTrim
   static readonly legacyRecord = legacyAttentionRecord
+}
+
+interface AttentionState {
+  readonly records: ReadonlyMap<string, ThreadAttentionView>
+  readonly revision: number
+}
+
+/** What one change does: rows to put and keys to delete, applied durably before the mirror moves. */
+interface AttentionChange {
+  readonly put: readonly ThreadAttentionView[]
+  readonly remove: readonly string[]
+}
+
+type Operation = AttentionStorageFailed['operation']
+
+const snapshotOf = (state: AttentionState): ThreadAttentionSnapshot => ({
+  revision: state.revision,
+  sessions: [...state.records.values()].sort((left, right) => (right.finishedAt ?? 0) - (left.finishedAt ?? 0) || byVersionAscending(left, right)),
+})
+
+/**
+ * The Host's durable record of threads the user has not acknowledged, in the `thread_attention` storage domain. Only
+ * unacknowledged threads are stored, so acknowledging deletes a row instead of keeping a comparison value that could
+ * drift from the Session log. Every change writes durably first, then moves the in-memory mirror reads answer from.
+ */
+export class ThreadAttention extends Context.Service<
+  ThreadAttention,
+  {
+    readonly snapshot: Effect.Effect<ThreadAttentionSnapshot>
+    readonly recordFinish: (input: {
+      readonly sessionId: string
+      readonly seq: number
+      readonly time: number
+      readonly reason: AttentionFinishReason
+    }) => Effect.Effect<void, AttentionStorageFailed>
+    readonly acknowledge: (input: { readonly sessionId: string; readonly version: number }) => Effect.Effect<ThreadAttentionSnapshot, AttentionStorageFailed>
+    readonly clearUnread: (input: { readonly sessionId: string; readonly version: number }) => Effect.Effect<ThreadAttentionSnapshot, AttentionStorageFailed>
+    readonly clearUnreadMany: (
+      entries: ReadonlyArray<{ readonly sessionId: string; readonly version: number }>,
+    ) => Effect.Effect<ThreadAttentionSnapshot, AttentionStorageFailed>
+    readonly markUnread: (input: { readonly sessionId: string }) => Effect.Effect<ThreadAttentionSnapshot, AttentionStorageFailed>
+    readonly markUnreadMany: (sessionIds: ReadonlyArray<string>) => Effect.Effect<ThreadAttentionSnapshot, AttentionStorageFailed>
+    readonly migrate: (entries: ReadonlyArray<ThreadAttentionMigrationEntry>) => Effect.Effect<ThreadAttentionSnapshot, AttentionStorageFailed>
+  }
+>()('@dshfiles/thread-sidebar/ThreadAttention') {
+  static readonly layer = Layer.effect(
+    ThreadAttention,
+    Effect.gen(function* () {
+      const domain = yield* (yield* StorageDomain)
+        .open(threadAttentionDomain)
+        .pipe(Effect.mapError(cause => new AttentionStorageFailed({ operation: 'open', cause })))
+      const table = domain.table('sessions')
+      const stored = yield* table.entries.pipe(Effect.mapError(cause => new AttentionStorageFailed({ operation: 'open', cause })))
+      const now = yield* Clock.currentTimeMillis
+      const state = yield* SynchronizedRef.make<AttentionState>({
+        records: new Map(stored),
+        revision: Math.max(now, ...stored.map(([, record]) => record.version)),
+      })
+
+      /** Run one change under the mirror's lock: plan it against the current records, write it, then publish it. */
+      const apply = (operation: Operation, plan: (records: ReadonlyMap<string, ThreadAttentionView>, takeVersion: () => number) => AttentionChange) =>
+        SynchronizedRef.modifyEffect(state, current =>
+          Effect.gen(function* () {
+            const at = yield* Clock.currentTimeMillis
+            let revision = current.revision
+            const takeVersion = (): number => {
+              revision = nextAttentionVersion(revision, at)
+              return revision
+            }
+            const change = plan(current.records, takeVersion)
+            const records = new Map(current.records)
+            for (const sessionId of change.remove) records.delete(sessionId)
+            for (const record of change.put) records.set(record.sessionId, record)
+            const trimmed = attentionKeysToTrim([...records.values()])
+            for (const sessionId of trimmed) records.delete(sessionId)
+            const puts = change.put.filter(record => records.has(record.sessionId))
+            yield* Effect.forEach(puts, record => table.put(record.sessionId, record), { discard: true })
+            yield* Effect.forEach([...change.remove, ...trimmed], sessionId => table.delete(sessionId), { discard: true })
+            const next = { records, revision }
+            return [snapshotOf(next), next] as const
+          }).pipe(Effect.mapError(cause => new AttentionStorageFailed({ operation, cause }))),
+        )
+
+      const unchanged: AttentionChange = { put: [], remove: [] }
+
+      return ThreadAttention.of({
+        snapshot: Effect.map(SynchronizedRef.get(state), snapshotOf),
+        recordFinish: Effect.fn('thread attention record')(function* (input) {
+          yield* apply('record', (records, takeVersion) => ({
+            put: [
+              {
+                sessionId: input.sessionId,
+                version: takeVersion(),
+                finishedAt: input.time,
+                finishedSeq: input.seq,
+                finishedReason: input.reason,
+                manuallyUnread: records.get(input.sessionId)?.manuallyUnread ?? false,
+              },
+            ],
+            remove: [],
+          }))
+        }),
+        acknowledge: Effect.fn('thread attention acknowledge')(function* (input) {
+          return yield* apply('acknowledge', (records, takeVersion) => {
+            const record = records.get(input.sessionId)
+            if (record === undefined || record.version > input.version) return unchanged
+            if (!record.manuallyUnread) return { put: [], remove: [input.sessionId] }
+            return {
+              put: [{ sessionId: input.sessionId, version: takeVersion(), finishedAt: null, finishedSeq: null, finishedReason: null, manuallyUnread: true }],
+              remove: [],
+            }
+          })
+        }),
+        clearUnread: Effect.fn('thread attention clear')(function* (input) {
+          return yield* apply('clear', records => {
+            const record = records.get(input.sessionId)
+            return record === undefined || record.version > input.version ? unchanged : { put: [], remove: [input.sessionId] }
+          })
+        }),
+        clearUnreadMany: Effect.fn('thread attention clear many')(function* (entries) {
+          return yield* apply('clear', records => ({
+            put: [],
+            remove: entries.flatMap(entry => {
+              const record = records.get(entry.sessionId)
+              return record === undefined || record.version > entry.version ? [] : [entry.sessionId]
+            }),
+          }))
+        }),
+        markUnread: Effect.fn('thread attention mark')(function* (input) {
+          return yield* apply('mark', (records, takeVersion) => {
+            const existing = records.get(input.sessionId)
+            return {
+              put: [
+                {
+                  sessionId: input.sessionId,
+                  version: takeVersion(),
+                  finishedAt: existing?.finishedAt ?? null,
+                  finishedSeq: existing?.finishedSeq ?? null,
+                  finishedReason: existing?.finishedReason ?? null,
+                  manuallyUnread: true,
+                },
+              ],
+              remove: [],
+            }
+          })
+        }),
+        markUnreadMany: Effect.fn('thread attention mark many')(function* (sessionIds) {
+          return yield* apply('mark', (records, takeVersion) => ({
+            put: sessionIds.map(sessionId => {
+              const existing = records.get(sessionId)
+              return {
+                sessionId,
+                version: takeVersion(),
+                finishedAt: existing?.finishedAt ?? null,
+                finishedSeq: existing?.finishedSeq ?? null,
+                finishedReason: existing?.finishedReason ?? null,
+                manuallyUnread: true,
+              }
+            }),
+            remove: [],
+          }))
+        }),
+        migrate: Effect.fn('thread attention migrate')(function* (entries) {
+          return yield* apply('migrate', (records, takeVersion) => ({
+            put: entries.flatMap(entry => {
+              if (records.has(entry.sessionId)) return []
+              const record = legacyAttentionRecord(entry, takeVersion())
+              return record === null ? [] : [record]
+            }),
+            remove: [],
+          }))
+        }),
+      })
+    }),
+  )
 }

@@ -88,7 +88,7 @@ Mutations require the user's request or the calling thread's explicitly authoriz
 
 ## Persistence and trust boundaries
 
-The Host stores local pack definitions, resource metadata and audit events in `$DSH_HOME/plugins/resource-packs/resources.db`, using prepared SQLite statements and transactional resource revision/audit writes. Closing/reopening the plugin retains the database. Native file contents and conversation history are not copied into it.
+The Host stores local pack definitions, resource metadata and audit events in `$DSH_HOME/plugins/resource-packs/resources.db`, through `@dshfiles/sqlite-store` (migration `1_initial` adopts a file the earlier opener wrote at `user_version` 1; a newer file is refused) with transactional resource revision/audit writes. A symlinked directory or file is refused. Closing/reopening the plugin retains the database. Native file contents and conversation history are not copied into it.
 
 This milestone is a single-owner local metadata surface. A reference is **not** an access grant to the native object. It does not add per-resource sharing ACLs or publish data externally. Stored labels/properties can still be sensitive; protect the DSH home and exports accordingly. Data validation and disabled UI controls are not substitutes for Host authorization.
 

@@ -11,39 +11,34 @@ Do not import this entry from Host, Client, API contract, or Settings contract s
 ## Programmatic builds
 
 ```ts
-import {
-  buildClient,
-  buildHost,
-  watchClient,
-  watchHost,
-} from "@dshfiles/dshx/tooling";
+import { buildClient, buildHost, watchClient, watchHost } from '@dshfiles/dshx/tooling'
 ```
 
 ```ts
 interface BuildHostOptions {
-  readonly packageId: string;
-  readonly logicalName?: string;
-  readonly root?: string;
-  readonly entry?: string;
-  readonly outDir: string;
-  readonly sourcemap?: boolean;
-  readonly declarations?: boolean;
-  readonly vite?: { readonly plugins?: readonly PluginOption[] };
-  readonly compatibility?: DshCompatibility;
+  readonly packageId: string
+  readonly logicalName?: string
+  readonly root?: string
+  readonly entry?: string
+  readonly outDir: string
+  readonly sourcemap?: boolean
+  readonly declarations?: boolean
+  readonly vite?: { readonly plugins?: readonly PluginOption[] }
+  readonly compatibility?: DshCompatibility
 }
 
 interface BuildClientOptions {
-  readonly packageId: string;
-  readonly logicalName?: string;
-  readonly root?: string;
-  readonly entry: string;
-  readonly outDir: string;
-  readonly sourcemap?: boolean;
-  readonly declarations?: boolean;
-  readonly vite?: { readonly plugins?: readonly PluginOption[] };
-  readonly external?: readonly string[];
-  readonly inject?: readonly string[];
-  readonly compatibility?: DshCompatibility;
+  readonly packageId: string
+  readonly logicalName?: string
+  readonly root?: string
+  readonly entry: string
+  readonly outDir: string
+  readonly sourcemap?: boolean
+  readonly declarations?: boolean
+  readonly vite?: { readonly plugins?: readonly PluginOption[] }
+  readonly external?: readonly string[]
+  readonly inject?: readonly string[]
+  readonly compatibility?: DshCompatibility
 }
 ```
 
@@ -51,13 +46,13 @@ interface BuildClientOptions {
 
 ```ts
 interface BuildReport {
-  readonly face: "host" | "client";
-  readonly entryFile: string;
-  readonly outDir: string;
+  readonly face: 'host' | 'client'
+  readonly entryFile: string
+  readonly outDir: string
   readonly output: readonly {
-    readonly fileName: string;
-    readonly type: "chunk" | "asset" | "declaration";
-  }[];
+    readonly fileName: string
+    readonly type: 'chunk' | 'asset' | 'declaration'
+  }[]
 }
 ```
 
@@ -65,8 +60,8 @@ There is no `watch?: boolean` option. Call `watchHost()` or `watchClient()` expl
 
 ```ts
 interface BuildWatcher {
-  on(event: "event", listener: (event: BuildEvent) => void): BuildWatcher;
-  close(): Promise<void>;
+  on(event: 'event', listener: (event: BuildEvent) => void): BuildWatcher
+  close(): Promise<void>
 }
 ```
 
@@ -75,7 +70,7 @@ interface BuildWatcher {
 ## Config resolution
 
 ```ts
-const project = await resolveDshxConfig({ cwd });
+const project = await resolveDshxConfig({ cwd })
 ```
 
 `ResolvedDshxConfig` contains canonical project paths, enabled entries, separately instantiated Host/Client Vite plugins, output directory, Profile name, build flags, compatibility override, manifest, and config dependency files. Resolution is read-only.
@@ -103,8 +98,8 @@ It also exports `DshxError`, structured diagnostic types, `PROTOCOL_1_COMPATIBIL
 `parseCliArgs`, `runCli`, and their IO/runtime types support embedding the published CLI grammar in Node tools. Manifest repair is a separate transactional sequence:
 
 ```ts
-const plan = await createManifestRepairPlan(project, options);
-await applyManifestRepairPlan(plan);
+const plan = await createManifestRepairPlan(project, options)
+await applyManifestRepairPlan(plan)
 // rollbackManifestRepairPlan(plan) if later validation fails
 ```
 

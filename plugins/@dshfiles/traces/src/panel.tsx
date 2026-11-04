@@ -42,7 +42,7 @@ import { ModelCostTable } from './model-costs.js'
 import { createThreadOpener } from './open-thread.js'
 import { ServiceMapView } from './service-map.js'
 import { TraceList } from './trace-list.js'
-import { TracesSchema, type Mutable } from './schema.js'
+import { Schema, type Types } from 'effect'
 import { storedTracesView, tracesTabSchema, WINDOW_OPTIONS, type TracesView } from './view-state.js'
 
 const ALL = '__all__'
@@ -79,7 +79,7 @@ export const TracesPanel = (props: {
   }
   const search = useDebouncedValue({ value: view.search.trim(), delayMs: 250 })
   // dshx API payloads refuse undefined values, so absent filters are omitted rather than sent as undefined.
-  const filters: Mutable<Omit<ListInput, 'cursor'>> = { limit: 50 }
+  const filters: Types.Mutable<Omit<ListInput, 'cursor'>> = { limit: 50 }
   if (search.length > 0) filters.search = search
   if (view.service !== null) filters.service = view.service
   if (view.operation !== null) filters.operation = view.operation
@@ -169,7 +169,7 @@ export const TracesPanel = (props: {
 
         <FiringAlertsBanner firing={view.tab === 'alerts' ? null : firing} onShow={() => update({ tab: 'alerts' })} t={props.tAlerts} />
 
-        <Tabs value={view.tab} onValueChange={value => update({ tab: TracesSchema.decode(tracesTabSchema, value) })} className="dshx:min-h-0 dshx:flex-1">
+        <Tabs value={view.tab} onValueChange={value => update({ tab: Schema.decodeUnknownSync(tracesTabSchema)(value) })} className="dshx:min-h-0 dshx:flex-1">
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
             <TabsList className="dshx:max-w-full dshx:justify-start dshx:overflow-x-auto">
               <TabsTrigger value="traces">{t('tabTraces')}</TabsTrigger>

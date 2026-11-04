@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { safeCordisLogger } from './safe-logger.js'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ToolDefinition, ToolRuntime } from '@deepseek-ai/dsh-tools'
 
@@ -77,7 +78,7 @@ const installToolEdits = (ctx: Context, packageId: string, edits: readonly ToolE
     const tools = ctx.get('tools')
     const agents = ctx.get('agents')
     if (tools === undefined || agents === undefined) return () => undefined
-    const warn = (message: string): void => ctx.logger('dshx:tool-edits').warn(`${packageId}: ${message}`)
+    const warn = (message: string): void => safeCordisLogger(ctx, 'dshx:tool-edits').warn(`${packageId}: ${message}`)
     const applied = new Map<Agent, Array<() => void>>()
     const install = (agent: Agent): void => {
       if (applied.has(agent)) return

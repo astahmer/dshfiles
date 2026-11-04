@@ -59,7 +59,7 @@
           "kind": "host-test",
           "id": "prompt-stash.prompt-library-host-wiring",
           "file": "plugins/@dshfiles/prompt-stash/src/host.test.ts",
-          "testName": "opens the declared domain and serves the shared prompt library"
+          "testName": "serves the shared prompt library and keeps it across a reload"
         }
       ],
       "telemetry": [

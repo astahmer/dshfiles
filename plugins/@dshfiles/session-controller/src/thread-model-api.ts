@@ -1,6 +1,5 @@
-import { defineApi, zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import { defineApi, method, zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
-import { method } from './api-schema.js'
 
 export const threadModelSelectionSchema = Schema.Struct({
   provider: Schema.String.check(Schema.isMinLength(1)),

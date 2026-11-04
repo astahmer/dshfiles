@@ -1,5 +1,5 @@
 import Schema from '@deepseek-ai/schemastery'
-import { defineSettings } from '@dshfiles/dshx/settings'
+import { defineSettings, type SettingsValue } from '@dshfiles/dshx/settings'
 import * as EffectSchema from 'effect/Schema'
 import { AiAccountsSchema } from './effect-schema.js'
 import { DEFAULT_RECOVERY_POLICY, recoveryPolicySchema, type KindPolicy } from './failure-policy.js'
@@ -120,29 +120,6 @@ export type PricingSettings = {
   readonly pricingOverrides: Readonly<Record<string, string>>
 }
 
-let readHostSettings: (() => unknown) | undefined
-
-/** The Host half of the namespace: it only remembers its scope so the pricing service reads live values. */
-export const aiAccountsHostSettings = aiAccountsSettings.host({
-  setup: scope => {
-    const read = (): unknown => scope.get()
-    readHostSettings = read
-    return () => {
-      if (readHostSettings === read) readHostSettings = undefined
-    }
-  },
-})
-
-const readLiveSettings = (): object => {
-  let value: unknown
-  try {
-    value = readHostSettings?.()
-  } catch {
-    value = undefined
-  }
-  return typeof value === 'object' && value !== null ? value : {}
-}
-
 /** The namespace keys read below; each stays `unknown` until its own rule decides whether it is usable. */
 const liveSettingsSchema = EffectSchema.Struct({
   costEstimates: EffectSchema.optional(EffectSchema.Unknown),
@@ -164,51 +141,51 @@ const decodeSetting = <S extends EffectSchema.ConstraintDecoder<unknown>>(schema
   return result._tag === 'Success' ? result.success : fallback
 }
 
-const readLiveSettingsFields = (): LiveSettings => {
-  const result = AiAccountsSchema.decodeResult(liveSettingsSchema, readLiveSettings())
+/** The committed namespace value; an older Host may still hold a malformed field, so each one is decoded again. */
+export type AiAccountsSettingsValue = SettingsValue<typeof aiAccountsSettings.schema>
+
+const liveFields = (live: AiAccountsSettingsValue): LiveSettings => {
+  const result = AiAccountsSchema.decodeResult(liveSettingsSchema, live)
   return result._tag === 'Success' ? result.success : {}
 }
 
-/** Live pricing preferences; defaults when the namespace is not registered on this Host. */
-const readPricingSettings = (): PricingSettings => {
-  const live = readLiveSettingsFields()
-  return {
-    costEstimates: decodeSetting(EffectSchema.Boolean, live.costEstimates, true),
-    pricingRefreshHours: decodeSetting(EffectSchema.Finite.check(EffectSchema.isGreaterThanOrEqualTo(1)), live.pricingRefreshHours, 24),
-    pricingOverrides: decodeSetting(EffectSchema.Record(EffectSchema.String, EffectSchema.String), live.pricingOverrides, {}),
+export interface AccountSettingsSnapshot {
+  readonly pricing: PricingSettings
+  /** Enable Codex Fast mode for supported routes unless a Session changes that route. */
+  readonly fastModeDefault: boolean
+  readonly lunaReserveRouting: boolean
+  readonly recovery: {
+    readonly policy: typeof recoveryPolicySchema.Type
+    readonly usageOrder: readonly string[]
+    readonly hiddenUsageAccounts: readonly string[]
   }
+  readonly quotaRetry: { readonly autoRetryDefault: boolean; readonly showChoice: boolean }
 }
 
-/** Live Fast mode preference; off when the namespace is not registered on this Host. */
-const readFastModeDefault = (): boolean => decodeSetting(EffectSchema.Boolean, readLiveSettingsFields().fastModeDefault, false)
-
-/** Live Luna Reserve routing; on when the namespace is not registered on this Host. */
-const readLunaReserveRouting = (): boolean => decodeSetting(EffectSchema.Boolean, readLiveSettingsFields().codexLunaReserve, true)
-
-/** Live failure policy plus the account order and hidden list a fail-over respects; defaults when unregistered. */
-const readRecoverySettings = () => {
-  const live = readLiveSettingsFields()
-  // Preserve the Host call shape without letting an old cosmetic list override canonical route priority.
+/** The Host-side preferences of the namespace, each falling back on its own when absent or malformed. */
+const fromLive = (live: AiAccountsSettingsValue): AccountSettingsSnapshot => {
+  const fields = liveFields(live)
   return {
-    policy: decodeSetting(recoveryPolicySchema, live.failureRecovery, DEFAULT_RECOVERY_POLICY),
-    usageOrder: [],
-    hiddenUsageAccounts: decodeSetting(EffectSchema.Array(EffectSchema.String), live.hiddenUsageAccounts, []),
-  }
-}
-
-/** Quota retry defaults; old or unregistered Hosts stay opted in and show the turn-level option. */
-const readQuotaRetrySettings = () => {
-  const live = readLiveSettingsFields()
-  return {
-    autoRetryDefault: decodeSetting(EffectSchema.Boolean, live.autoRetryQuotaDefault, true),
-    showChoice: decodeSetting(EffectSchema.Boolean, live.showQuotaRetryChoice, true),
+    pricing: {
+      costEstimates: decodeSetting(EffectSchema.Boolean, fields.costEstimates, true),
+      pricingRefreshHours: decodeSetting(EffectSchema.Finite.check(EffectSchema.isGreaterThanOrEqualTo(1)), fields.pricingRefreshHours, 24),
+      pricingOverrides: decodeSetting(EffectSchema.Record(EffectSchema.String, EffectSchema.String), fields.pricingOverrides, {}),
+    },
+    fastModeDefault: decodeSetting(EffectSchema.Boolean, fields.fastModeDefault, false),
+    lunaReserveRouting: decodeSetting(EffectSchema.Boolean, fields.codexLunaReserve, true),
+    // Preserve the Host call shape without letting an old cosmetic list override canonical route priority.
+    recovery: {
+      policy: decodeSetting(recoveryPolicySchema, fields.failureRecovery, DEFAULT_RECOVERY_POLICY),
+      usageOrder: [],
+      hiddenUsageAccounts: decodeSetting(EffectSchema.Array(EffectSchema.String), fields.hiddenUsageAccounts, []),
+    },
+    quotaRetry: {
+      autoRetryDefault: decodeSetting(EffectSchema.Boolean, fields.autoRetryQuotaDefault, true),
+      showChoice: decodeSetting(EffectSchema.Boolean, fields.showQuotaRetryChoice, true),
+    },
   }
 }
 
 export class AccountSettingsModel {
-  static readonly readFastModeDefault = readFastModeDefault
-  static readonly readPricingSettings = readPricingSettings
-  static readonly readLunaReserveRouting = readLunaReserveRouting
-  static readonly readRecoverySettings = readRecoverySettings
-  static readonly readQuotaRetrySettings = readQuotaRetrySettings
+  static readonly fromLive = fromLive
 }

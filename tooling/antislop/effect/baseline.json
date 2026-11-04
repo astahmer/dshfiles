@@ -1,0 +1,43 @@
+{
+  "effect-migration(no-host-child-process)": {
+    "plugins/@dshfiles/ai-accounts/src/account-session-service.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/claude-auth-status.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/claude-cli.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/codex-login-process.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/keychain.ts": 1
+  },
+  "effect-migration(no-host-global-timer)": {
+    "plugins/@dshfiles/ai-accounts/src/account-connection-verification.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/account-credential-home-work.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/account-login-service.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/account-session-service.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/account-setup-service.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/claude-auth-status.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/claude-cli.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/codex-login-process.ts": 1,
+    "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
+    "plugins/@dshfiles/optmem-core/src/engine.ts": 6
+  },
+  "effect-migration(no-host-module-state)": {
+    "plugins/@dshfiles/ai-accounts/src/account-credential-home-work.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/account-runtime.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/account-session-host.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/model-fallback-host.ts": 1,
+    "plugins/@dshfiles/ai-accounts/src/native-providers.ts": 1,
+    "plugins/@dshfiles/hmr-gate/src/host.ts": 1
+  },
+  "effect-migration(no-void-then)": {
+    "plugins/@dshfiles/ai-accounts/src/account-connection-summary.tsx": 1,
+    "plugins/@dshfiles/ai-accounts/src/host.ts": 1,
+    "plugins/@dshfiles/backlog/src/backlog-panel.tsx": 2,
+    "plugins/@dshfiles/diff-viewed/src/viewed-marks.ts": 2,
+    "plugins/@dshfiles/jj-integration/src/client.tsx": 1,
+    "plugins/@dshfiles/plugin-marketplace/tests/self-bootstrap.smoke.ts": 1,
+    "plugins/@dshfiles/settings-shell/src/client.tsx": 1,
+    "plugins/@dshfiles/settings-shell/src/schema-form/settings-form.tsx": 2,
+    "plugins/@dshfiles/thread-sidebar/src/client.tsx": 3,
+    "tooling/dshx/packages/dshx/src/client/app-services.ts": 1,
+    "tooling/dshx/packages/dshx/src/communication/bridge.ts": 1,
+    "tooling/dshx/packages/dshx/src/platform/client.ts": 1
+  }
+}

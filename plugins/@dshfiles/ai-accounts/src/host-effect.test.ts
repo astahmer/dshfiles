@@ -1,8 +1,14 @@
 import { Context } from '@deepseek-ai/cordis'
+import { HostContext } from '@dshfiles/dshx/effect'
 import { Effect, Exit } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { aiAccountsFastModeApi } from './model-fast-mode-api.js'
 import { effectHandler } from './host-effect.js'
+import { AccountStorePromiseService } from './account-store-promise.js'
+import { openAccountStore } from './fixtures/account-store.js'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 describe('AI Accounts Effect API bridge', () => {
   it('forwards request interruption to the original Promise handler', async () => {
@@ -19,14 +25,12 @@ describe('AI Accounts Effect API bridge', () => {
         signal.addEventListener('abort', () => reject(new Error('interrupted')), { once: true })
       })
     })
+    const store = await openAccountStore(join(mkdtempSync(join(tmpdir(), 'ai-accounts-effect-')), 'accounts.json'))
     const running = Effect.runPromiseExit(
-      handler({
-        ctx: new Context(),
-        caller: { kind: 'client' },
-        peer: undefined,
-        input: { provider: 'codex-primary', model: 'gpt-6-luna' },
-        signal: controller.signal,
-      }),
+      handler({ provider: 'codex-primary', model: 'gpt-6-luna' }, { caller: { kind: 'client' }, peer: undefined }).pipe(
+        Effect.provide(HostContext.layer({ ctx: new Context(), packageId: '@dshfiles/ai-accounts' })),
+        Effect.provideService(AccountStorePromiseService, store),
+      ),
       { signal: controller.signal },
     )
 

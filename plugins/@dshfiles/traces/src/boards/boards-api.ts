@@ -1,6 +1,5 @@
-import { defineApi } from '@dshfiles/dshx/api'
+import { defineApi, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
-import { method } from '../api-schema.js'
 import { attributeKeySchema, spanFilterSchema } from '../alerts/alert-types.js'
 
 const finiteNumber = Schema.Number.check(Schema.isFinite())

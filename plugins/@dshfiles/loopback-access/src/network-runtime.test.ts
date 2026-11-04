@@ -4,11 +4,12 @@ import { networkInterfaces } from 'node:os'
 import { Loader } from '@deepseek-ai/cordis-plugin-loader'
 import { ConfigEditor } from '@deepseek-ai/dsh-config-editor'
 import { SettingsForms } from '@deepseek-ai/dsh-settings'
+import { createHostApiClient } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it, vi } from 'vitest'
 import hostDefinition from './host.js'
-import { NetworkController } from './network-controller.js'
+import { loopbackAccessApi } from './api.js'
 import { NETWORK_SETTINGS_NAMESPACE } from './network-preferences.js'
 import * as startup from './startup.js'
 import { socketClosed } from './socket-closed.test-support.js'
@@ -102,7 +103,7 @@ async function mountRuntime(bindAddress: string, localhostEnabled: boolean, fres
     expect(host.ctx.get('webServer')).toBeDefined()
     await releaseReservations()
     const plugin = await host.mount(hostDefinition, { packageId: '@dshfiles/loopback-access' })
-    const controller = new NetworkController(host.ctx, host.ctx.dshfilesLoopbackAccess, host.ctx.dshfilesNetworkStartup)
+    const controller = createHostApiClient(host.ctx, loopbackAccessApi, '@test/network-runtime')
     return { host, plugin, controller, settings, entry: loader.resolve(NETWORK_SETTINGS_NAMESPACE) }
   } catch (error) {
     await host.dispose()
@@ -118,7 +119,7 @@ describe('required localhost native Host lifecycle', () => {
     const client = new Socket()
     client.on('error', () => undefined)
     try {
-      const snapshot = runtime.controller.snapshot()
+      const snapshot = await runtime.controller.network()
       expect(runtime.host.ctx.dshfilesNetworkStartup.preferences).toEqual({ lanEnabled: null, bindAddress: null, port: null })
       expect(runtime.settings.describe().find(item => item.ns === NETWORK_SETTINGS_NAMESPACE)?.value).not.toHaveProperty('localhostEnabled')
       expect(snapshot).toMatchObject({
@@ -142,7 +143,7 @@ describe('required localhost native Host lifecycle', () => {
     const client = new Socket()
     client.on('error', () => undefined)
     try {
-      const snapshot = runtime.controller.snapshot()
+      const snapshot = await runtime.controller.network()
       const port = snapshot.active.port
       expect(snapshot).toMatchObject({
         saved: { localhostEnabled: true, lanEnabled: true, bindAddress: lanHost },
@@ -159,6 +160,7 @@ describe('required localhost native Host lifecycle', () => {
       const connected = once(client, 'connect', { signal: AbortSignal.timeout(2_000) })
       client.connect({ host: '127.0.0.1', port })
       await connected
+      const access = runtime.host.ctx.dshfilesLoopbackAccess
       const closed = socketClosed(client)
       await runtime.plugin.dispose()
       await closed
@@ -172,7 +174,7 @@ describe('required localhost native Host lifecycle', () => {
       } finally {
         lanClient.destroy()
       }
-      expect(runtime.controller.snapshot()).toMatchObject({ active: { localhostEnabled: false }, pendingRestart: false })
+      expect(access.status()).toMatchObject({ state: 'stopped', localhostOrigin: null, listeners: [] })
       const replacement = createServer()
       try {
         const listening = once(replacement, 'listening', { signal: AbortSignal.timeout(2_000) })
@@ -190,10 +192,9 @@ describe('required localhost native Host lifecycle', () => {
   it.each([false, true])('native Settings and controller saves strip legacy %s without changing the boot listener', async localhostEnabled => {
     const runtime = await mountRuntime('127.0.0.1', localhostEnabled)
     try {
-      const before = runtime.controller.snapshot()
+      const before = await runtime.controller.network()
       const boot = runtime.host.ctx.dshfilesNetworkStartup
       const fiber = runtime.entry.fiber
-      const signal = new AbortController().signal
       expect(before.pendingRestart).toBe(false)
       const refused = await runtime.host.connection.requestApi({
         packageId: '@dshfiles/loopback-access',
@@ -203,16 +204,17 @@ describe('required localhost native Host lifecycle', () => {
         input: { ...before.saved, localhostEnabled: false, expectedRevision: before.revision },
       })
       expect(await refused.json()).toMatchObject({ result: { ok: false, error: { code: 'contract' } } })
-      expect(runtime.controller.snapshot()).toEqual(before)
-      const after = await runtime.controller.save({ ...before.saved, expectedRevision: before.revision, localhostEnabled: true }, signal)
+      expect(await runtime.controller.network()).toEqual(before)
+      const after = await runtime.controller.saveNetwork({ ...before.saved, expectedRevision: before.revision, localhostEnabled: true })
       expect(runtime.entry.options.config).toEqual({ lanEnabled: false, bindAddress: null, port: 0 })
       expect(after).toMatchObject({ saved: { localhostEnabled: true }, active: before.active, pendingRestart: false })
       expect(runtime.entry.fiber).toBe(fiber)
       expect(runtime.host.ctx.dshfilesNetworkStartup).toBe(boot)
-      const changed = await runtime.controller.save(
-        { ...after.saved, port: after.active.port === 65535 ? 65534 : after.active.port + 1, expectedRevision: after.revision },
-        signal,
-      )
+      const changed = await runtime.controller.saveNetwork({
+        ...after.saved,
+        port: after.active.port === 65535 ? 65534 : after.active.port + 1,
+        expectedRevision: after.revision,
+      })
       expect(changed.pendingRestart).toBe(true)
       expect(changed.active).toEqual(before.active)
       expect(runtime.host.ctx.dshfilesNetworkStartup).toBe(boot)

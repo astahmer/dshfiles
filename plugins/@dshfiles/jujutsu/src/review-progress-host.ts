@@ -1,64 +1,39 @@
-import type { Context } from '@deepseek-ai/cordis'
-import { DshxEffect } from '@dshfiles/dshx/effect'
-import { Effect } from 'effect'
-import type {} from '@deepseek-ai/dsh-storage-domain'
-import { jujutsuReviewProgressApi } from './review-progress-api.js'
-import { ReviewProgressStoreModel, reviewProgressDomain, type ReviewProgressStore } from './review-progress-store.js'
+import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
+import { Cache, Context, Duration, Effect, Exit, Layer, Scope } from 'effect'
+import { ReviewProgressUnavailable } from './errors.js'
+import type { ReviewProgressToggle } from './review-progress-api.js'
+import { ReviewProgressStoreModel, reviewProgressDomain } from './review-progress-store.js'
 
-interface OpenedReviewProgress {
-  readonly store: ReviewProgressStore
-  readonly close: () => Promise<void>
-}
+const make = Effect.gen(function* () {
+  const storage = yield* StorageDomain
+  const scope = yield* Effect.scope
 
-/**
- * One store per Host process, not per Cordis context: an API handler and any
- * future writer receive different contexts, and a second store would keep its
- * own record map and clobber the other's durable rows.
- */
-let opening: Promise<OpenedReviewProgress> | undefined
-
-const openReviewProgress = async (ctx: Context): Promise<OpenedReviewProgress> => {
-  const storage = ctx.get('storageDomain')
-  if (storage === undefined) throw new Error('Jujutsu review progress storage is unavailable.')
-  const domain = await storage.open(reviewProgressDomain)
-  return { store: ReviewProgressStoreModel.create({ table: domain.table('marks') }), close: () => domain.close() }
-}
-
-export const reviewProgressFor = (ctx: Context): Promise<ReviewProgressStore> => {
-  if (opening === undefined) {
-    const started = openReviewProgress(ctx)
-    opening = started
-    void started.catch(() => {
-      if (opening === started) opening = undefined
-    })
-  }
-  return opening.then(opened => opened.store)
-}
-
-export const closeReviewProgress = async (): Promise<void> => {
-  if (opening === undefined) return
-  const opened = await opening.then(
-    value => value,
-    () => undefined,
+  // The domain opens on first use and stays open for the plugin's Scope; a failed open is retried by the next call.
+  const opened = yield* Cache.makeWith(
+    () =>
+      storage.open(reviewProgressDomain).pipe(
+        Effect.flatMap(domain => ReviewProgressStoreModel.make(domain.table('marks'))),
+        Scope.provide(scope),
+        Effect.mapError(cause => new ReviewProgressUnavailable({ cause })),
+      ),
+    { capacity: 1, timeToLive: exit => (Exit.isSuccess(exit) ? Duration.infinity : Duration.zero) },
   )
-  // Cleared before the store is released, so the next reader opens a fresh one.
-  opening = undefined
-  if (opened === undefined) return
-  await opened.store.flush()
-  await opened.close()
-}
+  const store = Cache.get(opened, 'marks')
 
-export const jujutsuReviewProgressApiHost = DshxEffect.host(jujutsuReviewProgressApi, {
-  state: Effect.fn('jujutsu review progress state')(function* ({ ctx }) {
-    return yield* Effect.tryPromise({
-      try: () => reviewProgressFor(ctx).then(store => store.snapshot()),
-      catch: error => error,
-    })
-  }),
-  toggle: Effect.fn('jujutsu review progress toggle')(function* ({ ctx, input }) {
-    return yield* Effect.tryPromise({
-      try: () => reviewProgressFor(ctx).then(store => store.toggle(input)),
-      catch: error => error,
-    })
-  }),
+  const snapshot = Effect.fn('jujutsu review progress state')(function* () {
+    return yield* (yield* store).snapshot
+  })
+
+  const toggle = Effect.fn('jujutsu review progress toggle')(function* (input: ReviewProgressToggle) {
+    return yield* (yield* store).toggle(input).pipe(Effect.catchTag('StorageDomainWriteFailed', cause => Effect.fail(new ReviewProgressUnavailable({ cause }))))
+  })
+
+  yield* store.pipe(Effect.ignore({ log: 'Warn', message: 'Jujutsu review progress storage did not open; the next request retries' }))
+
+  return { snapshot, toggle }
 })
+
+/** The durable review marks of this Host, shared by every browser; the storage domain closes with the plugin's Scope. */
+export class ReviewProgress extends Context.Service<ReviewProgress>()('@dshfiles/jujutsu/ReviewProgress', { make }) {
+  static readonly layer = Layer.effect(ReviewProgress, ReviewProgress.make)
+}

@@ -68,14 +68,14 @@ export class NetworkPreferencesModel {
 
   /** The owned preferences only: a legacy localhost flag is read, then dropped from the stored row. */
   static normalize(input: NetworkPreferencesInput): NetworkPreferences {
-    const stored = LoopbackSchema.decodeStrict(preferencesSchema, input)
+    const stored = Schema.decodeUnknownSync(preferencesSchema, { onExcessProperty: 'error' })(input)
     return { lanEnabled: stored.lanEnabled, bindAddress: stored.bindAddress, port: stored.port }
   }
 
   /** The settings section hands back unknown JSON; decode it once, then keep only the owned preferences. */
   // oxlint-disable-next-line antislop/no-unknown-parameters -- this is the settings boundary: the stored row is unknown
   static decode(value: unknown): NetworkPreferences {
-    const stored: StoredNetworkPreferences = LoopbackSchema.decodeStrict(preferencesSchema, value)
+    const stored: StoredNetworkPreferences = Schema.decodeUnknownSync(preferencesSchema, { onExcessProperty: 'error' })(value)
     return { lanEnabled: stored.lanEnabled, bindAddress: stored.bindAddress, port: stored.port }
   }
 

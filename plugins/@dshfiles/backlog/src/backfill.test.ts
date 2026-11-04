@@ -1,30 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { BacklogBackfill, type TriageOutcome } from './backfill.js'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect } from 'effect'
+import { TestClock } from 'effect/testing'
+import { BacklogBackfill, type BackfillProgress, type TriageOutcome } from './backfill.js'
 import type { BacklogEvent, BacklogItem } from './item.js'
-import { BacklogModel, type BacklogFileRecord } from './store.js'
-
-const memoryTable = <Value>() => {
-  const rows = new Map<string, Value>()
-  return {
-    get: (key: string) => rows.get(key),
-    entries: () => rows.entries(),
-    keys: () => rows.keys(),
-    get size() {
-      return rows.size
-    },
-    put: async (key: string, value: Value) => {
-      rows.set(key, value)
-    },
-    delete: async (key: string) => rows.delete(key),
-    update: async (key: string, change: (current: Value) => Value) => {
-      const current = rows.get(key)
-      if (current === undefined) throw new Error('missing row')
-      const next = change(current)
-      rows.set(key, next)
-      return next
-    },
-  }
-}
+import { BacklogStore } from './store.js'
+import { backlogStoreLayer } from './test-support.js'
 
 const triaged: BacklogEvent = { at: 1, actor: 'system', kind: 'triaged', detail: 'suggested kind bug' }
 
@@ -76,57 +56,59 @@ describe('backfill selection', () => {
 })
 
 describe('backfill run', () => {
-  it('counts what each item became, reports progress, marks only unchanged ones, and leaves failures for later', async () => {
-    const marked: number[] = []
-    const progress: { completed: number; total: number; applied: number; proposed: number; unchanged: number; failed: number }[] = []
-    const outcomes = new Map<number, TriageOutcome>([
-      [1, 'applied'],
-      [2, 'proposed'],
-      [3, 'unchanged'],
-      [4, 'failed'],
-    ])
-    const report = await BacklogBackfill.run({
-      selection: { ids: [1, 2, 3, 4], total: 6, remaining: 2 },
-      triage: async id => outcomes.get(id) ?? 'failed',
-      markTriaged: async id => {
-        marked.push(id)
-      },
-      onProgress: report => progress.push(report),
-    })
+  it.effect('counts what each item became, reports progress, marks only unchanged ones, and leaves failures for later', () =>
+    Effect.gen(function* () {
+      const marked: number[] = []
+      const progress: BackfillProgress[] = []
+      const outcomes = new Map<number, TriageOutcome>([
+        [1, 'applied'],
+        [2, 'proposed'],
+        [3, 'unchanged'],
+        [4, 'failed'],
+      ])
+      const report = yield* BacklogBackfill.run({
+        selection: { ids: [1, 2, 3, 4], total: 6, remaining: 2 },
+        triage: id => Effect.succeed(outcomes.get(id) ?? 'failed'),
+        markTriaged: id => Effect.sync(() => void marked.push(id)),
+        onProgress: entry => Effect.sync(() => void progress.push(entry)),
+      })
 
-    expect(report).toEqual({ considered: 4, applied: 1, proposed: 1, unchanged: 1, failed: 1, remaining: 3 })
-    expect(marked).toEqual([3])
-    expect(progress.at(-1)).toEqual({ completed: 4, total: 4, applied: 1, proposed: 1, unchanged: 1, failed: 1 })
-  })
+      expect(report).toEqual({ considered: 4, applied: 1, proposed: 1, unchanged: 1, failed: 1, remaining: 3 })
+      expect(marked).toEqual([3])
+      expect(progress.at(-1)).toEqual({ completed: 4, total: 4, applied: 1, proposed: 1, unchanged: 1, failed: 1 })
+    }),
+  )
 
-  it('counts a throwing or vanished item as failed instead of stopping the run', async () => {
-    const report = await BacklogBackfill.run({
-      selection: { ids: [1, 2], total: 2, remaining: 0 },
-      triage: async id => {
-        if (id === 1) throw new Error('down')
-        return 'missing'
-      },
-      markTriaged: async () => undefined,
-    })
+  it.effect('counts a failing or vanished item as failed instead of stopping the run', () =>
+    Effect.gen(function* () {
+      const report = yield* BacklogBackfill.run({
+        selection: { ids: [1, 2], total: 2, remaining: 0 },
+        triage: id => (id === 1 ? Effect.fail('down') : Effect.succeed('missing' as const)),
+        markTriaged: () => Effect.void,
+      })
 
-    expect(report).toEqual({ considered: 2, applied: 0, proposed: 0, unchanged: 0, failed: 2, remaining: 2 })
-  })
+      expect(report).toEqual({ considered: 2, applied: 0, proposed: 0, unchanged: 0, failed: 2, remaining: 2 })
+    }),
+  )
 })
 
 describe('backfill store', () => {
-  it('records that triage looked at an item without making it look recently active', async () => {
-    const store = BacklogModel.createStore({ files: memoryTable<BacklogFileRecord>(), items: memoryTable<BacklogItem>(), now: () => 5 })
-    await store.capture({ text: 'captured before triage was set up', actor: { kind: 'user' } })
-    const scope = { statuses: BacklogBackfill.openStatuses, limit: 25 }
+  it.effect('records that triage looked at an item without making it look recently active', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(5)
+      const store = yield* BacklogStore
+      yield* store.capture({ text: 'captured before triage was set up', actor: { kind: 'user' } })
+      const scope = { statuses: BacklogBackfill.openStatuses, limit: 25 }
 
-    expect(store.triageCandidates(scope)).toEqual({ ids: [1], total: 1, remaining: 0 })
+      expect(yield* store.triageCandidates(scope)).toEqual({ ids: [1], total: 1, remaining: 0 })
 
-    await store.markTriaged(1)
-    const reopened = store.get(1)
-    expect(store.triageCandidates(scope)).toEqual({ ids: [], total: 0, remaining: 0 })
-    expect(reopened.ok && reopened.value.item.lastActivityAt).toBe(5)
-    expect(reopened.ok && reopened.value.item.events.at(-1)?.detail).toBe('found nothing to change')
-    // The marker is history, not activity: the item does not read as freshly touched in the feed.
-    expect(store.list({}).items[0]?.activity).toEqual({ count: 0, agents: 0, comments: 0, last: null })
-  })
+      yield* store.markTriaged(1)
+      const reopened = yield* store.get(1)
+      expect(yield* store.triageCandidates(scope)).toEqual({ ids: [], total: 0, remaining: 0 })
+      expect(reopened.ok && reopened.value.item.lastActivityAt).toBe(5)
+      expect(reopened.ok && reopened.value.item.events.at(-1)?.detail).toBe('found nothing to change')
+      // The marker is history, not activity: the item does not read as freshly touched in the feed.
+      expect((yield* store.list({})).items[0]?.activity).toEqual({ count: 0, agents: 0, comments: 0, last: null })
+    }).pipe(Effect.provide(backlogStoreLayer())),
+  )
 })

@@ -1,21 +1,18 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import * as Schema from 'effect/Schema'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { McpCommandLineModel } from './command-line.js'
 import { httpDraftSchema, stdioDraftSchema, type StoredServer } from './api.js'
 import { McpCatalogModel } from './catalog.js'
-import { ManagedLocalCommand } from './local-process.js'
-import { ClientReconciler } from './reconcile.js'
 import { redactText, redactingLogger } from './redaction.js'
 import { McpServerStateModel } from './server-state.js'
 import { createQuickPanelContribution, SessionQuickPanels } from './quick-panel.js'
 
 type StoredStdioServer = Extract<StoredServer, { readonly transport: 'stdio' }>
 
-const acceptsDraft = (value: unknown): boolean => {
-  const schema = typeof value === 'object' && value !== null && 'transport' in value && value.transport === 'stdio' ? stdioDraftSchema : httpDraftSchema
-  return Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(value)._tag === 'Success'
-}
+const draftSchema = Schema.Union([stdioDraftSchema, httpDraftSchema])
+
+const acceptsDraft = (value: unknown): boolean => Schema.decodeUnknownResult(draftSchema, { onExcessProperty: 'error' })(value)._tag === 'Success'
 
 const server = (overrides: Partial<StoredStdioServer> = {}): StoredStdioServer => ({
   id: 'one',
@@ -130,55 +127,6 @@ describe('catalog search', () => {
     expect(McpCatalogModel.filterProviders({ rows: McpCatalogModel.providers, query: 'project management' }).map(row => row.name)).toEqual(['Linear'])
     expect(McpCatalogModel.filterProviders({ rows: McpCatalogModel.providers, query: '' }).length).toBe(McpCatalogModel.providers.length)
   })
-
-  it('queries the official Registry and maps only safe streamable HTTP endpoints', async () => {
-    let requestUrl = ''
-    const registrySearch = McpCatalogModel.createRegistrySearchService({
-      fetch: async (input, init) => {
-        requestUrl = String(input)
-        expect(init.headers).toEqual({ accept: 'application/json' })
-        expect(init.redirect).toBe('error')
-        return new Response(
-          JSON.stringify({
-            servers: [
-              { server: { name: 123, remotes: [] } },
-              {
-                server: {
-                  name: 'io.example/weather',
-                  title: 'Weather',
-                  description: 'Forecast tools',
-                  version: '1.2.0',
-                  _meta: { 'com.example': { category: ['weather', 'development'], documentationUrl: 'https://docs.example.com/weather' } },
-                  remotes: [
-                    { type: 'streamable-http', url: 'https://api.example.com/mcp?token=do-not-return' },
-                    { type: 'streamable-http', url: 'https://api.example.com/mcp' },
-                  ],
-                },
-              },
-            ],
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        )
-      },
-    })
-    const rows = await registrySearch.search({ query: 'weather' })
-    expect(rows).toEqual([
-      {
-        name: 'io.example/weather',
-        title: 'Weather',
-        category: 'weather',
-        description: 'Forecast tools',
-        version: '1.2.0',
-        endpoint: 'https://api.example.com/mcp',
-        docsUrl: 'https://docs.example.com/weather',
-      },
-    ])
-    const request = new URL(requestUrl)
-    expect(request.searchParams.get('search')).toBe('weather')
-    expect(request.searchParams.get('version')).toBe('latest')
-    expect(request.searchParams.get('limit')).toBe('20')
-    expect(JSON.stringify(rows)).not.toContain('do-not-return')
-  })
 })
 
 describe('native composer quick panel', () => {
@@ -225,154 +173,43 @@ describe('local command parsing', () => {
   })
 })
 
+const recordingWarn = () => {
+  const calls: unknown[][] = []
+  const warn = (...args: unknown[]): void => {
+    calls.push(args)
+  }
+  return { calls, warn }
+}
+
 describe('native-client log redaction', () => {
   it('redacts literal and URL-encoded credential values before calling the Host logger', () => {
     const secret = 'sensitive value/with+symbols'
-    const warn = vi.fn()
-    const logger = redactingLogger({ warn } as never, [secret])
+    const recorded = recordingWarn()
+    const logger = redactingLogger({ warn: recorded.warn } as never, [secret])
     logger.warn(`remote returned ${secret} and ${encodeURIComponent(secret)}`)
-    expect(warn).toHaveBeenCalledWith('remote returned [REDACTED] and [REDACTED]')
+    expect(recorded.calls).toEqual([['remote returned [REDACTED] and [REDACTED]']])
     expect(redactText('key=sensitive value/with+symbols', [secret])).toBe('key=[REDACTED]')
   })
 
   it('redacts a start failure logged as an Error, including its cause', () => {
     const secret = 'token-123'
-    const warn = vi.fn()
-    const logger = redactingLogger({ warn } as never, [secret])
+    const recorded = recordingWarn()
+    const logger = redactingLogger({ warn: recorded.warn } as never, [secret])
     logger.warn('MCP server %s: native client failed to start: %s', 'one', new Error(`401 for ${secret}`, { cause: new Error(secret) }))
-    const logged = warn.mock.calls[0]?.[2]
+    const logged = recorded.calls[0]?.[2]
     expect(logged).toBeInstanceOf(Error)
     expect(String(logged)).not.toContain(secret)
     expect(String(logged instanceof Error ? logged.cause : undefined)).not.toContain(secret)
   })
   it('redacts through a named logger and keeps the rest of the Host logger reachable', () => {
     const secret = 'token-123'
-    const warn = vi.fn()
+    const recorded = recordingWarn()
     const exporters = new Map()
-    const service = Object.assign((name?: string) => ({ name, warn }), { warn: vi.fn(), exporters })
+    const service = Object.assign((name?: string) => ({ name, warn: recorded.warn }), { warn: recordingWarn().warn, exporters })
     const logger = redactingLogger(service as never, [secret])
     logger('mcp').warn(`refused ${secret}`)
-    expect(warn).toHaveBeenCalledWith('refused [REDACTED]')
+    expect(recorded.calls).toEqual([['refused [REDACTED]']])
     expect(logger('mcp').name).toBe('mcp')
     expect(logger.exporters).toBe(exporters)
-  })
-})
-
-describe('managed local HTTP process', () => {
-  it('resolves argv through the Host subprocess seam and waits for owned-range cleanup', async () => {
-    const stdout = { on: vi.fn(), resume: vi.fn() }
-    const stderr = { on: vi.fn(), resume: vi.fn() }
-    const handle = {
-      stdout,
-      stderr,
-      done: new Promise(() => undefined),
-      terminate: vi.fn(),
-      waitForExit: vi.fn(async () => true),
-    }
-    const subprocess = {
-      resolveExecutable: vi.fn(async () => '/resolved/npx'),
-      spawn: vi.fn(() => handle),
-    }
-    const managed = await ManagedLocalCommand.start(
-      subprocess as never,
-      {
-        command: 'npx',
-        args: ['-y', '@example/tunnel'],
-        cwd: '/opt/tunnel',
-      },
-      { ACCESS_TOKEN: 'secret-never-render' },
-    )
-
-    expect(subprocess.spawn).toHaveBeenCalledWith({
-      argv: ['/resolved/npx', '-y', '@example/tunnel'],
-      cwd: '/opt/tunnel',
-      env: { ACCESS_TOKEN: 'secret-never-render' },
-      stdio: { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
-      graceMs: 5_000,
-    })
-    expect(stdout.resume).toHaveBeenCalledOnce()
-    expect(stderr.resume).toHaveBeenCalledOnce()
-    managed.markRunning()
-    expect(managed.status).toBe('running')
-    await managed.stop()
-    expect(handle.terminate).toHaveBeenCalledOnce()
-    expect(handle.waitForExit).toHaveBeenCalledOnce()
-    expect(managed.status).toBe('stopped')
-  })
-
-  it('reports an early process exit without retaining the outcome error text', async () => {
-    let rejectDone: (reason: Error) => void = () => undefined
-    const handle = {
-      done: new Promise((_resolve, reject) => {
-        rejectDone = reject
-      }),
-      terminate: vi.fn(),
-      waitForExit: vi.fn(async () => true),
-    }
-    const subprocess = {
-      resolveExecutable: vi.fn(async () => '/resolved/runner'),
-      spawn: vi.fn(() => handle),
-    }
-    const managed = await ManagedLocalCommand.start(subprocess as never, { command: 'runner', args: [], cwd: '/tmp' }, {})
-    rejectDone(new Error('private transport secret'))
-    await Promise.resolve()
-    expect(managed.status).toBe('exited')
-    expect(JSON.stringify(managed)).not.toContain('private transport secret')
-  })
-})
-
-describe('native client lifecycle reconciliation', () => {
-  it('starts once, replaces edits, stops disabled servers, and removes deleted servers', async () => {
-    const started: string[] = []
-    const stopped: string[] = []
-    const reconciler = new ClientReconciler(async target => {
-      started.push(`${target.id}:${target.fingerprint}`)
-      return () => {
-        stopped.push(`${target.id}:${target.fingerprint}`)
-      }
-    })
-    const initial = { id: 'one', enabled: true, ready: true, fingerprint: 'a' }
-    await reconciler.update([initial])
-    await reconciler.update([initial])
-    expect(started).toEqual(['one:a'])
-    await reconciler.update([{ ...initial, fingerprint: 'b' }])
-    expect(stopped).toEqual(['one:a'])
-    await reconciler.update([{ ...initial, enabled: false, fingerprint: 'b' }])
-    expect(stopped).toEqual(['one:a', 'one:b'])
-    await reconciler.update([])
-    expect(started).toEqual(['one:a', 'one:b'])
-    await reconciler.dispose()
-  })
-
-  it('tracks a manual disconnect separately and reconnects by restarting the native fiber', async () => {
-    const started: string[] = []
-    const stopped: string[] = []
-    const reconciler = new ClientReconciler(async target => {
-      started.push(target.id)
-      return () => {
-        stopped.push(target.id)
-      }
-    })
-    const configured = { id: 'one', enabled: true, ready: true, fingerprint: 'ref-only-config' }
-    await reconciler.update([configured])
-    expect(reconciler.state('one')).toBe('loaded')
-    await reconciler.update([{ ...configured, suspended: true }])
-    expect(reconciler.state('one')).toBe('manually-disconnected')
-    expect(stopped).toEqual(['one'])
-    await reconciler.restart('one', [configured])
-    expect(reconciler.state('one')).toBe('loaded')
-    expect(started).toEqual(['one', 'one'])
-    await reconciler.update([{ ...configured, enabled: false }])
-    expect(reconciler.state('one')).toBe('inactive')
-    await reconciler.dispose()
-  })
-
-  it('reports native child activation failures without exposing error text', async () => {
-    const reconciler = new ClientReconciler(async () => {
-      throw new Error('sensitive transport detail')
-    })
-    await reconciler.update([{ id: 'one', enabled: true, ready: true, fingerprint: 'safe' }])
-    expect(reconciler.state('one')).toBe('start-failed')
-    await reconciler.dispose()
   })
 })

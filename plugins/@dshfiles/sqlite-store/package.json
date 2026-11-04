@@ -1,0 +1,46 @@
+{
+  "name": "@dshfiles/sqlite-store",
+  "version": "0.1.0",
+  "private": true,
+  "description": "One Effect SqlClient layer for plugin-owned SQLite files: private directory and file modes, WAL pragmas, Migrator migrations that adopt a legacy PRAGMA user_version, and statement spans off by default.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "dshx.features.json"
+  ],
+  "type": "module",
+  "types": "./src/sqlite-store.ts",
+  "exports": {
+    ".": {
+      "types": "./src/sqlite-store.ts",
+      "default": "./dist/sqlite-store.js"
+    },
+    "./errors": {
+      "types": "./src/errors.ts",
+      "default": "./dist/errors.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@effect/sql-sqlite-node": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@dshfiles/dshx": "workspace:*",
+    "@effect/platform-node": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}

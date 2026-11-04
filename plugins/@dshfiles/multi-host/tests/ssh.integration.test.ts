@@ -1,15 +1,27 @@
 import { createConnection } from 'node:net'
-import { describe, expect, test } from 'vitest'
+import { Effect, Exit, Layer, ManagedRuntime, Scope } from 'effect'
+import { FetchHttpClient, HttpClient } from 'effect/http'
+import { afterAll, describe, expect, test } from 'vitest'
 import { SshConnector } from '../src/connectors/ssh.js'
-import { GatewayUnavailableError } from '../src/connectors/gateway.js'
-import { createGatewayPool } from '../src/gateway-pool.js'
+import type { JsonValue } from '@dshfiles/dshx/platform'
+import type { Ssh } from '../src/ssh.js'
+import { exitCode, sshLayer } from './fixtures/ssh-runtime.js'
 
-const failureCode = async (run: () => Promise<unknown>): Promise<string> => {
-  try {
-    await run()
-    return 'no-error'
-  } catch (error) {
-    return error instanceof GatewayUnavailableError ? error.code : 'unexpected'
+const runtime = ManagedRuntime.make(Layer.mergeAll(sshLayer, FetchHttpClient.layer))
+afterAll(() => runtime.dispose())
+
+const failureCode = async (effect: Effect.Effect<unknown, unknown, Ssh | HttpClient.HttpClient | Scope.Scope>, signal?: AbortSignal): Promise<string> =>
+  exitCode(await runtime.runPromiseExit(Effect.scoped(effect), signal === undefined ? undefined : { signal }))
+
+/** A gateway whose tunnel lives until `dispose` closes its Scope. */
+const connect = async (input: { readonly sshTarget: string; readonly remoteHome: string }) => {
+  const scope = await runtime.runPromise(Scope.make())
+  const gateway = await runtime.runPromise(Scope.provide(scope)(SshConnector.connect(input)))
+  const inScope = <A, E>(effect: Effect.Effect<A, E>) => runtime.runPromise(Scope.provide(scope)(effect))
+  return {
+    api: (method: string, payload?: JsonValue) => inScope(gateway.api(method, payload)),
+    run: (namespace: string, method: string, args: Record<string, unknown>) => inScope(gateway.run({ namespace, method, args })),
+    dispose: () => runtime.runPromise(Scope.close(scope, Exit.void)),
   }
 }
 
@@ -26,22 +38,22 @@ const localSshdListening = (): Promise<boolean> =>
 // The system OpenSSH client, exactly as the connector runs it.
 describe('SSH connector error mapping (real ssh)', () => {
   test('an unresolvable host maps to ssh-host-unresolved', async () => {
-    expect(await failureCode(() => SshConnector.probe({ sshTarget: 'nobody@multi-host-test.invalid' }))).toBe('ssh-host-unresolved')
+    expect(await failureCode(SshConnector.probe({ sshTarget: 'nobody@multi-host-test.invalid' }))).toBe('ssh-host-unresolved')
   })
 
   test('a refused port maps to ssh-unreachable', async context => {
     if (await localSshdListening()) context.skip()
-    expect(await failureCode(() => SshConnector.probe({ sshTarget: 'nobody@127.0.0.1' }))).toBe('ssh-unreachable')
+    expect(await failureCode(SshConnector.probe({ sshTarget: 'nobody@127.0.0.1' }))).toBe('ssh-unreachable')
   })
 
   test('a shell-shaped target is refused before ssh runs', async () => {
-    await expect(SshConnector.probe({ sshTarget: 'host; touch /tmp/pwned' })).rejects.toThrow()
+    expect(await failureCode(SshConnector.probe({ sshTarget: 'host; touch /tmp/pwned' }))).toBe('invalid-ssh-target')
   })
 
   test('a cancelled probe stops ssh', async () => {
     const controller = new AbortController()
     controller.abort()
-    expect(await failureCode(() => SshConnector.probe({ sshTarget: 'nobody@multi-host-test.invalid', signal: controller.signal }))).toBe('cancelled')
+    expect(await failureCode(SshConnector.probe({ sshTarget: 'nobody@multi-host-test.invalid' }), controller.signal)).toBe('cancelled')
   })
 })
 
@@ -54,34 +66,23 @@ describe.skipIf(sshTarget === undefined || remoteHome === undefined)('SSH connec
   const home = remoteHome ?? ''
 
   test('discovers the remote DSH home from its launch file', async () => {
-    const homes = await SshConnector.discoverHomes({ sshTarget: target })
+    const homes = await runtime.runPromise(SshConnector.discoverHomes({ sshTarget: target }))
     expect(homes).toContainEqual({ path: home, source: 'multi-host' })
   })
 
   test('a missing launch file maps to runtime-not-running', async () => {
-    expect(await failureCode(() => SshConnector.connect({ sshTarget: target, remoteHome: '/nonexistent/dsh-home' }))).toBe('runtime-not-running')
+    expect(await failureCode(SshConnector.connect({ sshTarget: target, remoteHome: '/nonexistent/dsh-home' }))).toBe('runtime-not-running')
   })
 
-  test('one pooled tunnel serves consecutive calls and is replaced after it closes', async () => {
-    const pool = createGatewayPool({ isTransportFailure: () => false, connect: () => SshConnector.connect({ sshTarget: target, remoteHome: home }) })
+  test('one tunnel serves consecutive calls', async () => {
+    const gateway = await connect({ sshTarget: target, remoteHome: home })
     try {
-      const first = await pool.run('live', gateway => gateway.api('identity'), { mutation: false })
-      expect(first).toMatchObject({ protocolVersion: 1 })
-      const generation = pool.status('live')?.generation
+      expect(await gateway.api('identity')).toMatchObject({ protocolVersion: 1 })
       const startedAt = Date.now()
-      await pool.run('live', gateway => gateway.run('session', 'list', { _request: {} }), { mutation: false })
+      await gateway.run('session', 'list', { _request: {} })
       expect(Date.now() - startedAt).toBeLessThan(300)
-      expect(pool.status('live')?.generation).toBe(generation)
-
-      const held = await pool.acquire('live')
-      await held.gateway.dispose()
-      await held.gateway.closed
-      held.release()
-      expect(pool.status('live')).toBeUndefined()
-      await pool.run('live', gateway => gateway.api('identity'), { mutation: false })
-      expect(pool.status('live')?.generation).toBeGreaterThan(generation ?? 0)
     } finally {
-      await pool.close()
+      await gateway.dispose()
     }
   }, 60_000)
 })

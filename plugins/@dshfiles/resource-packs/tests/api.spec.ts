@@ -1,36 +1,29 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Schema } from 'effect'
-import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
-import { resourcePacksApi } from '../src/api.js'
-import { createResourcePacksHost } from '../src/host.js'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, Schema } from 'effect'
+import { createResourcePacksPlugin } from '../src/host.js'
 import { packDefinitionSchema, resourceSchema } from '../src/model.js'
+import { isolatedDshHome, owner, requestApi, testHost } from './host-layers.js'
+import { platformLayer } from './store-layers.js'
 
-const resourceResponse = Schema.Struct({ result: Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ output: resourceSchema }) }) })
-const errorResponse = Schema.Struct({
-  result: Schema.Struct({ ok: Schema.Literal(false), error: Schema.Struct({ code: Schema.String, message: Schema.String }) }),
+const decodeResourceResponse = Schema.decodeUnknownEffect(
+  Schema.Struct({ result: Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ output: resourceSchema }) }) }),
+)
+const decodeErrorResponse = Schema.decodeUnknownEffect(
+  Schema.Struct({
+    result: Schema.Struct({ ok: Schema.Literal(false), error: Schema.Struct({ code: Schema.String, message: Schema.String }) }),
+  }),
+)
+
+const mountedHost = Effect.gen(function* () {
+  yield* isolatedDshHome
+  const host = yield* testHost
+  yield* Effect.promise(() => host.mount(createResourcePacksPlugin(), { packageId: owner }))
+  // oxlint-disable-next-line antislop/no-unknown-parameters -- deliberately invalid wire input must reach the real API validator.
+  return (method: string, input: unknown) => requestApi(host, method, input)
 })
-let host: TestHost
-let directory: string
-beforeEach(async () => {
-  directory = mkdtempSync(join(tmpdir(), 'resource-packs-api-'))
-  host = await createTestHost()
-  await host.mount(createResourcePacksHost(join(directory, 'resources.db')), { packageId: '@dshfiles/resource-packs' })
-})
-afterEach(async () => {
-  await host.dispose()
-  rmSync(directory, { recursive: true, force: true })
-})
-// oxlint-disable-next-line antislop/no-unknown-parameters, antislop/no-unknown-returns -- Deliberately invalid wire input must reach the real API validator; each test parses its expected response envelope.
-async function call(method: string, input: unknown): Promise<unknown> {
-  const response = await host.connection.requestApi({ packageId: '@dshfiles/resource-packs', apiId: resourcePacksApi.id, version: 1, method, input })
-  return response.json()
-}
 
 describe('authoritative API validation', () => {
-  it.each([
+  it.effect.each([
     ['list', { limit: 201 }],
     ['list', { limit: 0 }],
     ['list', { query: 'x'.repeat(501) }],
@@ -49,45 +42,79 @@ describe('authoritative API validation', () => {
         },
       },
     ],
-  ])('refuses invalid wire input without mutation: %s %j', async (method, input) => {
-    expect(Schema.decodeUnknownSync(errorResponse)(await call(method, input)).result.error.code).toBe('contract')
-    expect(await call('list', {})).toMatchObject({ result: { ok: true, value: { output: { total: 0, resources: [] } } } })
-    expect(await call('catalog', undefined)).toMatchObject({ result: { ok: true, value: { output: { packs: [{ definition: { id: 'tracking' } }] } } } })
-  })
+  ] as const)('refuses invalid wire input without mutation: %s %j', ([method, input]) =>
+    Effect.gen(function* () {
+      const call = yield* mountedHost
+      expect((yield* decodeErrorResponse(yield* call(method, input))).result.error.code).toBe('contract')
+      expect(yield* call('list', {})).toMatchObject({ result: { ok: true, value: { output: { total: 0, resources: [] } } } })
+      expect(yield* call('catalog', undefined)).toMatchObject({ result: { ok: true, value: { output: { packs: [{ definition: { id: 'tracking' } }] } } } })
+    }).pipe(Effect.provide(platformLayer)),
+  )
 
-  it('returns bounded useful domain errors without echoing submitted values or opaque ids', async () => {
-    const registered = Schema.decodeUnknownSync(resourceResponse)(
-      await call('registerResource', { ref: { provider: 'native', kind: 'conversation', id: 'Native/SecretId' }, label: 'Explicit label' }),
-    ).result.value.output
-    const attached = Schema.decodeUnknownSync(resourceResponse)(
-      await call('attach', { resourceId: registered.id, expectedRevision: registered.revision, packId: 'tracking' }),
-    ).result.value.output
-    const input = { resourceId: registered.id, expectedRevision: attached.revision, packId: 'tracking' }
-    const before = await call('get', { resourceId: registered.id })
-    for (const values of [
-      { status: 'secret:DO_NOT_ECHO' },
-      { absent: 'secret:DO_NOT_ECHO' },
-      { related: { provider: 'native', kind: 'conversation', id: '', payload: 'secret:DO_NOT_ECHO' } },
-    ]) {
-      const error = Schema.decodeUnknownSync(errorResponse)(await call('setValues', { ...input, values })).result.error
-      expect(error.code).not.toBe('internal')
-      expect(error.message.length).toBeLessThanOrEqual(500)
-      expect(error.message).not.toContain('DO_NOT_ECHO')
-      expect(error.message).not.toContain('Native/SecretId')
-      expect(await call('get', { resourceId: registered.id })).toEqual(before)
-    }
-  })
+  it.effect('returns bounded useful domain errors without echoing submitted values or opaque ids', () =>
+    Effect.gen(function* () {
+      const call = yield* mountedHost
+      const registered = (yield* decodeResourceResponse(
+        yield* call('registerResource', { ref: { provider: 'native', kind: 'conversation', id: 'Native/SecretId' }, label: 'Explicit label' }),
+      )).result.value.output
+      const attached = (yield* decodeResourceResponse(
+        yield* call('attach', { resourceId: registered.id, expectedRevision: registered.revision, packId: 'tracking' }),
+      )).result.value.output
+      const input = { resourceId: registered.id, expectedRevision: attached.revision, packId: 'tracking' }
+      const before = yield* call('get', { resourceId: registered.id })
+      for (const values of [
+        { status: 'secret:DO_NOT_ECHO' },
+        { absent: 'secret:DO_NOT_ECHO' },
+        { related: { provider: 'native', kind: 'conversation', id: '', payload: 'secret:DO_NOT_ECHO' } },
+      ]) {
+        const response = yield* call('setValues', { ...input, values })
+        const error = (yield* decodeErrorResponse(response)).result.error
+        expect(error.code).not.toBe('internal')
+        expect(error.message.length).toBeLessThanOrEqual(500)
+        expect(JSON.stringify(response)).not.toContain('DO_NOT_ECHO')
+        expect(JSON.stringify(response)).not.toContain('Native/SecretId')
+        expect(yield* call('get', { resourceId: registered.id })).toEqual(before)
+      }
+    }).pipe(Effect.provide(platformLayer)),
+  )
 
-  it('computes user ownership for GUI registration and refuses builtin namespace takeover', async () => {
-    const definition = Schema.decodeUnknownSync(packDefinitionSchema)({
-      id: 'user-pack',
-      version: 1,
-      label: 'User pack',
-      properties: [{ id: 'note', label: 'Note', type: 'text' }],
-    })
-    expect(await call('registerPack', { definition })).toMatchObject({ result: { ok: true, value: { output: { owner: 'user' } } } })
-    expect(Schema.decodeUnknownSync(errorResponse)(await call('registerPack', { definition: { ...definition, id: 'tracking' } })).result.error.code).toBe(
-      'owner-conflict',
-    )
-  })
+  it.effect('computes user ownership for GUI registration and refuses builtin namespace takeover', () =>
+    Effect.gen(function* () {
+      const call = yield* mountedHost
+      const definition = Schema.decodeUnknownSync(packDefinitionSchema)({
+        id: 'user-pack',
+        version: 1,
+        label: 'User pack',
+        properties: [{ id: 'note', label: 'Note', type: 'text' }],
+      })
+      expect(yield* call('registerPack', { definition })).toMatchObject({ result: { ok: true, value: { output: { owner: 'user' } } } })
+      expect((yield* decodeErrorResponse(yield* call('registerPack', { definition: { ...definition, id: 'tracking' } }))).result.error.code).toBe(
+        'owner-conflict',
+      )
+    }).pipe(Effect.provide(platformLayer)),
+  )
+
+  it.effect('names the domain failure of every refused write on the wire', () =>
+    Effect.gen(function* () {
+      const call = yield* mountedHost
+      const registered = (yield* decodeResourceResponse(
+        yield* call('registerResource', { ref: { provider: 'native', kind: 'file', id: 'Opaque' }, label: 'Codes' }),
+      )).result.value.output
+      const base = { resourceId: registered.id, expectedRevision: registered.revision, packId: 'tracking' }
+      // oxlint-disable-next-line antislop/no-unknown-parameters -- the wire input is the boundary under test.
+      const codeOf = (method: string, input: unknown) => Effect.map(Effect.flatMap(call(method, input), decodeErrorResponse), response => response.result.error)
+      expect(yield* codeOf('setValues', { ...base, values: { status: 'todo' } })).toMatchObject({
+        code: 'pack-not-attached',
+        message: 'Attach this pack before setting its properties.',
+      })
+      expect(yield* codeOf('get', { resourceId: '00000000-0000-4000-8000-000000000000' })).toMatchObject({ code: 'unknown-resource' })
+      const attached = (yield* decodeResourceResponse(yield* call('attach', base))).result.value.output
+      const current = { ...base, expectedRevision: attached.revision }
+      expect(yield* codeOf('setValues', { ...current, values: { status: 'missing-option' } })).toMatchObject({
+        code: 'invalid-value',
+        message: 'The value does not match the declared select property type or options.',
+      })
+      expect(yield* codeOf('setValues', { ...current, values: { undeclared: 'x' } })).toMatchObject({ code: 'unknown-property' })
+    }).pipe(Effect.provide(platformLayer)),
+  )
 })

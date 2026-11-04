@@ -258,15 +258,11 @@ describe('tool-search host integration', () => {
     await runtime.dispose()
   })
 
-  it('returns a tagged failure for invalid search input', async () => {
+  it('refuses blank search input with its validation message', async () => {
     const runtime = await harness(await loadPlugin())
     const first = runtime.agents[0]!
 
-    await expect(runtime.searchTool(first).execute?.({ query: '   ' }, { agent: first })).rejects.toMatchObject({
-      _tag: 'ToolSearchFailure',
-      reason: 'query',
-      message: 'tool_search query must not be blank',
-    })
+    await expect(runtime.searchTool(first).execute?.({ query: '   ' }, { agent: first })).rejects.toThrow(/^tool_search query must not be blank$/u)
     await runtime.dispose()
   })
 

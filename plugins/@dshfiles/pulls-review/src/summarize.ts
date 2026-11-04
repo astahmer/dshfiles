@@ -1,6 +1,8 @@
+import type { SessionId } from '@dshfiles/dshx/ids'
+import { Context, Effect, Layer } from 'effect'
 import type { ReviewResult, SummarizeResult, SummaryFailureReason } from './api.js'
-import type { JjRun } from './jj.js'
-import { ReviewWorkspaceModel } from './review.js'
+import { ReviewWorkspace } from './review.js'
+import { SummaryRoutes } from './summary-routes-promise.js'
 
 type OkReview = Extract<ReviewResult, { readonly status: 'ok' }>
 
@@ -63,50 +65,18 @@ const parseSummaryResponse = (text: string, keys: readonly string[]): Record<str
   return Object.keys(cleaned).length === 0 ? undefined : cleaned
 }
 
-export interface SummaryRouteSources {
-  /** The provider the thread's own model requests use, from its session log. */
-  readonly providerOf: (sessionId: string) => Promise<string | undefined>
-  readonly modelsOf: (provider: string) => Promise<readonly string[]>
-}
-
-export interface SummarizeWorkspaceInput {
-  readonly run: JjRun
+export interface SummarizeInput {
   readonly path: string
   readonly base?: string | undefined
-  readonly sessionId?: string | undefined
+  readonly sessionId?: SessionId | undefined
   readonly provider?: string | undefined
   readonly model?: string | undefined
-  readonly signal?: AbortSignal | undefined
-  readonly routes: SummaryRouteSources
-  /** One model call; the Host supplies the real one, tests a scripted answer. */
-  readonly complete: (request: {
-    readonly provider: string
-    readonly model: string
-    /** The thread whose model route this call borrows; providers keyed per session need it. */
-    readonly sessionId?: string | undefined
-    readonly system: string
-    readonly input: string
-    readonly signal: AbortSignal
-  }) => Promise<string>
-}
-
-const resolveRoute = async (
-  input: Pick<SummarizeWorkspaceInput, 'sessionId' | 'provider' | 'model' | 'routes' | 'signal'>,
-): Promise<
-  { readonly kind: 'ready'; readonly provider: string; readonly model: string } | { readonly kind: 'absent'; readonly reason: SummaryFailureReason }
-> => {
-  const provider = input.provider ?? (input.sessionId === undefined ? undefined : await input.routes.providerOf(input.sessionId))
-  if (provider === undefined || provider.length === 0) return { kind: 'absent', reason: 'no-route' }
-  if (input.model !== undefined && input.model.length > 0) return { kind: 'ready', provider, model: input.model }
-  const offered = await input.routes.modelsOf(provider)
-  const model = offered[0]
-  return model === undefined ? { kind: 'absent', reason: 'no-route' } : { kind: 'ready', provider, model }
 }
 
 const messages = {
   'no-route': 'No model route is available for this thread; set a model on the thread and retry.',
   'llm-unavailable': 'The Host has no language-model service to summarize with.',
-  'llm-failed': 'The model call failed.',
+  'llm-failed': 'The model call failed; the thread model may be unavailable.',
   unparsed: 'The model answered without usable per-scope summaries.',
   'review-failed': 'The workspace diff could not be read, so there is nothing to summarize.',
   'no-changes': 'This thread has no changes to summarize yet.',
@@ -115,29 +85,54 @@ const messages = {
 const failure = (reason: SummaryFailureReason, message = messages[reason]): SummarizeResult => ({ status: 'failed', reason, message })
 
 /** Read the workspace again and let the thread's own model summarize each scope. */
-const summarizeWorkspace = async (input: SummarizeWorkspaceInput): Promise<SummarizeResult> => {
-  const review = await ReviewWorkspaceModel.review({ run: input.run, path: input.path, base: input.base, signal: input.signal })
-  if (review.status === 'failed') return failure('review-failed', review.message)
-  if (review.fileCount === 0) return failure('no-changes')
-  const resolved = await resolveRoute(input)
-  if (resolved.kind === 'absent') return failure(resolved.reason)
-  const answer = await input.complete({
-    provider: resolved.provider,
-    model: resolved.model,
-    sessionId: input.sessionId,
-    system: SUMMARY_SYSTEM_PROMPT,
-    input: buildSummaryInput(review),
-    signal: input.signal ?? new AbortController().signal,
-  })
-  const summaries = parseSummaryResponse(
-    answer,
-    review.scopes.map(scope => scope.key),
+export class PullsReviewSummary extends Context.Service<
+  PullsReviewSummary,
+  { readonly summarize: (input: SummarizeInput) => Effect.Effect<SummarizeResult> }
+>()('@dshfiles/pulls-review/PullsReviewSummary') {
+  static readonly layer = Layer.effect(
+    PullsReviewSummary,
+    Effect.gen(function* () {
+      const workspace = yield* ReviewWorkspace
+      const routes = yield* SummaryRoutes
+
+      const resolveRoute = Effect.fn('review summary route')(function* (input: SummarizeInput) {
+        const provider = input.provider ?? (input.sessionId === undefined ? undefined : yield* routes.providerOf(input.sessionId))
+        if (provider === undefined || provider.length === 0) return undefined
+        if (input.model !== undefined && input.model.length > 0) return { provider, model: input.model }
+        const model = (yield* routes.modelsOf(provider))[0]
+        return model === undefined ? undefined : { provider, model }
+      })
+
+      const summarize = Effect.fn('pulls-review summarize')(
+        function* (input: SummarizeInput) {
+          if (!routes.available) return failure('llm-unavailable')
+          const review = yield* workspace.review({ path: input.path, base: input.base })
+          if (review.status === 'failed') return failure('review-failed', review.message)
+          if (review.fileCount === 0) return failure('no-changes')
+          const route = yield* resolveRoute(input)
+          if (route === undefined) return failure('no-route')
+          const answer = yield* routes.complete({ ...route, sessionId: input.sessionId, system: SUMMARY_SYSTEM_PROMPT, input: buildSummaryInput(review) })
+          const summaries = parseSummaryResponse(
+            answer,
+            review.scopes.map(scope => scope.key),
+          )
+          return summaries === undefined ? failure('unparsed') : ({ status: 'ok', route, summaries } satisfies SummarizeResult)
+        },
+        effect =>
+          effect.pipe(
+            Effect.catchTags({
+              PullsReviewOperationError: error => Effect.succeed(failure('review-failed', error.message)),
+              LlmCallFailed: () => Effect.succeed(failure('llm-failed')),
+            }),
+          ),
+      )
+
+      return PullsReviewSummary.of({ summarize })
+    }),
   )
-  return summaries === undefined ? failure('unparsed') : { status: 'ok', route: { provider: resolved.provider, model: resolved.model }, summaries }
 }
 
 export class PullsReviewSummaryModel {
   static readonly buildInput = buildSummaryInput
   static readonly parseResponse = parseSummaryResponse
-  static readonly summarize = summarizeWorkspace
 }

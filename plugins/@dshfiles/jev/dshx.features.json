@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "jev-ask",
+      "title": "Ask Jev one Noul question and record its usage",
+      "summary": "Send one TypeSafe Jev classification over HttpClient with the shared request and answer schemas, return the probability and provider-reported tokens, and record every call in the usage plugin's Jev ledger.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["answered", "rejected", "timed-out", "invalid-answer", "unrecorded"],
+      "failureModes": [
+        "A non-2xx answer fails with JevStatusRejected naming the status and still records a failed call.",
+        "No answer within the caller's timeout fails with JevTimedOut and records a failed call with its duration.",
+        "An answer outside the Noul schema fails with JevAnswerInvalid.",
+        "When no plugin serves the usage API the call still answers; the usage record is dropped with a debug log."
+      ],
+      "externalDependencies": [
+        {
+          "id": "typesafe-jev",
+          "boundary": "POST to api.typesafe.ai/v1/systemone with one question and the caller-bounded text, authorized by the caller-resolved key.",
+          "deterministicFake": "An HttpClient built with HttpClient.make answers fixed responses in src/jev.test.ts."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "jev.success",
+          "file": "plugins/@dshfiles/jev/src/jev.test.ts",
+          "testName": "asks one Noul question and records a successful call with its tokens"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jev.status",
+          "file": "plugins/@dshfiles/jev/src/jev.test.ts",
+          "testName": "fails with the HTTP status and records a failed call"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jev.timeout",
+          "file": "plugins/@dshfiles/jev/src/jev.test.ts",
+          "testName": "times out a call that never answers"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jev.usage-missing",
+          "file": "plugins/@dshfiles/jev/src/jev.test.ts",
+          "testName": "answers even when no plugin records usage"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "jev classify",
+          "file": "plugins/@dshfiles/jev/src/jev.test.ts",
+          "testName": "records a jev classify client span with the question and token counts"
+        }
+      ]
+    }
+  ]
+}

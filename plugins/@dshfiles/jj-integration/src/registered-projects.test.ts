@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, Ref } from 'effect'
 import { registeredProjects, type RegisteredWorkspaceKind } from './registered-projects.js'
 
 const workspaces = [
@@ -14,22 +15,24 @@ const kindByPath = new Map<string, RegisteredWorkspaceKind>([
 ])
 
 describe('registeredProjects', () => {
-  it('splits projects from thread workspaces concurrently, drops missing folders and keeps registry order', async () => {
-    let activeChecks = 0
-    let maximumConcurrentChecks = 0
-    const result = await registeredProjects({
-      workspaces,
-      classify: async path => {
-        activeChecks += 1
-        maximumConcurrentChecks = Math.max(maximumConcurrentChecks, activeChecks)
-        await Promise.resolve()
-        activeChecks -= 1
-        return kindByPath.get(path) ?? 'project'
-      },
-    })
-
-    expect(result.projects).toEqual([workspaces[0], workspaces[3]])
-    expect(result.workspaces).toEqual([workspaces[1]])
-    expect(maximumConcurrentChecks).toBe(workspaces.length)
-  })
+  it.effect('splits projects from thread workspaces concurrently, drops missing folders and keeps registry order', () =>
+    Effect.gen(function* () {
+      const active = yield* Ref.make(0)
+      const peak = yield* Ref.make(0)
+      const result = yield* registeredProjects({
+        workspaces,
+        classify: path =>
+          Effect.gen(function* () {
+            const now = yield* Ref.updateAndGet(active, count => count + 1)
+            yield* Ref.update(peak, current => Math.max(current, now))
+            yield* Effect.yieldNow
+            yield* Ref.update(active, count => count - 1)
+            return kindByPath.get(path) ?? 'project'
+          }),
+      })
+      expect(result.projects).toEqual([workspaces[0], workspaces[3]])
+      expect(result.workspaces).toEqual([workspaces[1]])
+      expect(yield* Ref.get(peak)).toBe(workspaces.length)
+    }),
+  )
 })

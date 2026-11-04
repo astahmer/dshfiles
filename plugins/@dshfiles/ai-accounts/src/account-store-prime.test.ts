@@ -1,3 +1,4 @@
+import { AccountProfilesModel } from './account-store.js'
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -50,50 +51,30 @@ const loadStoreWith = async (accounts: unknown[]) => {
   )
   vi.stubEnv('DSH_HOME', home)
   vi.resetModules()
-  const storeModule = await import('./account-store.js')
   const { AccountHomePolicy } = await import('./account-home-policy.js')
-  return { ...storeModule, AccountHomePolicy }
+  const { openAccountStore } = await import('./fixtures/account-store.js')
+  return { accountStoreService: await openAccountStore(AccountHomePolicy.filePath()), AccountHomePolicy }
 }
 
-describe('account store priming', () => {
-  it('serves stored accounts to the first synchronous read', async () => {
+describe('account store snapshot', () => {
+  it('holds the stored accounts once the store is open, before any further read', async () => {
     const store = await loadStoreWith([accountDraft])
 
-    const primed = store.accountStoreService.primeAccountFile()
+    const opened = store.accountStoreService.current()
 
-    expect(primed.accounts).toHaveLength(1)
-    expect(primed.accounts[0]?.instanceId).toBe('codex-test')
+    expect(opened.accounts).toHaveLength(1)
+    expect(opened.accounts[0]?.instanceId).toBe('codex-test')
     expect(store.AccountHomePolicy.filePath()).toMatch(/\/plugins\/ai-accounts\/accounts\.json$/u)
   })
 
-  it('keeps the sync read stable across repeats without an async re-read', async () => {
+  it('keeps the synchronous snapshot stable across repeats without an async re-read', async () => {
     const store = await loadStoreWith([accountDraft])
 
-    store.accountStoreService.primeAccountFile()
-    const first = store.accountStoreService.readAccountFileSync()
-    const second = store.accountStoreService.readAccountFileSync()
+    const first = store.accountStoreService.current()
+    const second = store.accountStoreService.current()
 
     expect(first.accounts).toHaveLength(1)
     expect(second.accounts).toEqual(first.accounts)
-  })
-
-  it('yields an empty file when the cache was never primed', async () => {
-    const store = await loadStoreWith([accountDraft])
-
-    expect(store.accountStoreService.readAccountFileSync().accounts).toEqual([])
-  })
-
-  it('is what boot depends on: priming before the sync read is the only path that registers routes', async () => {
-    const store = await loadStoreWith([accountDraft])
-
-    // This is the boot sequence in host.ts, in order. Without the priming call
-    // the sync read yields no accounts, buildRoutes registers nothing, and the
-    // panel never mounts.
-    const unprimed = store.accountStoreService.readAccountFileSync()
-    const primed = store.accountStoreService.primeAccountFile()
-
-    expect(unprimed.accounts).toHaveLength(0)
-    expect(primed.accounts).toHaveLength(1)
   })
 
   it('moves an account within its provider order without changing other accounts', async () => {
@@ -112,7 +93,7 @@ describe('account store priming', () => {
     const moved = await store.accountStoreService.reorderAccount({ instanceId: 'last', targetInstanceId: 'codex-test', placement: 'before' })
     expect(moved.accounts.map(account => account.instanceId)).toEqual(['last', 'codex-test', 'disabled'])
     expect((await store.accountStoreService.readAccountFile()).accounts).toEqual(moved.accounts)
-    expect(store.accountStoreService.readAccountFileSync().accounts).toEqual(moved.accounts)
+    expect(store.accountStoreService.current().accounts).toEqual(moved.accounts)
   })
 
   it('serializes overlapping reorder, save, distribution and remove without lost updates', async () => {
@@ -222,7 +203,9 @@ describe('atomic setup account creation', () => {
       sharedHomePath: first.homePath,
       effectiveHomePath: first.homePath,
     })
-    expect(await store.accountStoreService.readAccountIdentity(first.instanceId)).toMatchObject({ signedIn: false })
+    expect(await AccountProfilesModel.readAccountIdentity(await store.accountStoreService.readAccountFile(), first.instanceId)).toMatchObject({
+      signedIn: false,
+    })
     expect(existsSync(first.homePath)).toBe(false)
     expect(existsSync(join(first.homePath, 'auth.json'))).toBe(false)
     expect(existsSync(third.homePath)).toBe(false)

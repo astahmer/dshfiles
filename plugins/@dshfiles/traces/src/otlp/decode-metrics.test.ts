@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { describe, expect, test } from 'vitest'
 import { OtlpBody } from './decode.js'
 import { SpanNormalizer } from './normalize.js'
@@ -8,8 +9,14 @@ const REDACT = { redactContent: true }
 describe('OTLP metric decoding', () => {
   test('decodes SDK metrics from protobuf into the same points as from JSON', async () => {
     const fixture = await SdkFixtures.metrics()
-    const fromProtobuf = SpanNormalizer.normalizeMetrics(OtlpBody.decodeMetrics({ body: Buffer.from(fixture.protobuf), wire: 'protobuf' }), REDACT)
-    const fromJson = SpanNormalizer.normalizeMetrics(OtlpBody.decodeMetrics({ body: Buffer.from(JSON.stringify(fixture.json)), wire: 'json' }), REDACT)
+    const fromProtobuf = SpanNormalizer.normalizeMetrics(
+      Effect.runSync(OtlpBody.decodeMetrics({ body: Buffer.from(fixture.protobuf), wire: 'protobuf' })),
+      REDACT,
+    )
+    const fromJson = SpanNormalizer.normalizeMetrics(
+      Effect.runSync(OtlpBody.decodeMetrics({ body: Buffer.from(JSON.stringify(fixture.json)), wire: 'json' })),
+      REDACT,
+    )
     expect(fromProtobuf.rejected).toBe(0)
     expect(fromProtobuf.points).toHaveLength(4)
     expect(fromProtobuf.points).toEqual(fromJson.points)
@@ -18,10 +25,9 @@ describe('OTLP metric decoding', () => {
   test('keeps the metric type, temporality, value and attributes', async () => {
     const fixture = await SdkFixtures.metrics()
     const byName = new Map(
-      SpanNormalizer.normalizeMetrics(OtlpBody.decodeMetrics({ body: Buffer.from(fixture.protobuf), wire: 'protobuf' }), REDACT).points.map(point => [
-        point.name,
-        point,
-      ]),
+      SpanNormalizer.normalizeMetrics(Effect.runSync(OtlpBody.decodeMetrics({ body: Buffer.from(fixture.protobuf), wire: 'protobuf' })), REDACT).points.map(
+        point => [point.name, point],
+      ),
     )
     expect(byName.get('http.requests')).toMatchObject({
       type: 'sum',
@@ -45,6 +51,6 @@ describe('OTLP metric decoding', () => {
       REDACT,
     )
     expect(result).toEqual({ points: [], rejected: 2 })
-    expect(() => OtlpBody.decodeMetrics({ body: Buffer.from('{"resourceMetrics":1}'), wire: 'json' })).toThrow(/ExportMetricsServiceRequest/)
+    expect(() => Effect.runSync(OtlpBody.decodeMetrics({ body: Buffer.from('{"resourceMetrics":1}'), wire: 'json' }))).toThrow(/ExportMetricsServiceRequest/)
   })
 })

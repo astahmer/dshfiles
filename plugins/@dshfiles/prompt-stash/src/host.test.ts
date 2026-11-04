@@ -1,40 +1,16 @@
-import type { Context } from '@deepseek-ai/cordis'
-import * as Schema from 'effect/Schema'
-import { describe, expect, it } from 'vitest'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import Storage from '@deepseek-ai/dsh-storage'
+import * as StorageDomainPlugin from '@deepseek-ai/dsh-storage-domain'
+import * as StorageJson from '@deepseek-ai/dsh-storage-json'
+import { createHostApiClient } from '@dshfiles/dshx/host'
+import { createTestHost } from '@dshfiles/dshx/testing'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect } from 'effect'
+import promptStashHost from './host.js'
 import type { SavedPrompt } from './library.js'
-import { promptStashMutationSchema, promptStashStateSchema } from './library-api.js'
-
-/**
- * Wiring check for the Host half: the built bundle serves the shared prompt
- * library through its API and leaves legacy draft rows declared in the domain.
- * The store unit test covers the record logic; this proves the
- * plugin opens the domain, registers the contract and writes rows.
- */
-
-interface BuiltPlugin {
-  readonly apply: (ctx: Context) => Promise<void> | void
-}
-
-const builtEntry = new URL('../dist/index.js', import.meta.url).href
-
-interface FetchRoute {
-  readonly path: string
-  readonly methods: readonly string[]
-  readonly requestBody: string
-  readonly fetch: (request: Request) => Promise<Response>
-}
-
-interface DomainSpec {
-  readonly name: string
-  readonly version: number
-  readonly tables: Record<string, { readonly valueSchema: unknown }>
-}
-
-const serverResponseSchema = Schema.Struct({
-  type: Schema.Literal('server-response'),
-  rpcId: Schema.String,
-  result: Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ version: Schema.Number, output: Schema.Unknown }) }),
-})
+import { promptStashApi } from './library-api.js'
 
 const prompt = (index: number): SavedPrompt => ({
   id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
@@ -44,170 +20,56 @@ const prompt = (index: number): SavedPrompt => ({
   updatedAt: 1_700_000_000_000 + index,
 })
 
-const memoryTable = <Value extends { readonly id: string }>(rows: Map<string, Value>) => ({
-  get: (key: string) => rows.get(key),
-  entries: () => rows.entries(),
-  keys: () => rows.keys(),
-  get size() {
-    return rows.size
-  },
-  put: async (key: string, value: Value) => {
-    rows.set(key, value)
-  },
-  delete: async (key: string) => rows.delete(key),
-  update: async (key: string, change: (current: Value) => Value) => {
-    const current = rows.get(key)
-    if (current === undefined) throw new Error('missing row')
-    const next = change(current)
-    rows.set(key, next)
-    return next
-  },
+const mountedStash = Effect.gen(function* () {
+  const root = yield* Effect.acquireRelease(
+    Effect.promise(() => mkdtemp(join(tmpdir(), 'prompt-stash-host-'))),
+    directory => Effect.promise(() => rm(directory, { recursive: true, force: true })),
+  )
+  const host = yield* Effect.acquireRelease(
+    Effect.promise(async () => {
+      const created = await createTestHost()
+      await created.ctx.plugin(Storage)
+      await created.ctx.plugin(StorageJson, { root })
+      await created.ctx.plugin(StorageDomainPlugin, { backend: 'json' })
+      return created
+    }),
+    created => Effect.promise(() => created.dispose()),
+  )
+  const plugin = yield* Effect.promise(() => host.mount(promptStashHost, { packageId: '@dshfiles/prompt-stash' }))
+  const client = createHostApiClient(host.ctx, promptStashApi, '@test/caller')
+  return { host, plugin, client }
 })
 
-const startHarness = async () => {
-  const plugin: BuiltPlugin = await import(builtEntry)
-  const prompts = new Map<string, SavedPrompt>()
-  const routes = new Map<string, FetchRoute>()
-  const disposers: (() => void)[] = []
-  const opened: DomainSpec[] = []
-  let closed = 0
-
-  const connection = {
-    fetch: {
-      register: (route: FetchRoute) => {
-        routes.set(route.path, route)
-        return async () => {
-          routes.delete(route.path)
-        }
-      },
-    },
-  }
-  const storageDomain = {
-    open: async (spec: DomainSpec) => {
-      opened.push(spec)
-      return {
-        table: () => memoryTable(prompts),
-        close: async () => {
-          closed += 1
-        },
-      }
-    },
-  }
-  const tools = { register: () => () => undefined }
-  const context = {
-    on: () => undefined,
-    once: () => undefined,
-    emit: () => undefined,
-    parallel: () => undefined,
-    serial: () => undefined,
-    bail: () => undefined,
-    waterfall: () => undefined,
-    effect: (callback: () => (() => void) | undefined) => {
-      const disposer = callback()
-      if (disposer !== undefined) disposers.push(disposer)
-    },
-    get: (name: string) => {
-      switch (name) {
-        case 'storageDomain':
-          return storageDomain
-        case 'connection':
-          return connection
-        case 'tools':
-          return tools
-        default:
-          return undefined
-      }
-    },
-    inject: () => undefined,
-    settings: {
-      configure: () => () => undefined,
-      describe: () => [],
-      update: async () => undefined,
-      replace: async () => undefined,
-    },
-  }
-  // SAFETY: the built Host bundle reads only the Cordis members this stub supplies.
-  const asHostContext = (value: typeof context): Context => value as unknown as Context
-  await plugin.apply(asHostContext(context))
-
-  const call = async <Output>(request: {
-    readonly method: string
-    readonly schema: Schema.ConstraintDecoder<Output>
-    readonly input?: object
-  }): Promise<Output> => {
-    const route = [...routes.values()].find(candidate => candidate.path.endsWith(`/${request.method}`))
-    if (route === undefined) throw new Error(`No route was registered for ${request.method}.`)
-    const response = await route.fetch(
-      new Request(`http://dsh.test${route.path}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          type: 'client-request',
-          rpcId: crypto.randomUUID(),
-          method: route.path.split('/').slice(2).join('/'),
-          payload: { version: 1, input: request.input },
-        }),
-      }),
-    )
-    expect(response.status).toBe(200)
-    const parsed = Schema.decodeUnknownSync(serverResponseSchema)(await response.json())
-    return Schema.decodeUnknownSync(request.schema, { onExcessProperty: 'error' })(parsed.result.value.output)
-  }
-
-  return {
-    prompts,
-    opened,
-    call,
-    closed: () => closed,
-    disposeAll: async () => {
-      for (const dispose of disposers.reverse()) await dispose()
-    },
-  }
-}
-
 describe('prompt-stash Host wiring', () => {
-  it('opens the declared domain and serves the shared prompt library', async () => {
-    const harness = await startHarness()
+  it.effect('serves the shared prompt library and keeps it across a reload', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { plugin, client } = yield* mountedStash
+        expect((yield* Effect.promise(() => client.state())).prompts).toEqual([])
 
-    expect(harness.opened).toHaveLength(1)
-    expect(harness.opened[0]?.name).toBe('prompt_stash')
-    expect(Object.keys(harness.opened[0]?.tables ?? {}).sort()).toEqual(['drafts', 'prompts'])
-    expect((await harness.call({ method: 'state', schema: promptStashStateSchema })).prompts).toEqual([])
+        const saved = yield* Effect.promise(() => client.save({ prompt: prompt(1), expectedRevision: null }))
+        expect(saved.kind).toBe('applied')
 
-    const saved = await harness.call({
-      method: 'save',
-      input: { prompt: prompt(1), expectedRevision: null },
-      schema: promptStashMutationSchema,
-    })
-    expect(saved.kind).toBe('applied')
-    expect(harness.prompts.has(prompt(1).id)).toBe(true)
+        yield* Effect.promise(() => plugin.reload())
+        const state = yield* Effect.promise(() => client.state())
+        expect(state.prompts.map(item => item.id)).toEqual([prompt(1).id])
+      }),
+    ),
+  )
 
-    const state = await harness.call({ method: 'state', schema: promptStashStateSchema })
-    expect(state.prompts.map(item => item.id)).toEqual([prompt(1).id])
+  it.effect('rejects a stale prompt write and removes a stored prompt', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { client } = yield* mountedStash
+        yield* Effect.promise(() => client.save({ prompt: prompt(1), expectedRevision: null }))
 
-    await harness.disposeAll()
-    expect(harness.closed()).toBe(1)
-  })
+        const stale = yield* Effect.promise(() => client.save({ prompt: prompt(1), expectedRevision: '20000000-0000-4000-8000-000000000009' }))
+        expect(stale.kind).toBe('conflict')
+        expect(stale.prompts[0]?.revision).toBe(prompt(1).revision)
 
-  it('rejects a stale prompt write and removes a stored prompt', async () => {
-    const harness = await startHarness()
-    await harness.call({ method: 'save', input: { prompt: prompt(1), expectedRevision: null }, schema: promptStashMutationSchema })
-
-    const stale = await harness.call({
-      method: 'save',
-      input: { prompt: prompt(1), expectedRevision: '20000000-0000-4000-8000-000000000009' },
-      schema: promptStashMutationSchema,
-    })
-    expect(stale.kind).toBe('conflict')
-    expect(harness.prompts.get(prompt(1).id)?.revision).toBe(prompt(1).revision)
-
-    const removed = await harness.call({
-      method: 'remove',
-      input: { id: prompt(1).id, expectedRevision: prompt(1).revision },
-      schema: promptStashMutationSchema,
-    })
-    expect(removed.kind).toBe('applied')
-    expect(harness.prompts.has(prompt(1).id)).toBe(false)
-    await harness.disposeAll()
-  })
+        const removed = yield* Effect.promise(() => client.remove({ id: prompt(1).id, expectedRevision: prompt(1).revision }))
+        expect(removed).toMatchObject({ kind: 'applied', prompts: [] })
+      }),
+    ),
+  )
 })

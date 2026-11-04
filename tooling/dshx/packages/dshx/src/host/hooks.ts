@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context, Events } from '@deepseek-ai/cordis'
+import { safeCordisLogger } from './safe-logger.js'
 import type { Agent, PreStepDecision, RequestErrorAction } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type { LlmCallConfig, LlmFailure, ResolvedRetryPolicy, UserMessage } from '@deepseek-ai/dsh-llm'
@@ -83,7 +84,7 @@ const install = (ctx: Context, packageId: string, hooks: HostHooks): void => {
     try {
       return await run()
     } catch (cause) {
-      ctx.logger('dshx:hooks').warn(`${packageId}: hook ${hook} failed and was skipped: ${cause instanceof Error ? cause.message : String(cause)}`)
+      safeCordisLogger(ctx, 'dshx:hooks').warn(`${packageId}: hook ${hook} failed and was skipped: ${cause instanceof Error ? cause.message : String(cause)}`)
       return undefined
     }
   }

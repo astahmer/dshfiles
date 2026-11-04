@@ -1,6 +1,7 @@
-import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
+import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
-import * as Schema from 'effect/Schema'
+import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
+import { Clock, Context, Effect, Layer, Ref, Schema } from 'effect'
 import { MAX_VIEWED_MARKS, viewedKey, type ViewedFile, type ViewedMarksSnapshot } from './marks-api.js'
 
 const viewedMarkSchema = Schema.Struct({
@@ -18,7 +19,17 @@ export const viewedMarksDomain = defineDomain({
 })
 
 export type ViewedMark = typeof viewedMarkSchema.Type
-export type ViewedMarksTable = KvTable<string, ViewedMark>
+
+/** A viewed mark could not be stored or removed; the marks the caller saw are unchanged. */
+export class ViewedMarksWriteFailed extends Schema.TaggedError<ViewedMarksWriteFailed>()(
+  'ViewedMarksWriteFailed',
+  { operation: Schema.Literals(['mark', 'unmark']), cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'viewed-marks-write-failed' },
+) {
+  override get message(): string {
+    return `The file could not be ${this.operation === 'mark' ? 'marked' : 'unmarked'} as viewed. Retry, or reload the page if storage was restarted.`
+  }
+}
 
 /** Monotone across Host restarts: a new mark always outranks every stored version. */
 const nextMarkVersion = (current: number, now: number): number => Math.max(current + 1, now)
@@ -32,72 +43,75 @@ const markKeysToTrim = (marks: readonly ViewedMark[], limit = MAX_VIEWED_MARKS):
     .slice(0, Math.max(0, marks.length - limit))
     .map(mark => mark.key)
 
-export interface ViewedMarksStore {
-  snapshot(): ViewedMarksSnapshot
-  toggle(file: ViewedFile): Promise<ViewedMarksSnapshot>
-  flush(): Promise<void>
+interface MarksState {
+  readonly revision: number
+  readonly records: ReadonlyMap<string, ViewedMark>
 }
 
-const createViewedMarksStore = ({
-  table,
-  now = Date.now,
-  reportError = error => console.error('Viewed marks write failed', { error: error instanceof Error ? error.message.slice(0, 200) : typeof error }),
-}: {
-  readonly table: ViewedMarksTable
-  readonly now?: () => number
-  readonly reportError?: (error: unknown) => void
-}): ViewedMarksStore => {
-  const records = new Map<string, ViewedMark>(table.entries())
-  let revision = Math.max(now(), ...[...records.values()].map(mark => mark.version))
-  let writes: Promise<void> = Promise.resolve()
+const snapshotOf = (state: MarksState): ViewedMarksSnapshot => ({
+  revision: state.revision,
+  marks: [...state.records.values()].sort(byVersionAscending).map(mark => mark.key),
+})
 
-  const enqueue = <Result>(operation: () => Promise<Result>): Promise<void> => {
-    const result = writes.then(operation).then(() => undefined)
-    writes = result.catch(() => undefined)
-    return result
+/** The reviewed files of every Session, stored durably in the Host's `diff_viewed` domain. */
+export class ViewedMarks extends Context.Service<
+  ViewedMarks,
+  {
+    readonly snapshot: Effect.Effect<ViewedMarksSnapshot>
+    readonly toggle: (file: ViewedFile) => Effect.Effect<ViewedMarksSnapshot, ViewedMarksWriteFailed>
   }
-
-  const trim = (): void => {
-    for (const key of markKeysToTrim([...records.values()])) {
-      records.delete(key)
-      void enqueue(() => table.delete(key)).catch(reportError)
-    }
-  }
-
-  const put = (mark: ViewedMark): Promise<void> => {
-    records.set(mark.key, mark)
-    trim()
-    return enqueue(() => table.put(mark.key, mark))
-  }
-
-  const snapshot = (): ViewedMarksSnapshot => ({
-    revision,
-    marks: [...records.values()].sort(byVersionAscending).map(mark => mark.key),
-  })
-
-  const takeVersion = (): number => {
-    revision = nextMarkVersion(revision, now())
-    return revision
-  }
-
-  return {
-    snapshot,
-    toggle: async file => {
-      const key = viewedKey(file)
-      if (records.has(key)) {
-        records.delete(key)
-        await enqueue(() => table.delete(key))
-      } else {
-        await put({ key, version: takeVersion() })
-      }
-      return snapshot()
-    },
-    flush: () => writes,
-  }
-}
-
-export class ViewedMarksModel {
+>()('@dshfiles/diff-viewed/ViewedMarks') {
   static readonly nextVersion = nextMarkVersion
   static readonly keysToTrim = markKeysToTrim
-  static readonly createStore = createViewedMarksStore
+
+  /** The marks of a store that keeps at most `bound` of them, dropping the least recently written first. */
+  static readonly layerWithBound = (bound: number) =>
+    Layer.effect(
+      ViewedMarks,
+      Effect.gen(function* () {
+        const storage = yield* StorageDomain
+        const domain = yield* storage.open(viewedMarksDomain)
+        const table = domain.table('marks')
+        const stored = yield* table.entries
+        const startedAt = yield* Clock.currentTimeMillis
+        const state = yield* Ref.make<MarksState>({
+          revision: Math.max(startedAt, ...stored.map(([, mark]) => mark.version)),
+          records: new Map(stored),
+        })
+
+        const unmark = Effect.fnUntraced(function* (key: string) {
+          yield* table.delete(key).pipe(Effect.mapError(cause => new ViewedMarksWriteFailed({ operation: 'unmark', cause })))
+          return yield* Ref.updateAndGet(state, current => {
+            const records = new Map(current.records)
+            records.delete(key)
+            return { ...current, records }
+          })
+        })
+
+        const mark = Effect.fnUntraced(function* (key: string) {
+          const now = yield* Clock.currentTimeMillis
+          const current = yield* Ref.get(state)
+          const added: ViewedMark = { key, version: nextMarkVersion(current.revision, now) }
+          yield* table.put(key, added).pipe(Effect.mapError(cause => new ViewedMarksWriteFailed({ operation: 'mark', cause })))
+          const records = new Map(current.records).set(key, added)
+          const trimmed = markKeysToTrim([...records.values()], bound)
+          for (const trimmedKey of trimmed) records.delete(trimmedKey)
+          yield* Ref.set(state, { revision: added.version, records })
+          yield* Effect.forEach(trimmed, trimmedKey => table.delete(trimmedKey), { discard: true }).pipe(
+            Effect.catchTag('StorageDomainWriteFailed', error => Effect.logWarning('Trimming old viewed marks failed', error)),
+          )
+          return yield* Ref.get(state)
+        })
+
+        const toggle = Effect.fn('diff viewed mark toggle')(function* (file: ViewedFile) {
+          const key = viewedKey(file)
+          const current = yield* Ref.get(state)
+          return snapshotOf(current.records.has(key) ? yield* unmark(key) : yield* mark(key))
+        }, domain.withWriteLock)
+
+        return ViewedMarks.of({ snapshot: Effect.map(Ref.get(state), snapshotOf), toggle })
+      }),
+    )
+
+  static readonly layer = ViewedMarks.layerWithBound(MAX_VIEWED_MARKS)
 }

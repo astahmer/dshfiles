@@ -110,37 +110,37 @@
         {
           "kind": "unit-test",
           "id": "memory.digest-idle",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "digests a thread once it goes idle, never while a turn runs"
         },
         {
           "kind": "unit-test",
           "id": "memory.digest-model-fallback",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "asks a cheap model only for a thread without a trail of its own"
         },
         {
           "kind": "unit-test",
           "id": "memory.digest-catch-up",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "catches up on sessions it has never seen and skips trivial ones"
         },
         {
           "kind": "unit-test",
           "id": "memory.dedupe",
-          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-repo.test.ts",
           "testName": "stores identical digests and notes once"
         },
         {
           "kind": "unit-test",
           "id": "memory.contentless-index",
-          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-repo.test.ts",
           "testName": "keeps only an index of message text, never the text itself"
         },
         {
           "kind": "unit-test",
           "id": "memory.retention",
-          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-repo.test.ts",
           "testName": "drops digests and indexed messages past retention but keeps notes"
         }
       ],
@@ -151,9 +151,9 @@
         },
         {
           "kind": "custom",
-          "span": "jev classify",
-          "file": "plugins/@dshfiles/memory/src/jev.test.ts",
-          "testName": "records a jev classify span with the question, status and token counts, never the key or text"
+          "span": "memory jev ask",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
+          "testName": "records a memory jev ask span per question without the key or the text"
         },
         {
           "kind": "automatic",
@@ -206,13 +206,13 @@
         {
           "kind": "unit-test",
           "id": "memory.block-frozen",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "gives every thread and subagent of a project the same frozen block until memory changes"
         },
         {
           "kind": "unit-test",
           "id": "memory.block-jj-workspaces",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "shares project notes between a jj checkout and its thread workspace"
         },
         {
@@ -273,37 +273,37 @@
         {
           "kind": "unit-test",
           "id": "memory.search-identifiers",
-          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-repo.test.ts",
           "testName": "finds exact identifiers by substring and words by stem"
         },
         {
           "kind": "unit-test",
           "id": "memory.search-ranking",
-          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-repo.test.ts",
           "testName": "ranks the caller project first and keeps old exact matches findable"
         },
         {
           "kind": "unit-test",
           "id": "memory.note-history",
-          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-repo.test.ts",
           "testName": "supersedes a note on update and hides it on forget, keeping the history"
         },
         {
           "kind": "unit-test",
           "id": "memory.tools-flow",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "answers a later thread through search, read and an excerpt, and counts the citation"
         },
         {
           "kind": "unit-test",
           "id": "memory.note-tool",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "adds, supersedes and forgets notes through memory_note"
         },
         {
           "kind": "unit-test",
           "id": "memory.retrieval-mode",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "ranks with BM25 unless hybrid is asked for and an embedding provider loads"
         }
       ],
@@ -319,43 +319,43 @@
         {
           "kind": "custom",
           "span": "thread finder resolve caller project",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "records finder phase spans without queries or session identifiers"
         },
         {
           "kind": "custom",
           "span": "thread finder prepare records",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "records finder phase spans without queries or session identifiers"
         },
         {
           "kind": "custom",
           "span": "thread finder list sessions",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "records finder phase spans without queries or session identifiers"
         },
         {
           "kind": "custom",
           "span": "thread finder read titles",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "records finder phase spans without queries or session identifiers"
         },
         {
           "kind": "custom",
           "span": "thread finder resolve projects",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "records finder phase spans without queries or session identifiers"
         },
         {
           "kind": "custom",
           "span": "thread finder content search",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "records finder phase spans without queries or session identifiers"
         },
         {
           "kind": "custom",
           "span": "thread finder memory search",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "records finder phase spans without queries or session identifiers"
         }
       ]
@@ -398,7 +398,7 @@
         {
           "kind": "unit-test",
           "id": "memory.review-notes-jev",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "reviews saved notes with Jev in bounded pages and never archives automatically"
         }
       ],
@@ -409,9 +409,9 @@
         },
         {
           "kind": "custom",
-          "span": "jev classify",
-          "file": "plugins/@dshfiles/memory/src/jev.test.ts",
-          "testName": "classifies saved-note durability with the relevance question"
+          "span": "memory jev ask",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
+          "testName": "records a memory jev ask span per question without the key or the text"
         }
       ],
       "reach": ["click button \"Memory: Browser\"", "expect tab \"Notes\""]
@@ -443,7 +443,7 @@
         {
           "kind": "unit-test",
           "id": "memory.preview-no-usage",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "previews a note without recording an agent memory-tool call"
         },
         {
@@ -491,19 +491,19 @@
         {
           "kind": "unit-test",
           "id": "memory.citation-counts",
-          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-repo.test.ts",
           "testName": "counts a citation as use of the tool call that returned the id and of the cited item"
         },
         {
           "kind": "unit-test",
           "id": "memory.cost-effectiveness",
-          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-repo.test.ts",
           "testName": "totals memory's own calls per day and how its start blocks and citations fare"
         },
         {
           "kind": "unit-test",
           "id": "memory.correction-heuristics",
-          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "file": "plugins/@dshfiles/memory/src/memory-services.test.ts",
           "testName": "flags, as heuristics, a citation the user then corrects and one the agent later revises"
         }
       ],

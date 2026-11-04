@@ -1,4 +1,4 @@
-/** The four-bar glyph names the effort level by how many bars it fills and which hue it takes. */
+/** The six-bar glyph names the effort level by how many bars it fills and which hue it takes. */
 export type EffortTone = 'muted' | 'success' | 'warning'
 
 export interface EffortGlyph {
@@ -6,9 +6,9 @@ export interface EffortGlyph {
   readonly tone: EffortTone
 }
 
-export const EFFORT_BAR_COUNT = 4
+export const EFFORT_BAR_COUNT = 6
 
-const toneFor = (position: number): EffortTone => (position < 0.34 ? 'muted' : position < 0.8 ? 'success' : 'warning')
+const toneFor = (position: number): EffortTone => (position < 0.3 ? 'muted' : position < 0.7 ? 'success' : 'warning')
 
 /**
  * Maps one level of a model's effort list onto the shared glyph: the lowest level fills one bar,
@@ -21,4 +21,4 @@ export const effortGlyph = ({ index, total }: { readonly index: number; readonly
 }
 
 /** The bar heights of the glyph, shortest first. */
-export const EFFORT_BAR_HEIGHTS = [4, 7, 10, 13] as const
+export const EFFORT_BAR_HEIGHTS = [3, 5, 7, 9, 11, 13] as const

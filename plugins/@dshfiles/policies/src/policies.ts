@@ -1,4 +1,4 @@
-import * as Schema from 'effect/Schema'
+import { Schema } from 'effect'
 
 const ruleSchema = Schema.Struct({
   name: Schema.String.check(Schema.isMaxLength(120)),

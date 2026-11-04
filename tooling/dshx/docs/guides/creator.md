@@ -64,32 +64,29 @@ The starter owns its copy with `defineLocale(namespace, { zh, en })`, passes the
 ## Programmatic API
 
 ```ts
-import { createProject } from "create-dshx";
+import { createProject } from 'create-dshx'
 
 const result = await createProject({
-  name: "my-plugin",
-  template: "showcase",
-  style: "tailwind",
-  packageManager: "pnpm",
+  name: 'my-plugin',
+  template: 'showcase',
+  style: 'tailwind',
+  packageManager: 'pnpm',
   install: true,
-});
+})
 ```
 
 ```ts
 interface CreateProjectOptions {
-  readonly name: string;
-  readonly template?: "starter" | "showcase";
-  readonly style?: "css-modules" | "tailwind" | "none";
-  readonly cwd?: string;
-  readonly install?: boolean;
-  readonly packageManager?: "pnpm" | "yarn" | "npm";
-  readonly onInstallProgress?: (event: {
-    readonly phase: "start" | "success" | "failure";
-    readonly packageManager: "pnpm" | "yarn" | "npm";
-  }) => void;
-  readonly dshxVersion?: string;
-  readonly dshVersion?: string;
-  readonly dshRange?: string;
+  readonly name: string
+  readonly template?: 'starter' | 'showcase'
+  readonly style?: 'css-modules' | 'tailwind' | 'none'
+  readonly cwd?: string
+  readonly install?: boolean
+  readonly packageManager?: 'pnpm' | 'yarn' | 'npm'
+  readonly onInstallProgress?: (event: { readonly phase: 'start' | 'success' | 'failure'; readonly packageManager: 'pnpm' | 'yarn' | 'npm' }) => void
+  readonly dshxVersion?: string
+  readonly dshVersion?: string
+  readonly dshRange?: string
 }
 ```
 

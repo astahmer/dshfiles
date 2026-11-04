@@ -28,8 +28,10 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/dshx": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "playwright-core": "1.56.1"
   },
   "devDependencies": {
@@ -51,6 +53,7 @@
     "@deepseek-ai/dsh-subprocess": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "react": "catalog:",

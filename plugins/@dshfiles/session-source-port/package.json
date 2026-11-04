@@ -14,13 +14,15 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run && node --test tests/runtime-distribution.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh-api-session-controller": "catalog:",
     "@deepseek-ai/dsh-session": "catalog:",
+    "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "effect": "catalog:",
     "typescript": "catalog:",

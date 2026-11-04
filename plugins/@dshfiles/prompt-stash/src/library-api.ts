@@ -1,16 +1,7 @@
-import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
-import { defineApi, method as defineMethod } from '@dshfiles/dshx/api'
+import { defineApi, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import { MAX_PROMPTS, promptSchema, type SavedPrompt } from './library.js'
-import { strictStandardSchema, uuidSchema } from './schema.js'
-
-const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Output extends Schema.ConstraintDecoder<unknown>>(
-  options: Omit<ApiMethodOptions<Input, Output>, 'input' | 'output' | 'tool'> & {
-    readonly input: Input
-    readonly output: Output
-    readonly tool?: ApiToolExposure<Output['Type']>
-  },
-) => defineMethod({ ...options, input: strictStandardSchema(options.input), output: strictStandardSchema(options.output) })
+import { uuidSchema } from './schema.js'
 
 const revisionSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))
 const promptListSchema = Schema.Array(promptSchema).check(Schema.isMaxLength(MAX_PROMPTS))
@@ -40,9 +31,9 @@ export const promptStashApi = defineApi({
   version: 1,
   owner: '@dshfiles/prompt-stash',
   methods: {
-    state: defineMethod({
-      input: strictStandardSchema(Schema.Void),
-      output: strictStandardSchema(promptStashStateSchema),
+    state: method({
+      input: Schema.Void,
+      output: promptStashStateSchema,
       description: 'The saved prompt library every browser and plugin shares. Read-only.',
       tool: { name: 'prompt_stash_state', readOnly: true },
     }),

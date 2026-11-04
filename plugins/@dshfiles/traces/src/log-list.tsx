@@ -12,8 +12,8 @@ import { errorMessage, keepPreviousData, useInfiniteQuery } from '@dshfiles/plug
 import * as Schema from 'effect/Schema'
 import { useState } from 'react'
 import type { LogsInput } from './api.js'
-import type { Mutable } from './schema.js'
-import { createStoredValue } from './stored-value.js'
+import type { Types } from 'effect'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { TraceFormat } from './format.js'
 import type { TracesTranslate } from './locales.js'
 import { tracesQueries, type TracesClient } from './queries.js'
@@ -140,7 +140,7 @@ export const LogsView = (props: {
   const search = useDebouncedValue({ value: view.search.trim(), delayMs: 250 })
   const attribute = parseAttributeFilter(useDebouncedValue({ value: view.attribute, delayMs: 250 }))
   // dshx API payloads refuse undefined values, so absent filters are omitted rather than sent as undefined.
-  const filters: Mutable<Omit<LogsInput, 'cursor'>> = { limit: 100 }
+  const filters: Types.Mutable<Omit<LogsInput, 'cursor'>> = { limit: 100 }
   if (search.length > 0) filters.search = search
   if (view.service !== null) filters.service = view.service
   if (view.minSeverity !== 0) filters.minSeverity = view.minSeverity

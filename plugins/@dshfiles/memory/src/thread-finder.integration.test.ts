@@ -6,11 +6,12 @@ import { Context } from '@deepseek-ai/cordis'
 import { SESSION_FORMAT_VERSION, type SessionHeader } from '@deepseek-ai/dsh-session'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session/types'
 import SqliteSessionQueryEngine from '@deepseek-ai/dsh-session-query-sqlite'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from '@effect/vitest'
+import { Effect, Option, Schema } from 'effect'
 
 import { sessionContentHits } from './session-content.ts'
 import { createThread } from './testing/session-fixture.ts'
-import { createThreadFinder, ThreadFinderError, type ThreadFinderRecord } from './thread-finder.ts'
+import { ThreadFinder, type ContentFailure, type ThreadFinderDeps, type ThreadFinderRecord } from './thread-finder.ts'
 
 let root: string
 let counter = 0
@@ -94,6 +95,25 @@ const record = (session: Stored, project = '/dev/dshfiles'): ThreadFinderRecord 
   parentSessionId: null,
 })
 
+const failureCode = Schema.decodeUnknownOption(Schema.Struct({ code: Schema.String }))
+
+const contentOf = (ctx: Context) => (request: { readonly query: string; readonly limit: number }) =>
+  Effect.tryPromise({
+    try: async () => sessionContentHits(await ctx.sessionQuery.searchSessions({ query: request.query, limit: request.limit })),
+    catch: (cause): ContentFailure => ({
+      code: Option.match(failureCode(cause), { onNone: () => 'unknown', onSome: failure => failure.code }),
+      message: cause instanceof Error ? cause.message : 'failed',
+    }),
+  })
+
+const depsOf = (ctx: Context, session: Stored, attempts: number): ThreadFinderDeps<never> => ({
+  records: [record(session)],
+  searchContent: contentOf(ctx),
+  searchMemory: () => Effect.succeed([]),
+  readDigest: () => Effect.succeed(null),
+  retry: { attempts, delaysMs: Array.from({ length: attempts }, () => 0) },
+})
+
 describe('thread finder against the installed session-query backend', () => {
   it('returns ranked Session hits from a stable corpus', async () => {
     const session = stored('session-11111111-0000-4000-8000-000000000000', 'Retry storm plan', 'We must cap the retry storm at four attempts.')
@@ -118,14 +138,12 @@ describe('thread finder against the installed session-query backend', () => {
     const session = stored('session-33333333-0000-4000-8000-000000000000', 'Retry storm plan', 'We must cap the retry storm at four attempts.')
     const persistence = scriptedPersistence(session, ['revision-1', 'revision-2', 'revision-3', 'revision-4', 'revision-5'])
     const ctx = await boot(persistence)
-    const finder = createThreadFinder({
-      listSessions: async () => [record(session)],
-      searchContent: async request => sessionContentHits(await ctx.sessionQuery.searchSessions({ query: request.query, limit: request.limit })),
-      searchMemory: async () => [],
-      readDigest: async () => null,
-      retry: { attempts: 3, delaysMs: [0, 0, 0], sleep: async () => {} },
-    })
-    const page = await finder.find({ query: 'retry storm', projects: [], ownProject: '/dev/dshfiles', limit: 5 })
+    const page = await Effect.runPromise(
+      ThreadFinder.find({
+        deps: depsOf(ctx, session, 3),
+        query: { query: 'retry storm', projects: [], ownProject: '/dev/dshfiles', limit: 5 },
+      }),
+    )
     expect(page.degraded).toEqual([])
     expect(page.diagnostics.attempts).toBe(2)
     expect(page.hits.map(hit => hit.sessionId)).toEqual([session.header.id])
@@ -137,29 +155,23 @@ describe('thread finder against the installed session-query backend', () => {
     const revisions = Array.from({ length: 64 }, (_, index) => `revision-${index}`)
     const unstable = scriptedPersistence(session, revisions)
     const ctx = await boot(unstable)
-    const finder = createThreadFinder({
-      listSessions: async () => [record(session)],
-      searchContent: async request => sessionContentHits(await ctx.sessionQuery.searchSessions({ query: request.query, limit: request.limit })),
-      searchMemory: async () => [],
-      readDigest: async () => null,
-      retry: { attempts: 3, delaysMs: [0, 0, 0], sleep: async () => {} },
-    })
-    const degraded = await finder.find({ query: 'retry storm', projects: [], ownProject: '/dev/dshfiles', limit: 5 })
+    const degraded = await Effect.runPromise(
+      ThreadFinder.find({ deps: depsOf(ctx, session, 3), query: { query: 'retry storm', projects: [], ownProject: '/dev/dshfiles', limit: 5 } }),
+    )
     expect(degraded.degraded).toHaveLength(1)
     expect(degraded.degraded[0]?.code).toBe('SESSION_QUERY_PERSISTENCE_FAILED')
     expect(degraded.diagnostics.incomplete).toBe(true)
     expect(degraded.hits.map(hit => hit.sessionId)).toEqual([session.header.id])
     expect(unstable.state.listCalls).toBe(12)
 
-    const other = createThreadFinder({
-      listSessions: async () => [record(session)],
-      searchContent: async request => sessionContentHits(await ctx.sessionQuery.searchSessions({ query: request.query, limit: request.limit })),
-      searchMemory: async () => [],
-      readDigest: async () => null,
-      retry: { attempts: 2, delaysMs: [0, 0], sleep: async () => {} },
-    })
-    await expect(other.find({ query: 'nothing matches this at all', projects: [], ownProject: '/dev/dshfiles', limit: 5 })).rejects.toBeInstanceOf(
-      ThreadFinderError,
+    const empty = await Effect.runPromise(
+      Effect.flip(
+        ThreadFinder.find({
+          deps: depsOf(ctx, session, 2),
+          query: { query: 'nothing matches this at all', projects: [], ownProject: '/dev/dshfiles', limit: 5 },
+        }),
+      ),
     )
+    expect(empty._tag).toBe('FinderSearchUnavailable')
   })
 })

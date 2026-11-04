@@ -1,40 +1,34 @@
 import { randomUUID } from 'node:crypto'
-import * as Schema from 'effect/Schema'
-import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { chmod, link, lstat, mkdir, open, readFile, rm } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
-import { HostDirectoryStore } from './store.js'
-import { MultiHostSchema } from './schema.js'
-import { runtimeIdentitySchema, type RuntimeIdentity } from './records.js'
+import { Config, Context, Effect, FileSystem, Layer, Option, Path, Schema } from 'effect'
+import { IdentityCorrupt, IdentityPathInvalid, IdentityUnreadable, IdentityWriteFailed, ProfileMismatch, ProfileUnavailable } from './errors.js'
+import { MultiHostPaths } from './paths.js'
+import { PrivateFile } from './private-file.js'
+import { runtimeIdentitySchema, type RuntimeIdentity as RuntimeIdentityValue } from './records.js'
 
 const persistedIdentitySchema = Schema.Struct({
   schemaVersion: Schema.Literal(1),
   runtimeId: Schema.String.check(Schema.isUUID()),
   profile: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
 })
+type PersistedIdentity = Schema.Schema.Type<typeof persistedIdentitySchema>
 const profileSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
 
-export class RuntimeIdentityError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-  ) {
-    super(message)
-    this.name = 'RuntimeIdentityError'
-  }
-}
+const decodePersisted = Schema.decodeUnknownEffect(Schema.fromJsonString(persistedIdentitySchema), { onExcessProperty: 'error' })
+const decodeProfile = Schema.decodeUnknownOption(profileSchema)
+const decodeVersion = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ version: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)) })),
+)
+const decodeIdentity = Schema.decodeUnknownEffect(runtimeIdentitySchema, { onExcessProperty: 'error' })
 
-const activeProfile = (): string | undefined => {
-  const environmentProfile = process.env.DSH_PROFILE ?? process.env.DSH_PROFILE_NAME
-  if (environmentProfile !== undefined && environmentProfile.trim() !== '') return environmentProfile.trim()
-  const argumentsList = process.argv
+/** The profile the DSH CLI was launched with: `--profile`, `-p` or its first positional argument. */
+const launchedProfile = (argv: readonly string[]): string | undefined => {
   const valueOptions = new Set(['--port', '--host', '--cwd'])
-  for (let index = 2; index < argumentsList.length; index += 1) {
-    const argument = argumentsList[index]
+  for (let index = 2; index < argv.length; index += 1) {
+    const argument = argv[index]
     if (argument === undefined) continue
     if (argument === '--profile' || argument === '-p') {
-      const profile = argumentsList[index + 1]
+      const profile = argv[index + 1]
       if (profile !== undefined && profile.trim() !== '') return profile.trim()
       index += 1
       continue
@@ -49,114 +43,80 @@ const activeProfile = (): string | undefined => {
   return undefined
 }
 
-const dshVersion = (): string => {
-  try {
-    const require = createRequire(import.meta.url)
-    const packagePath = require.resolve('@deepseek-ai/dsh/package.json')
-    const packageValue: unknown = JSON.parse(readFileSync(packagePath, 'utf8'))
-    const parsed = MultiHostSchema.safeDecode(Schema.Struct({ version: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)) }), packageValue)
-    return parsed.success ? parsed.data.version : 'unknown'
-  } catch {
-    return 'unknown'
-  }
-}
+export type RuntimeIdentityError = IdentityPathInvalid | IdentityUnreadable | IdentityCorrupt | IdentityWriteFailed | ProfileUnavailable | ProfileMismatch
 
-const secureIdentityPath = async (path: string): Promise<void> => {
-  const parent = dirname(path)
-  try {
-    const parentFacts = await lstat(parent)
-    if (!parentFacts.isDirectory()) throw new RuntimeIdentityError('identity-path-invalid', 'The runtime identity directory must be a private directory.')
-    await chmod(parent, 0o700)
-  } catch (error) {
-    if (error instanceof RuntimeIdentityError) throw error
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return
-    throw new RuntimeIdentityError('identity-unreadable', 'The runtime identity directory could not be secured.')
-  }
-  try {
-    const fileFacts = await lstat(path)
-    if (!fileFacts.isFile()) throw new RuntimeIdentityError('identity-path-invalid', 'The runtime identity must be stored in a regular file.')
-    await chmod(path, 0o600)
-  } catch (error) {
-    if (error instanceof RuntimeIdentityError) throw error
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return
-    throw new RuntimeIdentityError('identity-unreadable', 'The runtime identity file could not be secured.')
-  }
-}
+/** This runtime's stable identity: one runtime id per DSH profile, persisted privately under the plugin data. */
+export class RuntimeIdentity extends Context.Service<RuntimeIdentity, { readonly current: Effect.Effect<RuntimeIdentityValue, RuntimeIdentityError> }>()(
+  '@dshfiles/multi-host/RuntimeIdentity',
+) {
+  /** `configuredProfile` is the plugin's `profile` setting, checked against the profile DSH was launched with. */
+  static readonly layer = (input: { readonly configuredProfile: string | undefined }) =>
+    Layer.effect(
+      RuntimeIdentity,
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const paths = yield* MultiHostPaths
+        const provided = <A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>) =>
+          effect.pipe(Effect.provideService(FileSystem.FileSystem, fileSystem), Effect.provideService(Path.Path, path))
 
-const readPersistedIdentity = async (path: string): Promise<Schema.Schema.Type<typeof persistedIdentitySchema> | undefined> => {
-  await secureIdentityPath(path)
-  let content: string
-  try {
-    content = await readFile(path, 'utf8')
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return undefined
-    throw new RuntimeIdentityError('identity-unreadable', 'The runtime identity file could not be read.')
-  }
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(content)
-  } catch {
-    throw new RuntimeIdentityError('identity-corrupt', 'The runtime identity file contains invalid JSON and was left untouched.')
-  }
-  const result = MultiHostSchema.safeDecodeStrict(persistedIdentitySchema, parsed)
-  if (!result.success) throw new RuntimeIdentityError('identity-corrupt', 'The runtime identity file has an unsupported shape and was left untouched.')
-  return result.data
-}
+        const environmentProfile = yield* Config.option(
+          Config.NonEmptyString('DSH_PROFILE').pipe(Config.orElse(() => Config.NonEmptyString('DSH_PROFILE_NAME'))),
+        )
+        const discoveredProfile = Option.getOrUndefined(environmentProfile)?.trim() || launchedProfile(process.argv)
 
-const persistIdentity = async (path: string, value: Schema.Schema.Type<typeof persistedIdentitySchema>): Promise<void> => {
-  const parent = dirname(path)
-  await mkdir(parent, { recursive: true, mode: 0o700 })
-  await secureIdentityPath(path)
-  const temporary = join(parent, 'runtime-identity.' + process.pid + '.' + randomUUID() + '.tmp')
-  const file = await open(temporary, 'wx', 0o600)
-  try {
-    await file.writeFile(JSON.stringify(value, null, 2) + '\n', 'utf8')
-    await file.sync()
-  } finally {
-    await file.close()
-  }
-  try {
-    await link(temporary, path)
-    await chmod(path, 0o600)
-    await rm(temporary, { force: true })
-  } catch {
-    await rm(temporary, { force: true })
-    throw new RuntimeIdentityError('identity-write-failed', 'The runtime identity could not be committed atomically.')
-  }
-}
+        const dshVersion = yield* Effect.try(() => createRequire(import.meta.url).resolve('@deepseek-ai/dsh/package.json')).pipe(
+          Effect.flatMap(packagePath => fileSystem.readFileString(packagePath)),
+          Effect.map(text => Option.match(decodeVersion(text), { onNone: () => 'unknown', onSome: value => value.version })),
+          Effect.orElseSucceed(() => 'unknown'),
+        )
 
-export const readOrCreateRuntimeIdentity = async (configuredProfile?: string): Promise<RuntimeIdentity> => {
-  const discoveredProfile = activeProfile()
-  const reportedProfile = discoveredProfile ?? configuredProfile?.trim()
-  if (reportedProfile === undefined || reportedProfile.length === 0) {
-    throw new RuntimeIdentityError('profile-unavailable', 'Set the multi-host profile field or launch DSH with --profile before registering this runtime.')
-  }
-  if (discoveredProfile !== undefined && configuredProfile !== undefined && discoveredProfile !== configuredProfile) {
-    throw new RuntimeIdentityError('profile-mismatch', 'The multi-host profile setting does not match the running DSH profile.')
-  }
-  const profile = MultiHostSchema.decode(profileSchema, reportedProfile)
-  const path = HostDirectoryStore.pluginDataPath(join('runtime-identities', profile + '.json'))
-  let persisted = await readPersistedIdentity(path)
-  if (persisted === undefined) {
-    const proposed = { schemaVersion: 1 as const, runtimeId: randomUUID(), profile }
-    try {
-      await persistIdentity(path, proposed)
-      persisted = proposed
-    } catch (error) {
-      const winner = await readPersistedIdentity(path)
-      if (winner === undefined) throw error
-      persisted = winner
-    }
-  }
-  if (persisted.profile !== profile) {
-    throw new RuntimeIdentityError('profile-mismatch', 'The recorded runtime identity belongs to a different DSH profile.')
-  }
-  return MultiHostSchema.decodeStrict(runtimeIdentitySchema, {
-    protocolVersion: 1,
-    runtimeId: persisted.runtimeId,
-    profile: persisted.profile,
-    homeLeaf: HostDirectoryStore.runtimeHomeLeaf(),
-    dshVersion: dshVersion(),
-    capabilities: ['workspace', 'session', 'agent'],
-  })
+        const readPersisted = Effect.fnUntraced(function* (file: string) {
+          const state = yield* provided(PrivateFile.secure(file)).pipe(Effect.mapError(cause => new IdentityUnreadable({ cause })))
+          if (state === 'invalid') return yield* new IdentityPathInvalid()
+          const text = yield* provided(PrivateFile.readIfPresent(file)).pipe(Effect.mapError(cause => new IdentityUnreadable({ cause })))
+          if (text === undefined) return undefined
+          return yield* decodePersisted(text).pipe(Effect.mapError(() => new IdentityCorrupt()))
+        })
+
+        const persist = (persistInput: { readonly file: string; readonly value: PersistedIdentity }) =>
+          provided(PrivateFile.write({ path: persistInput.file, body: `${JSON.stringify(persistInput.value, null, 2)}\n`, commit: 'link' })).pipe(
+            Effect.mapError(cause => new IdentityWriteFailed({ cause })),
+          )
+
+        /** A concurrent writer may have linked its identity first; that one wins. */
+        const create = Effect.fnUntraced(function* (createInput: { readonly file: string; readonly profile: string }) {
+          const proposed: PersistedIdentity = { schemaVersion: 1, runtimeId: randomUUID(), profile: createInput.profile }
+          return yield* persist({ file: createInput.file, value: proposed }).pipe(
+            Effect.as(proposed),
+            Effect.catchTag('IdentityWriteFailed', error =>
+              Effect.flatMap(readPersisted(createInput.file), winner => (winner === undefined ? Effect.fail(error) : Effect.succeed(winner))),
+            ),
+          )
+        })
+
+        const current = Effect.gen(function* () {
+          const reported = discoveredProfile ?? input.configuredProfile?.trim()
+          if (reported === undefined || reported.length === 0) return yield* new ProfileUnavailable()
+          if (discoveredProfile !== undefined && input.configuredProfile !== undefined && discoveredProfile !== input.configuredProfile) {
+            return yield* new ProfileMismatch({ reason: 'setting' })
+          }
+          const profile = Option.getOrUndefined(decodeProfile(reported))
+          if (profile === undefined) return yield* new ProfileUnavailable()
+          const file = paths.dataPath(path.join('runtime-identities', `${profile}.json`))
+          const persisted = (yield* readPersisted(file)) ?? (yield* create({ file, profile }))
+          if (persisted.profile !== profile) return yield* new ProfileMismatch({ reason: 'recorded' })
+          return yield* decodeIdentity({
+            protocolVersion: 1,
+            runtimeId: persisted.runtimeId,
+            profile: persisted.profile,
+            homeLeaf: path.basename(paths.dshHome),
+            dshVersion,
+            capabilities: ['workspace', 'session', 'agent'],
+          }).pipe(Effect.orDie)
+        }).pipe(Effect.withSpan('multi-host identity read'))
+
+        return RuntimeIdentity.of({ current })
+      }).pipe(Effect.orDie),
+    )
 }

@@ -27,8 +27,6 @@ const INBOX_LISTS = [
   ['next-step', 'nextStep'],
 ] as const satisfies readonly (readonly [InboxTarget, 'nextTurn' | 'nextStep'])[]
 
-export class QueueItemMissingError extends Error {}
-
 export interface QueueMoveRequest {
   readonly sessionId: string
   readonly itemId: string
@@ -38,9 +36,9 @@ export interface QueueMoveRequest {
 /**
  * Move one pending item by exactly one position, as one remove plus one insert.
  * Both are durable inbox splices, so the log holds the new order rather than a
- * deletion paired with an unrelated re-queue.
+ * deletion paired with an unrelated re-queue. Undefined when the item is no longer pending.
  */
-const moveWithinInbox = <Message extends { readonly id: string }>(inbox: QueueInbox<Message>, request: QueueMoveRequest): QueuePosition => {
+const moveWithinInbox = <Message extends { readonly id: string }>(inbox: QueueInbox<Message>, request: QueueMoveRequest): QueuePosition | undefined => {
   for (const [target, list] of INBOX_LISTS) {
     const pending = inbox[list]
     const index = pending.findIndex(message => message.id === request.itemId)
@@ -62,7 +60,7 @@ const moveWithinInbox = <Message extends { readonly id: string }>(inbox: QueueIn
     inbox.splice(target, destination, 0, [moved])
     return position(destination)
   }
-  throw new QueueItemMissingError(`Queued item ${request.itemId} is no longer pending.`)
+  return undefined
 }
 
 /** Pending ids per list, for rendering which affordances are available. */

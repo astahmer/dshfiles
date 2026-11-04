@@ -448,19 +448,54 @@ export default definePlugin({
 `
 }
 
-function renderEffectHost(context: TemplateContext): string {
-  return `import { Effect, Layer, Schema } from 'effect'
-import { defineApi, method } from '@dshfiles/dshx/api'
-import { DshxEffect } from '@dshfiles/dshx/effect'
-import { defineHost } from '@dshfiles/dshx/host'
+function effectServiceName(context: TemplateContext): string {
+  return `${context.packageId.startsWith('@') ? context.packageId : `@dshfiles/${packageSlug(context.packageId)}`}/Status`
+}
 
-const { setup } = DshxEffect.plugin({ layer: Layer.empty, setup: () => Effect.void })
+function renderEffectHost(context: TemplateContext): string {
+  const slug = packageSlug(context.packageId)
+  return `import { defineApi, method } from '@dshfiles/dshx/api'
+import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
+import { Context, Effect, Layer, Ref, Schema } from 'effect'
+
+/** The plugin is not ready yet. The annotation exposes its code, message and fields to API callers and the agent. */
+export class StatusNotReady extends Schema.TaggedError<StatusNotReady>()('StatusNotReady', { reason: Schema.String }, { dshxWireCode: 'status-not-ready' }) {
+  override get message(): string {
+    return \`The plugin is not ready: \${this.reason}.\`
+  }
+}
+
+/** The plugin's state: built once per activation, released when the plugin unloads. */
+export class Status extends Context.Service<
+  Status,
+  {
+    readonly read: () => Effect.Effect<string, StatusNotReady>
+    readonly setReady: (ready: boolean) => Effect.Effect<void>
+  }
+>()('${effectServiceName(context)}') {
+  static readonly layer = Layer.effect(
+    Status,
+    Effect.gen(function* () {
+      const ready = yield* Ref.make(true)
+      return Status.of({
+        read: Effect.fn('${slug} status read')(function* () {
+          if (!(yield* Ref.get(ready))) return yield* new StatusNotReady({ reason: 'starting' })
+          return 'ready'
+        }),
+        setReady: Effect.fn('${slug} status set')(function* (value: boolean) {
+          yield* Ref.set(ready, value)
+        }),
+      })
+    }),
+  )
+}
 
 const statusApi = defineApi({
   id: 'status',
   version: 1,
   methods: {
     status: method({
+      input: Schema.Void,
       output: Schema.String,
       description: 'Report whether this plugin is ready.',
       tool: { name: '${toolName(context.packageId)}', readOnly: true },
@@ -468,9 +503,30 @@ const statusApi = defineApi({
   },
 })
 
-export default defineHost({
-  setup,
-  apis: [DshxEffect.host(statusApi, { status: () => Effect.succeed('ready') })],
+export default DshxPlugin.make({
+  name: '${context.packageId}',
+  layer: Status.layer,
+  apis: [Api.bind(statusApi, { status: () => Status.use(status => status.read()) })],
+})
+`
+}
+
+function renderEffectServiceTest(context: TemplateContext): string {
+  return `import { describe, expect, it } from '@effect/vitest'
+import { Effect } from 'effect'
+import { Status, StatusNotReady } from '../src/host.js'
+
+describe('${context.packageId} Status', () => {
+  it.layer(Status.layer)(it => {
+    it.effect('reads ready, then fails with StatusNotReady', () =>
+      Effect.gen(function* () {
+        const status = yield* Status
+        expect(yield* status.read()).toBe('ready')
+        yield* status.setReady(false)
+        expect(yield* Effect.flip(status.read())).toBeInstanceOf(StatusNotReady)
+      }),
+    )
+  })
 })
 `
 }
@@ -505,12 +561,15 @@ export const TEMPLATE_REGISTRY = {
   },
   'effect-host': {
     label: 'Effect Host plugin',
-    description: 'A typed dshx API and tool using an Effect-managed plugin runtime.',
+    description: 'A typed dshx API and agent tool served by DshxPlugin.make from one Effect service.',
     hostOnly: true,
     clientProviders: [],
-    devDependencies: context => ({ ...sdkDependencies(context), effect: '4.1.0', '@deepseek-ai/dsh-tools': context.dshVersion }),
-    peerDependencies: context => ({ '@deepseek-ai/dsh': context.dshRange, '@deepseek-ai/dsh-tools': context.dshRange, effect: '^4.1.0' }),
-    files: context => [{ path: 'src/host.ts', contents: renderEffectHost(context) }],
+    devDependencies: context => ({ ...sdkDependencies(context), effect: '4.1.0', '@effect/vitest': '4.1.0', '@deepseek-ai/dsh-tools': context.dshVersion }),
+    peerDependencies: context => ({ '@deepseek-ai/dsh': context.dshRange, '@deepseek-ai/dsh-tools': context.dshRange, effect: '4.1.0' }),
+    files: context => [
+      { path: 'src/host.ts', contents: renderEffectHost(context) },
+      { path: 'tests/status.spec.ts', contents: renderEffectServiceTest(context) },
+    ],
   },
   tool: {
     label: 'Tool plugin',

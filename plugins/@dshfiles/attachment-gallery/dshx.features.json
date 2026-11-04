@@ -4,7 +4,7 @@
     {
       "id": "image-gallery-navigation",
       "title": "Navigate image previews",
-      "summary": "Open a draft image and move among all attached images with left/right keyboard controls or the thumbnail strip.",
+      "summary": "Open a draft image or an image of a sent message and move among all images of that draft or message with left/right keyboard controls or the thumbnail strip.",
       "reach": [
         "click button \"New session\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",

@@ -25,11 +25,12 @@ function createHostApiClient<const Methods extends Record<string, AnyApiMethodDe
       if (contract.methods[name] === undefined) throw ApiProtocolModel.error('contract', `Unknown API method ${name}.`, contract.id, name, false)
       const served = registry.apis.get(apiKey(owner, contract.id))
       if (served === undefined) throw ApiProtocolModel.ownerMissing(owner, contract.id, name)
-      ApiProtocolModel.jsonBytes(input)
+      const payload = ApiProtocolModel.jsonInput(input)
+      ApiProtocolModel.jsonBytes(payload)
       const result = await served.dispatch(
         name,
         // Copies, so an in-process caller and the owner never share mutable objects, exactly as over Connection.
-        { version: contract.version, input: structuredClone(input) },
+        { version: contract.version, input: structuredClone(payload) },
         options?.signal ?? new AbortController().signal,
         { kind: 'plugin', packageId: callerPackageId },
         undefined,

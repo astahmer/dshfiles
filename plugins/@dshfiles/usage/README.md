@@ -61,9 +61,10 @@ Provider values are the exact recorded DSH route IDs; for configured AI Accounts
 The Host walks `<sessions root>/<project>/<session>/session[.vN].jsonl.zstd`
 (newest generation only) and keeps, per log, the byte offset of the last
 complete Zstandard frame and the fold state, in
-`$DSH_HOME/plugins/usage/usage.db` (node:sqlite). A pass every 30 s, or
+`$DSH_HOME/plugins/usage/usage.db`, opened through `@dshfiles/sqlite-store` (its schema steps are
+migrations `0001`–`0008`; a file from the old opener is adopted at `user_version` 8). A pass every 30 s, or
 **Refresh**, decodes only the frames a log gained; a torn final frame waits for
-the writer. A fold-version bump — a change in how a log is read — clears the
+the writer. A Refresh during a pass joins it, and an aborted Refresh never cuts the pass short. A fold-version bump — a change in how a log is read — clears the
 stored cursors and tool rows once, so the next pass re-reads every log.
 
 | Field       | Source                                                                                                                                                                                                                   |

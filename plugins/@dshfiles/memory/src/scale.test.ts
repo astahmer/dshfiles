@@ -1,23 +1,32 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect } from 'effect'
+import { TestClock } from 'effect/testing'
 
 import { renderStartBlock } from './block.ts'
-import { openMemoryStore } from './store.ts'
+import { repoLayer } from './testing/memory-store.ts'
 import { seedSyntheticCorpus } from './testing/synthetic-corpus.ts'
 
+const now = 1_800_000_000_000
+
 describe('memory at scale', () => {
-  it('keeps the start block within its byte budget once a project outgrows it', () => {
-    const now = Date.now()
-    const store = openMemoryStore({ path: ':memory:', now: () => now })
-    const { projects } = seedSyntheticCorpus({ store, items: 1_000, projects: 40, now })
-    const budgetBytes = 1_000
-    const outgrown = projects.filter(
-      project => Buffer.byteLength(renderStartBlock({ store, project, budgetBytes: 8_192, crossProject: true, staleDays: 90 })) > budgetBytes,
-    )
-    expect(outgrown.length).toBeGreaterThanOrEqual(10)
-    for (const project of outgrown) {
-      const block = renderStartBlock({ store, project, budgetBytes, crossProject: true, staleDays: 90 })
-      expect(Buffer.byteLength(block)).toBeLessThanOrEqual(budgetBytes)
-      expect(block).toContain('Threads in')
-    }
-  })
+  it.effect(
+    'keeps the start block within its byte budget once a project outgrows it',
+    () =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(now)
+        const { projects } = yield* seedSyntheticCorpus({ items: 1_000, projects: 40, now })
+        const budgetBytes = 1_000
+        const outgrown: string[] = []
+        for (const project of projects)
+          if (Buffer.byteLength(yield* renderStartBlock({ project, budgetBytes: 8_192, crossProject: true, staleDays: 90 })) > budgetBytes)
+            outgrown.push(project)
+        expect(outgrown.length).toBeGreaterThanOrEqual(10)
+        for (const project of outgrown) {
+          const block = yield* renderStartBlock({ project, budgetBytes, crossProject: true, staleDays: 90 })
+          expect(Buffer.byteLength(block)).toBeLessThanOrEqual(budgetBytes)
+          expect(block).toContain('Threads in')
+        }
+      }).pipe(Effect.provide(repoLayer(':memory:'))),
+    30_000,
+  )
 })

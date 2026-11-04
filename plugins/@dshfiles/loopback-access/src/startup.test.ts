@@ -15,10 +15,16 @@ describe('immutable network startup provider', () => {
 
   it('reads the section reference only once when capturing the boot plan', () => {
     const config = Config({ lanEnabled: true, bindAddress: '192.0.2.10', port: 0 })
-    const observed: StartupConfig = { get: vi.fn(() => config.get()) }
+    let reads = 0
+    const observed: StartupConfig = {
+      get: () => {
+        reads += 1
+        return config.get()
+      },
+    }
     const boot = captureNetworkPreferences(observed)
     expect(boot).toMatchObject({ host: '192.0.2.10', port: 0 })
-    expect(observed.get).toHaveBeenCalledTimes(1)
+    expect(reads).toBe(1)
   })
 
   it('rejects unknown keys and malformed legacy flags in the native Config validator', () => {
@@ -37,12 +43,12 @@ describe('immutable network startup provider', () => {
     const loaderFiber = ctx.plugin(Loader)
     await loaderFiber.await()
     const loader = ctx.loader
-    const activations = vi.fn()
+    let activations = 0
     let activeConfig: StartupConfig | undefined
     loader.builtins['network-startup-test'] = {
       Config,
       apply(child: Context, config: StartupConfig) {
-        activations()
+        activations += 1
         activeConfig = config
         child.provide('dshfilesNetworkStartup', captureNetworkPreferences(config))
       },
@@ -53,7 +59,7 @@ describe('immutable network startup provider', () => {
         config: { lanEnabled: true, bindAddress: '192.0.2.10', port: 3080, localhostEnabled },
       })
       await loader.await()
-      expect(activations).toHaveBeenCalledTimes(1)
+      expect(activations).toBe(1)
       const boot = ctx.dshfilesNetworkStartup
       const entry = loader.resolve(id)
       const fiber = entry.fiber
@@ -91,7 +97,7 @@ describe('immutable network startup provider', () => {
       // Fiber's public update validates before its restart waterfall; ConfigEditor uses the same schema before saving.
       expect(() => fiber?.update({ lanEnabled: true, bindAddress: null }, true)).toThrow('Choose an interface address')
       expect(activeConfig?.get()).toEqual({ lanEnabled: true, bindAddress: '192.0.2.11', port: 3198 })
-      expect(activations).toHaveBeenCalledTimes(1)
+      expect(activations).toBe(1)
       expect(entry.fiber).toBe(fiber)
       expect(ctx.dshfilesNetworkStartup).toBe(boot)
       expect(boot).toEqual({ host: '192.0.2.10', port: 3080, preferences: { lanEnabled: true, bindAddress: '192.0.2.10', port: 3080 } })

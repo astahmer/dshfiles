@@ -22,25 +22,6 @@ export class McpSchema {
   // oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the schema parses the unknown input
   static readonly decode = <S extends SchemaTypes.ConstraintDecoder<unknown>>(schema: S, input: unknown): S['Type'] => Schema.decodeUnknownSync(schema)(input)
 
-  /** Decodes once at a boundary with no unknown keys, the rule `z.object(...).strict()` carried. */
-  // oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the schema parses the unknown input
-  static readonly decodeStrict = <S extends SchemaTypes.ConstraintDecoder<unknown>>(schema: S, input: unknown): S['Type'] =>
-    Schema.decodeUnknownSync(schema, { onExcessProperty: 'error' })(input)
-
-  /** Like `decode`, but returns a `Result` so a caller can branch without a throw. */
-  // oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the schema parses the unknown input
-  static readonly decodeResult = <S extends SchemaTypes.ConstraintDecoder<unknown>>(schema: S, input: unknown) => Schema.decodeUnknownResult(schema)(input)
-
-  /** Whether the input decodes, without throwing or keeping the decoded value. */
-  // oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the schema parses the unknown input
-  static readonly accepts = <S extends SchemaTypes.ConstraintDecoder<unknown>>(schema: S, input: unknown): boolean =>
-    Schema.decodeUnknownResult(schema)(input)._tag === 'Success'
-
-  /** Whether the input decodes with no unknown keys, the rule `z.object(...).strict()` carried. */
-  // oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the schema parses the unknown input
-  static readonly acceptsStrict = <S extends SchemaTypes.ConstraintDecoder<unknown>>(schema: S, input: unknown): boolean =>
-    Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(input)._tag === 'Success'
-
   /** A required string bounded by a maximum length. */
   static readonly id = (maximum: number) => Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(maximum))
 
@@ -86,12 +67,6 @@ export class McpContract {
       '~standard': { ...standard['~standard'], jsonSchema: { ...jsonSchema, input: published, output: published } },
     }
   }
-
-  /**
-   * The published view of a row config: unknown keys are ignored (a Loader row may carry fields this version drops), and
-   * the JSON Schema is Effect's own so the config editor can derive its form.
-   */
-  static readonly standard = <S extends SchemaTypes.ConstraintDecoder<unknown>>(schema: S) => Schema.toStandardSchemaV1(schema)
 
   /** One contract method from Effect schemas: input and output decode strictly and publish through the standard shape. */
   static readonly method = <const Input extends SchemaTypes.ConstraintDecoder<unknown>, const Output extends SchemaTypes.ConstraintDecoder<unknown>>(

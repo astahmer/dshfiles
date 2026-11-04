@@ -1,11 +1,9 @@
-import { Option, Schema } from 'effect'
-import { afterEach, describe, expect, it } from 'vitest'
+import { Effect, Option, Schema } from 'effect'
+import { describe, expect, it } from '@effect/vitest'
 import { verificationReceiptActivity } from './adapters.js'
-import { createActivityTimelineService } from './service.js'
+import { ActivityTimeline } from './activity-timeline.js'
+import { temporaryStatePath, timelineLayer } from './test-support.js'
 import { verificationReceiptEventSchema } from './types.js'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 
 const revision = 'b'.repeat(40)
 const value = {
@@ -25,8 +23,6 @@ const value = {
   sourceRevisionBefore: revision,
   sourceRevisionAfter: revision,
 }
-
-const temporaryRoots: string[] = []
 
 const accepts = (candidate: unknown): boolean =>
   Option.isSome(Schema.decodeUnknownOption(verificationReceiptEventSchema, { onExcessProperty: 'error' })(candidate))
@@ -68,38 +64,43 @@ describe('verification receipt activity contract', () => {
     expect(accepts({ ...event, value: { ...value, label: 'bad\u0085label' } })).toBe(false)
   })
 
-  it('maps failure and cancellation truthfully and deduplicates receipt replay', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'activity-verification-'))
-    temporaryRoots.push(root)
-    const service = createActivityTimelineService({ statePath: join(root, 'state.json'), now: () => 20 })
-    const failed = verificationReceiptActivity(value)
-    const first = await service.ingest(failed)
-    const replay = await service.ingest(verificationReceiptActivity(value))
-    const cancelled = verificationReceiptActivity({ ...value, receiptId: '00000000-0000-4000-8000-000000000002', status: 'cancelled', exitCode: null })
-    const timedOut = verificationReceiptActivity({
-      ...value,
-      receiptId: '00000000-0000-4000-8000-000000000003',
-      status: 'timed-out',
-      failure: null,
-      exitCode: null,
-    })
-    const passed = verificationReceiptActivity({ ...value, receiptId: '00000000-0000-4000-8000-000000000004', status: 'passed', failure: null, exitCode: 0 })
+  it.effect('maps failure and cancellation truthfully and deduplicates receipt replay', () =>
+    Effect.gen(function* () {
+      const statePath = yield* temporaryStatePath
+      yield* Effect.gen(function* () {
+        const service = yield* ActivityTimeline
+        const failed = verificationReceiptActivity(value)
+        const [first] = yield* service.ingest([failed])
+        const [replay] = yield* service.ingest([verificationReceiptActivity(value)])
+        const cancelled = verificationReceiptActivity({ ...value, receiptId: '00000000-0000-4000-8000-000000000002', status: 'cancelled', exitCode: null })
+        const timedOut = verificationReceiptActivity({
+          ...value,
+          receiptId: '00000000-0000-4000-8000-000000000003',
+          status: 'timed-out',
+          failure: null,
+          exitCode: null,
+        })
+        const passed = verificationReceiptActivity({
+          ...value,
+          receiptId: '00000000-0000-4000-8000-000000000004',
+          status: 'passed',
+          failure: null,
+          exitCode: 0,
+        })
 
-    expect(first.event.id).toBe(`verification:${value.receiptId}`)
-    expect(first.event.correlationId).toBe(value.receiptId)
-    expect(first.event.level).toBe('attention')
-    expect(replay.duplicate).toBe(true)
-    expect(cancelled.level).toBe('notable')
-    expect(cancelled.type).toBe('verification.cancelled')
-    expect(cancelled.metadata?.failure).toBe(null)
-    expect(timedOut.level).toBe('attention')
-    expect(timedOut.type).toBe('verification.timed-out')
-    expect(passed.level).toBe('routine')
-    expect(JSON.stringify(first.event)).not.toMatch(/argv|stdout|stderr|environment|prompt/i)
-    expect((await service.attention()).map(event => event.id)).toEqual([`verification:${value.receiptId}`])
-  })
-})
-
-afterEach(async () => {
-  await Promise.all(temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
+        expect(first?.event.id).toBe(`verification:${value.receiptId}`)
+        expect(first?.event.correlationId).toBe(value.receiptId)
+        expect(first?.event.level).toBe('attention')
+        expect(replay?.duplicate).toBe(true)
+        expect(cancelled.level).toBe('notable')
+        expect(cancelled.type).toBe('verification.cancelled')
+        expect(cancelled.metadata?.failure).toBe(null)
+        expect(timedOut.level).toBe('attention')
+        expect(timedOut.type).toBe('verification.timed-out')
+        expect(passed.level).toBe('routine')
+        expect(JSON.stringify(first?.event)).not.toMatch(/argv|stdout|stderr|environment|prompt/i)
+        expect((yield* service.attention(20)).map(event => event.id)).toEqual([`verification:${value.receiptId}`])
+      }).pipe(Effect.provide(timelineLayer({ statePath })))
+    }),
+  )
 })

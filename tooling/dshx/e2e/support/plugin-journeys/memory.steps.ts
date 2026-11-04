@@ -1,18 +1,18 @@
 import { join } from 'node:path'
 import { openGlobalPanel } from '../plugin-view-names.js'
 import { expect, type Page } from '@playwright/test'
-import { openMemoryStore } from '../../../../../plugins/@dshfiles/memory/src/store.ts'
+import { openMemoryStore } from '../../../../../plugins/@dshfiles/memory/src/testing/memory-store-promise.ts'
 import { Given, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
 
 const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
 
-const addMemoryNote = (options: { readonly page: Page; readonly text: string; readonly category: 'project' | 'feedback' }): void => {
+const addMemoryNote = async (options: { readonly page: Page; readonly text: string; readonly category: 'project' | 'feedback' }): Promise<void> => {
   // The Host has the same SQLite file open in WAL mode; a second connection writes the note the way memory_note would.
   const store = openMemoryStore({ path: join(profileFor(options.page).homeRoot, 'plugins', 'memory', 'memory.db') })
   try {
-    store.addNote({
+    await store.addNote({
       project: '/work/e2e-project',
       text: options.text,
       category: options.category,
@@ -23,16 +23,16 @@ const addMemoryNote = (options: { readonly page: Page; readonly text: string; re
       origin: 'agent',
     })
   } finally {
-    store.close()
+    await store.close()
   }
 }
 
 Given('memory holds the project note {string}', async ({ page }: { page: Page }, text: string) => {
-  addMemoryNote({ page, text, category: 'project' })
+  await addMemoryNote({ page, text, category: 'project' })
 })
 
 Given('memory holds the feedback note {string}', async ({ page }: { page: Page }, text: string) => {
-  addMemoryNote({ page, text, category: 'feedback' })
+  await addMemoryNote({ page, text, category: 'feedback' })
 })
 
 When('the Memory panel is opened', async ({ page }: { page: Page }) => {
@@ -69,7 +69,7 @@ Given(
   async ({ page }: { page: Page }, id: string, title: string, digest: string) => {
     const store = openMemoryStore({ path: join(profileFor(page).homeRoot, 'plugins', 'memory', 'memory.db') })
     try {
-      store.putThread({
+      await store.putThread({
         id,
         project: '/work/e2e-project',
         parent: null,
@@ -81,7 +81,7 @@ Given(
         updatedAt: Date.now(),
       })
     } finally {
-      store.close()
+      await store.close()
     }
   },
 )

@@ -1,15 +1,18 @@
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { DshxEffect } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import { BundleSources } from '../src/source.js'
+import { NodeFileSystem } from '@effect/platform-node'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, FileSystem } from 'effect'
+import { classCandidates, discoverPluginRoots, listBundles, SourceResolver } from '../src/source.js'
 
-const bundle = async (root: string): Promise<string> => {
+const bundleRoot = Effect.gen(function* () {
+  const fileSystem = yield* FileSystem.FileSystem
+  const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: 'dsh-annotations-' })
   const dist = join(root, 'fake-plugin', 'dist')
-  await mkdir(dist, { recursive: true })
-  await writeFile(join(dist, 'client.js'), 'const styles={"primary":"_primary_abc12"};export{styles}\n', 'utf8')
-  await writeFile(
+  yield* fileSystem.makeDirectory(dist, { recursive: true })
+  yield* fileSystem.writeFileString(join(dist, 'client.js'), 'const styles={"primary":"_primary_abc12"};export{styles}\n')
+  yield* fileSystem.writeFileString(
     join(dist, 'client.js.map'),
     JSON.stringify({
       version: 3,
@@ -18,82 +21,76 @@ const bundle = async (root: string): Promise<string> => {
       mappings: 'AAAA',
       names: [],
     }),
-    'utf8',
   )
   return root
-}
-
-const temporary: string[] = []
-
-const temporaryRoot = async (): Promise<string> => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-annotations-'))
-  temporary.push(root)
-  return await bundle(root)
-}
-
-afterEach(() => {
-  temporary.length = 0
 })
 
+const resolverFor = Effect.flatMap(bundleRoot, root => SourceResolver.make({ roots: [root] }))
+
 describe('source resolver', () => {
-  it('lists built client bundles', async () => {
-    const root = await temporaryRoot()
-    const bundles = await BundleSources.listBundles({ root })
-    expect(bundles.map(entry => entry.name)).toEqual(['fake-plugin'])
-  })
+  it.layer(NodeFileSystem.layer)(it => {
+    it.effect('lists built client bundles', () =>
+      Effect.gen(function* () {
+        const bundles = yield* listBundles({ root: yield* bundleRoot })
+        expect(bundles.map(entry => entry.name)).toEqual(['fake-plugin'])
+      }).pipe(Effect.scoped),
+    )
 
-  it('maps a class hash to its module source', async () => {
-    const root = await temporaryRoot()
-    const resolver = BundleSources.createSourceResolver({ roots: [root] })
-    const matches = await resolver.resolve(['_primary_abc12'])
-    expect(matches).toHaveLength(1)
-    expect(matches[0]?.file.endsWith('src/tab-strip.module.css')).toBe(true)
-    expect(matches[0]?.confidence).toBe('map')
-  })
+    it.effect('maps a class hash to its module source', () =>
+      Effect.gen(function* () {
+        const matches = yield* (yield* resolverFor).resolve(['_primary_abc12'])
+        expect(matches).toHaveLength(1)
+        expect(matches[0]?.file.endsWith('src/tab-strip.module.css')).toBe(true)
+        expect(matches[0]?.confidence).toBe('map')
+      }).pipe(Effect.scoped),
+    )
 
-  it('falls back to text in the original source', async () => {
-    const root = await temporaryRoot()
-    const resolver = BundleSources.createSourceResolver({ roots: [root] })
-    const matches = await resolver.resolveText(['color:blue'])
-    expect(matches[0]?.line).toBe(2)
-    expect(matches[0]?.confidence).toBe('text')
-  })
+    it.effect('falls back to text in the original source', () =>
+      Effect.gen(function* () {
+        const matches = yield* (yield* resolverFor).resolveText(['color:blue'])
+        expect(matches[0]?.line).toBe(2)
+        expect(matches[0]?.confidence).toBe('text')
+      }).pipe(Effect.scoped),
+    )
 
-  it('returns no match rather than guessing', async () => {
-    const root = await temporaryRoot()
-    const resolver = BundleSources.createSourceResolver({ roots: [root] })
-    expect(await resolver.resolve(['_missing_class'])).toEqual([])
-  })
+    it.effect('returns no match rather than guessing', () =>
+      Effect.gen(function* () {
+        expect(yield* (yield* resolverFor).resolve(['_missing_class'])).toEqual([])
+      }).pipe(Effect.scoped),
+    )
 
-  it('records the resolve span', async () => {
-    const root = await temporaryRoot()
-    using recorder = recordSpans()
-    const resolver = BundleSources.createSourceResolver({ roots: [root] })
-    await resolver.resolve(['_primary_abc12'])
-    expect(recorder.span('annotations resolve source')).toBeDefined()
-  })
+    it.effect('records the resolve span', () =>
+      Effect.gen(function* () {
+        const recorder = yield* Effect.acquireRelease(
+          Effect.sync(() => recordSpans()),
+          spans => Effect.sync(() => spans[Symbol.dispose]()),
+        )
+        yield* (yield* resolverFor).resolve(['_primary_abc12'])
+        expect(recorder.span('annotations resolve source')).toBeDefined()
+      }).pipe(Effect.scoped, Effect.provide(DshxEffect.tracerLayer)),
+    )
 
-  it('derives the bundle root from the Host module URL', async () => {
-    const roots = await BundleSources.discoverPluginRoots({
-      start: '/tmp',
-      env: {},
-      moduleUrl: 'file:///checkout/plugins/@dshfiles/annotations/dist/index.js',
-    })
-    expect(roots).toEqual(['/checkout/plugins/@dshfiles'])
-  })
-
-  it('discovers the checkout from DSHFILES_DIR', async () => {
-    const roots = await BundleSources.discoverPluginRoots({ start: '/tmp', env: { DSHFILES_DIR: '/checkout' } })
-    expect(roots).toEqual([join('/checkout', 'plugins', '@dshfiles')])
+    it.effect('derives the bundle root from the Host module URL, then from DSHFILES_DIR', () =>
+      Effect.gen(function* () {
+        expect(
+          yield* discoverPluginRoots({
+            start: '/tmp',
+            dshfilesDirectory: undefined,
+            moduleUrl: 'file:///checkout/plugins/@dshfiles/annotations/dist/index.js',
+          }),
+        ).toEqual(['/checkout/plugins/@dshfiles'])
+        expect(yield* discoverPluginRoots({ start: '/tmp', dshfilesDirectory: '/checkout' })).toEqual([join('/checkout', 'plugins', '@dshfiles')])
+      }),
+    )
   })
 })
 
 describe('classCandidates', () => {
   it('keeps CSS-module names and drops bare utilities', () => {
-    expect(BundleSources.classCandidates('div.uV2eYG_row > button.dshx\\:inline-flex.cta')).toEqual(['uV2eYG_row'])
+    expect(classCandidates('div.uV2eYG_row > button.dshx\\:inline-flex.cta')).toEqual(['uV2eYG_row'])
   })
 
   it('returns nothing for a selector without a module class', () => {
-    expect(BundleSources.classCandidates('button.cta')).toEqual([])
+    expect(classCandidates('button.cta')).toEqual([])
   })
 })

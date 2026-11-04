@@ -1,12 +1,6 @@
 {
   "schemaVersion": 1,
   "kind": "bundle",
-  "ioDelegation": [
-    {
-      "file": "src/host.ts",
-      "reason": "The subprocess runner runs only inside createCloneJobs and createProject (src/project-lifecycle.ts), whose project clone and project create spans cover every git, jj and gh process; executable lookups run inside the automatic api-dispatch span."
-    }
-  ],
   "features": [
     {
       "id": "workspace-folder-add-flow",

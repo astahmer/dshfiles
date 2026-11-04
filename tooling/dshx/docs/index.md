@@ -21,7 +21,7 @@ DSHX exposes a small authoring surface and keeps compiler/runtime internals out 
 8. [Creator](./guides/creator.md) — template/style matrix, generated dependencies, and automation.
 9. [Tooling](./guides/tooling.md) — experimental Node-side build/watch, config, compatibility, diagnostics, CLI, and repair APIs.
 10. [Tracing](./guides/tracing.md) — metadata-only Host spans, OTLP/HTTP JSON export behind `OTEL_EXPORTER_OTLP_*`, and what is never recorded.
-11. [Effect](./sdk/effect.md) — opt-in `DshxEffect`: per-plugin ManagedRuntime, scoped setup, traced API handlers, Effect clients, and event Streams.
+11. [Effect](./sdk/effect.md) — `DshxPlugin.make`: one layer graph and Scope per plugin, `Api.bind` handlers, `Tool.make` agent tools, wire errors by annotation, typed `Api.client`.
 
 Additional references:
 
@@ -34,18 +34,18 @@ Additional references:
 
 ## Public entry points
 
-| Entry                                      | Status                 | Browser-safe | Purpose                                                                       |
-| ------------------------------------------ | ---------------------- | ------------ | ----------------------------------------------------------------------------- |
-| `@dshfiles/dshx`                           | API Candidate          | Yes          | `defineConfig`, `DshxConfig` only                                             |
-| `@dshfiles/dshx/config`                    | API Candidate          | Yes          | Same config-only surface                                                      |
-| `@dshfiles/dshx/host`                      | Supported              | No           | Host definitions, contributions, and scoped lifecycle setup                   |
-| `@dshfiles/dshx/client`                    | API Candidate          | Yes          | Client definitions, Locale/Slot contributions, and React Hooks                |
-| `@dshfiles/dshx/api`                       | API Candidate          | Yes          | Shared typed API contracts and error guards                                   |
-| `@dshfiles/dshx/settings`                  | API Candidate          | Yes          | Shared Settings contracts                                                     |
-| `@dshfiles/dshx/tracing`                   | API Candidate          | No           | Host spans and OTLP trace export (off unless an endpoint is configured)       |
+| Entry                                      | Status                 | Browser-safe | Purpose                                                                                          |
+| ------------------------------------------ | ---------------------- | ------------ | ------------------------------------------------------------------------------------------------ |
+| `@dshfiles/dshx`                           | API Candidate          | Yes          | `defineConfig`, `DshxConfig` only                                                                |
+| `@dshfiles/dshx/config`                    | API Candidate          | Yes          | Same config-only surface                                                                         |
+| `@dshfiles/dshx/host`                      | Supported              | No           | Host definitions, contributions, and scoped lifecycle setup                                      |
+| `@dshfiles/dshx/client`                    | API Candidate          | Yes          | Client definitions, Locale/Slot contributions, and React Hooks                                   |
+| `@dshfiles/dshx/api`                       | API Candidate          | Yes          | Shared typed API contracts and error guards                                                      |
+| `@dshfiles/dshx/settings`                  | API Candidate          | Yes          | Shared Settings contracts                                                                        |
+| `@dshfiles/dshx/tracing`                   | API Candidate          | No           | Host spans and OTLP trace export (off unless an endpoint is configured)                          |
 | `@dshfiles/dshx/effect`                    | API Candidate          | Yes          | Opt-in Effect layer over handlers, plugin runtime, clients and event Streams (`effect` 4.1 peer) |
-| `@dshfiles/dshx/experimental/conversation` | Experimental           | Yes          | Conversation lifecycle and renderer contributions                             |
-| `@dshfiles/dshx/tooling`                   | Tooling / Experimental | No           | Compiler, config resolution, compatibility, diagnostics, CLI, and repair APIs |
+| `@dshfiles/dshx/experimental/conversation` | Experimental           | Yes          | Conversation lifecycle and renderer contributions                                                |
+| `@dshfiles/dshx/tooling`                   | Tooling / Experimental | No           | Compiler, config resolution, compatibility, diagnostics, CLI, and repair APIs                    |
 
 The removed `@dshfiles/dshx/compiler`, `/compat`, `/cli`, and `/conversation` entries have no runtime aliases.
 

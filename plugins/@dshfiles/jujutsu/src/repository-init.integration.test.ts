@@ -3,8 +3,27 @@ import { spawnSync } from 'node:child_process'
 import { lstat, mkdir, mkdtemp, readFile, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { NodeServices } from '@effect/platform-node'
+import { Effect, Layer, ManagedRuntime } from 'effect'
 import { onTestFinished, test } from 'vitest'
-import { ensureJujutsuRepository, RepositoryInitializationError, type RepositoryInitRunner } from './repository-init.ts'
+import { JujutsuCommandFailed, RepositoryInitFailed } from './errors.ts'
+import { RepositoryInitializer, type RepositoryInitRunner } from './repository-init.ts'
+
+type Runner = RepositoryInitRunner<JujutsuCommandFailed>
+
+/** One initializer per fixture, so concurrent opens share its per-root queue the way one Host does. */
+const initializer = () => {
+  const runtime = ManagedRuntime.make(RepositoryInitializer.layer.pipe(Layer.provide(NodeServices.layer)))
+  onTestFinished(() => runtime.dispose())
+  return (input: { readonly path: string; readonly runJj: Runner; readonly signal?: AbortSignal }) =>
+    runtime.runPromise(
+      RepositoryInitializer.use(service => service.ensure({ path: input.path, runJj: input.runJj })),
+      input.signal === undefined ? undefined : { signal: input.signal },
+    )
+}
+
+const failing = (run: () => { readonly stdout: string; readonly truncated: boolean }) =>
+  Effect.try({ try: run, catch: cause => new JujutsuCommandFailed({ exitCode: 1, cause }) })
 
 const fixture = async () => {
   const home = await realpath(await mkdtemp(join(tmpdir(), 'dshfiles-jj-init-')))
@@ -34,11 +53,12 @@ const fixture = async () => {
   const git = (args: readonly string[], cwd = repo): string => command('git', cwd, args)
   const jj = (args: readonly string[], cwd = repo): string => command(process.env.JJ_TEST_EXECUTABLE ?? 'jj', cwd, ['--color=never', '--no-pager', ...args])
   const calls: { readonly cwd: string; readonly args: readonly string[] }[] = []
-  const runJj: RepositoryInitRunner = async (cwd, args, signal) => {
-    signal?.throwIfAborted()
-    calls.push({ cwd, args })
-    return { stdout: jj(args, cwd), truncated: false }
-  }
+  const runJj: Runner = (cwd, args) =>
+    failing(() => {
+      calls.push({ cwd, args })
+      return { stdout: jj(args, cwd), truncated: false }
+    })
+  const ensureJujutsuRepository = initializer()
   const createGit = async (cwd = repo): Promise<void> => {
     await mkdir(cwd, { recursive: true })
     git(['init', '--initial-branch=main'], cwd)
@@ -52,7 +72,7 @@ const fixture = async () => {
     git(['branch', 'feature/preserved'], cwd)
   }
   const open = (path = repo) => ensureJujutsuRepository({ path, runJj })
-  return { home, repo, git, jj, createGit, calls, runJj, open }
+  return { home, repo, git, jj, createGit, calls, runJj, open, ensureJujutsuRepository }
 }
 
 const absent = async (path: string): Promise<void> => {
@@ -155,7 +175,7 @@ for (const marker of ['file', 'directory', 'dangling-symlink'] as const) {
     else if (marker === 'directory') await mkdir(jjPath)
     else await symlink(join(f.home, 'missing-jj'), jjPath, 'dir')
     const before = await lstat(jjPath)
-    await assert.rejects(f.open(), RepositoryInitializationError)
+    await assert.rejects(f.open(), RepositoryInitFailed)
     assert.equal((await lstat(jjPath)).ino, before.ino)
     assert.equal(initCalls(f.calls).length, 0)
     if (marker === 'file') assert.equal(await readFile(jjPath, 'utf8'), 'do not overwrite\n')
@@ -166,7 +186,7 @@ test('plain, missing and regular-file selections never invoke JJ or create metad
   const f = await fixture()
   const file = join(f.repo, 'ordinary.txt')
   await writeFile(file, 'plain\n')
-  for (const selection of [f.repo, join(f.home, 'missing'), file]) await assert.rejects(f.open(selection), RepositoryInitializationError)
+  for (const selection of [f.repo, join(f.home, 'missing'), file]) await assert.rejects(f.open(selection), RepositoryInitFailed)
   assert.deepEqual(f.calls, [])
   await absent(join(f.repo, '.jj'))
   await absent(join(f.repo, '.git'))
@@ -177,8 +197,8 @@ test('bare repositories and their subdirectories never initialize, even inside a
   await f.createGit()
   const bare = join(f.repo, 'nested.git')
   f.git(['init', '--bare', bare])
-  await assert.rejects(f.open(bare), RepositoryInitializationError)
-  await assert.rejects(f.open(join(bare, 'objects')), RepositoryInitializationError)
+  await assert.rejects(f.open(bare), RepositoryInitFailed)
+  await assert.rejects(f.open(join(bare, 'objects')), RepositoryInitFailed)
   assert.deepEqual(f.calls, [])
   await absent(join(bare, '.jj'))
   await absent(join(f.repo, '.jj'))
@@ -218,7 +238,7 @@ test('a malformed nested Git marker blocks initialization of its valid outer Git
   const nested = join(f.repo, 'nested')
   await mkdir(nested)
   await writeFile(join(nested, '.git'), 'not a gitdir pointer\n')
-  await assert.rejects(f.open(nested), RepositoryInitializationError)
+  await assert.rejects(f.open(nested), RepositoryInitFailed)
   assert.deepEqual(f.calls, [])
   await absent(join(f.repo, '.jj'))
   assert.equal(await readFile(join(nested, '.git'), 'utf8'), 'not a gitdir pointer\n')
@@ -235,7 +255,7 @@ test('a real linked Git worktree initializes on installed JJ and preserves both 
   const primaryBefore = gitState(f.git)
   const pointer = await readFile(join(worktree, '.git'))
   const opened = await f.open(worktree).catch((error: unknown) => {
-    if (error instanceof RepositoryInitializationError && error.message.includes('may not support Git worktrees')) return undefined
+    if (error instanceof RepositoryInitFailed && error.message.includes('may not support Git worktrees')) return undefined
     throw error
   })
   if (opened === undefined) {
@@ -256,10 +276,8 @@ test('a worktree init failure is static, leaves markers untouched and does not i
   const worktree = join(f.home, 'worktree')
   f.git(['worktree', 'add', '-b', 'linked-worktree', worktree])
   const pointer = await readFile(join(worktree, '.git'))
-  const runJj: RepositoryInitRunner = async () => {
-    throw new Error('raw stderr https://secret@example.invalid/private')
-  }
-  await assert.rejects(ensureJujutsuRepository({ path: worktree, runJj }), {
+  const runJj: Runner = () => Effect.fail(new JujutsuCommandFailed({ exitCode: 1, cause: new Error('raw stderr https://secret@example.invalid/private') }))
+  await assert.rejects(f.ensureJujutsuRepository({ path: worktree, runJj }), {
     message: 'Jujutsu could not initialize this Git worktree. This JJ version may not support Git worktrees; existing metadata was not replaced.',
   })
   assert.deepEqual(await readFile(join(worktree, '.git')), pointer)
@@ -271,24 +289,27 @@ test('initialization verifies the exact canonical root and rejects wrong or trun
   for (const mode of ['wrong-root', 'truncated'] as const) {
     const f = await fixture()
     await f.createGit()
-    const runJj: RepositoryInitRunner = async (cwd, args, signal) =>
-      args.includes('init') ? f.runJj(cwd, args, signal) : { stdout: `${mode === 'wrong-root' ? f.home : f.repo}\n`, truncated: mode === 'truncated' }
-    await assert.rejects(ensureJujutsuRepository({ path: f.repo, runJj }), { message: 'Jujutsu did not confirm the exact selected repository root.' })
+    const runJj: Runner = (cwd, args) =>
+      args.includes('init') ? f.runJj(cwd, args) : Effect.succeed({ stdout: `${mode === 'wrong-root' ? f.home : f.repo}\n`, truncated: mode === 'truncated' })
+    await assert.rejects(f.ensureJujutsuRepository({ path: f.repo, runJj }), { message: 'Jujutsu did not confirm the exact selected repository root.' })
   }
 })
 
 test('a changed root identity during a managed init is rejected rather than accepted as the original repository', async () => {
   const f = await fixture()
   await f.createGit()
-  const runJj: RepositoryInitRunner = async (cwd, args, signal) => {
-    const result = await f.runJj(cwd, args, signal)
-    if (args.includes('init')) {
-      await rename(f.repo, join(f.home, 'original'))
-      await f.createGit()
-    }
-    return result
-  }
-  await assert.rejects(ensureJujutsuRepository({ path: f.repo, runJj }), {
+  const runJj: Runner = (cwd, args) =>
+    f.runJj(cwd, args).pipe(
+      Effect.tap(() =>
+        args.includes('init')
+          ? Effect.promise(async () => {
+              await rename(f.repo, join(f.home, 'original'))
+              await f.createGit()
+            })
+          : Effect.void,
+      ),
+    )
+  await assert.rejects(f.ensureJujutsuRepository({ path: f.repo, runJj }), {
     message: 'Repository identity changed before initialization. Open the repository again.',
   })
   await absent(join(f.repo, '.jj'))
@@ -299,7 +320,7 @@ test('pre-cancelled requests do not execute any subprocess', async () => {
   await f.createGit()
   const controller = new AbortController()
   controller.abort()
-  await assert.rejects(ensureJujutsuRepository({ path: f.repo, runJj: f.runJj, signal: controller.signal }), { message: 'Jujutsu request was cancelled.' })
+  await assert.rejects(f.ensureJujutsuRepository({ path: f.repo, runJj: f.runJj, signal: controller.signal }))
   assert.deepEqual(f.calls, [])
   await absent(join(f.repo, '.jj'))
 })
@@ -345,7 +366,7 @@ test('oversized Git markers fail closed before any JJ command', async () => {
   const nested = join(f.repo, 'nested')
   await mkdir(nested)
   await writeFile(join(nested, '.git'), `gitdir: ${'x'.repeat(9000)}\n`)
-  await assert.rejects(f.open(nested), RepositoryInitializationError)
+  await assert.rejects(f.open(nested), RepositoryInitFailed)
   assert.deepEqual(f.calls, [])
   await absent(join(f.repo, '.jj'))
 })
@@ -361,19 +382,20 @@ test("an aborted waiting opener cannot cancel another opener's shared initializa
   const gate = new Promise<void>(resolveGate => {
     release = resolveGate
   })
-  const runJj: RepositoryInitRunner = async (cwd, args, signal) => {
-    if (args.includes('init')) {
-      entered?.()
-      await gate
-    }
-    return f.runJj(cwd, args, signal)
-  }
-  const owner = ensureJujutsuRepository({ path: f.repo, runJj })
+  const runJj: Runner = (cwd, args) =>
+    (args.includes('init')
+      ? Effect.promise(() => {
+          entered?.()
+          return gate
+        })
+      : Effect.void
+    ).pipe(Effect.andThen(f.runJj(cwd, args)))
+  const owner = f.ensureJujutsuRepository({ path: f.repo, runJj })
   await started
   const controller = new AbortController()
-  const waiter = ensureJujutsuRepository({ path: f.repo, runJj, signal: controller.signal })
+  const waiter = f.ensureJujutsuRepository({ path: f.repo, runJj, signal: controller.signal })
   controller.abort()
-  await assert.rejects(waiter, { message: 'Jujutsu request was cancelled.' })
+  await assert.rejects(waiter)
   release?.()
   assert.deepEqual(await owner, { root: f.repo, initialized: true })
   assert.equal(initCalls(f.calls).length, 1)

@@ -7,9 +7,9 @@ import { decodeNetworkSnapshot, type NetworkSnapshot } from './network-api.js'
 import { NetworkPreferences, NetworkSection } from './network-section.js'
 
 const unavailableHost = vi.hoisted(() => ({
-  network: vi.fn(async () => {
+  network: async () => {
     throw new Error('Host method is unavailable')
-  }),
+  },
 }))
 vi.mock('@dshfiles/dshx/client', async importOriginal => ({
   ...(await importOriginal<typeof import('@dshfiles/dshx/client')>()),
@@ -30,14 +30,29 @@ const initialSnapshot = (): NetworkSnapshot => ({
   unavailableReason: null,
 })
 
+type SaveInput = Parameters<Parameters<typeof NetworkPreferences>[0]['save']>[0]
+
+/** The Host save the form calls, recording each input; `failNext` makes the next save reject with that error. */
+const recordedSave = (snapshot: NetworkSnapshot) => {
+  const calls: SaveInput[] = []
+  const failures: Error[] = []
+  const save = async (input: SaveInput): Promise<NetworkSnapshot> => {
+    calls.push(input)
+    const failure = failures.shift()
+    if (failure !== undefined) throw failure
+    return {
+      ...snapshot,
+      revision: input.expectedRevision + 1,
+      saved: { lanEnabled: input.lanEnabled, bindAddress: input.bindAddress, localhostEnabled: input.localhostEnabled, port: input.port },
+      pendingRestart: true,
+    }
+  }
+  return Object.assign(save, { calls, failNext: (error: Error) => failures.push(error) })
+}
+
 const mount = (snapshot = initialSnapshot()) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
-  const save = vi.fn(async (input: Parameters<Parameters<typeof NetworkPreferences>[0]['save']>[0]): Promise<NetworkSnapshot> => ({
-    ...snapshot,
-    revision: input.expectedRevision + 1,
-    saved: { lanEnabled: input.lanEnabled, bindAddress: input.bindAddress, localhostEnabled: input.localhostEnabled, port: input.port },
-    pendingRestart: true,
-  }))
+  const save = recordedSave(snapshot)
   const view = render(
     <PluginQueryProvider client={client}>
       <NetworkPreferences snapshot={snapshot} t={t} save={save} />
@@ -84,12 +99,12 @@ describe('Network access preferences', () => {
     expect(screen.getAllByRole('switch')).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() =>
-      expect(save).toHaveBeenCalledWith({ lanEnabled: true, bindAddress: '192.168.1.94', localhostEnabled: true, port: 0, expectedRevision: 4 }),
+      expect(save.calls).toContainEqual({ lanEnabled: true, bindAddress: '192.168.1.94', localhostEnabled: true, port: 0, expectedRevision: 4 }),
     )
     fireEvent.click(screen.getByRole('switch', { name: 'LAN access' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() =>
-      expect(save).toHaveBeenLastCalledWith({ lanEnabled: false, bindAddress: '192.168.1.94', localhostEnabled: true, port: 0, expectedRevision: 5 }),
+      expect(save.calls.at(-1)).toEqual({ lanEnabled: false, bindAddress: '192.168.1.94', localhostEnabled: true, port: 0, expectedRevision: 5 }),
     )
   })
 
@@ -106,7 +121,7 @@ describe('Network access preferences', () => {
     fireEvent.change(screen.getByLabelText('Port'), { target: { value: '4321' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() =>
-      expect(save).toHaveBeenCalledWith({ lanEnabled: true, bindAddress: '192.168.1.94', localhostEnabled: true, port: 4321, expectedRevision: 4 }),
+      expect(save.calls).toContainEqual({ lanEnabled: true, bindAddress: '192.168.1.94', localhostEnabled: true, port: 4321, expectedRevision: 4 }),
     )
   })
 
@@ -116,7 +131,7 @@ describe('Network access preferences', () => {
     expect(screen.getByRole('combobox', { name: 'LAN address' }).textContent).toContain(networkEnglish.chooseAddress)
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.getByText(networkEnglish.addressRequired)).toBeTruthy())
-    expect(save).not.toHaveBeenCalled()
+    expect(save.calls).toEqual([])
   })
 
   it('retains a dirty draft and its revision when actual status refreshes', async () => {
@@ -127,7 +142,7 @@ describe('Network access preferences', () => {
     expect(screen.getByLabelText<HTMLInputElement>('Port').value).toBe('4321')
     expect(screen.getByText('http://127.0.0.1:3200')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(save).toHaveBeenCalledWith({ ...snapshot.saved, port: 4321, expectedRevision: 4 }))
+    await waitFor(() => expect(save.calls).toContainEqual({ ...snapshot.saved, port: 4321, expectedRevision: 4 }))
   })
 
   it('shows an unavailable saved address and never silently chooses an available replacement', async () => {
@@ -140,7 +155,7 @@ describe('Network access preferences', () => {
     expect(screen.getByRole('combobox').textContent).toContain('192.168.2.20')
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.getByText('Choose an available LAN address before saving.')).toBeTruthy())
-    expect(save).not.toHaveBeenCalled()
+    expect(save.calls).toEqual([])
   })
 
   it('rejects out-of-range port drafts without a Host write', async () => {
@@ -148,7 +163,7 @@ describe('Network access preferences', () => {
     fireEvent.change(screen.getByLabelText('Port'), { target: { value: '65536' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.getByText('Enter a whole number from 0 to 65535.')).toBeTruthy())
-    expect(save).not.toHaveBeenCalled()
+    expect(save.calls).toEqual([])
   })
 
   it('disables writes for unsupported launchers and shows actual status and CLI overrides', () => {
@@ -175,14 +190,12 @@ describe('Network access preferences', () => {
     expect(screen.getByLabelText<HTMLInputElement>('Port').value).toBe('4321')
     fireEvent.change(screen.getByLabelText('Port'), { target: { value: '4322' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await waitFor(() =>
-      expect(save).toHaveBeenLastCalledWith({ lanEnabled: false, bindAddress: null, localhostEnabled: true, port: 4322, expectedRevision: 5 }),
-    )
+    await waitFor(() => expect(save.calls.at(-1)).toEqual({ lanEnabled: false, bindAddress: null, localhostEnabled: true, port: 4322, expectedRevision: 5 }))
   })
 
   it('keeps a failed save draft and displays the mutation failure', async () => {
     const { save } = mount()
-    save.mockRejectedValueOnce(new Error('Network preferences changed; read them again.'))
+    save.failNext(new Error('Network preferences changed; read them again.'))
     fireEvent.change(screen.getByLabelText('Port'), { target: { value: '4321' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.getByText('Network preferences changed; read them again.')).toBeTruthy())

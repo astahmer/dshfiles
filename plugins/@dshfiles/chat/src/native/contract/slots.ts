@@ -5,6 +5,7 @@ import type {} from '../../turn-usage-cost.ts'
 export type { TurnErrorActionOwnerProps } from '../../turn-error-action.ts'
 export type { TurnUsageCostOwnerProps } from '../../turn-usage-cost.ts'
 import type { ChatTurnActionExtras, ChatTurnTailExtras } from '../../chat-focus.ts'
+import type { MessageImageGallery } from '../../message-images.ts'
 import type { RefObject } from 'react'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
@@ -422,7 +423,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * registration replaces the shipped gallery; without one, images are omitted.
      */
     'conversation.chat.message.images': { kind: 'single'; scope: 'session'; owner: MessageImagesOwnerProps }
-    /** User-message images, including pending and local-echo previews, independently replaceable from output images. */
+    /**
+     * User-message images, including pending and local-echo previews, independently replaceable from output images.
+     * Each call may carry the whole message gallery (see {@link MessageImageGallery}) so the attachment row and the
+     * inline references open the same preview over every image of that message.
+     */
     'conversation.chat.user.images': { kind: 'single'; scope: 'session'; owner: MessageImagesOwnerProps }
     /**
      * Command row keyed by the command name. The component receives the folded

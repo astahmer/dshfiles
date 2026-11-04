@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { InboxTarget } from '@deepseek-ai/dsh-agent/types'
-import { QueueOrderModel, QueueItemMissingError, type QueueInbox } from './queue-order.js'
+import { QueueOrderModel, type QueueInbox } from './queue-order.js'
 
 interface QueuedMessage {
   readonly id: string
@@ -73,7 +73,7 @@ describe('moveWithinInbox', () => {
 
   it('reports an item that is no longer pending', () => {
     const { inbox } = memoryInbox(['a'])
-    expect(() => QueueOrderModel.moveWithinInbox(inbox, { sessionId: 's', itemId: 'gone', direction: 'up' })).toThrow(QueueItemMissingError)
+    expect(QueueOrderModel.moveWithinInbox(inbox, { sessionId: 's', itemId: 'gone', direction: 'up' })).toBeUndefined()
   })
 })
 

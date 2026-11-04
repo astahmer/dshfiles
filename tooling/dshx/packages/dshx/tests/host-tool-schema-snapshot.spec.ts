@@ -1,13 +1,17 @@
 import { lstat, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
+import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
+import Storage from '@deepseek-ai/dsh-storage'
+import * as StorageDomainPlugin from '@deepseek-ai/dsh-storage-domain'
+import * as StorageJson from '@deepseek-ai/dsh-storage-json'
+import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { describe, expect, it } from 'vitest'
 import { createServer } from 'vite'
 import { buildHost, type BuildHostOptions } from '../src/compiler/host/build.js'
 import { resolveDshxConfig } from '../src/config/resolve.js'
 import { createTestHost } from '../src/testing/index.js'
 
-const expectedCounts = { hostBundles: 57, apiMethods: 446, apiToolBindings: 307, apiToolSchemas: 74, definedTools: 24, tools: 98 }
-const effectSchemaChangedTools = new Set(['traces_alert_delete', 'traces_alert_save', 'traces_breakdown', 'traces_clear'])
+const expectedCounts = { hostBundles: 57, apiMethods: 449, apiToolBindings: 308, apiToolSchemas: 307, definedTools: 28, tools: 335 }
 const fixturePath = new URL('../../../e2e/fixtures/tool-schemas.json', import.meta.url)
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -41,15 +45,7 @@ const toolProperty = (schemas: readonly unknown[], name: string, propertyName: s
   return isObjectRecord(property) ? property : undefined
 }
 
-const withoutEffectSchemaChanges = (source: string): string => {
-  const snapshot: unknown = JSON.parse(source)
-  if (!isObjectRecord(snapshot)) throw new Error('Host tool schema snapshot must be an object.')
-  const schemas = getArrayProperty(snapshot, 'schemas').filter(schema => {
-    const name = getObjectProperty(schema, 'name')
-    return typeof name !== 'string' || !effectSchemaChangedTools.has(name)
-  })
-  return `${JSON.stringify(canonicalize({ ...snapshot, schemas }), null, 2)}\n`
-}
+const canonicalSnapshot = (source: string): string => `${JSON.stringify(canonicalize(JSON.parse(source)), null, 2)}\n`
 
 const linkNodeModules = async (source: string, target: string) => {
   await mkdir(target, { recursive: true })
@@ -130,6 +126,11 @@ const collectHostToolSchemas = async () => {
   const scratchRoot = await mkdtemp(join(repositoryRoot, '.dshx-host-tool-schemas-'))
   const aliases = await workspaceAliases(pluginRoot, projects)
   const host = await createTestHost()
+  await host.ctx.plugin(LocalSubprocessRuntime)
+  await host.ctx.plugin(Storage)
+  await host.ctx.plugin(StorageJson, { root: join(scratchRoot, '.storage') })
+  await host.ctx.plugin(StorageDomainPlugin, { backend: 'json' })
+  await host.ctx.plugin(LocalAttachmentStore, { dshHome: join(scratchRoot, '.home') })
   const viteServer = await createServer({
     root: repositoryRoot,
     configFile: false,
@@ -213,7 +214,10 @@ const collectHostToolSchemas = async () => {
       const plugin = builtModule.__dshxSchemaPlugin
       if (plugin === undefined) throw new Error(`Missing schema-only Host plugin export for ${resolved.packageId}.`)
       try {
-        await host.ctx.plugin(plugin)
+        // Declarations never run setup: wait only for the injected services this Host provides, so a plugin that also
+        // needs a session or web service still registers its tools and APIs.
+        const inject = getArrayProperty(plugin, 'inject').filter(name => typeof name === 'string' && host.ctx.get(name) !== undefined)
+        await host.ctx.plugin({ ...plugin, inject })
       } catch (error) {
         throw new Error(`Could not mount schema declarations from ${resolved.packageId}: ${String(error)}`)
       }
@@ -238,7 +242,7 @@ const collectHostToolSchemas = async () => {
 }
 
 describe('all Host tool schemas', () => {
-  it('matches the pre-Effect snapshot and pins the intentional Effect schema deltas', async () => {
+  it('matches the recorded snapshot of every Host tool schema', async () => {
     const snapshot = await collectHostToolSchemas()
     if (process.env.UPDATE_HOST_TOOL_SCHEMA_SNAPSHOT === '1') {
       const outputPath = process.env.HOST_TOOL_SCHEMA_SNAPSHOT_PATH ?? fixturePath.pathname
@@ -250,7 +254,7 @@ describe('all Host tool schemas', () => {
     const snapshotText = snapshot.toString()
     const recorded: unknown = JSON.parse(snapshotText)
     expect(recorded).toMatchObject(expectedCounts)
-    expect(withoutEffectSchemaChanges(snapshotText)).toBe(withoutEffectSchemaChanges(await readFile(fixturePath, 'utf8')))
+    expect(canonicalSnapshot(snapshotText)).toBe(canonicalSnapshot(await readFile(fixturePath, 'utf8')))
 
     const schemas = getArrayProperty(recorded, 'schemas')
     expect(toolProperty(schemas, 'traces_alert_delete', 'confirm')).toMatchObject({ type: 'boolean', enum: [true] })

@@ -1,7 +1,6 @@
 import { ChatFocusModel, type ChatFocus } from '@dshfiles/chat/chat-focus'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { TracesSchema } from './schema.js'
 import type { AttributeValue } from './types.js'
 
 const TRACES_VIEW_ID = 'dshfiles-traces'
@@ -12,7 +11,7 @@ const tracesFocusSchema = Schema.Struct({ turn: Schema.Int.check(Schema.isGreate
 /** What the Traces tab opens for a Conversation View request: the trace of one of the thread's turns. */
 export type TracesFocus = Schema.Schema.Type<typeof tracesFocusSchema>
 
-const encodeFocus = (focus: TracesFocus): string => `${FOCUS_PREFIX}${JSON.stringify(TracesSchema.decode(tracesFocusSchema, focus))}`
+const encodeFocus = (focus: TracesFocus): string => `${FOCUS_PREFIX}${JSON.stringify(Schema.decodeUnknownSync(tracesFocusSchema)(focus))}`
 
 const decodeFocus = (value: string): TracesFocus | null => {
   if (!value.startsWith(FOCUS_PREFIX)) return null

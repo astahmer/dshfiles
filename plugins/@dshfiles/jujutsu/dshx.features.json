@@ -49,9 +49,9 @@
         },
         {
           "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
-          "testName": "records a jj log span with flag names only and whether output was cut"
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         }
       ]
     },
@@ -189,9 +189,9 @@
         },
         {
           "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
-          "testName": "records a jj log span with flag names only and whether output was cut"
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         }
       ]
     },
@@ -332,9 +332,9 @@
         },
         {
           "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
-          "testName": "records a jj log span with flag names only and whether output was cut"
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         }
       ]
     },
@@ -392,9 +392,9 @@
         },
         {
           "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
-          "testName": "records a jj log span with flag names only and whether output was cut"
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         }
       ]
     },
@@ -477,9 +477,9 @@
         },
         {
           "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
-          "testName": "records a jj log span with flag names only and whether output was cut"
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         }
       ]
     },
@@ -631,9 +631,9 @@
         },
         {
           "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
-          "testName": "records a jj log span with flag names only and whether output was cut"
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         }
       ]
     },
@@ -688,9 +688,9 @@
         },
         {
           "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
-          "testName": "records a jj log span with flag names only and whether output was cut"
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         }
       ]
     },
@@ -736,9 +736,9 @@
         },
         {
           "kind": "custom",
-          "span": "jj <subcommand>",
-          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
-          "testName": "records a jj log span with flag names only and whether output was cut"
+          "span": "jj <verb>",
+          "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
+          "testName": "records one jj <verb> client span with value-free attributes and the exit code"
         }
       ]
     },
@@ -815,12 +815,5 @@
       ]
     }
   ],
-  "kind": "bundle",
-  "ioDelegation": [
-    {
-      "file": "src/host.ts",
-      "tracedBy": "jj <subcommand>",
-      "reason": "Every jj spawn here goes through runAt, which wraps it in withJjSpan from src/jj-span.ts."
-    }
-  ]
+  "kind": "bundle"
 }

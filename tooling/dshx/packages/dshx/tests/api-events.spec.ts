@@ -7,7 +7,6 @@ import { ApiChannelModel } from '../src/api/channel.js'
 import { HostApiEventsModel } from '../src/api/host-events.js'
 import { registerApi } from '../src/api/host-runtime.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
-import '../src/effect/index.js'
 import type { ApiEventStatus } from '../src/api/types.js'
 
 const jobsApi = defineApi({

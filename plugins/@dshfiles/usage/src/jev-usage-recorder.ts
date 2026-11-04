@@ -1,17 +1,15 @@
-import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
+import type { ApiCaller } from '@dshfiles/dshx/api'
+import { Effect } from 'effect'
+import { JevCallerRejected } from './errors.js'
 import type { JevUsageRecord } from './jev-usage.js'
+import { UsageRepo } from './store.js'
 
-export const jevSourceOf = (caller: ApiCaller, source: JevUsageRecord['source']): boolean =>
-  caller.kind === 'plugin' && caller.packageId === `@dshfiles/${source}`
+const jevSourceOf = (caller: ApiCaller, source: JevUsageRecord['source']): boolean => caller.kind === 'plugin' && caller.packageId === `@dshfiles/${source}`
 
-export const createJevUsageRecorder = (dependencies: {
-  readonly authorize: (caller: ApiCaller, source: JevUsageRecord['source']) => boolean
-  readonly record: (record: JevUsageRecord) => void
-}) => {
-  const handler = ({ input, caller }: { readonly input: JevUsageRecord; readonly caller: ApiCaller }) => {
-    if (!dependencies.authorize(caller, input.source)) throw new PluginApiError('Only the Jev source plugin may record its own usage.', { code: 'jev-caller' })
-    dependencies.record(input)
-    return { accepted: true as const }
-  }
-  return handler
-}
+/** Only the plugin a Jev record names (backlog or memory) may record it; nothing is persisted otherwise. */
+export const recordJevUsage = Effect.fn('usage jev record')(function* (input: { readonly record: JevUsageRecord; readonly caller: ApiCaller }) {
+  if (!jevSourceOf(input.caller, input.record.source)) return yield* new JevCallerRejected({ source: input.record.source })
+  const repo = yield* UsageRepo
+  yield* repo.recordJevUsage(input.record)
+  return { accepted: true as const }
+})

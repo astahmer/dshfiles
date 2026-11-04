@@ -25,11 +25,13 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/jj-cli": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
@@ -50,6 +52,7 @@
     "@deepseek-ai/dsh-subprocess": "catalog:",
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/frame-layout": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "jsdom": "catalog:",

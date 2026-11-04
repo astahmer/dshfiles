@@ -1,11 +1,16 @@
-import { Context, Effect, Layer, Schema, SchemaGetter } from 'effect'
-import {
-  formatSecretReference,
-  parseSecretReference,
-  SecretReferenceResolver as PromiseSecretReferenceResolver,
+import { HostContext } from '@dshfiles/dshx/effect/host-context'
+import { Context, Effect, Layer, Option, Schema, SchemaGetter } from 'effect'
+import { formatSecretReference, parseSecretReference, type SecretReference } from './grammar.js'
+import { resolveSecretCredential, secretResolutionFailed, type ResolvedSecretCredential, type SecretReferenceResolverError } from './resolve.js'
+import type { SecretCatalogValues } from './secret-reference.js'
+
+export {
+  InvalidSecretReferenceError,
+  SecretCatalogResolutionError,
+  SecretCatalogUnavailableError,
   type ResolvedSecretCredential,
-  type SecretCatalogValues,
-} from './secret-reference.js'
+  type SecretReferenceResolverError,
+} from './resolve.js'
 
 export const secretAliasSchemaEffect = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128), Schema.isPattern(/^[A-Za-z_][A-Za-z0-9_-]*$/u))
 
@@ -37,51 +42,57 @@ export const secretCredentialLabelSchemaEffect = secretCredentialLabelTextSchema
   }),
 )
 
-export class InvalidSecretReferenceError extends Schema.TaggedError<InvalidSecretReferenceError>()('InvalidSecretReferenceError', {}) {}
-
-export class SecretCatalogUnavailableError extends Schema.TaggedError<SecretCatalogUnavailableError>()('SecretCatalogUnavailableError', {}) {}
-
-export class SecretCatalogResolutionError extends Schema.TaggedError<SecretCatalogResolutionError>()('SecretCatalogResolutionError', {}) {}
-
-export type SecretReferenceResolverError = InvalidSecretReferenceError | SecretCatalogUnavailableError | SecretCatalogResolutionError
-
-export class SecretReferenceResolverService extends Context.Service<
-  SecretReferenceResolverService,
-  {
-    resolve(input: {
-      readonly referenceText: string
-      readonly environmentValue: string | undefined
-    }): Effect.Effect<string | undefined, SecretReferenceResolverError>
-    resolveWithLabel(input: {
-      readonly referenceText: string
-      readonly environmentValue: string | undefined
-      readonly environmentVariableName: string
-    }): Effect.Effect<ResolvedSecretCredential | undefined, SecretReferenceResolverError>
-  }
->()('@dshfiles/credential-port/SecretReferenceResolver') {
-  static layer(values: Pick<SecretCatalogValues, 'resolve'> | undefined) {
-    const resolveWithLabel = (input: {
-      readonly referenceText: string
-      readonly environmentValue: string | undefined
-      readonly environmentVariableName: string
-    }): Effect.Effect<ResolvedSecretCredential | undefined, SecretReferenceResolverError> => {
-      const reference = parseSecretReference(input.referenceText)
-      if (reference === null && input.referenceText.trim() !== '') return Effect.fail(new InvalidSecretReferenceError())
-      if (reference !== null && values === undefined) return Effect.fail(new SecretCatalogUnavailableError())
-      return Effect.tryPromise({
-        try: signal => PromiseSecretReferenceResolver.resolveWithLabel({ ...input, values, signal }),
-        catch: () => new SecretCatalogResolutionError(),
-      })
-    }
-
-    return Layer.succeed(
-      SecretReferenceResolverService,
-      SecretReferenceResolverService.of({
-        resolve: input => Effect.map(resolveWithLabel({ ...input, environmentVariableName: 'environment' }), credential => credential?.value),
-        resolveWithLabel,
-      }),
-    )
-  }
+export interface SecretCredentialRequest {
+  readonly referenceText: string
+  readonly environmentValue: string | undefined
 }
 
-export { SecretReferenceResolverService as SecretReferenceResolver }
+export interface LabelledSecretCredentialRequest extends SecretCredentialRequest {
+  readonly environmentVariableName: string
+}
+
+const catalogReveal = (values: Pick<SecretCatalogValues, 'resolve'>) => (reference: SecretReference) =>
+  Effect.tryPromise({ try: signal => values.resolve({ reference, cwd: null, signal }), catch: secretResolutionFailed(reference) })
+
+/**
+ * The one credential resolver: the bound reference through the Secret Catalog when the setting holds one, otherwise
+ * the environment variable. Interruption aborts the catalog request.
+ */
+export class SecretReferenceResolver extends Context.Service<
+  SecretReferenceResolver,
+  {
+    readonly resolve: (input: SecretCredentialRequest) => Effect.Effect<Option.Option<string>, SecretReferenceResolverError>
+    readonly resolveWithLabel: (input: LabelledSecretCredentialRequest) => Effect.Effect<Option.Option<ResolvedSecretCredential>, SecretReferenceResolverError>
+  }
+>()('@dshfiles/credential-port/SecretReferenceResolver') {
+  /** Reads the Host's `secretCatalogValues` per call, so the Secret Catalog may load after the plugin using it. */
+  static readonly layer = Layer.effect(
+    SecretReferenceResolver,
+    Effect.map(HostContext, host => makeResolver(() => host.ctx.get('secretCatalogValues'))),
+  )
+
+  /** A resolver over an explicit value port (or none), standing in for the Secret Catalog plugin in tests. */
+  static readonly layerTest = (values: Pick<SecretCatalogValues, 'resolve'> | undefined) =>
+    Layer.succeed(
+      SecretReferenceResolver,
+      makeResolver(() => values),
+    )
+}
+
+const makeResolver = (catalog: () => Pick<SecretCatalogValues, 'resolve'> | undefined) => {
+  const resolveWithLabel = (input: LabelledSecretCredentialRequest) =>
+    Effect.suspend(() => {
+      const values = catalog()
+      return resolveSecretCredential({ ...input, reveal: values === undefined ? undefined : catalogReveal(values) })
+    })
+  return SecretReferenceResolver.of({
+    resolveWithLabel,
+    resolve: input =>
+      Effect.map(
+        resolveWithLabel({ ...input, environmentVariableName: 'environment' }),
+        Option.map(credential => credential.value),
+      ),
+  })
+}
+
+export { SecretReferenceResolver as SecretReferenceResolverService }

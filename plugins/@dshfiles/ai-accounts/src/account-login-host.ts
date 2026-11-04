@@ -1,14 +1,16 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { LoginIntentInactive } from './errors.js'
 import type { ApiCaller } from '@dshfiles/dshx/api'
-import { DshxEffect } from '@dshfiles/dshx/effect'
-import { accountRuntime, AccountLoginIntentModel, AccountSessionWorkModel } from './account-runtime.js'
+import { Api } from '@dshfiles/dshx/effect'
+import { accountRuntime, AccountLoginIntentModel } from './account-runtime.js'
 import { AccountHomePolicy } from './account-home-policy.js'
-import { accountStoreService, type AccountStoreFile } from './account-store.js'
+import type { AccountStoreFile } from './account-store.js'
+import type { AccountStorePromise } from './account-store-promise.js'
 import { accountLoginMetadata, aiAccountsLoginApi, type AccountLoginState } from './account-login-api.js'
 import { createAccountLoginService, type AccountLoginAccount } from './account-login-service.js'
 import { createCodexLoginFiles } from './codex-login-files.js'
 import { accountSessionRelatedIds } from './account-session-host.js'
-import { effectHandler } from './host-effect.js'
+import { effectHandler, lockedHandler } from './host-effect.js'
 
 export class AccountLoginHostModel {
   static readonly accountsFromFile = (file: AccountStoreFile): AccountLoginAccount[] =>
@@ -26,13 +28,13 @@ export class AccountLoginHostModel {
     caller.kind === 'client' ? state : accountLoginMetadata(state)
 }
 
-export const installAccountLogin = (ctx: Context): void => {
+export const installAccountLogin = (ctx: Context, store: AccountStorePromise): void => {
   const runtime = accountRuntime(ctx)
   if (runtime === undefined) throw new Error('AI Accounts runtime is unavailable.')
   runtime.accountLogin = createAccountLoginService({
     files: createCodexLoginFiles(path => AccountHomePolicy.isManagedSetupHome(path, 'codex')),
     account: async id => {
-      const file = await accountStoreService.readAccountFile()
+      const file = await store.readAccountFile()
       const pending = runtime.accountSetup?.candidates() ?? []
       return AccountLoginHostModel.accountsFromFile({ ...file, accounts: [...pending, ...file.accounts] }).find(account => account.instanceId === id)
     },
@@ -50,16 +52,21 @@ const loginFor = (ctx: Context) => {
   return login
 }
 
-export const accountLoginHostApi = DshxEffect.host(aiAccountsLoginApi, {
-  begin: effectHandler(aiAccountsLoginApi, 'begin', ({ ctx, input, caller }) => {
-    const account =
-      accountRuntime(ctx)?.accountSetup?.candidate(input.instanceId) ??
-      accountStoreService.readAccountFileSync().accounts.find(candidate => candidate.instanceId === input.instanceId)
-    return AccountSessionWorkModel.run(ctx, account === undefined ? [input.instanceId] : accountSessionRelatedIds(account), async () => {
-      if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId)) throw new Error('This account sign-in intent is no longer active.')
+export const accountLoginHostApi = Api.bind(aiAccountsLoginApi, {
+  begin: lockedHandler(
+    aiAccountsLoginApi,
+    'begin',
+    ({ ctx, input, store }) => {
+      const file = store.current()
+      const account =
+        accountRuntime(ctx)?.accountSetup?.candidate(input.instanceId) ?? file.accounts.find(candidate => candidate.instanceId === input.instanceId)
+      return account === undefined ? [input.instanceId] : accountSessionRelatedIds(file, account)
+    },
+    async ({ ctx, input, caller }) => {
+      if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId)) throw new LoginIntentInactive({ instanceId: input.instanceId })
       return AccountLoginHostModel.forCaller(await loginFor(ctx).begin(input.instanceId, input.replaceExisting), caller)
-    })
-  }),
+    },
+  ),
   status: effectHandler(aiAccountsLoginApi, 'status', ({ ctx, input, caller }) =>
     AccountLoginHostModel.forCaller(loginFor(ctx).state(input.instanceId), caller),
   ),

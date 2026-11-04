@@ -1,9 +1,11 @@
-import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
-import { waitForManagedExit } from '@dshfiles/dshx/host'
-import { redactIdentifier, withSpan } from '@dshfiles/dshx/tracing'
+import { redactIdentifier } from '@dshfiles/dshx/tracing'
+import { Context, Duration, Effect, Exit, Layer, Option, Ref, Stream } from 'effect'
+import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import { basename, isAbsolute } from 'node:path'
+import { ProcessGroupStillRunning } from './errors.js'
+import { Executables } from './host-promise.js'
 
-type ProcessFailure = 'spawn-failed' | 'process-group-failed' | 'cancelled' | 'timed-out'
+type ProcessFailure = 'spawn-failed' | 'process-group-failed' | 'timed-out'
 
 export interface ProcessResult {
   readonly exitCode: number | null
@@ -12,89 +14,106 @@ export interface ProcessResult {
   readonly failure: ProcessFailure | null
 }
 
-interface ManagedProcessRequest {
-  readonly subprocess: Pick<SubprocessRuntime, 'resolveExecutable' | 'spawn'>
+export interface ProcessRequest {
   readonly command: string
   readonly args: readonly string[]
   readonly cwd: string
   readonly timeoutMs: number
-  readonly signal: AbortSignal | undefined
 }
 
-/** One `project-checks run` span per managed process: executable name, argument count, exit code and failure kind only. */
-export const runManagedProcess = (request: ManagedProcessRequest): Promise<ProcessResult> =>
-  withSpan(
-    'project-checks run',
-    {
-      kind: 'client',
-      attributes: { 'process.executable.name': redactIdentifier(basename(request.command)), 'dshx.project-checks.argument_count': request.args.length },
+const STOP_CONFIRM_TIMEOUT = Duration.seconds(10)
+const STDOUT_LIMIT = 16_384
+const STDERR_LIMIT = 4_096
+
+const decoder = new TextDecoder()
+
+/** The last `limit` bytes of a stream as text: the collected tail a check's diagnostics need. */
+const tailText = <E>(stream: Stream.Stream<Uint8Array, E>, limit: number) =>
+  Stream.runFold(
+    stream,
+    () => new Uint8Array(),
+    (tail, chunk) => {
+      const joined = new Uint8Array(tail.length + chunk.length)
+      joined.set(tail)
+      joined.set(chunk, tail.length)
+      return joined.length > limit ? joined.slice(joined.length - limit) : joined
     },
-    async span => {
-      const result = await runUntracedProcess(request)
-      span.setAttributes({ 'process.exit.code': result.exitCode ?? undefined, 'dshx.project-checks.failure': result.failure ?? undefined })
-      if (result.failure !== null || result.exitCode !== 0) span.setStatus('error', result.failure ?? 'exit')
-      return result
-    },
+  ).pipe(Effect.map(bytes => decoder.decode(bytes)))
+
+const failed = (failure: ProcessFailure, exitCode: number | null = null): ProcessResult => ({ exitCode, stdout: '', stderr: '', failure })
+
+/**
+ * Runs one check process on the DSH spawner. A timeout or interruption terminates its whole process range; the run
+ * reports `process-group-failed` (or, when interrupted, dies with `ProcessGroupStillRunning`) unless that range is
+ * confirmed empty.
+ */
+export class ProcessRunner extends Context.Service<ProcessRunner, { readonly run: (request: ProcessRequest) => Effect.Effect<ProcessResult> }>()(
+  '@dshfiles/project-checks/ProcessRunner',
+) {
+  static readonly layer = Layer.effect(
+    ProcessRunner,
+    Effect.gen(function* () {
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const executables = yield* Executables
+
+      const run = Effect.fn('project-checks run')(
+        function* (request: ProcessRequest) {
+          const executableName = redactIdentifier(basename(request.command)) ?? 'process'
+          yield* Effect.annotateCurrentSpan({ 'process.executable.name': executableName, 'dshx.project-checks.argument_count': request.args.length })
+          const executable = yield* Effect.option(executables.resolve(request.command))
+          if (Option.isNone(executable) || !isAbsolute(executable.value) || executable.value.includes('\0')) return failed('spawn-failed')
+
+          const stopAttempted = yield* Ref.make(false)
+          const stopGroupOf = (handle: ChildProcessSpawner.ChildProcessHandle) =>
+            Ref.set(stopAttempted, true).pipe(
+              Effect.andThen(handle.kill()),
+              Effect.timeoutOption(STOP_CONFIRM_TIMEOUT),
+              Effect.map(Option.isSome),
+              Effect.catch(() => Effect.succeed(false)),
+            )
+          const spawned = yield* Effect.uninterruptible(
+            spawner.spawn(ChildProcess.make(executable.value, request.args, { cwd: request.cwd, stdin: 'ignore', forceKillAfter: Duration.seconds(1) })).pipe(
+              Effect.tap(handle =>
+                Effect.addFinalizer(() =>
+                  Effect.gen(function* () {
+                    if (yield* Ref.get(stopAttempted)) return
+                    if (!(yield* stopGroupOf(handle))) return yield* Effect.die(new ProcessGroupStillRunning({ executable: executableName }))
+                  }),
+                ),
+              ),
+              Effect.exit,
+            ),
+          )
+          if (Exit.isFailure(spawned)) return failed('spawn-failed')
+          const handle = spawned.value
+          const stopGroup = stopGroupOf(handle)
+
+          const outcome = yield* Effect.all(
+            {
+              exitCode: handle.exitCode.pipe(
+                Effect.map(Option.some<number>),
+                Effect.catch(error => (error.reason.method === 'exitCode' ? Effect.succeed(Option.none()) : Effect.fail(error))),
+              ),
+              stdout: tailText(handle.stdout, STDOUT_LIMIT),
+              stderr: tailText(handle.stderr, STDERR_LIMIT),
+            },
+            { concurrency: 'unbounded' },
+          ).pipe(Effect.timeoutOption(Duration.millis(request.timeoutMs)), Effect.exit)
+
+          const confirmed = yield* stopGroup
+          if (Exit.isFailure(outcome)) return failed(confirmed ? 'spawn-failed' : 'process-group-failed')
+          if (Option.isNone(outcome.value)) return failed(confirmed ? 'timed-out' : 'process-group-failed')
+          const exitCode = Option.getOrNull(outcome.value.value.exitCode)
+          if (!confirmed) return failed('process-group-failed', exitCode)
+          return { exitCode, stdout: outcome.value.value.stdout, stderr: outcome.value.value.stderr, failure: null }
+        },
+        Effect.scoped,
+        Effect.tap(result =>
+          Effect.annotateCurrentSpan({ 'process.exit.code': result.exitCode ?? undefined, 'dshx.project-checks.failure': result.failure ?? undefined }),
+        ),
+      )
+
+      return ProcessRunner.of({ run })
+    }),
   )
-
-const runUntracedProcess = async ({ subprocess, command, args, cwd, timeoutMs, signal }: ManagedProcessRequest): Promise<ProcessResult> => {
-  const controller = new AbortController()
-  let timedOut = false
-  let managedExit = false
-  let handle: ReturnType<ManagedProcessRequest['subprocess']['spawn']> | undefined
-  const abortFromCaller = (): void => controller.abort(signal?.reason)
-  const timeout = setTimeout(() => {
-    timedOut = true
-    controller.abort(new Error('Project action timed out.'))
-  }, timeoutMs)
-
-  signal?.addEventListener('abort', abortFromCaller, { once: true })
-  if (signal?.aborted === true) abortFromCaller()
-
-  const stopAndConfirm = async (failure: 'cancelled' | 'timed-out'): Promise<ProcessResult> => {
-    if (handle === undefined) return { exitCode: null, stdout: '', stderr: '', failure }
-    handle.terminate()
-    managedExit = await waitForManagedExit({ handle, timeoutMs: 10_000 }).catch(() => false)
-    return managedExit ? { exitCode: null, stdout: '', stderr: '', failure } : { exitCode: null, stdout: '', stderr: '', failure: 'process-group-failed' }
-  }
-
-  try {
-    if (controller.signal.aborted) return { exitCode: null, stdout: '', stderr: '', failure: 'cancelled' }
-    const executable = await subprocess.resolveExecutable(command, undefined, controller.signal)
-    if (!isAbsolute(executable) || executable.includes('\0')) return { exitCode: null, stdout: '', stderr: '', failure: 'spawn-failed' }
-
-    handle = subprocess.spawn({
-      argv: [executable, ...args],
-      cwd,
-      stdio: {
-        stdin: 'ignore',
-        stdout: { maxBytes: 16_384 },
-        stderr: { maxBytes: 4_096 },
-      },
-      graceMs: 1_000,
-      signal: controller.signal,
-    })
-    const outcome = await handle.done
-    if (controller.signal.aborted) return stopAndConfirm(timedOut ? 'timed-out' : 'cancelled')
-
-    managedExit = await waitForManagedExit({ handle, timeoutMs, signal: controller.signal })
-    if (!managedExit) {
-      handle.terminate()
-      return { exitCode: outcome.exitCode, stdout: '', stderr: '', failure: 'process-group-failed' }
-    }
-
-    const stdout = handle.collected.stdout?.readFrom(0)
-    const stderr = handle.collected.stderr?.readFrom(0)
-    return { exitCode: outcome.exitCode, stdout: stdout?.text ?? '', stderr: stderr?.text ?? '', failure: null }
-  } catch {
-    if (controller.signal.aborted) return stopAndConfirm(timedOut ? 'timed-out' : 'cancelled')
-    return { exitCode: null, stdout: '', stderr: '', failure: 'spawn-failed' }
-  } finally {
-    clearTimeout(timeout)
-    signal?.removeEventListener('abort', abortFromCaller)
-    if (handle !== undefined && !managedExit) {
-      handle.terminate()
-      await waitForManagedExit({ handle, timeoutMs: 10_000 }).catch(() => false)
-    }
-  }
 }

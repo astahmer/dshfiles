@@ -9,54 +9,47 @@ Conversation combines a pure official event-fold lifecycle with one React render
 ## Define, project, and render
 
 ```tsx
-import { defineClient, useApi } from "@dshfiles/dshx/client";
-import {
-  defineConversation,
-  type ConversationRenderProps,
-} from "@dshfiles/dshx/experimental/conversation";
-import { reviewApi } from "./review-api.js";
+import { defineClient, useApi } from '@dshfiles/dshx/client'
+import { defineConversation, type ConversationRenderProps } from '@dshfiles/dshx/experimental/conversation'
+import { reviewApi } from './review-api.js'
 
 const turnLifecycle = defineConversation({
-  kind: "turn-status",
+  kind: 'turn-status',
   events: {
-    "turn/start": {
-      role: "start",
-      id: (event) => String(event.data.turn),
-      publication: "immediate",
+    'turn/start': {
+      role: 'start',
+      id: event => String(event.data.turn),
+      publication: 'immediate',
     },
-    "turn/end": {
-      role: "update",
-      id: (event) => String(event.data.turn),
-      publication: "animation-frame",
+    'turn/end': {
+      role: 'update',
+      id: event => String(event.data.turn),
+      publication: 'animation-frame',
     },
   },
   initial(_context, event) {
-    return { turn: event.data.turn, status: "running" as const };
+    return { turn: event.data.turn, status: 'running' as const }
   },
   reduce(state, _context, event) {
-    return { ...state, status: event.data.reason.kind };
+    return { ...state, status: event.data.reason.kind }
   },
   project(state) {
-    return { label: `Turn ${state.turn}: ${state.status}` };
+    return { label: `Turn ${state.turn}: ${state.status}` }
   },
-});
+})
 
-type TurnProps = ConversationRenderProps<typeof turnLifecycle>;
+type TurnProps = ConversationRenderProps<typeof turnLifecycle>
 
 function TurnNode({ data }: TurnProps) {
-  const api = useApi(reviewApi);
-  return (
-    <button onClick={() => void api.refresh({ turn: data.label })}>
-      {data.label}
-    </button>
-  );
+  const api = useApi(reviewApi)
+  return <button onClick={() => void api.refresh({ turn: data.label })}>{data.label}</button>
 }
 
-const turnConversation = turnLifecycle.render(TurnNode);
+const turnConversation = turnLifecycle.render(TurnNode)
 
 export default defineClient({
   conversations: [turnConversation],
-});
+})
 ```
 
 `.render(Component)` returns one opaque contribution that contains both the official Conversation definition and the keyed `conversation.chat.node` renderer. Do not create a second Slot for the same kind.

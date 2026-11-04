@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { activityInputSchema, activityReportSchema, otelMetricsInputSchema, resolveActivityQuery, resolveOtelMetricsRange, usageApi } from './api.js'
+import { Result } from 'effect'
 import * as Schema from 'effect/Schema'
 
 // oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the schema parses the unknown test input
@@ -10,50 +11,58 @@ const strictParse = <ValueSchema extends Schema.ConstraintDecoder<unknown>>(sche
 const strictAccepts = <ValueSchema extends Schema.ConstraintDecoder<unknown>>(schema: ValueSchema, value: unknown): boolean =>
   Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(value)._tag === 'Success'
 
+const resolved = <A, E>(result: Result.Result<A, E>): A => Result.getOrThrow(result)
+const rejection = <A>(result: Result.Result<A, { readonly message: string }>): string => (Result.isFailure(result) ? result.failure.message : '')
+
 describe('usage tool exposure', () => {
   test('activity stats default to the last 30 days and support bounded ranked queries', () => {
-    const defaults = resolveActivityQuery(strictParse(activityInputSchema, {}), 1_000_000)
+    const defaults = resolved(resolveActivityQuery(strictParse(activityInputSchema, {}), 1_000_000))
     expect(defaults).toEqual({ from: 1_000_000 - 30 * 24 * 60 * 60 * 1_000, to: 1_000_000, limit: 10, bucket: 'day', tzOffsetMinutes: 0 })
-    expect(resolveActivityQuery(strictParse(activityInputSchema, { days: 7, category: 'skill', limit: 5 }), 1_000_000)).toMatchObject({
+    expect(resolved(resolveActivityQuery(strictParse(activityInputSchema, { days: 7, category: 'skill', limit: 5 }), 1_000_000))).toMatchObject({
       from: 1_000_000 - 7 * 24 * 60 * 60 * 1_000,
       to: 1_000_000,
       category: 'skill',
       limit: 5,
     })
-    expect(resolveActivityQuery(strictParse(activityInputSchema, { from: 100, to: 200, limit: 25 }), 1_000_000)).toMatchObject({
+    expect(resolved(resolveActivityQuery(strictParse(activityInputSchema, { from: 100, to: 200, limit: 25 }), 1_000_000))).toMatchObject({
       from: 100,
       to: 200,
       limit: 25,
     })
-    expect(() => resolveActivityQuery(strictParse(activityInputSchema, { from: 100 }), 1_000_000)).toThrow(/both/u)
-    expect(() => resolveActivityQuery(strictParse(activityInputSchema, { from: 200, to: 100 }), 1_000_000)).toThrow(/after/u)
-    expect(resolveActivityQuery(strictParse(activityInputSchema, { from: 0, to: 3 * 24 * 60 * 60 * 1_000, bucket: 'hour' }), 1_000_000)).toMatchObject({
+    expect(rejection(resolveActivityQuery(strictParse(activityInputSchema, { from: 100 }), 1_000_000))).toMatch(/both/u)
+    expect(rejection(resolveActivityQuery(strictParse(activityInputSchema, { from: 200, to: 100 }), 1_000_000))).toMatch(/after/u)
+    expect(
+      resolved(resolveActivityQuery(strictParse(activityInputSchema, { from: 0, to: 3 * 24 * 60 * 60 * 1_000, bucket: 'hour' }), 1_000_000)),
+    ).toMatchObject({
       bucket: 'day',
     })
-    expect(resolveActivityQuery(strictParse(activityInputSchema, { from: 0, to: 60 * 60 * 1_000, bucket: 'hour' }), 1_000_000)).toMatchObject({
+    expect(resolved(resolveActivityQuery(strictParse(activityInputSchema, { from: 0, to: 60 * 60 * 1_000, bucket: 'hour' }), 1_000_000))).toMatchObject({
       bucket: 'hour',
     })
-    expect(() => resolveActivityQuery(strictParse(activityInputSchema, { from: 100, to: 200, days: 7 }), 1_000_000)).toThrow(/cannot be combined/u)
-    expect(() => resolveActivityQuery(strictParse(activityInputSchema, { to: 200, days: 7 }), 1_000_000)).toThrow(/cannot be combined/u)
+    expect(rejection(resolveActivityQuery(strictParse(activityInputSchema, { from: 100, to: 200, days: 7 }), 1_000_000))).toMatch(/cannot be combined/u)
+    expect(rejection(resolveActivityQuery(strictParse(activityInputSchema, { to: 200, days: 7 }), 1_000_000))).toMatch(/cannot be combined/u)
     expect(strictAccepts(activityInputSchema, { query: 'secret' })).toBe(false)
     expect(strictAccepts(activityInputSchema, { eventLimit: 201 })).toBe(false)
     expect(strictAccepts(activityInputSchema, { from: 1, to: 2, category: 'not-a-category' })).toBe(false)
   })
 
   test('resolves bounded OTLP export ranges and exposes only a local read tool', () => {
-    const defaults = resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, {}), 2_000_000_000)
+    const defaults = resolved(resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, {}), 2_000_000_000))
     expect(defaults).toEqual({ from: 0, to: 2_000_000_000 })
-    expect(resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, { days: 7 }), 2_000_000_000)).toEqual({
+    expect(resolved(resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, { days: 7 }), 2_000_000_000))).toEqual({
       from: 2_000_000_000 - 7 * 24 * 60 * 60 * 1_000,
       to: 2_000_000_000,
     })
-    expect(resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, { from: 1_000, to: 2_000 }), 2_000_000_000)).toEqual({ from: 1_000, to: 2_000 })
-    expect(() => resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, { from: 1_000 }), 2_000_000_000)).toThrow(/both/u)
-    expect(() => resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, { from: 2_000, to: 1_000 }), 2_000_000_000)).toThrow(/after/u)
-    expect(() => resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, { days: 7, to: 2_000 }), 2_000_000_000)).toThrow(/cannot be combined/u)
-    expect(() => resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, { from: 1_000, to: 1_000 + 366 * 24 * 60 * 60 * 1_000 }), 2_000_000_000)).toThrow(
-      /365 days/u,
-    )
+    expect(resolved(resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, { from: 1_000, to: 2_000 }), 2_000_000_000))).toEqual({
+      from: 1_000,
+      to: 2_000,
+    })
+    expect(rejection(resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, { from: 1_000 }), 2_000_000_000))).toMatch(/both/u)
+    expect(rejection(resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, { from: 2_000, to: 1_000 }), 2_000_000_000))).toMatch(/after/u)
+    expect(rejection(resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, { days: 7, to: 2_000 }), 2_000_000_000))).toMatch(/cannot be combined/u)
+    expect(
+      rejection(resolveOtelMetricsRange(strictParse(otelMetricsInputSchema, { from: 1_000, to: 1_000 + 366 * 24 * 60 * 60 * 1_000 }), 2_000_000_000)),
+    ).toMatch(/365 days/u)
     expect(strictAccepts(otelMetricsInputSchema, { from: Number.MAX_SAFE_INTEGER + 1, to: Number.MAX_SAFE_INTEGER + 2 })).toBe(false)
     const tool = usageApi.methods.otelMetrics.tool
     expect(tool?.name).toBe('usage_otel_metrics')

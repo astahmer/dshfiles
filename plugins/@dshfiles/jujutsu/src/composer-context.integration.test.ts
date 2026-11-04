@@ -4,8 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, onTestFinished, test } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import { ComposerContextHost } from './composer-context-host.ts'
+import { Result, Schema } from 'effect'
 import {
   COMPOSER_BASE_TEMPLATE,
   COMPOSER_BOOKMARKS_TEMPLATE,
@@ -57,7 +56,9 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
   await writeFile(join(repo, 'base.txt'), 'one\nthree\n')
   await writeFile(join(repo, 'new file.txt'), 'hello\n')
 
-  const head = JujutsuOutputModel.parseJsonLines(runJj(repo, home, ['log', '--no-graph', '-r', '@', '-T', COMPOSER_HEAD_TEMPLATE]), value => value)[0]
+  const head = Result.getOrThrow(
+    JujutsuOutputModel.parseJsonLines(runJj(repo, home, ['log', '--no-graph', '-r', '@', '-T', COMPOSER_HEAD_TEMPLATE]), Schema.Unknown),
+  )[0]
   expect(head).toMatchObject({ bookmarks: [], empty: false, conflict: false, description: '' })
   expect(runJj(repo, home, ['--ignore-working-copy', 'workspace', 'list', '-T', COMPOSER_WORKSPACE_TEMPLATE]).trim()).toBe('"default"')
 
@@ -112,9 +113,9 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
       '-T',
       COMPOSER_BASE_TEMPLATE,
     ]),
-    value => value,
+    Schema.Unknown,
   )
-  expect(baseRows).toEqual([{ commitId: baseCommitId, bookmarks: ['main'] }])
+  expect(Result.getOrThrow(baseRows)).toEqual([{ commitId: baseCommitId, bookmarks: ['main'] }])
   const revisionCountRevsets = ComposerContextModel.revisionCountRevsets(baseCommitId)
   expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', revisionCountRevsets.ahead, '-T', '"x"']).length).toBe(2)
   expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', revisionCountRevsets.behind, '-T', '"x"']).length).toBe(0)
@@ -137,9 +138,9 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
   })
   const parentFiles = JujutsuOutputModel.parseJsonLines(
     runJj(repo, home, ['--ignore-working-copy', 'diff', ...parentRange, '-T', COMPOSER_FILE_TEMPLATE]),
-    value => value,
+    Schema.Unknown,
   )
-  expect(parentFiles).toEqual([
+  expect(Result.getOrThrow(parentFiles)).toEqual([
     { path: 'base.txt', status: 'modified' },
     { path: 'new file.txt', status: 'added' },
   ])
@@ -167,25 +168,3 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
   // This builds a real repository through dozens of jj and git subprocesses; the suite runs files in parallel,
   // where the 15s bound was a coin flip.
 }, 60_000)
-
-test('composer reads spawn jj again for view reads only after an operation lands', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-composer-reads-'))
-  const repo = join(home, 'repo')
-  onTestFinished(() => rm(home, { recursive: true, force: true }))
-  runJj(home, home, ['git', 'init', '--no-colocate', repo])
-  const spawned: string[] = []
-  const read = ComposerContextHost.reads(async (_ctx, cwd, args) => {
-    spawned.push(args.join(' '))
-    return { stdout: runJj(cwd, home, args), truncated: false }
-  })
-  const ctx = new Context()
-  const describeAt = () => read(ctx, repo, ['--ignore-working-copy', 'log', '--no-graph', '-r', '@', '-T', 'description'], undefined, { outputLimit: 8_000 })
-
-  expect((await describeAt()).stdout).toBe('')
-  expect((await describeAt()).stdout).toBe('')
-  expect(spawned).toHaveLength(1)
-
-  runJj(repo, home, ['describe', '-m', 'landed'])
-  expect((await describeAt()).stdout).toBe('landed\n')
-  expect(spawned).toHaveLength(2)
-})

@@ -10,6 +10,7 @@ import {
   type RequestMessage,
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
+import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Effect, Schema } from 'effect'
 import type { RequestMessagesStatus } from './contract.ts'
 
@@ -23,7 +24,7 @@ interface PreparedCallHandle {
 
 type AdapterStream = (this: LlmRuntime, options: GenerateOptions, prepared?: PreparedCallHandle) => AsyncIterable<StreamChunk>
 
-type EffectRunner = <Value, Failure>(effect: Effect.Effect<Value, Failure>) => Promise<Value>
+type Dispatch = (options: GenerateOptions) => Promise<GenerateOptions>
 
 /**
  * Shared by every loaded copy of this bundle, so the method is wrapped once and the
@@ -31,7 +32,7 @@ type EffectRunner = <Value, Failure>(effect: Effect.Effect<Value, Failure>) => P
  */
 interface Installation {
   readonly ownDescriptor: PropertyDescriptor | undefined
-  readonly hosts: Map<symbol, { readonly ctx: Context; readonly run: EffectRunner }>
+  readonly hosts: Map<symbol, Dispatch>
 }
 
 const installationKey = Symbol.for('@dshfiles/request-messages/installation')
@@ -43,49 +44,52 @@ const isInstallation = (value: unknown): value is Installation => typeof value =
 const isMessage = (message: RequestMessage): message is Message => message.id !== undefined
 
 class RequestMessagesListenerFailure extends Schema.TaggedError<RequestMessagesListenerFailure>()('RequestMessagesListenerFailure', {
-  message: Schema.String,
-  cause: Schema.Unknown,
-}) {}
+  sessionId: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {
+  override get message(): string {
+    return `An agent/request-messages listener failed for ${this.sessionId}.`
+  }
+}
 
-const requestOptions = Effect.fn('request messages dispatch')((ctx: Context, options: GenerateOptions) =>
-  Effect.gen(function* () {
-    if (!isAgentLoopRequest(options) || options.sessionId === undefined || options.toolHistory === undefined) return options
-    const toolHistory = options.toolHistory
-    const agent = ctx.agents.get(options.sessionId)
-    if (agent === undefined) return options
-    const messages = options.messages
-    if (!messages.every(isMessage)) return options
-    const stepStart = agent.session.snapshotEvents().findLast(event => event.type === 'step/start')
-    if (stepStart?.type !== 'step/start') return options
-    const signal = options.signal ?? new AbortController().signal
-    const sent = yield* Effect.tryPromise({
-      try: () =>
-        agentEvents(ctx, agent).waterfall(
-          'agent/request-messages',
-          {
-            turn: stepStart.data.turn,
-            step: stepStart.data.step,
-            isFirstStepOfTurn: stepStart.data.step === 1,
-            messages,
-            toolHistory,
-            signal,
-          },
-          () => Promise.resolve(messages),
-        ),
-      catch: cause => new RequestMessagesListenerFailure({ message: cause instanceof Error ? cause.message : String(cause), cause }),
-    }).pipe(
-      Effect.catch(error => {
-        if (signal.aborted) return Effect.fail(error)
-        ctx.logger('request-messages').warn('an agent/request-messages listener failed; sending the derived messages: %s', error.message)
-        return Effect.succeed(messages)
-      }),
-    )
-    if (sent === messages) return options
-    const frozen = sent.map(message => (Object.isFrozen(message) ? message : freezeMessage(message)))
-    Object.freeze(frozen)
-    return markAgentLoopRequest(Object.freeze({ ...options, messages: frozen }))
-  }),
-)
+const requestOptions = Effect.fn('request messages dispatch')(function* (ctx: Context, options: GenerateOptions) {
+  if (!isAgentLoopRequest(options) || options.sessionId === undefined || options.toolHistory === undefined) return options
+  const sessionId = options.sessionId
+  const toolHistory = options.toolHistory
+  const agent = ctx.agents.get(sessionId)
+  if (agent === undefined) return options
+  const messages = options.messages
+  if (!messages.every(isMessage)) return options
+  const stepStart = agent.session.snapshotEvents().findLast(event => event.type === 'step/start')
+  if (stepStart?.type !== 'step/start') return options
+  const signal = options.signal ?? new AbortController().signal
+  const sent = yield* Effect.tryPromise({
+    try: () =>
+      agentEvents(ctx, agent).waterfall(
+        'agent/request-messages',
+        {
+          turn: stepStart.data.turn,
+          step: stepStart.data.step,
+          isFirstStepOfTurn: stepStart.data.step === 1,
+          messages,
+          toolHistory,
+          signal,
+        },
+        () => Promise.resolve(messages),
+      ),
+    catch: cause => new RequestMessagesListenerFailure({ sessionId, cause }),
+  }).pipe(
+    Effect.catch(error => {
+      if (signal.aborted) return Effect.fail(error)
+      ctx.logger('request-messages').warn('%s Sending the derived messages: %o', error.message, error.cause)
+      return Effect.succeed(messages)
+    }),
+  )
+  if (sent === messages) return options
+  const frozen = sent.map(message => (Object.isFrozen(message) ? message : freezeMessage(message)))
+  Object.freeze(frozen)
+  return markAgentLoopRequest(Object.freeze({ ...options, messages: frozen }))
+})
 
 const release = (runtime: LlmRuntime, installation: Installation, token: symbol): void => {
   installation.hosts.delete(token)
@@ -104,33 +108,33 @@ const release = (runtime: LlmRuntime, installation: Installation, token: symbol)
  * waterfall and before projection and dispatch. Requests the agent loop did not build (summaries,
  * titles, compaction) pass through untouched.
  */
-export const installRequestMessages = Effect.fn('request messages install')((ctx: Context, runtime: LlmRuntime, run: EffectRunner) =>
-  Effect.gen(function* () {
-    const token = Symbol('request-messages host')
-    const existing = installationKey in runtime ? runtime[installationKey] : undefined
-    if (isInstallation(existing)) {
-      existing.hosts.set(token, { ctx, run })
-      yield* Effect.addFinalizer(() => Effect.sync(() => release(runtime, existing, token)))
-      return { active: true } satisfies RequestMessagesStatus
-    }
-    const original: unknown = runtime['adapterStream']
-    if (!isAdapterStream(original))
-      return {
-        active: false,
-        reason: 'this DSH llm runtime has no adapterStream method, so agent/request-messages cannot be dispatched',
-      } satisfies RequestMessagesStatus
-    const installation: Installation = {
-      ownDescriptor: Reflect.getOwnPropertyDescriptor(runtime, 'adapterStream'),
-      hosts: new Map([[token, { ctx, run }]]),
-    }
-    const wrapped: AdapterStream = async function* (this: LlmRuntime, options, prepared) {
-      const host = installation.hosts.values().next().value
-      const sent = host === undefined ? options : await host.run(requestOptions(host.ctx, options))
-      yield* original.call(this, sent, prepared)
-    }
-    yield* Effect.addFinalizer(() => Effect.sync(() => release(runtime, installation, token)))
-    Reflect.defineProperty(runtime, 'adapterStream', { value: wrapped, configurable: true, writable: true })
-    Reflect.defineProperty(runtime, installationKey, { value: installation, configurable: true })
+export const installRequestMessages = Effect.fn('request messages install')(function* (input: { readonly ctx: Context; readonly runtime: LlmRuntime }) {
+  const runtime = input.runtime
+  const token = Symbol('request-messages host')
+  const dispatch = yield* DshxPlugin.callback((options: GenerateOptions) => requestOptions(input.ctx, options))
+  const existing = installationKey in runtime ? runtime[installationKey] : undefined
+  if (isInstallation(existing)) {
+    existing.hosts.set(token, dispatch)
+    yield* Effect.addFinalizer(() => Effect.sync(() => release(runtime, existing, token)))
     return { active: true } satisfies RequestMessagesStatus
-  }),
-)
+  }
+  const original: unknown = runtime['adapterStream']
+  if (!isAdapterStream(original))
+    return {
+      active: false,
+      reason: 'this DSH llm runtime has no adapterStream method, so agent/request-messages cannot be dispatched',
+    } satisfies RequestMessagesStatus
+  const installation: Installation = {
+    ownDescriptor: Reflect.getOwnPropertyDescriptor(runtime, 'adapterStream'),
+    hosts: new Map([[token, dispatch]]),
+  }
+  const wrapped: AdapterStream = async function* (this: LlmRuntime, options, prepared) {
+    const host = installation.hosts.values().next().value
+    const sent = host === undefined ? options : await host(options)
+    yield* original.call(this, sent, prepared)
+  }
+  yield* Effect.addFinalizer(() => Effect.sync(() => release(runtime, installation, token)))
+  Reflect.defineProperty(runtime, 'adapterStream', { value: wrapped, configurable: true, writable: true })
+  Reflect.defineProperty(runtime, installationKey, { value: installation, configurable: true })
+  return { active: true } satisfies RequestMessagesStatus
+})

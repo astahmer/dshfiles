@@ -12,7 +12,6 @@ import { workspaceListed } from '@dshfiles/plugin-ui/lib/workspace-listed'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { createActor, useSelector, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import { useQuery, type QueryClient } from '@dshfiles/plugin-ui/query'
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { HostChip, multiHostApi } from '@dshfiles/multi-host/destination'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
@@ -55,7 +54,7 @@ const noSpares: Readonly<Record<string, SpareWorkspace>> = {}
 
 const storedSpares = createStoredValue({
   key: 'dshfiles-jj-integration.spare-workspaces',
-  schema: zodSchemaFromEffect(Schema.Record(Schema.String, Schema.Struct({ workspaceId: Schema.String, name: threadWorkspaceNameEffect }))),
+  schema: Schema.Record(Schema.String, Schema.Struct({ workspaceId: Schema.String, name: threadWorkspaceNameEffect })),
   fallback: noSpares,
 })
 

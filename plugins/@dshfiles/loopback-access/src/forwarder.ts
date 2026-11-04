@@ -139,16 +139,17 @@ export class LoopbackForwarder {
       span.setStatus(outcome === 'connected' ? 'ok' : 'error')
       span.end()
     }
-    const deadline = setTimeout(() => {
+    // The socket idle timeout bounds the connect: nothing flows before it, and it is cleared once the upstream connects.
+    upstream.setTimeout(connectTimeoutMs)
+    upstream.once('timeout', () => {
       finishConnect('timeout')
       incoming.destroy()
       upstream.destroy()
-    }, connectTimeoutMs)
-    deadline.unref()
+    })
 
     const destroyPair = () => {
       finishConnect('closed')
-      clearTimeout(deadline)
+      upstream.setTimeout(0)
       incoming.destroy()
       upstream.destroy()
     }
@@ -168,7 +169,7 @@ export class LoopbackForwarder {
     upstream.once('close', onClose)
     upstream.once('connect', () => {
       finishConnect('connected')
-      clearTimeout(deadline)
+      upstream.setTimeout(0)
     })
 
     // pipe handles stream backpressure and preserves TCP half-close semantics.

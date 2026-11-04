@@ -27,7 +27,8 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/plugin-ui": "workspace:*",
-    "@dshfiles/shared-runtime": "workspace:*"
+    "@dshfiles/shared-runtime": "workspace:*",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
@@ -42,6 +43,7 @@
     "@deepseek-ai/dsh-llm": "catalog:",
     "@deepseek-ai/dsh-session": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "react": "catalog:",

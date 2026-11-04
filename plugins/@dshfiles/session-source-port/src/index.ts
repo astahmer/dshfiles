@@ -18,7 +18,12 @@ import type {
   SessionUpdateQueueValue,
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { Context, Effect, Layer, Option, Schema } from 'effect'
+import * as SessionPayload from './payload.ts'
+
+export { SessionSourceRegistryError, SessionSources, type EffectSessionSource } from './effect.ts'
+export { fromEffect } from './session-source-promise.ts'
+export * as SessionPayload from './payload.ts'
+export { SessionPayloadError } from './payload.ts'
 
 /**
  * One place where Sessions live other than this Host — a DSH runtime reached through a tunnel, or anything else that can
@@ -62,38 +67,6 @@ export interface SessionSourceRegistry {
   resolveOwner(sessionId: SessionId): Promise<MirroredSessionSource | undefined>
 }
 
-export class SessionSourceRegistryError extends Schema.TaggedError<SessionSourceRegistryError>()('SessionSourceRegistryError', {
-  operation: Schema.Literals(['resolve-owner']),
-}) {}
-
-export class SessionSources extends Context.Service<
-  SessionSources,
-  {
-    register(source: MirroredSessionSource): Effect.Effect<() => void>
-    sources(): Effect.Effect<readonly MirroredSessionSource[]>
-    claim(source: MirroredSessionSource, sessionIds: readonly SessionId[]): Effect.Effect<void>
-    ownerOf(sessionId: string): Effect.Effect<MirroredSessionSource | undefined>
-    resolveOwner(sessionId: SessionId): Effect.Effect<MirroredSessionSource | undefined, SessionSourceRegistryError>
-  }
->()('@dshfiles/session-source-port/SessionSources') {
-  static layer(registry: SessionSourceRegistry) {
-    return Layer.succeed(
-      SessionSources,
-      SessionSources.of({
-        register: source => Effect.sync(() => registry.register(source)),
-        sources: () => Effect.sync(() => registry.sources()),
-        claim: (source, sessionIds) => Effect.sync(() => registry.claim(source, sessionIds)),
-        ownerOf: sessionId => Effect.sync(() => registry.ownerOf(sessionId)),
-        resolveOwner: sessionId =>
-          Effect.tryPromise({
-            try: () => registry.resolveOwner(sessionId),
-            catch: () => new SessionSourceRegistryError({ operation: 'resolve-owner' }),
-          }),
-      }),
-    )
-  }
-}
-
 /**
  * Create the registry the Session controller provides.
  * @returns an empty registry whose claims follow its registered sources.
@@ -133,107 +106,41 @@ export const createSessionSourceRegistry = (): SessionSourceRegistry => {
   }
 }
 
-const boundedString = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))
-/** One runtime's payload keeps every field it sent; only the fields this Host reads are named. */
-const passthrough = <Shape extends Schema.StructWithRest.Objects>(shape: Shape) => Schema.StructWithRest(shape, [Schema.Record(Schema.String, Schema.Unknown)])
-/** Check an unknown wire payload against its shape and hand it back with the wire type it already has. */
-const wirePayload = <Wire>(shape: Schema.ConstraintDecoder<unknown>) =>
-  Schema.declare<Wire>((value): value is Wire => Option.isSome(Schema.decodeUnknownOption(shape)(value)))
-
-const sessionSummaryShape = passthrough(
-  Schema.Struct({
-    sessionId: boundedString(1, 256),
-    updatedAt: Schema.Number,
-    running: Schema.Boolean,
-    blank: Schema.Boolean,
-    agentAvailable: Schema.Boolean,
-    cwd: Schema.optionalKey(Schema.String),
-    parentSessionId: Schema.optionalKey(Schema.String),
-    origin: Schema.optionalKey(Schema.Literal('subagent')),
-    formatStatus: Schema.optionalKey(Schema.Literals(['current', 'migration-required'])),
-    projections: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
-  }),
-)
-const sessionSummarySchema = wirePayload<SessionSummary>(sessionSummaryShape)
-const sessionFollowFrameSchema = wirePayload<SessionFollowFrame>(
-  passthrough(Schema.Struct({ type: Schema.Literals(['snapshot', 'event', 'assistant-stream']) })),
-)
-const sessionPageSchema = wirePayload<SessionPage>(
-  passthrough(Schema.Struct({ records: Schema.Array(Schema.Unknown).check(Schema.isMaxLength(10_000)), hasMore: Schema.Boolean })),
-)
-const acceptedShape = passthrough(Schema.Struct({ accepted: Schema.Literal(true) }))
-const sessionPromptValueSchema = wirePayload<SessionPromptValue>(acceptedShape)
-const sessionCancelValueSchema = wirePayload<SessionCancelValue>(acceptedShape)
-const sessionUpdateQueueValueSchema = wirePayload<SessionUpdateQueueValue>(acceptedShape)
-const modelSelectionShape = passthrough(Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optionalKey(Schema.String) }))
-const sessionSelectModelValueSchema = wirePayload<SessionSelectModelValue>(passthrough(Schema.Struct({ selected: modelSelectionShape })))
-const projectionsShape = Schema.Union([
-  Schema.Null,
-  passthrough(Schema.Struct({ kind: Schema.Literal('sequenced'), asOfSeq: Schema.Number })),
-  passthrough(Schema.Struct({ kind: Schema.Literal('migration-required') })),
-])
-const sessionProjectionsValueSchema = wirePayload<SessionProjectionsValue>(projectionsShape)
-
 /**
- * Decoders for the payloads a remote runtime answers with. Each one validates the fields this Host or the browser
- * actually reads at the JSON boundary and then declares the wire type, so no caller casts an `unknown` further.
+ * Synchronous decoders for Host code that is not Effect yet; each throws the `SessionPayloadError` that the matching
+ * `SessionPayload` Effect decoder fails with.
  */
 export class SessionSourcePayload {
-  /**
-   * Rows of one runtime's `session/list` answer.
-   * @param value - the runtime's `SessionListValue`.
-   * @returns the rows the browser's Session model reads.
-   */
   static summaries(value: unknown): readonly SessionSummary[] {
-    return Schema.decodeUnknownSync(passthrough(Schema.Struct({ items: Schema.Array(sessionSummarySchema).check(Schema.isMaxLength(10_000)) })))(value).items
+    return SessionPayload.summaries.sync(value)
   }
 
-  /**
-   * One frame of a runtime's `session/follow` stream. The frame was produced by a DSH Host's own encoder, so only its
-   * discriminant is checked here and the browser validates the events it renders.
-   * @param value - one stream item.
-   * @returns the same frame typed for the Session wire.
-   */
   static followFrame(value: unknown): SessionFollowFrame {
-    return Schema.decodeUnknownSync(sessionFollowFrameSchema)(value)
+    return SessionPayload.followFrame.sync(value)
   }
 
-  /**
-   * One history page of a runtime's `session/page` answer.
-   * @param value - the runtime's `SessionPage`.
-   * @returns the page typed for the Session wire.
-   */
   static page(value: unknown): SessionPage {
-    return Schema.decodeUnknownSync(sessionPageSchema)(value)
+    return SessionPayload.page.sync(value)
   }
 
-  /**
-   * One runtime's `session/projections` answer.
-   * @param value - the runtime's `SessionProjectionsValue`.
-   * @returns the same value typed for the Session wire.
-   */
   static projections(value: unknown): SessionProjectionsValue {
-    return Schema.decodeUnknownSync(sessionProjectionsValueSchema)(value)
+    return SessionPayload.projections.sync(value)
   }
 
-  /** Decode an admitted prompt receipt. */
   static prompt(value: unknown): SessionPromptValue {
-    return Schema.decodeUnknownSync(sessionPromptValueSchema)(value)
+    return SessionPayload.prompt.sync(value)
   }
 
-  /** Decode an admitted cancellation receipt. */
   static cancel(value: unknown): SessionCancelValue {
-    return Schema.decodeUnknownSync(sessionCancelValueSchema)(value)
+    return SessionPayload.cancel.sync(value)
   }
 
-  /** Decode the selected model accepted by a remote Session's runtime. */
   static selectedModel(value: unknown): SessionSelectModelValue {
-    return Schema.decodeUnknownSync(sessionSelectModelValueSchema)(value)
+    return SessionPayload.selectedModel.sync(value)
   }
 
-  /** Decode an applied queue mutation receipt. */
   static queue(value: unknown): SessionUpdateQueueValue {
-    return Schema.decodeUnknownSync(sessionUpdateQueueValueSchema)(value)
+    return SessionPayload.queue.sync(value)
   }
 }
 

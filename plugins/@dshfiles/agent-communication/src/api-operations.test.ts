@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Schema } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   CommunicationService,
@@ -10,10 +10,32 @@ import {
   type CommunicationAgent,
   type CommunicationPrincipal,
 } from '@dshfiles/dshx/communication'
-import { browseMessagesInputSchema, postMessageInputSchema, type AgentCommunicationSubscriptionInput } from './api.js'
-import { createAgentCommunicationOperations } from './api-operations.js'
+import {
+  browseMessagesInputSchema,
+  postMessageInputSchema,
+  type AgentCommunicationBrowseInput,
+  type AgentCommunicationPostInput,
+  type AgentCommunicationSubscriptionInput,
+} from './api.js'
+import { CommunicationOperations } from './api-operations.js'
+import { CommunicationHub } from './communication-hub-promise.js'
+import { HostAgents } from './host-edge-promise.js'
 
 const temporaryRoots: string[] = []
+
+const operationsOver = (service: CommunicationService, agents: readonly CommunicationAgent[]) => {
+  const layer = CommunicationOperations.layer.pipe(Layer.provide(Layer.merge(CommunicationHub.fromService(service), HostAgents.layerTest(agents))))
+  const run = <A, E>(body: (operations: CommunicationOperations['Service']) => Effect.Effect<A, E>) =>
+    Effect.runPromise(CommunicationOperations.use(body).pipe(Effect.provide(layer)))
+  return {
+    diagnostics: (limit?: number) => run(operations => operations.diagnostics(limit)),
+    browseMessages: (request: AgentCommunicationBrowseInput) => run(operations => operations.browseMessages(request)),
+    postMessage: (request: AgentCommunicationPostInput) => run(operations => operations.postMessage(request)),
+    setSubscription: (request: AgentCommunicationSubscriptionInput) => run(operations => operations.setSubscription(request)),
+    unsubscribe: (request: { readonly agentId: string; readonly topic: string }) => run(operations => operations.unsubscribe(request)),
+    acknowledge: (request: { readonly agentId: string; readonly messageId: string }) => run(operations => operations.acknowledge(request)),
+  }
+}
 
 const createTestOperations = async () => {
   const root = await mkdtemp(join(tmpdir(), 'agent-communication-api-'))
@@ -23,7 +45,7 @@ const createTestOperations = async () => {
     { id: 'agent-reader', status: 'idle', workspaceTopic: 'workspace/demo' },
     { id: 'agent-sender', status: 'running', workspaceTopic: 'workspace/demo' },
   ]
-  return { service, operations: createAgentCommunicationOperations({ service: () => service, listAgents: () => agents }) }
+  return { service, operations: operationsOver(service, agents) }
 }
 
 afterEach(async () => {

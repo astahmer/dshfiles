@@ -4,7 +4,7 @@ Verified on stock DSH 0.2.1-rc.2 with official Node 22.23.3 and the system Chrom
 
 ## Focused proof
 
-- `pnpm --dir plugins/@dshfiles/resource-packs test`: real temporary SQLite and Cordis Host tests, plus React UI tests. They cover all nine types, retained detach/reattach data, reopen, additive schema changes, readonly ownership, independent contributor unload, optimistic revisions and transaction rollback. The contributor calls the exported dshx API rather than private store methods.
+- `pnpm --dir plugins/@dshfiles/resource-packs test`: `@effect/vitest` tests over the real `ResourceStore` layer on temporary SQLite files and a real Cordis Host with an isolated `DSH_HOME`, plus React UI tests that drive the panel, editor and dialogs against that real Host (no mocked API client). They cover all nine types, retained detach/reattach data, reopen, additive schema changes, readonly ownership, independent contributor unload, optimistic revisions and transaction rollback. The contributor calls the exported dshx API rather than private store methods.
 - `pnpm --dir plugins/@dshfiles/resource-packs typecheck`: strict workspace TypeScript passes.
 - `pnpm exec oxlint --deny-warnings --report-unused-disable-directives plugins/@dshfiles/resource-packs/src plugins/@dshfiles/resource-packs/tests tooling/dshx/e2e/support/plugin-journeys/resource-packs.steps.ts`: zero warnings/errors, using the repository rules rather than scaffold overrides.
 - Build both `@dshfiles/resource-packs` and `@dshfiles/ui-styles`; import the Host, API and model JavaScript entries with the pinned Node. All pass.

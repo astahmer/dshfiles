@@ -37,7 +37,7 @@
         {
           "kind": "unit-test",
           "id": "multi-host.directory-safety",
-          "file": "plugins/@dshfiles/multi-host/tests/store.test.ts",
+          "file": "plugins/@dshfiles/multi-host/tests/host-directory.test.ts",
           "testName": "corrupt directory stays untouched and rejects writes instead of replacing user data"
         }
       ],
@@ -103,7 +103,7 @@
         {
           "kind": "unit-test",
           "id": "multi-host.host-hidden",
-          "file": "plugins/@dshfiles/multi-host/tests/store.test.ts",
+          "file": "plugins/@dshfiles/multi-host/tests/host-directory.test.ts",
           "testName": "hides a host without touching its runtimes, and a later edit keeps it hidden"
         },
         {
@@ -115,7 +115,7 @@
         {
           "kind": "unit-test",
           "id": "multi-host.local-project-files",
-          "file": "plugins/@dshfiles/multi-host/src/local-project-files.test.ts",
+          "file": "plugins/@dshfiles/multi-host/tests/local-project-files.test.ts",
           "testName": "scans untracked files by default, explicitly includes ignored files, blocks credential-like paths, and archives only selected files"
         },
         {
@@ -138,19 +138,19 @@
         {
           "kind": "custom",
           "span": "local project files scan",
-          "file": "plugins/@dshfiles/multi-host/src/local-project-files.test.ts",
+          "file": "plugins/@dshfiles/multi-host/tests/local-project-files.test.ts",
           "testName": "scans untracked files by default, explicitly includes ignored files, blocks credential-like paths, and archives only selected files"
         },
         {
           "kind": "custom",
           "span": "local project files archive",
-          "file": "plugins/@dshfiles/multi-host/src/local-project-files.test.ts",
+          "file": "plugins/@dshfiles/multi-host/tests/local-project-files.test.ts",
           "testName": "scans untracked files by default, explicitly includes ignored files, blocks credential-like paths, and archives only selected files"
         },
         {
           "kind": "custom",
           "span": "ssh command",
-          "file": "plugins/@dshfiles/multi-host/src/connectors/connector-spans.test.ts",
+          "file": "plugins/@dshfiles/multi-host/tests/ssh-spans.test.ts",
           "testName": "records an ssh command span that fails on a refused target before ssh starts"
         }
       ]
@@ -193,7 +193,7 @@
         {
           "kind": "custom",
           "span": "ssh command",
-          "file": "plugins/@dshfiles/multi-host/src/connectors/connector-spans.test.ts",
+          "file": "plugins/@dshfiles/multi-host/tests/ssh-spans.test.ts",
           "testName": "records an ssh command span that fails on a refused target before ssh starts"
         }
       ]
@@ -274,9 +274,9 @@
         },
         {
           "kind": "custom",
-          "span": "multi-host resource snapshot refresh",
-          "file": "plugins/@dshfiles/multi-host/src/runtime-status-snapshot-cache.test.ts",
-          "testName": "uses the domain span name for resource refreshes"
+          "span": "multi-host runtime status refresh",
+          "file": "plugins/@dshfiles/multi-host/tests/status-snapshots.test.ts",
+          "testName": "coalesces refreshes, caches results, and traces the remote work unit"
         }
       ]
     },
@@ -394,7 +394,7 @@
         {
           "kind": "custom",
           "span": "multi-host runtime status refresh",
-          "file": "plugins/@dshfiles/multi-host/src/runtime-status-snapshot-cache.test.ts",
+          "file": "plugins/@dshfiles/multi-host/tests/status-snapshots.test.ts",
           "testName": "coalesces refreshes, caches results, and traces the remote work unit"
         }
       ]
@@ -439,11 +439,5 @@
     }
   ],
   "kind": "bundle",
-  "ioDelegation": [
-    {
-      "file": "src/connectors/loopback.ts",
-      "tracedBy": "<namespace>/<method>",
-      "reason": "Raw TCP forward and port probe for the SSH tunnel; every request through it is a gateway <namespace>/<method> span and the tunnel itself an ssh tunnel open span."
-    }
-  ]
+  "ioDelegation": []
 }

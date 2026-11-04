@@ -5,10 +5,16 @@
     {
       "id": "model-selection",
       "title": "Search and select account models",
-      "summary": "Search account-and-model routes in a two-pane composer picker: brand marks, account chips with each account's colour and remaining quota, a reasoning-effort glyph with a hover legend, and a details pane for accounts, reasoning effort and the fallback chain; route handoff stays with the shared selection directory.",
+      "summary": "Search account-and-model routes in a two-pane composer picker: brand marks, the model name with a subtle service label, account tags with each account's colour and remaining quota (the same binding window as the AI Accounts strip), a six-bar reasoning-effort glyph with a hover legend, and a details pane for accounts, reasoning effort and the fallback chain; route handoff stays with the shared selection directory.",
       "surfaces": ["client", "host", "api", "integration"],
       "configuration": [],
-      "reach": ["seed tool-call-thread", "click button \", reasoning *\"", "expect list \"Models and accounts\""],
+      "reach": [
+        "seed tool-call-thread",
+        "click button \", reasoning *\"",
+        "expect list \"Models and accounts\"",
+        "hover button \"Reasoning effort: *\"",
+        "expect button \"High\""
+      ],
       "states": ["closed", "open", "scanning", "searching", "empty-search", "handoff-check", "compacting"],
       "failureModes": [
         "A search with no catalog match shows an explicit empty state without clearing the current model or reasoning effort.",
@@ -148,8 +154,15 @@
     {
       "id": "model-fallbacks",
       "title": "Edit the model fallback chain from the composer picker",
-      "summary": "A Fallback chain section in the picker's details pane adds the inspected selection to the thread's or the default fallback chain, reorders and removes rungs, picks whether a thread stays on a fallback, and returns a thread to its selection. Rows carry the model's mark, its account chip and the account's remaining quota as an arc gauge. AI Accounts owns the chain on the Host and walks it under Priority distribution.",
-      "reach": ["seed tool-call-thread", "click button \", reasoning *\"", "click button \"Details for*\"", "expect region \"Fallbacks\""],
+      "summary": "A Fallback chain section in the picker's details pane adds the inspected selection to the thread's or the default fallback chain, reorders and removes rungs, picks whether a thread stays on a fallback, and returns a thread to its selection. Rows carry the model's mark, its service and account, and the account's remaining quota. AI Accounts owns the chain on the Host and walks it under Priority distribution.",
+      "reach": [
+        "seed tool-call-thread",
+        "click button \", reasoning *\"",
+        "click button \"Details for*\"",
+        "expect region \"Fallbacks\"",
+        "click button \"Add fallback\"",
+        "expect list \"Fallback order\""
+      ],
       "surfaces": ["client", "host"],
       "configuration": [],
       "states": ["unavailable", "follows-default", "thread-chain", "serving-fallback"],

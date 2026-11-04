@@ -5,11 +5,11 @@ import { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { SessionSearchEngine } from '../src/engine.js'
-import { SearchWorkerClient } from '../src/worker-client.js'
+import { openSearchWorker } from '../src/worker-port-promise.js'
 import { appendSessionLogEvent, writeSessionLog } from './session-log-fixture.js'
 
 let home: string
-let client: SearchWorkerClient | undefined
+let client: ReturnType<typeof openSearchWorker> | undefined
 let fiber: Awaited<ReturnType<Context['plugin']>> | undefined
 
 beforeEach(() => {
@@ -29,7 +29,7 @@ const boot = async (): Promise<Context> => {
   const second = 'session-22222222-0000-4000-8000-000000000000'
   await writeSessionLog({ directory: join(root, 'project', first), exchanges: 3, sessionId: first })
   await writeSessionLog({ directory: join(root, 'project', second), exchanges: 3, sessionId: second })
-  client = new SearchWorkerClient({ indexPath: join(home, 'index.sqlite') })
+  client = openSearchWorker({ indexPath: join(home, 'index.sqlite') })
   const context = new Context()
   context.provide('sessions', { list: () => [], get: () => undefined })
   context.provide('sessionPersistence', {
@@ -38,7 +38,7 @@ const boot = async (): Promise<Context> => {
       throw new Error('the owned backend must not read logs through the persistence service')
     },
   })
-  fiber = await context.plugin(SessionSearchEngine, { client })
+  fiber = await context.plugin(SessionSearchEngine, { client: client.port })
   await client.startIngest(root)
   return context
 }

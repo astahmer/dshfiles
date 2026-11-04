@@ -1,4 +1,3 @@
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import * as Schema from 'effect/Schema'
 
@@ -21,7 +20,7 @@ export type FrecencyEntries = typeof frecencySchema.Type
  */
 export const paletteFrecency = createStoredValue({
   key: 'dshfiles.thread-sidebar.palette-frecency.v1',
-  schema: zodSchemaFromEffect(frecencySchema),
+  schema: frecencySchema,
   fallback: [],
 })
 

@@ -1,32 +1,5 @@
 import type { SecretScope } from './index.js'
-
-/** The environment a reference without `@env` means; Secret Catalog writes `prod` when the user does not choose one. */
-export const DEFAULT_SECRET_ENVIRONMENT = 'prod'
-
-export interface SecretReference {
-  readonly alias: string
-  readonly environment: string
-}
-
-export interface ResolvedSecretCredential {
-  readonly value: string
-  readonly label: string
-}
-
-const referencePattern = /^secret:([A-Za-z_][A-Za-z0-9_-]*)(?:@([A-Za-z0-9_-]+))?$/
-
-/** Parses `secret:ALIAS` or `secret:ALIAS@ENV`; null for anything else, so a field can hold prose instead. */
-export const parseSecretReference = (text: string): SecretReference | null => {
-  const match = referencePattern.exec(text.trim())
-  if (match === null) return null
-  const alias = match[1]
-  if (alias === undefined) return null
-  return { alias, environment: match[2] ?? DEFAULT_SECRET_ENVIRONMENT }
-}
-
-/** The canonical text for a reference: no `@env` suffix for the default environment. */
-export const formatSecretReference = (reference: SecretReference): string =>
-  reference.environment === DEFAULT_SECRET_ENVIRONMENT ? `secret:${reference.alias}` : `secret:${reference.alias}@${reference.environment}`
+import type { SecretReference } from './grammar.js'
 
 /** One reference resolved for a folder: `project`/`local` aliases come from that folder's config, `global` needs none. */
 export interface SecretReferenceResolution {
@@ -50,39 +23,5 @@ export interface SecretCatalogValues {
 declare module '@deepseek-ai/cordis' {
   interface Context {
     secretCatalogValues?: SecretCatalogValues
-  }
-}
-
-/**
- * The key a Host feature uses for an API: the bound reference when the setting holds one, otherwise the process
- * environment variable it has always read. Resolving here keeps the value on the Host and gives every consumer one
- * error vocabulary for a bad binding.
- */
-export class SecretReferenceResolver {
-  static async resolve(input: {
-    readonly referenceText: string
-    readonly values: Pick<SecretCatalogValues, 'resolve'> | undefined
-    readonly environmentValue: string | undefined
-    readonly signal?: AbortSignal
-  }): Promise<string | undefined> {
-    return (await SecretReferenceResolver.resolveWithLabel({ ...input, environmentVariableName: 'environment' }))?.value
-  }
-
-  static async resolveWithLabel(input: {
-    readonly referenceText: string
-    readonly values: Pick<SecretCatalogValues, 'resolve'> | undefined
-    readonly environmentValue: string | undefined
-    readonly environmentVariableName: string
-    readonly signal?: AbortSignal
-  }): Promise<ResolvedSecretCredential | undefined> {
-    const reference = parseSecretReference(input.referenceText)
-    if (reference !== null) {
-      if (input.values === undefined) throw new Error('The Secret Catalog plugin is not loaded, so the bound secret reference cannot be resolved.')
-      const value = await input.values.resolve(input.signal === undefined ? { reference, cwd: null } : { reference, cwd: null, signal: input.signal })
-      return { value, label: formatSecretReference(reference) }
-    }
-    if (input.referenceText.trim() !== '') throw new Error('The bound key is not a secret:ALIAS or secret:ALIAS@env reference.')
-    if (input.environmentValue === undefined || input.environmentValue === '') return undefined
-    return { value: input.environmentValue, label: `env:${input.environmentVariableName}` }
   }
 }

@@ -4,7 +4,7 @@ import { SessionQueryEngine, type SessionRecord } from '@deepseek-ai/dsh-session
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { afterEach, expect, it, vi } from 'vitest'
 import { SessionSearchEngine } from './engine.js'
-import { SearchWorkerClient } from './worker-client.js'
+import { openSearchWorker } from './worker-port-promise.js'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -21,7 +21,7 @@ it('lists Sessions once until one is created, disposed, or a listed header chang
     const record: SessionRecord = { header: structuredClone(header), live: true, persisted: true }
     return [record]
   })
-  const engine = new SessionSearchEngine(ctx, { client: new SearchWorkerClient({ indexPath: ':memory:' }) })
+  const engine = new SessionSearchEngine(ctx, { client: openSearchWorker({ indexPath: ':memory:' }).port })
   // SAFETY: the listing only compares the Session's id and header; the event body is irrelevant to it.
   const anyEvent = { seq: 1, type: 'session/title', time: 1, data: {} } as never
 

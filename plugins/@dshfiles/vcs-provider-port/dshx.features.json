@@ -31,7 +31,7 @@
           "kind": "unit-test",
           "id": "vcs-provider-port.effect-service",
           "file": "plugins/@dshfiles/vcs-provider-port/src/index.test.ts",
-          "testName": "provides the same provider resolution through the Effect service"
+          "testName": "resolves the provider through the Effect service, skipping a provider whose detect fails"
         }
       ],
       "telemetry": [

@@ -1,0 +1,73 @@
+name: Setup
+description: >-
+  The setup every Required-checks job shares: checkout, pnpm, Node with the pnpm store cache, the optional binaries and
+  systemd user scope a job's gates need, the workspace install, and the Turbo cache restored from earlier runs.
+
+# `pnpm install:all` locally is this action minus nothing: `pnpm install --frozen-lockfile` here plus the Playwright
+# install only in the jobs that launch a browser (`browsers: 'true'`). A job that only lints or typechecks must not pay
+# for a Chromium download, a jj tarball or an apt run it never uses.
+inputs:
+  browsers:
+    description: Install the Playwright Chromium headless shell (boot, e2e and the dshx suite launch it).
+    default: 'false'
+  jj:
+    description: Install the pinned jj release; the jj, boot, e2e and plugin suites run real repositories.
+    default: 'false'
+  ffmpeg:
+    description: Install ffmpeg; tweet-context's Host integration test samples a real video.
+    default: 'false'
+  systemd-scope:
+    description: Start a systemd user manager, which subprocess-local launches scopes through.
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 12.5.1
+    - uses: actions/setup-node@v4
+      with:
+        node-version-file: .node-version
+        cache: pnpm
+        cache-dependency-path: pnpm-lock.yaml
+    - name: Install jj
+      if: inputs.jj == 'true'
+      shell: bash
+      run: |
+        curl -fsSL https://github.com/jj-vcs/jj/releases/download/v0.46.0/jj-v0.46.0-x86_64-unknown-linux-musl.tar.gz | tar -xz -C "$RUNNER_TEMP" ./jj
+        echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+    - name: Install ffmpeg
+      if: inputs.ffmpeg == 'true'
+      shell: bash
+      run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
+    - name: Start a systemd user manager for subprocess scopes
+      if: inputs.systemd-scope == 'true'
+      shell: bash
+      run: |
+        sudo loginctl enable-linger "$USER"
+        runtime="/run/user/$(id -u)"
+        for attempt in $(seq 1 50); do [ -S "$runtime/bus" ] && break; sleep 0.2; done
+        echo "XDG_RUNTIME_DIR=$runtime" >> "$GITHUB_ENV"
+        echo "DBUS_SESSION_BUS_ADDRESS=unix:path=$runtime/bus" >> "$GITHUB_ENV"
+        XDG_RUNTIME_DIR="$runtime" systemd-run --user --scope --quiet true
+    # One content-addressed Turbo cache for every job of this repository (`scripts/turbo-cache.mjs`). Turbo validates
+    # each task against its own input hash, so restoring a coarser key is always safe: a task whose inputs moved misses
+    # and runs. Honest limit: parallel jobs in the SAME run start together, so a cache saved by one cannot warm its
+    # siblings — the restore only removes rebuilds relative to earlier pushes (and earlier runs on this branch/main).
+    - name: Restore the Turbo cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/dshfiles/turbo
+        key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('plugins/**', 'tooling/dshx/**', 'scripts/**', 'tsconfig*.json', 'turbo.json') }}
+        restore-keys: |
+          turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+          turbo-${{ runner.os }}-
+    - name: Install the workspace
+      shell: bash
+      run: pnpm install --frozen-lockfile
+    - name: Install Playwright Chromium
+      if: inputs.browsers == 'true'
+      shell: bash
+      run: pnpm --dir tooling/dshx exec playwright install --with-deps --only-shell chromium

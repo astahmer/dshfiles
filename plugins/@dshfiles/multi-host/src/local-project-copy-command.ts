@@ -1,5 +1,5 @@
 import { posix } from 'node:path'
-import { shellQuote } from './connectors/ssh.js'
+import { shellQuote } from './ssh.js'
 
 export const createLocalProjectCopyCommand = (input: { readonly destinationPath: string; readonly paths: readonly string[] }): string => {
   const symlinkPaths = new Set<string>()

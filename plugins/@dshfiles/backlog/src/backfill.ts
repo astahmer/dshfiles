@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import type { BacklogItem, BacklogStatus } from './item.js'
 
 const openStatuses: readonly BacklogStatus[] = ['inbox', 'todo']
@@ -23,12 +24,13 @@ export interface BackfillSelection {
 
 export type TriageOutcome = 'applied' | 'proposed' | 'unchanged' | 'missing' | 'failed'
 
-export interface BackfillRun {
+export interface BackfillRun<E, R> {
   readonly selection: BackfillSelection
-  readonly triage: (id: number) => Promise<TriageOutcome>
+  /** A failing triage counts as `failed` and leaves the item for the next run. */
+  readonly triage: (id: number) => Effect.Effect<TriageOutcome, unknown, R>
   /** Records that triage found nothing to change, so the next run skips the item. */
-  readonly markTriaged: (id: number) => Promise<void>
-  readonly onProgress?: (progress: BackfillProgress) => void
+  readonly markTriaged: (id: number) => Effect.Effect<void, E, R>
+  readonly onProgress?: ((progress: BackfillProgress) => Effect.Effect<void, never, R>) | undefined
 }
 
 export interface BackfillProgress {
@@ -69,22 +71,25 @@ const select = (items: readonly BacklogItem[], scope: BackfillScope): BackfillSe
 }
 
 /** One pass over a selection, one item at a time: an item that fails stays eligible for the next run. */
-const run = async (request: BackfillRun): Promise<BackfillReport> => {
-  const counts = { applied: 0, proposed: 0, unchanged: 0, failed: 0 }
-  for (const [index, id] of request.selection.ids.entries()) {
-    const outcome = await request.triage(id).catch(() => 'failed' as const)
-    if (outcome === 'applied') counts.applied += 1
-    if (outcome === 'proposed') counts.proposed += 1
-    if (outcome === 'failed' || outcome === 'missing') counts.failed += 1
-    if (outcome === 'unchanged') {
-      counts.unchanged += 1
-      await request.markTriaged(id)
+const run = <E, R>(request: BackfillRun<E, R>): Effect.Effect<BackfillReport, E, R> =>
+  Effect.gen(function* () {
+    const counts = { applied: 0, proposed: 0, unchanged: 0, failed: 0 }
+    for (const [index, id] of request.selection.ids.entries()) {
+      const outcome = yield* request
+        .triage(id)
+        .pipe(Effect.catch(error => Effect.as(Effect.logWarning(`backlog backfill: triage of b:${String(id)} failed`, error), 'failed' as const)))
+      if (outcome === 'applied') counts.applied += 1
+      if (outcome === 'proposed') counts.proposed += 1
+      if (outcome === 'failed' || outcome === 'missing') counts.failed += 1
+      if (outcome === 'unchanged') {
+        counts.unchanged += 1
+        yield* request.markTriaged(id)
+      }
+      if (request.onProgress !== undefined) yield* request.onProgress({ completed: index + 1, total: request.selection.ids.length, ...counts })
     }
-    request.onProgress?.({ completed: index + 1, total: request.selection.ids.length, ...counts })
-  }
-  const handled = counts.applied + counts.proposed + counts.unchanged
-  return { considered: request.selection.ids.length, ...counts, remaining: Math.max(0, request.selection.total - handled) }
-}
+    const handled = counts.applied + counts.proposed + counts.unchanged
+    return { considered: request.selection.ids.length, ...counts, remaining: Math.max(0, request.selection.total - handled) }
+  }).pipe(Effect.withSpan('backlog backfill run', { attributes: { 'dshx.backlog.backfill.selected': request.selection.ids.length } }))
 
 export class BacklogBackfill {
   static readonly openStatuses = openStatuses

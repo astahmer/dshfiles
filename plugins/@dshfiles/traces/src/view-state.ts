@@ -1,5 +1,5 @@
 import * as Schema from 'effect/Schema'
-import { createStoredValue } from './stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 
 export const WINDOW_OPTIONS = [15, 60, 1_440, 10_080] as const
 

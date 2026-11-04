@@ -1,189 +1,144 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ThreadAttentionView } from './attention-api.js'
-import { InflightTurns } from './inflight-turns.js'
-import { createRestartRecoveryStore } from './restart-recovery.js'
+import { Settings } from '@dshfiles/dshx/effect/settings'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, FileSystem, Layer, PubSub, Ref } from 'effect'
+import { TestClock } from 'effect/testing'
+import { ThreadAttention } from './attention-store.js'
+import { INFLIGHT_FILE, InflightTurns } from './inflight-turns.js'
+import { Recoveries, bootRecovery } from './recoveries.js'
+import { RecoveryStore } from './restart-recovery.js'
+import { StateFiles } from './runtime-files.js'
+import { SessionEvents, attentionRecorder, inflightTracker, type SessionEvent } from './session-events.js'
+import { threadSidebarSettings } from './settings.js'
+import { fakeSidebarHost, makeFakeHost, type FakeHost } from './sidebar-host.test-support.js'
+import { SidebarSettings, type SidebarSettingsValue } from './sidebar-settings.js'
+import { temporaryStateFiles } from './state-files.test-support.js'
+import { jsonStorageDomain } from './storage.test-support.js'
 
 /**
- * Wiring check for the Host half: the built bundle turns committed `turn/end`
- * events into durable attention rows, tracks the turns a crash could leave
- * open, and promotes a previous process's in-flight turns at boot. The unit
- * tests cover the stores and the reason mapping; this proves the plugin
- * actually subscribes and writes.
+ * The Host half's event wiring over real layers: committed `turn/end` events become durable attention rows, turn
+ * boundaries keep the in-flight markers a crash could leave, and boot promotes a previous process's markers.
  */
+const withWiring = <A, E>(
+  options: { readonly seed?: Effect.Effect<void, unknown, StateFiles>; readonly boot?: boolean; readonly resumeAfterRestart?: boolean },
+  body: (input: {
+    readonly publish: (event: SessionEvent['event']) => Effect.Effect<void>
+    readonly fake: FakeHost
+  }) => Effect.Effect<A, E, InflightTurns | RecoveryStore | ThreadAttention>,
+) =>
+  Effect.gen(function* () {
+    const root = yield* (yield* FileSystem.FileSystem).makeTempDirectoryScoped({ prefix: 'thread-sidebar-host-' })
+    if (options.seed !== undefined) yield* options.seed
+    const pubsub = yield* PubSub.unbounded<SessionEvent>()
+    const fake = yield* makeFakeHost
+    const files = yield* StateFiles
+    const settings = Settings.layerTest<SidebarSettingsValue>('thread-sidebar', {
+      ...threadSidebarSettings.schema({}),
+      resumeAfterRestart: options.resumeAfterRestart ?? false,
+    })
+    const consumers =
+      options.boot === true ? Layer.mergeAll(attentionRecorder, inflightTracker, bootRecovery) : Layer.mergeAll(attentionRecorder, inflightTracker)
+    const layer = consumers.pipe(
+      Layer.provideMerge(Layer.mergeAll(ThreadAttention.layer.pipe(Layer.provide(jsonStorageDomain(root))), InflightTurns.layer, Recoveries.layer)),
+      Layer.provideMerge(RecoveryStore.layer),
+      Layer.provideMerge(Layer.mergeAll(SessionEvents.layerTest(pubsub), fakeSidebarHost(fake), SidebarSettings.layer.pipe(Layer.provide(settings)))),
+      Layer.provide(Layer.succeed(StateFiles, files)),
+    )
+    const publish = (event: SessionEvent['event']) => PubSub.publish(pubsub, { sessionId: 'session-1', event }).pipe(Effect.asVoid)
+    return yield* body({ publish, fake }).pipe(Effect.provide(layer))
+  }).pipe(Effect.provide(temporaryStateFiles))
 
-interface BuiltPlugin {
-  /** The harness only cares that activation ran; the returned disposable is ignored. */
-  readonly apply: (ctx: unknown, config?: unknown) => void
-}
+/** Consumers run on their own fibers and write files on the event loop: yield until `read` satisfies `done`. */
+const eventually = <A, E, R>(read: Effect.Effect<A, E, R>, done: (value: A) => boolean) =>
+  read.pipe(Effect.tap(Effect.yieldNow), Effect.repeat({ until: done, times: 500 }))
 
-const builtEntry = new URL('../dist/index.js', import.meta.url).href
-
-type SessionEventListener = (session: { readonly id: string }, event: unknown) => void
-
-interface Harness {
-  readonly home: string
-  readonly rows: Map<string, ThreadAttentionView>
-  readonly dispatch: (event: unknown) => void
-}
-
-const temporaryHomes: string[] = []
-const previousDshHome = process.env.DSH_HOME
-
-const table = (rows: Map<string, ThreadAttentionView>) => ({
-  get: (key: string) => rows.get(key),
-  entries: () => rows.entries(),
-  keys: () => rows.keys(),
-  get size() {
-    return rows.size
-  },
-  put: async (key: string, value: ThreadAttentionView) => {
-    rows.set(key, value)
-  },
-  delete: async (key: string) => rows.delete(key),
-  update: async (key: string, change: (current: ThreadAttentionView) => ThreadAttentionView) => {
-    const current = rows.get(key)
-    if (current === undefined) throw new Error('missing row')
-    const next = change(current)
-    rows.set(key, next)
-    return next
-  },
+const turnStart = (seq: number) => ({ type: 'turn/start', seq, time: seq, data: { turn: 1 } })
+const turnEnd = (kind: string, reason?: { readonly kind: string }) => ({
+  type: 'turn/end',
+  seq: 16,
+  time: 1_700_000_000_000,
+  data: { turn: 1, reason: reason === undefined ? { kind } : { kind, reason } },
 })
 
-/**
- * A fresh scratch home and module instance, so each test's stores are its own.
- * `seed` runs before the module loads, which is what a previous Host process
- * would have left behind on disk.
- */
-const startHarness = async (seed?: (home: string) => Promise<void>): Promise<Harness> => {
-  const home = await mkdtemp(join(tmpdir(), 'thread-sidebar-host-'))
-  temporaryHomes.push(home)
-  if (seed !== undefined) await seed(home)
-  process.env.DSH_HOME = home
-  vi.resetModules()
-  // SAFETY: the built Host bundle default-exports the plugin whose `apply` this harness drives.
-  const plugin = (await import(builtEntry)) as BuiltPlugin
-  const rows = new Map<string, ThreadAttentionView>()
-  const listeners = new Map<string, SessionEventListener[]>()
-  const disposers: (() => void)[] = []
-  const on = (event: string, handler: SessionEventListener): void => {
-    listeners.set(event, [...(listeners.get(event) ?? []), handler])
-  }
-  const ctx = {
-    on,
-    once: on,
-    emit: on,
-    parallel: on,
-    serial: on,
-    bail: on,
-    waterfall: on,
-    effect: (callback: () => unknown) => {
-      const disposer = callback()
-      // SAFETY: Cordis effects return a disposer function; the typeof check above established it.
-      if (typeof disposer === 'function') disposers.push(disposer as () => void)
-    },
-    get: (name: string) => (name === 'storageDomain' ? { open: async () => ({ table: () => table(rows), close: async () => undefined }) } : undefined),
-    inject: () => undefined,
-    commands: { register: () => () => undefined },
-    sessionProjections: { register: () => () => undefined },
-    settings: {
-      configure: () => () => undefined,
-      describe: () => [{ ns: 'thread-sidebar', value: {} }],
-      update: async () => undefined,
-      replace: async () => undefined,
-    },
-  }
-  await plugin.apply(ctx)
-  return {
-    home,
-    rows,
-    dispatch: event => {
-      const handlers = listeners.get('session/event')
-      if (handlers === undefined) throw new Error('thread-sidebar registered no session/event listener')
-      for (const handler of handlers) handler({ id: 'session-1' }, event)
-    },
-  }
-}
+const inflightIds = InflightTurns.use(inflight => Effect.map(inflight.list, entries => entries.map(entry => entry.sessionId)))
+const recoveryRows = RecoveryStore.use(store => Effect.map(store.list, entries => entries.map(entry => [entry.sessionId, entry.reason])))
+const attentionRows = ThreadAttention.use(attention => Effect.map(attention.snapshot, snapshot => snapshot.sessions))
 
-const turnEnd = (kind: string): unknown => ({ type: 'turn/end', seq: 16, time: 1_700_000_000_000, data: { turn: 1, reason: { kind } } })
+describe('thread-sidebar Host event wiring', () => {
+  it.effect('stores a finished turn and ignores turn ends that ask for nothing', () =>
+    withWiring({}, ({ publish }) =>
+      Effect.gen(function* () {
+        yield* publish(turnStart(4))
+        yield* publish(turnEnd('forked'))
+        yield* publish(turnEnd('interrupted'))
+        yield* publish(turnEnd('error'))
+        const rows = yield* eventually(attentionRows, sessions => sessions.length > 0)
+        expect(rows).toEqual([
+          expect.objectContaining({ sessionId: 'session-1', finishedReason: 'error', finishedSeq: 16, finishedAt: 1_700_000_000_000, manuallyUnread: false }),
+        ])
+      }),
+    ),
+  )
 
-const inflightSessionIds = async (home: string): Promise<string[]> => (await InflightTurns.open({ home }).list()).map(entry => entry.sessionId)
+  it.effect('records an open turn and clears it when the turn ends', () =>
+    withWiring({}, ({ publish }) =>
+      Effect.gen(function* () {
+        yield* publish(turnStart(4))
+        expect(yield* eventually(inflightIds, ids => ids.length > 0)).toEqual(['session-1'])
+        yield* publish(turnEnd('completed'))
+        expect(yield* eventually(inflightIds, ids => ids.length === 0)).toEqual([])
+        expect(yield* recoveryRows).toEqual([])
+      }),
+    ),
+  )
 
-afterEach(async () => {
-  vi.restoreAllMocks()
-  if (previousDshHome === undefined) delete process.env.DSH_HOME
-  else process.env.DSH_HOME = previousDshHome
-  await Promise.all(temporaryHomes.splice(0).map(home => rm(home, { recursive: true, force: true })))
-})
+  it.effect('keeps a resume row when crash recovery closes the turn before the boot promotion reads it', () =>
+    withWiring({}, ({ publish }) =>
+      Effect.gen(function* () {
+        yield* publish(turnStart(4))
+        yield* eventually(inflightIds, ids => ids.length > 0)
+        yield* publish(turnEnd('interrupted'))
+        expect(yield* eventually(recoveryRows, rows => rows.length > 0)).toEqual([['session-1', 'interrupted']])
+        expect(yield* inflightIds).toEqual([])
+      }),
+    ),
+  )
 
-describe('thread-sidebar attention wiring', () => {
-  it('stores a finished turn and ignores turn ends that ask for nothing', async () => {
-    const harness = await startHarness()
+  it.effect('keeps the marker of a turn its own shutdown cut off, so the next process can resume it', () =>
+    withWiring({}, ({ publish }) =>
+      Effect.gen(function* () {
+        yield* publish(turnStart(4))
+        yield* eventually(inflightIds, ids => ids.length > 0)
+        yield* publish(turnEnd('aborted', { kind: 'disposed' }))
+        // The next boundary is handled after the shutdown one: once it is seen, the shutdown left the marker alone.
+        yield* publish(turnStart(6))
+        yield* publish(turnEnd('aborted', { kind: 'user' }))
+        expect(yield* eventually(inflightIds, ids => ids.length === 0)).toEqual([])
+        expect(yield* recoveryRows).toEqual([])
+      }),
+    ),
+  )
 
-    harness.dispatch({ type: 'turn/start', seq: 4, time: 1, data: { turn: 1 } })
-    harness.dispatch(turnEnd('forked'))
-    harness.dispatch(turnEnd('interrupted'))
-    await Promise.resolve()
-    expect(harness.rows.size).toBe(0)
-
-    harness.dispatch(turnEnd('error'))
-    await vi.waitFor(() => expect(harness.rows.size).toBe(1))
-    const record = harness.rows.get('session-1')
-    expect(record).toMatchObject({ finishedReason: 'error', finishedSeq: 16, finishedAt: 1_700_000_000_000, manuallyUnread: false })
-  })
-
-  it('records an open turn and clears it when the turn ends', async () => {
-    const harness = await startHarness()
-
-    harness.dispatch({ type: 'turn/start', seq: 4, time: 1, data: { turn: 1 } })
-    await vi.waitFor(async () => expect(await inflightSessionIds(harness.home)).toEqual(['session-1']))
-
-    harness.dispatch(turnEnd('completed'))
-    await vi.waitFor(async () => expect(await inflightSessionIds(harness.home)).toEqual([]))
-    expect(await createRestartRecoveryStore({ home: harness.home }).list()).toEqual([])
-  })
-
-  it('keeps a resume row when crash recovery closes the turn before the boot promotion reads it', async () => {
-    const harness = await startHarness()
-
-    harness.dispatch({ type: 'turn/start', seq: 4, time: 1, data: { turn: 1 } })
-    await vi.waitFor(async () => expect(await inflightSessionIds(harness.home)).toEqual(['session-1']))
-
-    harness.dispatch(turnEnd('interrupted'))
-    await vi.waitFor(async () => {
-      const entries = await createRestartRecoveryStore({ home: harness.home }).list()
-      expect(entries).toEqual([expect.objectContaining({ sessionId: 'session-1', reason: 'interrupted' })])
-    })
-    expect(await inflightSessionIds(harness.home)).toEqual([])
-  })
-
-  it('keeps the marker of a turn its own shutdown cut off, so the next process can resume it', async () => {
-    const harness = await startHarness()
-    harness.dispatch({ type: 'turn/start', seq: 4, time: 1, data: { turn: 1 } })
-    await vi.waitFor(async () => expect(await inflightSessionIds(harness.home)).toEqual(['session-1']))
-
-    harness.dispatch({ type: 'turn/end', seq: 5, time: 2, data: { turn: 1, reason: { kind: 'aborted', reason: { kind: 'disposed' } } } })
-    await new Promise(resolve => setTimeout(resolve, 100))
-    expect(await inflightSessionIds(harness.home)).toEqual(['session-1'])
-    expect(await createRestartRecoveryStore({ home: harness.home }).list()).toEqual([])
-
-    harness.dispatch({ type: 'turn/start', seq: 6, time: 3, data: { turn: 2 } })
-    harness.dispatch({ type: 'turn/end', seq: 7, time: 4, data: { turn: 2, reason: { kind: 'aborted', reason: { kind: 'user' } } } })
-    await vi.waitFor(async () => expect(await inflightSessionIds(harness.home)).toEqual([]))
-  })
-
-  it('promotes the turns a previous process left open as interrupted recoveries', async () => {
-    const harness = await startHarness(async home => {
-      await mkdir(join(home, 'runtime'), { recursive: true })
-      await writeFile(InflightTurns.filePath(home), `${JSON.stringify({ version: 1, entries: [{ sessionId: 'crashed-thread', startedAt: 1 }] })}\n`)
-    })
-
-    await vi.waitFor(async () => {
-      const entries = await createRestartRecoveryStore({ home: harness.home }).list()
-      expect(entries).toEqual([expect.objectContaining({ sessionId: 'crashed-thread', reason: 'interrupted' })])
-    })
-    expect(await inflightSessionIds(harness.home)).toEqual([])
-  })
+  it.effect('promotes the turns a previous process left open as interrupted recoveries, then resumes them', () =>
+    withWiring(
+      {
+        boot: true,
+        resumeAfterRestart: true,
+        seed: StateFiles.use(files =>
+          files.write({
+            path: files.runtimePath(INFLIGHT_FILE),
+            text: `${JSON.stringify({ version: 1, entries: [{ sessionId: 'crashed-thread', startedAt: 1 }] })}\n`,
+          }),
+        ),
+      },
+      ({ fake }) =>
+        Effect.gen(function* () {
+          expect(yield* eventually(recoveryRows, rows => rows.length > 0)).toEqual([['crashed-thread', 'interrupted']])
+          expect(yield* inflightIds).toEqual([])
+          expect(yield* Ref.get(fake.prompts)).toEqual([])
+          const prompts = yield* eventually(Effect.andThen(TestClock.adjust('10 seconds'), Ref.get(fake.prompts)), sent => sent.length > 0)
+          expect(prompts.map(prompt => prompt.sessionId)).toEqual(['crashed-thread'])
+          expect(yield* eventually(recoveryRows, rows => rows.length === 0)).toEqual([])
+        }),
+    ),
+  )
 })

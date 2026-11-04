@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { test } from 'vitest'
 import * as Schema from 'effect/Schema'
@@ -136,7 +135,7 @@ test('system delivery proceeds when the browser refuses the deduplication ledger
   }
   const ledger = createStoredValue({
     key: 'notification-test',
-    schema: zodSchemaFromEffect(Schema.mutable(Schema.Array(Schema.String))),
+    schema: Schema.mutable(Schema.Array(Schema.String)),
     fallback: [],
     storage: () => storage,
   })

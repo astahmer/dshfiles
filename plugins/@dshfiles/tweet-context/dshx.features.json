@@ -20,17 +20,17 @@
         {
           "id": "fxembed-public-api",
           "boundary": "The public numeric post ID is sent to api.fxtwitter.com; the thread response supplies post, quote, and thread text, author metadata, and media URLs.",
-          "deterministicFake": "The host test injects a fetcher that serves a fixed FxEmbed-shaped response from a local HTTP fixture; it never calls a public post API."
+          "deterministicFake": "The host and media tests provide a FetchHttpClient.Fetch stand-in that answers with a fixed FxEmbed-shaped response; the plugin's HttpClient, size limits and decoding run for real and no public post API is called."
         },
         {
           "id": "x-image-cdn",
           "boundary": "Photos are downloaded from pbs.twimg.com and saved as image attachments.",
-          "deterministicFake": "The media tests provide photo responses using a controlled fetch seam and verify host and redirect restrictions."
+          "deterministicFake": "The media tests answer pbs.twimg.com through the same Fetch stand-in and verify host and redirect restrictions."
         },
         {
           "id": "x-video-cdn",
           "boundary": "An MP4 variant is downloaded from video.twimg.com and decoded by the Host's ffmpeg binary.",
-          "deterministicFake": "The host test routes a video.twimg.com URL to a generated two-second local MP4, then uses the real download and ffmpeg sampling path."
+          "deterministicFake": "The host test answers a video.twimg.com URL with a generated two-second local MP4, then uses the real download, temp-file and ffmpeg sampling path."
         }
       ],
       "verification": [

@@ -1,8 +1,12 @@
+import * as Schema from 'effect/Schema'
 import { describe, expect, test } from 'vitest'
 import { tracesBoardsApi } from '../boards/boards-api.js'
-import { TracesSchema } from '../schema.js'
 import { ALERT_KINDS, alertRuleDraftSchema } from './alert-types.js'
 import { muteInputSchema, removeInputSchema, tracesAlertsApi } from './alerts-api.js'
+
+// oxlint-disable-next-line antislop/no-unknown-parameters -- test boundary: the schema parses the unknown value
+const acceptsStrict = <S extends Schema.Decoder<unknown>>(schema: S, value: unknown): boolean =>
+  Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(value)._tag === 'Success'
 
 const toolsOf = (methods: Readonly<Record<string, { readonly tool?: { readonly name: string; readonly readOnly?: boolean } | undefined }>>) =>
   Object.values(methods).flatMap(method => (method.tool === undefined ? [] : [method.tool]))
@@ -40,17 +44,17 @@ describe('alert and board agent tools', () => {
   })
 
   test('delete refuses to run without an explicit confirm', () => {
-    expect(TracesSchema.acceptsStrict(removeInputSchema, { id: 'rule-1' })).toBe(false)
-    expect(TracesSchema.acceptsStrict(removeInputSchema, { id: 'rule-1', confirm: false })).toBe(false)
-    expect(TracesSchema.acceptsStrict(removeInputSchema, { id: 'rule-1', confirm: true })).toBe(true)
+    expect(acceptsStrict(removeInputSchema, { id: 'rule-1' })).toBe(false)
+    expect(acceptsStrict(removeInputSchema, { id: 'rule-1', confirm: false })).toBe(false)
+    expect(acceptsStrict(removeInputSchema, { id: 'rule-1', confirm: true })).toBe(true)
   })
 
   test('mute takes minutes within a week, or null to unmute', () => {
-    expect(TracesSchema.acceptsStrict(muteInputSchema, { id: 'rule-1', minutes: 60 })).toBe(true)
-    expect(TracesSchema.acceptsStrict(muteInputSchema, { id: 'rule-1', minutes: null })).toBe(true)
-    expect(TracesSchema.acceptsStrict(muteInputSchema, { id: 'rule-1', minutes: 0 })).toBe(false)
-    expect(TracesSchema.acceptsStrict(muteInputSchema, { id: 'rule-1', minutes: 7 * 24 * 60 + 1 })).toBe(false)
-    expect(TracesSchema.acceptsStrict(muteInputSchema, { id: 'rule-1' })).toBe(false)
+    expect(acceptsStrict(muteInputSchema, { id: 'rule-1', minutes: 60 })).toBe(true)
+    expect(acceptsStrict(muteInputSchema, { id: 'rule-1', minutes: null })).toBe(true)
+    expect(acceptsStrict(muteInputSchema, { id: 'rule-1', minutes: 0 })).toBe(false)
+    expect(acceptsStrict(muteInputSchema, { id: 'rule-1', minutes: 7 * 24 * 60 + 1 })).toBe(false)
+    expect(acceptsStrict(muteInputSchema, { id: 'rule-1' })).toBe(false)
   })
 })
 
@@ -63,22 +67,22 @@ describe('alert rule drafts', () => {
       { service: null, operation: 'chat deepseek', attribute: { key: 'gen_ai.provider.name', value: 'deepseek' } },
       { service: null, operation: null, attribute: { key: 'rpc.system', value: '*' } },
     ])
-      expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, kind, threshold, filter })).toBe(true)
+      expect(acceptsStrict(alertRuleDraftSchema, { ...draft, kind, threshold, filter })).toBe(true)
   })
 
   test('refuses an error-rate threshold above 1 but allows it for other kinds', () => {
-    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, threshold: 20 })).toBe(false)
-    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, kind: 'latency', threshold: 20 })).toBe(true)
+    expect(acceptsStrict(alertRuleDraftSchema, { ...draft, threshold: 20 })).toBe(false)
+    expect(acceptsStrict(alertRuleDraftSchema, { ...draft, kind: 'latency', threshold: 20 })).toBe(true)
   })
 
   test('refuses windows, percentiles, ids and attribute keys outside the contract', () => {
-    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, windowMinutes: 0 })).toBe(false)
-    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, windowMinutes: 24 * 60 + 1 })).toBe(false)
-    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, percentile: 75 })).toBe(false)
-    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, threshold: -1 })).toBe(false)
-    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, id: 'Rule One' })).toBe(false)
-    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, filter: { ...draft.filter, attribute: { key: 'a"b', value: 'x' } } })).toBe(false)
-    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, name: '  ' })).toBe(false)
-    expect(TracesSchema.acceptsStrict(alertRuleDraftSchema, { ...draft, extra: true })).toBe(false)
+    expect(acceptsStrict(alertRuleDraftSchema, { ...draft, windowMinutes: 0 })).toBe(false)
+    expect(acceptsStrict(alertRuleDraftSchema, { ...draft, windowMinutes: 24 * 60 + 1 })).toBe(false)
+    expect(acceptsStrict(alertRuleDraftSchema, { ...draft, percentile: 75 })).toBe(false)
+    expect(acceptsStrict(alertRuleDraftSchema, { ...draft, threshold: -1 })).toBe(false)
+    expect(acceptsStrict(alertRuleDraftSchema, { ...draft, id: 'Rule One' })).toBe(false)
+    expect(acceptsStrict(alertRuleDraftSchema, { ...draft, filter: { ...draft.filter, attribute: { key: 'a"b', value: 'x' } } })).toBe(false)
+    expect(acceptsStrict(alertRuleDraftSchema, { ...draft, name: '  ' })).toBe(false)
+    expect(acceptsStrict(alertRuleDraftSchema, { ...draft, extra: true })).toBe(false)
   })
 })

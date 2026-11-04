@@ -1,4 +1,4 @@
-import { isApiOwnerMissing, zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -97,7 +97,7 @@ const preferencesSchema = Schema.Struct({
 
 const preferences = createStoredValue({
   key: 'dshfiles.backlog.view.v2',
-  schema: zodSchemaFromEffect(preferencesSchema),
+  schema: preferencesSchema,
   fallback: {
     view: 'feed' as const,
     groupBy: 'status' as const,
@@ -518,12 +518,12 @@ export const BacklogPanel = (props: {
   const list = useQuery({
     queryKey: [BacklogQueries.key, 'list', debounced, kinds, projectFilters, showsResults ? stored.statuses : []],
     queryFn: async ({ signal }) => {
-      const statuses = showsResults && stored.statuses.length > 0 ? stored.statuses : undefined
+      const statusFilter = showsResults && stored.statuses.length > 0 ? { statuses: stored.statuses } : {}
       const input: Parameters<typeof api.list>[0] = {
         query: debounced,
         kinds,
         ...scoped,
-        statuses,
+        ...statusFilter,
         freshness: 'all',
         limit: showsResults ? 200 : 2_000,
       }

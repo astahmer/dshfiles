@@ -95,7 +95,8 @@
                       "required": [
                         "provider",
                         "model"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     {
                       "type": "null"
@@ -151,7 +152,8 @@
                     "messaging",
                     "handles",
                     "subagents"
-                  ]
+                  ],
+                  "additionalProperties": false
                 },
                 "enabled": {
                   "type": "boolean"
@@ -204,14 +206,16 @@
                 "updatedAt",
                 "lastUsedAt",
                 "threadCount"
-              ]
+              ],
+              "additionalProperties": false
             }
           }
         },
         "required": [
           "revision",
           "agents"
-        ]
+        ],
+        "additionalProperties": false
       },
       "toolInput": {
         "type": "null"
@@ -261,7 +265,8 @@
                   "required": [
                     "provider",
                     "model"
-                  ]
+                  ],
+                  "additionalProperties": false
                 },
                 "memoryScope": {
                   "type": "string"
@@ -294,7 +299,8 @@
                     "messaging",
                     "handles",
                     "subagents"
-                  ]
+                  ],
+                  "additionalProperties": false
                 },
                 "enabled": {
                   "type": "boolean"
@@ -332,14 +338,16 @@
                 "updatedAt",
                 "lastUsedAt",
                 "threadCount"
-              ]
+              ],
+              "additionalProperties": false
             }
           }
         },
         "required": [
           "revision",
           "agents"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -360,7 +368,8 @@
         },
         "required": [
           "handle"
-        ]
+        ],
+        "additionalProperties": false
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -438,7 +447,8 @@
                         "required": [
                           "provider",
                           "model"
-                        ]
+                        ],
+                        "additionalProperties": false
                       },
                       {
                         "type": "null"
@@ -494,7 +504,8 @@
                       "messaging",
                       "handles",
                       "subagents"
-                    ]
+                    ],
+                    "additionalProperties": false
                   },
                   "enabled": {
                     "type": "boolean"
@@ -547,7 +558,8 @@
                   "updatedAt",
                   "lastUsedAt",
                   "threadCount"
-                ]
+                ],
+                "additionalProperties": false
               },
               {
                 "type": "null"
@@ -557,7 +569,8 @@
         },
         "required": [
           "agent"
-        ]
+        ],
+        "additionalProperties": false
       },
       "toolInput": {
         "type": "object",
@@ -568,7 +581,8 @@
         },
         "required": [
           "handle"
-        ]
+        ],
+        "additionalProperties": false
       },
       "toolOutput": {
         "type": "object",
@@ -610,7 +624,8 @@
                 "required": [
                   "provider",
                   "model"
-                ]
+                ],
+                "additionalProperties": false
               },
               "memoryScope": {
                 "type": "string"
@@ -643,7 +658,8 @@
                   "messaging",
                   "handles",
                   "subagents"
-                ]
+                ],
+                "additionalProperties": false
               },
               "enabled": {
                 "type": "boolean"
@@ -681,12 +697,14 @@
               "updatedAt",
               "lastUsedAt",
               "threadCount"
-            ]
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
           "agent"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -742,13 +760,15 @@
               },
               "required": [
                 "id"
-              ]
+              ],
+              "additionalProperties": false
             }
           }
         },
         "required": [
           "presets"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -825,7 +845,8 @@
                     "required": [
                       "provider",
                       "model"
-                    ]
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "type": "null"
@@ -872,7 +893,8 @@
                 "required": [
                   "messaging",
                   "handles"
-                ]
+                ],
+                "additionalProperties": false
               },
               "enabled": {
                 "type": "boolean"
@@ -887,12 +909,14 @@
               "preset",
               "route",
               "enabled"
-            ]
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
           "agent"
-        ]
+        ],
+        "additionalProperties": false
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -983,7 +1007,8 @@
                           "required": [
                             "provider",
                             "model"
-                          ]
+                          ],
+                          "additionalProperties": false
                         },
                         {
                           "type": "null"
@@ -1039,7 +1064,8 @@
                         "messaging",
                         "handles",
                         "subagents"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "enabled": {
                       "type": "boolean"
@@ -1092,7 +1118,8 @@
                     "updatedAt",
                     "lastUsedAt",
                     "threadCount"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               },
               "agent": {
@@ -1165,7 +1192,8 @@
                         "required": [
                           "provider",
                           "model"
-                        ]
+                        ],
+                        "additionalProperties": false
                       },
                       {
                         "type": "null"
@@ -1221,7 +1249,8 @@
                       "messaging",
                       "handles",
                       "subagents"
-                    ]
+                    ],
+                    "additionalProperties": false
                   },
                   "enabled": {
                     "type": "boolean"
@@ -1274,7 +1303,8 @@
                   "updatedAt",
                   "lastUsedAt",
                   "threadCount"
-                ]
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
@@ -1282,7 +1312,8 @@
               "revision",
               "agents",
               "agent"
-            ]
+            ],
+            "additionalProperties": false
           },
           {
             "type": "object",
@@ -1370,7 +1401,8 @@
                           "required": [
                             "provider",
                             "model"
-                          ]
+                          ],
+                          "additionalProperties": false
                         },
                         {
                           "type": "null"
@@ -1426,7 +1458,8 @@
                         "messaging",
                         "handles",
                         "subagents"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "enabled": {
                       "type": "boolean"
@@ -1479,7 +1512,8 @@
                     "updatedAt",
                     "lastUsedAt",
                     "threadCount"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             },
@@ -1487,7 +1521,8 @@
               "kind",
               "revision",
               "agents"
-            ]
+            ],
+            "additionalProperties": false
           }
         ]
       },
@@ -1531,7 +1566,8 @@
                 "required": [
                   "provider",
                   "model"
-                ]
+                ],
+                "additionalProperties": false
               },
               "memoryScope": {
                 "type": "string"
@@ -1563,7 +1599,8 @@
                 "required": [
                   "messaging",
                   "handles"
-                ]
+                ],
+                "additionalProperties": false
               },
               "enabled": {
                 "type": "boolean"
@@ -1578,12 +1615,14 @@
               "preset",
               "route",
               "enabled"
-            ]
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
           "agent"
-        ]
+        ],
+        "additionalProperties": false
       },
       "toolOutput": {
         "oneOf": [
@@ -1638,7 +1677,8 @@
                       "required": [
                         "provider",
                         "model"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "memoryScope": {
                       "type": "string"
@@ -1671,7 +1711,8 @@
                         "messaging",
                         "handles",
                         "subagents"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "enabled": {
                       "type": "boolean"
@@ -1709,7 +1750,8 @@
                     "updatedAt",
                     "lastUsedAt",
                     "threadCount"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               },
               "agent": {
@@ -1749,7 +1791,8 @@
                     "required": [
                       "provider",
                       "model"
-                    ]
+                    ],
+                    "additionalProperties": false
                   },
                   "memoryScope": {
                     "type": "string"
@@ -1782,7 +1825,8 @@
                       "messaging",
                       "handles",
                       "subagents"
-                    ]
+                    ],
+                    "additionalProperties": false
                   },
                   "enabled": {
                     "type": "boolean"
@@ -1820,7 +1864,8 @@
                   "updatedAt",
                   "lastUsedAt",
                   "threadCount"
-                ]
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
@@ -1828,7 +1873,8 @@
               "revision",
               "agents",
               "agent"
-            ]
+            ],
+            "additionalProperties": false
           },
           {
             "type": "object",
@@ -1881,7 +1927,8 @@
                       "required": [
                         "provider",
                         "model"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "memoryScope": {
                       "type": "string"
@@ -1914,7 +1961,8 @@
                         "messaging",
                         "handles",
                         "subagents"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "enabled": {
                       "type": "boolean"
@@ -1952,7 +2000,8 @@
                     "updatedAt",
                     "lastUsedAt",
                     "threadCount"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             },
@@ -1960,7 +2009,8 @@
               "kind",
               "revision",
               "agents"
-            ]
+            ],
+            "additionalProperties": false
           }
         ]
       }
@@ -1990,7 +2040,8 @@
         "required": [
           "handle",
           "confirm"
-        ]
+        ],
+        "additionalProperties": false
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2081,7 +2132,8 @@
                       "required": [
                         "provider",
                         "model"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     {
                       "type": "null"
@@ -2137,7 +2189,8 @@
                     "messaging",
                     "handles",
                     "subagents"
-                  ]
+                  ],
+                  "additionalProperties": false
                 },
                 "enabled": {
                   "type": "boolean"
@@ -2190,7 +2243,8 @@
                 "updatedAt",
                 "lastUsedAt",
                 "threadCount"
-              ]
+              ],
+              "additionalProperties": false
             }
           }
         },
@@ -2198,7 +2252,8 @@
           "kind",
           "revision",
           "agents"
-        ]
+        ],
+        "additionalProperties": false
       },
       "toolInput": {
         "type": "object",
@@ -2216,7 +2271,8 @@
         "required": [
           "handle",
           "confirm"
-        ]
+        ],
+        "additionalProperties": false
       },
       "toolOutput": {
         "type": "object",
@@ -2271,7 +2327,8 @@
                   "required": [
                     "provider",
                     "model"
-                  ]
+                  ],
+                  "additionalProperties": false
                 },
                 "memoryScope": {
                   "type": "string"
@@ -2304,7 +2361,8 @@
                     "messaging",
                     "handles",
                     "subagents"
-                  ]
+                  ],
+                  "additionalProperties": false
                 },
                 "enabled": {
                   "type": "boolean"
@@ -2342,7 +2400,8 @@
                 "updatedAt",
                 "lastUsedAt",
                 "threadCount"
-              ]
+              ],
+              "additionalProperties": false
             }
           }
         },
@@ -2350,7 +2409,8 @@
           "kind",
           "revision",
           "agents"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -2382,7 +2442,8 @@
                 "required": [
                   "sessionId",
                   "title"
-                ]
+                ],
+                "additionalProperties": false
               },
               {
                 "type": "null"
@@ -2392,7 +2453,8 @@
         },
         "required": [
           "handle"
-        ]
+        ],
+        "additionalProperties": false
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2475,7 +2537,8 @@
                       "required": [
                         "provider",
                         "model"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     {
                       "type": "null"
@@ -2531,7 +2594,8 @@
                     "messaging",
                     "handles",
                     "subagents"
-                  ]
+                  ],
+                  "additionalProperties": false
                 },
                 "enabled": {
                   "type": "boolean"
@@ -2584,14 +2648,16 @@
                 "updatedAt",
                 "lastUsedAt",
                 "threadCount"
-              ]
+              ],
+              "additionalProperties": false
             }
           }
         },
         "required": [
           "revision",
           "agents"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -2612,7 +2678,8 @@
         },
         "required": [
           "handle"
-        ]
+        ],
+        "additionalProperties": false
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2647,13 +2714,15 @@
                 "handle",
                 "title",
                 "startedAt"
-              ]
+              ],
+              "additionalProperties": false
             }
           }
         },
         "required": [
           "threads"
-        ]
+        ],
+        "additionalProperties": false
       },
       "toolInput": {
         "type": "object",
@@ -2664,7 +2733,8 @@
         },
         "required": [
           "handle"
-        ]
+        ],
+        "additionalProperties": false
       },
       "toolOutput": {
         "type": "object",
@@ -2692,13 +2762,15 @@
                 "handle",
                 "title",
                 "startedAt"
-              ]
+              ],
+              "additionalProperties": false
             }
           }
         },
         "required": [
           "threads"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -2716,7 +2788,8 @@
         },
         "required": [
           "sessionId"
-        ]
+        ],
+        "additionalProperties": false
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2794,7 +2867,8 @@
                         "required": [
                           "provider",
                           "model"
-                        ]
+                        ],
+                        "additionalProperties": false
                       },
                       {
                         "type": "null"
@@ -2850,7 +2924,8 @@
                       "messaging",
                       "handles",
                       "subagents"
-                    ]
+                    ],
+                    "additionalProperties": false
                   },
                   "enabled": {
                     "type": "boolean"
@@ -2903,7 +2978,8 @@
                   "updatedAt",
                   "lastUsedAt",
                   "threadCount"
-                ]
+                ],
+                "additionalProperties": false
               },
               {
                 "type": "null"
@@ -2913,7 +2989,8 @@
         },
         "required": [
           "agent"
-        ]
+        ],
+        "additionalProperties": false
       }
     }
   ]

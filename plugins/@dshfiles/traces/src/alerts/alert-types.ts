@@ -1,5 +1,13 @@
 import * as Schema from 'effect/Schema'
-import { TracesSchema } from '../schema.js'
+import * as SchemaGetter from 'effect/SchemaGetter'
+
+/** A padded text field filters and saves on its text. */
+export const trimmedString: Schema.Codec<string, string> = Schema.String.pipe(
+  Schema.decodeTo(Schema.String, {
+    decode: SchemaGetter.transform((value: string) => value.trim()),
+    encode: SchemaGetter.transform((value: string) => value),
+  }),
+)
 
 export const ALERT_KINDS = ['error-rate', 'latency', 'throughput', 'span-count', 'duration'] as const
 export const alertKindSchema = Schema.Literals(ALERT_KINDS)
@@ -23,10 +31,10 @@ export const attributeKeySchema = Schema.String.check(Schema.isPattern(/^[\w.:/-
 
 /** Which spans a rule counts; every set field must match. */
 export const spanFilterSchema = Schema.Struct({
-  service: Schema.NullOr(TracesSchema.trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(256))).annotate({
+  service: Schema.NullOr(trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(256))).annotate({
     description: 'Only spans of this service.name; null for any service.',
   }),
-  operation: Schema.NullOr(TracesSchema.trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(256))).annotate({
+  operation: Schema.NullOr(trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(256))).annotate({
     description: 'Span name: exact, or a prefix when it ends with * (e.g. "chat *", "jj *"); null for any span.',
   }),
   attribute: Schema.NullOr(
@@ -42,7 +50,7 @@ export const alertRuleDraftSchema = Schema.Struct({
   id: Schema.optional(Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,63}$/))).annotate({
     description: 'Existing rule id to update; omit to create a rule.',
   }),
-  name: TracesSchema.trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  name: trimmedString.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
   kind: alertKindSchema.annotate({
     description:
       'error-rate: share of matching spans that failed (threshold 0 to 1). latency: the percentile duration in ms. throughput: matching spans per minute. span-count: matching spans in the window. duration: any matching span longer than threshold ms.',

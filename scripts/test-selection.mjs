@@ -82,6 +82,13 @@ const testFilesOf = directory => {
   return files
 }
 
+/**
+ * Whether the test imports its own package by name (which resolves to dist). A bare mention — a `packageId`, a
+ * fixture label, a snapshot — does not need a build.
+ */
+const importsBuiltName = (content, name) =>
+  new RegExp(`(?:from\\s*['"]|import\\(\\s*['"])${name.replace(/[.\\/]/gu, '\\$&')}(?:/[^'"]*)?['"]`, 'u').test(content)
+
 // A related run needs the owner's build when its tests load the built entry instead of source, or
 // import their own package name (which resolves to dist). Everything else runs source directly.
 const buildRequiredFor = ({ packages, sharedChecks }) => {
@@ -93,7 +100,7 @@ const buildRequiredFor = ({ packages, sharedChecks }) => {
       const content = readFileSync(testFile, 'utf8')
       if (/['"`][^'"`\n]*\/dist\//.test(content))
         return { required: true, reason: `${packageInfo.name} test loads dist: ${relative(repositoryRoot, testFile)}` }
-      if (content.includes(`${packageInfo.name}/`) || content.includes(`'${packageInfo.name}'`))
+      if (importsBuiltName(content, packageInfo.name))
         return { required: true, reason: `${packageInfo.name} test imports its built package name: ${relative(repositoryRoot, testFile)}` }
     }
   }

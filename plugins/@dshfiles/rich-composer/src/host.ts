@@ -1,44 +1,46 @@
+import type {} from '@deepseek-ai/dsh-api-session-controller'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { Context as CordisContext } from '@deepseek-ai/cordis'
-import { DshxEffect } from '@dshfiles/dshx/effect'
-import { defineHost } from '@dshfiles/dshx/host'
-import { Context, Effect, Layer, Schema } from 'effect'
+import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
+import { Context, Effect, Layer, Option, Schema } from 'effect'
 import { agentWarmupApi } from './agent-warmup-api.ts'
 import { composerControlsSettings } from './composer-controls-settings.ts'
 
-class AgentWarmupRuntime extends Context.Service<AgentWarmupRuntime, { readonly sessionController: ReturnType<CordisContext['get']> }>()(
-  '@dshfiles/rich-composer/AgentWarmupRuntime',
-) {}
+class AgentWarmupFailure extends Schema.TaggedError<AgentWarmupFailure>()(
+  'AgentWarmupFailure',
+  { sessionId: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'agent-warmup-failure' },
+) {
+  override get message(): string {
+    return `Thread ${this.sessionId} could not be resumed ahead of its first send; sending still resumes it.`
+  }
+}
 
-class AgentWarmupFailure extends Schema.TaggedError<AgentWarmupFailure>()('AgentWarmupFailure', {
-  message: Schema.String,
-}) {}
-
-const agentWarmupLayer = (ctx: CordisContext) =>
-  Layer.succeed(AgentWarmupRuntime, {
-    sessionController: ctx.get('sessionController'),
-  })
-
-const { hostApi, ...effectPlugin } = DshxEffect.plugin({
-  layer: agentWarmupLayer,
-  setup: () => Effect.void,
-})
-
-const agentWarmupHost = hostApi(agentWarmupApi, {
-  warm: Effect.fn('agent warmup')(({ input }) =>
-    AgentWarmupRuntime.use(runtime => {
-      if (runtime.sessionController === undefined) return Effect.succeed({ live: false })
-      return Effect.tryPromise({
-        try: () => runtime.sessionController.resolveAgent(SessionId(input.sessionId)),
-        catch: error => new AgentWarmupFailure({ message: error instanceof Error ? error.message : String(error) }),
-      }).pipe(Effect.map(resolved => ({ live: resolved !== null && typeof resolved === 'object' && 'agent' in resolved })))
+/** Resumes a thread's Agent before its first send, when this Host runs a Session controller. */
+class AgentWarmups extends Context.Service<
+  AgentWarmups,
+  { readonly warm: (sessionId: SessionId) => Effect.Effect<{ readonly live: boolean }, AgentWarmupFailure> }
+>()('@dshfiles/rich-composer/AgentWarmups') {
+  static readonly layer = Layer.effect(
+    AgentWarmups,
+    Effect.gen(function* () {
+      const controller = yield* Effect.option(hostService('sessionController'))
+      return AgentWarmups.of({
+        warm: Effect.fn('agent warmup')(function* (sessionId: SessionId) {
+          if (Option.isNone(controller)) return { live: false }
+          const resolved = yield* Effect.tryPromise({
+            try: () => controller.value.resolveAgent(sessionId),
+            catch: cause => new AgentWarmupFailure({ sessionId, cause }),
+          })
+          return { live: 'agent' in resolved }
+        }),
+      })
     }),
-  ),
-})
+  )
+}
 
-export default defineHost({
-  ...effectPlugin,
+export default DshxPlugin.make({
   name: 'dshfiles-rich-composer',
   settings: [composerControlsSettings],
-  apis: [agentWarmupHost],
+  layer: AgentWarmups.layer,
+  apis: [Api.bind(agentWarmupApi, { warm: input => AgentWarmups.use(warmups => warmups.warm(SessionId(input.sessionId))) })],
 })

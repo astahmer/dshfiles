@@ -1,4 +1,5 @@
-import { SshConnector, shellQuote } from './connectors/ssh.js'
+import { Effect } from 'effect'
+import { Ssh, shellQuote } from './ssh.js'
 
 export interface RemoteExecResult {
   readonly ok: boolean
@@ -13,20 +14,18 @@ export interface RemoteExecResult {
 const buildRemoteExecCommand = ({ command, cwd }: { readonly command: string; readonly cwd: string | undefined }): string =>
   cwd === undefined ? command : `cd ${shellQuote(cwd)} && ${command}`
 
-const runRemoteExec = async ({
-  sshTarget,
-  command,
-  cwd,
-  timeoutMs = 30_000,
-  signal,
-}: {
+const runRemoteExec = Effect.fnUntraced(function* (input: {
   readonly sshTarget: string
   readonly command: string
   readonly cwd?: string | undefined
   readonly timeoutMs?: number | undefined
-  readonly signal?: AbortSignal | undefined
-}): Promise<RemoteExecResult> => {
-  const result = await SshConnector.run({ sshTarget, command: buildRemoteExecCommand({ command, cwd }), timeoutMs, signal })
+}) {
+  const ssh = yield* Ssh
+  const result = yield* ssh.run({
+    sshTarget: input.sshTarget,
+    command: buildRemoteExecCommand({ command: input.command, cwd: input.cwd }),
+    timeout: input.timeoutMs ?? 30_000,
+  })
   return {
     ok: result.code === 0 && !result.timedOut,
     code: result.code,
@@ -34,8 +33,8 @@ const runRemoteExec = async ({
     stderr: result.stderr.slice(-16_000),
     timedOut: result.timedOut,
     durationMs: result.durationMs,
-  }
-}
+  } satisfies RemoteExecResult
+})
 
 export class RemoteExec {
   static readonly buildCommand = buildRemoteExecCommand

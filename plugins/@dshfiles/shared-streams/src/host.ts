@@ -1,82 +1,53 @@
-import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { DshxEffect } from '@dshfiles/dshx/effect'
-import { defineHost } from '@dshfiles/dshx/host'
-import { Context as EffectContext, Effect, Layer, Schema } from 'effect'
+import { DshxPlugin, hostService } from '@dshfiles/dshx/effect'
+import { Effect, Layer, Schema } from 'effect'
 import { injectAfterHead, SHARED_EVENT_SOURCE_WORKER, SHARED_EVENT_SOURCE_WORKER_PATH, sharedEventSourceScript } from './shim.js'
 
-const rowConfig = Schema.Struct({
+/** A missing row config still decodes to the enabled-by-default configuration. */
+const SharedStreamsConfig = Schema.Struct({
   enabled: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(true))),
 }).pipe(Schema.withDecodingDefaultType(Effect.succeed({ enabled: true })))
 
-/** A missing row config still decodes to the enabled-by-default configuration. */
-const standardRowConfig = Schema.toStandardSchemaV1(rowConfig)
-export const Config = { '~standard': standardRowConfig['~standard'] }
-type SharedStreamsConfig = typeof rowConfig.Type
-
 class SharedStreamsSetupFailure extends Schema.TaggedError<SharedStreamsSetupFailure>()('SharedStreamsSetupFailure', {
-  message: Schema.String,
-}) {}
+  operation: Schema.Literals(['worker-route', 'index-tap']),
+  cause: Schema.optional(Schema.Defect()),
+}) {
+  override get message(): string {
+    return `Shared streams could not install its ${this.operation}; every tab keeps its own EventSource. Check the Host log, then restart DSH.`
+  }
+}
 
-class SharedStreamsHost extends EffectContext.Service<SharedStreamsHost, { readonly webServer: NonNullable<Context['webServer']> }>()(
-  '@dshfiles/shared-streams/Host',
-) {}
-
-const rootLayer = (ctx: Context) =>
-  Layer.effect(
-    SharedStreamsHost,
+const serveSharedEventSource = Effect.fn('shared streams setup')(function* (config: typeof SharedStreamsConfig.Type) {
+  if (!config.enabled) return
+  const webServer = yield* hostService('webServer')
+  const markup = `<script>${sharedEventSourceScript()}</script>`
+  yield* Effect.acquireRelease(
     Effect.try({
-      try: () => {
-        const webServer = ctx.get('webServer')
-        if (webServer === undefined) throw new Error('The web server service is unavailable.')
-        return { webServer }
-      },
-      catch: error => new SharedStreamsSetupFailure({ message: error instanceof Error ? error.message : String(error) }),
+      try: () =>
+        webServer.register({
+          kind: 'exact',
+          path: `/${SHARED_EVENT_SOURCE_WORKER_PATH}`,
+          handler: (_request, response) => {
+            response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' })
+            response.end(SHARED_EVENT_SOURCE_WORKER)
+          },
+        }),
+      catch: cause => new SharedStreamsSetupFailure({ operation: 'worker-route', cause }),
     }),
+    unregister => Effect.sync(unregister),
   )
-
-const setupSharedStreams = Effect.fn('shared streams setup')((config: SharedStreamsConfig) => {
-  if (!config.enabled) return Effect.void
-  return Effect.gen(function* () {
-    const runtime = yield* SharedStreamsHost
-    const markup = `<script>${sharedEventSourceScript()}</script>`
-    yield* Effect.acquireRelease(
-      Effect.try({
-        try: () => {
-          const unregisterRoute = runtime.webServer.register({
-            kind: 'exact',
-            path: `/${SHARED_EVENT_SOURCE_WORKER_PATH}`,
-            handler: (_request, response) => {
-              response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' })
-              response.end(SHARED_EVENT_SOURCE_WORKER)
-            },
-          })
-          const untapIndex = runtime.webServer.tapIndex(html => injectAfterHead(html, markup))
-          return () => {
-            unregisterRoute()
-            untapIndex()
-          }
-        },
-        catch: error => new SharedStreamsSetupFailure({ message: error instanceof Error ? error.message : String(error) }),
-      }),
-      cleanup => Effect.sync(cleanup),
-    )
-  })
+  yield* Effect.acquireRelease(
+    Effect.try({
+      try: () => webServer.tapIndex(html => injectAfterHead(html, markup)),
+      catch: cause => new SharedStreamsSetupFailure({ operation: 'index-tap', cause }),
+    }),
+    untap => Effect.sync(untap),
+  )
 })
 
-const effectPlugin = DshxEffect.plugin({ layer: rootLayer, setup: (_ctx: Context, config: SharedStreamsConfig) => setupSharedStreams(config) })
-
-const setupHost = (ctx: Context, config: SharedStreamsConfig) =>
-  Effect.runPromise(
-    Effect.tryPromise({
-      try: () => effectPlugin.setup(ctx, config),
-      catch: error => new SharedStreamsSetupFailure({ message: error instanceof Error ? error.message : String(error) }),
-    }),
-  )
-
-export default defineHost({
+export default DshxPlugin.make({
   name: '@dshfiles/shared-streams',
   inject: ['webServer'],
-  Config,
-  setup: setupHost,
+  Config: SharedStreamsConfig,
+  layer: config => Layer.effectDiscard(serveSharedEventSource(config)),
 })

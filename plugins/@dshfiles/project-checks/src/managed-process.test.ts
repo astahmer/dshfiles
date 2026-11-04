@@ -1,90 +1,106 @@
-import type { SubprocessHandle, SubprocessOutcome, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
+import type { SubprocessHandle, SubprocessOutcome, SubprocessRuntime, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
+import { DshxEffect, HostContext } from '@dshfiles/dshx/effect'
+import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
+import { createTestHost } from '@dshfiles/dshx/testing'
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import { describe, expect, it } from 'vitest'
-import { runManagedProcess } from './managed-process.js'
+import { describe, expect, it } from '@effect/vitest'
+import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer } from 'effect'
+import { TestClock } from 'effect/testing'
+import { Executables } from './host-promise.js'
+import { ProcessRunner } from './managed-process.js'
 
-const subprocessExiting = (exitCode: number): Pick<SubprocessRuntime, 'resolveExecutable' | 'spawn'> => {
-  const handle: SubprocessHandle = {
-    stdin: undefined,
-    stdout: undefined,
-    stderr: undefined,
-    control: undefined,
-    collected: {
-      stdout: { readFrom: () => ({ text: 'ok', nextOffset: 2, lossy: false }) },
-      stderr: { readFrom: () => ({ text: '', nextOffset: 0, lossy: false }) },
-    },
-    done: Promise.resolve({ exitCode, signal: null }),
-    terminate: () => undefined,
-    waitForExit: async () => true,
-  }
-  return { resolveExecutable: async () => '/usr/local/bin/pnpm', spawn: () => handle }
-}
+type FakeSubprocess = Pick<SubprocessRuntime, 'resolveExecutable' | 'spawn'>
 
-const subprocessControlled = (processGroupExited: boolean) => {
-  let spawned = (): void => undefined
-  const spawnedProcess = new Promise<void>(resolve => {
-    spawned = resolve
+/** A DSH subprocess provider whose process exits on its own or once terminated; a lost range makes `waitForExit` throw. */
+const fakeSubprocess = (input: {
+  readonly exitCode?: number
+  readonly rangeEmpties: boolean
+  readonly spawned: (spec: SubprocessSpawnSpec) => void
+}): FakeSubprocess => ({
+  resolveExecutable: async () => '/usr/local/bin/pnpm',
+  spawn: spec => {
+    input.spawned(spec)
+    let settle: (outcome: SubprocessOutcome) => void = () => undefined
+    const done = new Promise<SubprocessOutcome>(resolve => {
+      settle = resolve
+    })
+    if (input.exitCode !== undefined) settle({ exitCode: input.exitCode, signal: null })
+    const handle: SubprocessHandle = {
+      stdin: undefined,
+      stdout: undefined,
+      stderr: undefined,
+      control: undefined,
+      collected: {},
+      done,
+      terminate: () => settle({ exitCode: null, signal: 'SIGTERM' }),
+      waitForExit: () => (input.rangeEmpties ? Promise.resolve(true) : Promise.reject(new Error('The managed range is no longer observable.'))),
+    }
+    return handle
+  },
+})
+
+const runnerOver = (subprocess: FakeSubprocess) =>
+  Effect.gen(function* () {
+    const host = yield* Effect.acquireRelease(
+      Effect.promise(() => createTestHost()),
+      created => Effect.promise(() => created.dispose()),
+    )
+    host.ctx.provide('subprocess', subprocess)
+    const services = yield* Layer.build(
+      ProcessRunner.layer.pipe(
+        Layer.provide(Layer.mergeAll(DshChildProcessSpawner.layer, Executables.layer)),
+        Layer.provide(HostContext.layer({ ctx: host.ctx, packageId: '@dshfiles/project-checks' })),
+      ),
+    )
+    return Context.get(services, ProcessRunner)
   })
-  let resolveDone: (value: SubprocessOutcome) => void = () => undefined
-  const handle: SubprocessHandle = {
-    stdin: undefined,
-    stdout: undefined,
-    stderr: undefined,
-    control: undefined,
-    collected: {},
-    done: new Promise(resolve => {
-      resolveDone = resolve
-    }),
-    terminate: () => undefined,
-    waitForExit: async () => processGroupExited,
-  }
-  const subprocess: Pick<SubprocessRuntime, 'resolveExecutable' | 'spawn'> = {
-    resolveExecutable: async () => '/usr/local/bin/pnpm',
-    spawn: request => {
-      spawned()
-      if (request.signal === undefined) throw new Error('Expected a managed abort signal.')
-      request.signal.addEventListener('abort', () => resolveDone({ exitCode: null, signal: 'SIGTERM' }), { once: true })
-      return handle
-    },
-  }
-  return { subprocess, spawnedProcess }
-}
+
+const request = { command: 'pnpm', args: ['run', 'synthetic-private-script'], cwd: '/private/tmp/project', timeoutMs: 5_000 }
 
 describe('managed project-check process', () => {
-  it('records a project-checks run span with the executable, argument count and exit code, never argv', async () => {
-    using recorder = recordSpans()
-    const result = await runManagedProcess({
-      subprocess: subprocessExiting(2),
-      command: 'pnpm',
-      args: ['run', 'synthetic-private-script'],
-      cwd: '/private/tmp/project',
-      timeoutMs: 5_000,
-      signal: undefined,
-    })
-    expect(result).toMatchObject({ exitCode: 2, failure: null })
-    const span = recorder.span('project-checks run')
-    expect(span.attributes).toMatchObject({ 'process.executable.name': 'pnpm', 'dshx.project-checks.argument_count': 2, 'process.exit.code': 2 })
-    expect(span.status.code).toBe('error')
-    expect(JSON.stringify(span.attributes)).not.toMatch(/synthetic-private-script|\/private\/tmp/)
-  })
+  it.live('records a project-checks run span with the executable, argument count and exit code, never argv', () =>
+    Effect.gen(function* () {
+      using recorder = recordSpans()
+      const runner = yield* runnerOver(fakeSubprocess({ exitCode: 2, rangeEmpties: true, spawned: () => undefined }))
+      const result = yield* runner.run(request).pipe(Effect.provide(DshxEffect.tracerLayer))
+      expect(result).toMatchObject({ exitCode: 2, failure: null })
+      const span = recorder.span('project-checks run')
+      expect(span.attributes).toMatchObject({ 'process.executable.name': 'pnpm', 'dshx.project-checks.argument_count': 2, 'process.exit.code': 2 })
+      expect(JSON.stringify(span.attributes)).not.toMatch(/synthetic-private-script|\/private\/tmp/)
+    }).pipe(Effect.scoped),
+  )
 
-  it('reports cancellation only after process-group exit is confirmed', async () => {
-    const controller = new AbortController()
-    const { subprocess, spawnedProcess } = subprocessControlled(true)
-    const running = runManagedProcess({ subprocess, command: 'pnpm', args: [], cwd: '/private/tmp/project', timeoutMs: 5_000, signal: controller.signal })
-    await spawnedProcess
-    controller.abort()
+  it.live('an interrupted run ends interrupted once its process group exit is confirmed', () =>
+    Effect.gen(function* () {
+      const spawned = yield* Deferred.make<void>()
+      const runner = yield* runnerOver(fakeSubprocess({ rangeEmpties: true, spawned: () => Deferred.doneUnsafe(spawned, Exit.void) }))
+      const running = yield* Effect.forkChild(runner.run(request))
+      yield* Deferred.await(spawned)
+      yield* Fiber.interrupt(running)
+      const exit = yield* Fiber.await(running)
+      expect(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)).toBe(true)
+    }).pipe(Effect.scoped),
+  )
 
-    expect(await running).toMatchObject({ failure: 'cancelled' })
-  })
+  it.live('an interrupted run whose process group cannot confirm its exit dies with ProcessGroupStillRunning', () =>
+    Effect.gen(function* () {
+      const spawned = yield* Deferred.make<void>()
+      const runner = yield* runnerOver(fakeSubprocess({ rangeEmpties: false, spawned: () => Deferred.doneUnsafe(spawned, Exit.void) }))
+      const running = yield* Effect.forkChild(runner.run(request))
+      yield* Deferred.await(spawned)
+      yield* Fiber.interrupt(running)
+      const exit = yield* Fiber.await(running)
+      expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true)
+      expect(Exit.isFailure(exit) ? String(Cause.squash(exit.cause)) : '').toMatch(/did not confirm its exit/u)
+    }).pipe(Effect.scoped),
+  )
 
-  it('keeps cancellation outcome unknown when process-group exit cannot be confirmed', async () => {
-    const controller = new AbortController()
-    const { subprocess, spawnedProcess } = subprocessControlled(false)
-    const running = runManagedProcess({ subprocess, command: 'pnpm', args: [], cwd: '/private/tmp/project', timeoutMs: 5_000, signal: controller.signal })
-    await spawnedProcess
-    controller.abort()
-
-    expect(await running).toMatchObject({ failure: 'process-group-failed' })
-  })
+  it.effect('a run that outlives its timeout and cannot be stopped reports process-group-failed', () =>
+    Effect.gen(function* () {
+      const runner = yield* runnerOver(fakeSubprocess({ rangeEmpties: false, spawned: () => undefined }))
+      const running = yield* Effect.forkChild(runner.run(request))
+      yield* TestClock.adjust('5 seconds')
+      expect(yield* Fiber.join(running)).toMatchObject({ failure: 'process-group-failed' })
+    }).pipe(Effect.scoped),
+  )
 })

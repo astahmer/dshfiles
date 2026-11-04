@@ -1,7 +1,7 @@
 import type { DockviewApi, SerializedDockview } from 'dockview-react'
 import * as Schema from 'effect/Schema'
 import type { NestedSurfacePath } from './dock-regions.js'
-import { createEffectStoredValue } from './effect-stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import type { WorkbenchPanelDefinition } from './registry.js'
 
 /** Every docked panel uses this one Dockview component; the panel id names the registry entry it renders. */
@@ -70,7 +70,7 @@ type LayoutStoreOptions = { surface?: LayoutStoreSurface; storage?: LayoutStorag
 
 /** Every region keeps its own layout, so docking in one never rearranges another. */
 export const createLayoutStore = (options?: Readonly<LayoutStoreOptions>) =>
-  createEffectStoredValue({ key: surfaceStorageKey(options?.surface ?? 'main'), schema: layoutSchema, fallback: null, storage: options?.storage })
+  createStoredValue({ key: surfaceStorageKey(options?.surface ?? 'main'), schema: layoutSchema, fallback: null, storage: options?.storage })
 
 export type LayoutStore = ReturnType<typeof createLayoutStore>
 export type NestedLayouts = Record<NestedSurfacePath, SerializedDockview | null>
@@ -82,7 +82,7 @@ const NO_NESTED_PATHS: NestedSurfacePath[] = []
  * notifies an already-mounted surface through its existing subscription.
  */
 export const createNestedLayoutStores = (options?: { readonly storage?: LayoutStorage }) => {
-  const paths = createEffectStoredValue({
+  const paths = createStoredValue({
     key: 'dshfiles.workbench.nested-paths.v1',
     schema: Schema.Array(nestedSurfacePathSchema),
     fallback: NO_NESTED_PATHS,

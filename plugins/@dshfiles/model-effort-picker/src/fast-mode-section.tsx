@@ -23,7 +23,7 @@ export const FastModeSection = ({ sessionId, provider, model, disabled, onEnable
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const status = state.data
-  if (status === undefined) return <span className="dshx:h-5 dshx:w-24" />
+  if (status === undefined) return <span className="dshx:h-5 dshx:w-10 dshx:shrink-0" />
   if (!status.available) return null
 
   const update = async (enabled: boolean): Promise<void> => {
@@ -41,18 +41,22 @@ export const FastModeSection = ({ sessionId, provider, model, disabled, onEnable
   }
 
   return (
-    <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5" data-model-fast-mode>
+    <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1" data-model-fast-mode>
       <ZapIcon aria-hidden="true" className={cn('dshx:size-3.5 dshx:shrink-0', status.enabled ? 'dshx:text-warning' : 'dshx:text-muted-foreground')} />
-      <span className="dshx:text-[10px] dshx:text-muted-foreground">Fast mode</span>
-      <Switch
-        aria-label="Fast mode; may cost more"
-        checked={status.enabled}
-        className="dshx:data-[size=sm]:h-4 dshx:data-[size=sm]:w-7"
-        data-model-fast-mode-toggle
-        disabled={disabled || pending}
-        onCheckedChange={(enabled: boolean) => void update(enabled)}
-        size="sm"
-      />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Switch
+            aria-label="Fast mode; may cost more"
+            checked={status.enabled}
+            className="dshx:data-[size=sm]:h-3.5 dshx:data-[size=sm]:w-6 dshx:data-[state=unchecked]:bg-muted-foreground/35"
+            data-model-fast-mode-toggle
+            disabled={disabled || pending}
+            onCheckedChange={(enabled: boolean) => void update(enabled)}
+            size="sm"
+          />
+        </TooltipTrigger>
+        <TooltipContent side="top">Fast mode {status.enabled ? 'on' : 'off'}; may cost more</TooltipContent>
+      </Tooltip>
       {error === null ? null : (
         <Tooltip>
           <TooltipTrigger asChild>

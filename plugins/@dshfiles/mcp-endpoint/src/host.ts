@@ -1,44 +1,20 @@
-import type { Context } from '@deepseek-ai/cordis'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-workspace'
-import { Context as EffectContext, Effect, Layer, Schema } from 'effect'
-import { DshxEffect } from '@dshfiles/dshx/effect'
-import { defineHost } from '@dshfiles/dshx/host'
+import { Api, DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
+import { createHostApiClient } from '@dshfiles/dshx/host'
+import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
+import { Context, Effect, Layer } from 'effect'
 import { mcpEndpointApi } from './endpoint-api.js'
-import { createEndpointStore, type EndpointStore } from './endpoint-store.js'
+import { EndpointTokens } from './endpoint-tokens.js'
 import { isLoopbackAddress } from './local-address.js'
-import { createMcpRoute, MCP_PATH } from './mcp-route.js'
-import { createSessionsClient } from './sessions-client.js'
+import { handleMcpRequest, MCP_PATH } from './mcp-route.js'
+import { McpServers } from './mcp-sdk-promise.js'
+import { McpProjects, McpSessions } from './mcp-tools.js'
 
+const PACKAGE_ID = '@dshfiles/mcp-endpoint'
 const VERSION = '0.1.0'
-
-class EndpointStorageFailure extends Schema.TaggedError<EndpointStorageFailure>()('EndpointStorageFailure', {
-  message: Schema.String,
-}) {}
-
-class EndpointRuntime extends EffectContext.Service<EndpointRuntime, { readonly store: EndpointStore }>()('dshfiles/mcp-endpoint/EndpointRuntime') {}
-
-const endpointPlugin = DshxEffect.plugin({
-  layer: (ctx: Context) => Layer.succeed(EndpointRuntime, { store: createEndpointStore(ctx) }),
-  setup: (ctx: Context) =>
-    Effect.gen(function* () {
-      const runtime = yield* EndpointRuntime
-      const route = createMcpRoute({
-        store: runtime.store,
-        sessions: () => createSessionsClient(ctx),
-        projects: () => ctx.workspaceRegistry.list().map(workspace => ({ projectId: workspace.id, title: workspace.title, path: workspace.path })),
-        version: VERSION,
-      })
-      yield* Effect.acquireRelease(
-        Effect.sync(() => ctx.webServer.register({ kind: 'exact', path: MCP_PATH, handler: route })),
-        unregister => Effect.sync(unregister),
-      )
-    }),
-})
-
-const storageOperation = <Value>(operation: () => Promise<Value>) =>
-  Effect.tryPromise({ try: operation, catch: () => new EndpointStorageFailure({ message: 'The MCP endpoint storage operation failed.' }) })
 
 const urlsOf = (webServer: WebServer) => {
   const port = webServer.port
@@ -48,48 +24,73 @@ const urlsOf = (webServer: WebServer) => {
   return { localUrl: `${webServer.protocol}//127.0.0.1:${port}${MCP_PATH}`, lanUrl: `${webServer.getOrigin()}${MCP_PATH}` }
 }
 
-const statusOf = (store: EndpointStore, webServer: WebServer) =>
-  Effect.gen(function* () {
-    const lanEnabled = yield* storageOperation(() => store.lanEnabled())
-    const token = yield* storageOperation(() => store.tokenInfo())
-    return { path: MCP_PATH, ...urlsOf(webServer), lanEnabled, token }
-  })
+/** The Host's web server: where the endpoint is reachable, and the route registration for the plugin's Scope. */
+class EndpointWeb extends Context.Service<EndpointWeb, { readonly server: WebServer }>()('@dshfiles/mcp-endpoint/EndpointWeb') {
+  static readonly layer = Layer.effect(
+    EndpointWeb,
+    Effect.map(hostService('webServer'), server => EndpointWeb.of({ server })),
+  )
+}
 
-const { hostApi, ...effectPlugin } = endpointPlugin
-
-const endpointHost = hostApi(mcpEndpointApi, {
-  status: Effect.fn('mcp endpoint status read')(({ ctx }) =>
-    Effect.gen(function* () {
-      const runtime = yield* EndpointRuntime
-      return yield* statusOf(runtime.store, ctx.webServer)
-    }),
-  ),
-  rotateToken: Effect.fn('mcp endpoint token rotate')(({ ctx }) =>
-    Effect.gen(function* () {
-      const runtime = yield* EndpointRuntime
-      const token = yield* storageOperation(() => runtime.store.rotate())
-      return { token, status: yield* statusOf(runtime.store, ctx.webServer) }
-    }),
-  ),
-  revokeToken: Effect.fn('mcp endpoint token revoke')(({ ctx }) =>
-    Effect.gen(function* () {
-      const runtime = yield* EndpointRuntime
-      yield* storageOperation(() => runtime.store.revoke())
-      return yield* statusOf(runtime.store, ctx.webServer)
-    }),
-  ),
-  setLanAccess: Effect.fn('mcp endpoint LAN access set')(({ ctx, input }) =>
-    Effect.gen(function* () {
-      const runtime = yield* EndpointRuntime
-      yield* storageOperation(() => runtime.store.setLanEnabled(input.enabled))
-      return yield* statusOf(runtime.store, ctx.webServer)
-    }),
-  ),
+const endpointStatus = Effect.fn('mcp endpoint status read')(function* () {
+  const tokens = yield* EndpointTokens
+  const web = yield* EndpointWeb
+  const lanEnabled = yield* tokens.lanEnabled
+  const token = yield* tokens.tokenInfo
+  return { path: MCP_PATH, ...urlsOf(web.server), lanEnabled, token }
 })
 
-export default defineHost({
-  ...effectPlugin,
+const McpSessionsLive = Layer.effect(
+  McpSessions,
+  Effect.gen(function* () {
+    const host = yield* HostContext
+    return Api.client({ contract: sessionsApi, api: createHostApiClient(host.ctx, sessionsApi, PACKAGE_ID) })
+  }),
+)
+
+const McpProjectsLive = Layer.effect(
+  McpProjects,
+  Effect.map(hostService('workspaceRegistry'), registry =>
+    McpProjects.of({
+      list: Effect.sync(() => registry.list().map(workspace => ({ projectId: workspace.id, title: workspace.title, path: workspace.path }))),
+    }),
+  ),
+)
+
+/** Serve `/mcp` on the Host web server while the plugin is active; each request runs in the plugin's services. */
+const McpRouteLive = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const web = yield* EndpointWeb
+    const handler = yield* DshxPlugin.callback((request: IncomingMessage, response: ServerResponse) =>
+      handleMcpRequest({ request, response, version: VERSION }),
+    )
+    yield* Effect.acquireRelease(
+      Effect.sync(() => web.server.register({ kind: 'exact', path: MCP_PATH, handler })),
+      unregister => Effect.sync(unregister),
+    )
+  }),
+)
+
+const EndpointLive = McpRouteLive.pipe(
+  Layer.provide(McpServers.layer),
+  Layer.provide(Layer.mergeAll(McpSessionsLive, McpProjectsLive)),
+  Layer.provideMerge(Layer.mergeAll(EndpointTokens.layer, EndpointWeb.layer)),
+)
+
+export default DshxPlugin.make({
   name: 'dshfiles-mcp-endpoint',
   inject: ['webServer', 'workspaceRegistry'],
-  apis: [endpointHost],
+  layer: EndpointLive,
+  apis: [
+    Api.bind(mcpEndpointApi, {
+      status: () => endpointStatus(),
+      rotateToken: () =>
+        Effect.gen(function* () {
+          const token = yield* EndpointTokens.use(tokens => tokens.rotate)
+          return { token, status: yield* endpointStatus() }
+        }),
+      revokeToken: () => EndpointTokens.use(tokens => tokens.revoke).pipe(Effect.andThen(endpointStatus())),
+      setLanAccess: input => EndpointTokens.use(tokens => tokens.setLanEnabled(input.enabled)).pipe(Effect.andThen(endpointStatus())),
+    }),
+  ],
 })

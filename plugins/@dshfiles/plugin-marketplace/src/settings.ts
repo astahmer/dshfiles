@@ -21,6 +21,12 @@ export const normalizeHubBaseUrl = (value: string): string => {
   return url.href.replace(/\/$/, '')
 }
 
+export type MarketplaceSettings = {
+  readonly hubBaseUrl: string
+  readonly defaultSort: 'latest' | 'stars'
+  readonly hideIncompatible: boolean
+}
+
 export const marketplaceSettings = defineSettings({
   namespace: 'dshx-plugin-marketplace',
   schema: Schema.object({

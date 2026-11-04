@@ -11,6 +11,20 @@ export interface RecordedSpan {
   readonly status: { readonly code: SpanStatusCode; readonly message: string | undefined }
   readonly startTimeUnixNano: bigint
   readonly endTimeUnixNano: bigint
+  readonly events: readonly RecordedSpanEvent[]
+  readonly links: readonly RecordedSpanLink[]
+}
+
+export interface RecordedSpanEvent {
+  readonly name: string
+  readonly timeUnixNano: bigint
+  readonly attributes: Readonly<Record<string, SpanAttributeValue>>
+}
+
+export interface RecordedSpanLink {
+  readonly traceId: string
+  readonly spanId: string
+  readonly attributes: Readonly<Record<string, SpanAttributeValue>>
 }
 
 export interface SpanRecorder extends Disposable {
@@ -48,6 +62,8 @@ const toRecorded = (span: FinishedSpan): RecordedSpan => ({
   status: { code: span.status.code, message: span.status.message },
   startTimeUnixNano: span.startTimeUnixNano,
   endTimeUnixNano: span.endTimeUnixNano,
+  events: (span.events ?? []).map(event => ({ name: event.name, timeUnixNano: event.timeUnixNano, attributes: Object.fromEntries(event.attributes) })),
+  links: (span.links ?? []).map(link => ({ traceId: link.traceId, spanId: link.spanId, attributes: Object.fromEntries(link.attributes) })),
 })
 
 const record = (): SpanRecorder => {

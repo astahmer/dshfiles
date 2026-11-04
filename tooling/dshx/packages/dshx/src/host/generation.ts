@@ -1,6 +1,7 @@
 import { watch, type FSWatcher } from 'node:fs'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
+import { safeCordisLogger } from './safe-logger.js'
 import { readFile } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -88,7 +89,7 @@ export const createHostGenerationPlugin = (options: HostGenerationPluginOptions)
     let closed = false
     let updateChain = Promise.resolve()
     const attempted = new Set<string>()
-    const logger = context.logger('dshx:host-hmr')
+    const logger = safeCordisLogger(context, 'dshx:host-hmr')
 
     const fail = (generation: string, error: unknown): void => {
       logger.error('Host generation failed (plugin=%s generation=%s): %s', options.metadata.packageId, generation, errorMessage(error))

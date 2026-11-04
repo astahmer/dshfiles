@@ -1,46 +1,54 @@
-import { readdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { basename, dirname, isAbsolute, join } from 'node:path'
+import { Effect, FileSystem, Path } from 'effect'
 
 /**
  * Names SSH already knows how to reach, offered when adding a host: concrete `Host` aliases from the OpenSSH config
  * (following `Include`) and plain host names from `known_hosts`. Wildcards and hashed entries are skipped.
  */
-export const listSshConfigHosts = async (sshDirectory: string): Promise<{ aliases: string[]; knownHosts: string[] }> => {
+export const listSshConfigHosts = Effect.fn('multi-host ssh config read')(function* (sshDirectory: string) {
+  const fileSystem = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
   const aliases = new Set<string>()
   const visited = new Set<string>()
-  const expand = async (pattern: string): Promise<string[]> => {
-    const absolute = pattern.startsWith('~/') ? join(homedir(), pattern.slice(2)) : isAbsolute(pattern) ? pattern : join(sshDirectory, pattern)
+  const readText = (file: string) => fileSystem.readFileString(file).pipe(Effect.orElseSucceed(() => ''))
+
+  const expand = Effect.fnUntraced(function* (pattern: string) {
+    const absolute = pattern.startsWith('~/') ? path.join(homedir(), pattern.slice(2)) : path.isAbsolute(pattern) ? pattern : path.join(sshDirectory, pattern)
     if (!absolute.includes('*')) return [absolute]
-    const directory = dirname(absolute)
+    const directory = path.dirname(absolute)
     const matcher = new RegExp(
-      `^${basename(absolute)
+      `^${path
+        .basename(absolute)
         .replace(/[.+^${}()|[\]\\]/g, '\\$&')
         .replace(/\*/g, '.*')}$`,
     )
-    const names = await readdir(directory).catch(() => [])
-    return names.filter(name => matcher.test(name)).map(name => join(directory, name))
-  }
-  const visit = async (path: string, depth: number): Promise<void> => {
-    if (depth > 4 || visited.has(path) || aliases.size >= 200) return
-    visited.add(path)
-    const content = await readFile(path, 'utf8').catch(() => '')
-    for (const rawLine of content.split('\n')) {
-      const line = rawLine.trim()
-      const match = /^(Host|Include)\s+(.+)$/i.exec(line)
-      if (match === null) continue
-      const values = (match[2] ?? '').split(/\s+/).filter(Boolean)
-      if (match[1]?.toLowerCase() === 'include') {
-        for (const value of values) for (const included of await expand(value)) await visit(included, depth + 1)
-        continue
+    const names = yield* fileSystem.readDirectory(directory).pipe(Effect.orElseSucceed((): string[] => []))
+    return names.filter(name => matcher.test(name)).map(name => path.join(directory, name))
+  })
+
+  const visit = (file: string, depth: number): Effect.Effect<void> =>
+    Effect.gen(function* () {
+      if (depth > 4 || visited.has(file) || aliases.size >= 200) return
+      visited.add(file)
+      const includes: string[] = []
+      for (const rawLine of (yield* readText(file)).split('\n')) {
+        const match = /^(Host|Include)\s+(.+)$/i.exec(rawLine.trim())
+        if (match === null) continue
+        const values = (match[2] ?? '').split(/\s+/).filter(Boolean)
+        if (match[1]?.toLowerCase() === 'include') {
+          includes.push(...values)
+          continue
+        }
+        for (const value of values) if (!/[*?!]/.test(value)) aliases.add(value)
       }
-      for (const value of values) if (!/[*?!]/.test(value)) aliases.add(value)
-    }
-  }
-  await visit(join(sshDirectory, 'config'), 0)
+      for (const include of includes) {
+        for (const included of yield* expand(include)) yield* visit(included, depth + 1)
+      }
+    })
+
+  yield* visit(path.join(sshDirectory, 'config'), 0)
   const knownHosts = new Set<string>()
-  const known = await readFile(join(sshDirectory, 'known_hosts'), 'utf8').catch(() => '')
-  for (const line of known.split('\n')) {
+  for (const line of (yield* readText(path.join(sshDirectory, 'known_hosts'))).split('\n')) {
     const field = line.split(' ', 1)[0] ?? ''
     if (field === '' || field.startsWith('|') || field.startsWith('#') || field.startsWith('@')) continue
     for (const name of field.split(',')) if (/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) knownHosts.add(name)
@@ -52,4 +60,4 @@ export const listSshConfigHosts = async (sshDirectory: string): Promise<{ aliase
       .sort()
       .slice(0, 200),
   }
-}
+})

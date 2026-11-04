@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { openMemoryStore } from '../../../plugins/@dshfiles/memory/src/store.ts'
+import { openMemoryStore } from '../../../plugins/@dshfiles/memory/src/testing/memory-store-promise.ts'
 
 /**
  * Memory retrieval scope probe. Builds a scratch database in which one unrelated project's corpus outranks the

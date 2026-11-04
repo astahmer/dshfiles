@@ -1,19 +1,32 @@
 import { randomUUID } from 'node:crypto'
-import { chmodSync, closeSync, constants, lstatSync, mkdirSync, openSync } from 'node:fs'
-import { dirname } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import type { ApiCaller, ApiHostInput, ApiHostOutput } from '@dshfiles/dshx/api'
-import { Schema } from 'effect'
+import { SqliteStore } from '@dshfiles/sqlite-store'
+import { type Cause, Clock, Context, Effect, FileSystem, Layer, Option, Path, Schema } from 'effect'
+import { Reactivity } from 'effect/reactivity'
+import { type SqlError, SqlSchema } from 'effect/sql'
+import type { SqlClient } from 'effect/sql'
 import type { resourcePacksApi } from './api.js'
+import {
+  AttachmentLimitReached,
+  PackNotAttached,
+  PackNotFound,
+  PackOwnerConflict,
+  type ResourceDomainError,
+  ResourceNotFound,
+  ResourceStoreFailed,
+  StaleResourceRevision,
+  UnsafeResourceStorage,
+} from './errors.js'
+import { resourcePacksMigrations } from './migrations.js'
 import {
   attachmentSchema,
   resourceEventSchema,
   resourceLabelSchema,
   resourceRefSchema,
-  resourceSchema,
   storedPackSchema,
   trackingPack,
+  type ResourceAttachment,
   type ResourceEvent,
   type ResourceRecord,
   type StoredPack,
@@ -22,301 +35,410 @@ import { ResourceValidation } from './validation.js'
 
 type Input<Method extends keyof typeof resourcePacksApi.methods> = ApiHostInput<(typeof resourcePacksApi.methods)[Method]>
 type ResourceCatalog = ApiHostOutput<typeof resourcePacksApi.methods.catalog>
+type Request<Method extends keyof typeof resourcePacksApi.methods> = { readonly input: Input<Method>; readonly caller: ApiCaller }
+export type ResourceStoreError = ResourceDomainError | ResourceStoreFailed
+type StepError = ResourceDomainError | SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError
+
+const memoryFilename = ':memory:'
+const attachmentLimit = 40
+const eventLimit = 100
+const providerPackage = '@dshfiles/resource-packs'
+
+const uuid = Schema.String.check(Schema.isUUID())
+const positiveInt = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))
 const countInt = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
-const jsonRow = Schema.Struct({ json: Schema.String })
-const idRow = Schema.Struct({ id: Schema.String.check(Schema.isUUID()) })
-const resourceRow = Schema.Struct({
-  id: Schema.String.check(Schema.isUUID()),
-  provider: Schema.String,
-  kind: Schema.String,
-  native_id: Schema.String,
-  label: Schema.String,
-  revision: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0)),
+const strictJson = { onExcessProperty: 'error' } as const
+
+const JsonRow = Schema.Struct({ json: Schema.String })
+const IdRow = Schema.Struct({ id: uuid })
+const TotalRow = Schema.Struct({ total: countInt })
+const ResourceRow = Schema.Struct({
+  id: uuid,
+  provider: resourceRefSchema.fields.provider,
+  kind: resourceRefSchema.fields.kind,
+  native_id: resourceRefSchema.fields.id,
+  label: resourceLabelSchema,
+  revision: positiveInt,
   created_at: countInt,
   updated_at: countInt,
 })
-const attachmentRow = Schema.Struct({ pack_id: Schema.String, values_json: Schema.String, attached: Schema.Literals([0, 1]) })
+const AttachmentRow = Schema.Struct({ pack_id: attachmentSchema.fields.packId, values_json: Schema.String, attached: Schema.Literals([0, 1]) })
+const PackWrite = Schema.Struct({ id: Schema.String, json: Schema.String })
+const ResourceInsert = Schema.Struct({ id: uuid, provider: Schema.String, kind: Schema.String, nativeId: Schema.String, label: Schema.String, now: countInt })
+const ListFilter = Schema.Struct({ query: Schema.NullOr(Schema.String), kind: Schema.NullOr(Schema.String), packId: Schema.NullOr(Schema.String) })
+const ListPage = Schema.Struct({ ...ListFilter.fields, limit: positiveInt })
+const RevisionBump = Schema.Struct({ id: uuid, expectedRevision: positiveInt, now: countInt })
+const EventInsert = Schema.Struct({ resourceId: uuid, revision: positiveInt, json: Schema.String })
+const AttachmentKey = Schema.Struct({ resourceId: uuid, packId: Schema.String })
+const AttachmentValues = Schema.Struct({ ...AttachmentKey.fields, valuesJson: Schema.String })
+
+const decodeStoredPack = Schema.decodeEffect(Schema.fromJsonString(storedPackSchema), strictJson)
+const decodeEvent = Schema.decodeEffect(Schema.fromJsonString(resourceEventSchema), strictJson)
+const encodeStoredPack = Schema.encodeEffect(Schema.fromJsonString(storedPackSchema))
+const encodeEvent = Schema.encodeEffect(Schema.fromJsonString(resourceEventSchema))
+
+/** Where the registry lives: `$DSH_HOME/plugins/resource-packs/resources.db`, resolved when the plugin activates. */
+export class ResourceStoreFile extends Context.Service<ResourceStoreFile, { readonly filename: string }>()('@dshfiles/resource-packs/ResourceStoreFile') {
+  static readonly layer = (filename: string) => Layer.succeed(ResourceStoreFile, ResourceStoreFile.of({ filename }))
+  static readonly fromDshHome = Layer.effect(
+    ResourceStoreFile,
+    Effect.sync(() => ResourceStoreFile.of({ filename: dshHomePath('plugins', 'resource-packs', 'resources.db') })),
+  )
+}
+
+class ResourceDb extends Context.Service<ResourceDb, SqlClient.SqlClient>()('@dshfiles/resource-packs/ResourceDb') {}
+
+const refuseSymbolicLink = Effect.fnUntraced(function* (fs: FileSystem.FileSystem, target: string) {
+  if (Option.isSome(yield* Effect.option(fs.readLink(target)))) return yield* new UnsafeResourceStorage({ reason: 'symbolic-link' })
+})
+
+/** The private-path checks sqlite-store does not do: a symlinked directory or file is refused, never followed. */
+const preparePrivateFiles = Effect.fn('resource-packs store prepare')(function* (filename: string) {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const directory = path.dirname(filename)
+  yield* fs.makeDirectory(directory, { recursive: true, mode: 0o700 })
+  yield* refuseSymbolicLink(fs, directory)
+  if ((yield* fs.stat(directory)).type !== 'Directory') return yield* new UnsafeResourceStorage({ reason: 'not-directory' })
+  yield* fs.chmod(directory, 0o700)
+  if (!(yield* fs.exists(filename))) return
+  yield* refuseSymbolicLink(fs, filename)
+  if ((yield* fs.stat(filename)).type !== 'File') return yield* new UnsafeResourceStorage({ reason: 'not-file' })
+})
+
+const resourceDbLayer = Layer.effect(
+  ResourceDb,
+  Effect.gen(function* () {
+    const file = yield* ResourceStoreFile
+    if (file.filename !== memoryFilename)
+      yield* preparePrivateFiles(file.filename).pipe(
+        Effect.catchTag('PlatformError', cause => Effect.fail(new ResourceStoreFailed({ operation: 'open', cause }))),
+      )
+    return yield* SqliteStore.make({
+      filename: file.filename,
+      migrations: resourcePacksMigrations,
+      legacyUserVersion: 1,
+      pragmas: { journalMode: 'delete', foreignKeys: true },
+    })
+  }),
+).pipe(Layer.provide(Reactivity.layer))
+
+const failStore = (operation: ResourceStoreFailed['operation']) => (cause: SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError) =>
+  Effect.fail(new ResourceStoreFailed({ operation, cause }))
+
+const storeFailure =
+  (operation: ResourceStoreFailed['operation']) =>
+  <A, R>(effect: Effect.Effect<A, StepError, R>): Effect.Effect<A, ResourceStoreError, R> =>
+    effect.pipe(Effect.catchTags({ SqlError: failStore(operation), SchemaError: failStore(operation), NoSuchElementError: failStore(operation) }))
+
+const attachmentOf = (resource: ResourceRecord, packId: string) => resource.attachments.find(item => item.packId === packId)
 
 /** Owns only the registry database, never a native resource or its contents. */
-export class ResourceStore {
-  private readonly db: DatabaseSync
-  private closed = false
-
-  constructor(path = dshHomePath('plugins', 'resource-packs', 'resources.db')) {
-    const directory = dirname(path)
-    mkdirSync(directory, { recursive: true, mode: 0o700 })
-    if (!lstatSync(directory).isDirectory() || lstatSync(directory).isSymbolicLink()) {
-      ResourceValidation.refuse('unsafe-storage', 'The resource metadata directory must be a private directory, not a symbolic link.')
-    }
-    chmodSync(directory, 0o700)
-    const fd = openSync(path, constants.O_CREAT | constants.O_RDWR | constants.O_NOFOLLOW, 0o600)
-    closeSync(fd)
-    chmodSync(path, 0o600)
-    this.db = new DatabaseSync(path)
-    try {
-      this.db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = DELETE;')
-      this.migrate()
-      this.registerPack({ definition: trackingPack }, { kind: 'plugin', packageId: '@dshfiles/resource-packs' })
-    } catch (error) {
-      this.db.close()
-      throw error
-    }
+export class ResourceStore extends Context.Service<
+  ResourceStore,
+  {
+    readonly catalog: () => Effect.Effect<ResourceCatalog, ResourceStoreError>
+    readonly list: (input: Input<'list'>) => Effect.Effect<{ resources: Array<ResourceRecord>; total: number }, ResourceStoreError>
+    readonly get: (input: Input<'get'>) => Effect.Effect<{ resource: ResourceRecord; events: Array<ResourceEvent> }, ResourceStoreError>
+    readonly registerPack: (request: Request<'registerPack'>) => Effect.Effect<StoredPack, ResourceStoreError>
+    readonly registerResource: (request: Request<'registerResource'>) => Effect.Effect<ResourceRecord, ResourceStoreError>
+    readonly attach: (request: Request<'attach'>) => Effect.Effect<ResourceRecord, ResourceStoreError>
+    readonly setValues: (request: Request<'setValues'>) => Effect.Effect<ResourceRecord, ResourceStoreError>
+    readonly detach: (request: Request<'detach'>) => Effect.Effect<ResourceRecord, ResourceStoreError>
   }
+>()('@dshfiles/resource-packs/ResourceStore') {
+  static readonly layer = Layer.effect(
+    ResourceStore,
+    Effect.gen(function* () {
+      const sql = yield* ResourceDb
 
-  close(): void {
-    if (this.closed) return
-    this.db.close()
-    this.closed = true
-  }
-
-  private transaction<T>(operation: () => T): T {
-    this.db.exec('BEGIN IMMEDIATE')
-    try {
-      const result = operation()
-      this.db.exec('COMMIT')
-      return result
-    } catch (error) {
-      this.db.exec('ROLLBACK')
-      throw error
-    }
-  }
-
-  private migrate(): void {
-    this.transaction(() => {
-      const { user_version: version } = Schema.decodeUnknownSync(Schema.Struct({ user_version: countInt }))(this.db.prepare('PRAGMA user_version').get())
-      if (version > 1) ResourceValidation.refuse('unsupported-storage-version', 'This database was written by a newer resource-packs version.')
-      if (version === 1) return
-      this.db.exec(`
-        CREATE TABLE packs (id TEXT PRIMARY KEY, json TEXT NOT NULL);
-        CREATE TABLE resources (
-          id TEXT PRIMARY KEY, provider TEXT NOT NULL, kind TEXT NOT NULL, native_id TEXT NOT NULL,
-          label TEXT NOT NULL, revision INTEGER NOT NULL CHECK (revision > 0), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
-          UNIQUE (provider, kind, native_id)
-        );
-        CREATE TABLE attachments (
-          resource_id TEXT NOT NULL REFERENCES resources(id), pack_id TEXT NOT NULL REFERENCES packs(id),
-          values_json TEXT NOT NULL, attached INTEGER NOT NULL CHECK (attached IN (0, 1)), PRIMARY KEY (resource_id, pack_id)
-        );
-        CREATE TABLE events (
-          sequence INTEGER PRIMARY KEY AUTOINCREMENT, resource_id TEXT NOT NULL REFERENCES resources(id), revision INTEGER NOT NULL,
-          json TEXT NOT NULL, UNIQUE (resource_id, revision)
-        );
-        CREATE INDEX resource_events ON events(resource_id, sequence DESC);
-        CREATE INDEX attached_packs ON attachments(pack_id, attached, resource_id);
-        PRAGMA user_version = 1;
-      `)
-    })
-  }
-
-  // oxlint-disable-next-line antislop/no-unknown-parameters -- SQLite rows enter here and are parsed immediately with the persisted-row and pack schemas.
-  private readPack(row: unknown): StoredPack {
-    const pack = Schema.decodeUnknownSync(storedPackSchema, { onExcessProperty: 'error' })(JSON.parse(Schema.decodeUnknownSync(jsonRow)(row).json))
-    ResourceValidation.parseDefinition(pack.definition)
-    return pack
-  }
-
-  private pack(id: string): StoredPack {
-    const row = this.db.prepare('SELECT json FROM packs WHERE id = ?').get(id)
-    if (row === undefined) return ResourceValidation.refuse('unknown-pack', 'This pack is not registered.')
-    return this.readPack(row)
-  }
-
-  catalog(): ResourceCatalog {
-    return {
-      packs: this.db
-        .prepare('SELECT json FROM packs ORDER BY id')
-        .all()
-        .map(row => this.readPack(row)),
-    }
-  }
-
-  registerPack(input: Input<'registerPack'>, caller: ApiCaller): StoredPack {
-    const definition = ResourceValidation.parseDefinition(input.definition)
-    const owner = ResourceValidation.ownerOf(caller)
-    return this.transaction(() => {
-      const row = this.db.prepare('SELECT json FROM packs WHERE id = ?').get(definition.id)
-      const previous = row === undefined ? undefined : this.readPack(row)
-      if (previous !== undefined) {
-        if (previous.owner !== owner) ResourceValidation.refuse('owner-conflict', 'This pack ID belongs to another owner. Choose a different namespace.')
-        if (JSON.stringify(previous.definition) === JSON.stringify(definition)) return previous
-        ResourceValidation.assertCompatible(previous.definition, definition)
-      }
-      const now = Date.now()
-      const pack = Schema.decodeUnknownSync(storedPackSchema, { onExcessProperty: 'error' })({
-        definition,
-        owner,
-        createdAt: previous?.createdAt ?? now,
-        updatedAt: now,
+      const findPackJson = SqlSchema.findOneOption({ Request: Schema.String, Result: JsonRow, execute: id => sql`SELECT json FROM packs WHERE id = ${id}` })
+      const allPackJson = SqlSchema.findAll({ Request: Schema.Void, Result: JsonRow, execute: () => sql`SELECT json FROM packs ORDER BY id` })
+      const savePack = SqlSchema.void({
+        Request: PackWrite,
+        execute: row => sql`INSERT INTO packs(id, json) VALUES (${row.id}, ${row.json}) ON CONFLICT(id) DO UPDATE SET json = excluded.json`,
       })
-      this.db.prepare('INSERT INTO packs(id, json) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET json = excluded.json').run(definition.id, JSON.stringify(pack))
-      // Added null fields must not inflate an existing attached or detached resource beyond its budget.
-      if (previous !== undefined && previous.definition.properties.length !== definition.properties.length) {
-        for (const row of this.db.prepare('SELECT resource_id AS id FROM attachments WHERE pack_id = ?').all(definition.id)) {
-          this.resource(Schema.decodeUnknownSync(idRow)(row).id)
-        }
-      }
-      return pack
-    })
-  }
+      const attachedResourceIds = SqlSchema.findAll({
+        Request: Schema.String,
+        Result: IdRow,
+        execute: packId => sql`SELECT resource_id AS id FROM attachments WHERE pack_id = ${packId}`,
+      })
+      const findResourceRow = SqlSchema.findOneOption({
+        Request: Schema.String,
+        Result: ResourceRow,
+        execute: id => sql`SELECT * FROM resources WHERE id = ${id}`,
+      })
+      const attachmentRows = SqlSchema.findAll({
+        Request: Schema.String,
+        Result: AttachmentRow,
+        execute: id => sql`SELECT pack_id, values_json, attached FROM attachments WHERE resource_id = ${id} ORDER BY pack_id`,
+      })
+      const recentEventJson = SqlSchema.findAll({
+        Request: Schema.String,
+        Result: JsonRow,
+        execute: id => sql`SELECT json FROM events WHERE resource_id = ${id} ORDER BY sequence DESC LIMIT ${eventLimit}`,
+      })
+      // instr treats wildcard punctuation literally; every caller value remains a bound SQL parameter.
+      const listWhere = (filter: typeof ListFilter.Encoded) =>
+        sql`WHERE (${filter.query} IS NULL OR instr(lower(r.label), lower(${filter.query})) > 0 OR instr(lower(r.native_id), lower(${filter.query})) > 0)
+          AND (${filter.kind} IS NULL OR r.kind = ${filter.kind})
+          AND (${filter.packId} IS NULL OR EXISTS (SELECT 1 FROM attachments a WHERE a.resource_id = r.id AND a.pack_id = ${filter.packId} AND a.attached = 1))`
+      const countResources = SqlSchema.findOne({
+        Request: ListFilter,
+        Result: TotalRow,
+        execute: filter => sql`SELECT count(*) AS total FROM resources r ${listWhere(filter)}`,
+      })
+      const pageResourceIds = SqlSchema.findAll({
+        Request: ListPage,
+        Result: IdRow,
+        execute: page => sql`SELECT r.id FROM resources r ${listWhere(page)} ORDER BY r.updated_at DESC, r.id LIMIT ${page.limit}`,
+      })
+      const findResourceIdByRef = SqlSchema.findOneOption({
+        Request: resourceRefSchema,
+        Result: IdRow,
+        execute: ref => sql`SELECT id FROM resources WHERE provider = ${ref.provider} AND kind = ${ref.kind} AND native_id = ${ref.id}`,
+      })
+      const insertResource = SqlSchema.void({
+        Request: ResourceInsert,
+        execute: row =>
+          sql`INSERT INTO resources(id, provider, kind, native_id, label, revision, created_at, updated_at) VALUES (${row.id}, ${row.provider}, ${row.kind}, ${row.nativeId}, ${row.label}, 1, ${row.now}, ${row.now})`,
+      })
+      const bumpRevision = SqlSchema.findAll({
+        Request: RevisionBump,
+        Result: IdRow,
+        execute: bump =>
+          sql`UPDATE resources SET revision = revision + 1, updated_at = ${bump.now} WHERE id = ${bump.id} AND revision = ${bump.expectedRevision} RETURNING id`,
+      })
+      const insertEvent = SqlSchema.void({
+        Request: EventInsert,
+        execute: row => sql`INSERT INTO events(resource_id, revision, json) VALUES (${row.resourceId}, ${row.revision}, ${row.json})`,
+      })
+      const upsertAttachment = SqlSchema.void({
+        Request: AttachmentValues,
+        execute: row =>
+          sql`INSERT INTO attachments(resource_id, pack_id, values_json, attached) VALUES (${row.resourceId}, ${row.packId}, ${row.valuesJson}, 1) ON CONFLICT(resource_id, pack_id) DO UPDATE SET attached = 1`,
+      })
+      const updateAttachmentValues = SqlSchema.void({
+        Request: AttachmentValues,
+        execute: row => sql`UPDATE attachments SET values_json = ${row.valuesJson} WHERE resource_id = ${row.resourceId} AND pack_id = ${row.packId}`,
+      })
+      const markDetached = SqlSchema.void({
+        Request: AttachmentKey,
+        execute: key => sql`UPDATE attachments SET attached = 0 WHERE resource_id = ${key.resourceId} AND pack_id = ${key.packId}`,
+      })
 
-  private resource(id: string): ResourceRecord {
-    const row = this.db.prepare('SELECT * FROM resources WHERE id = ?').get(id)
-    if (row === undefined) return ResourceValidation.refuse('unknown-resource', 'This resource is not registered.')
-    const data = Schema.decodeUnknownSync(resourceRow)(row)
-    const attachments = this.db
-      .prepare('SELECT pack_id, values_json, attached FROM attachments WHERE resource_id = ? ORDER BY pack_id')
-      .all(id)
-      .map(row => {
-        const attachment = Schema.decodeUnknownSync(attachmentRow)(row)
-        const pack = this.pack(attachment.pack_id)
-        const values = ResourceValidation.parseValues(pack.definition, JSON.parse(attachment.values_json))
-        return Schema.decodeUnknownSync(attachmentSchema, { onExcessProperty: 'error' })({
+      const readPack = Effect.fnUntraced(function* (json: string) {
+        const pack = yield* decodeStoredPack(json)
+        yield* ResourceValidation.checkDefinition(pack.definition)
+        return pack
+      })
+
+      const packOf = Effect.fnUntraced(function* (id: string) {
+        const row = yield* findPackJson(id)
+        if (Option.isNone(row)) return yield* new PackNotFound()
+        return yield* readPack(row.value.json)
+      })
+
+      const attachmentRecord = Effect.fnUntraced(function* (attachment: typeof AttachmentRow.Type) {
+        const pack = yield* packOf(attachment.pack_id)
+        const values = yield* ResourceValidation.readPersistedValues({ definition: pack.definition, json: attachment.values_json })
+        const record: ResourceAttachment = {
           packId: attachment.pack_id,
           attached: attachment.attached === 1,
           values: ResourceValidation.fillMissing(pack.definition, values),
-        })
+        }
+        return record
       })
-    const resource = Schema.decodeUnknownSync(resourceSchema, { onExcessProperty: 'error' })({
-      id: data.id,
-      ref: { provider: data.provider, kind: data.kind, id: data.native_id },
-      label: data.label,
-      revision: data.revision,
-      attachments,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-    })
-    ResourceValidation.assertPayloadSize(resource, 256 * 1024, 'The resource metadata')
-    return resource
-  }
 
-  get(input: Input<'get'>): { resource: ResourceRecord; events: ResourceEvent[] } {
-    return this.transaction(() => ({
-      resource: this.resource(input.resourceId),
-      events: this.db
-        .prepare('SELECT json FROM events WHERE resource_id = ? ORDER BY sequence DESC LIMIT 100')
-        .all(input.resourceId)
-        .map(row => Schema.decodeUnknownSync(resourceEventSchema, { onExcessProperty: 'error' })(JSON.parse(Schema.decodeUnknownSync(jsonRow)(row).json))),
-    }))
-  }
-
-  list(input: Input<'list'>): { resources: ResourceRecord[]; total: number } {
-    // instr treats wildcard punctuation literally; every caller value remains a bound SQL parameter.
-    const where = `WHERE (? IS NULL OR instr(lower(r.label), lower(?)) > 0 OR instr(lower(r.native_id), lower(?)) > 0)
-      AND (? IS NULL OR r.kind = ?)
-      AND (? IS NULL OR EXISTS (SELECT 1 FROM attachments a WHERE a.resource_id = r.id AND a.pack_id = ? AND a.attached = 1))`
-    const parameters = [
-      input.query ?? null,
-      input.query ?? null,
-      input.query ?? null,
-      input.kind ?? null,
-      input.kind ?? null,
-      input.packId ?? null,
-      input.packId ?? null,
-    ]
-    return this.transaction(() => {
-      const { total } = Schema.decodeUnknownSync(Schema.Struct({ total: countInt }))(
-        this.db.prepare(`SELECT count(*) AS total FROM resources r ${where}`).get(...parameters),
-      )
-      const ids = this.db.prepare(`SELECT r.id FROM resources r ${where} ORDER BY r.updated_at DESC, r.id LIMIT ?`).all(...parameters, input.limit ?? 200)
-      return { total, resources: ids.map(row => this.resource(Schema.decodeUnknownSync(idRow)(row).id)) }
-    })
-  }
-
-  private event(resource: ResourceRecord, caller: ApiCaller, action: ResourceEvent['action'], packId: string | null): void {
-    const event = Schema.decodeUnknownSync(resourceEventSchema, { onExcessProperty: 'error' })({
-      id: randomUUID(),
-      resourceId: resource.id,
-      revision: resource.revision,
-      actor: ResourceValidation.ownerOf(caller),
-      action,
-      packId,
-      at: resource.updatedAt,
-    })
-    this.db.prepare('INSERT INTO events(resource_id, revision, json) VALUES (?, ?, ?)').run(resource.id, resource.revision, JSON.stringify(event))
-  }
-
-  registerResource(input: Input<'registerResource'>, caller: ApiCaller): ResourceRecord {
-    const ref = Schema.decodeUnknownSync(resourceRefSchema, { onExcessProperty: 'error' })(input.ref)
-    const label = Schema.decodeUnknownSync(resourceLabelSchema)(input.label)
-    return this.transaction(() => {
-      const existing = this.db.prepare('SELECT id FROM resources WHERE provider = ? AND kind = ? AND native_id = ?').get(ref.provider, ref.kind, ref.id)
-      if (existing !== undefined) return this.resource(Schema.decodeUnknownSync(idRow)(existing).id)
-      const now = Date.now()
-      const resource = Schema.decodeUnknownSync(resourceSchema, { onExcessProperty: 'error' })({
-        id: randomUUID(),
-        ref,
-        label,
-        revision: 1,
-        attachments: [],
-        createdAt: now,
-        updatedAt: now,
+      const resourceOf = Effect.fnUntraced(function* (id: string) {
+        const found = yield* findResourceRow(id)
+        if (Option.isNone(found)) return yield* new ResourceNotFound()
+        const row = found.value
+        const resource: ResourceRecord = {
+          id: row.id,
+          ref: { provider: row.provider, kind: row.kind, id: row.native_id },
+          label: row.label,
+          revision: row.revision,
+          attachments: yield* Effect.forEach(yield* attachmentRows(id), attachmentRecord),
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        }
+        yield* ResourceValidation.assertPayloadSize({ value: resource, subject: 'resource' })
+        return resource
       })
-      this.db
-        .prepare('INSERT INTO resources(id, provider, kind, native_id, label, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(resource.id, ref.provider, ref.kind, ref.id, label, 1, now, now)
-      this.event(resource, caller, 'created', null)
-      return resource
-    })
-  }
 
-  private change(
-    input: Input<'attach'>,
-    caller: ApiCaller,
-    action: ResourceEvent['action'],
-    update: (resource: ResourceRecord, pack: StoredPack) => boolean,
-  ): ResourceRecord {
-    return this.transaction(() => {
-      const resource = this.resource(input.resourceId)
-      if (resource.revision !== input.expectedRevision)
-        ResourceValidation.refuse('stale-revision', 'This resource changed. Reload it before editing its metadata.')
-      const pack = this.pack(input.packId)
-      if (!update(resource, pack)) return resource
-      const now = Date.now()
-      const result = this.db
-        .prepare('UPDATE resources SET revision = revision + 1, updated_at = ? WHERE id = ? AND revision = ?')
-        .run(now, resource.id, input.expectedRevision)
-      if (result.changes !== 1) ResourceValidation.refuse('stale-revision', 'This resource changed. Reload it before editing its metadata.')
-      const updated = this.resource(resource.id)
-      this.event(updated, caller, action, pack.definition.id)
-      return updated
-    })
-  }
+      const recordEvent = Effect.fnUntraced(function* (input: {
+        readonly resource: ResourceRecord
+        readonly caller: ApiCaller
+        readonly action: ResourceEvent['action']
+        readonly packId: string | null
+      }) {
+        const event: ResourceEvent = {
+          id: randomUUID(),
+          resourceId: input.resource.id,
+          revision: input.resource.revision,
+          actor: yield* ResourceValidation.ownerOf(input.caller),
+          action: input.action,
+          packId: input.packId,
+          at: input.resource.updatedAt,
+        }
+        yield* insertEvent({ resourceId: input.resource.id, revision: input.resource.revision, json: yield* encodeEvent(event) })
+      })
 
-  attach(input: Input<'attach'>, caller: ApiCaller): ResourceRecord {
-    return this.change(input, caller, 'attached', (resource, pack) => {
-      const attachment = resource.attachments.find(item => item.packId === input.packId)
-      if (attachment?.attached) return false
-      if (attachment === undefined && resource.attachments.length >= 40)
-        ResourceValidation.refuse('attachment-limit', 'A resource may retain at most 40 packs, including detached packs.')
-      const values = ResourceValidation.fillMissing(pack.definition, attachment?.values ?? {})
-      this.db
-        .prepare(
-          'INSERT INTO attachments(resource_id, pack_id, values_json, attached) VALUES (?, ?, ?, 1) ON CONFLICT(resource_id, pack_id) DO UPDATE SET attached = 1',
+      const registerPack = Effect.fn('resource-packs register pack')(function* (request: Request<'registerPack'>) {
+        const definition = yield* ResourceValidation.checkDefinition(request.input.definition)
+        const owner = yield* ResourceValidation.ownerOf(request.caller)
+        return yield* sql.withTransaction(
+          Effect.gen(function* () {
+            const row = yield* findPackJson(definition.id)
+            const previous = Option.isNone(row) ? undefined : yield* readPack(row.value.json)
+            if (previous !== undefined) {
+              if (previous.owner !== owner) return yield* new PackOwnerConflict()
+              if (JSON.stringify(previous.definition) === JSON.stringify(definition)) return previous
+              yield* ResourceValidation.assertCompatible({ previous: previous.definition, next: definition })
+            }
+            const now = yield* Clock.currentTimeMillis
+            const pack: StoredPack = { definition, owner, createdAt: previous?.createdAt ?? now, updatedAt: now }
+            yield* savePack({ id: definition.id, json: yield* encodeStoredPack(pack) })
+            // Added null fields must not inflate an existing attached or detached resource beyond its budget.
+            if (previous !== undefined && previous.definition.properties.length !== definition.properties.length) {
+              yield* Effect.forEach(yield* attachedResourceIds(definition.id), attached => resourceOf(attached.id), { discard: true })
+            }
+            return pack
+          }),
         )
-        .run(resource.id, input.packId, JSON.stringify(values))
-      return true
-    })
-  }
+      }, storeFailure('register-pack'))
 
-  setValues(input: Input<'setValues'>, caller: ApiCaller): ResourceRecord {
-    return this.change(input, caller, 'values-updated', (resource, pack) => {
-      const attachment = resource.attachments.find(item => item.packId === input.packId)
-      if (attachment?.attached !== true) ResourceValidation.refuse('pack-not-attached', 'Attach this pack before setting its properties.')
-      const values = ResourceValidation.parseValues(pack.definition, input.values, caller, pack.owner)
-      this.db
-        .prepare('UPDATE attachments SET values_json = ? WHERE resource_id = ? AND pack_id = ?')
-        .run(JSON.stringify({ ...attachment.values, ...values }), resource.id, input.packId)
-      return true
-    })
-  }
+      const changeResource = Effect.fnUntraced(function* (change: {
+        readonly input: Input<'attach'>
+        readonly caller: ApiCaller
+        readonly action: ResourceEvent['action']
+        readonly update: (resource: ResourceRecord, pack: StoredPack) => Effect.Effect<boolean, StepError>
+      }) {
+        return yield* sql.withTransaction(
+          Effect.gen(function* () {
+            const resource = yield* resourceOf(change.input.resourceId)
+            if (resource.revision !== change.input.expectedRevision) return yield* new StaleResourceRevision()
+            const pack = yield* packOf(change.input.packId)
+            if (!(yield* change.update(resource, pack))) return resource
+            const now = yield* Clock.currentTimeMillis
+            const bumped = yield* bumpRevision({ id: resource.id, expectedRevision: change.input.expectedRevision, now })
+            if (bumped.length !== 1) return yield* new StaleResourceRevision()
+            const updated = yield* resourceOf(resource.id)
+            yield* recordEvent({ resource: updated, caller: change.caller, action: change.action, packId: pack.definition.id })
+            return updated
+          }),
+        )
+      })
 
-  detach(input: Input<'detach'>, caller: ApiCaller): ResourceRecord {
-    if (input.confirm !== true) return ResourceValidation.refuse('confirmation-required', 'Confirm detachment explicitly. Stored values will be retained.')
-    return this.change(input, caller, 'detached', resource => {
-      const attachment = resource.attachments.find(item => item.packId === input.packId)
-      if (attachment?.attached !== true) return false
-      this.db.prepare('UPDATE attachments SET attached = 0 WHERE resource_id = ? AND pack_id = ?').run(resource.id, input.packId)
-      return true
-    })
-  }
+      yield* registerPack({ input: { definition: trackingPack }, caller: { kind: 'plugin', packageId: providerPackage } }).pipe(
+        Effect.mapError(cause => new ResourceStoreFailed({ operation: 'open', cause })),
+      )
+
+      return ResourceStore.of({
+        catalog: Effect.fn('resource-packs catalog')(function* () {
+          const rows = yield* allPackJson(undefined)
+          return { packs: yield* Effect.forEach(rows, row => readPack(row.json)) }
+        }, storeFailure('catalog')),
+        list: Effect.fn('resource-packs list')(function* (input: Input<'list'>) {
+          const filter = { query: input.query ?? null, kind: input.kind ?? null, packId: input.packId ?? null }
+          return yield* sql.withTransaction(
+            Effect.gen(function* () {
+              const counted = yield* countResources(filter)
+              const ids = yield* pageResourceIds({ ...filter, limit: input.limit ?? 200 })
+              return { total: counted.total, resources: yield* Effect.forEach(ids, row => resourceOf(row.id)) }
+            }),
+          )
+        }, storeFailure('list')),
+        get: Effect.fn('resource-packs get')(function* (input: Input<'get'>) {
+          return yield* sql.withTransaction(
+            Effect.gen(function* () {
+              const resource = yield* resourceOf(input.resourceId)
+              const events = yield* Effect.forEach(yield* recentEventJson(input.resourceId), row => decodeEvent(row.json))
+              return { resource, events }
+            }),
+          )
+        }, storeFailure('get')),
+        registerPack,
+        registerResource: Effect.fn('resource-packs register resource')(function* (request: Request<'registerResource'>) {
+          const ref = request.input.ref
+          return yield* sql.withTransaction(
+            Effect.gen(function* () {
+              const existing = yield* findResourceIdByRef(ref)
+              if (Option.isSome(existing)) return yield* resourceOf(existing.value.id)
+              const now = yield* Clock.currentTimeMillis
+              const resource: ResourceRecord = {
+                id: randomUUID(),
+                ref,
+                label: request.input.label,
+                revision: 1,
+                attachments: [],
+                createdAt: now,
+                updatedAt: now,
+              }
+              yield* insertResource({ id: resource.id, provider: ref.provider, kind: ref.kind, nativeId: ref.id, label: resource.label, now })
+              yield* recordEvent({ resource, caller: request.caller, action: 'created', packId: null })
+              return resource
+            }),
+          )
+        }, storeFailure('register-resource')),
+        attach: Effect.fn('resource-packs attach')(function* (request: Request<'attach'>) {
+          const packId = request.input.packId
+          return yield* changeResource({
+            input: request.input,
+            caller: request.caller,
+            action: 'attached',
+            update: (resource, pack) =>
+              Effect.gen(function* () {
+                const attachment = attachmentOf(resource, packId)
+                if (attachment?.attached === true) return false
+                if (attachment === undefined && resource.attachments.length >= attachmentLimit)
+                  return yield* new AttachmentLimitReached({ limit: attachmentLimit })
+                const values = ResourceValidation.fillMissing(pack.definition, attachment?.values ?? {})
+                yield* upsertAttachment({ resourceId: resource.id, packId, valuesJson: JSON.stringify(values) })
+                return true
+              }),
+          })
+        }, storeFailure('attach')),
+        setValues: Effect.fn('resource-packs set values')(function* (request: Request<'setValues'>) {
+          const input = request.input
+          return yield* changeResource({
+            input,
+            caller: request.caller,
+            action: 'values-updated',
+            update: (resource, pack) =>
+              Effect.gen(function* () {
+                const attachment = attachmentOf(resource, input.packId)
+                if (attachment?.attached !== true) return yield* new PackNotAttached()
+                const values = yield* ResourceValidation.checkValues({
+                  definition: pack.definition,
+                  values: input.values,
+                  writer: { caller: request.caller, owner: pack.owner },
+                })
+                yield* updateAttachmentValues({
+                  resourceId: resource.id,
+                  packId: input.packId,
+                  valuesJson: JSON.stringify({ ...attachment.values, ...values }),
+                })
+                return true
+              }),
+          })
+        }, storeFailure('set-values')),
+        detach: Effect.fn('resource-packs detach')(function* (request: Request<'detach'>) {
+          const packId = request.input.packId
+          return yield* changeResource({
+            input: request.input,
+            caller: request.caller,
+            action: 'detached',
+            update: resource =>
+              Effect.gen(function* () {
+                if (attachmentOf(resource, packId)?.attached !== true) return false
+                yield* markDetached({ resourceId: resource.id, packId })
+                return true
+              }),
+          })
+        }, storeFailure('detach')),
+      })
+    }),
+  ).pipe(Layer.provide(resourceDbLayer))
 }

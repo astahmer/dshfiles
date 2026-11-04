@@ -10,6 +10,8 @@ import {
   type BatchExporter,
   type ExportConfig,
   type FinishedSpan,
+  type FinishedSpanEvent,
+  type FinishedSpanLink,
   type SpanAttributeValue,
   type SpanKind,
   type SpanStatus,
@@ -50,7 +52,9 @@ export interface Tracer {
    * Run `run` with `parent` (a remote span from an incoming `traceparent`, or a span this process started and owns) as
    * the parent of the spans it opens, synchronously or not; `undefined` runs it in the current context.
    */
-  runWithParent<T>(parent: SpanContext | undefined, run: () => T): T
+  runWithParent<T, Args extends unknown[] = []>(parent: SpanContext | undefined, run: (...args: Args) => T, ...args: Args): T
+  /** Start a span whose clock and lifetime another tracer drives (the Effect bridge); `parent` is already resolved. */
+  createRecordingSpan<S extends RecordingSpan>(create: (onEnd: (span: FinishedSpan) => void) => S): S
   flush(): Promise<void>
 }
 
@@ -60,6 +64,9 @@ const MAX_STRING = 1_024
 const MAX_LIST = 64
 const MAX_STATUS_MESSAGE = 256
 const MAX_ERROR_TYPE = 128
+const MAX_EVENTS = 128
+const MAX_EVENT_ATTRIBUTES = 32
+const MAX_LINKS = 32
 
 const NOOP_SPAN: Span = Object.freeze({
   recording: false,
@@ -94,35 +101,90 @@ const nonZeroHex = (bytes: number): string => {
   }
 }
 
-class RecordingSpan implements Span {
+const boundedAttributes = (attributes: SpanAttributes | undefined): ReadonlyMap<string, SpanAttributeValue> => {
+  const result = new Map<string, SpanAttributeValue>()
+  if (attributes === undefined) return result
+  for (const key in attributes) {
+    const value = attributes[key]
+    if (value === undefined) continue
+    if (result.size >= MAX_EVENT_ATTRIBUTES) break
+    result.set(key, bounded(value))
+  }
+  return result
+}
+
+export interface RecordingSpanInput {
+  readonly name: string
+  readonly kind: SpanKind
+  readonly parent: SpanContext | undefined
+  /** Unix epoch nanoseconds; now when omitted or `0n` (a tracer that does not time its spans). */
+  readonly startTimeUnixNano?: bigint | undefined
+  readonly onEnd: (span: FinishedSpan) => void
+}
+
+/**
+ * A span that records and exports. Its `traceId`/`spanId` are the exported ids and it is its own `context`, so the
+ * async context can hold the span itself and an identity check tells whether it is already the active parent.
+ */
+export class RecordingSpan implements Span, SpanContext {
   readonly recording = true
-  readonly context: SpanContext
-  readonly #name: string
-  readonly #kind: SpanKind
+  readonly name: string
+  readonly kind: SpanKind
+  readonly traceId: string
+  readonly spanId: string
   readonly #parentSpanId: string | undefined
-  readonly #start = nowUnixNano()
+  readonly #start: bigint
   readonly #attributes = new Map<string, SpanAttributeValue>()
   readonly #onEnd: (span: FinishedSpan) => void
+  #events: FinishedSpanEvent[] | undefined
+  #links: FinishedSpanLink[] | undefined
   #status: SpanStatus = { code: 'unset', message: undefined }
   #ended = false
 
-  constructor(input: {
-    readonly name: string
-    readonly kind: SpanKind
-    readonly parent: SpanContext | undefined
-    readonly onEnd: (span: FinishedSpan) => void
-  }) {
-    this.#name = input.name.slice(0, MAX_NAME)
-    this.#kind = input.kind
+  constructor(input: RecordingSpanInput) {
+    this.name = input.name.slice(0, MAX_NAME)
+    this.kind = input.kind
     this.#parentSpanId = input.parent?.spanId
-    this.context = { traceId: input.parent?.traceId ?? nonZeroHex(16), spanId: nonZeroHex(8) }
+    this.traceId = input.parent?.traceId ?? nonZeroHex(16)
+    this.spanId = nonZeroHex(8)
+    this.#start = input.startTimeUnixNano === undefined || input.startTimeUnixNano === 0n ? nowUnixNano() : input.startTimeUnixNano
     this.#onEnd = input.onEnd
+  }
+
+  get context(): SpanContext {
+    return this
+  }
+
+  get attributes(): ReadonlyMap<string, SpanAttributeValue> {
+    return this.#attributes
+  }
+
+  get ended(): boolean {
+    return this.#ended
   }
 
   setAttribute(key: string, value: SpanAttributeValue | undefined): void {
     if (this.#ended || value === undefined) return
     if (!this.#attributes.has(key) && this.#attributes.size >= MAX_ATTRIBUTES) return
     this.#attributes.set(key, bounded(value))
+  }
+
+  addEvent(input: { readonly name: string; readonly timeUnixNano?: bigint | undefined; readonly attributes?: SpanAttributes | undefined }): void {
+    if (this.#ended) return
+    this.#events ??= []
+    if (this.#events.length >= MAX_EVENTS) return
+    this.#events.push({
+      name: input.name.slice(0, MAX_NAME),
+      timeUnixNano: input.timeUnixNano === undefined || input.timeUnixNano === 0n ? nowUnixNano() : input.timeUnixNano,
+      attributes: boundedAttributes(input.attributes),
+    })
+  }
+
+  addLink(input: { readonly context: SpanContext; readonly attributes?: SpanAttributes | undefined }): void {
+    if (this.#ended) return
+    this.#links ??= []
+    if (this.#links.length >= MAX_LINKS) return
+    this.#links.push({ traceId: input.context.traceId, spanId: input.context.spanId, attributes: boundedAttributes(input.attributes) })
   }
 
   setAttributes(attributes: SpanAttributes): void {
@@ -141,19 +203,26 @@ class RecordingSpan implements Span {
   }
 
   end(): void {
+    this.endAt(nowUnixNano())
+  }
+
+  /** End with the end time another clock measured; `0n` means now. */
+  endAt(endTimeUnixNano: bigint): void {
     if (this.#ended) return
     this.#ended = true
     try {
       this.#onEnd({
-        traceId: this.context.traceId,
-        spanId: this.context.spanId,
+        traceId: this.traceId,
+        spanId: this.spanId,
         parentSpanId: this.#parentSpanId,
-        name: this.#name,
-        kind: this.#kind,
+        name: this.name,
+        kind: this.kind,
         startTimeUnixNano: this.#start,
-        endTimeUnixNano: nowUnixNano(),
+        endTimeUnixNano: endTimeUnixNano === 0n ? nowUnixNano() : endTimeUnixNano,
         attributes: this.#attributes,
         status: this.#status,
+        events: this.#events,
+        links: this.#links,
       })
     } catch {
       return
@@ -168,6 +237,7 @@ class RecordingSpan implements Span {
  */
 const createRecordingTracer = (exporter: BatchExporter | undefined, exportEnabled: () => boolean): Tracer => {
   const storage = new AsyncLocalStorage<SpanContext>()
+  const activeContext = (): SpanContext | undefined => storage.getStore()
   const isEnabled = (): boolean => exportEnabled() || SpanRecorders.active()
   const onEnd = (finished: FinishedSpan): void => {
     if (exporter !== undefined && exportEnabled()) exporter.enqueue(finished)
@@ -204,12 +274,13 @@ const createRecordingTracer = (exporter: BatchExporter | undefined, exportEnable
         span.end()
       }
     },
-    activeContext: () => storage.getStore(),
+    activeContext,
     traceparent: () => {
       const active = storage.getStore()
       return active === undefined ? undefined : TraceparentModel.format(active)
     },
-    runWithParent: (parent, run) => (parent === undefined ? run() : storage.run(parent, run)),
+    runWithParent: (parent, run, ...args) => (parent === undefined || storage.getStore() === parent ? run(...args) : storage.run(parent, run, ...args)),
+    createRecordingSpan: create => create(onEnd),
     flush: async () => exporter?.flush(),
   }
 }
@@ -249,8 +320,9 @@ const createTracer = (input: {
  * Every plugin bundles its own copy of dshx, so the process tracer lives on globalThis under a versioned symbol:
  * all copies share one exporter queue and one async context, and a span opened in one plugin parents the spans
  * another plugin opens while serving that call. v2: the tracer can start recording after creation (local receiver).
+ * v3: `createRecordingSpan` lets the Effect bridge record spans whose ids Effect itself sees.
  */
-const TRACER_KEY = Symbol.for('@dshfiles/dshx.tracing.v2')
+const TRACER_KEY = Symbol.for('@dshfiles/dshx.tracing.v3')
 
 const processTracer = (): Tracer => {
   // SAFETY: only this module writes the versioned symbol, and always a Tracer.

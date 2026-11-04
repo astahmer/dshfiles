@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
 import * as Schema from 'effect/Schema'
-import { createEffectStoredValue } from './effect-stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { trimmedString } from './schema.js'
 
 /** The workbench's own `main` panel key; a contributor checks the slot ledger for it to know the workbench is loaded. */
@@ -61,7 +61,7 @@ const panelPreferencesSchema = Schema.Record(Schema.String.check(Schema.isMinLen
 const isStrictPanelPreference = (value: unknown): value is WorkbenchPanelPreference => Schema.is(panelPreferenceSchema)(value)
 
 const emptyPanelPreferences: Record<string, WorkbenchPanelPreference> = {}
-const storedPanelPreferences = createEffectStoredValue({
+const storedPanelPreferences = createStoredValue({
   key: 'dshfiles.workbench.side-panel-preferences.v1',
   schema: panelPreferencesSchema,
   fallback: emptyPanelPreferences,

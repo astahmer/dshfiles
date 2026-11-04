@@ -1,5 +1,6 @@
-import { GatewayUnavailableError } from './connectors/gateway.js'
-import { SshConnector, shellQuote } from './connectors/ssh.js'
+import { Effect } from 'effect'
+import { SshCommandFailed, SshTimedOut } from './errors.js'
+import { Ssh, shellQuote } from './ssh.js'
 
 const statusTimeoutMs = 20_000
 
@@ -132,20 +133,13 @@ const waitForLaunchCommand = ({ remoteHome }: { readonly remoteHome: string }): 
   ].join('\n')
 }
 
-const readRuntimeStatus = async ({
-  sshTarget,
-  remoteHome,
-  signal,
-}: {
-  readonly sshTarget: string
-  readonly remoteHome: string
-  readonly signal?: AbortSignal | undefined
-}): Promise<RemoteRuntimeStatus> => {
-  const result = await SshConnector.run({ sshTarget, command: statusScript({ remoteHome }), timeoutMs: statusTimeoutMs, signal })
-  if (result.timedOut) throw new GatewayUnavailableError('ssh-timeout', 'The runtime status probe exceeded its time limit.')
-  if (result.code !== 0) throw new GatewayUnavailableError('ssh-command-failed', result.stderr.trim() || 'The runtime status probe failed.')
-  return parseRuntimeStatus({ output: result.stdout, remoteHome })
-}
+const readRuntimeStatus = Effect.fn('remote runtime status read')(function* (input: { readonly sshTarget: string; readonly remoteHome: string }) {
+  const ssh = yield* Ssh
+  const result = yield* ssh.run({ sshTarget: input.sshTarget, command: statusScript({ remoteHome: input.remoteHome }), timeout: statusTimeoutMs })
+  if (result.timedOut) return yield* new SshTimedOut({ timeoutMs: statusTimeoutMs })
+  if (result.code !== 0) return yield* new SshCommandFailed({ exitCode: result.code, stderrTail: result.stderr.trim() || 'The runtime status probe failed.' })
+  return parseRuntimeStatus({ output: result.stdout, remoteHome: input.remoteHome })
+})
 
 export class RemoteRuntime {
   static readonly logPath = runtimeLogPath

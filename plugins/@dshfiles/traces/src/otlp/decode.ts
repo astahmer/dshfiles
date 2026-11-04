@@ -1,53 +1,38 @@
-import * as Schema from 'effect/Schema'
-import type * as SchemaTypes from 'effect/Schema'
-import { RequestRejection, type Wire } from '../receiver.js'
-import {
-  otlpLogsRequestSchema,
-  otlpMetricsRequestSchema,
-  otlpTraceRequestSchema,
-  type OtlpLogsRequest,
-  type OtlpMetricsRequest,
-  type OtlpTraceRequest,
-} from './json-schema.js'
+import { Effect, Schema } from 'effect'
+import { OtlpRequestRejected } from '../receiver-errors.js'
+import { otlpLogsRequestSchema, otlpMetricsRequestSchema, otlpTraceRequestSchema } from './json-schema.js'
 import { OtlpProtobuf, ProtobufDecodeError } from './protobuf.js'
 
-const decodeJsonBody = <Decoded>(body: Buffer, schema: SchemaTypes.ConstraintDecoder<Decoded>, label: string): Decoded => {
-  let json: unknown
-  try {
-    json = JSON.parse(body.toString('utf8'))
-  } catch {
-    throw new RequestRejection(400, 'The JSON body could not be parsed.')
+export type Wire = 'json' | 'protobuf'
+export type OtlpSignal = 'traces' | 'metrics' | 'logs'
+export type OtlpBodyInput = { readonly body: Buffer; readonly wire: Wire }
+
+const parseJson = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))
+
+const decoderOf = <Decoded>(input: { readonly schema: Schema.Decoder<Decoded>; readonly protobuf: (bytes: Uint8Array) => Decoded; readonly label: string }) => {
+  const decodeJson = Schema.decodeUnknownEffect(input.schema)
+  return (body: OtlpBodyInput): Effect.Effect<Decoded, OtlpRequestRejected> => {
+    if (body.wire === 'protobuf')
+      return Effect.try({
+        try: () => input.protobuf(body.body),
+        catch: cause =>
+          new OtlpRequestRejected({
+            status: 400,
+            reason: cause instanceof ProtobufDecodeError ? cause.message : `The protobuf body is not an ${input.label}.`,
+            cause,
+          }),
+      })
+    return parseJson(body.body.toString('utf8')).pipe(
+      Effect.mapError(cause => new OtlpRequestRejected({ status: 400, reason: 'The JSON body could not be parsed.', cause })),
+      Effect.flatMap(json =>
+        Effect.mapError(decodeJson(json), cause => new OtlpRequestRejected({ status: 400, reason: `The JSON body is not an OTLP ${input.label}.`, cause })),
+      ),
+    )
   }
-  const parsed = Schema.decodeUnknownResult(schema)(json)
-  if (parsed._tag === 'Failure') throw new RequestRejection(400, `The JSON body is not an OTLP ${label}.`)
-  return parsed.success
-}
-
-const decodeProtobufBody = <Decoded>(body: Buffer, decode: (bytes: Uint8Array) => Decoded, label: string): Decoded => {
-  try {
-    return decode(body)
-  } catch (error) {
-    throw new RequestRejection(400, error instanceof ProtobufDecodeError ? error.message : `The protobuf body is not an ${label}.`)
-  }
-}
-
-const decodeTraceBody = (input: { readonly body: Buffer; readonly wire: Wire }): OtlpTraceRequest => {
-  if (input.wire === 'protobuf') return decodeProtobufBody(input.body, OtlpProtobuf.decodeTraces, 'ExportTraceServiceRequest')
-  return decodeJsonBody(input.body, otlpTraceRequestSchema, 'ExportTraceServiceRequest')
-}
-
-const decodeLogsBody = (input: { readonly body: Buffer; readonly wire: Wire }): OtlpLogsRequest => {
-  if (input.wire === 'protobuf') return decodeProtobufBody(input.body, OtlpProtobuf.decodeLogs, 'ExportLogsServiceRequest')
-  return decodeJsonBody(input.body, otlpLogsRequestSchema, 'ExportLogsServiceRequest')
-}
-
-const decodeMetricsBody = (input: { readonly body: Buffer; readonly wire: Wire }): OtlpMetricsRequest => {
-  if (input.wire === 'protobuf') return decodeProtobufBody(input.body, OtlpProtobuf.decodeMetrics, 'ExportMetricsServiceRequest')
-  return decodeJsonBody(input.body, otlpMetricsRequestSchema, 'ExportMetricsServiceRequest')
 }
 
 export class OtlpBody {
-  static readonly decodeTraces = decodeTraceBody
-  static readonly decodeLogs = decodeLogsBody
-  static readonly decodeMetrics = decodeMetricsBody
+  static readonly decodeTraces = decoderOf({ schema: otlpTraceRequestSchema, protobuf: OtlpProtobuf.decodeTraces, label: 'ExportTraceServiceRequest' })
+  static readonly decodeLogs = decoderOf({ schema: otlpLogsRequestSchema, protobuf: OtlpProtobuf.decodeLogs, label: 'ExportLogsServiceRequest' })
+  static readonly decodeMetrics = decoderOf({ schema: otlpMetricsRequestSchema, protobuf: OtlpProtobuf.decodeMetrics, label: 'ExportMetricsServiceRequest' })
 }

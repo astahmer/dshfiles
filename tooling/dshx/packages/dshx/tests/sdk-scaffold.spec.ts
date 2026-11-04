@@ -15,7 +15,7 @@ import { typecheckProject } from '../src/project/typecheck.js'
 import { testProject } from '../src/toolchain/index.js'
 
 describe('SDK-first templates', () => {
-  it.each(['basic', 'ui', 'tool', 'full-stack'] as const)('builds and validates the %s native bundle', async template => {
+  it.each(['basic', 'ui', 'tool', 'effect-host', 'full-stack'] as const)('builds and validates the %s native bundle', async template => {
     const root = await mkdtemp(resolve(tmpdir(), 'dshx-sdk-template-'))
     try {
       for (const file of renderProjectTemplate(
@@ -32,6 +32,9 @@ describe('SDK-first templates', () => {
       await symlink(fileURLToPath(new URL('../../../node_modules/vitest', import.meta.url)), resolve(root, 'node_modules/vitest'))
       await symlink(fileURLToPath(new URL('../node_modules/react', import.meta.url)), resolve(root, 'node_modules/react'))
       await symlink(fileURLToPath(new URL('../node_modules/@types', import.meta.url)), resolve(root, 'node_modules/@types'))
+      await symlink(fileURLToPath(new URL('../node_modules/effect', import.meta.url)), resolve(root, 'node_modules/effect'))
+      await mkdir(resolve(root, 'node_modules/@effect'), { recursive: true })
+      await symlink(fileURLToPath(new URL('../node_modules/@effect/vitest', import.meta.url)), resolve(root, 'node_modules/@effect/vitest'))
       const config = await resolveDshxConfig({ cwd: root })
       expect((await typecheckProject(root)).diagnostics).toEqual([])
       const output: string[] = []
@@ -68,7 +71,7 @@ describe('SDK-first templates', () => {
       const patch = await readFile(resolve(root, 'cordis.patch.yml'), 'utf8')
       expect(patch).toContain('id: my-plugin')
       if (template === 'full-stack') expect(await readFile(resolve(root, 'src/settings.ts'), 'utf8')).toContain("namespace: 'my-plugin'")
-      if (template === 'basic' || template === 'tool') {
+      if (template === 'basic' || template === 'tool' || template === 'effect-host') {
         expect(config.clientEntry).toBeUndefined()
         expect(config.manifest.dsh).not.toHaveProperty('client')
         expect(config.manifest.exports).not.toHaveProperty('./client')

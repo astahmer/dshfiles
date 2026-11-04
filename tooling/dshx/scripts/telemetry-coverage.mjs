@@ -15,15 +15,24 @@ const IO_PRIMITIVES = [
   { label: 'child_process', pattern: /^import\s+(?!type\b)(?:\{[^}]*\}|[^\n{])*?from ['"]node:child_process['"]/mu },
   { label: 'subprocess spawn', pattern: /\.spawn\(\s*\{|\bresolveExecutable\(/u },
 ]
-const SPAN_PRIMITIVE = /\b(?:withSpan|traced|startSpan)\(/u
+const SPAN_PRIMITIVE = /\b(?:withSpan|traced|startSpan)\(|\bEffect\.fn\(\s*['"`]/u
 
 /** What makes an automatic source true for a plugin: its Host code does the thing that emits the span. */
 const AUTOMATIC_EVIDENCE = {
   'api-dispatch': { pattern: /\bdefineApi\(/u, needs: 'a dshx API (defineApi) in its Host or module code' },
-  'agent-tool': { pattern: /\bdefineTool\(|\btool:\s*\{/u, needs: 'an agent tool (defineTool or a dshx method tool binding)' },
-  'model-stream': { pattern: /\bctx\.llm\b|\.get\(\s*['"]llm['"]\s*\)|inject:\s*\[[^\]]*['"]llm['"]/u, needs: 'a ctx.llm stream' },
+  'agent-tool': {
+    pattern: /\bdefineTool\(|\btool:\s*\{|\bTool\.(?:make|register)\(/u,
+    needs: 'an agent tool (defineTool, Tool.make or a dshx method tool binding)',
+  },
+  'model-stream': {
+    pattern: /\bctx\.llm\b|\.get\(\s*['"]llm['"]\s*\)|inject:\s*\[[^\]]*['"]llm['"]|from ['"]@dshfiles\/dshx\/effect\/llm['"]/u,
+    needs: 'a ctx.llm stream or the dshx Llm service',
+  },
   jj: { pattern: /@dshfiles\/(?:jujutsu|jj-integration)\b/u, needs: 'a call into the jujutsu or jj-integration Host API' },
-  secret: { pattern: /\bsecretCatalogValues\b/u, needs: "a ctx.get('secretCatalogValues') resolve" },
+  secret: {
+    pattern: /\bsecretCatalogValues\b|\bSecretReferenceResolver\b/u,
+    needs: "a ctx.get('secretCatalogValues') resolve or the credential-port SecretReferenceResolver",
+  },
   'multi-host': { pattern: /@dshfiles\/multi-host\b/u, needs: 'a call into the multi-host gateway' },
 }
 

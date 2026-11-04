@@ -6,12 +6,9 @@
     "test:boot": {
       "dependsOn": [],
       "inputs": [
-        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__credential-port.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__git-worktrees.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__vcs-provider-port.sha256",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/cordis.patch.yml",
-        "$TURBO_ROOT$/plugins/@dshfiles/credential-port/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/git-worktrees/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/git-worktrees/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/vcs-provider-port/cordis.patch.yml",

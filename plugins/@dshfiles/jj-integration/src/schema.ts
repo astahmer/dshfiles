@@ -54,42 +54,17 @@ const reorderArrayKeywords = (value: unknown): JsonSchemaValue => {
 const publishedDocument = (document: unknown): JsonObject => (isJsonObject(document) ? document : {})
 
 /** `Schema.Struct({})` publishes `{ not: { type: 'null' } }` where `z.object({})` published an empty object. */
-const replaceEmptyObject = (document: Record<string, unknown>, closed: boolean): Record<string, unknown> => {
+const closeEmptyObject = (document: Record<string, unknown>): Record<string, unknown> => {
   if (!emptyObject(document)) return document
   const { not: _not, $schema, ...rest } = document
-  const replaced = closed ? { ...rest, type: 'object', properties: {}, additionalProperties: false } : { ...rest, type: 'object', properties: {} }
+  const replaced = { ...rest, type: 'object', properties: {}, additionalProperties: false }
   return $schema === undefined ? replaced : { $schema, ...replaced }
 }
 
 const merge = (standardDocument: Record<string, unknown>, document: ReturnType<typeof closedDocument>, options: JsonSchemaOptions) => {
   const closed = current(document, options)
   if (!emptyObject(closed)) return { ...standardDocument, ...closed }
-  return replaceEmptyObject({ ...standardDocument, ...closed }, true)
-}
-
-/**
- * Effect publishes `additionalProperties: true` for a Struct and dshx drops that keyword, while zod published
- * `additionalProperties: false` on an object's output side only. The closed document is merged into the output schema
- * and the input keeps Effect's open one, so decoding stays as permissive as `z.object(...)`, which strips unknown keys.
- */
-export const standardSchema = <S extends SchemaTypes.ConstraintDecoder<unknown>>(schema: S) => {
-  const standardSchema = Schema.toStandardSchemaV1(schema)
-  const standardJsonSchema = Schema.toStandardJSONSchemaV1(schema)['~standard'].jsonSchema
-  const document = closedDocument(schema)
-
-  return {
-    ast: schema.ast,
-    '~standard': {
-      ...standardSchema['~standard'],
-      jsonSchema: {
-        ...standardJsonSchema,
-        input: (options: JsonSchemaOptions) =>
-          publishedDocument(reorderArrayKeywords(omitDefaultAdditionalProperties(replaceEmptyObject(standardJsonSchema.input(options), false)))),
-        output: (options: JsonSchemaOptions) =>
-          publishedDocument(reorderArrayKeywords(omitDefaultAdditionalProperties(merge(standardJsonSchema.output(options), document, options)))),
-      },
-    },
-  }
+  return closeEmptyObject({ ...standardDocument, ...closed })
 }
 
 /**

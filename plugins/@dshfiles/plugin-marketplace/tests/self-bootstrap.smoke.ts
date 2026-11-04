@@ -3,12 +3,21 @@ import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { Context } from '@deepseek-ai/cordis'
+import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
+import { layer as nodePathLayer } from '@effect/platform-node/NodePath'
 import { decodeJson } from '@dshfiles/dshx/json'
 import { execa } from 'execa'
+import { Context, Effect, Layer } from 'effect'
+import { FetchHttpClient } from 'effect/http'
+import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import * as Schema from 'effect/Schema'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { MarketplaceHostService } from '../src/host-service.js'
+import { HostContext } from '@dshfiles/dshx/effect'
+import { MarketplaceCatalog } from '../src/catalog.js'
+import { MarketplaceFiles } from '../src/marketplace-files.js'
+import { MarketplaceProcesses } from '../src/marketplace-processes.js'
+import { MarketplaceService } from '../src/marketplace-service.js'
+import { marketplaceSettingsTestLayer } from '../src/settings-tag.js'
 
 const profileManifestSchema = Schema.Struct({ dsh: Schema.Struct({ profile: Schema.Struct({ bundles: Schema.Array(Schema.String) }) }) })
 
@@ -54,6 +63,21 @@ function listen(server: Server): Promise<number> {
       resolveListen(address.port)
     })
   })
+}
+
+/** The marketplace over the real Profile, catalog and DSH spawner, with only the Hub URL pointed at the fixture. */
+const smokeService = (input: { readonly hubBaseUrl: string; readonly profileDir: string }) => {
+  const host = HostContext.layer({ ctx: { baseUrl: pathToFileURL(input.profileDir).href } as never, packageId: '@dshfiles/plugin-marketplace' })
+  const layer = MarketplaceService.layer.pipe(
+    Layer.provideMerge(MarketplaceCatalog.layer),
+    Layer.provideMerge(MarketplaceFiles.layer.pipe(Layer.provide(nodeFileSystemLayer), Layer.provide(nodePathLayer))),
+    Layer.provideMerge(MarketplaceProcesses.layer),
+    Layer.provide(marketplaceSettingsTestLayer({ hubBaseUrl: input.hubBaseUrl })),
+    Layer.provideMerge(host),
+    Layer.provide(FetchHttpClient.layer),
+    Layer.provide(DshChildProcessSpawner.layer.pipe(Layer.provide(host))),
+  )
+  return Effect.map(Layer.build(layer), context => Context.get(context, MarketplaceService)).pipe(Effect.scoped)
 }
 
 describe('plugin marketplace self-bootstrap smoke', () => {
@@ -183,12 +207,8 @@ describe('plugin marketplace self-bootstrap smoke', () => {
 
   it('installs through the typed marketplace service and loads after Profile restart', async () => {
     process.env.DSH_HOME = dshHome
-    // SAFETY: the Host service reads only `baseUrl` from its Context, which this smoke test supplies.
-    const ctx = { baseUrl: pathToFileURL(profileDir).href } as Context
-    const service = new MarketplaceHostService({
-      settings: () => ({ hubBaseUrl }),
-    })
-    const catalog = await service.list({ locale: 'en' }, ctx, new AbortController().signal)
+    const service = await Effect.runPromise(smokeService({ hubBaseUrl, profileDir }))
+    const catalog = await Effect.runPromise(service.list({ locale: 'en' }))
     expect(catalog.items).toHaveLength(1)
     expect(catalog.items[0]).toMatchObject({
       slug: 'marketplace-smoke-target',
@@ -196,7 +216,7 @@ describe('plugin marketplace self-bootstrap smoke', () => {
       compatibility: 'compatible',
     })
 
-    await expect(service.install('marketplace-smoke-target', ctx, new AbortController().signal)).resolves.toMatchObject({
+    await expect(Effect.runPromise(service.install('marketplace-smoke-target'))).resolves.toMatchObject({
       status: 'installed',
       packageName: '@dshx-smoke/marketplace-target',
       restartRequired: true,

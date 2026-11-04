@@ -344,19 +344,19 @@
           "kind": "unit-test",
           "id": "project-checks.durable-task-cancel",
           "file": "plugins/@dshfiles/project-checks/src/durable-task-runner.test.ts",
-          "testName": "cancels a running process through its signal and records its confirmed result"
+          "testName": "cancels a running attempt by interrupting it and records the cancellation"
         },
         {
           "kind": "unit-test",
           "id": "project-checks.durable-task-cancel-confirmed",
           "file": "plugins/@dshfiles/project-checks/src/managed-process.test.ts",
-          "testName": "reports cancellation only after process-group exit is confirmed"
+          "testName": "an interrupted run ends interrupted once its process group exit is confirmed"
         },
         {
           "kind": "unit-test",
           "id": "project-checks.durable-task-cancel-unknown",
           "file": "plugins/@dshfiles/project-checks/src/managed-process.test.ts",
-          "testName": "keeps cancellation outcome unknown when process-group exit cannot be confirmed"
+          "testName": "an interrupted run whose process group cannot confirm its exit dies with ProcessGroupStillRunning"
         },
         {
           "kind": "unit-test",

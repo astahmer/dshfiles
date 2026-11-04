@@ -1,135 +1,128 @@
-import { describe, expect, it } from 'vitest'
-import { SecretCliError } from './secret-cli-runner.js'
-import type { SecretMetadata } from './secret-metadata.js'
-import type { SecretCatalogOperations } from './secret-operations.js'
+import { NodeFileSystem } from '@effect/platform-node'
+import { describe, expect, it } from '@effect/vitest'
+import { Deferred, Effect, Exit, Fiber, Layer } from 'effect'
+import { catalogWithCli } from './secret-catalog-fixture.js'
+import { SecretCliError, type SecretCliFailureCode, type SecretCliRequest } from './secret-cli.js'
 import { checkSecretReference } from './secret-reference-status.js'
 
-const row = (overrides: Partial<SecretMetadata>): SecretMetadata => ({
-  id: 'row',
+const row = (overrides: Record<string, string>) => ({
   alias: 'DSH_JEV_BACKLOG',
   scope: 'global',
-  environment: 'prod',
-  variableName: 'DSH_JEV_BACKLOG',
+  env: 'prod',
+  envKey: 'DSH_JEV_BACKLOG',
   item: 'global/dsh-jev-backlog',
   field: 'password',
-  service: '',
-  description: '',
   ...overrides,
 })
 
-const operationsWith = (input: {
-  readonly rows?: readonly SecretMetadata[]
-  readonly rowsByFolder?: Readonly<Record<string, readonly SecretMetadata[]>>
-  readonly listError?: Error
-  readonly revealError?: Error
+const cliFailure = (code: SecretCliFailureCode) => Effect.fail(new SecretCliError({ code, cleanupConfirmed: true }))
+
+const catalogWith = (input: {
+  readonly rows?: readonly Record<string, string>[]
+  readonly rowsByFolder?: Readonly<Record<string, readonly Record<string, string>[]>>
+  readonly listFailure?: SecretCliFailureCode
+  readonly revealFailure?: SecretCliFailureCode
   readonly value?: string
-}): Pick<SecretCatalogOperations, 'list' | 'reveal'> => ({
-  list: async cwd => {
-    if (input.listError !== undefined) throw input.listError
-    if (cwd !== null) return input.rowsByFolder?.[cwd] ?? []
-    return input.rows ?? []
-  },
-  reveal: async () => {
-    if (input.revealError !== undefined) throw input.revealError
-    return input.value ?? 'synthetic-value'
-  },
-})
+}) =>
+  catalogWithCli((request: SecretCliRequest) => {
+    if (request.args[0] === 'get') return input.revealFailure === undefined ? Effect.succeed(input.value ?? 'synthetic-value') : cliFailure(input.revealFailure)
+    if (input.listFailure !== undefined) return cliFailure(input.listFailure)
+    if (request.cwd !== null) return Effect.succeed(JSON.stringify(input.rowsByFolder?.[request.cwd] ?? []))
+    return Effect.succeed(JSON.stringify(input.rows ?? []))
+  })
 
-const plainGlobalConfig = async () => ({ path: '/home/synthetic/.config/secret/config.json', linkedTo: null })
-
-const check = (referenceText: string, operations: Pick<SecretCatalogOperations, 'list' | 'reveal'>, probeFolders: readonly string[] = []) =>
-  checkSecretReference({ operations, referenceText, cwd: null, probeFolders, inspectGlobalConfig: plainGlobalConfig })
+const check = (fixture: ReturnType<typeof catalogWith>, referenceText: string, probeFolders: readonly string[] = []) =>
+  checkSecretReference({ referenceText, cwd: null, probeFolders }).pipe(Effect.provide(Layer.merge(fixture.layer, NodeFileSystem.layer)))
 
 describe('secret reference status', () => {
-  it('reports an empty field and a non-reference without calling the CLI', async () => {
-    const operations = operationsWith({ listError: new Error('must not run') })
-    expect((await check('  ', operations)).state).toBe('empty')
-    expect(await check('plain-text-key', operations)).toMatchObject({ state: 'invalid-reference', alias: null })
-  })
+  it.effect('reports an empty field and a non-reference without calling the CLI', () =>
+    Effect.gen(function* () {
+      const fixture = catalogWith({ listFailure: 'cli-failed' })
+      expect((yield* check(fixture, '  ')).state).toBe('empty')
+      expect(yield* check(fixture, 'plain-text-key')).toMatchObject({ state: 'invalid-reference', alias: null })
+      expect(fixture.requests).toEqual([])
+    }),
+  )
 
-  it('names a missing alias with its canonical reference', async () => {
-    const status = await check('secret:DSH_JEV_BACKLOG', operationsWith({ rows: [row({ alias: 'OTHER' })] }))
-    expect(status).toMatchObject({ state: 'alias-missing', reference: 'secret:DSH_JEV_BACKLOG', alias: 'DSH_JEV_BACKLOG', environment: 'prod' })
-  })
+  it.effect('names a missing alias with its canonical reference', () =>
+    Effect.gen(function* () {
+      const status = yield* check(catalogWith({ rows: [row({ alias: 'OTHER' })] }), 'secret:DSH_JEV_BACKLOG')
+      expect(status).toMatchObject({ state: 'alias-missing', reference: 'secret:DSH_JEV_BACKLOG', alias: 'DSH_JEV_BACKLOG', environment: 'prod' })
+    }),
+  )
 
-  it('passes cancellation through primary and elsewhere list reads', async () => {
-    const controller = new AbortController()
-    const reason = new Error('reference check cancelled')
-    const calls: Array<{ readonly cwd: string | null; readonly signal: AbortSignal | undefined }> = []
-    const operations: Pick<SecretCatalogOperations, 'list' | 'reveal'> = {
-      list: async (cwd, signal) => {
-        calls.push({ cwd, signal })
-        if (cwd !== null) {
-          controller.abort(reason)
-          throw reason
-        }
-        return []
-      },
-      reveal: async () => '',
-    }
+  it.effect('interrupts primary and elsewhere list reads with the check', () =>
+    Effect.gen(function* () {
+      const probing = yield* Deferred.make<void>()
+      const interrupted: (string | null)[] = []
+      const fixture = catalogWithCli(request => {
+        if (request.cwd === null) return Effect.succeed('[]')
+        return Deferred.succeed(probing, undefined).pipe(
+          Effect.andThen(Effect.never),
+          Effect.onInterrupt(() => Effect.sync(() => interrupted.push(request.cwd))),
+        )
+      })
+      const fiber = yield* Effect.forkChild(
+        checkSecretReference({ referenceText: 'secret:DSH_JEV_BACKLOG', cwd: null, probeFolders: ['/work/one'] }).pipe(
+          Effect.provide(Layer.merge(fixture.layer, NodeFileSystem.layer)),
+        ),
+      )
+      yield* Deferred.await(probing)
+      yield* Fiber.interrupt(fiber)
+      expect(Exit.hasInterrupts(yield* Fiber.await(fiber))).toBe(true)
+      expect(fixture.requests.map(request => request.cwd)).toEqual([null, '/work/one'])
+      expect(interrupted).toEqual(['/work/one'])
+    }),
+  )
 
-    await expect(
-      checkSecretReference({
-        operations,
-        referenceText: 'secret:DSH_JEV_BACKLOG',
-        cwd: null,
-        probeFolders: ['/work/one'],
-        inspectGlobalConfig: plainGlobalConfig,
-        signal: controller.signal,
-      }),
-    ).rejects.toBe(reason)
-    expect(calls).toEqual([
-      { cwd: null, signal: controller.signal },
-      { cwd: '/work/one', signal: controller.signal },
-    ])
-  })
+  it.effect('says the alias is missing from every scope, or names the project that holds it', () =>
+    Effect.gen(function* () {
+      const everywhere = yield* check(catalogWith({ rows: [] }), 'secret:DSH_JEV_BACKLOG', ['/work/one'])
+      expect(everywhere).toMatchObject({ state: 'alias-missing', elsewhere: [], writeScope: 'global' })
+      const projectOnly = yield* check(
+        catalogWith({ rows: [], rowsByFolder: { '/work/one': [row({ scope: 'project' }), row({ alias: 'OTHER', scope: 'project' })] } }),
+        'secret:DSH_JEV_BACKLOG',
+        ['/work/one'],
+      )
+      expect(projectOnly.elsewhere).toEqual([{ scope: 'project', folder: '/work/one', environment: 'prod' }])
+    }),
+  )
 
-  it('says the alias is missing from every scope, or names the project that holds it', async () => {
-    const everywhere = await check('secret:DSH_JEV_BACKLOG', operationsWith({ rows: [] }), ['/work/one'])
-    expect(everywhere).toMatchObject({ state: 'alias-missing', elsewhere: [], writeScope: 'global' })
-    const projectOnly = await check(
-      'secret:DSH_JEV_BACKLOG',
-      operationsWith({ rows: [], rowsByFolder: { '/work/one': [row({ scope: 'project' }), row({ alias: 'OTHER', scope: 'project' })] } }),
-      ['/work/one'],
-    )
-    expect(projectOnly.elsewhere).toEqual([{ scope: 'project', folder: '/work/one', environment: 'prod' }])
-  })
+  it.effect('lists the environments that do exist when only the environment is wrong', () =>
+    Effect.gen(function* () {
+      const status = yield* check(catalogWith({ rows: [row({ env: 'prod' }), row({ env: 'dev' })] }), 'secret:DSH_JEV_BACKLOG@staging')
+      expect(status).toMatchObject({ state: 'environment-missing', reference: 'secret:DSH_JEV_BACKLOG@staging', environments: ['dev', 'prod'] })
+    }),
+  )
 
-  it('reports a symlinked global config so a global write is never silent', async () => {
-    const status = await checkSecretReference({
-      operations: operationsWith({ rows: [] }),
-      referenceText: 'secret:DSH_JEV_BACKLOG',
-      cwd: null,
-      inspectGlobalConfig: async () => ({ path: '/home/synthetic/.config/secret/config.json', linkedTo: '/home/synthetic/nixfiles/global.json' }),
-    })
-    expect(status.globalConfig.linkedTo).toBe('/home/synthetic/nixfiles/global.json')
-  })
+  it.effect('refuses to guess between scopes', () =>
+    Effect.gen(function* () {
+      const status = yield* check(catalogWith({ rows: [row({ scope: 'global' }), row({ scope: 'project' })] }), 'secret:DSH_JEV_BACKLOG')
+      expect(status).toMatchObject({ state: 'ambiguous', scopes: ['global', 'project'] })
+    }),
+  )
 
-  it('lists the environments that do exist when only the environment is wrong', async () => {
-    const status = await check('secret:DSH_JEV_BACKLOG@staging', operationsWith({ rows: [row({ environment: 'prod' }), row({ environment: 'dev' })] }))
-    expect(status).toMatchObject({ state: 'environment-missing', reference: 'secret:DSH_JEV_BACKLOG@staging', environments: ['dev', 'prod'] })
-  })
+  it.effect('resolves a unique alias whose value reads back non-empty', () =>
+    Effect.gen(function* () {
+      expect(yield* check(catalogWith({ rows: [row({})] }), 'secret:DSH_JEV_BACKLOG')).toMatchObject({ state: 'resolved', scope: 'global' })
+    }),
+  )
 
-  it('refuses to guess between scopes', async () => {
-    const status = await check('secret:DSH_JEV_BACKLOG', operationsWith({ rows: [row({ scope: 'global' }), row({ scope: 'project' })] }))
-    expect(status).toMatchObject({ state: 'ambiguous', scopes: ['global', 'project'] })
-  })
+  it.effect('reports an unreadable or empty vault value against the matched scope', () =>
+    Effect.gen(function* () {
+      const unreadable = yield* check(catalogWith({ rows: [row({})], revealFailure: 'cli-failed' }), 'secret:DSH_JEV_BACKLOG')
+      expect(unreadable).toMatchObject({ state: 'value-unreadable', scope: 'global' })
+      expect((yield* check(catalogWith({ rows: [row({})], value: '' }), 'secret:DSH_JEV_BACKLOG')).state).toBe('value-empty')
+    }),
+  )
 
-  it('resolves a unique alias whose value reads back non-empty', async () => {
-    expect(await check('secret:DSH_JEV_BACKLOG', operationsWith({ rows: [row({})] }))).toMatchObject({ state: 'resolved', scope: 'global' })
-  })
-
-  it('reports an unreadable or empty vault value against the matched scope', async () => {
-    const unreadable = await check('secret:DSH_JEV_BACKLOG', operationsWith({ rows: [row({})], revealError: new SecretCliError('cli-failed') }))
-    expect(unreadable).toMatchObject({ state: 'value-unreadable', scope: 'global' })
-    expect((await check('secret:DSH_JEV_BACKLOG', operationsWith({ rows: [row({})], value: '' }))).state).toBe('value-empty')
-  })
-
-  it('maps CLI failures to their typed codes', async () => {
-    expect((await check('secret:X', operationsWith({ listError: new SecretCliError('cli-missing') }))).state).toBe('cli-missing')
-    expect((await check('secret:X', operationsWith({ listError: new SecretCliError('cli-timeout') }))).state).toBe('cli-timeout')
-    expect((await check('secret:X', operationsWith({ listError: new Error('anything') }))).state).toBe('cli-failed')
-    const timedOutRead = await check('secret:DSH_JEV_BACKLOG', operationsWith({ rows: [row({})], revealError: new SecretCliError('cli-timeout') }))
-    expect(timedOutRead.state).toBe('cli-timeout')
-  })
+  it.effect('maps CLI failures to their typed codes', () =>
+    Effect.gen(function* () {
+      expect((yield* check(catalogWith({ listFailure: 'cli-missing' }), 'secret:X')).state).toBe('cli-missing')
+      expect((yield* check(catalogWith({ listFailure: 'cli-timeout' }), 'secret:X')).state).toBe('cli-timeout')
+      expect((yield* check(catalogWith({ listFailure: 'cli-failed' }), 'secret:X')).state).toBe('cli-failed')
+      const timedOutRead = yield* check(catalogWith({ rows: [row({})], revealFailure: 'cli-timeout' }), 'secret:DSH_JEV_BACKLOG')
+      expect(timedOutRead.state).toBe('cli-timeout')
+    }),
+  )
 })

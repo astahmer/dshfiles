@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
+import type { ApiPayload } from './registry.js'
 import type { ApiError, ApiErrorKind } from './types.js'
 import { resolveApiSchema } from './schema.js'
 
@@ -24,11 +25,17 @@ export class PluginApiError extends Error {
   readonly [PLUGIN_API_ERROR] = true
   /** Stable machine code the Client reads as `ApiError.remoteCode`; reserved or malformed codes become `plugin`. */
   readonly code: string
+  /** JSON fields the Client reads as `ApiError.remoteDetails`, e.g. an encoded Effect error it decodes back. */
+  readonly details: Readonly<Record<string, unknown>> | undefined
 
-  constructor(message: string, options: { readonly code?: string; readonly cause?: unknown } = {}) {
+  constructor(
+    message: string,
+    options: { readonly code?: string; readonly cause?: unknown; readonly details?: Readonly<Record<string, unknown>> | undefined } = {},
+  ) {
     super(message.slice(0, MAX_PLUGIN_ERROR_MESSAGE), options.cause === undefined ? undefined : { cause: options.cause })
     const code = options.code
     this.code = code !== undefined && PLUGIN_API_ERROR_CODE.test(code) && !RESERVED_REMOTE_CODES.has(code) ? code : 'plugin'
+    this.details = options.details
   }
 }
 
@@ -43,10 +50,13 @@ class InternalApiError extends Error {
     readonly method: string,
     readonly retryable: boolean,
     readonly remoteCode?: string,
-    options?: { readonly cause?: unknown },
+    options?: { readonly cause?: unknown; readonly remoteDetails?: Readonly<Record<string, unknown>> },
   ) {
-    super(message, options)
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause })
+    this.remoteDetails = options?.remoteDetails
   }
+
+  readonly remoteDetails: Readonly<Record<string, unknown>> | undefined
 }
 
 /** The first few Standard Schema issues as `path: message`, so a caller (often the agent) can fix its input. */
@@ -100,6 +110,33 @@ export class ApiProtocolModel {
 
   /** Key-sorted JSON of a call input, so equal inputs written in another key order share one fingerprint. */
   static readonly stableJson = (value: unknown): string => formatStableJson(value)
+
+  /**
+   * A Client input becomes the JSON on the wire, where an object member holding `undefined` simply disappears. Callers
+   * write an absent optional field as `field: undefined`, so the payload is normalized the same way before it reaches
+   * the strict JSON contract. Undefined inside an array still fails there: JSON would silently turn it into `null`.
+   */
+  static jsonInput(value: ApiPayload): ApiPayload {
+    const active = new Set<object>()
+    const normalize = (item: ApiPayload, depth: number): ApiPayload => {
+      if (depth > 100 || item === null || typeof item !== 'object' || active.has(item)) return item
+      if (Object.getOwnPropertySymbols(item).length > 0) return item
+      active.add(item)
+      try {
+        if (Array.isArray(item)) return item.map(entry => normalize(entry, depth + 1))
+        const prototype = Object.getPrototypeOf(item)
+        if (prototype !== Object.prototype && prototype !== null) return item
+        const entries = Object.entries(Object.getOwnPropertyDescriptors(item))
+        if (entries.some(([, descriptor]) => descriptor.get !== undefined || descriptor.set !== undefined || !descriptor.enumerable)) return item
+        return Object.fromEntries(
+          entries.filter(([, descriptor]) => descriptor.value !== undefined).map(([key, descriptor]) => [key, normalize(descriptor.value, depth + 1)]),
+        )
+      } finally {
+        active.delete(item)
+      }
+    }
+    return normalize(value, 0)
+  }
 
   static jsonBytes(value: unknown): number {
     if (value === undefined) return 0
@@ -162,6 +199,26 @@ export class ApiProtocolModel {
 
   static error(kind: ApiError['kind'], message: string, apiId: string, method: string, retryable: boolean, cause?: unknown, remoteCode?: string): ApiError {
     return new InternalApiError(kind, message, apiId, method, retryable, remoteCode, cause === undefined ? undefined : { cause })
+  }
+
+  /** A failure the remote handler chose to send: its code, message and JSON details. */
+  static remote(input: {
+    readonly message: string
+    readonly apiId: string
+    readonly method: string
+    readonly code: string | undefined
+    readonly details: Readonly<Record<string, unknown>> | undefined
+  }): ApiError {
+    const details = input.details === undefined || Object.keys(input.details).length === 0 ? undefined : input.details
+    return new InternalApiError(
+      'remote',
+      input.message,
+      input.apiId,
+      input.method,
+      false,
+      input.code,
+      details === undefined ? undefined : { remoteDetails: details },
+    )
   }
 
   static aborted(apiId: string, method: string, cause?: unknown): ApiError {

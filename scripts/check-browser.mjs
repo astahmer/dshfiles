@@ -66,7 +66,8 @@ if (force || forcedByEnv) {
 }
 // Journeys stay serial (parallel Host plus Chromium boots make them flaky under load); the boot gate asserts a mount
 // and runs no journey, so three at a time measured ~2.7x faster on ten cores.
-const concurrency = process.env.CHECK_BROWSER_CONCURRENCY ?? (mode === 'boot' && !inCi ? '3' : '1')
+// Parallel plugin suites flake under load (real jj/git suites miss their timers); one task at a time is slower but honest.
+const concurrency = process.env.CHECK_BROWSER_CONCURRENCY ?? '1'
 // A broad local journey run stops at the first red owner instead of paying for every remaining owner to fail, and
 // bounds Playwright's own failure list. CI and `DSHX_E2E_KEEP_GOING=1` still report the whole picture.
 const keepGoing = !broadJourneys || inCi || !['', '0', 'false'].includes(process.env.DSHX_E2E_KEEP_GOING ?? '')

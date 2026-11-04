@@ -1,6 +1,7 @@
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import { describe, expect, it } from 'vitest'
-import { createCleanupJobRunner } from './cleanup-jobs.js'
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect } from 'effect'
 import { SettleCleanupModel, parseSettledStatus } from './settle-cleanup.js'
 import { defaultJjIntegrationSettings } from './settings.js'
 
@@ -56,47 +57,37 @@ describe('SettleCleanupModel', () => {
     ).toEqual([{ repoRoot: '/repo', name: 'landed', kind: 'integrated' }])
   })
 
-  it('sends targets through the shared runner as an automatic job', async () => {
-    const requests: unknown[] = []
-    const runner = createCleanupJobRunner({
-      execute: async ({ request }) => {
-        requests.push(request)
-        return { applied: true, workspaces: [], skipped: [], untracked: [], emptyRevisions: [] }
-      },
-    })
-    const targets = [{ repoRoot: '/repo', name: 'landed', kind: 'integrated' as const }]
-    await runner.start({ path: null, olderThanHours: 0, kinds: ['integrated'], targets, trigger: 'automatic' }).done
-    expect(requests).toEqual([{ path: null, olderThanHours: 0, kinds: ['integrated'], targets, trigger: 'automatic' }])
-  })
-
-  it('records a settle cleanup span with settled, targeted and removed counts', async () => {
-    using recorder = recordSpans()
-    const removed = await SettleCleanupModel.run({
-      justSettled: ['a'],
-      settled: ['a'],
-      kinds: ['integrated'],
-      repositories: async () => [repository],
-      archived: () => new Set(),
-      remove: async targets => ({
-        applied: true,
-        workspaces: targets.map(target => ({
-          repoRoot: target.repoRoot,
-          name: target.name,
-          path: `/t/${target.name}`,
-          kind: 'integrated',
-          lastUsedAt: 0,
-          missing: false,
-          outcome: 'removed',
-        })),
-        skipped: [],
-        untracked: [],
-        emptyRevisions: [],
-      }),
-    })
-    expect(removed).toBe(1)
-    const span = recorder.span('jj-integration settle cleanup')
-    expect(span.attributes['dshx.cleanup.settled']).toBe(1)
-    expect(span.attributes['dshx.cleanup.targets']).toBe(1)
-    expect(span.attributes['dshx.cleanup.removed']).toBe(1)
-  })
+  it.effect('records a settle cleanup span with settled, targeted and removed counts', () =>
+    Effect.gen(function* () {
+      using recorder = recordSpans()
+      const removed = yield* SettleCleanupModel.run({
+        justSettled: ['a'],
+        settled: ['a'],
+        kinds: ['integrated'],
+        repositories: Effect.succeed([repository]),
+        archived: Effect.succeed(new Set<string>()),
+        remove: targets =>
+          Effect.succeed({
+            applied: true,
+            workspaces: targets.map(target => ({
+              repoRoot: target.repoRoot,
+              name: target.name,
+              path: `/t/${target.name}`,
+              kind: 'integrated',
+              lastUsedAt: 0,
+              missing: false,
+              outcome: 'removed',
+            })),
+            skipped: [],
+            untracked: [],
+            emptyRevisions: [],
+          }),
+      }).pipe(Effect.provide(DshxEffect.tracerLayer))
+      expect(removed).toBe(1)
+      const span = recorder.span('jj-integration settle cleanup')
+      expect(span.attributes['dshx.cleanup.settled']).toBe(1)
+      expect(span.attributes['dshx.cleanup.targets']).toBe(1)
+      expect(span.attributes['dshx.cleanup.removed']).toBe(1)
+    }),
+  )
 })

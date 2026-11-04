@@ -1,12 +1,5 @@
-import type { Context } from '@deepseek-ai/cordis'
-import { DshxEffect } from '@dshfiles/dshx/effect'
-import { Effect } from 'effect'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { realpath } from 'node:fs/promises'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
-import * as Schema from 'effect/Schema'
-import { composerContextApi, type ComposerBase } from './composer-context-api.js'
-import { RevisionReads } from './revision-reads.js'
+import { Cache, Context, Duration, Effect, Exit, FileSystem, Layer, Option, Path, Schema } from 'effect'
+import type { ComposerBase } from './composer-context-api.js'
 import {
   COMPOSER_BASE_TEMPLATE,
   COMPOSER_BOOKMARKS_TEMPLATE,
@@ -18,15 +11,8 @@ import {
   ComposerContextModel,
 } from './composer-context-core.js'
 import { JujutsuOutputModel, JujutsuPathModel } from './core.js'
-import { SchemaHelpers } from './schema-helpers.js'
-
-type RunJj = (
-  ctx: Context,
-  cwd: string,
-  args: readonly string[],
-  signal: AbortSignal | undefined,
-  options: { readonly outputLimit: number },
-) => Promise<{ readonly stdout: string; readonly truncated: boolean }>
+import { WorkspaceNotFound, type JjRunError } from './errors.js'
+import { JujutsuCommands, type JjRunResult } from './jujutsu-commands.js'
 
 const headSchema = Schema.Struct({
   changeId: Schema.String.check(Schema.isMaxLength(64)),
@@ -48,38 +34,22 @@ const remoteBookmarkRowSchema = Schema.String.check(Schema.isMaxLength(513))
 const bookmarkNameSchema = Schema.String.check(Schema.isMaxLength(256))
 const workspaceNameSchema = Schema.String.check(Schema.isMaxLength(128))
 const MAX_FILES = 500
+const MAX_READS = 256
+const MAX_WORKSPACE_ROOTS = 256
 
 /** A Session's cwd keeps its workspace root, so the composer resolves it once instead of spawning jj on every read. */
-const WORKSPACE_ROOT_TTL_MS = 60_000
-const workspaceRoots = new Map<string, { readonly root: string; readonly at: number }>()
+const WORKSPACE_ROOT_TTL = Duration.minutes(1)
 
-/** Canonical workspace root for a Session cwd, or null when the directory is not inside a JJ workspace. */
-const workspaceRoot = async (ctx: Context, run: RunJj, cwd: string, signal: AbortSignal | undefined): Promise<string | null> => {
-  let canonical: string
-  try {
-    canonical = await realpath(JujutsuPathModel.validatedRepositoryPath(cwd))
-  } catch {
-    return null
-  }
-  const known = workspaceRoots.get(canonical)
-  if (known !== undefined && Date.now() - known.at < WORKSPACE_ROOT_TTL_MS) {
-    // A forgotten workspace takes its directory with it; resolving the root again proves it still exists.
-    const root = await realpath(known.root).catch(() => null)
-    if (root !== null) return root
-    workspaceRoots.delete(canonical)
-  }
-  try {
-    const result = await run(ctx, canonical, ['workspace', 'root'], signal, { outputLimit: 8_000 })
-    const root = result.stdout.trim()
-    if (result.truncated || root.length === 0 || root.includes('\n') || !isAbsolute(root)) return null
-    const resolved = await realpath(root)
-    workspaceRoots.set(canonical, { root: resolved, at: Date.now() })
-    if (workspaceRoots.size > 256) for (const [path, entry] of workspaceRoots) if (Date.now() - entry.at > WORKSPACE_ROOT_TTL_MS) workspaceRoots.delete(path)
-    return resolved
-  } catch {
-    if (signal?.aborted === true) throw new Error('Jujutsu request was cancelled.')
-    return null
-  }
+/**
+ * The composer bar re-reads its JJ context on every render burst; one snapshotting read per argument set serves them
+ * all for two seconds. `--ignore-working-copy` reads are already answered per operation head by jj-cli.
+ */
+const SNAPSHOT_READ_TTL = Duration.seconds(2)
+
+interface ComposerRead {
+  readonly cwd: string
+  readonly args: readonly string[]
+  readonly outputLimit: number
 }
 
 const baseLabel = (base: ComposerBase, targetBookmarks: readonly string[]): string => {
@@ -89,167 +59,148 @@ const baseLabel = (base: ComposerBase, targetBookmarks: readonly string[]): stri
   return '@-'
 }
 
-/** The composer bar re-reads its JJ context on every render burst; one read per argument set serves them all. */
-const COMPOSER_READ_TTL_MS = 2_000
+/** A failed optional read is an absent section of the composer bar, never a failed context. */
+const optional = <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.option(effect)
 
-/**
- * The store's operation heads as seen from a workspace root, or null when unreadable. A `--ignore-working-copy` read
- * depends only on them, so it is reused until an operation lands instead of for two seconds: each jj spawn loads the
- * repository view first, 80–340 ms on a store with dozens of workspaces.
- */
-const operationHeads = (root: string): string | null => {
-  try {
-    const marker = join(root, '.jj', 'repo')
-    const store = statSync(marker).isDirectory() ? marker : resolve(dirname(marker), readFileSync(marker, 'utf8').trim())
-    return readdirSync(join(store, 'op_heads', 'heads'))
-      .sort()
-      .join(',')
-  } catch {
-    return null
-  }
-}
+const make = Effect.gen(function* () {
+  const fileSystem = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const commands = yield* JujutsuCommands
 
-/** Read-only JJ context for the composer: one snapshotting read, then parallel reads that skip the working copy. */
-/** Memoized JJ reads: in-flight reads are shared, snapshotting reads last two seconds, view reads one operation head. */
-const composerReads = (directRun: RunJj): RunJj => {
-  const readResults = new Map<string, { readonly value: Awaited<ReturnType<RunJj>>; readonly at: number }>()
-  const readsInFlight = new Map<string, Promise<Awaited<ReturnType<RunJj>>>>()
-  return (ctx, cwd, args, signal, options) => {
-    const heads = args[0] === '--ignore-working-copy' ? operationHeads(cwd) : null
-    const key = `${cwd}\u0000${heads ?? ''}\u0000${args.join('\u0000')}\u0000${String(options.outputLimit)}`
-    const cached = readResults.get(key)
-    if (cached !== undefined && (heads !== null || Date.now() - cached.at < COMPOSER_READ_TTL_MS)) return Promise.resolve(cached.value)
-    const inFlight = readsInFlight.get(key)
-    if (inFlight !== undefined) return inFlight
-    const read = directRun(ctx, cwd, args, signal, options).then(value => {
-      readResults.set(key, { value, at: Date.now() })
-      if (readResults.size > 256) readResults.delete(readResults.keys().next().value ?? key)
-      return value
+  const reads = yield* Cache.makeWith((read: ComposerRead) => commands.run({ cwd: read.cwd, args: read.args, outputLimit: read.outputLimit }), {
+    capacity: MAX_READS,
+    timeToLive: exit => (Exit.isSuccess(exit) ? SNAPSHOT_READ_TTL : Duration.zero),
+  })
+
+  const run = (read: ComposerRead): Effect.Effect<JjRunResult, JjRunError> =>
+    read.args[0] === '--ignore-working-copy' ? commands.run({ cwd: read.cwd, args: read.args, outputLimit: read.outputLimit }) : Cache.get(reads, read)
+
+  const resolveRoot = (canonical: string) =>
+    run({ cwd: canonical, args: ['workspace', 'root'], outputLimit: 8_000 }).pipe(
+      Effect.flatMap(result => {
+        const root = result.stdout.trim()
+        if (result.truncated || root.length === 0 || root.includes('\n') || !path.isAbsolute(root)) return Effect.succeedNone
+        return fileSystem.realPath(root).pipe(Effect.map(Option.some))
+      }),
+      Effect.orElseSucceed(() => Option.none<string>()),
+    )
+
+  const roots = yield* Cache.makeWith(resolveRoot, {
+    capacity: MAX_WORKSPACE_ROOTS,
+    timeToLive: exit => (Exit.isSuccess(exit) && Option.isSome(exit.value) ? WORKSPACE_ROOT_TTL : Duration.zero),
+  })
+
+  /** Canonical workspace root for a Session cwd, or none when the directory is not inside a JJ workspace. */
+  const workspaceRoot = Effect.fnUntraced(function* (cwd: string) {
+    const canonical = yield* Effect.fromResult(JujutsuPathModel.validatedRepositoryPath(cwd)).pipe(Effect.flatMap(fileSystem.realPath), Effect.option)
+    if (Option.isNone(canonical)) return Option.none<string>()
+    const known = yield* Cache.get(roots, canonical.value)
+    if (Option.isNone(known)) return known
+    // A forgotten workspace takes its directory with it; resolving the root again proves it still exists.
+    const stillThere = yield* fileSystem.realPath(known.value).pipe(Effect.option)
+    if (Option.isSome(stillThere)) return stillThere
+    yield* Cache.invalidate(roots, canonical.value)
+    return yield* Cache.get(roots, canonical.value)
+  })
+
+  const context = Effect.fn('jujutsu composer context')(function* (input: { readonly cwd: string; readonly base: ComposerBase }) {
+    const located = yield* workspaceRoot(input.cwd)
+    if (Option.isNone(located)) return { repository: null }
+    const root = located.value
+    const headResult = yield* run({ cwd: root, args: ['log', '--no-graph', '--revisions', '@', '--template', COMPOSER_HEAD_TEMPLATE], outputLimit: 64_000 })
+    const head = (yield* Effect.fromResult(JujutsuOutputModel.parseJsonLines(headResult.stdout, headSchema)))[0]
+    if (head === undefined) return { repository: null }
+    const read = (args: readonly string[], outputLimit: number) => run({ cwd: root, args: ['--ignore-working-copy', ...args], outputLimit })
+    const range = ComposerContextModel.composerDiffRange(input.base)
+    const [nearest, base, stat, files, localBookmarks, remoteBookmarks, workspaces] = yield* Effect.all(
+      [
+        read(['log', '--no-graph', '--revisions', 'heads(::@- & bookmarks())', '--limit', '2', '--template', COMPOSER_BOOKMARKS_TEMPLATE], 16_000),
+        optional(
+          read(
+            ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '2', '--template', COMPOSER_BASE_TEMPLATE],
+            64_000,
+          ),
+        ),
+        optional(read(['diff', ...range, '--stat'], 256_000)),
+        optional(read(['diff', ...range, '--template', COMPOSER_FILE_TEMPLATE], 512_000)),
+        optional(read(['bookmark', 'list', '--template', COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE], 32_000)),
+        optional(read(['log', '--no-graph', '--revisions', 'remote_bookmarks()', '--template', COMPOSER_REMOTE_BOOKMARK_LIST_TEMPLATE], 32_000)),
+        optional(read(['workspace', 'list', '--template', COMPOSER_WORKSPACE_TEMPLATE], 16_000)),
+      ],
+      { concurrency: 'unbounded' },
+    )
+    const rowsOf = <S extends Schema.ConstraintDecoder<unknown>>(output: Option.Option<JjRunResult>, schema: S) =>
+      Option.isNone(output) ? Effect.succeed([]) : Effect.fromResult(JujutsuOutputModel.parseJsonLines(JujutsuOutputModel.completeLines(output.value), schema))
+    const nearestBookmarks = (yield* Effect.fromResult(JujutsuOutputModel.parseJsonLines(JujutsuOutputModel.completeLines(nearest), nameListSchema))).flat()
+    const baseRows = yield* rowsOf(base, baseRevisionRowSchema)
+    const targetBookmarks = baseRows[0]?.bookmarks ?? []
+    const resolvedBaseCommitId = Option.isNone(base) || base.value.truncated || baseRows.length !== 1 ? undefined : baseRows[0]?.commitId
+    const readRevisionCount = (revset: string) =>
+      read(['log', '--no-graph', '--revisions', revset, '--template', '"x"'], 1_000_000).pipe(
+        Effect.map(result => ComposerContextModel.parseRevisionCount(result.stdout, result.truncated)),
+        Effect.orElseSucceed(() => null),
+      )
+    const revisionCounts =
+      resolvedBaseCommitId === undefined
+        ? null
+        : yield* Effect.gen(function* () {
+            const revsets = ComposerContextModel.revisionCountRevsets(resolvedBaseCommitId)
+            const [ahead, behind] = yield* Effect.all([readRevisionCount(revsets.ahead), readRevisionCount(revsets.behind)], { concurrency: 'unbounded' })
+            return ahead === null || behind === null ? null : { ahead, behind }
+          })
+    const fileRows = yield* rowsOf(files, fileRowSchema)
+    const bookmarkNames = yield* rowsOf(localBookmarks, bookmarkNameSchema)
+    // The remote-bookmark template emits plain `name@remote` lines, not JSON records.
+    const remoteBookmarkRows = Option.isNone(remoteBookmarks)
+      ? []
+      : yield* Effect.fromResult(JujutsuOutputModel.parseLines(JujutsuOutputModel.completeLines(remoteBookmarks.value), remoteBookmarkRowSchema))
+    const remoteBookmarkNames = remoteBookmarkRows.flatMap(value => {
+      const separator = value.lastIndexOf('@')
+      if (separator < 1 || separator === value.length - 1) return []
+      return [{ name: value.slice(0, separator), remote: value.slice(separator + 1) }]
     })
-    readsInFlight.set(key, read)
-    return read.finally(() => {
-      if (readsInFlight.get(key) === read) readsInFlight.delete(key)
-    })
-  }
-}
-
-/** One composer snapshot for a Session cwd; exported so its decoders are tested without a Host. */
-const readComposerContext = async (
-  args: {
-    readonly input: { readonly cwd: string; readonly base: ComposerBase }
-    readonly ctx: Context
-    readonly signal: AbortSignal | undefined
-  },
-  run: RunJj,
-) => {
-  const { input, ctx, signal } = args
-  const root = await workspaceRoot(ctx, run, input.cwd, signal)
-  if (root === null) return { repository: null }
-  const headResult = await run(ctx, root, ['log', '--no-graph', '--revisions', '@', '--template', COMPOSER_HEAD_TEMPLATE], signal, { outputLimit: 64_000 })
-  const head = JujutsuOutputModel.parseJsonLines(headResult.stdout, value => SchemaHelpers.decode(headSchema, value))[0]
-  if (head === undefined) return { repository: null }
-  const read = (args: readonly string[], outputLimit: number) => run(ctx, root, ['--ignore-working-copy', ...args], signal, { outputLimit })
-  const range = ComposerContextModel.composerDiffRange(input.base)
-  const [nearest, base, stat, files, localBookmarks, remoteBookmarks, workspaces] = await Promise.all([
-    read(['log', '--no-graph', '--revisions', 'heads(::@- & bookmarks())', '--limit', '2', '--template', COMPOSER_BOOKMARKS_TEMPLATE], 16_000),
-    read(
-      ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '2', '--template', COMPOSER_BASE_TEMPLATE],
-      64_000,
-    ).catch(() => null),
-    read(['diff', ...range, '--stat'], 256_000).catch(() => null),
-    read(['diff', ...range, '--template', COMPOSER_FILE_TEMPLATE], 512_000).catch(() => null),
-    read(['bookmark', 'list', '--template', COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE], 32_000).catch(() => null),
-    read(['log', '--no-graph', '--revisions', 'remote_bookmarks()', '--template', COMPOSER_REMOTE_BOOKMARK_LIST_TEMPLATE], 32_000).catch(() => null),
-    read(['workspace', 'list', '--template', COMPOSER_WORKSPACE_TEMPLATE], 16_000).catch(() => null),
-  ])
-  const completeLines = (result: { readonly stdout: string; readonly truncated: boolean }): string =>
-    result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
-  const nearestBookmarks = JujutsuOutputModel.parseJsonLines(completeLines(nearest), value => SchemaHelpers.decode(nameListSchema, value)).flat()
-  const baseRows = base === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(base), value => SchemaHelpers.decode(baseRevisionRowSchema, value))
-  const targetBookmarks = baseRows[0]?.bookmarks ?? []
-  const resolvedBaseCommitId = base === null || base.truncated || baseRows.length !== 1 ? undefined : baseRows[0]?.commitId
-  const readRevisionCount = async (revset: string): Promise<number | null> => {
-    try {
-      const result = await read(['log', '--no-graph', '--revisions', revset, '--template', '"x"'], 1_000_000)
-      return ComposerContextModel.parseRevisionCount(result.stdout, result.truncated)
-    } catch {
-      return null
+    const workspaceNames = yield* rowsOf(workspaces, workspaceNameSchema)
+    const remoteBookmarkList = yield* Schema.decodeUnknownEffect(remoteBookmarkListSchema)(
+      [...new Map(remoteBookmarkNames.map(bookmark => [bookmark.name + '@' + bookmark.remote, bookmark])).values()].slice(0, 200),
+    ).pipe(Effect.orDie)
+    return {
+      repository: {
+        root,
+        // Two workspaces sharing one @ commit both match; the first is the usual single match.
+        workspace: workspaceNames[0] ?? null,
+        changeId: head.changeId,
+        commitId: head.commitId,
+        description: head.description.slice(0, 500),
+        empty: head.empty,
+        conflict: head.conflict,
+        bookmarks: head.bookmarks,
+        nearestBookmarks: [...new Set(nearestBookmarks)].slice(0, 32),
+        base: { label: baseLabel(input.base, targetBookmarks), found: resolvedBaseCommitId !== undefined },
+        revisionCounts,
+        totals: Option.isNone(stat) || stat.value.truncated ? null : ComposerContextModel.parseStatTotals(stat.value.stdout),
+        files: fileRows.slice(0, MAX_FILES).map(row => ({ path: row.path, status: JujutsuOutputModel.fileStatusLetter(row.status) })),
+        filesTruncated: Option.isNone(files) || files.value.truncated || fileRows.length > MAX_FILES,
+        localBookmarks: bookmarkNames.slice(0, 200),
+        remoteBookmarks: remoteBookmarkList,
+      },
     }
-  }
-  const revisionCounts =
-    resolvedBaseCommitId === undefined
-      ? null
-      : await (async () => {
-          const revsets = ComposerContextModel.revisionCountRevsets(resolvedBaseCommitId)
-          const [ahead, behind] = await Promise.all([readRevisionCount(revsets.ahead), readRevisionCount(revsets.behind)])
-          return ahead === null || behind === null ? null : { ahead, behind }
-        })()
-  const fileRows = files === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(files), value => SchemaHelpers.decode(fileRowSchema, value))
-  const bookmarkNames =
-    localBookmarks === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(localBookmarks), value => SchemaHelpers.decode(bookmarkNameSchema, value))
-  // The remote-bookmark template emits plain `name@remote` lines, not JSON records.
-  const remoteBookmarkRows =
-    remoteBookmarks === null ? [] : JujutsuOutputModel.parseLines(completeLines(remoteBookmarks), line => SchemaHelpers.decode(remoteBookmarkRowSchema, line))
-  const remoteBookmarkNames = remoteBookmarkRows.flatMap(value => {
-    const separator = value.lastIndexOf('@')
-    if (separator < 1 || separator === value.length - 1) return []
-    return [{ name: value.slice(0, separator), remote: value.slice(separator + 1) }]
   })
-  const workspaceNames =
-    workspaces === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(workspaces), value => SchemaHelpers.decode(workspaceNameSchema, value))
-  return {
-    repository: {
-      root,
-      // Two workspaces sharing one @ commit both match; the first is the usual single match.
-      workspace: workspaceNames[0] ?? null,
-      changeId: head.changeId,
-      commitId: head.commitId,
-      description: head.description.slice(0, 500),
-      empty: head.empty,
-      conflict: head.conflict,
-      bookmarks: head.bookmarks,
-      nearestBookmarks: [...new Set(nearestBookmarks)].slice(0, 32),
-      base: { label: baseLabel(input.base, targetBookmarks), found: resolvedBaseCommitId !== undefined },
-      revisionCounts,
-      totals: stat === null || stat.truncated ? null : ComposerContextModel.parseStatTotals(stat.stdout),
-      files: fileRows.slice(0, MAX_FILES).map(row => ({ path: row.path, status: JujutsuOutputModel.fileStatusLetter(row.status) })),
-      filesTruncated: files === null || files.truncated || fileRows.length > MAX_FILES,
-      localBookmarks: bookmarkNames.slice(0, 200),
-      remoteBookmarks: SchemaHelpers.decode(
-        remoteBookmarkListSchema,
-        [...new Map(remoteBookmarkNames.map(bookmark => [bookmark.name + '@' + bookmark.remote, bookmark])).values()].slice(0, 200),
-      ),
-    },
-  }
-}
 
-/** The composer context host, grouped as one export for its three seams. */
-export class ComposerContextHost {
-  static readonly reads = composerReads
-  static readonly read = readComposerContext
-  static readonly create = (directRun: RunJj) => composerContextHost(directRun)
-}
-
-const composerContextHost = (directRun: RunJj) => {
-  const run = composerReads(directRun)
-  return DshxEffect.host(composerContextApi, {
-    context: Effect.fn('jujutsu composer context')(function* (args) {
-      return yield* Effect.tryPromise({ try: () => readComposerContext(args, run), catch: error => error })
-    }),
-    diff: Effect.fn('jujutsu composer diff')(function* ({ input, ctx, signal }) {
-      return yield* Effect.tryPromise({
-        try: async () => {
-          const root = await workspaceRoot(ctx, run, input.cwd, signal)
-          if (root === null) throw new Error('Jujutsu could not find a workspace for this Session.')
-          const patch = await run(ctx, root, ['diff', ...ComposerContextModel.composerDiffRange(input.base), '--git'], signal, { outputLimit: 1_160_000 })
-          return {
-            patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
-            truncated: patch.truncated,
-            files: ComposerContextModel.parsePatchFileStats(patch.stdout).slice(0, 2000),
-          }
-        },
-        catch: error => RevisionReads.publicError(error),
-      })
-    }),
+  const diff = Effect.fn('jujutsu composer diff')(function* (input: { readonly cwd: string; readonly base: ComposerBase }) {
+    const located = yield* workspaceRoot(input.cwd)
+    if (Option.isNone(located)) return yield* new WorkspaceNotFound({})
+    const patch = yield* run({ cwd: located.value, args: ['diff', ...ComposerContextModel.composerDiffRange(input.base), '--git'], outputLimit: 1_160_000 })
+    return {
+      patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
+      truncated: patch.truncated,
+      files: ComposerContextModel.parsePatchFileStats(patch.stdout).slice(0, 2000),
+    }
   })
+
+  return { context, diff }
+})
+
+/** Read-only JJ context for a Session's composer: one snapshotting read of `@`, then reads that skip the working copy. */
+export class ComposerContext extends Context.Service<ComposerContext>()('@dshfiles/jujutsu/ComposerContext', { make }) {
+  static readonly layer = Layer.effect(ComposerContext, ComposerContext.make)
 }

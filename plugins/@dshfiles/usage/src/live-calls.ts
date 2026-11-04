@@ -24,7 +24,8 @@ const ABORT_KINDS = new Set(['aborted', 'interrupted', 'cancelled'])
 export const observeLiveCall = (input: {
   readonly options: GenerateOptions
   readonly next: () => AsyncIterable<StreamChunk>
-  readonly record: (row: RequestRow) => void
+  /** Never rejects: recording is best effort and must not break the caller's stream. */
+  readonly record: (row: RequestRow) => Promise<void>
   readonly now?: () => number
 }): AsyncIterable<StreamChunk> => {
   const purpose = livePurposeOf(input.options)
@@ -57,29 +58,25 @@ export const observeLiveCall = (input: {
     } finally {
       const failed = thrown || finish?.kind === 'error'
       const aborted = !failed && (finish === null || ABORT_KINDS.has(finish.kind))
-      try {
-        input.record({
-          id: `live:${sessionId}:${String(startedAt)}:${purpose}`,
-          sessionId,
-          seq: null,
-          messageId: null,
-          turn: null,
-          step: null,
-          purpose,
-          source: 'live',
-          provider: input.options.provider,
-          model: input.options.model,
-          startedAt,
-          endedAt: now(),
-          ttftMs: firstChunkAt === null ? null : firstChunkAt - startedAt,
-          usage,
-          status: failed ? 'failed' : aborted ? 'aborted' : 'ok',
-          stopReason: finish?.kind ?? null,
-          errorCode: finish?.code ?? null,
-        })
-      } catch {
-        // Recording is best effort; it must never break the caller's stream.
-      }
+      await input.record({
+        id: `live:${sessionId}:${String(startedAt)}:${purpose}`,
+        sessionId,
+        seq: null,
+        messageId: null,
+        turn: null,
+        step: null,
+        purpose,
+        source: 'live',
+        provider: input.options.provider,
+        model: input.options.model,
+        startedAt,
+        endedAt: now(),
+        ttftMs: firstChunkAt === null ? null : firstChunkAt - startedAt,
+        usage,
+        status: failed ? 'failed' : aborted ? 'aborted' : 'ok',
+        stopReason: finish?.kind ?? null,
+        errorCode: finish?.code ?? null,
+      })
     }
   })()
 }

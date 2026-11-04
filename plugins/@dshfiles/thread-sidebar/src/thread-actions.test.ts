@@ -1,6 +1,8 @@
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
+import { Effect } from 'effect'
 import { describe, expect, test } from 'vitest'
-import { createThreadActions, type ProjectRow, type ThreadActionDeps, type ThreadSummary } from './thread-actions.js'
+import { ThreadHostCallFailed } from './sidebar-errors.js'
+import { createThreadActions as createEffectActions, type HostEffect, type ProjectRow, type ThreadActionDeps, type ThreadSummary } from './thread-actions.js'
 import { threadActionsApi } from './thread-actions-api.js'
 
 const signal = new AbortController().signal
@@ -21,7 +23,77 @@ const project = (projectId: string, sessionIds: readonly string[] = []): Project
   sessionIds,
 })
 
-const createDeps = (overrides: Partial<ThreadActionDeps> = {}): ThreadActionDeps => ({
+/** The Host verbs as the fixtures below write them: Promises for Host calls, plain values for registry reads. */
+type FixtureDeps = {
+  readonly [K in keyof ThreadActionDeps]: ThreadActionDeps[K] extends (...args: infer Args) => HostEffect<infer A>
+    ? (...args: Args) => Promise<A>
+    : ThreadActionDeps[K]
+}
+
+const hostVerb =
+  <Args extends unknown[], A>(run: (...args: Args) => Promise<A>) =>
+  (...args: Args): HostEffect<A> =>
+    Effect.tryPromise({ try: () => run(...args), catch: cause => new ThreadHostCallFailed({ cause }) })
+
+const effectDeps = (deps: FixtureDeps): ThreadActionDeps => ({
+  ...deps,
+  listSessions: hostVerb(deps.listSessions),
+  readTitles: hostVerb(deps.readTitles),
+  listThreadRelations: hostVerb(deps.listThreadRelations),
+  searchThreadContent: hostVerb(deps.searchThreadContent),
+  setSettled: hostVerb(deps.setSettled),
+  archive: hostVerb(deps.archive),
+  unarchive: hostVerb(deps.unarchive),
+  pin: hostVerb(deps.pin),
+  unpin: hostVerb(deps.unpin),
+  rename: hostVerb(deps.rename),
+  fork: hostVerb(deps.fork),
+  continueIn: hostVerb(deps.continueIn),
+  create: hostVerb(deps.create),
+  prompt: hostVerb(deps.prompt),
+  ownWorkspaceFor: hostVerb(deps.ownWorkspaceFor),
+  stop: hostVerb(deps.stop),
+  selectModel: hostVerb(deps.selectModel),
+  registerProject: hostVerb(deps.registerProject),
+  renameProject: hostVerb(deps.renameProject),
+  deleteProject: hostVerb(deps.deleteProject),
+  reorderProject: hostVerb(deps.reorderProject),
+  moveSession: hostVerb(deps.moveSession),
+})
+
+/** The actions as an API caller awaits them, with the call's abort signal interrupting the action. */
+const createThreadActions = (deps: FixtureDeps) => {
+  const actions = createEffectActions(effectDeps(deps))
+  const call =
+    <Input, A>(action: (context: { readonly input: Input; readonly caller: ApiCaller }) => Effect.Effect<A, PluginApiError>) =>
+    (context: { readonly input: Input; readonly caller: ApiCaller; readonly signal: AbortSignal }): Promise<A> =>
+      Effect.runPromise(action({ input: context.input, caller: context.caller }), { signal: context.signal })
+  return {
+    list: call(actions.list),
+    references: call(actions.references),
+    archive: call(actions.archive),
+    unarchive: call(actions.unarchive),
+    settle: call(actions.settle),
+    unsettle: call(actions.unsettle),
+    pin: call(actions.pin),
+    unpin: call(actions.unpin),
+    rename: call(actions.rename),
+    fork: call(actions.fork),
+    continueIn: call(actions.continueIn),
+    create: call(actions.create),
+    prompt: call(actions.prompt),
+    stop: call(actions.stop),
+    selectModel: call(actions.selectModel),
+    projectList: () => Effect.runPromise(actions.projectList()),
+    projectRegister: call(actions.projectRegister),
+    projectRename: call(actions.projectRename),
+    projectDelete: call(actions.projectDelete),
+    projectReorder: call(actions.projectReorder),
+    move: call(actions.move),
+  }
+}
+
+const createDeps = (overrides: Partial<FixtureDeps> = {}): FixtureDeps => ({
   listSessions: async () => [summary('session-a'), summary('session-b')],
   readTitles: async ids => new Map(ids.map(id => [id, `title ${id}`])),
   listThreadRelations: async () => [],
@@ -540,7 +612,7 @@ describe('thread actions: projects', () => {
 })
 
 describe('thread actions: continue in another project', () => {
-  const recording = (overrides: Partial<ThreadActionDeps> = {}) => {
+  const recording = (overrides: Partial<FixtureDeps> = {}) => {
     const continued: Array<{ sessionId: string; workspaceId: string; includeOpenTurn: boolean }> = []
     const settled: string[] = []
     const prompts: Array<{ sessionId: string; text: string }> = []

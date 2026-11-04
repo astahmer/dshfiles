@@ -7,6 +7,7 @@ export default defineConfig({
     'chat-focus': 'src/chat-focus.ts',
     'turn-usage-cost': 'src/turn-usage-cost.ts',
     'pinned-tool-calls': 'src/pinned-tool-calls.ts',
+    'message-images': 'src/message-images.ts',
   },
   client: {
     entry: 'src/client-entry.tsx',

@@ -1,26 +1,12 @@
-import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { isAgentLoopRequest } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session'
-import { DshxEffect } from '@dshfiles/dshx/effect'
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { defineHost } from '@dshfiles/dshx/host'
-import type { SettingsScope, SettingsValue } from '@dshfiles/dshx/settings'
-import { Effect, Queue, Schema } from 'effect'
+import { Api, DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
+import { Llm } from '@dshfiles/dshx/effect/llm'
+import { Settings } from '@dshfiles/dshx/effect/settings'
+import { Effect, Layer, Queue, Schema } from 'effect'
 import { sessionWarmingSettings } from './settings.js'
-import { SessionWarming } from './warming.js'
-
-type WarmingSettingsValue = SettingsValue<typeof sessionWarmingSettings.schema>
-
-const defaults: WarmingSettingsValue = sessionWarmingSettings.schema({})
-let settingsScope: SettingsScope<WarmingSettingsValue> | undefined
-
-const readSettings = (): WarmingSettingsValue => {
-  try {
-    return settingsScope?.get() ?? defaults
-  } catch {
-    return defaults
-  }
-}
+import { SessionWarming, type WarmingEvent } from './warming.js'
 
 const sessionWarmingApi = defineApi({
   id: 'session-warming',
@@ -56,48 +42,32 @@ const sessionWarmingApi = defineApi({
   },
 })
 
-const { hostApi, ...effectPlugin } = DshxEffect.plugin({
-  layer: (ctx: CordisContext) => SessionWarming.layer({ settings: readSettings, llm: ctx.llm }),
-  setup: (ctx: CordisContext) =>
-    Effect.gen(function* () {
-      const active = yield* SessionWarming
-      yield* Effect.acquireRelease(
-        Effect.sync(() => [
-          ctx.on('llm/stream', (options, next) => {
-            if (options.sessionId !== undefined && options.purpose === undefined && isAgentLoopRequest(options))
-              Queue.offerUnsafe(active.requests, { kind: 'request', sessionId: String(options.sessionId), request: options })
-            return next()
-          }),
-          ctx.on('session/event', (session, event) => {
-            if (event.type === 'turn/start') Queue.offerUnsafe(active.requests, { kind: 'turn-start', sessionId: String(session.header.id) })
-            if (event.type === 'turn/end') Queue.offerUnsafe(active.requests, { kind: 'turn-end', sessionId: String(session.header.id) })
-          }),
-        ]),
-        disposers => Effect.sync(() => disposers.forEach(dispose => dispose())),
-      )
-    }),
-})
+/**
+ * Feeds agent-loop requests and turn boundaries to SessionWarming in emission order: both handlers offer to one
+ * unbounded queue synchronously while the Host dispatches.
+ */
+const WarmingEvents = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const warming = yield* SessionWarming
+    const events = yield* Queue.unbounded<WarmingEvent>()
+    yield* HostEvents.intercept('llm/stream', ({ args: [options], next }) =>
+      options.sessionId !== undefined && options.purpose === undefined && isAgentLoopRequest(options)
+        ? Effect.andThen(Queue.offer(events, { kind: 'request', sessionId: String(options.sessionId), request: options }), next)
+        : next,
+    )
+    yield* HostEvents.on('session/event', (session, event) => {
+      if (event.type === 'turn/start') return Effect.asVoid(Queue.offer(events, { kind: 'turn-start', sessionId: String(session.header.id) }))
+      if (event.type === 'turn/end') return Effect.asVoid(Queue.offer(events, { kind: 'turn-end', sessionId: String(session.header.id) }))
+      return Effect.void
+    })
+    yield* DshxPlugin.worker(Queue.take(events).pipe(Effect.flatMap(warming.handle), Effect.forever))
+  }),
+)
 
-export default defineHost({
-  ...effectPlugin,
+export default DshxPlugin.make({
   name: '@dshfiles/session-warming',
   inject: ['llm'],
-  settings: [
-    sessionWarmingSettings.host({
-      setup: scope => {
-        settingsScope = scope
-        return () => {
-          if (settingsScope === scope) settingsScope = undefined
-        }
-      },
-    }),
-  ],
-  apis: [
-    hostApi(sessionWarmingApi, {
-      status: Effect.fn('session-warming status')(function* () {
-        const active = yield* SessionWarming
-        return yield* active.status()
-      }),
-    }),
-  ],
+  settings: [sessionWarmingSettings],
+  layer: WarmingEvents.pipe(Layer.provideMerge(SessionWarming.layer), Layer.provide(Layer.mergeAll(Settings.layer(sessionWarmingSettings), Llm.layer))),
+  apis: [Api.bind(sessionWarmingApi, { status: () => SessionWarming.use(warming => warming.status) })],
 })

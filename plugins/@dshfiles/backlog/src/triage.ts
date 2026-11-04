@@ -1,4 +1,5 @@
-import { Option, Schema } from 'effect'
+import type { JevQuestion } from '@dshfiles/jev'
+import { Effect, Option, Schema } from 'effect'
 
 import { BacklogItems, type BacklogItem, type BacklogKind, type BacklogProposal, type BacklogStatus } from './item.js'
 
@@ -6,15 +7,15 @@ const MAX_CANDIDATES = 5
 const MAX_CORRECTIONS = 5
 const DUPLICATE_THRESHOLD = 0.7
 
-export interface TriageQuestion {
-  readonly instructions: string
-  readonly criteria: { readonly true: string; readonly false: string }
-}
+export type TriageQuestion = JevQuestion
+
+/** One Jev yes/no question; it answers with a probability. */
+export type JevAsk = (request: { readonly question: TriageQuestion; readonly text: string }) => Effect.Effect<number, unknown>
 
 /** Jev answers one yes/no question with a probability; the model returns raw text. Either may be absent. */
 export interface TriageServices {
-  readonly jev?: ((request: { readonly question: TriageQuestion; readonly text: string }) => Promise<number>) | undefined
-  readonly complete?: ((request: { readonly system: string; readonly input: string }) => Promise<string>) | undefined
+  readonly jev?: JevAsk | undefined
+  readonly complete?: ((request: { readonly system: string; readonly input: string }) => Effect.Effect<string, unknown>) | undefined
 }
 
 export interface TriageCorrection {
@@ -24,17 +25,20 @@ export interface TriageCorrection {
 }
 
 const actionable: TriageQuestion = {
+  name: 'triage-actionable',
   instructions:
     'Is `content` work someone should do (a task, a change to make) or a problem someone should fix (a bug report, something broken or wrong), rather than a note, a tip or a reference to keep?',
   criteria: { true: 'Work to do or a problem to fix, including a bug report', false: 'A note, tip, fact, link or thought to keep' },
 }
 
 const sameWork = (existing: string): TriageQuestion => ({
+  name: 'triage-duplicate',
   instructions: `Does \`content\` describe the same piece of work as this existing backlog item: "${existing.slice(0, 300)}"?`,
   criteria: { true: 'The same work, a restatement or a subset of it', false: 'Different work, even if related' },
 })
 
 const resolvesItem: TriageQuestion = {
+  name: 'thread-resolution',
   instructions:
     'Does `content` (a backlog item followed by the last reply of the thread working on it) show that the reply finished the work the item describes, so the item can be marked done?',
   criteria: {
@@ -184,22 +188,24 @@ const changesOnly = (item: BacklogItem, proposal: BacklogProposal): BacklogPropo
 /**
  * One triage pass: use the model for the full shape when configured; otherwise Jev answers actionable and duplicate questions. A failing service is skipped, never fatal.
  */
-const run = async (request: {
+const skipFailure = <A>(effect: Effect.Effect<A, unknown>): Effect.Effect<A | undefined> =>
+  Effect.catch(effect, error => Effect.as(Effect.logDebug('backlog triage: a service failed, skipping it', error), undefined))
+
+const run = Effect.fn('backlog triage run')(function* (request: {
   readonly item: BacklogItem
   readonly others: readonly BacklogItem[]
   readonly services: TriageServices
   readonly now: number
-}): Promise<BacklogProposal | null> => {
+}) {
   const item = request.item
   const candidates = candidatesFor(item, request.others)
   const text = `${item.title}\n${item.body}`.trim()
   let fromJev: BacklogProposal | undefined
   if (request.services.jev !== undefined && request.services.complete === undefined) {
     const ask = request.services.jev
-    const probability =
-      item.kind === 'task' && !item.humanFields.includes('kind') ? await ask({ question: actionable, text }).catch(() => undefined) : undefined
+    const probability = item.kind === 'task' && !item.humanFields.includes('kind') ? yield* skipFailure(ask({ question: actionable, text })) : undefined
     const closest = candidates[0]
-    const duplicate = closest === undefined ? undefined : await ask({ question: sameWork(closest.title), text }).catch(() => undefined)
+    const duplicate = closest === undefined ? undefined : yield* skipFailure(ask({ question: sameWork(closest.title), text }))
     if (probability !== undefined || (closest !== undefined && duplicate !== undefined)) {
       const isWork = probability === undefined || probability >= 0.5
       const jev: ProposalDraft = {
@@ -215,10 +221,8 @@ const run = async (request: {
   }
   let fromModel: BacklogProposal | undefined
   if (request.services.complete !== undefined) {
-    const answer = await request.services
-      .complete({ system: systemPrompt, input: modelInput(item, candidates, correctionsFrom(request.others)) })
-      .then(parseModelAnswer)
-      .catch(() => undefined)
+    const raw = yield* skipFailure(request.services.complete({ system: systemPrompt, input: modelInput(item, candidates, correctionsFrom(request.others)) }))
+    const answer = raw === undefined ? undefined : parseModelAnswer(raw)
     if (answer !== undefined) {
       const model: ProposalDraft = { confidence: answer.confidence, reason: answer.reason, source: 'model', at: request.now }
       if (answer.kind !== undefined) model.kind = answer.kind
@@ -243,22 +247,22 @@ const run = async (request: {
   const duplicateOf = fromModel.duplicateOf ?? fromJev.duplicateOf
   if (duplicateOf !== undefined) both.duplicateOf = duplicateOf
   return changesOnly(item, both)
-}
+})
 
 /**
  * One Jev question about a finished thread, asked when `threadResolution` is on: a reply that reads as resolution leaves
  * a `done` suggestion on the item, which the user accepts or dismisses. Jev missing or failing proposes nothing.
  */
-const resolveThread = async (request: {
+const resolveThread = Effect.fn('backlog triage resolve thread')(function* (request: {
   readonly item: Pick<BacklogItem, 'title' | 'body'>
   readonly reply: string
-  readonly jev: (request: { readonly question: TriageQuestion; readonly text: string }) => Promise<number>
+  readonly jev: JevAsk
   readonly now: number
-}): Promise<BacklogProposal | null> => {
+}) {
   const text = `Backlog item: ${request.item.title}\n${request.item.body.slice(0, 2_000)}\n\nThread reply:\n${request.reply.slice(0, 4_000)}`
-  const probability = await request.jev({ question: resolvesItem, text }).catch(() => undefined)
+  const probability = yield* skipFailure(request.jev({ question: resolvesItem, text }))
   if (probability === undefined || probability < RESOLUTION_THRESHOLD) return null
-  return {
+  const proposal: BacklogProposal = {
     status: 'done',
     confidence: probability,
     reason: "The thread's last reply says the work is done.",
@@ -266,7 +270,8 @@ const resolveThread = async (request: {
     origin: 'thread',
     at: request.now,
   }
-}
+  return proposal
+})
 
 /** "kind bug, status todo, tags a b, duplicate of b:3" — the wording events and the peek share. */
 const describe = (proposal: Pick<BacklogProposal, 'kind' | 'status' | 'title' | 'tags' | 'duplicateOf'>): string =>

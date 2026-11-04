@@ -1,23 +1,12 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect } from 'effect'
 import { ActivityTimelineAdapters } from './adapters.js'
-import { createActivityTimelineService } from './service.js'
+import { ActivityTimeline } from './activity-timeline.js'
+import { now, temporaryStatePath, timelineLayer } from './test-support.js'
 import type { ActivityIngest } from './types.js'
 
-const temporaryRoots: string[] = []
-const now = 1_800_000_000_000
-
-const statePath = async (): Promise<string> => {
-  const root = await mkdtemp(join(tmpdir(), 'activity-timeline-'))
-  temporaryRoots.push(root)
-  return join(root, 'state.json')
-}
-
-afterEach(async () => {
-  await Promise.all(temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
-})
+const withTimeline = <A, E>(body: Effect.Effect<A, E, ActivityTimeline>) =>
+  Effect.flatMap(temporaryStatePath, statePath => body.pipe(Effect.provide(timelineLayer({ statePath }))))
 
 const cleanupFailure = (input: { readonly sessionId: string; readonly workspaceId: string; readonly workspaceName: string }): ActivityIngest =>
   ActivityTimelineAdapters.workspaceActivity({
@@ -31,41 +20,50 @@ const cleanupFailure = (input: { readonly sessionId: string; readonly workspaceI
   })
 
 describe('workspace activity without a workspace', () => {
-  it('stores the reported cleanup failure even though it names no workspace', async () => {
-    const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
-    await expect(service.ingest(cleanupFailure({ sessionId: '', workspaceId: '', workspaceName: '' }))).resolves.toMatchObject({ duplicate: false })
-    const page = await service.page({ detailed: true })
-    expect(page.items[0]?.references).toEqual([])
-  })
+  it.effect('stores the reported cleanup failure even though it names no workspace', () =>
+    withTimeline(
+      Effect.gen(function* () {
+        const timeline = yield* ActivityTimeline
+        const [stored] = yield* timeline.ingest([cleanupFailure({ sessionId: '', workspaceId: '', workspaceName: '' })])
+        expect(stored?.duplicate).toBe(false)
+        expect((yield* timeline.page({ detailed: true })).items[0]?.references).toEqual([])
+      }),
+    ),
+  )
 
-  it('drops a blank reference instead of failing the whole event', async () => {
-    const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
-    await expect(service.ingest(cleanupFailure({ sessionId: '', workspaceId: 'workspace-1', workspaceName: 'thread-a' }))).resolves.toMatchObject({
-      duplicate: false,
-    })
-    const page = await service.page({ detailed: true })
-    expect(page.items[0]?.references).toEqual([{ kind: 'workspace', id: 'workspace-1', label: 'thread-a' }])
-  })
+  it.effect('drops a blank reference instead of failing the whole event', () =>
+    withTimeline(
+      Effect.gen(function* () {
+        const timeline = yield* ActivityTimeline
+        const [stored] = yield* timeline.ingest([cleanupFailure({ sessionId: '', workspaceId: 'workspace-1', workspaceName: 'thread-a' })])
+        expect(stored?.duplicate).toBe(false)
+        expect((yield* timeline.page({ detailed: true })).items[0]?.references).toEqual([{ kind: 'workspace', id: 'workspace-1', label: 'thread-a' }])
+      }),
+    ),
+  )
 
-  it('stores session activity without an invalid blank session reference', async () => {
-    const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
-    await expect(service.ingest(ActivityTimelineAdapters.sessionActivity({ kind: 'created', at: now, sessionId: '' }))).resolves.toMatchObject({
-      duplicate: false,
-    })
-    const page = await service.page({ detailed: true })
-    expect(page.items[0]).toMatchObject({ sessionId: null, references: [] })
-  })
+  it.effect('stores session activity without an invalid blank session reference', () =>
+    withTimeline(
+      Effect.gen(function* () {
+        const timeline = yield* ActivityTimeline
+        const [stored] = yield* timeline.ingest([ActivityTimelineAdapters.sessionActivity({ kind: 'created', at: now, sessionId: '' })])
+        expect(stored?.duplicate).toBe(false)
+        expect((yield* timeline.page({ detailed: true })).items[0]).toMatchObject({ sessionId: null, references: [] })
+      }),
+    ),
+  )
 
-  it('rejects a malformed event through its promise instead of throwing at the caller', async () => {
-    const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
-    const malformed: ActivityIngest = {
-      ...cleanupFailure({ sessionId: '', workspaceId: 'workspace-1', workspaceName: 'thread-a' }),
-      references: [{ kind: 'workspace', id: '', label: null }],
-    }
-    let pending: Promise<unknown> | undefined
-    expect(() => {
-      pending = service.enqueue(malformed)
-    }).not.toThrow()
-    await expect(pending).rejects.toThrow()
-  })
+  it.effect('fails a malformed enqueued event with a typed error instead of storing it', () =>
+    withTimeline(
+      Effect.gen(function* () {
+        const timeline = yield* ActivityTimeline
+        const malformed: ActivityIngest = {
+          ...cleanupFailure({ sessionId: '', workspaceId: 'workspace-1', workspaceName: 'thread-a' }),
+          references: [{ kind: 'workspace', id: '', label: null }],
+        }
+        expect((yield* Effect.flip(timeline.enqueue(malformed)))._tag).toBe('ActivityIngestInvalid')
+        expect((yield* timeline.stats).retained).toBe(0)
+      }),
+    ),
+  )
 })

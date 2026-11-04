@@ -1,6 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
 import * as Schema from 'effect/Schema'
-import { createEffectStoredValue } from './effect-stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { PromptLibraryMigration, type PromptLibraryLocalStatus, type PromptLibraryMigrationClient } from './library-migration-machine.js'
@@ -177,7 +177,7 @@ const localLibraryStorage = () => {
   }
 }
 
-const storedLibrary = createEffectStoredValue({
+const storedLibrary = createStoredValue({
   key: PROMPT_LIBRARY_LOCAL_STORAGE_KEY,
   schema: PromptLibrary.schema,
   fallback: PromptLibrary.emptyStore(),

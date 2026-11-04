@@ -51,11 +51,14 @@ describe('create-dshx', () => {
       devDependencies: Record<string, string>
       peerDependencies: Record<string, string>
     }
-    expect(host).toContain("import { DshxEffect } from '@dshfiles/dshx/effect'")
-    expect(host).toContain('const { setup } = DshxEffect.plugin({ layer: Layer.empty, setup: () => Effect.void })')
-    expect(host).toContain("apis: [DshxEffect.host(statusApi, { status: () => Effect.succeed('ready') })]")
+    expect(host).toContain("import { Api, DshxPlugin } from '@dshfiles/dshx/effect'")
+    expect(host).toContain("{ dshxWireCode: 'status-not-ready' }")
+    expect(host).toContain('export default DshxPlugin.make({')
+    expect(host).toContain('apis: [Api.bind(statusApi, { status: () => Status.use(status => status.read()) })]')
+    expect(files.find(file => file.path === 'tests/status.spec.ts')?.contents).toContain('it.layer(Status.layer)')
     expect(manifest.devDependencies.effect).toBe('4.1.0')
-    expect(manifest.peerDependencies.effect).toBe('^4.1.0')
+    expect(manifest.devDependencies['@effect/vitest']).toBe('4.1.0')
+    expect(manifest.peerDependencies.effect).toBe('4.1.0')
     expect(files.some(file => file.path === 'src/client.tsx')).toBe(false)
   })
 

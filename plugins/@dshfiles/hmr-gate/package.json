@@ -26,7 +26,8 @@
   },
   "dependencies": {
     "@dshfiles/shared-runtime": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

@@ -41,7 +41,11 @@ export const connectDshxApiClient = async <
       : createDshxApiCaller({ ...target, origin: options.origin, cookie: options.cookie ?? '' })
   const invoke = async (method: string, input: unknown, callOptions?: ApiCallOptions): Promise<unknown> => {
     try {
-      return await call(method, input === undefined ? undefined : Schema.decodeUnknownSync(jsonValueSchema)(input), callOptions?.signal)
+      return await call(
+        method,
+        input === undefined ? undefined : Schema.decodeUnknownSync(jsonValueSchema)(ApiProtocolModel.jsonInput(input)),
+        callOptions?.signal,
+      )
     } catch (error) {
       throw apiErrorOf(error, contract, method)
     }

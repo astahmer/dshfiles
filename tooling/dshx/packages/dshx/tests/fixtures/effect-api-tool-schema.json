@@ -1,1 +1,1 @@
-[{"name":"effect_schema_lookup","parameters":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}}]
+[{"name":"effect_schema_lookup","parameters":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false}}]

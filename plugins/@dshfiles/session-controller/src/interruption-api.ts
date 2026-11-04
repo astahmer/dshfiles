@@ -1,6 +1,5 @@
-import { defineApi } from '@dshfiles/dshx/api'
+import { defineApi, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
-import { method } from './api-schema.js'
 
 const input = Schema.Struct({
   sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),

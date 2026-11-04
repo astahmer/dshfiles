@@ -43,7 +43,7 @@
           "kind": "host-test",
           "id": "policies.runtime-guard",
           "file": "plugins/@dshfiles/policies/src/policies.test.ts",
-          "testName": "denies a matching call before its tool runs and lets other calls through"
+          "testName": "denies a matching call before its tool runs, follows settings updates and serves the list"
         }
       ],
       "telemetry": [

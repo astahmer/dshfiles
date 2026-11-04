@@ -3,6 +3,7 @@ import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import type { FastModeService } from './codex-fast-mode.js'
+import type { DeclaredRetryAfter } from './provider-retry-after.js'
 import { AccountsRules } from './api.js'
 import type { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import type { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
@@ -91,6 +92,8 @@ export class ProviderProfileModel {
     readonly provider: string
     readonly displayName: string
     readonly additionalModelIds: readonly string[]
+    /** Sees every HTTP response this account's provider receives, e.g. to read a declared Retry-After. */
+    readonly onResponse?: (response: { readonly status: number; readonly headers: Readonly<Record<string, string>> }) => void
   }): ResolvedPiAiProviderProfile => {
     const hidden = new Set(params.hiddenModelIds ?? [])
     const favorites = new Set(params.favoriteModelIds ?? [])
@@ -167,12 +170,15 @@ export class ProviderProfileModel {
         maxDelayMs: 30_000,
         jitterRatio: 0.2,
       },
-      piProvider: {
-        ...params.upstream,
-        id: params.provider,
-        name: params.displayName,
-        getModels: () => offeredModels,
-      },
+      piProvider: observedProvider(
+        {
+          ...params.upstream,
+          id: params.provider,
+          name: params.displayName,
+          getModels: () => offeredModels,
+        },
+        params.onResponse,
+      ),
     }
     profilePins.set(profile, pins)
     nativeModels.set(profile, new Set(upstreamModels.map(model => model.id)))
@@ -201,6 +207,31 @@ const pinnedCall = (
  */
 const UPSTREAM_REPLAY_OVERFLOW = /exceeded request buffer limit while retrying upstream/i
 
+type PiProvider = NonNullable<ResolvedPiAiProviderProfile['piProvider']>
+
+/**
+ * The provider's HTTP responses, rejected ones included, seen through its `fetch` on the simple stream the adapter
+ * calls; pi-ai's own `onResponse` only fires for accepted responses.
+ */
+const observedProvider = (
+  provider: PiProvider,
+  onResponse: ((response: { readonly status: number; readonly headers: Readonly<Record<string, string>> }) => void) | undefined,
+): PiProvider => {
+  if (onResponse === undefined) return provider
+  return {
+    ...provider,
+    streamSimple: (model, context, options) =>
+      provider.streamSimple(model, context, {
+        ...options,
+        fetch: async (input, init) => {
+          const response = await (options?.fetch ?? globalThis.fetch)(input, init)
+          onResponse({ status: response.status, headers: Object.fromEntries(response.headers.entries()) })
+          return response
+        },
+      }),
+  }
+}
+
 async function* retryableUpstreamReplayOverflow(chunks: AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk> {
   for await (const chunk of chunks) {
     if (chunk.type === 'finish' && chunk.reason.kind === 'error' && UPSTREAM_REPLAY_OVERFLOW.test(chunk.reason.failure.message)) {
@@ -221,6 +252,7 @@ export class EffortPinnedAdapter extends PiAiAdapter {
   private readonly profilesFor: ConstructorParameters<typeof PiAiAdapter>[0]['profiles']
   private readonly routeFor: (options: GenerateOptions) => string
   private readonly pricingFor: ((provider: string, model: string) => LlmImageRequestPricing | undefined) | undefined
+  private readonly declaredRetryAfter: DeclaredRetryAfter | undefined
 
   constructor(
     config: ConstructorParameters<typeof PiAiAdapter>[0],
@@ -235,6 +267,8 @@ export class EffortPinnedAdapter extends PiAiAdapter {
       routeFor?: (options: GenerateOptions) => string
       /** Route-owned visual-token pricing; routes without one keep the neutral estimate. */
       imageRequestPricing?: (provider: string, model: string) => LlmImageRequestPricing | undefined
+      /** The Retry-After each route's provider declared, put back on its failed attempts. */
+      declaredRetryAfter?: DeclaredRetryAfter
     },
   ) {
     super(config)
@@ -243,6 +277,7 @@ export class EffortPinnedAdapter extends PiAiAdapter {
     this.fastMode = deps.fastMode
     this.routeFor = deps.routeFor ?? (options => options.provider)
     this.pricingFor = deps.imageRequestPricing
+    this.declaredRetryAfter = deps.declaredRetryAfter
   }
 
   override imageRequestPricing(provider: string, model: string): LlmImageRequestPricing | undefined {
@@ -287,9 +322,15 @@ export class EffortPinnedAdapter extends PiAiAdapter {
     )
   }
 
+  private withDeclaredRetryAfter(wireOptions: GenerateOptions, stream: AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk> {
+    if (this.declaredRetryAfter === undefined) return stream
+    this.declaredRetryAfter.forget(wireOptions.provider)
+    return this.declaredRetryAfter.attach(wireOptions.provider, stream)
+  }
+
   override stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     const wireOptions = this.wireCall(options)
-    return this.withFastMode(options, wireOptions, retryableUpstreamReplayOverflow(super.stream(wireOptions)))
+    return this.withFastMode(options, wireOptions, this.withDeclaredRetryAfter(wireOptions, retryableUpstreamReplayOverflow(super.stream(wireOptions))))
   }
 
   override prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
@@ -298,7 +339,7 @@ export class EffortPinnedAdapter extends PiAiAdapter {
       model: this.withModelDefault(call.model),
       stream: (options: GenerateOptions) => {
         const wireOptions = this.wireCall(options)
-        return this.withFastMode(options, wireOptions, retryableUpstreamReplayOverflow(call.stream(wireOptions)))
+        return this.withFastMode(options, wireOptions, this.withDeclaredRetryAfter(wireOptions, retryableUpstreamReplayOverflow(call.stream(wireOptions))))
       },
     }))
   }

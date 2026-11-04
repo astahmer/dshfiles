@@ -195,45 +195,16 @@ const registryEntryFromRow = (row: unknown): RegistryEntry | undefined => {
 
 const registryPayloadSchema = Schema.Struct({ servers: Schema.optional(Schema.Array(Schema.Unknown)) })
 
+const decodeRegistryPayload = Schema.decodeUnknownResult(Schema.fromJsonString(registryPayloadSchema))
+
 const parseRegistryRows = (text: string): readonly RegistryEntry[] => {
-  const parsed = Schema.decodeUnknownResult(registryPayloadSchema)(JSON.parse(text))
+  const parsed = decodeRegistryPayload(text)
   if (parsed._tag === 'Failure') return []
   return (parsed.success.servers ?? []).flatMap(row => {
     const entry = registryEntryFromRow(row)
     return entry === undefined ? [] : [entry]
   })
 }
-
-const readBoundedJson = async (response: Response): Promise<readonly RegistryEntry[]> => {
-  if (response.body === null) throw new Error('Registry response has no body.')
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let size = 0
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      size += value.byteLength
-      if (size > MAX_REGISTRY_BYTES) {
-        await reader.cancel()
-        throw new Error('Registry response is too large.')
-      }
-      chunks.push(value)
-    }
-  } finally {
-    reader.releaseLock()
-  }
-  const bytes = new Uint8Array(size)
-  let offset = 0
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return parseRegistryRows(new TextDecoder().decode(bytes))
-}
-
-export type RegistrySearchFetcher = (input: URL, init: RequestInit) => Promise<Response>
-export type RegistrySearchService = { readonly search: (input: { readonly query: string }) => Promise<RegistryEntry[]> }
 
 export class McpCatalogModel {
   static readonly providers = providers
@@ -259,20 +230,17 @@ export class McpCatalogModel {
     return needle.length === 0 ? [...rows] : rows.filter(row => `${row.name} ${row.category} ${row.description}`.toLocaleLowerCase().includes(needle))
   }
 
-  static readonly createRegistrySearchService = ({ fetch }: { readonly fetch: RegistrySearchFetcher }): RegistrySearchService => ({
-    search: async ({ query }) => {
-      const url = new URL(REGISTRY_ENDPOINT)
-      url.searchParams.set('search', query)
-      url.searchParams.set('version', 'latest')
-      url.searchParams.set('limit', '20')
-      const response = await fetch(url, {
-        headers: { accept: 'application/json' },
-        signal: AbortSignal.timeout(8_000),
-        redirect: 'error',
-      })
-      if (!response.ok) throw new Error('Registry request failed.')
-      const rows = await readBoundedJson(response)
-      return rows.slice(0, 20)
-    },
-  })
+  /** The official Registry search URL for one query: latest versions, at most 20 rows. */
+  static readonly registryUrl = (query: string): URL => {
+    const url = new URL(REGISTRY_ENDPOINT)
+    url.searchParams.set('search', query)
+    url.searchParams.set('version', 'latest')
+    url.searchParams.set('limit', '20')
+    return url
+  }
+
+  static readonly maxRegistryBytes = MAX_REGISTRY_BYTES
+
+  /** Registry rows that carry a safe streamable HTTP endpoint; anything malformed is dropped. */
+  static readonly registryRows = parseRegistryRows
 }

@@ -34,6 +34,10 @@
     "./pinned-tool-calls": {
       "types": "./src/pinned-tool-calls.ts",
       "default": "./dist/pinned-tool-calls.js"
+    },
+    "./message-images": {
+      "types": "./src/message-images.ts",
+      "default": "./dist/message-images.js"
     }
   },
   "scripts": {

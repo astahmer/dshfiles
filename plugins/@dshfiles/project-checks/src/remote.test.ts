@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { Schema } from 'effect'
+import { Effect, Schema } from 'effect'
 import { remoteHostSchema, type RemoteHost } from './core.js'
 import { PeerSnapshotModel, type PeerShellRunner, type StepResult } from './remote.js'
 
 const { command: buildPeerCommand, jjCommand: buildPeerJjCommand, changeId: parseChangeId, revision: parseRevision } = PeerSnapshotModel
 const shellQuote = PeerSnapshotModel.quote
 const snapshotBookmark = PeerSnapshotModel.bookmark
-const runPeerSnapshot = PeerSnapshotModel.run
+const runPeerSnapshot = (input: Parameters<typeof PeerSnapshotModel.run>[0]) => Effect.runPromise(PeerSnapshotModel.run(input))
 
 const TARGET = 'a'.repeat(40)
 const OTHER = 'b'.repeat(40)
@@ -35,24 +35,26 @@ const createPeer = (script: Script) => {
   const peerCommands: string[] = []
   const localCommands: string[][] = []
   const revisions = [...(script.revisions ?? [])]
-  const runPeerShell: PeerShellRunner = async ({ command }) => {
-    peerCommands.push(command)
-    if (command.includes("'git' 'fetch'")) return script.fetch ?? ok()
-    if (command.includes("'bookmark' 'forget'")) return script.forget ?? ok()
-    if (command.includes("'diff'")) return script.diff ?? ok()
-    if (command.includes("'edit'")) return script.edit ?? ok()
-    if (command.includes("'commit_id'")) return revisions.shift() ?? ok(TARGET)
-    if (command.includes("'install-peers'")) return script.install ?? ok()
-    return script.run ?? ok()
-  }
+  const runPeerShell: PeerShellRunner = ({ command }) =>
+    Effect.sync(() => {
+      peerCommands.push(command)
+      if (command.includes("'git' 'fetch'")) return script.fetch ?? ok()
+      if (command.includes("'bookmark' 'forget'")) return script.forget ?? ok()
+      if (command.includes("'diff'")) return script.diff ?? ok()
+      if (command.includes("'edit'")) return script.edit ?? ok()
+      if (command.includes("'commit_id'")) return revisions.shift() ?? ok(TARGET)
+      if (command.includes("'install-peers'")) return script.install ?? ok()
+      return script.run ?? ok()
+    })
   return {
     peerCommands,
     localCommands,
     runPeerShell,
-    runLocalGit: async ({ args }: { readonly args: readonly string[] }) => {
-      localCommands.push([...args])
-      return script.push ?? ok()
-    },
+    runLocalGit: ({ args }: { readonly args: readonly string[] }) =>
+      Effect.sync(() => {
+        localCommands.push([...args])
+        return script.push ?? ok()
+      }),
   }
 }
 

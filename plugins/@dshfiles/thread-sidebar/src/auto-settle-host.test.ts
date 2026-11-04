@@ -1,40 +1,19 @@
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Settings } from '@dshfiles/dshx/effect/settings'
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import { describe, expect, it } from 'vitest'
-import { createAutoSettleScanner, type AutoSettleClock, type AutoSettleSnapshot } from './auto-settle-host.js'
+import { describe, expect, it } from '@effect/vitest'
+import { Effect, Layer, Ref } from 'effect'
+import { TestClock } from 'effect/testing'
+import { AutoSettle, AutoSettleSources } from './auto-settle-host.js'
 import { AutoSettleScanModel, type ScannedSession } from './auto-settle-scan.js'
 import { DEFAULT_PREFERENCES, type AutoSettlePolicy } from './organization.js'
+import { OutsideReload } from './outside-reload-promise.js'
 import type { RebasedThread } from './rebased-threads.js'
+import { threadSidebarSettings } from './settings.js'
+import { HostCallFailed } from './sidebar-errors.js'
+import { SidebarSettings, ThreadSidebarSettings, type SidebarSettingsValue } from './sidebar-settings.js'
 
 const MINUTE = 60_000
-
-const createFakeClock = (start: number) => {
-  let current = start
-  let timers: { readonly at: number; readonly run: () => void }[] = []
-  const clock: AutoSettleClock = {
-    now: () => current,
-    schedule: (run, delayMs) => {
-      const timer = { at: current + delayMs, run }
-      timers.push(timer)
-      return () => {
-        timers = timers.filter(candidate => candidate !== timer)
-      }
-    },
-  }
-  /** Move time forward, firing each due timer in order and letting the scan it starts settle. */
-  const advance = async (ms: number): Promise<void> => {
-    const target = current + ms
-    for (;;) {
-      const due = timers.filter(timer => timer.at <= target).sort((left, right) => left.at - right.at)[0]
-      if (due === undefined) break
-      timers = timers.filter(timer => timer !== due)
-      current = due.at
-      due.run()
-      for (let tick = 0; tick < 20; tick += 1) await Promise.resolve()
-    }
-    current = target
-  }
-  return { clock, advance, pending: () => timers.length }
-}
 
 const policy = (overrides: Partial<AutoSettlePolicy> = {}): AutoSettlePolicy => ({
   autoSettleEnabled: true,
@@ -58,39 +37,57 @@ const session = (overrides: Partial<ScannedSession> & Pick<ScannedSession, 'id' 
 
 const BOOT = 1_000_000_000
 
-interface FakeHostState {
-  policy: AutoSettlePolicy | undefined
-  readonly settled: Set<string>
-  readonly pinned: Set<string>
-  writes: number
-}
+const settingsValue = (autoSettle: AutoSettlePolicy): SidebarSettingsValue => ({ ...threadSidebarSettings.schema({}), ...autoSettle })
 
-/** A Host whose sessions, settings and settled ids live in plain values the test changes. */
-const createHost = (input: { readonly sessions: ScannedSession[]; readonly policy: AutoSettlePolicy; readonly rebasedThreads?: RebasedThread[] }) => {
-  const state: FakeHostState = { policy: input.policy, settled: new Set(), pinned: new Set(), writes: 0 }
-  const snapshot = (): AutoSettleSnapshot => ({
-    sessions: input.sessions,
-    workspaceBySession: new Map(),
-    archivedSessionIds: new Set(),
-    pinnedSessionIds: state.pinned,
-    settledSessionIds: new Set(state.settled),
+/** The Host a scan reads: fixed Sessions, a pinned set the test changes, and a session list that can time out. */
+const fakeSources = (input: {
+  readonly sessions: readonly ScannedSession[]
+  readonly pinned: Ref.Ref<ReadonlySet<string>>
+  readonly failing: Ref.Ref<boolean>
+}) =>
+  Layer.effect(
+    AutoSettleSources,
+    Effect.gen(function* () {
+      const settings = yield* SidebarSettings
+      return AutoSettleSources.of({
+        snapshot: Effect.gen(function* () {
+          if (yield* Ref.get(input.failing)) return yield* new HostCallFailed({ operation: 'list sessions' })
+          return {
+            sessions: input.sessions,
+            workspaceBySession: new Map(),
+            archivedSessionIds: new Set(),
+            pinnedSessionIds: yield* Ref.get(input.pinned),
+            settledSessionIds: new Set(yield* settings.settledSessionIds),
+          }
+        }),
+        rebasedThreads: Effect.succeedNone,
+      })
+    }),
+  )
+
+/** Auto-settle over in-memory settings at BOOT; `scheduled` also runs the Host's scan loop. */
+const withAutoSettle = <A, E>(
+  input: { readonly sessions: readonly ScannedSession[]; readonly policy: AutoSettlePolicy; readonly scheduled?: boolean },
+  body: (host: {
+    readonly pinned: Ref.Ref<ReadonlySet<string>>
+    readonly failing: Ref.Ref<boolean>
+  }) => Effect.Effect<A, E, AutoSettle | SidebarSettings | Settings.SettingsOf<SidebarSettingsValue>>,
+) =>
+  Effect.gen(function* () {
+    yield* TestClock.setTime(BOOT)
+    const pinned = yield* Ref.make<ReadonlySet<string>>(new Set())
+    const failing = yield* Ref.make(false)
+    const service = AutoSettle.layer.pipe(Layer.provideMerge(fakeSources({ sessions: input.sessions, pinned, failing })))
+    const withLoop = input.scheduled === true ? AutoSettle.schedule().pipe(Layer.provideMerge(service), Layer.provide(OutsideReload.layerTest)) : service
+    const layer = withLoop.pipe(
+      Layer.provideMerge(SidebarSettings.layer),
+      Layer.provideMerge(Settings.layerTest<SidebarSettingsValue>('thread-sidebar', settingsValue(input.policy))),
+    )
+    return yield* body({ pinned, failing }).pipe(Effect.provide(layer))
   })
-  const fake = createFakeClock(BOOT)
-  const scanner = createAutoSettleScanner({
-    clock: fake.clock,
-    bootDelayMs: 30_000,
-    sources: {
-      readPolicy: () => state.policy,
-      readSnapshot: async () => snapshot(),
-      readRebasedThreads: async () => input.rebasedThreads,
-      settle: async sessionIds => {
-        state.writes += 1
-        for (const sessionId of sessionIds) state.settled.add(sessionId)
-      },
-    },
-  })
-  return { scanner, state, ...fake }
-}
+
+const settledIds = SidebarSettings.use(settings => settings.settledSessionIds)
+const revision = ThreadSidebarSettings.use(settings => settings.snapshot)
 
 describe('AutoSettleScanModel.decide', () => {
   const base = {
@@ -162,114 +159,123 @@ describe('AutoSettleScanModel.decide', () => {
   })
 })
 
-describe('createAutoSettleScanner', () => {
-  it('waits for the boot delay, then scans on the configured interval with no browser', async () => {
-    const host = createHost({ sessions: [session({ id: 'a', updatedAt: BOOT - 115 * MINUTE })], policy: policy() })
-    host.scanner.start()
-    expect(host.scanner.status().nextScanAt).toBe(BOOT + 30_000)
+describe('AutoSettle', () => {
+  it.effect('waits for the boot delay, then scans on the configured interval with no browser', () =>
+    withAutoSettle({ sessions: [session({ id: 'a', updatedAt: BOOT - 115 * MINUTE })], policy: policy(), scheduled: true }, () =>
+      Effect.gen(function* () {
+        const autoSettle = yield* AutoSettle
+        yield* Effect.yieldNow
+        expect((yield* autoSettle.status).nextScanAt).toBe(BOOT + 30_000)
 
-    await host.advance(29_999)
-    expect(host.state.settled.size).toBe(0)
-    await host.advance(1)
-    // Idle for 115.5 min: not yet.
-    expect(host.state.settled.size).toBe(0)
-    expect(host.scanner.status().lastScan).toMatchObject({ idleSettled: 0, rebasedSettled: 0 })
-    expect(host.scanner.status().nextScanAt).toBe(BOOT + 30_000 + 10 * MINUTE)
+        yield* TestClock.adjust(29_999)
+        expect(yield* settledIds).toEqual([])
+        yield* TestClock.adjust(1)
+        // Idle for 115.5 min: not yet.
+        expect(yield* settledIds).toEqual([])
+        expect((yield* autoSettle.status).lastScan).toMatchObject({ idleSettled: 0, rebasedSettled: 0 })
+        expect((yield* autoSettle.status).nextScanAt).toBe(BOOT + 30_000 + 10 * MINUTE)
 
-    await host.advance(10 * MINUTE)
-    expect([...host.state.settled]).toEqual(['a'])
-    expect(host.scanner.status().recent).toEqual([{ sessionId: 'a', reason: 'idle for 120 min', source: 'idle', at: BOOT + 30_000 + 10 * MINUTE }])
-    host.scanner.stop()
-    expect(host.pending()).toBe(0)
-  })
+        yield* TestClock.adjust(10 * MINUTE)
+        expect(yield* settledIds).toEqual(['a'])
+        expect((yield* autoSettle.status).recent).toEqual([{ sessionId: 'a', reason: 'idle for 120 min', source: 'idle', at: BOOT + 30_000 + 10 * MINUTE }])
+      }),
+    ),
+  )
 
-  it('reads nothing and settles nothing while auto-settle is off', async () => {
-    const host = createHost({ sessions: [session({ id: 'a', updatedAt: BOOT - 500 * MINUTE })], policy: policy({ autoSettleEnabled: false }) })
-    host.scanner.start()
-    await host.advance(60 * MINUTE)
-    expect(host.state.writes).toBe(0)
-    expect(host.scanner.status()).toMatchObject({ active: false, nextScanAt: null, lastScan: null })
-  })
+  it.effect('reads nothing and settles nothing while auto-settle is off', () =>
+    withAutoSettle({ sessions: [session({ id: 'a', updatedAt: BOOT - 500 * MINUTE })], policy: policy({ autoSettleEnabled: false }), scheduled: true }, () =>
+      Effect.gen(function* () {
+        const before = yield* revision
+        yield* TestClock.adjust(60 * MINUTE)
+        expect((yield* revision).revision).toBe(before.revision)
+        expect(yield* AutoSettle.use(autoSettle => autoSettle.status)).toMatchObject({ active: false, nextScanAt: null, lastScan: null })
+      }),
+    ),
+  )
 
-  it('rescans at once when the policy changes, but not for other sidebar writes', async () => {
-    const host = createHost({ sessions: [session({ id: 'a', updatedAt: BOOT - 500 * MINUTE })], policy: policy({ autoSettleEnabled: false }) })
-    host.scanner.start()
-    await host.advance(30_000)
+  it.effect('rescans at once when the policy changes, but not for other sidebar writes', () =>
+    withAutoSettle({ sessions: [session({ id: 'a', updatedAt: BOOT - 500 * MINUTE })], policy: policy({ autoSettleEnabled: false }), scheduled: true }, () =>
+      Effect.gen(function* () {
+        const settings = yield* ThreadSidebarSettings
+        yield* TestClock.adjust(30_000)
 
-    host.scanner.settingsChanged()
-    await host.advance(0)
-    expect(host.state.writes).toBe(0)
+        yield* settings.update({ collapsedGroups: ['other'] })
+        yield* TestClock.adjust(0)
+        expect(yield* settledIds).toEqual([])
 
-    host.state.policy = policy()
-    host.scanner.settingsChanged()
-    await host.advance(0)
-    expect([...host.state.settled]).toEqual(['a'])
-  })
+        yield* settings.update({ autoSettleEnabled: true })
+        yield* TestClock.adjust(0)
+        expect(yield* settledIds).toEqual(['a'])
+      }),
+    ),
+  )
 
-  it('records one auto-settle scan span with the settled counts', async () => {
-    using recorder = recordSpans()
-    const host = createHost({ sessions: [session({ id: 'a', updatedAt: BOOT - 500 * MINUTE })], policy: policy() })
-    await host.scanner.scan()
-    const spans = recorder.spans.filter(span => span.name === 'auto-settle scan')
-    expect(spans).toHaveLength(1)
-    expect(spans[0]?.attributes).toMatchObject({ 'thread_sidebar.sessions.count': 1, 'thread_sidebar.settled.idle': 1, 'thread_sidebar.settled.rebased': 0 })
-  })
+  it.effect('records one auto-settle scan span with the settled counts', () =>
+    withAutoSettle({ sessions: [session({ id: 'a', updatedAt: BOOT - 500 * MINUTE })], policy: policy() }, () =>
+      Effect.gen(function* () {
+        using recorder = recordSpans()
+        yield* AutoSettle.use(autoSettle => autoSettle.scan).pipe(Effect.provide(DshxEffect.tracerLayer))
+        const spans = recorder.spans.filter(span => span.name === 'auto-settle scan')
+        expect(spans).toHaveLength(1)
+        expect(spans[0]?.attributes).toMatchObject({
+          'thread_sidebar.sessions.count': 1,
+          'thread_sidebar.settled.idle': 1,
+          'thread_sidebar.settled.rebased': 0,
+        })
+      }),
+    ),
+  )
 
-  it('reports a failed scan and keeps scanning', async () => {
-    const fake = createFakeClock(BOOT)
-    let fail = true
-    const scanner = createAutoSettleScanner({
-      clock: fake.clock,
-      bootDelayMs: 0,
-      sources: {
-        readPolicy: () => policy(),
-        readSnapshot: async () => {
-          if (fail) throw new Error('session list timed out')
-          return { sessions: [], workspaceBySession: new Map(), archivedSessionIds: new Set(), pinnedSessionIds: new Set(), settledSessionIds: new Set() }
-        },
-        readRebasedThreads: async () => undefined,
-        settle: async () => undefined,
+  it.effect('reports a failed scan and keeps scanning', () =>
+    withAutoSettle({ sessions: [], policy: policy(), scheduled: true }, host =>
+      Effect.gen(function* () {
+        const autoSettle = yield* AutoSettle
+        yield* Ref.set(host.failing, true)
+        yield* TestClock.adjust(30_000)
+        expect((yield* autoSettle.status).lastScan?.error).toBe('The Host could not list sessions. Retry in a moment.')
+        yield* Ref.set(host.failing, false)
+        yield* TestClock.adjust(10 * MINUTE)
+        expect((yield* autoSettle.status).lastScan?.error).toBeUndefined()
+      }),
+    ),
+  )
+
+  it.effect('settles a trigger request with its reason and reports what it skipped', () =>
+    withAutoSettle(
+      {
+        sessions: [
+          session({ id: 'merged', updatedAt: BOOT }),
+          session({ id: 'busy', updatedAt: BOOT, running: true }),
+          session({ id: 'pinned', updatedAt: BOOT }),
+        ],
+        policy: policy({ autoSettleEnabled: false }),
       },
-    })
-    scanner.start()
-    await fake.advance(0)
-    expect(scanner.status().lastScan?.error).toBe('session list timed out')
-    fail = false
-    await fake.advance(10 * MINUTE)
-    expect(scanner.status().lastScan?.error).toBeUndefined()
-  })
-
-  it('settles a trigger request with its reason and reports what it skipped', async () => {
-    const host = createHost({
-      sessions: [
-        session({ id: 'merged', updatedAt: BOOT }),
-        session({ id: 'busy', updatedAt: BOOT, running: true }),
-        session({ id: 'pinned', updatedAt: BOOT }),
-      ],
-      policy: policy({ autoSettleEnabled: false }),
-    })
-    host.state.pinned.add('pinned')
-    const result = await host.scanner.requestSettle({
-      sessionIds: ['merged', 'busy', 'pinned', 'gone'],
-      reason: 'pull request #12 merged',
-      source: '@dshfiles/pull-requests',
-    })
-    expect(result.results).toEqual([
-      { sessionId: 'merged', outcome: 'settled' },
-      { sessionId: 'busy', outcome: 'skipped', skipReason: 'running' },
-      { sessionId: 'pinned', outcome: 'skipped', skipReason: 'pinned' },
-      { sessionId: 'gone', outcome: 'skipped', skipReason: 'unknown' },
-    ])
-    expect([...host.state.settled]).toEqual(['merged'])
-    expect(host.scanner.status().recent[0]).toEqual({ sessionId: 'merged', reason: 'pull request #12 merged', source: '@dshfiles/pull-requests', at: BOOT })
-    expect((await host.scanner.requestSettle({ sessionIds: ['merged'], reason: 'again', source: 'test' })).results).toEqual([
-      { sessionId: 'merged', outcome: 'already-settled' },
-    ])
-  })
-
-  it('refuses a trigger request while the settings namespace is unavailable', async () => {
-    const host = createHost({ sessions: [], policy: policy() })
-    host.state.policy = undefined
-    await expect(host.scanner.requestSettle({ sessionIds: ['a'], reason: 'r', source: 's' })).rejects.toThrow('restart DSH')
-  })
+      host =>
+        Effect.gen(function* () {
+          const autoSettle = yield* AutoSettle
+          yield* Ref.set(host.pinned, new Set(['pinned']))
+          const result = yield* autoSettle.requestSettle({
+            sessionIds: ['merged', 'busy', 'pinned', 'gone'],
+            reason: 'pull request #12 merged',
+            source: '@dshfiles/pull-requests',
+          })
+          expect(result.results).toEqual([
+            { sessionId: 'merged', outcome: 'settled' },
+            { sessionId: 'busy', outcome: 'skipped', skipReason: 'running' },
+            { sessionId: 'pinned', outcome: 'skipped', skipReason: 'pinned' },
+            { sessionId: 'gone', outcome: 'skipped', skipReason: 'unknown' },
+          ])
+          expect(yield* settledIds).toEqual(['merged'])
+          expect((yield* autoSettle.status).recent[0]).toEqual({
+            sessionId: 'merged',
+            reason: 'pull request #12 merged',
+            source: '@dshfiles/pull-requests',
+            at: BOOT,
+          })
+          expect((yield* autoSettle.requestSettle({ sessionIds: ['merged'], reason: 'again', source: 'test' })).results).toEqual([
+            { sessionId: 'merged', outcome: 'already-settled' },
+          ])
+        }),
+    ),
+  )
 })

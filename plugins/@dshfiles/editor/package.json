@@ -29,6 +29,7 @@
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "effect": "catalog:",
     "monaco-editor": "0.57.0"
   },
@@ -47,6 +48,7 @@
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/dsh-client-ui-workspace": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "react": "catalog:",

@@ -14,19 +14,6 @@ export class LoopbackSchema {
       encode: SchemaGetter.transform((value: string) => value),
     }),
   )
-
-  /** Decodes once at a boundary, throwing a `SchemaError` a caller can report. */
-  // oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the schema parses the unknown input
-  static readonly decode = <S extends SchemaTypes.ConstraintDecoder<unknown>>(schema: S, input: unknown): S['Type'] => Schema.decodeUnknownSync(schema)(input)
-
-  /** Decodes once at a boundary with no unknown keys, the rule `z.object(...).strict()` carried. */
-  // oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the schema parses the unknown input
-  static readonly decodeStrict = <S extends SchemaTypes.ConstraintDecoder<unknown>>(schema: S, input: unknown): S['Type'] =>
-    Schema.decodeUnknownSync(schema, { onExcessProperty: 'error' })(input)
-
-  /** Like `decode`, but returns a `Result` so a caller can branch without a throw. */
-  // oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the schema parses the unknown input
-  static readonly decodeResult = <S extends SchemaTypes.ConstraintDecoder<unknown>>(schema: S, input: unknown) => Schema.decodeUnknownResult(schema)(input)
 }
 
 const closedDocument = (schema: SchemaTypes.ConstraintDecoder<unknown>) => Schema.toJsonSchemaDocument(schema, { onExcessProperty: 'error' })

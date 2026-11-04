@@ -56,8 +56,6 @@ export interface CleanupJobView {
   readonly result: CleanupResult | null
 }
 
-const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 400)
-
 export const MAX_CLEANUP_JOBS = 12
 
 /** Pure decisions about a removal request, kept off the trail so a test can state them without a clock. */
@@ -209,82 +207,3 @@ export const createCleanupJobTrail = (options: { readonly now?: () => number; re
 }
 
 export type CleanupJobTrail = ReturnType<typeof createCleanupJobTrail>
-
-/** What an executing cleanup reports back while it runs; the job owns the queue, the executor owns the work. */
-export interface CleanupItemReporter {
-  beginPhase(phase: Extract<CleanupJobPhase, 'removing' | 'abandoning'>): void
-  beginItem(name: string): void
-  settleItem(outcome: CleanupJobOutcome): void
-}
-
-export interface CleanupJobReporter extends CleanupItemReporter {
-  /** The scan finished: its candidates are what the removal pass now walks through. */
-  planned(total: number): void
-}
-
-export interface CleanupJobRunner {
-  start(request: CleanupJobRequest): { readonly job: CleanupJobView; readonly done: Promise<CleanupResult> }
-  live(): CleanupJobView | undefined
-  trail(): readonly CleanupJobView[]
-}
-
-/**
- * One removal at a time: each forgets jj workspaces and reads the Session activity the others are judged on. The promise
- * is the job, not the request that asked for it, so closing the panel never stops a removal; a request for a scope that
- * is already queued or running attaches to it instead of queuing the same removal twice.
- */
-export const createCleanupJobRunner = (options: {
-  readonly execute: (input: { readonly request: CleanupJobRequest; readonly report: CleanupJobReporter }) => Promise<CleanupResult>
-  readonly now?: () => number
-  readonly limit?: number
-}): CleanupJobRunner => {
-  const trail = createCleanupJobTrail(options)
-  const results = new Map<string, Promise<CleanupResult>>()
-  let queue: Promise<void> = Promise.resolve()
-
-  return {
-    start(request: CleanupJobRequest) {
-      const live = trail.live()
-      const liveDone = live === undefined ? undefined : results.get(live.id)
-      if (live !== undefined && liveDone !== undefined && CleanupJobModel.sameRequest(live.request, request)) return { job: live, done: liveDone }
-      const job = trail.start(request)
-      const done = queue.then(async (): Promise<CleanupResult> => {
-        trail.begin(job.id, 'scanning')
-        try {
-          const result = await options.execute({
-            request: job.request,
-            report: {
-              planned: total => {
-                trail.planned(job.id, total)
-              },
-              beginPhase: phase => {
-                trail.begin(job.id, phase)
-              },
-              beginItem: name => {
-                trail.current(job.id, name)
-              },
-              settleItem: outcome => {
-                trail.settled(job.id, outcome)
-              },
-            },
-          })
-          trail.done(job.id, result)
-          return result
-        } catch (error) {
-          trail.failed(job.id, errorText(error))
-          throw error
-        }
-      })
-      results.set(job.id, done)
-      const settled = done.then(
-        () => undefined,
-        () => undefined,
-      )
-      void settled.then(() => results.delete(job.id))
-      queue = settled
-      return { job, done }
-    },
-    live: () => trail.live(),
-    trail: () => trail.trail(),
-  }
-}

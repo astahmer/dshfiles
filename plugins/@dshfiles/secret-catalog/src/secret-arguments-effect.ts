@@ -11,9 +11,6 @@ export const secretAliasSchemaEffectForCatalog = secretAliasSchemaEffect
 export const secretEnvironmentSchemaEffectForCatalog = secretEnvironmentSchemaEffect
 export const secretScopeSchemaEffectForCatalog = secretScopeSchemaEffect
 
-export const exactStructEffect = <Fields extends Schema.Struct.Fields>(fields: Fields) =>
-  Schema.Struct(fields).check(Schema.makeFilter(() => undefined, { toJsonSchema: () => ({ additionalProperties: false }) }))
-
 export const createMetadataFields = {
   name: freeTextSchema(512).pipe(Schema.optionalKey),
   source: freeTextSchema(2048).pipe(Schema.optionalKey),
@@ -28,6 +25,6 @@ export const updateMetadataFields = {
   tags: freeTextSchema(1024).pipe(Schema.optionalKey),
 }
 
-export const createMetadataSchemaEffect = exactStructEffect(createMetadataFields)
+export const createMetadataSchemaEffect = Schema.Struct(createMetadataFields)
 
-export const updateMetadataSchemaEffect = exactStructEffect(updateMetadataFields)
+export const updateMetadataSchemaEffect = Schema.Struct(updateMetadataFields)

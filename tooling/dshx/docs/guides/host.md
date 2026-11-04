@@ -129,17 +129,17 @@ export default defineHost({
 })
 ```
 
-| Hook | DSH point | Runs | Returns |
-| --- | --- | --- | --- |
-| `promptAdmission` | `agent/pre-step` | before later listeners | `{ messages }` to replace what the step admits (text, files), `'reject'` to hold the step |
-| `request` | `agent/request` | after the chain | a patch of provider, model, reasoning effort, temperature, max tokens, stop |
-| `systemPrompt` | `system-prompt/assemble` | after the chain | the assembly: sections, contexts, tool schemas |
-| `retry` | `agent/request-error` | after the chain | `'retry'` or `'stop'` |
-| `permission` | `approval/request` | before the chain | an approval outcome, answering for the user |
-| `toolBefore` | `tools/pre-execute` | before the chain | `allow`, `deny`, `cancel` or `ask` |
-| `toolAfter` | `tools/post-execute` | after the chain (not after a `block`) | `accept` with new content or value, or `block` with feedback |
-| `shellEnv` | `shellEnv.register` | per `bash` call | environment variables |
-| `http` | `connection/request` | for authenticated requests under `/api`, before Connection routes them | `true` once the response is written |
+| Hook              | DSH point                | Runs                                                                   | Returns                                                                                   |
+| ----------------- | ------------------------ | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `promptAdmission` | `agent/pre-step`         | before later listeners                                                 | `{ messages }` to replace what the step admits (text, files), `'reject'` to hold the step |
+| `request`         | `agent/request`          | after the chain                                                        | a patch of provider, model, reasoning effort, temperature, max tokens, stop               |
+| `systemPrompt`    | `system-prompt/assemble` | after the chain                                                        | the assembly: sections, contexts, tool schemas                                            |
+| `retry`           | `agent/request-error`    | after the chain                                                        | `'retry'` or `'stop'`                                                                     |
+| `permission`      | `approval/request`       | before the chain                                                       | an approval outcome, answering for the user                                               |
+| `toolBefore`      | `tools/pre-execute`      | before the chain                                                       | `allow`, `deny`, `cancel` or `ask`                                                        |
+| `toolAfter`       | `tools/post-execute`     | after the chain (not after a `block`)                                  | `accept` with new content or value, or `block` with feedback                              |
+| `shellEnv`        | `shellEnv.register`      | per `bash` call                                                        | environment variables                                                                     |
+| `http`            | `connection/request`     | for authenticated requests under `/api`, before Connection routes them | `true` once the response is written                                                       |
 
 Not covered: request hooks by kind for side calls (compaction, titles). `llm/stream` is the only point that sees them,
 and its `next()` streams the original options, so a listener cannot rewrite them without running the whole chain twice.
@@ -166,13 +166,13 @@ export default defineHost({
 })
 ```
 
-| Field | DSH registry | Inject added |
-| --- | --- | --- |
-| `agentPresets` | `agentPresets.register` (a preset is a list of Loader rows) | `agentPresets` |
-| `providers` | `llm.registerAdapter`, `llm.registerConfigurableProviders` (Settings › Models) | `llm` |
-| `models` | `llm.registerModelDiscovery` | `llm` |
-| `skills` | `skills.register` | `skills` |
-| `mcpServers` | one `@deepseek-ai/dsh-mcp-client` plugin per server, loaded on first use from the Host installation | none |
+| Field          | DSH registry                                                                                        | Inject added   |
+| -------------- | --------------------------------------------------------------------------------------------------- | -------------- |
+| `agentPresets` | `agentPresets.register` (a preset is a list of Loader rows)                                         | `agentPresets` |
+| `providers`    | `llm.registerAdapter`, `llm.registerConfigurableProviders` (Settings › Models)                      | `llm`          |
+| `models`       | `llm.registerModelDiscovery`                                                                        | `llm`          |
+| `skills`       | `skills.register`                                                                                   | `skills`       |
+| `mcpServers`   | one `@deepseek-ai/dsh-mcp-client` plugin per server, loaded on first use from the Host installation | none           |
 
 Commands already have `commands`. Not covered, because DSH 0.2.1 has no registry for them: references (the Session
 reference resolver and file references are fixed services), integrations (no DSH concept), and credentials (one

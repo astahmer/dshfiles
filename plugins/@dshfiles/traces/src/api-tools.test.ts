@@ -1,6 +1,10 @@
+import * as Schema from 'effect/Schema'
 import { describe, expect, test } from 'vitest'
 import { clearInputSchema, tracesApi } from './api.js'
-import { TracesSchema } from './schema.js'
+
+// oxlint-disable-next-line antislop/no-unknown-parameters -- test boundary: the schema parses the unknown value
+const acceptsStrict = <S extends Schema.Decoder<unknown>>(schema: S, value: unknown): boolean =>
+  Schema.decodeUnknownResult(schema, { onExcessProperty: 'error' })(value)._tag === 'Success'
 
 describe('traces agent tools', () => {
   test('every traces capability is a named tool and only clear writes', () => {
@@ -23,8 +27,8 @@ describe('traces agent tools', () => {
   })
 
   test('clear refuses to run without an explicit confirm', () => {
-    expect(TracesSchema.acceptsStrict(clearInputSchema, {})).toBe(false)
-    expect(TracesSchema.acceptsStrict(clearInputSchema, { confirm: false })).toBe(false)
-    expect(TracesSchema.acceptsStrict(clearInputSchema, { confirm: true })).toBe(true)
+    expect(acceptsStrict(clearInputSchema, {})).toBe(false)
+    expect(acceptsStrict(clearInputSchema, { confirm: false })).toBe(false)
+    expect(acceptsStrict(clearInputSchema, { confirm: true })).toBe(true)
   })
 })

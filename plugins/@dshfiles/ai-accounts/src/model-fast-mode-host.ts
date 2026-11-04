@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { SessionScopeRefused } from './errors.js'
 import type { ApiCaller } from '@dshfiles/dshx/api'
-import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Api } from '@dshfiles/dshx/effect'
 import { accountRuntime } from './account-runtime.js'
 import { effectHandler } from './host-effect.js'
 import { aiAccountsFastModeApi } from './model-fast-mode-api.js'
@@ -15,14 +16,14 @@ type FastModeRoute = Omit<FastModeRouteInput, 'sessionId'> & { readonly sessionI
 
 export const fastModeRouteForCaller = (input: FastModeRouteInput, caller: ApiCaller): FastModeRoute => {
   if (caller.kind === 'agent') {
-    if (caller.sessionId === undefined) throw new Error('Fast mode requires an active Agent session.')
+    if (caller.sessionId === undefined) throw new SessionScopeRefused({ reason: 'fast-mode-agent-session' })
     if (input.sessionId !== undefined && input.sessionId !== caller.sessionId) {
-      throw new Error('Agents can only access Fast mode for their own session.')
+      throw new SessionScopeRefused({ reason: 'fast-mode-other-session' })
     }
     return { ...input, sessionId: caller.sessionId }
   }
 
-  if (input.sessionId === undefined) throw new Error('Fast mode requires a session ID.')
+  if (input.sessionId === undefined) throw new SessionScopeRefused({ reason: 'fast-mode-session' })
   return { ...input, sessionId: input.sessionId }
 }
 
@@ -32,7 +33,7 @@ const fastModeFor = (ctx: Context) => {
   return fastMode
 }
 
-export const modelFastModeHostApi = DshxEffect.host(aiAccountsFastModeApi, {
+export const modelFastModeHostApi = Api.bind(aiAccountsFastModeApi, {
   status: effectHandler(aiAccountsFastModeApi, 'status', ({ ctx, input, caller }) => fastModeFor(ctx).status(fastModeRouteForCaller(input, caller))),
   setFast: effectHandler(aiAccountsFastModeApi, 'setFast', ({ ctx, input, caller }) =>
     fastModeFor(ctx).set({ ...fastModeRouteForCaller(input, caller), enabled: input.enabled }),

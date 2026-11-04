@@ -5,7 +5,11 @@ import { Context } from '@deepseek-ai/cordis'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from '@effect/vitest'
+import { Deferred, Effect, Exit, Fiber, Schedule, Scope } from 'effect'
+import { TestClock } from 'effect/testing'
+import { UsageHistorySchedule } from './usage-history-schedule.js'
+import { UsageHistoryPromiseModel } from './usage-history-promise.js'
 import type { AccountProfile, UsageCard } from './api.js'
 import { usageHistoryDomain } from './usage-history.js'
 import { createUsageHistoryService, type AccountUsageReader } from './usage-recorder.js'
@@ -166,38 +170,42 @@ describe('usage history collection', () => {
 })
 
 describe('usage history scheduler', () => {
-  it('collects on start, shares one in-flight sweep with a manual refresh, and waits for the interval', async () => {
-    const ctx = await openContext()
-    let calls = 0
-    let release: (() => void) | undefined
-    const gate = new Promise<void>(resolve => {
-      release = resolve
-    })
-    let clock = Date.now()
-    const scheduler = createUsageHistoryService(ctx).createScheduler(async () => ({ accounts: [profile('codex_a', 'codex')], shadowRoot: '' }), {
-      now: () => clock,
-      readUsage: async () => {
-        calls += 1
-        await gate
-        return okCard(50, clock + 60_000)
-      },
-    })
-    try {
-      await new Promise(resolve => setTimeout(resolve, 20))
-      const manual = scheduler.collectNow()
-      release?.()
-      expect(await manual).toBe(1)
+  it.effect('collects on start, shares one in-flight sweep with a manual refresh, and waits for the interval', () =>
+    Effect.gen(function* () {
+      const ctx = yield* Effect.promise(openContext)
+      const history = createUsageHistoryService(ctx)
+      let calls = 0
+      const gate = yield* Deferred.make<void>()
+      const sweep = history.sweep(async () => ({ accounts: [profile('codex_a', 'codex')], shadowRoot: '' }), {
+        readUsage: async () => {
+          calls += 1
+          await Effect.runPromise(Deferred.await(gate))
+          return okCard(50, Date.now() + 60_000)
+        },
+      })
+      const scope = yield* Scope.make()
+      yield* TestClock.setTime(Date.now())
+      const schedule = yield* UsageHistorySchedule.make({
+        sweep: UsageHistoryPromiseModel.sweep(sweep),
+        nextSweepAt: UsageHistoryPromiseModel.nextSweepAt(history.nextSweepAt),
+        checkEvery: Schedule.spaced('1 minute'),
+      }).pipe(Scope.provide(scope))
+      yield* Effect.promise(() => new Promise(resolve => setTimeout(resolve, 20)))
+      const manual = yield* Effect.forkChild(schedule.collectNow)
+      yield* Deferred.succeed(gate, undefined)
+      expect(yield* Fiber.join(manual)).toBe(1)
       expect(calls).toBe(1)
 
-      // Within the interval the next manual call reads again, but the timer would not.
-      const meta = await createUsageHistoryService(ctx).readSettings()
-      expect(clock - (meta.lastAttemptAt ?? 0)).toBeLessThan(meta.intervalMinutes * 60_000)
-      clock += meta.intervalMinutes * 60_000
-      expect(await scheduler.collectNow()).toBe(1)
+      // Within the interval the schedule does not sweep again, but a manual call does.
+      const meta = yield* Effect.promise(() => history.readSettings())
+      yield* TestClock.adjust('1 minute')
+      expect(calls).toBe(1)
+      expect(yield* schedule.collectNow).toBe(1)
       expect(calls).toBe(2)
-    } finally {
-      scheduler.dispose()
-    }
-    expect(await scheduler.collectNow()).toBe(0)
-  })
+      expect(meta.intervalMinutes).toBeGreaterThan(1)
+
+      yield* Scope.close(scope, Exit.void)
+      expect(yield* schedule.collectNow).toBe(0)
+    }),
+  )
 })

@@ -1,4 +1,4 @@
-import { Schema } from 'effect'
+import { Effect, Schema } from 'effect'
 
 const boundedString = (maxLength: number) => Schema.String.check(Schema.isMaxLength(maxLength))
 const secretPrintRowSchema = Schema.Struct({
@@ -46,24 +46,26 @@ const rowsFromValidatedOutput = (output: typeof secretPrintRowsSchema.Type) => {
   return output.aliases
 }
 
-export const parseSecretPrintMetadata = (jsonText: string, defaultScope = 'unknown'): SecretMetadata[] => {
-  const decoded: unknown = JSON.parse(jsonText)
-  const rows = rowsFromValidatedOutput(Schema.decodeUnknownSync(secretPrintRowsSchema)(decoded))
-  return rows.map(row => {
-    const environment = row.environment ?? row.environmentName ?? row.env ?? 'prod'
-    const variableName = row.envKey ?? row.env_key ?? row.dotenvKey ?? row.dotenv_key ?? row.alias
-    const item = row.item ?? ''
-    const field = row.field ?? ''
-    return Schema.decodeUnknownSync(secretMetadataSchema)({
-      id: JSON.stringify([row.scope ?? defaultScope, row.alias, environment, item, field]),
-      alias: row.alias,
-      scope: row.scope ?? defaultScope,
-      environment,
-      variableName: variableName.length > 0 ? variableName : row.alias,
-      item,
-      field,
-      service: row.service ?? row.source ?? item,
-      description: row.description ?? row.service ?? row.source ?? item,
-    })
-  })
-}
+const decodePrintOutput = Schema.decodeUnknownEffect(Schema.fromJsonString(secretPrintRowsSchema))
+
+/** Value-free metadata from `secret print --json`; a value field the CLI prints is never kept. */
+export const decodeSecretPrintMetadata = (input: { readonly jsonText: string; readonly defaultScope: string }) =>
+  Effect.map(decodePrintOutput(input.jsonText), output =>
+    rowsFromValidatedOutput(output).map((row): SecretMetadata => {
+      const environment = row.environment ?? row.environmentName ?? row.env ?? 'prod'
+      const variableName = row.envKey ?? row.env_key ?? row.dotenvKey ?? row.dotenv_key ?? row.alias
+      const item = row.item ?? ''
+      const field = row.field ?? ''
+      return {
+        id: JSON.stringify([row.scope ?? input.defaultScope, row.alias, environment, item, field]),
+        alias: row.alias,
+        scope: row.scope ?? input.defaultScope,
+        environment,
+        variableName: variableName.length > 0 ? variableName : row.alias,
+        item,
+        field,
+        service: row.service ?? row.source ?? item,
+        description: row.description ?? row.service ?? row.source ?? item,
+      }
+    }),
+  )

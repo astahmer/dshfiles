@@ -1,27 +1,50 @@
 // @vitest-environment jsdom
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { PluginQueryProvider, QueryClient } from '@dshfiles/plugin-ui/query'
 import { createHostApiClient } from '@dshfiles/dshx/host'
-import { createTestHost } from '@dshfiles/dshx/testing'
+import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
 import { resourcePacksApi } from './api.js'
 import { AddResourceDialog, NewPackDialog } from './dialogs.js'
 import { ResourceEditor, ResourceValuesForm } from './editor.js'
 import { PropertyInput } from './editor-fields.js'
+import { createResourcePacksPlugin } from './host.js'
 import { ResourcesPanel } from './panel.js'
 import { ResourceTable } from './table.js'
-import { trackingPack, type PackDefinition, type PropertyDefinition, type ResourceRecord, type ResourceRef, type StoredPack } from './model.js'
-import { ResourceUiModel, type ResourcePacksClient } from './ui-helpers.js'
+import { trackingPack, type PackDefinition, type PropertyDefinition, type ResourceRecord, type ResourceRef } from './model.js'
+import { ResourceUiModel } from './ui-helpers.js'
+
+const owner = '@dshfiles/resource-packs'
+const guiPackage = '@test/resources-gui'
+const ignore = () => undefined
+let dshHome: string
+let previousDshHome: string | undefined
+const hosts: TestHost[] = []
 
 beforeAll(() => {
-  Element.prototype.scrollIntoView = vi.fn()
+  Element.prototype.scrollIntoView = ignore
   globalThis.ResizeObserver = class {
     observe() {}
     unobserve() {}
     disconnect() {}
   }
 })
-afterEach(cleanup)
+beforeEach(() => {
+  previousDshHome = process.env['DSH_HOME']
+  dshHome = mkdtempSync(join(tmpdir(), 'resource-packs-ui-'))
+  process.env['DSH_HOME'] = dshHome
+})
+afterEach(async () => {
+  cleanup()
+  await Promise.all(hosts.splice(0).map(host => host.dispose()))
+  if (previousDshHome === undefined) Reflect.deleteProperty(process.env, 'DSH_HOME')
+  else process.env['DSH_HOME'] = previousDshHome
+  rmSync(dshHome, { recursive: true, force: true })
+})
+
 const resource: ResourceRecord = {
   id: '01900000-0000-7000-8000-000000000001',
   label: 'Conversation review',
@@ -38,19 +61,21 @@ const target: ResourceRecord = {
   ref: { provider: 'local', kind: 'file', id: '/work/spec.md' },
   attachments: [],
 }
-const storedPack: StoredPack = { definition: trackingPack, owner: 'resource-packs', createdAt: 0, updatedAt: 0 }
-function client(): ResourcePacksClient {
-  return {
-    catalog: vi.fn(async () => ({ packs: [storedPack] })),
-    list: vi.fn(async () => ({ resources: [resource, target], total: 2 })),
-    get: vi.fn(async () => ({ resource, events: [] })),
-    registerPack: vi.fn(async ({ definition }) => ({ ...storedPack, definition })),
-    registerResource: vi.fn(async ({ ref, label }) => ({ ...target, ref, label })),
-    attach: vi.fn(async () => ({ ...resource, revision: 4 })),
-    detach: vi.fn(async () => ({ ...resource, revision: 4, attachments: [{ packId: 'tracking', attached: false, values: { assignee: 'Original' } }] })),
-    setValues: vi.fn(async () => ({ ...resource, revision: 4 })),
-  }
+
+/** A real Host serving the plugin, a GUI client, the pack owner, and the two fixture resources registered through the API. */
+const seededHost = async () => {
+  const host = await createTestHost()
+  hosts.push(host)
+  await host.mount(createResourcePacksPlugin(), { packageId: owner })
+  const api = createHostApiClient(host.ctx, resourcePacksApi, guiPackage)
+  const ownerApi = createHostApiClient(host.ctx, resourcePacksApi, owner)
+  const registered = await api.registerResource({ ref: resource.ref, label: resource.label })
+  const attached = await api.attach({ resourceId: registered.id, expectedRevision: registered.revision, packId: 'tracking' })
+  const review = await api.setValues({ resourceId: attached.id, expectedRevision: attached.revision, packId: 'tracking', values: { assignee: 'Original' } })
+  const spec = await api.registerResource({ ref: target.ref, label: target.label })
+  return { host, api, ownerApi, review, spec }
 }
+
 function provider(children: React.ReactNode, queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })) {
   return { ...render(<PluginQueryProvider client={queryClient}>{children}</PluginQueryProvider>), queryClient }
 }
@@ -80,14 +105,14 @@ const extraProperties: PropertyDefinition[] = [
   { id: 'links', label: 'Links', type: 'references', description: '', readOnly: false },
   { id: 'source.value', label: 'Owner value', type: 'text', description: '', readOnly: true },
 ]
-const allTypes: PackDefinition = { ...trackingPack, properties: [...trackingPack.properties, ...extraProperties] }
+const allTypes: PackDefinition = { ...trackingPack, version: 2, properties: [...trackingPack.properties, ...extraProperties] }
 
 describe('Resources UI', () => {
   it('selects a registered reference with its object value', async () => {
-    const onChange = vi.fn()
-    render(<PropertyInput property={trackingPack.properties[3]!} value={null} resources={[target]} onChange={onChange} />)
+    const changes: unknown[] = []
+    render(<PropertyInput property={trackingPack.properties[3]!} value={null} resources={[target]} onChange={value => changes.push(value)} />)
     await choose('Related resource', /Spec file/)
-    expect(onChange).toHaveBeenCalledWith(target.ref)
+    expect(changes).toEqual([target.ref])
   })
   it('uses definition columns even when no values exist and shows unknown references as readable text', () => {
     provider(
@@ -95,8 +120,8 @@ describe('Resources UI', () => {
         resources={[{ ...resource, attachments: [{ packId: 'tracking', attached: true, values: {} }] }]}
         pack={allTypes}
         references={[target]}
-        onEdit={vi.fn()}
-        onOpenReference={vi.fn()}
+        onEdit={ignore}
+        onOpenReference={ignore}
       />,
     )
     for (const property of allTypes.properties)
@@ -111,53 +136,64 @@ describe('Resources UI', () => {
   })
 
   it('opens readonly single and multiple conversation references explicitly and reports unavailable targets without opening an editor', async () => {
-    const api = client()
+    const seeded = await seededHost()
     const missing: ResourceRef = { provider: 'dsh', kind: 'conversation', id: 'unavailable-conversation' }
-    const referencePack: PackDefinition = {
-      ...trackingPack,
-      properties: [
-        { id: 'related', label: 'Related conversation', type: 'reference', readOnly: true, description: '' },
-        { id: 'links', label: 'Linked resources', type: 'references', readOnly: true, description: '' },
-      ],
+    await seeded.ownerApi.registerPack({
+      definition: {
+        ...trackingPack,
+        version: 2,
+        properties: [
+          ...trackingPack.properties,
+          { id: 'source', label: 'Related conversation', type: 'reference', readOnly: true, description: '' },
+          { id: 'links', label: 'Linked resources', type: 'references', readOnly: true, description: '' },
+        ],
+      },
+    })
+    const registered = await seeded.api.registerResource({ ref: { provider: 'local', kind: 'record', id: 'review-row' }, label: 'Review metadata' })
+    const attached = await seeded.api.attach({ resourceId: registered.id, expectedRevision: registered.revision, packId: 'tracking' })
+    const row = await seeded.ownerApi.setValues({
+      resourceId: attached.id,
+      expectedRevision: attached.revision,
+      packId: 'tracking',
+      values: { source: resource.ref, links: [missing, target.ref] },
+    })
+    const opened: ResourceRef[] = []
+    const openConversation = (ref: ResourceRef) => {
+      opened.push(ref)
+      return ref.id === missing.id ? 'This conversation is unavailable. Its reference has been preserved.' : null
     }
-    const row: ResourceRecord = {
-      ...target,
-      id: '01900000-0000-7000-8000-000000000003',
-      label: 'Review metadata',
-      ref: { provider: 'local', kind: 'record', id: 'review-row' },
-      attachments: [{ packId: 'tracking', attached: true, values: { related: resource.ref, links: [missing, target.ref] } }],
-    }
-    vi.mocked(api.catalog).mockResolvedValue({ packs: [{ ...storedPack, definition: referencePack }] })
-    vi.mocked(api.list).mockResolvedValue({ resources: [row, resource, target], total: 3 })
-    const openConversation = vi.fn<(ref: ResourceRef) => string | null>(ref =>
-      ref.id === missing.id ? 'This conversation is unavailable. Its reference has been preserved.' : null,
-    )
-    provider(<ResourcesPanel api={api} openConversation={openConversation} />)
+    provider(<ResourcesPanel api={seeded.api} openConversation={openConversation} />)
     const known = await screen.findByRole('button', { name: 'Open conversation Conversation review' })
     expect(known.hasAttribute('disabled')).toBe(false)
-    expect(openConversation).not.toHaveBeenCalled()
+    expect(opened).toEqual([])
     fireEvent.click(known)
-    expect(openConversation).toHaveBeenLastCalledWith(resource.ref)
+    expect(opened).toEqual([resource.ref])
     fireEvent.click(screen.getByRole('button', { name: 'Open conversation Unregistered reference: dsh / conversation / unavailable-conversation' }))
-    expect(openConversation).toHaveBeenLastCalledWith(missing)
-    expect(openConversation).toHaveBeenCalledTimes(2)
+    expect(opened).toEqual([resource.ref, missing])
     expect(await screen.findByRole('status')).toHaveProperty('textContent', 'This conversation is unavailable. Its reference has been preserved.')
     expect(screen.queryByRole('button', { name: 'Open conversation Spec file' })).toBeNull()
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(api.get).not.toHaveBeenCalled()
-    expect(api.setValues).not.toHaveBeenCalled()
+    expect((await seeded.api.get({ resourceId: row.id })).resource).toEqual(row)
   })
 
   it('renders all nine editors, submits native reference objects and excludes owner-only values', async () => {
-    const api = client()
+    const seeded = await seededHost()
+    await seeded.ownerApi.registerPack({ definition: allTypes })
+    const current = await seeded.ownerApi.setValues({
+      resourceId: seeded.review.id,
+      expectedRevision: seeded.review.revision,
+      packId: 'tracking',
+      values: { 'source.value': 'Owner' },
+    })
+    const saved: unknown[] = []
     provider(
       <ResourceValuesForm
-        api={api}
-        resource={{ ...resource, attachments: [{ packId: 'tracking', attached: true, values: { 'source.value': 'Owner' } }] }}
+        api={seeded.api}
+        resource={current}
         pack={allTypes}
-        references={[target]}
-        onSaved={vi.fn()}
-        onCancel={vi.fn()}
+        references={[seeded.spec]}
+        onSaved={value => saved.push(value)}
+        onCancel={ignore}
       />,
     )
     fireEvent.change(screen.getByLabelText('Assignee'), { target: { value: 'Alice' } })
@@ -175,23 +211,22 @@ describe('Resources UI', () => {
     expect(screen.getByRole('combobox', { name: 'Related resource' }).textContent).toContain('Spec file')
     expect(screen.getByLabelText('Owner value (read-only)').hasAttribute('disabled')).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(api.setValues).toHaveBeenCalledOnce())
-    expect(api.setValues).toHaveBeenCalledWith({
-      resourceId: resource.id,
-      packId: 'tracking',
-      expectedRevision: 3,
-      values: {
-        assignee: 'Alice',
-        count: 2.5,
-        due: '2027-04-21',
-        time: new Date('2027-04-21T13:30').toISOString(),
-        checked: true,
-        status: 'doing',
-        related: target.ref,
-        links: [target.ref],
-        tags: ['one'],
-      },
+    await waitFor(() => expect(saved).toHaveLength(1))
+    const stored = await seeded.api.get({ resourceId: current.id })
+    expect(stored.resource.revision).toBe(current.revision + 1)
+    expect(stored.resource.attachments[0]?.values).toEqual({
+      assignee: 'Alice',
+      count: 2.5,
+      due: '2027-04-21',
+      time: new Date('2027-04-21T13:30').toISOString(),
+      checked: true,
+      status: 'doing',
+      related: target.ref,
+      links: [target.ref],
+      tags: ['one'],
+      'source.value': 'Owner',
     })
+    expect(stored.events[0]).toMatchObject({ action: 'values-updated', actor: guiPackage })
   })
 
   it('validates current definitions without overwriting unknown or stale values', () => {
@@ -214,105 +249,115 @@ describe('Resources UI', () => {
   })
 
   it('keeps open drafts and their revision during page cache refresh; a stale save stays visible', async () => {
-    const api = client()
-    vi.mocked(api.setValues).mockRejectedValue(new Error('Revision conflict: reload the resource before saving.'))
-    const onClose = vi.fn()
+    const seeded = await seededHost()
+    let closed = 0
     const { queryClient } = provider(
       <ResourceEditor
-        api={api}
-        resourceId={resource.id}
+        api={seeded.api}
+        resourceId={seeded.review.id}
         pack={trackingPack}
-        references={[target]}
+        references={[seeded.spec]}
         openConversation={() => 'Archived or unavailable.'}
-        onClose={onClose}
-        onSaved={vi.fn()}
+        onClose={() => {
+          closed += 1
+        }}
+        onSaved={ignore}
       />,
     )
     const assignee = await screen.findByLabelText('Assignee')
     fireEvent.change(assignee, { target: { value: 'Unsaved draft' } })
+    const concurrent = await seeded.ownerApi.setValues({
+      resourceId: seeded.review.id,
+      expectedRevision: seeded.review.revision,
+      packId: 'tracking',
+      values: { assignee: 'Concurrent writer' },
+    })
     await queryClient.invalidateQueries({ queryKey: ['resource-packs'] })
-    expect(api.get).toHaveBeenCalledOnce()
     expect(screen.getByLabelText('Assignee')).toHaveProperty('value', 'Unsaved draft')
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Revision conflict: reload the resource before saving.')
-    expect(api.setValues).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: 3, values: expect.objectContaining({ assignee: 'Unsaved draft' }) }))
-    expect(api.setValues).toHaveBeenCalledOnce()
-    expect(onClose).not.toHaveBeenCalled()
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'This resource changed. Reload it before editing its metadata.')
+    expect((await seeded.api.get({ resourceId: seeded.review.id })).resource).toEqual(concurrent)
+    expect(closed).toBe(0)
     fireEvent.click(screen.getByRole('button', { name: 'Open conversation' }))
     expect(screen.getByText('Archived or unavailable.')).toBeDefined()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(onClose).toHaveBeenCalledOnce()
+    expect(closed).toBe(1)
   })
 
   it('requires explicit detach confirmation and can reattach retained metadata', async () => {
-    const api = client()
+    const seeded = await seededHost()
     provider(
       <ResourceEditor
-        api={api}
-        resourceId={resource.id}
+        api={seeded.api}
+        resourceId={seeded.review.id}
         pack={trackingPack}
         references={[]}
         openConversation={() => null}
-        onClose={vi.fn()}
-        onSaved={vi.fn()}
+        onClose={ignore}
+        onSaved={ignore}
       />,
     )
     fireEvent.click(await screen.findByRole('button', { name: 'Detach pack' }))
-    expect(api.detach).not.toHaveBeenCalled()
+    expect((await seeded.api.get({ resourceId: seeded.review.id })).resource.revision).toBe(seeded.review.revision)
     fireEvent.click(screen.getByRole('button', { name: 'Confirm detach' }))
-    await waitFor(() => expect(api.detach).toHaveBeenCalledWith({ resourceId: resource.id, packId: 'tracking', expectedRevision: 3, confirm: true }))
     fireEvent.click(await screen.findByRole('button', { name: 'Attach pack' }))
-    await waitFor(() => expect(api.attach).toHaveBeenCalledWith({ resourceId: resource.id, packId: 'tracking', expectedRevision: 4 }))
     expect(await screen.findByLabelText('Assignee')).toHaveProperty('value', 'Original')
+    const stored = await seeded.api.get({ resourceId: seeded.review.id })
+    expect(stored.resource).toMatchObject({ revision: seeded.review.revision + 2, attachments: [{ packId: 'tracking', attached: true }] })
+    expect(stored.events.slice(0, 2).map(event => event.action)).toEqual(['attached', 'detached'])
   })
 
   it('reports a missing API owner without requesting resource data or polling', async () => {
     const host = await createTestHost()
-    try {
-      const absent = createHostApiClient(host.ctx, resourcePacksApi, '@dshfiles/resource-packs-ui-test')
-      const api = client()
-      vi.mocked(api.catalog).mockImplementation(absent.catalog)
-      const view = provider(<ResourcesPanel api={api} openConversation={() => null} />)
-      expect(await screen.findByRole('alert')).toHaveProperty(
-        'textContent',
-        'Resources unavailable: the Host plugin is not active. No background retries will run. Reopen this page after the plugin is activated.',
-      )
-      expect(api.catalog).toHaveBeenCalledOnce()
-      expect(api.list).not.toHaveBeenCalled()
-      const catalogQuery = view.queryClient.getQueryCache().find({ queryKey: ['resource-packs', 'catalog'] })
-      expect(catalogQuery?.getObserversCount()).toBe(1)
-      view.unmount()
-      view.queryClient.clear()
-    } finally {
-      await host.dispose()
-    }
+    hosts.push(host)
+    const absent = createHostApiClient(host.ctx, resourcePacksApi, '@dshfiles/resource-packs-ui-test')
+    const view = provider(<ResourcesPanel api={absent} openConversation={() => null} />)
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Resources unavailable: the Host plugin is not active. No background retries will run. Reopen this page after the plugin is activated.',
+    )
+    const cache = view.queryClient.getQueryCache()
+    const catalogQuery = cache.find({ queryKey: ['resource-packs', 'catalog'] })
+    expect(catalogQuery?.getObserversCount()).toBe(1)
+    const resourceRequests = cache.getAll().filter(query => query !== catalogQuery)
+    expect(resourceRequests.map(query => [query.state.fetchStatus, query.state.dataUpdateCount, query.state.errorUpdateCount])).toEqual([
+      ['idle', 0, 0],
+      ['idle', 0, 0],
+    ])
+    view.unmount()
+    view.queryClient.clear()
   })
 
   it('keeps unassociated resources visible with Tracking selected', async () => {
-    const api = client()
-    provider(<ResourcesPanel api={api} openConversation={() => null} />)
+    const seeded = await seededHost()
+    provider(<ResourcesPanel api={seeded.api} openConversation={() => null} />)
     expect(await screen.findByRole('heading', { name: 'Resources' })).toBeDefined()
     expect(await screen.findByRole('button', { name: 'Edit Spec file' })).toBeDefined()
-    expect(api.list).toHaveBeenCalledWith({ query: '', limit: 200 }, expect.objectContaining({ signal: expect.any(AbortSignal) }))
     expect(screen.getByRole('combobox', { name: 'Property pack' }).textContent).toContain('Tracking')
   })
 
   it('registers source references without reading or opening native contents', async () => {
-    const api = client()
-    provider(<AddResourceDialog api={api} onClose={vi.fn()} onCreated={vi.fn()} />)
+    const seeded = await seededHost()
+    const created: unknown[] = []
+    provider(<AddResourceDialog api={seeded.api} onClose={ignore} onCreated={value => created.push(value)} />)
     fireEvent.change(screen.getByRole('textbox', { name: 'Provider' }), { target: { value: 'local' } })
     await choose('Kind', 'file')
     fireEvent.change(screen.getByRole('textbox', { name: 'Native ID' }), { target: { value: '/work/example.md' } })
     fireEvent.change(screen.getByRole('textbox', { name: 'Resource label' }), { target: { value: 'Example file' } })
     fireEvent.click(screen.getByRole('button', { name: 'Register resource' }))
-    await waitFor(() =>
-      expect(api.registerResource).toHaveBeenCalledWith({ ref: { provider: 'local', kind: 'file', id: '/work/example.md' }, label: 'Example file' }),
-    )
+    await waitFor(() => expect(created).toHaveLength(1))
+    const listed = await seeded.api.list({ query: '/work/example.md' })
+    expect(listed).toMatchObject({
+      total: 1,
+      resources: [{ label: 'Example file', ref: { provider: 'local', kind: 'file', id: '/work/example.md' }, attachments: [] }],
+    })
   })
 
   it('builds a reusable select pack with editable stable field and option IDs', async () => {
-    const api = client()
-    provider(<NewPackDialog api={api} packs={[storedPack]} onClose={vi.fn()} onCreated={vi.fn()} />)
+    const seeded = await seededHost()
+    const catalog = await seeded.api.catalog()
+    const created: unknown[] = []
+    provider(<NewPackDialog api={seeded.api} packs={catalog.packs} onClose={ignore} onCreated={value => created.push(value)} />)
     fireEvent.change(screen.getByLabelText('Pack label'), { target: { value: 'Review' } })
     expect(screen.getByLabelText('Pack ID')).toHaveProperty('value', 'review')
     fireEvent.change(screen.getByLabelText('Field 1 label'), { target: { value: 'Decision' } })
@@ -323,28 +368,29 @@ describe('Resources UI', () => {
     fireEvent.change(screen.getByLabelText('Field 1 option 2 label'), { target: { value: 'Approved' } })
     fireEvent.change(screen.getByLabelText('Field 1 option 2 ID'), { target: { value: 'done' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create pack' }))
-    await waitFor(() =>
-      expect(api.registerPack).toHaveBeenCalledWith({
-        definition: {
-          id: 'review',
-          label: 'Review',
-          version: 1,
-          description: '',
-          properties: [
-            {
-              id: 'decision',
-              label: 'Decision',
-              description: '',
-              readOnly: false,
-              type: 'select',
-              options: [
-                { id: 'todo', label: 'To review' },
-                { id: 'done', label: 'Approved' },
-              ],
-            },
-          ],
-        },
-      }),
-    )
+    await waitFor(() => expect(created).toHaveLength(1))
+    const review = (await seeded.api.catalog()).packs.find(pack => pack.definition.id === 'review')
+    expect(review).toMatchObject({
+      owner: guiPackage,
+      definition: {
+        id: 'review',
+        label: 'Review',
+        version: 1,
+        description: '',
+        properties: [
+          {
+            id: 'decision',
+            label: 'Decision',
+            description: '',
+            readOnly: false,
+            type: 'select',
+            options: [
+              { id: 'todo', label: 'To review' },
+              { id: 'done', label: 'Approved' },
+            ],
+          },
+        ],
+      },
+    })
   })
 })

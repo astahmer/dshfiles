@@ -113,6 +113,58 @@
     "./effect/services": {
       "types": "./dist/effect/services.d.ts",
       "default": "./dist/effect/services.js"
+    },
+    "./ids": {
+      "types": "./dist/ids.d.ts",
+      "default": "./dist/ids.js"
+    },
+    "./effect/host-context": {
+      "types": "./dist/effect/host-context.d.ts",
+      "default": "./dist/effect/host-context.js"
+    },
+    "./effect/storage-domain": {
+      "types": "./dist/effect/storage-domain.d.ts",
+      "default": "./dist/effect/storage-domain.js"
+    },
+    "./effect/plugin-storage": {
+      "types": "./dist/effect/plugin-storage.d.ts",
+      "default": "./dist/effect/plugin-storage.js"
+    },
+    "./effect/settings": {
+      "types": "./dist/effect/settings.d.ts",
+      "default": "./dist/effect/settings.js"
+    },
+    "./effect/child-process-spawner": {
+      "types": "./dist/effect/child-process-spawner.d.ts",
+      "default": "./dist/effect/child-process-spawner.js"
+    },
+    "./effect/host-terminal": {
+      "types": "./dist/effect/host-terminal.d.ts",
+      "default": "./dist/effect/host-terminal.js"
+    },
+    "./effect/host-apis": {
+      "types": "./dist/effect/host-apis.d.ts",
+      "default": "./dist/effect/host-apis.js"
+    },
+    "./effect/communication": {
+      "types": "./dist/effect/communication.d.ts",
+      "default": "./dist/effect/communication.js"
+    },
+    "./effect/llm": {
+      "types": "./dist/effect/llm.d.ts",
+      "default": "./dist/effect/llm.js"
+    },
+    "./effect/keyed-mutex": {
+      "types": "./dist/effect/keyed-mutex.d.ts",
+      "default": "./dist/effect/keyed-mutex.js"
+    },
+    "./effect/host-commands": {
+      "types": "./dist/effect/host-commands.d.ts",
+      "default": "./dist/effect/host-commands.js"
+    },
+    "./effect/host-prompt": {
+      "types": "./dist/effect/host-prompt.d.ts",
+      "default": "./dist/effect/host-prompt.js"
     }
   },
   "scripts": {
@@ -147,6 +199,8 @@
     "@deepseek-ai/dsh-agent": "catalog:",
     "@deepseek-ai/dsh-agent-preset-registry": "catalog:",
     "@deepseek-ai/dsh-api-session-controller": "catalog:",
+    "@deepseek-ai/dsh-attachment": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-attachment-local": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-connection": "catalog:",
     "@deepseek-ai/dsh-client-locale": "catalog:",
     "@deepseek-ai/dsh-client-ui-chat": "catalog:",
@@ -167,13 +221,15 @@
     "@deepseek-ai/dsh-storage-domain": "catalog:",
     "@deepseek-ai/dsh-storage-json": "catalog:",
     "@deepseek-ai/dsh-subprocess": "catalog:",
+    "@deepseek-ai/dsh-subprocess-local": "0.2.1-rc.2",
     "@deepseek-ai/dsh-system-prompt": "catalog:",
     "@deepseek-ai/dsh-tool-cordis": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@deepseek-ai/dsh-user-approval": "catalog:",
     "@deepseek-ai/dsh-web-app": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-workspace": "catalog:",
     "@deepseek-ai/schemastery": "catalog:",
-    "@dshfiles/credential-port": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
@@ -214,8 +270,9 @@
     "@deepseek-ai/dsh-tool-cordis": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-user-approval": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-workspace": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "~3.18.4",
-    "@dshfiles/credential-port": ">=0.1.0 <0.2.0",
+    "@effect/platform-node": ">=4.1.0 <5",
     "effect": ">=4.1.0 <5",
     "playwright": ">=1.56.0 <2",
     "react": ">=18 <20",
@@ -226,9 +283,6 @@
       "optional": true
     },
     "@deepseek-ai/dsh-subprocess": {
-      "optional": true
-    },
-    "@dshfiles/credential-port": {
       "optional": true
     },
     "@deepseek-ai/dsh-api-session-controller": {
@@ -289,6 +343,12 @@
       "optional": true
     },
     "@deepseek-ai/dsh-skill": {
+      "optional": true
+    },
+    "@effect/platform-node": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-workspace": {
       "optional": true
     }
   },

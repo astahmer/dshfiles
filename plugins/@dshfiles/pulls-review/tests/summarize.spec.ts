@@ -1,9 +1,13 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { JjRun, JjRunInput } from '../src/jj.js'
-import { PullsReviewSummaryModel } from '../src/summarize.js'
+import { NodeFileSystem } from '@effect/platform-node'
+import { afterAll, beforeAll, describe, expect, it } from '@effect/vitest'
+import { Effect, Layer } from 'effect'
+import { ReviewJj, type JjReadFailed, type JjReadInput, type JjReadOutput } from '../src/jj.js'
+import { ReviewWorkspace } from '../src/review.js'
+import { PullsReviewSummary, PullsReviewSummaryModel, type SummarizeInput } from '../src/summarize.js'
+import { SummaryRoutes, type SummaryCompletion } from '../src/summary-routes-promise.js'
 
 const PATCH = [
   'diff --git a/src/app.ts b/src/app.ts',
@@ -15,12 +19,31 @@ const PATCH = [
   '',
 ].join('\n')
 
-const run: JjRun = async (input: JjRunInput) => {
-  if (input.args[0] === 'log') return { stdout: input.args[2] === '@' ? 'abc1234\n' : 'def5678\n', truncated: false }
-  return { stdout: PATCH, truncated: false }
-}
+type JjRead = (input: JjReadInput) => Effect.Effect<JjReadOutput, JjReadFailed>
 
-const answer = (text: string) => async () => text
+const run: JjRead = input =>
+  Effect.succeed(
+    input.args[0] === 'log' ? { stdout: input.args[2] === '@' ? 'abc1234\n' : 'def5678\n', truncated: false } : { stdout: PATCH, truncated: false },
+  )
+
+type Routes = Pick<SummaryRoutes['Service'], 'providerOf' | 'modelsOf'>
+
+const answer = (text: string) => (_request: SummaryCompletion) => Effect.succeed(text)
+
+/** jj and the model are the external systems; the review and summary services above them are real. */
+const summarizeOver = (input: SummarizeInput & { readonly read?: JjRead; readonly routes: Routes; readonly complete: SummaryRoutes['Service']['complete'] }) =>
+  PullsReviewSummary.use(summary => summary.summarize(input)).pipe(
+    Effect.provide(
+      PullsReviewSummary.layer.pipe(
+        Layer.provide(
+          Layer.merge(
+            ReviewWorkspace.layer.pipe(Layer.provide(Layer.merge(Layer.succeed(ReviewJj, ReviewJj.of({ read: input.read ?? run })), NodeFileSystem.layer))),
+            Layer.succeed(SummaryRoutes, SummaryRoutes.of({ available: true, ...input.routes, complete: input.complete })),
+          ),
+        ),
+      ),
+    ),
+  )
 
 describe('parseSummaryResponse', () => {
   it('reads one keyed line per scope', () => {
@@ -66,8 +89,8 @@ describe('buildSummaryInput', () => {
 })
 
 describe('summarizeWorkspace', () => {
-  const routes = { providerOf: async () => 'acme', modelsOf: async () => ['acme-first', 'acme-big'] }
-  const common = () => ({ run, path: workspace, sessionId: 'session-1', routes })
+  const routes: Routes = { providerOf: () => Effect.succeed('acme'), modelsOf: () => Effect.succeed(['acme-first', 'acme-big']) }
+  const common = () => ({ path: workspace, sessionId: 'session-1', routes })
 
   let workspace = ''
 
@@ -79,63 +102,75 @@ describe('summarizeWorkspace', () => {
     await rm(workspace, { recursive: true, force: true })
   })
 
-  it('uses the thread provider with the first model it offers, and lends it the session id', async () => {
-    const seen: { route: string; sessionId?: string | undefined }[] = []
-    const result = await PullsReviewSummaryModel.summarize({
-      ...common(),
-      complete: async request => {
-        seen.push({ route: `${request.provider}/${request.model}`, sessionId: request.sessionId })
-        return 'code: Adds a second answer.'
-      },
-    })
-    expect(result).toEqual({ status: 'ok', route: { provider: 'acme', model: 'acme-first' }, summaries: { code: 'Adds a second answer.' } })
-    expect(seen).toEqual([{ route: 'acme/acme-first', sessionId: 'session-1' }])
-  })
+  it.effect('uses the thread provider with the first model it offers, and lends it the session id', () =>
+    Effect.gen(function* () {
+      const seen: { route: string; sessionId?: string | undefined }[] = []
+      const result = yield* summarizeOver({
+        ...common(),
+        complete: request =>
+          Effect.sync(() => {
+            seen.push({ route: `${request.provider}/${request.model}`, sessionId: request.sessionId })
+            return 'code: Adds a second answer.'
+          }),
+      })
+      expect(result).toEqual({ status: 'ok', route: { provider: 'acme', model: 'acme-first' }, summaries: { code: 'Adds a second answer.' } })
+      expect(seen).toEqual([{ route: 'acme/acme-first', sessionId: 'session-1' }])
+    }),
+  )
 
-  it('honours an explicit provider and model over the thread route', async () => {
-    const result = await PullsReviewSummaryModel.summarize({
-      ...common(),
-      provider: 'other',
-      model: 'other-large',
-      complete: answer('code: Explicit.'),
-    })
-    expect(result).toEqual({ status: 'ok', route: { provider: 'other', model: 'other-large' }, summaries: { code: 'Explicit.' } })
-  })
+  it.effect('honours an explicit provider and model over the thread route', () =>
+    Effect.gen(function* () {
+      const result = yield* summarizeOver({
+        ...common(),
+        provider: 'other',
+        model: 'other-large',
+        complete: answer('code: Explicit.'),
+      })
+      expect(result).toEqual({ status: 'ok', route: { provider: 'other', model: 'other-large' }, summaries: { code: 'Explicit.' } })
+    }),
+  )
 
-  it('reports no route when neither the caller nor the thread names a provider', async () => {
-    const result = await PullsReviewSummaryModel.summarize({
-      run,
-      path: workspace,
-      sessionId: 'session-1',
-      routes: { providerOf: async () => undefined, modelsOf: async () => [] },
-      complete: answer('code: never called'),
-    })
-    expect(result).toMatchObject({ status: 'failed', reason: 'no-route' })
-  })
+  it.effect('reports no route when neither the caller nor the thread names a provider', () =>
+    Effect.gen(function* () {
+      const result = yield* summarizeOver({
+        path: workspace,
+        sessionId: 'session-1',
+        routes: { providerOf: () => Effect.succeed(undefined), modelsOf: () => Effect.succeed([]) },
+        complete: answer('code: never called'),
+      })
+      expect(result).toMatchObject({ status: 'failed', reason: 'no-route' })
+    }),
+  )
 
-  it('reports no route when the provider offers no model', async () => {
-    const result = await PullsReviewSummaryModel.summarize({ ...common(), routes: { ...routes, modelsOf: async () => [] }, complete: answer('code: no') })
-    expect(result).toMatchObject({ status: 'failed', reason: 'no-route' })
-  })
+  it.effect('reports no route when the provider offers no model', () =>
+    Effect.gen(function* () {
+      const result = yield* summarizeOver({ ...common(), routes: { ...routes, modelsOf: () => Effect.succeed([]) }, complete: answer('code: no') })
+      expect(result).toMatchObject({ status: 'failed', reason: 'no-route' })
+    }),
+  )
 
-  it('reports an unusable answer instead of inventing summaries', async () => {
-    const result = await PullsReviewSummaryModel.summarize({ ...common(), complete: answer('Sorry, I cannot.') })
-    expect(result).toMatchObject({ status: 'failed', reason: 'unparsed' })
-  })
+  it.effect('reports an unusable answer instead of inventing summaries', () =>
+    Effect.gen(function* () {
+      const result = yield* summarizeOver({ ...common(), complete: answer('Sorry, I cannot.') })
+      expect(result).toMatchObject({ status: 'failed', reason: 'unparsed' })
+    }),
+  )
 
-  it('names the real reason instead of blaming the model', async () => {
-    const empty = await PullsReviewSummaryModel.summarize({
-      ...common(),
-      run: async input => (input.args[0] === 'log' ? { stdout: 'abc1234\n', truncated: false } : { stdout: '', truncated: false }),
-      complete: answer('code: never called'),
-    })
-    expect(empty).toMatchObject({ status: 'failed', reason: 'no-changes' })
+  it.effect('names the real reason instead of blaming the model', () =>
+    Effect.gen(function* () {
+      const empty = yield* summarizeOver({
+        ...common(),
+        read: input => Effect.succeed(input.args[0] === 'log' ? { stdout: 'abc1234\n', truncated: false } : { stdout: '', truncated: false }),
+        complete: answer('code: never called'),
+      })
+      expect(empty).toMatchObject({ status: 'failed', reason: 'no-changes' })
 
-    const broken = await PullsReviewSummaryModel.summarize({
-      ...common(),
-      run: async () => ({ stdout: '', truncated: false }),
-      complete: answer('code: never called'),
-    })
-    expect(broken).toMatchObject({ status: 'failed', reason: 'review-failed' })
-  })
+      const broken = yield* summarizeOver({
+        ...common(),
+        read: () => Effect.succeed({ stdout: '', truncated: false }),
+        complete: answer('code: never called'),
+      })
+      expect(broken).toMatchObject({ status: 'failed', reason: 'review-failed' })
+    }),
+  )
 })

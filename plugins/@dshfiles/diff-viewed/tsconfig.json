@@ -5,7 +5,7 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
-    "types": ["react", "@dshfiles/dshx/client/env"],
+    "types": ["node", "react", "@dshfiles/dshx/client/env"],
     "noEmit": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]

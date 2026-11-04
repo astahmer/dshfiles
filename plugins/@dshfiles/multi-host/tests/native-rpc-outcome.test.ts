@@ -1,13 +1,16 @@
 import { createServer } from 'node:http'
 import { describe, expect, test } from 'vitest'
 import * as Schema from 'effect/Schema'
-import { MultiHostSchema } from '../src/schema.js'
+import { SchemaFields } from '../src/schema.js'
 import type { NativeRpcRequest } from '../src/api.js'
-import { connectGateway } from '../src/connectors/gateway.js'
-import { NativeRpcModel } from '../src/native-rpc.js'
+import { openGateway } from './fixtures/gateway-runtime.js'
+import { NativeRpc } from '../src/native-rpc.js'
+import { Effect } from 'effect'
+
+const decodeValue = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, input: unknown): S['Type'] => Schema.decodeUnknownSync(schema)(input)
 
 describe('native mutation outcome recovery', () => {
-  const requestEnvelopeSchema = Schema.Struct({ rpcId: Schema.String }).pipe(MultiHostSchema.passthrough)
+  const requestEnvelopeSchema = Schema.Struct({ rpcId: Schema.String }).pipe(SchemaFields.passthrough)
   const addressSchema = Schema.Struct({ port: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65_535)) })
 
   test('reports an admitted create as unknown after its reply is lost and reconciles without replay', async () => {
@@ -24,7 +27,7 @@ describe('native mutation outcome recovery', () => {
       request.on('end', () => {
         let requestId: string
         try {
-          requestId = MultiHostSchema.decode(requestEnvelopeSchema, JSON.parse(body.join(''))).rpcId
+          requestId = decodeValue(requestEnvelopeSchema, JSON.parse(body.join(''))).rpcId
         } catch {
           response.writeHead(400).end()
           return
@@ -57,29 +60,28 @@ describe('native mutation outcome recovery', () => {
     const address = Schema.decodeUnknownResult(addressSchema)(server.address())
     if (address._tag === 'Failure') throw new Error('The loopback fixture did not bind.')
     const launchUrl = `http://127.0.0.1:${address.success.port}/?token=fixture-token-12345678`
-    const gateway = await connectGateway({
-      launchUrl,
-      createTransport: async origin => ({ origin: origin.origin, launchUrl, dispose: async () => {} }),
-    })
+    const opened = await openGateway(launchUrl)
+    const gateway = opened.gateway
     try {
       const createRequest: NativeRpcRequest = {
         namespace: 'session',
         method: 'create',
         args: { request: { cwd: '/tmp/multi-host-outcome-fixture' } },
       }
-      const result = await NativeRpcModel.call(gateway, createRequest)
+      const result = await opened.call(
+        NativeRpc.call(gateway, createRequest).pipe(Effect.catch(error => Effect.succeed(NativeRpc.failureResult({ request: createRequest, error })))),
+      )
       expect(result).toEqual({
         ok: false,
         code: 'unknown-mutation-outcome',
         message: 'The connection failed after the mutation was sent. Outcome is unknown; inspect runtime state before retrying.',
       })
       expect(admittedSessionCount).toBe(1)
-      const reconciled = await gateway.runSafe('session', 'list', { _request: {} })
-      expect(reconciled.ok).toBe(true)
-      if (reconciled.ok) expect(reconciled.value).toMatchObject({ items: [{ sessionId: 'admitted-session' }] })
+      const reconciled = await opened.call(gateway.run({ namespace: 'session', method: 'list', args: { _request: {} } }))
+      expect(reconciled).toMatchObject({ items: [{ sessionId: 'admitted-session' }] })
       expect(admittedSessionCount).toBe(1)
     } finally {
-      await gateway.dispose()
+      await opened.close()
       await new Promise<void>((resolve, reject) => server.close(error => (error ? reject(error) : resolve())))
     }
   })

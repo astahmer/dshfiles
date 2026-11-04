@@ -30,26 +30,26 @@
         {
           "kind": "unit-test",
           "id": "agent-questions.parent-child-question-unit-stable-operation-id",
-          "file": "plugins/@dshfiles/agent-questions/src/service.test.ts",
-          "testName": "returns a stable question id for a duplicate operation"
+          "file": "plugins/@dshfiles/agent-questions/src/parent-questions.test.ts",
+          "testName": "returns a stable question id for a duplicate operation and delivers one notice"
         },
         {
           "kind": "unit-test",
           "id": "agent-questions.parent-child-question-unit-parent-authorization",
-          "file": "plugins/@dshfiles/agent-questions/src/service.test.ts",
-          "testName": "rejects an answer from any Agent except the recorded direct parent"
+          "file": "plugins/@dshfiles/agent-questions/src/parent-questions.test.ts",
+          "testName": "rejects an answer from any Agent except the recorded direct parent, and a competing answer"
         },
         {
           "kind": "unit-test",
           "id": "agent-questions.parent-child-question-unit-host-reopen",
-          "file": "plugins/@dshfiles/agent-questions/src/storage.test.ts",
-          "testName": "keeps a pending question answerable across Host shutdown and durable reopen"
+          "file": "plugins/@dshfiles/agent-questions/src/parent-questions.test.ts",
+          "testName": "persists pending and answered records across Host restarts and interrupts waiters on shutdown"
         },
         {
           "kind": "unit-test",
           "id": "agent-questions.parent-child-question-unit-wait-reattach",
-          "file": "plugins/@dshfiles/agent-questions/src/service.test.ts",
-          "testName": "interrupts Host waiters without cancelling their durable question"
+          "file": "plugins/@dshfiles/agent-questions/src/parent-questions.test.ts",
+          "testName": "persists pending and answered records across Host restarts and interrupts waiters on shutdown"
         }
       ],
       "telemetry": [
@@ -83,26 +83,26 @@
         {
           "kind": "unit-test",
           "id": "agent-questions.question-expiry-unit-recommended-choice",
-          "file": "plugins/@dshfiles/agent-questions/src/service.test.ts",
-          "testName": "uses the recommended option when a question reaches its persisted deadline"
+          "file": "plugins/@dshfiles/agent-questions/src/parent-questions.test.ts",
+          "testName": "uses the recommended option when a waited question reaches its deadline"
         },
         {
           "kind": "unit-test",
           "id": "agent-questions.question-expiry-unit-deferred-file",
-          "file": "plugins/@dshfiles/agent-questions/src/deferred-question.test.ts",
+          "file": "plugins/@dshfiles/agent-questions/src/deferred-question-files.test.ts",
           "testName": "writes private, fenced, idempotent workspace files"
         },
         {
           "kind": "unit-test",
           "id": "agent-questions.question-expiry-unit-symlink-protection",
-          "file": "plugins/@dshfiles/agent-questions/src/deferred-question.test.ts",
+          "file": "plugins/@dshfiles/agent-questions/src/deferred-question-files.test.ts",
           "testName": "does not follow a workspace questions symlink"
         },
         {
           "kind": "unit-test",
           "id": "agent-questions.question-expiry-unit-durable-reattach",
-          "file": "plugins/@dshfiles/agent-questions/src/storage.test.ts",
-          "testName": "reattaches to a deferred outcome and file path after JSON domain reopen"
+          "file": "plugins/@dshfiles/agent-questions/src/question-storage.test.ts",
+          "testName": "reattaches to a deferred outcome and file path after a Host restart"
         }
       ],
       "telemetry": [
@@ -144,32 +144,32 @@
         {
           "kind": "unit-test",
           "id": "agent-questions.revisioned-feedback-unit-current-or-stale-receipt",
-          "file": "plugins/@dshfiles/agent-questions/src/revisioned-feedback.test.ts",
+          "file": "plugins/@dshfiles/agent-questions/src/parent-feedback.test.ts",
           "testName": "records batch resolutions with current or stale revision receipts"
         },
         {
           "kind": "unit-test",
           "id": "agent-questions.revisioned-feedback-unit-stale-on-retrieval",
-          "file": "plugins/@dshfiles/agent-questions/src/revisioned-feedback.test.ts",
+          "file": "plugins/@dshfiles/agent-questions/src/parent-feedback.test.ts",
           "testName": "turns a previously current receipt stale if the document changes before retrieval"
         },
         {
           "kind": "unit-test",
           "id": "agent-questions.revisioned-feedback-unit-exact-anchor",
-          "file": "plugins/@dshfiles/agent-questions/src/markdown-target.test.ts",
+          "file": "plugins/@dshfiles/agent-questions/src/markdown-documents.test.ts",
           "testName": "captures exact workspace lines against the whole-file revision"
         },
         {
           "kind": "unit-test",
           "id": "agent-questions.revisioned-feedback-unit-unsafe-anchor",
-          "file": "plugins/@dshfiles/agent-questions/src/markdown-target.test.ts",
+          "file": "plugins/@dshfiles/agent-questions/src/markdown-documents.test.ts",
           "testName": "rejects traversal, symlinks, and a quote that does not match the source lines"
         },
         {
           "kind": "unit-test",
           "id": "agent-questions.revisioned-feedback-unit-durable-receipt",
-          "file": "plugins/@dshfiles/agent-questions/src/storage.test.ts",
-          "testName": "preserves anchored feedback and late resolution receipts across JSON domain reopen"
+          "file": "plugins/@dshfiles/agent-questions/src/parent-feedback.test.ts",
+          "testName": "resolves after child shutdown and lets the reattached child retrieve the durable receipt across a Host restart"
         }
       ],
       "telemetry": [
@@ -203,7 +203,7 @@
         {
           "kind": "unit-test",
           "id": "agent-questions.bounded-batch-unit-twenty-item-limit",
-          "file": "plugins/@dshfiles/agent-questions/src/revisioned-feedback.test.ts",
+          "file": "plugins/@dshfiles/agent-questions/src/parent-feedback.test.ts",
           "testName": "accepts batches of 20 and rejects larger batches before resolving any item"
         }
       ],
@@ -268,7 +268,7 @@
         {
           "kind": "unit-test",
           "id": "agent-questions.inbox-parent-list-exact-countdown",
-          "file": "plugins/@dshfiles/agent-questions/src/service.test.ts",
+          "file": "plugins/@dshfiles/agent-questions/src/parent-questions.test.ts",
           "testName": "lists pending questions by direct parent with exact deadline and child filter"
         },
         {

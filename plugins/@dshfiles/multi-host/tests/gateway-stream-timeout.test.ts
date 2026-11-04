@@ -2,7 +2,9 @@ import { createServer, type Server } from 'node:http'
 import type { Socket } from 'node:net'
 import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, test } from 'vitest'
-import { connectGateway } from '../src/connectors/gateway.js'
+import { Effect } from 'effect'
+import { exitCode } from './fixtures/ssh-runtime.js'
+import { openGateway } from './fixtures/gateway-runtime.js'
 
 const addressSchema = Schema.Struct({ port: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65_535)) })
 
@@ -33,13 +35,10 @@ describe('runtime stream follow', () => {
     const address = Schema.decodeUnknownResult(addressSchema)(server.address())
     if (address._tag === 'Failure') throw new Error('The loopback fixture did not bind.')
     const launchUrl = `http://127.0.0.1:${address.success.port}/?token=fixture-token-12345678`
-    const gateway = await connectGateway({
-      launchUrl,
-      createTransport: async origin => ({ origin: origin.origin, launchUrl, dispose: async () => {} }),
-    })
+    const opened = await openGateway(launchUrl)
 
-    await expect(gateway.follow('session/state', {}, 30)).rejects.toMatchObject({ code: 'stream-timeout' })
+    expect(exitCode(await Effect.runPromiseExit(opened.gateway.follow({ endpoint: 'session/state', args: {}, timeout: 30 })))).toBe('stream-timeout')
     await settleTicks()
-    await gateway.dispose()
+    await opened.close()
   })
 })

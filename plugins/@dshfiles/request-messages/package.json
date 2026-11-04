@@ -35,6 +35,7 @@
     "@deepseek-ai/dsh-llm": "catalog:",
     "@deepseek-ai/dsh-scope": "0.2.1-rc.2",
     "@dshfiles/dshx": "workspace:*",
+    "@effect/vitest": "catalog:",
     "@types/node": "22.20.5",
     "typescript": "catalog:",
     "vitest": "catalog:"

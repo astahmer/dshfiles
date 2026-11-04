@@ -16,6 +16,7 @@ import { accountColor } from './account-color.js'
 import { ModelDetails, type InspectedRoute } from './model-details.js'
 import { ModelPickerModel } from './model-picker-model.js'
 import { ModelRow } from './model-row.js'
+import { PROVIDER_LABEL } from './provider-labels.js'
 import { modelEffortPickerSettings } from './settings.js'
 
 type Props = ModelSelectInjected & { readonly locked: boolean; readonly sessionId: string }
@@ -41,6 +42,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const [inspected, setInspected] = useState<InspectedRoute | null>(null)
   const [narrowDetails, setNarrowDetails] = useState(false)
   const modelListRef = useRef<HTMLDivElement>(null)
+  const detailsRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const state = useSyncExternalStore(
     onStoreChange => directory.subscribe(onStoreChange),
@@ -57,7 +59,10 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   }, [filteredGroups, state.current])
   const usage = useApiQuery(aiAccountsApi, 'usage')
   const profiles = useApiQuery(aiAccountsApi, 'read')
-  const accountBadges = useMemo(() => new Map((profiles.data?.accounts ?? []).map(profile => [profile.instanceId, profile.badge])), [profiles.data])
+  const providerLabels = useMemo(
+    () => new Map((profiles.data?.accounts ?? []).map(profile => [profile.instanceId, PROVIDER_LABEL[profile.kind]])),
+    [profiles.data],
+  )
   const accountAccents = useMemo(
     () =>
       new Map(
@@ -105,7 +110,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
       modelListRef.current?.querySelector('[data-model-picker-option][aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' })
     })
     return () => cancelAnimationFrame(frame)
-  }, [open, selectedGroup?.id, selectedModel?.id])
+  }, [open, query, rows.length, selectedGroup?.id, selectedModel?.id])
 
   const submitSelection = async (selection: ModelSelection): Promise<void> => {
     setSelectionError(null)
@@ -120,6 +125,12 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const choose = (selection: ModelSelection): void => {
     setInspected({ model: selection.model, provider: selection.provider })
     void submitSelection(selection)
+  }
+
+  const showDetails = (route: InspectedRoute): void => {
+    setInspected(route)
+    setNarrowDetails(true)
+    requestAnimationFrame(() => detailsRef.current?.focus())
   }
 
   if (!available) return null
@@ -197,6 +208,12 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
           <PopoverContent
             align="start"
             className="dshx-root dshx:w-[min(42rem,calc(100vw-1rem))] dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:shadow-none"
+            onEscapeKeyDown={(event: KeyboardEvent) => {
+              if (!narrowDetails || !window.matchMedia('(max-width: 43rem)').matches) return
+              event.preventDefault()
+              setNarrowDetails(false)
+              requestAnimationFrame(() => searchInputRef.current?.focus())
+            }}
             side="top"
             sideOffset={8}
           >
@@ -229,6 +246,13 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     className="dshx:h-7 dshx:rounded-lg dshx:border-border dshx:bg-muted/40 dshx:pl-7 dshx:pr-11 dshx:text-[11px] dshx:focus-visible:ring-1 dshx:focus-visible:ring-info/60"
                     onChange={event => setQuery(event.currentTarget.value)}
                     onKeyDown={event => {
+                      if (event.key === 'Enter') {
+                        const first = rows[0]
+                        if (first === undefined || busy) return
+                        event.preventDefault()
+                        choose(ModelPickerModel.selectionForModel(first.group, first.model, current))
+                        return
+                      }
                       if (event.key !== 'ArrowDown') return
                       event.preventDefault()
                       modelListRef.current?.querySelector<HTMLButtonElement>('button[data-model-picker-option]:not(:disabled)')?.focus()
@@ -260,7 +284,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   >
                     {rows.map(({ group, model }) => {
                       const active = current?.provider === group.id && current.model === model.id
-                      const quota = usage.data?.cards.find(card => card.instanceId === group.id)?.usage.windows[0]?.percentRemaining
+                      const quota = ModelPickerModel.quota(usage.data?.cards.find(card => card.instanceId === group.id))
                       return (
                         <ModelRow
                           accountAccent={accountAccents.get(group.id)}
@@ -271,11 +295,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                           key={`${group.id}:${model.id}`}
                           model={model}
                           onEffort={choose}
-                          onInspect={() => {
-                            setInspected({ model: model.id, provider: group.id })
-                            setNarrowDetails(true)
-                          }}
+                          onInspect={() => showDetails({ model: model.id, provider: group.id })}
                           onSelect={choose}
+                          providerLabel={providerLabels.get(group.id)}
                           quota={quota}
                           sessionId={sessionId}
                         />
@@ -298,10 +320,12 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
 
               <div
                 className={cn(
-                  'dshx:relative dshx:flex dshx:max-h-[min(26rem,var(--radix-popover-content-available-height))] dshx:w-[calc(50%-0.3125rem)] dshx:min-w-0 dshx:flex-col dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-3 dshx:shadow-lg',
+                  'dshx:relative dshx:flex dshx:max-h-[min(26rem,var(--radix-popover-content-available-height))] dshx:w-[calc(50%-0.3125rem)] dshx:min-w-0 dshx:flex-col dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-2.5 dshx:shadow-lg dshx:outline-none',
                   'dshx:@max-pane-compact:w-full',
                   !narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
+                ref={detailsRef}
+                tabIndex={-1}
               >
                 <span
                   aria-hidden="true"
@@ -310,13 +334,15 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 <div className="dshx:min-h-0 dshx:overflow-y-auto">
                   <ModelDetails
                     accountAccents={accountAccents}
-                    accountBadges={accountBadges}
                     busy={busy}
                     current={current}
                     error={selectionError ?? state.error}
                     groups={state.groups}
                     inspected={inspectedRoute}
-                    onBack={() => setNarrowDetails(false)}
+                    onBack={() => {
+                      setNarrowDetails(false)
+                      requestAnimationFrame(() => searchInputRef.current?.focus())
+                    }}
                     onClose={() => setOpen(false)}
                     onFastModeChange={enabled =>
                       setFastModeOverride(
@@ -328,6 +354,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     onInspect={setInspected}
                     onRetry={load}
                     onSelect={choose}
+                    providerLabels={providerLabels}
                     sessionId={sessionId}
                   />
                 </div>

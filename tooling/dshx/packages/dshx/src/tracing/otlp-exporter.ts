@@ -20,7 +20,15 @@ export interface FinishedSpan {
   readonly endTimeUnixNano: bigint
   readonly attributes: ReadonlyMap<string, SpanAttributeValue>
   readonly status: SpanStatus
-  readonly events?: readonly FinishedSpanEvent[]
+  readonly events?: readonly FinishedSpanEvent[] | undefined
+  readonly links?: readonly FinishedSpanLink[] | undefined
+}
+
+/** A causal relation to a span in this or another trace (a batch consumer linking each producer). */
+export interface FinishedSpanLink {
+  readonly traceId: string
+  readonly spanId: string
+  readonly attributes: ReadonlyMap<string, SpanAttributeValue>
 }
 
 /** A timestamped point inside a span (a long task during a browser interaction). */
@@ -69,6 +77,13 @@ interface OtlpSpan {
   readonly attributes: readonly OtlpKeyValue[]
   readonly status: OtlpStatus
   events?: readonly OtlpEvent[]
+  links?: readonly OtlpLink[]
+}
+
+interface OtlpLink {
+  readonly traceId: string
+  readonly spanId: string
+  readonly attributes: readonly OtlpKeyValue[]
 }
 
 interface OtlpEvent {
@@ -123,6 +138,9 @@ const encodeSpan = (span: FinishedSpan): OtlpSpan => {
       timeUnixNano: event.timeUnixNano.toString(),
       attributes: keyValues(event.attributes),
     }))
+  }
+  if (span.links !== undefined && span.links.length > 0) {
+    encoded.links = span.links.map(link => ({ traceId: link.traceId, spanId: link.spanId, attributes: keyValues(link.attributes) }))
   }
   return encoded
 }

@@ -1,44 +1,23 @@
-// Registers the dshx Effect Schema adapter `defineApi` needs before this module publishes its contracts.
-import '@dshfiles/dshx/effect'
-import type { Context } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-workspace'
-import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
-import { defineApi, method, PluginApiError } from '@dshfiles/dshx/api'
-import { defineHost } from '@dshfiles/dshx/host'
-import type { SettingsScope, SettingsValue } from '@dshfiles/dshx/settings'
+import { defineApi, method } from '@dshfiles/dshx/api'
+import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
+import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
+import { Settings } from '@dshfiles/dshx/effect/settings'
 import { VcsProviders } from '@dshfiles/vcs-provider-port'
-import { Schema } from 'effect'
-import { homedir } from 'node:os'
-import { basename, join } from 'node:path'
-import { createGitWorktrees } from './git-worktrees.js'
+import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
+import { layer as nodePathLayer } from '@effect/platform-node/NodePath'
+import { Effect, Layer, Path, Schema } from 'effect'
+import { GitWorktrees } from './git-worktrees.js'
 import { gitWorktreesSettings } from './settings.js'
+import { WorkspaceRegistry } from './workspace-registry-promise.js'
 
-type GitWorktreesSettings = SettingsValue<typeof gitWorktreesSettings.schema>
-
-const defaults: GitWorktreesSettings = gitWorktreesSettings.schema({})
-let settingsScope: SettingsScope<GitWorktreesSettings> | undefined
-let hostContext: Context | undefined
-
-const readSettings = (): GitWorktreesSettings => {
-  try {
-    return settingsScope?.get() ?? defaults
-  } catch {
-    return defaults
+class WorkspaceNotFound extends Schema.TaggedError<WorkspaceNotFound>()(
+  'WorkspaceNotFound',
+  { workspaceId: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'workspace-not-found' },
+) {
+  override get message(): string {
+    return `Unknown workspace ${this.workspaceId}; refresh and retry.`
   }
-}
-
-const worktrees = createGitWorktrees({
-  threadsDirectory: repoRoot => {
-    const configured = readSettings().threadsDirectory.trim()
-    if (configured === '') return `${repoRoot}-threads`
-    return join(configured.startsWith('~/') ? join(homedir(), configured.slice(2)) : configured, basename(repoRoot))
-  },
-})
-
-const registry = () => {
-  const found = hostContext?.get('workspaceRegistry')
-  if (found === undefined) throw new PluginApiError('The DSH workspace registry is unavailable; restart DSH and retry.', { code: 'registry-missing' })
-  return found
 }
 
 const worktreeSchema = Schema.Struct({ name: Schema.String, path: Schema.String, branch: Schema.NullOr(Schema.String) })
@@ -74,55 +53,70 @@ const gitWorktreesApi = defineApi({
   },
 })
 
-const api = gitWorktreesApi.host({
-  worktrees: async ({ input }) => {
-    const location = await worktrees.locate(input.path)
-    return { worktrees: location === undefined ? [] : [...(await worktrees.worktrees(location.repoRoot))] }
-  },
-  remove: async ({ input }) => {
-    const registered = await registry().resolveByPath(input.path)
-    await worktrees.remove(input.path, input.force)
-    if (registered !== undefined) await registry().delete(registered.id)
-    return { removed: true }
-  },
+const provision = Effect.fn('git workspace provision')(function* (input: {
+  readonly workspaceId: string
+  readonly base?: string | undefined
+  readonly isolate?: boolean | undefined
+}) {
+  const worktrees = yield* GitWorktrees
+  const registry = yield* WorkspaceRegistry
+  const path = yield* Path.Path
+  const source = yield* registry.get(input.workspaceId)
+  if (source === undefined) return yield* new WorkspaceNotFound({ workspaceId: input.workspaceId })
+  const location = yield* worktrees.locate(source.path)
+  if (location === undefined || !(yield* worktrees.isolateByDefault) || input.isolate === false) return { workspaceId: source.id, isolated: false }
+  const project = yield* registry.resolveByPath(location.repoRoot)
+  const thread = yield* worktrees.provision(location.repoRoot, input.base)
+  const workspace = yield* registry.create(thread.path, `${project?.title ?? path.basename(location.repoRoot)} · ${thread.name}`)
+  return { workspaceId: workspace.id, isolated: true }
 })
 
-const vcsProvider = VcsProviders.contract('@dshfiles/git-worktrees').host({
-  detect: async ({ input }) => {
-    const location = await worktrees.locate(input.path)
-    if (location === undefined) return { match: null }
-    return {
-      match: { vcs: 'git', priority: 10, repoRoot: location.repoRoot, workspaceRoot: location.workspaceRoot, isolated: location.threadName !== undefined },
-    }
-  },
-  provision: async ({ input }) => {
-    const source = registry().get(WorkspaceId(input.workspaceId))
-    if (source === undefined) throw new PluginApiError(`Unknown workspace ${input.workspaceId}; refresh and retry.`, { code: 'workspace-not-found' })
-    const location = await worktrees.locate(source.path)
-    if (location === undefined || !readSettings().isolate || input.isolate === false) return { workspaceId: source.id, isolated: false }
-    const project = await registry().resolveByPath(location.repoRoot)
-    const thread = await worktrees.provision(location.repoRoot, input.base)
-    const workspace = await registry().create(thread.path, `${project?.title ?? basename(location.repoRoot)} · ${thread.name}`)
-    return { workspaceId: workspace.id, isolated: true }
-  },
-  snapshot: async ({ input }) => ({ snapshot: await worktrees.snapshot(input.path) }),
-  restore: async ({ input }) => ({ previous: await worktrees.restore(input.path, input.snapshot) }),
+const removeWorktree = Effect.fn('git worktree remove')(function* (input: { readonly path: string; readonly force: boolean }) {
+  const worktrees = yield* GitWorktrees
+  const registry = yield* WorkspaceRegistry
+  const registered = yield* registry.resolveByPath(input.path)
+  yield* worktrees.remove(input.path, input.force)
+  if (registered !== undefined) yield* registry.delete(registered.id)
+  return { removed: true as const }
 })
 
-export default defineHost({
+const platform = Layer.mergeAll(DshChildProcessSpawner.layer, nodeFileSystemLayer, nodePathLayer, Settings.layer(gitWorktreesSettings))
+
+export default DshxPlugin.make({
   name: '@dshfiles/git-worktrees',
-  settings: [
-    gitWorktreesSettings.host({
-      setup: scope => {
-        settingsScope = scope
-        return () => {
-          if (settingsScope === scope) settingsScope = undefined
-        }
-      },
+  settings: [gitWorktreesSettings],
+  layer: Layer.mergeAll(GitWorktrees.layer, WorkspaceRegistry.layer).pipe(Layer.provideMerge(platform)),
+  apis: [
+    Api.bind(gitWorktreesApi, {
+      worktrees: input =>
+        GitWorktrees.use(worktrees =>
+          Effect.gen(function* () {
+            const location = yield* worktrees.locate(input.path)
+            return { worktrees: location === undefined ? [] : [...(yield* worktrees.worktrees(location.repoRoot))] }
+          }),
+        ),
+      remove: removeWorktree,
+    }),
+    Api.bind(VcsProviders.contract('@dshfiles/git-worktrees'), {
+      detect: input =>
+        GitWorktrees.use(worktrees =>
+          Effect.map(worktrees.locate(input.path), location =>
+            location === undefined
+              ? { match: null }
+              : {
+                  match: {
+                    vcs: 'git',
+                    priority: 10,
+                    repoRoot: location.repoRoot,
+                    workspaceRoot: location.workspaceRoot,
+                    isolated: location.threadName !== undefined,
+                  },
+                },
+          ),
+        ),
+      provision,
+      snapshot: input => GitWorktrees.use(worktrees => Effect.map(worktrees.snapshot(input.path), snapshot => ({ snapshot }))),
+      restore: input => GitWorktrees.use(worktrees => Effect.map(worktrees.restore(input.path, input.snapshot), previous => ({ previous }))),
     }),
   ],
-  apis: [api, vcsProvider],
-  setup: context => {
-    hostContext = context
-  },
 })

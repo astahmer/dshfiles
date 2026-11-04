@@ -1,4 +1,4 @@
-import { createEffectStoredValue } from './effect-stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import * as Schema from 'effect/Schema'
 import * as SchemaGetter from 'effect/SchemaGetter'
 import * as Option from 'effect/Option'
@@ -54,7 +54,7 @@ export const threadBoardViewSchema = SchemaHelpers.strictStruct(
   ),
 )
 
-export const storedThreadBoardView = createEffectStoredValue({
+export const storedThreadBoardView = createStoredValue({
   key: 'dshfiles.thread-sidebar.board-view.v1',
   schema: threadBoardViewSchema,
   fallback: DEFAULT_THREAD_BOARD_VIEW,

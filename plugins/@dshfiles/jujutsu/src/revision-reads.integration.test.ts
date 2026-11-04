@@ -3,9 +3,11 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PluginApiError } from '@dshfiles/dshx/api'
+import { Effect } from 'effect'
 import { onTestFinished, test } from 'vitest'
-import { RevisionReads, type JjRun } from './revision-reads.ts'
+import { JujutsuCommandFailed } from './errors.ts'
+import type { JjRun } from './jujutsu-commands.ts'
+import { makeEditTimeCache, RevisionReads } from './revision-reads.ts'
 
 const jjAt =
   (cwd: string, home: string) =>
@@ -32,7 +34,9 @@ const scratchRepo = async (): Promise<{ readonly repo: string; readonly jj: (arg
   jj(['git', 'init', '--no-colocate'])
   jj(['config', 'set', '--repo', 'user.name', 'Reads Test'])
   jj(['config', 'set', '--repo', 'user.email', 'reads@example.invalid'])
-  return { repo, jj, run: async args => ({ stdout: jj(args), truncated: false }) }
+  const run: JjRun = args =>
+    Effect.try({ try: () => ({ stdout: jj(args), truncated: false }), catch: cause => new JujutsuCommandFailed({ exitCode: 1, cause }) })
+  return { repo, jj, run }
 }
 
 const workingCopyCommitId = (jj: (argv: readonly string[]) => string): string =>
@@ -49,7 +53,7 @@ test('details of an @ that another jj process already rewrote still load instead
   assert.notEqual(workingCopyCommitId(jj), shownCommitId)
   assert.ok(!jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', 'all()', '--template', 'commit_id ++ "\\n"']).includes(shownCommitId))
 
-  const details = await RevisionReads.details(run, shownCommitId)
+  const details = await Effect.runPromise(RevisionReads.details(run, shownCommitId))
   assert.deepEqual(
     details.files.map(file => [file.path, file.status, file.additions]),
     [['first.txt', 'A', 1]],
@@ -63,12 +67,12 @@ test('details accept a hex prefix or a change id, which is what jj log and chat 
   const commitId = workingCopyCommitId(jj)
   const changeId = jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@', '--template', 'change_id.shortest(8)']).trim()
 
-  const byPrefix = await RevisionReads.details(run, commitId.slice(0, 12))
+  const byPrefix = await Effect.runPromise(RevisionReads.details(run, commitId.slice(0, 12)))
   assert.deepEqual(
     byPrefix.files.map(file => [file.path, file.status]),
     [['prefixed.txt', 'A']],
   )
-  const byChange = await RevisionReads.details(run, changeId)
+  const byChange = await Effect.runPromise(RevisionReads.details(run, changeId))
   assert.deepEqual(
     byChange.files.map(file => file.path),
     ['prefixed.txt'],
@@ -78,7 +82,8 @@ test('details accept a hex prefix or a change id, which is what jj log and chat 
 test('an unknown prefix reports that no revision matches instead of a stale-revision message', async () => {
   const { run } = await scratchRepo()
 
-  await assert.rejects(() => RevisionReads.details(run, 'deadbeef1234'), /does not name exactly one revision/u)
+  const error = await Effect.runPromise(Effect.flip(RevisionReads.details(run, 'deadbeef1234')))
+  assert.match(error.message, /does not name exactly one revision/u)
 })
 
 test('details never snapshot the working copy, so a read cannot rewrite @ under other agents', async () => {
@@ -89,41 +94,19 @@ test('details never snapshot the working copy, so a read cannot rewrite @ under 
   const operationsBefore = jj(['--ignore-working-copy', 'operation', 'log', '--no-graph', '--template', 'id ++ "\\n"'])
 
   await writeFile(join(repo, 'dirty.txt'), 'not yet snapshotted\n')
-  await RevisionReads.details(run, commitId)
+  await Effect.runPromise(RevisionReads.details(run, commitId))
 
   assert.equal(workingCopyCommitId(jj), commitId)
   assert.equal(jj(['--ignore-working-copy', 'operation', 'log', '--no-graph', '--template', 'id ++ "\\n"']), operationsBefore)
 })
 
-test('an unknown revision reports a readable failure instead of the generic Host error', async () => {
+test('an unknown revision reports that it is no longer available', async () => {
   const { run } = await scratchRepo()
   const missing = 'a'.repeat(40)
 
-  const failure = await RevisionReads.details(run, missing).then(
-    () => assert.fail('expected the read to fail'),
-    (error: unknown) => RevisionReads.failure(error, 'Could not load revision details.'),
-  )
+  const error = await Effect.runPromise(Effect.flip(RevisionReads.details(run, missing)))
 
-  assert.equal(failure.failure.message, 'Revision aaaaaaaaaaaa is no longer available. Refresh and try again.')
-})
-
-test('unexpected errors fall back to a generic message so raw parser or process text never reaches the client', () => {
-  assert.equal(
-    RevisionReads.failure(new Error('ParseError: [{"path":["files"]}]'), 'Could not load revision details.').failure.message,
-    'Could not load revision details.',
-  )
-  assert.equal(RevisionReads.failure('boom', 'Could not load this repository.').failure.message, 'Could not load this repository.')
-  assert.equal(RevisionReads.failure(new Error('Jujutsu command timed out.'), 'fallback').failure.message, 'Jujutsu command timed out.')
-})
-
-test('a stale preview reaches the Client as a PluginApiError while unexpected errors stay generic', () => {
-  const stale = RevisionReads.publicError(new Error('Preview expired or repository state changed. Refresh and preview again.'))
-  assert.ok(stale instanceof PluginApiError)
-  assert.equal(stale.message, 'Preview expired or repository state changed. Refresh and preview again.')
-  const raw = new Error("ENOENT: no such file or directory, stat '/Users/someone/repo'")
-  const generic = RevisionReads.publicError(raw)
-  assert.equal(generic.message, 'Jujutsu request failed.')
-  assert.equal(generic.cause, raw)
+  assert.equal(error.message, 'Revision aaaaaaaaaaaa is no longer available. Refresh and try again.')
 })
 
 test('changed-file stats and revision details mark the files a rebase left conflicted', async () => {
@@ -142,7 +125,7 @@ test('changed-file stats and revision details mark the files a rebase left confl
   jj(['status'])
   jj(['rebase', '--revisions', '@', '--destination', left])
 
-  const stats = await RevisionReads.fileStats(run, [workingCopyCommitId(jj)])
+  const stats = await Effect.runPromise(RevisionReads.fileStats(run, [workingCopyCommitId(jj)]))
   assert.deepEqual(
     stats.revisions[0]?.files.map(file => [file.path, file.conflict]),
     [
@@ -150,7 +133,7 @@ test('changed-file stats and revision details mark the files a rebase left confl
       ['shared.txt', true],
     ],
   )
-  const details = await RevisionReads.details(run, workingCopyCommitId(jj))
+  const details = await Effect.runPromise(RevisionReads.details(run, workingCopyCommitId(jj)))
   assert.deepEqual(
     details.files.map(file => [file.path, file.conflict]),
     [
@@ -162,10 +145,11 @@ test('changed-file stats and revision details mark the files a rebase left confl
 
 test('edit times keep the last content change through rebases and describes, and count a squash into the revision', { timeout: 60_000 }, async () => {
   const { repo, jj, run } = await scratchRepo()
+  const cache = makeEditTimeCache()
   const lastOperationTime = (): string => jj(['op', 'log', '--no-graph', '--limit', '1', '--template', 'self.time().end().utc().format("%+")']).trim()
   const commitIdOf = (revision: string): string => jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', revision, '--template', 'commit_id']).trim()
   const editedAt = async (revision: string): Promise<string | null> =>
-    (await RevisionReads.editTimes(run, { repositoryRoot: repo, commitIds: [commitIdOf(revision)] }))[0]?.editedAt ?? null
+    (await Effect.runPromise(RevisionReads.editTimes(run, { repositoryRoot: repo, commitIds: [commitIdOf(revision)], cache })))[0]?.editedAt ?? null
 
   const changeIdOf = (revision: string): string => jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', revision, '--template', 'change_id']).trim()
 

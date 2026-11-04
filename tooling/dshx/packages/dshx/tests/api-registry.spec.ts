@@ -1,7 +1,6 @@
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it, vi } from 'vitest'
-import '../src/effect/index.js'
 import { defineApi, dshxRegistryApi, isApiOwnerMissing, method, type ApiCaller, type RegistryListing } from '../src/api/index.js'
 import { publishedJsonSchema, toToolSchema } from '../src/api/json-schema.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
@@ -139,6 +138,7 @@ describe('API registry', () => {
     expect(host.tools.schemas().find(schema => schema.name === 'test_thread_status')?.parameters).toEqual({
       type: 'object',
       properties: { path: { type: 'string' } },
+      additionalProperties: false,
     })
 
     const status = await host.tools.execute({
@@ -318,7 +318,7 @@ describe('API registry', () => {
 })
 
 describe('tool parameter projection', () => {
-  it('keeps the enforced subset and loosens everything else', () => {
+  it('keeps the enforced subset, closes objects and loosens everything else', () => {
     const schema = Schema.Struct({
       name: Schema.String.check(Schema.isMinLength(1)).annotate({ description: 'Thread name' }),
       kind: Schema.NullOr(Schema.Literals(['a', 'b'])),
@@ -334,6 +334,7 @@ describe('tool parameter projection', () => {
         when: {},
       },
       required: ['name', 'kind', 'tags'],
+      additionalProperties: false,
     })
   })
 
@@ -354,16 +355,19 @@ describe('tool parameter projection', () => {
               type: 'object',
               properties: { kind: { type: 'string', enum: ['describe'] }, message: { type: 'string' } },
               required: ['kind', 'message'],
+              additionalProperties: false,
             },
             {
               type: 'object',
               properties: { kind: { type: 'string', enum: ['new'] }, commitId: { type: 'string' } },
               required: ['kind'],
+              additionalProperties: false,
             },
           ],
         },
       },
       required: ['action'],
+      additionalProperties: false,
     })
   })
 })

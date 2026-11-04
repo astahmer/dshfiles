@@ -18,6 +18,11 @@ export function UserContent({ content, loadImage, facts, interactive = false, el
 FactoryComponentPropsOf<'conversation.chat.user.content'>) {
   const { text, attachments, extraBlocks, referenceLabels = EMPTY_LABELS } = content
   const imageAttachments = attachments.filter((attachment): attachment is Extract<UserContentAttachment, { readonly type: 'image' }> => attachment.type === 'image')
+  // One gallery per message: every rendered position carries the whole set so
+  // the attachment row and the inline references open the same preview.
+  const galleryImages = imageAttachments.map(attachment => attachment.image)
+  const galleryOf = (index: number) => ({ images: galleryImages, index })
+  const galleryPositions = new Map(imageAttachments.map((attachment, index) => [attachment, index]))
   const imageParts = userImageReferenceParts(text, imageAttachments.length)
   let imageIndex = 0
   const remainingAttachments = attachments.filter(attachment => {
@@ -37,7 +42,11 @@ FactoryComponentPropsOf<'conversation.chat.user.content'>) {
             ? (
               <Fragment key={`image:${index}`}>
                 {renderSlot('conversation.chat.user.images', {
-                  images: [attachment.image], loadImage, align: 'end', compact: compactImages,
+                  images: [attachment.image],
+                  loadImage,
+                  align: 'end',
+                  compact: compactImages,
+                  gallery: galleryOf(galleryPositions.get(attachment) ?? 0),
                 })}
               </Fragment>
             )
@@ -69,7 +78,7 @@ FactoryComponentPropsOf<'conversation.chat.user.content'>) {
           return (
             <span key={`image:${index}`} className={css.inlineImageReference}>
               {renderSlot('conversation.chat.user.images', {
-                images: [image.image], loadImage, align: 'start', thumbnail: true,
+                images: [image.image], loadImage, align: 'start', thumbnail: true, gallery: galleryOf(part.index),
               })}
             </span>
           )

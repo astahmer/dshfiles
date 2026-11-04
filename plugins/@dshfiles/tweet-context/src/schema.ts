@@ -1,14 +1,7 @@
-import * as Schema from 'effect/Schema'
+import { Schema } from 'effect'
 
-/** `z.string().url()`: a string `new URL` parses, kept as the string the API sent. */
-const parseableUrl = Schema.makeFilter((value: string) => {
-  try {
-    void new URL(value)
-    return true
-  } catch {
-    return 'Expected a full URL.'
-  }
-})
+/** A string `new URL` parses, kept as the string the API sent. */
+const parseableUrl = Schema.makeFilter((value: string) => (URL.canParse(value) ? true : 'Expected a full URL.'))
 
 /** A bounded URL string: the shape every post and media reference repeats. */
 export const urlString = Schema.String.check(Schema.isMaxLength(2_048)).check(parseableUrl)

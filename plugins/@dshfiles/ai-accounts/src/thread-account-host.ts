@@ -1,12 +1,14 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { AccountUnsuitable, OwnerApiMissing, ThreadSelectionChanged } from './errors.js'
 import type {} from '@deepseek-ai/dsh-token-meter'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 
-import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Api } from '@dshfiles/dshx/effect'
 import { threadModelApi } from '@dshfiles/session-controller/thread-model-api'
-import { accountStoreService } from './account-store.js'
+import type { AccountStorePromise } from './account-store-promise.js'
 import { accountRuntime } from './account-runtime.js'
 import { servingAccountSessionForCaller } from './serving-account-host.js'
 import { threadAccountApi, type ThreadAccountPreview } from './thread-account-api.js'
@@ -17,16 +19,24 @@ const threadModels = (ctx: Context) => createHostApiClient(ctx, threadModelApi, 
 
 const previewThreadAccount = async (
   ctx: Context,
+  store: AccountStorePromise,
   input: { readonly sessionId?: string | undefined; readonly instanceId: string },
   caller: ApiCaller,
 ): Promise<ThreadAccountPreview> => {
   const sessionId = servingAccountSessionForCaller(input, caller)
-  const session = await threadModels(ctx).snapshot({ sessionId })
-  const file = await accountStoreService.readAccountFile()
+  const session = await threadModels(ctx)
+    .snapshot({ sessionId })
+    .catch((error: unknown) => {
+      if (error instanceof Error && isApiOwnerMissing(error))
+        throw new OwnerApiMissing({ owner: '@dshfiles/session-controller', apiId: threadModelApi.id, method: 'snapshot' })
+      throw error
+    })
+  const file = await store.readAccountFile()
   const account = file.accounts.find(account => account.instanceId === input.instanceId)
-  if (account === undefined || !account.enabled || account.kind === 'cursor') throw new Error('Choose an enabled account that can run models on this Host.')
+  if (account === undefined || !account.enabled || account.kind === 'cursor')
+    throw new AccountUnsuitable({ instanceId: input.instanceId, reason: 'cannot-run-models' })
   if (!ctx.llm.listProviders().some(provider => provider.id === account.instanceId))
-    throw new Error('This account has no active model route. Connect the account first.')
+    throw new AccountUnsuitable({ instanceId: input.instanceId, reason: 'no-route' })
   const models = await ctx.llm.listModels(account.instanceId)
   const choice = ThreadAccountModel.choose({
     current: session.selection,
@@ -75,12 +85,12 @@ const previewThreadAccount = async (
   }
 }
 
-export const threadAccountHostApi = DshxEffect.host(threadAccountApi, {
-  preview: effectHandler(threadAccountApi, 'preview', ({ ctx, input, caller }) => previewThreadAccount(ctx, input, caller)),
-  switch: effectHandler(threadAccountApi, 'switch', async ({ ctx, input, caller }) => {
-    const preview = await previewThreadAccount(ctx, input, caller)
+export const threadAccountHostApi = Api.bind(threadAccountApi, {
+  preview: effectHandler(threadAccountApi, 'preview', ({ ctx, input, caller, store }) => previewThreadAccount(ctx, store, input, caller)),
+  switch: effectHandler(threadAccountApi, 'switch', async ({ ctx, input, caller, store }) => {
+    const preview = await previewThreadAccount(ctx, store, input, caller)
     if (preview.expectedRevision !== input.expectedRevision || !ThreadAccountModel.same(preview.target, input.target))
-      throw new Error('The thread selection or account catalog changed. Review the new target before switching.')
+      throw new ThreadSelectionChanged({ sessionId: preview.sessionId })
     await threadModels(ctx).select({
       sessionId: preview.sessionId,
       selection: preview.target,

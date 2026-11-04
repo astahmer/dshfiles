@@ -1,6 +1,6 @@
 import type { SerializedDockview } from 'dockview-react'
 import * as Schema from 'effect/Schema'
-import { createEffectStoredValue } from './effect-stored-value.js'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { layoutSchema, nestedLayoutStores, nestedSurfacePathSchema, type LayoutSurface, type NestedLayouts, type NestedLayoutStores } from './layout-store.js'
 
 /** One named arrangement: whatever each region held when it was saved. A region it did not record stays as it is. */
@@ -44,7 +44,7 @@ const layoutsSchema = Schema.Record(Schema.String.check(Schema.isMinLength(1), S
 const NO_SAVED_LAYOUTS: SavedLayoutMap = {}
 
 /** Named layouts live beside the live ones in this browser: presentation state, not Host state. */
-export const savedLayouts = createEffectStoredValue({
+export const savedLayouts = createStoredValue({
   key: 'dshfiles.workbench.saved-layouts.v1',
   schema: layoutsSchema,
   fallback: NO_SAVED_LAYOUTS,

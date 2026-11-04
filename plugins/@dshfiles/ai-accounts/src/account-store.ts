@@ -1,7 +1,5 @@
-import { mkdir, readFile, rename, writeFile, chmod } from 'node:fs/promises'
-import { readFileSync, renameSync } from 'node:fs'
-import * as Schema from 'effect/Schema'
-import { dirname, join } from 'node:path'
+import { Context, Effect, FileSystem, Layer, Option, Path, Schema, Semaphore, SubscriptionRef } from 'effect'
+import { join } from 'node:path'
 import { accountDraftSchema, accountsFileSchema, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
 
 import { AiAccountsSchema } from './effect-schema.js'
@@ -13,9 +11,9 @@ import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
 import { DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
 import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
-import { AccountWriteQueue } from './account-write-queue.js'
 import { AccountOrderModel } from './account-order-model.js'
-import { createSetupAccountInputSchema, type AccountReorder, type CreateSetupAccountInput } from './api.js'
+import { type AccountReorder, type CreateSetupAccountInput } from './api.js'
+import { AccountConflict, AccountOrderRejected, AccountStoreWriteFailed } from './errors.js'
 import { AccountDraftModel } from './account-draft.js'
 import { AccountHomePolicy } from './account-home-policy.js'
 
@@ -28,8 +26,6 @@ import { AccountHomePolicy } from './account-home-policy.js'
  * *identity and layout* is stored — never a token, and never `auth.json` content,
  * which stays inside each Codex home where its owner put it.
  */
-
-const STORE_PATH = AccountHomePolicy.filePath()
 
 const DEFAULT_SHADOW_ROOT = join(CodexHomeModel.accountHome(), '.codex-dshx')
 
@@ -53,36 +49,6 @@ const storeFileSchema = Schema.Struct({
   ...accountsFileSchema.fields,
   accounts: AiAccountsSchema.list(accountDraftSchema, 64),
 })
-
-const parseJson = (raw: string): unknown => {
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return undefined
-  }
-}
-
-interface AccountStoreFileSystem {
-  readText(path: string): Promise<string>
-  readTextSync(path: string): string
-  makeDirectory(path: string): Promise<void>
-  writeText(path: string, content: string): Promise<void>
-  rename(source: string, target: string): Promise<void>
-  renameSync(source: string, target: string): void
-  chmod(path: string, mode: number): Promise<void>
-}
-
-const nodeAccountStoreFileSystem: AccountStoreFileSystem = {
-  readText: path => readFile(path, 'utf8'),
-  readTextSync: path => readFileSync(path, 'utf8'),
-  makeDirectory: async path => {
-    await mkdir(path, { recursive: true })
-  },
-  writeText: (path, content) => writeFile(path, content, 'utf8'),
-  rename,
-  renameSync,
-  chmod,
-}
 
 const layoutFor = (profile: AccountDraft, file: AccountStoreFile) => AccountHomePolicy.codexLayoutFor(profile, file.shadowRoot)
 
@@ -219,191 +185,191 @@ const observe = async (
   }
 }
 
-const createAccountStoreService = (dependencies: { readonly filePath: string; readonly fileSystem: AccountStoreFileSystem }) => {
-  let cachedRaw: string | undefined
-  // Serialize the entire read-modify-write, not just rename: all Host callers share this store.
-  const mutate = AccountWriteQueue.create()
+/** The page and tool share profiles joined with live health and login state. */
+const buildAccountsFile = async (
+  file: AccountStoreFile,
+  statuses: readonly AccountStatus[],
+  resolveCredential?: CredentialValueResolver,
+  isCopilotSignedIn?: (instanceId: string) => Promise<boolean>,
+): Promise<AccountsFile> => ({
+  ...file,
+  accounts: await Promise.all(
+    file.accounts.map(async draft => {
+      const status = statuses.find(candidate => candidate.id === draft.instanceId)
+      return observe(draft, file, status, resolveCredential, isCopilotSignedIn)
+    }),
+  ),
+})
 
-  /** Load the file into the cache so activation can read it synchronously. */
-  const primeAccountFile = (): AccountStoreFile => {
-    try {
-      cachedRaw = dependencies.fileSystem.readTextSync(dependencies.filePath)
-    } catch {
-      cachedRaw = undefined
-    }
-    return readAccountFileSync()
+/** Reuse the established home rules without materializing, copying or reading authentication. */
+const connectionMetadata = (draft: AccountDraft, shadowRoot: string): Pick<AccountProfile, 'mode' | 'loginHint'> => {
+  if (draft.kind === 'codex') {
+    const layout = AccountHomePolicy.codexLayoutFor(draft, shadowRoot)
+    return { mode: layout.mode, loginHint: CodexHomeModel.loginHint(layout) }
   }
+  if (draft.kind === 'claude')
+    return { mode: 'direct', loginHint: ClaudeAccountModel.claudeLoginHint(ClaudeAccountModel.resolveClaudeConfigDir(draft.homePath)) }
+  return { mode: 'direct', loginHint: draft.kind === 'commandcode' ? 'cmd login' : draft.kind === 'cursor' ? CURSOR_LOGIN_HINT : '' }
+}
 
-  /**
-   * Cordis activates synchronously, so boot reads cached bytes if primed and
-   * defaults otherwise. Later requests re-read the file and see external edits.
-   */
-  const readAccountFileSync = (): AccountStoreFile => {
-    if (cachedRaw === undefined) return emptyFile()
-    const result = AiAccountsSchema.decodeResult(storeFileSchema, parseJson(cachedRaw))
-    return result._tag === 'Success' ? result.success : emptyFile()
+/**
+ * Creating the shadow home first lets Codex write auth data into the home
+ * when users follow the login command shown by the page.
+ */
+const readAccountIdentity = async (
+  file: AccountStoreFile,
+  instanceId: string,
+): Promise<{ readonly instanceId: string; readonly email: string | null; readonly plan: string | null; readonly signedIn: boolean }> => {
+  const draft = file.accounts.find(account => account.instanceId === instanceId)
+  if (draft === undefined || draft.kind !== 'codex') return { instanceId, email: null, plan: null, signedIn: false }
+  const layout = layoutFor(draft, file)
+  await materializeCodexShadowHome(layout).catch(() => undefined)
+  const auth = await describeCodexAuth(layout)
+  return { instanceId, email: auth.identity ?? null, plan: auth.plan ?? null, signedIn: auth.signedIn }
+}
+
+/** Reads of the stored profiles that observe homes and credentials but never write the accounts file. */
+export class AccountProfilesModel {
+  static readonly buildAccountsFile = buildAccountsFile
+  static readonly connectionMetadata = connectionMetadata
+  static readonly readAccountIdentity = readAccountIdentity
+  static readonly layoutFor = layoutFor
+}
+
+const decodeStoreText = Schema.decodeUnknownOption(Schema.fromJsonString(storeFileSchema))
+const validateStoreFile = Schema.decodeUnknownEffect(storeFileSchema)
+
+export interface ConnectionCommit {
+  readonly draft: AccountDraft
+  readonly existing: AccountDraft | undefined
+  readonly claimCommit: () => boolean
+  readonly didCommit: () => void
+  readonly beforeCommit?: Effect.Effect<void>
+}
+
+const sameConnection = (current: AccountDraft, existing: AccountDraft): boolean =>
+  current.kind === existing.kind &&
+  current.homePath === existing.homePath &&
+  current.shadowHomePath === existing.shadowHomePath &&
+  current.apiKeyEnv === existing.apiKeyEnv &&
+  current.authSource === existing.authSource &&
+  current.apiBaseUrl === existing.apiBaseUrl
+
+const committedProfile = (current: AccountDraft, draft: AccountDraft): AccountDraft => {
+  const { authSource: _currentAuthSource, ...currentWithoutAuthSource } = current
+  // Optional ownership must be absent, not an own undefined: the committed
+  // profile is returned over the strict JSON API before any disk round-trip.
+  const committed: AccountDraft = {
+    ...currentWithoutAuthSource,
+    enabled: true,
+    homePath: draft.homePath,
+    shadowHomePath: draft.shadowHomePath,
+    apiKeyEnv: draft.apiKeyEnv,
+    apiBaseUrl: draft.apiBaseUrl,
   }
+  return draft.authSource === undefined ? committed : { ...committed, authSource: draft.authSource }
+}
 
-  /** Missing or unreadable storage yields defaults so first run remains usable. */
-  const readAccountFile = async (): Promise<AccountStoreFile> => {
-    let raw: string
-    try {
-      raw = await dependencies.fileSystem.readText(dependencies.filePath)
-    } catch {
-      return emptyFile()
-    }
-    cachedRaw = raw
-    const result = AiAccountsSchema.decodeResult(storeFileSchema, parseJson(raw))
-    return result._tag === 'Success' ? result.success : emptyFile()
+const reorderedAccounts = (file: AccountStoreFile, input: AccountReorder) => {
+  const rejection = AccountOrderModel.rejection(file.accounts, input)
+  return rejection === undefined
+    ? Effect.succeed(AccountOrderModel.reorder(file.accounts, input))
+    : Effect.fail(new AccountOrderRejected({ reason: rejection }))
+}
+
+/**
+ * The accounts file: one in-memory snapshot read at activation, every edit a serialized read-modify-write that
+ * publishes atomically (temporary file, owner-only mode, rename) and then updates the snapshot.
+ */
+export class AccountStore extends Context.Service<
+  AccountStore,
+  {
+    readonly filePath: string
+    /** The file as last read or written; synchronous Cordis hooks read it with `SubscriptionRef.getUnsafe`. */
+    readonly snapshot: SubscriptionRef.SubscriptionRef<AccountStoreFile>
+    /** Re-read the file so external edits count; missing or unreadable storage yields defaults. */
+    readonly read: Effect.Effect<AccountStoreFile>
+    readonly write: (next: AccountStoreFile) => Effect.Effect<AccountStoreFile, AccountStoreWriteFailed>
+    readonly upsertAccount: (
+      draft: AccountDraft,
+      previousInstanceId?: string,
+      requireExisting?: boolean,
+    ) => Effect.Effect<AccountStoreFile, AccountConflict | AccountStoreWriteFailed>
+    readonly removeAccount: (instanceId: string) => Effect.Effect<AccountStoreFile, AccountStoreWriteFailed>
+    readonly moveAccount: (instanceId: string, direction: AccountOrderDirection) => Effect.Effect<AccountStoreFile, AccountConflict | AccountStoreWriteFailed>
+    readonly reorderAccount: (input: AccountReorder) => Effect.Effect<AccountStoreFile, AccountOrderRejected | AccountStoreWriteFailed>
+    readonly setDistribution: (distribution: AccountsFile['distribution']) => Effect.Effect<AccountStoreFile, AccountStoreWriteFailed>
+    /** Allocate metadata only. The Host lifecycle, not the durable store, owns unconnected candidates. */
+    readonly createSetupAccount: (
+      input: CreateSetupAccountInput,
+    ) => Effect.Effect<{ readonly instanceId: string; readonly draft: AccountDraft; readonly file: AccountStoreFile }, AccountConflict>
+    /** Publish a verified operation once, under the same lock as every settings write. */
+    readonly commitConnection: (input: ConnectionCommit) => Effect.Effect<AccountStoreFile, AccountConflict | AccountStoreWriteFailed>
   }
+>()('@dshfiles/ai-accounts/AccountStore') {
+  static readonly makeAt = Effect.fn('ai accounts store open')(function* (filePath: string) {
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const lock = yield* Semaphore.make(1)
 
-  /** Replace the stored profiles atomically and private to this user. */
-  const persistAccountFile = async (next: AccountStoreFile, claimCommit?: () => boolean, didCommit?: () => void): Promise<AccountStoreFile> => {
-    const validated = AiAccountsSchema.decode(storeFileSchema, next)
-    await dependencies.fileSystem.makeDirectory(dirname(dependencies.filePath))
-    const temporary = `${dependencies.filePath}.${process.pid}.tmp`
-    await dependencies.fileSystem.writeText(temporary, `${JSON.stringify(validated, null, 2)}\n`)
-    await dependencies.fileSystem.chmod(temporary, 0o600)
-    if (claimCommit === undefined) await dependencies.fileSystem.rename(temporary, dependencies.filePath)
-    else {
-      // Cancellation cannot interleave between the final operation fence and publication.
-      if (!claimCommit()) throw new Error('This account connection is no longer active.')
-      dependencies.fileSystem.renameSync(temporary, dependencies.filePath)
-      didCommit?.()
-    }
-    cachedRaw = `${JSON.stringify(validated, null, 2)}\n`
-    return validated
-  }
+    const readFile = fs.readFileString(filePath).pipe(
+      Effect.map(text => Option.getOrElse(decodeStoreText(text), emptyFile)),
+      Effect.orElseSucceed(emptyFile),
+    )
+    const snapshot = yield* SubscriptionRef.make(yield* readFile)
+    const read = readFile.pipe(Effect.tap(file => SubscriptionRef.set(snapshot, file)))
 
-  const writeAccountFile = (next: AccountStoreFile): Promise<AccountStoreFile> => mutate(() => persistAccountFile(next))
+    const writeFailed = (cause: unknown) => new AccountStoreWriteFailed({ path: filePath, cause })
 
-  /** The page and tool share profiles joined with live health and login state. */
-  const buildAccountsFile = async (
-    file: AccountStoreFile,
-    statuses: readonly AccountStatus[],
-    resolveCredential?: CredentialValueResolver,
-    isCopilotSignedIn?: (instanceId: string) => Promise<boolean>,
-  ): Promise<AccountsFile> => ({
-    ...file,
-    accounts: await Promise.all(
-      file.accounts.map(async draft => {
-        const status = statuses.find(candidate => candidate.id === draft.instanceId)
-        return observe(draft, file, status, resolveCredential, isCopilotSignedIn)
-      }),
-    ),
-  })
-
-  /** Allocate metadata only. The Host lifecycle, not the durable store, owns unconnected candidates. */
-  const createSetupAccount = async (
-    input: CreateSetupAccountInput,
-  ): Promise<{ readonly instanceId: string; readonly draft: AccountDraft; readonly file: AccountStoreFile }> => {
-    const request = AiAccountsSchema.decode(createSetupAccountInputSchema, input)
-    const instanceId = `${request.kind}_work_${request.requestId.replaceAll('-', '').toLowerCase()}`
-    const file = await readAccountFile()
-    if (file.accounts.some(account => account.instanceId === instanceId)) throw new Error('This account identity is already saved.')
-    const generated = AccountDraftModel.newAccountDraft({ kind: request.kind, existing: file.accounts })
-    const privateHome = join(dirname(dependencies.filePath), 'homes', instanceId)
-    const draft: AccountDraft = {
-      ...generated,
-      instanceId,
-      enabled: false,
-      homePath: request.kind === 'codex' || request.kind === 'claude' ? privateHome : generated.homePath,
-      shadowHomePath: request.kind === 'codex' ? privateHome : generated.shadowHomePath,
-      apiKeyEnv: generated.apiKeyEnv === '' ? '' : AccountDraftModel.suggestedApiKeyRef(instanceId),
-    }
-    return { instanceId, draft, file }
-  }
-
-  /** Reuse the established home rules without materializing, copying or reading authentication. */
-  const connectionMetadata = (draft: AccountDraft, shadowRoot: string): Pick<AccountProfile, 'mode' | 'loginHint'> => {
-    if (draft.kind === 'codex') {
-      const layout = AccountHomePolicy.codexLayoutFor(draft, shadowRoot)
-      return { mode: layout.mode, loginHint: CodexHomeModel.loginHint(layout) }
-    }
-    if (draft.kind === 'claude')
-      return { mode: 'direct', loginHint: ClaudeAccountModel.claudeLoginHint(ClaudeAccountModel.resolveClaudeConfigDir(draft.homePath)) }
-    return { mode: 'direct', loginHint: draft.kind === 'commandcode' ? 'cmd login' : draft.kind === 'cursor' ? CURSOR_LOGIN_HINT : '' }
-  }
-
-  /** Publish a verified operation once, under the same queue as every settings write. */
-  const commitConnection = (input: {
-    readonly draft: AccountDraft
-    readonly existing: AccountDraft | undefined
-    readonly claimCommit: () => boolean
-    readonly didCommit: () => void
-    readonly beforeCommit?: () => Promise<void>
-  }): Promise<AccountStoreFile> =>
-    mutate(async () => {
-      const file = await readAccountFile()
-      const current = file.accounts.find(account => account.instanceId === input.draft.instanceId)
-      if (input.existing === undefined) {
-        if (current !== undefined) throw new Error('This account identity is already saved.')
-        await input.beforeCommit?.()
-        return persistAccountFile({ ...file, accounts: [...file.accounts, { ...input.draft, enabled: true }] }, input.claimCommit, input.didCommit)
-      }
-      if (current === undefined) throw new Error('This saved account was removed.')
-      if (
-        current.kind !== input.existing.kind ||
-        current.homePath !== input.existing.homePath ||
-        current.shadowHomePath !== input.existing.shadowHomePath ||
-        current.apiKeyEnv !== input.existing.apiKeyEnv ||
-        current.authSource !== input.existing.authSource ||
-        current.apiBaseUrl !== input.existing.apiBaseUrl
-      )
-        throw new Error('The saved account connection settings changed. Start again.')
-      const { authSource: _currentAuthSource, ...currentWithoutAuthSource } = current
-      // Optional ownership must be absent, not an own undefined: the committed
-      // profile is returned over the strict JSON API before any disk round-trip.
-      const committed: AccountDraft = {
-        ...currentWithoutAuthSource,
-        enabled: true,
-        homePath: input.draft.homePath,
-        shadowHomePath: input.draft.shadowHomePath,
-        apiKeyEnv: input.draft.apiKeyEnv,
-        apiBaseUrl: input.draft.apiBaseUrl,
-      }
-      const next = input.draft.authSource === undefined ? committed : { ...committed, authSource: input.draft.authSource }
-      await input.beforeCommit?.()
-      return persistAccountFile({ ...file, accounts: file.accounts.map(account => (account === current ? next : account)) }, input.claimCommit, input.didCommit)
+    /** Validate and write the next file beside the live one, owner-only; nothing is published yet. */
+    const stage = Effect.fn('ai accounts store stage')(function* (next: AccountStoreFile) {
+      yield* validateStoreFile(next).pipe(Effect.orDie)
+      const temporary = `${filePath}.${process.pid}.tmp`
+      yield* fs
+        .makeDirectory(path.dirname(filePath), { recursive: true })
+        .pipe(
+          Effect.andThen(fs.writeFileString(temporary, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })),
+          Effect.andThen(fs.chmod(temporary, 0o600)),
+          Effect.mapError(writeFailed),
+        )
+      return temporary
     })
 
-  /** Create or update a profile; a rename replaces the previous id in place. */
-  const upsertAccount = (draft: AccountDraft, previousInstanceId?: string, requireExisting = false): Promise<AccountStoreFile> =>
-    mutate(async () => {
-      const file = await readAccountFile()
+    const publish = Effect.fn('ai accounts store publish')(function* (next: AccountStoreFile, temporary: string) {
+      yield* fs.rename(temporary, filePath).pipe(Effect.mapError(writeFailed))
+      yield* SubscriptionRef.set(snapshot, next)
+      return next
+    })
+
+    const persist = (next: AccountStoreFile) => Effect.flatMap(stage(next), temporary => publish(next, temporary))
+
+    /** A cancelled connection refuses itself after its last await and before publication. */
+    const persistFenced = Effect.fn('ai accounts store publish connection')(function* (next: AccountStoreFile, fence: ConnectionCommit) {
+      const temporary = yield* stage(next)
+      if (!fence.claimCommit()) return yield* new AccountConflict({ instanceId: fence.draft.instanceId, reason: 'connection-inactive' })
+      const published = yield* publish(next, temporary)
+      fence.didCommit()
+      return published
+    })
+
+    const serialized = lock.withPermit
+
+    const upsertAccount = Effect.fn('ai accounts store upsert')(function* (draft: AccountDraft, previousInstanceId?: string, requireExisting = false) {
+      const file = yield* read
       const replaced = previousInstanceId ?? draft.instanceId
-      if (replaced !== draft.instanceId && file.accounts.some(existing => existing.instanceId === draft.instanceId)) {
-        throw new Error(`An account named '${draft.instanceId}' already exists.`)
-      }
+      if (replaced !== draft.instanceId && file.accounts.some(existing => existing.instanceId === draft.instanceId))
+        return yield* new AccountConflict({ instanceId: draft.instanceId, reason: 'name-taken' })
       const position = file.accounts.findIndex(existing => existing.instanceId === replaced)
-      if (requireExisting && position === -1) throw new Error('Connect a new account before saving its settings; this saved account no longer exists.')
+      if (requireExisting && position === -1) return yield* new AccountConflict({ instanceId: replaced, reason: 'not-saved' })
       const normalized: AccountDraft = { ...draft, displayName: defaultName(draft) }
-      if (normalized.kind === 'codex') {
-        await materializeCodexShadowHome(layoutFor(normalized, file)).catch(() => undefined)
-      }
       const accounts = position === -1 ? [...file.accounts, normalized] : file.accounts.map((existing, index) => (index === position ? normalized : existing))
-      return persistAccountFile({ ...file, accounts })
+      return yield* persist({ ...file, accounts })
     })
 
-  const removeAccount = (instanceId: string): Promise<AccountStoreFile> =>
-    mutate(async () => {
-      const file = await readAccountFile()
-      return persistAccountFile({ ...file, accounts: file.accounts.filter(account => account.instanceId !== instanceId) })
-    })
-
-  const reorderAccount = (input: AccountReorder): Promise<AccountStoreFile> =>
-    mutate(async () => {
-      const file = await readAccountFile()
-      const accounts = AccountOrderModel.reorder(file.accounts, input)
-      if (accounts.every((account, index) => account === file.accounts[index])) return file
-      return persistAccountFile({ ...file, accounts })
-    })
-
-  const moveAccount = (instanceId: string, direction: AccountOrderDirection): Promise<AccountStoreFile> =>
-    mutate(async () => {
-      const file = await readAccountFile()
+    const moveAccount = Effect.fn('ai accounts store move')(function* (instanceId: string, direction: AccountOrderDirection) {
+      const file = yield* read
       const current = file.accounts.find(account => account.instanceId === instanceId)
-      if (current === undefined) throw new Error(`Account '${instanceId}' is no longer available.`)
+      if (current === undefined) return yield* new AccountConflict({ instanceId, reason: 'missing' })
       const group = file.accounts.filter(account => account.kind === current.kind)
       const target = group[group.indexOf(current) + (direction === 'earlier' ? -1 : 1)]
       if (target === undefined) return file
@@ -412,59 +378,68 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
         targetInstanceId: target.instanceId,
         placement: direction === 'earlier' ? 'before' : 'after',
       })
-      return persistAccountFile({ ...file, accounts })
+      return yield* persist({ ...file, accounts })
     })
 
-  const setDistribution = (distribution: AccountsFile['distribution']): Promise<AccountStoreFile> =>
-    mutate(async () => {
-      const file = await readAccountFile()
-      return persistAccountFile({ ...file, distribution })
+    const reorderAccount = Effect.fn('ai accounts store reorder')(function* (input: AccountReorder) {
+      const file = yield* read
+      const accounts = yield* reorderedAccounts(file, input)
+      if (accounts.every((account, index) => account === file.accounts[index])) return file
+      return yield* persist({ ...file, accounts })
     })
 
-  /**
-   * Creating the shadow home first lets Codex write auth data into the home
-   * when users follow the login command shown by the page.
-   */
-  const readAccountIdentity = async (
-    instanceId: string,
-  ): Promise<{
-    readonly instanceId: string
-    readonly email: string | null
-    readonly plan: string | null
-    readonly signedIn: boolean
-  }> => {
-    const file = await readAccountFile()
-    const draft = file.accounts.find(account => account.instanceId === instanceId)
-    if (draft === undefined || draft.kind !== 'codex') {
-      return { instanceId, email: null, plan: null, signedIn: false }
-    }
-    const layout = layoutFor(draft, file)
-    await materializeCodexShadowHome(layout).catch(() => undefined)
-    const auth = await describeCodexAuth(layout)
-    return {
-      instanceId,
-      email: auth.identity ?? null,
-      plan: auth.plan ?? null,
-      signedIn: auth.signedIn,
-    }
-  }
+    const createSetupAccount = Effect.fn('ai accounts store allocate')(function* (input: CreateSetupAccountInput) {
+      const instanceId = `${input.kind}_work_${input.requestId.replaceAll('-', '').toLowerCase()}`
+      const file = yield* read
+      if (file.accounts.some(account => account.instanceId === instanceId)) return yield* new AccountConflict({ instanceId, reason: 'identity-saved' })
+      const generated = AccountDraftModel.newAccountDraft({ kind: input.kind, existing: file.accounts })
+      const privateHome = path.join(path.dirname(filePath), 'homes', instanceId)
+      const draft: AccountDraft = {
+        ...generated,
+        instanceId,
+        enabled: false,
+        homePath: input.kind === 'codex' || input.kind === 'claude' ? privateHome : generated.homePath,
+        shadowHomePath: input.kind === 'codex' ? privateHome : generated.shadowHomePath,
+        apiKeyEnv: generated.apiKeyEnv === '' ? '' : AccountDraftModel.suggestedApiKeyRef(instanceId),
+      }
+      return { instanceId, draft, file }
+    })
 
-  return {
-    primeAccountFile,
-    readAccountFileSync,
-    readAccountFile,
-    writeAccountFile,
-    buildAccountsFile,
-    createSetupAccount,
-    connectionMetadata,
-    commitConnection,
-    upsertAccount,
-    removeAccount,
-    moveAccount,
-    reorderAccount,
-    setDistribution,
-    readAccountIdentity,
-  }
+    const commitConnection = Effect.fn('ai accounts store commit connection')(function* (input: ConnectionCommit) {
+      const file = yield* read
+      const instanceId = input.draft.instanceId
+      const current = file.accounts.find(account => account.instanceId === instanceId)
+      const beforeCommit = input.beforeCommit ?? Effect.void
+      if (input.existing === undefined) {
+        if (current !== undefined) return yield* new AccountConflict({ instanceId, reason: 'identity-saved' })
+        yield* beforeCommit
+        return yield* persistFenced({ ...file, accounts: [...file.accounts, { ...input.draft, enabled: true }] }, input)
+      }
+      if (current === undefined) return yield* new AccountConflict({ instanceId, reason: 'removed' })
+      if (!sameConnection(current, input.existing)) return yield* new AccountConflict({ instanceId, reason: 'connection-changed' })
+      const next = committedProfile(current, input.draft)
+      yield* beforeCommit
+      return yield* persistFenced({ ...file, accounts: file.accounts.map(account => (account === current ? next : account)) }, input)
+    })
+
+    return AccountStore.of({
+      filePath,
+      snapshot,
+      read,
+      write: next => serialized(persist(next)),
+      upsertAccount: (draft, previousInstanceId, requireExisting) => serialized(upsertAccount(draft, previousInstanceId, requireExisting)),
+      removeAccount: instanceId =>
+        serialized(Effect.flatMap(read, file => persist({ ...file, accounts: file.accounts.filter(account => account.instanceId !== instanceId) }))),
+      moveAccount: (instanceId, direction) => serialized(moveAccount(instanceId, direction)),
+      reorderAccount: input => serialized(reorderAccount(input)),
+      setDistribution: distribution => serialized(Effect.flatMap(read, file => persist({ ...file, distribution }))),
+      createSetupAccount,
+      commitConnection: input => serialized(commitConnection(input)),
+    })
+  })
+
+  static readonly layer = Layer.effect(
+    AccountStore,
+    Effect.suspend(() => AccountStore.makeAt(AccountHomePolicy.filePath())),
+  )
 }
-
-export const accountStoreService = createAccountStoreService({ filePath: STORE_PATH, fileSystem: nodeAccountStoreFileSystem })

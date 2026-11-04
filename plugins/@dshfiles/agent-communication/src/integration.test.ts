@@ -5,9 +5,12 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createCommunicationService, type CommunicationService } from '@dshfiles/dshx/communication'
-import { AgentCommunicationLifecycle } from './agent-lifecycle.js'
-import { createAgentCommunicationOperations } from './api-operations.js'
+import { createCommunicationService, type CommunicationAgent, type CommunicationService } from '@dshfiles/dshx/communication'
+import { Effect, Layer } from 'effect'
+import { initializeCommunicationAgent } from './agent-lifecycle.js'
+import { CommunicationOperations } from './api-operations.js'
+import { CommunicationHub } from './communication-hub-promise.js'
+import { HostAgents } from './host-edge-promise.js'
 import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 import { SessionHistoryModel } from './session-history.js'
 
@@ -54,7 +57,9 @@ const registryFor = (agents: readonly TestAgent[], ownership: Readonly<Record<st
 })
 
 const register = async (service: CommunicationService, agent: TestAgent): Promise<void> => {
-  await AgentCommunicationLifecycle.initializeCommunicationAgent({ service, agentId: agent.id, workspaceCwd: agent.session.header.cwd })
+  await Effect.runPromise(
+    initializeCommunicationAgent({ agentId: agent.id, workspaceCwd: agent.session.header.cwd }).pipe(Effect.provide(CommunicationHub.fromService(service))),
+  )
 }
 
 afterEach(async () => {
@@ -190,10 +195,15 @@ describe('Agent communication integration', () => {
     const service = await createService()
     const sender = createAgent({ id: 'session-sender', status: 'running', cwd })
     const recipient = createAgent({ id: 'session-recipient', status: 'idle', cwd })
-    const operations = createAgentCommunicationOperations({
-      service: () => service,
-      listAgents: () => [{ id: recipient.id, status: recipient.status }],
-    })
+    const agents: readonly CommunicationAgent[] = [{ id: recipient.id, status: recipient.status }]
+    const operations = {
+      postMessage: (request: Parameters<CommunicationOperations['Service']['postMessage']>[0]) =>
+        Effect.runPromise(
+          CommunicationOperations.use(operations => operations.postMessage(request)).pipe(
+            Effect.provide(CommunicationOperations.layer.pipe(Layer.provide(Layer.merge(CommunicationHub.fromService(service), HostAgents.layerTest(agents))))),
+          ),
+        ),
+    }
 
     const notice = await operations.postMessage({ topic: 'workspace/demo', text: 'FYI.' })
     const request = await operations.postMessage({ topic: 'workspace/demo', text: 'Please review.', intent: 'request' })

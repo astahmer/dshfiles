@@ -1,32 +1,23 @@
-import { MultiHostSchema } from '../schema.js'
+import { Effect, Schema } from 'effect'
+import { InvalidRuntimeLocator } from '../errors.js'
 import { runtimeLocatorSchema } from '../records.js'
-import { connectGateway, GatewayUnavailableError, type Gateway } from './gateway.js'
-import { createLoopbackForward } from './loopback.js'
+import { connectGateway } from './gateway.js'
+import { Loopback } from './loopback.js'
 
-export const connectLocal = ({
-  launchUrl,
-  originPort,
-  signal,
-}: {
-  readonly launchUrl: string
-  readonly originPort?: number
-  readonly signal?: AbortSignal | undefined
-}): Promise<Gateway> => {
-  const locator = MultiHostSchema.decodeStrict(runtimeLocatorSchema, { kind: 'local', launchUrl })
-  if (locator.kind !== 'local') throw new GatewayUnavailableError('invalid-runtime-locator', 'The local runtime locator is invalid.')
-  return connectGateway({
+const decodeLocator = Schema.decodeUnknownEffect(runtimeLocatorSchema, { onExcessProperty: 'error' })
+
+/** A runtime on this machine, reached through a private loopback forward on its stable origin port. */
+export const connectLocal = Effect.fnUntraced(function* (input: { readonly launchUrl: string; readonly originPort?: number | undefined }) {
+  const locator = yield* decodeLocator({ kind: 'local', launchUrl: input.launchUrl }).pipe(Effect.mapError(() => new InvalidRuntimeLocator()))
+  if (locator.kind !== 'local') return yield* new InvalidRuntimeLocator()
+  return yield* connectGateway({
     launchUrl: locator.launchUrl,
-    signal,
-    createTransport: async (origin, requestSignal) => {
-      const forward = await createLoopbackForward({
-        target: origin,
-        ...(originPort !== undefined && { originPort }),
-        ...(requestSignal !== undefined && { signal: requestSignal }),
-      })
-      const launch = new URL(locator.launchUrl)
-      launch.hostname = forward.address
-      launch.port = String(forward.port)
-      return { origin: launch.origin, launchUrl: launch.toString(), dispose: forward.dispose }
-    },
+    transport: origin =>
+      Effect.map(Loopback.forward({ target: origin, originPort: input.originPort }), endpoint => {
+        const launch = new URL(locator.launchUrl)
+        launch.hostname = endpoint.address
+        launch.port = String(endpoint.port)
+        return { origin: launch.origin, launchUrl: launch.toString(), closed: Effect.never }
+      }),
   })
-}
+})
