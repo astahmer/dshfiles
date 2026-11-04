@@ -47,13 +47,28 @@ export const trySessionControllerOperation = <Value>(operation: string, run: () 
     },
   })
 
+/**
+ * Each service is read when a handler uses it, not once at setup: the native controller this plugin starts waits for
+ * `sessionQuery`, which an owned search backend registers after its worker starts, so a setup-time read could keep
+ * `undefined` for the life of the Host.
+ */
 const servicesOf = (ctx: CordisContext) => ({
   ctx,
-  sessionController: ctx.get('sessionController'),
-  commands: ctx.get('commands'),
-  workspaceRegistry: ctx.get('workspaceRegistry'),
-  sessionQuery: ctx.get('sessionQuery'),
-  agentPresets: ctx.get('agentPresets'),
+  get sessionController() {
+    return ctx.get('sessionController')
+  },
+  get commands() {
+    return ctx.get('commands')
+  },
+  get workspaceRegistry() {
+    return ctx.get('workspaceRegistry')
+  },
+  get sessionQuery() {
+    return ctx.get('sessionQuery')
+  },
+  get agentPresets() {
+    return ctx.get('agentPresets')
+  },
 })
 
 export class SessionControllerHostRuntime extends Context.Service<SessionControllerHostRuntime, ReturnType<typeof servicesOf>>()(
