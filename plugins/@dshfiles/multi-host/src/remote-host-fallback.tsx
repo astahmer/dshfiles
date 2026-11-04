@@ -21,7 +21,7 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
   const openHost = useMutation({
     mutationFn: async ({ runtimeId, tab }: { readonly runtimeId: string; readonly tab: Window }) => {
       try {
-        const view = await api.runtimeOpenView({ runtimeId })
+        const view = await api.runtimeOpenView({ runtimeId, sessionId: props.sessionId })
         tab.opener = null
         tab.location.href = view.launchUrl
       } catch (error) {
@@ -58,9 +58,6 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
       </Button>
       {openHost.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(openHost.error, 'Could not open the remote host.')}</span> : null}
       {popupBlocked ? <span className="dshx:text-xs dshx:text-destructive">Allow pop-ups to open the remote host.</span> : null}
-      <span className="dshx:text-xs dshx:text-muted-foreground">
-        Opens the host home; select this thread there for its native questions, approvals, terminals, or JJ tools.
-      </span>
     </div>
   )
 }

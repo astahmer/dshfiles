@@ -975,7 +975,7 @@ const effectMultiHostApi = defineApi({
       }),
     }),
     runtimeOpenView: method({
-      input: Schema.Struct({ runtimeId: idSchema }),
+      input: Schema.Struct({ runtimeId: idSchema, sessionId: Schema.optional(sessionIdSchema) }),
       output: Schema.Struct({ leaseId: Schema.String.check(Schema.isUUID()), launchUrl: SchemaFields.urlString }),
     }),
     runtimeCloseView: method({

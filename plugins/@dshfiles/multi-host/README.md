@@ -72,9 +72,9 @@ With a host chosen:
 - The started thread opens in the main area as a **normal thread of this client**:
   this Host mirrors the remote Session, so the native chat, its live transcript,
   and this machine's own composer (commands, references, attachments, queue,
-  stop) work on it. **Host UI** still opens the host's own DSH in a new tab on a
-  stable loopback origin for what the mirror cannot answer yet (approvals,
-  terminals). If the host drops, the composer keeps its draft and the message is
+  stop) work on it. **Open on remote host** opens the host's own DSH in a new tab
+  on a stable loopback origin, on that same thread, for what the mirror cannot
+  answer yet (approvals, terminals). If the host drops, the composer keeps its draft and the message is
   refused until the host is back.
 - The **Remote threads** list shows every thread on every registered host,
   grouped by host and newest first: threads started from here keep their title,
