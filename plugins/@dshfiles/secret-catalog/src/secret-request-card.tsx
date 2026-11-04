@@ -97,7 +97,11 @@ const RequestCard = (props: {
  * Secrets an Agent of this Session is waiting for (`request_secret`), on the Session's latest turn. The value is typed
  * into the Catalog's masked form and stored on the Host; the waiting tool call receives only the reference.
  */
-export const SecretRequestCards = (props: { readonly sessionId: string; readonly turn: TurnLocation; readonly t: SecretCatalogTranslate }): JSX.Element | null => {
+export const SecretRequestCards = (props: {
+  readonly sessionId: string
+  readonly turn: TurnLocation
+  readonly t: SecretCatalogTranslate
+}): JSX.Element | null => {
   const api = useApi(secretRequestsApi)
   const queryClient = useQueryClient()
   const [answers, setAnswers] = useState<Readonly<Record<string, Answer>>>({})

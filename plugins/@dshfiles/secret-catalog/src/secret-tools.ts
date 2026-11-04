@@ -135,7 +135,9 @@ const secretRemoveAlias = Tool.make({
   output: Schema.Struct({ removed: Schema.Literal(true), alias: Schema.String, scope: Schema.String }),
   render: value => `Removed alias ${value.alias} from its ${value.scope} config; its vault item was kept.`,
   execute: Effect.fn('secret tool remove alias')(function* (input, call) {
-    yield* SecretCatalog.use(catalog => catalog.removeAlias({ alias: input.alias, scope: input.scope, cwd: input.scope === 'global' ? null : sessionCwd(call) }))
+    yield* SecretCatalog.use(catalog =>
+      catalog.removeAlias({ alias: input.alias, scope: input.scope, cwd: input.scope === 'global' ? null : sessionCwd(call) }),
+    )
     return { removed: true, alias: input.alias, scope: input.scope } as const
   }),
 })

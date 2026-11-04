@@ -66,7 +66,10 @@ export interface SecretRequestsShape {
   readonly ask: (input: SecretRequestInput) => Effect.Effect<SecretRequestOutcome, SecretRequestRefused>
   readonly pending: (sessionId: string | null) => Effect.Effect<readonly SecretRequestView[]>
   /** Settle a request with the reference of a value the user already stored; the Host checks the alias exists first. */
-  readonly complete: (input: { readonly requestId: string; readonly reference: string }) => Effect.Effect<{ readonly reference: string }, SecretRequestRefused | SecretCatalogFailure>
+  readonly complete: (input: {
+    readonly requestId: string
+    readonly reference: string
+  }) => Effect.Effect<{ readonly reference: string }, SecretRequestRefused | SecretCatalogFailure>
   readonly decline: (requestId: string) => Effect.Effect<{ readonly declined: true }, SecretRequestRefused>
   /** Fires after a request is added or settled, so browsers read the pending list again. */
   readonly changes: Stream.Stream<void>
@@ -122,7 +125,9 @@ export class SecretRequests extends Context.Service<SecretRequests, SecretReques
           expiresAt: now + input.timeoutMs,
         }
         const admitted = yield* Ref.modify(requests, current =>
-          current.size >= MAX_PENDING_SECRET_REQUESTS ? ([false, current] as const) : ([true, new Map(current).set(view.requestId, { view, settled })] as const),
+          current.size >= MAX_PENDING_SECRET_REQUESTS
+            ? ([false, current] as const)
+            : ([true, new Map(current).set(view.requestId, { view, settled })] as const),
         )
         if (!admitted) return yield* new SecretRequestRefused({ reason: 'too-many-pending' })
         yield* Effect.annotateCurrentSpan({ 'secret.alias': view.alias, 'secret.environment': view.environment, 'secret.scope': view.scope })
@@ -163,4 +168,3 @@ export class SecretRequests extends Context.Service<SecretRequests, SecretReques
     }),
   )
 }
-

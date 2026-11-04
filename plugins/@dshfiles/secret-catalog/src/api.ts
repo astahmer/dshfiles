@@ -1,5 +1,10 @@
 import { defineApi, event, method } from '@dshfiles/dshx/api'
-import { secretAliasSchemaEffect, secretEnvironmentSchemaEffect, secretReferenceTextSchemaEffect, secretScopeSchemaEffect } from '@dshfiles/credential-port/effect'
+import {
+  secretAliasSchemaEffect,
+  secretEnvironmentSchemaEffect,
+  secretReferenceTextSchemaEffect,
+  secretScopeSchemaEffect,
+} from '@dshfiles/credential-port/effect'
 import { Schema } from 'effect'
 import {
   createInputSchema,
@@ -91,8 +96,7 @@ export const secretRequestsApi = defineApi({
         }),
       }),
       output: Schema.Struct({ requests: Schema.Array(secretRequestViewSchema).check(Schema.isMaxLength(64)) }),
-      description:
-        'List the secrets Agents are waiting for the user to store (alias, environment, scope and stated purpose). Never returns values. Read-only.',
+      description: 'List the secrets Agents are waiting for the user to store (alias, environment, scope and stated purpose). Never returns values. Read-only.',
       tool: {
         name: 'secret_requests_pending',
         readOnly: true,

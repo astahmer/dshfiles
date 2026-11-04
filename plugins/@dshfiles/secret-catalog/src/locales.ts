@@ -33,7 +33,8 @@ const en = {
   requestDeclining: 'Declining…',
   requestStored: 'Stored. The agent received only {reference}.',
   requestDeclined: 'Declined. The agent was told that nothing was stored.',
-  requestLost: 'This request is no longer waiting (it expired or the turn stopped). A stored value stays in the Secret Catalog; ask the agent to request it again.',
+  requestLost:
+    'This request is no longer waiting (it expired or the turn stopped). A stored value stays in the Secret Catalog; ask the agent to request it again.',
   moreWaysToAdd: 'More ways to add a secret',
   addWithDetails: 'Add with details…',
   quickAddRow: 'New secret',

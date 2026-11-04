@@ -10,11 +10,12 @@ export const catalogWithCli = (
   const requests: SecretCliRequest[] = []
   const layer = SecretCatalog.layer.pipe(
     Layer.provide(
-      SecretCli.layerTest(request =>
-        Effect.suspend(() => {
-          requests.push(request)
-          return answer(request)
-        }),
+      SecretCli.layerTest(
+        request =>
+          Effect.suspend(() => {
+            requests.push(request)
+            return answer(request)
+          }),
         revision,
       ),
     ),

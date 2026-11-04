@@ -97,7 +97,13 @@ export class SecretCli extends Context.Service<SecretCli, SecretCliShape>()('@ds
 
       const stamp = (path: string) =>
         fs.stat(path).pipe(
-          Effect.map(info => `${Option.getOrElse(Option.map(info.mtime, date => date.getTime()), () => 0)}:${info.size}:${info.ino ?? 0}`),
+          Effect.map(
+            info =>
+              `${Option.getOrElse(
+                Option.map(info.mtime, date => date.getTime()),
+                () => 0,
+              )}:${info.size}:${info.ino ?? 0}`,
+          ),
           Effect.orElseSucceed(() => 'absent'),
         )
 
