@@ -13,6 +13,7 @@ import { projectNativeQuestion } from './question-inbox.js'
 import { QuestionFacts, QuestionScan } from './question-scan.js'
 
 const form = (overrides: Partial<PendingUserQuestion> = {}): PendingUserQuestion =>
+  // SAFETY: a test fixture: every field the projection reads is set below, and the rest of the native form is unused.
   ({
     callId: 'call-1',
     state: 'continued',
@@ -45,7 +46,13 @@ describe('native question inbox provider', () => {
     const [answerable, inThread, several] = NativeQuestionAttention.draftsOf([
       projected(form()),
       projected(form({ callId: ToolCallId('call-2'), state: 'open' })),
-      projected(form({ callId: ToolCallId('call-3'), questions: [...form().questions, { id: 'why', question: 'Why?', options: [] }] as PendingUserQuestion['questions'] })),
+      projected(
+        form({
+          callId: ToolCallId('call-3'),
+          // SAFETY: a second free-text question in the same shape the fixture form already carries.
+          questions: [...form().questions, { id: 'why', question: 'Why?', options: [] }] as PendingUserQuestion['questions'],
+        }),
+      ),
     ])
     expect(answerable).toEqual({
       dedupeKey: 'session-root:call-1',
@@ -59,7 +66,11 @@ describe('native question inbox provider', () => {
         { id: '1', label: 'Wait' },
       ],
     })
-    expect(inThread).toMatchObject({ dedupeKey: 'session-root:call-2', verbs: ['Open', 'Done', 'Snooze', 'MuteSource'], detail: 'Open the thread to answer it there.' })
+    expect(inThread).toMatchObject({
+      dedupeKey: 'session-root:call-2',
+      verbs: ['Open', 'Done', 'Snooze', 'MuteSource'],
+      detail: 'Open the thread to answer it there.',
+    })
     expect(inThread).not.toHaveProperty('choices')
     expect(several).toMatchObject({ reason: 'Asks: Deploy the release now? (+1 more)', verbs: ['Open', 'Done', 'Snooze', 'MuteSource'] })
   })
@@ -114,7 +125,10 @@ describe('native question inbox provider', () => {
     const facts = Layer.succeed(
       QuestionFacts,
       QuestionFacts.of({
-        load: target => Effect.succeed(target.sessionId === 'session-root' ? { facts: { pending: forms, waits: [] }, projectionUnavailable: false } : { projectionUnavailable: true }),
+        load: target =>
+          Effect.succeed(
+            target.sessionId === 'session-root' ? { facts: { pending: forms, waits: [] }, projectionUnavailable: false } : { projectionUnavailable: true },
+          ),
       }),
     )
     const statedCount = async (count: number): Promise<readonly AttentionDraft[]> => {

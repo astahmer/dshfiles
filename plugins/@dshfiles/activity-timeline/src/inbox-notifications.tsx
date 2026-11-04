@@ -22,10 +22,12 @@ const Toggle = (props: { readonly t: InboxTranslate }): JSX.Element | null => {
       storedBlockingAlerts.set(false)
       return
     }
-    void Notification.requestPermission().then(permission => {
+    const ask = async (): Promise<void> => {
+      const permission = await Notification.requestPermission()
       setDenied(permission === 'denied')
       storedBlockingAlerts.set(permission === 'granted')
-    })
+    }
+    void ask()
   }
   return (
     <div className="dshx:flex dshx:max-w-full dshx:flex-col dshx:gap-1">

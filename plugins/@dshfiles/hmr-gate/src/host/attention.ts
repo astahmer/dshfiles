@@ -7,9 +7,6 @@ import type { DeferredPackage } from '../api.js'
 export const DEFERRED_UPDATE_SOURCE = 'hmr-gate.deferred-update'
 
 const PACKAGE_ID = '@dshfiles/hmr-gate'
-/** A build rewrites several bundles in a burst; one reconcile covers it. */
-const RECONCILE_DEBOUNCE_MS = 250
-
 const clamp = (value: string, max: number): string => (value.length <= max ? value : `${value.slice(0, max - 1)}…`)
 
 /**
@@ -41,24 +38,34 @@ const draftsOf = (deferred: readonly DeferredPackage[]): readonly AttentionDraft
  * hmr-gate as an inbox provider. `changed` is called whenever the deferred set may have changed; the inbox hears the
  * whole set once a burst settles, and again whenever it announces it is ready.
  */
-const install = (ctx: Context, deferred: () => readonly DeferredPackage[]): { readonly changed: () => void; readonly dispose: () => void } => {
+const install = (ctx: Context, deferred: () => readonly DeferredPackage[]) => {
   const inbox = createHostApiClient(ctx, attentionApi, PACKAGE_ID)
-  let timer: ReturnType<typeof setTimeout> | undefined
   let disposed = false
+  // A build rewrites several bundles in a burst: changes that arrive while a reconcile runs collapse into one rerun.
+  let running = false
+  let dirty = false
 
   const reconcile = async (): Promise<void> => {
     if (disposed || !isApiServed(ctx, attentionApi, PACKAGE_ID)) return
     await inbox.reconcile({ source: DEFERRED_UPDATE_SOURCE, items: [...draftsOf(deferred())] })
   }
 
+  const drain = async (): Promise<void> => {
+    while (dirty && !disposed) {
+      dirty = false
+      await reconcile().catch((error: unknown) =>
+        ctx.logger.warn('hmr-gate: inbox reconcile failed (%s)', error instanceof Error ? error.message : 'unknown error'),
+      )
+    }
+    running = false
+  }
+
   const changed = (): void => {
     if (disposed) return
-    if (timer !== undefined) clearTimeout(timer)
-    timer = setTimeout(() => {
-      timer = undefined
-      reconcile().catch((error: unknown) => ctx.logger.warn('hmr-gate: inbox reconcile failed (%s)', error instanceof Error ? error.message : 'unknown error'))
-    }, RECONCILE_DEBOUNCE_MS)
-    timer.unref?.()
+    dirty = true
+    if (running) return
+    running = true
+    queueMicrotask(() => void drain())
   }
 
   const offReady = ctx.on('dshfiles/attention/ready', changed)
@@ -68,7 +75,6 @@ const install = (ctx: Context, deferred: () => readonly DeferredPackage[]): { re
     dispose: () => {
       disposed = true
       offReady()
-      if (timer !== undefined) clearTimeout(timer)
     },
   }
 }

@@ -242,7 +242,8 @@ export default defineClient({
                 return [
                   {
                     key,
-                    title: panelTabTitle(key, resolveSlotLabel((nav ?? entry).options.label), providedTitles) ?? key.replace(/^dshfiles-/u, '').replaceAll('-', ' '),
+                    title:
+                      panelTabTitle(key, resolveSlotLabel((nav ?? entry).options.label), providedTitles) ?? key.replace(/^dshfiles-/u, '').replaceAll('-', ' '),
                     hiddenFromAdd: nav === undefined,
                   },
                 ]

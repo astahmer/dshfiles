@@ -20,7 +20,10 @@ const COPY = {
   'needs-input': { severity: 'blocking', reason: (title: string, id: string) => `b:${id} ${title} needs your input.` },
   blocked: { severity: 'blocking', reason: (title: string, id: string) => `b:${id} ${title} is blocked.` },
   waiting: { severity: 'ready', reason: (title: string, id: string) => `b:${id} ${title} is waiting.` },
-} as const satisfies Record<Exclude<BacklogSummaryView['attention'], 'none'>, unknown>
+} as const satisfies Record<
+  Exclude<BacklogSummaryView['attention'], 'none'>,
+  { readonly severity: 'blocking' | 'ready'; readonly reason: (title: string, id: string) => string }
+>
 
 /**
  * One open, unsnoozed item with attention as an inbox item: needs-input and blocked ask the user to act (Needs you),

@@ -86,7 +86,11 @@ describe('settings groups', () => {
 
   it('links stage pages owned by other plugins only while they are loaded', () => {
     expect(all.find(entry => entry.id === 'link:mcp-servers')).toMatchObject({ groupId: 'tools', label: 'MCP servers' })
-    expect(all.find(entry => entry.id === 'plugin:secret-catalog')).toMatchObject({ groupId: 'security', label: 'Secrets', link: { panelId: 'secret-catalog' } })
+    expect(all.find(entry => entry.id === 'plugin:secret-catalog')).toMatchObject({
+      groupId: 'security',
+      label: 'Secrets',
+      link: { panelId: 'secret-catalog' },
+    })
     expect(all.find(entry => entry.id === 'link:dshfiles-multi-host-hosts')).toMatchObject({ groupId: 'hosts', label: 'Hosts' })
     const without = SettingsGroups.group({ sections, pages, panels: new Set() }).flatMap(group => group.entries)
     expect(without.some(entry => entry.link !== undefined)).toBe(false)

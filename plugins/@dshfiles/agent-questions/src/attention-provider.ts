@@ -1,13 +1,9 @@
-import {
-  attentionApi,
-  type AttentionActOutcome,
-  type AttentionActRequest,
-  type AttentionDraft,
-} from '@dshfiles/activity-timeline/attention-api'
-import { DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
+import { attentionApi, type AttentionActOutcome, type AttentionActRequest, type AttentionDraft } from '@dshfiles/activity-timeline/attention-api'
+import { DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Clock, Effect, Layer, Stream } from 'effect'
 import { AgentDirectory } from './agent-host-promise.js'
+import { handleAttentionActs } from './attention-act-promise.js'
 import { ParentQuestions } from './parent-questions.js'
 import { QuestionStore } from './question-store.js'
 import type { ParentQuestionRecord } from './store.js'
@@ -49,7 +45,6 @@ const inboxAnswerText = (option: ParentQuestionRecord['options'][number]): strin
 const refused = (message: string): AttentionActOutcome => ({ ok: false, message })
 
 const make = Effect.gen(function* () {
-  const host = yield* HostContext
   const store = yield* QuestionStore
   const questions = yield* ParentQuestions
   const directory = yield* AgentDirectory
@@ -85,17 +80,10 @@ const make = Effect.gen(function* () {
     )
   })
 
-  const services = yield* Effect.context<never>()
-  const runAnswer = Effect.runPromiseWith(services)
-  yield* Effect.acquireRelease(
-    Effect.sync(() =>
-      host.ctx.on('dshfiles/attention/act', request =>
-        request.item.source === CHILD_QUESTION_SOURCE
-          ? runAnswer(answer(request).pipe(Effect.catchCause(() => Effect.succeed(refused('Answering failed on the Host. Open the parent thread and answer there.')))))
-          : Promise.resolve(undefined),
-      ),
-    ),
-    dispose => Effect.sync(dispose),
+  yield* handleAttentionActs(request =>
+    request.item.source === CHILD_QUESTION_SOURCE
+      ? answer(request).pipe(Effect.catchCause(() => Effect.succeed(refused('Answering failed on the Host. Open the parent thread and answer there.'))))
+      : Effect.succeed(undefined),
   )
 
   yield* Stream.mergeAll(

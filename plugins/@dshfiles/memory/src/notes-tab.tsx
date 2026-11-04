@@ -480,7 +480,9 @@ const NoteDetail = (props: {
               </Button>
             </div>
           ) : null}
-          {archive.isError ? <p className="dshx:text-xs dshx:text-destructive">{errorMessage(archive.error, 'The archive action failed. Try it again.')}</p> : null}
+          {archive.isError ? (
+            <p className="dshx:text-xs dshx:text-destructive">{errorMessage(archive.error, 'The archive action failed. Try it again.')}</p>
+          ) : null}
         </section>
 
         {mode === 'view' ? null : <NoteEditorForm note={note} editor={{ snapshot, send }} key={`${note.id}:${note.updatedAt}`} />}
@@ -851,11 +853,17 @@ export const NotesTab = (props: {
                 </div>
               ))}
               {archiveSuggestion.isError ? (
-                <p className="dshx:text-xs dshx:text-destructive">{errorMessage(archiveSuggestion.error, 'The note could not be archived. Try Archive again.')}</p>
+                <p className="dshx:text-xs dshx:text-destructive">
+                  {errorMessage(archiveSuggestion.error, 'The note could not be archived. Try Archive again.')}
+                </p>
               ) : null}
             </section>
           )}
-          {notes.isError ? <p className="dshx:p-4 dshx:text-xs dshx:text-destructive">{errorMessage(notes.error, 'Notes are unavailable. Switch to another tab and back to reload them.')}</p> : null}
+          {notes.isError ? (
+            <p className="dshx:p-4 dshx:text-xs dshx:text-destructive">
+              {errorMessage(notes.error, 'Notes are unavailable. Switch to another tab and back to reload them.')}
+            </p>
+          ) : null}
           {notes.isSuccess && visibleNotes.length === 0 ? (
             <EmptyState>
               {filtered ? 'No notes match these filters.' : 'No notes yet. Agents add them with memory_note when you correct or decide something.'}

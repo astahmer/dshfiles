@@ -57,7 +57,11 @@ const itemFor = (questionId: string): AttentionItem => ({
 describe('agent-questions attention provider', () => {
   it('states each pending, unexpired child question as a blocking item about its parent thread', () => {
     const drafts = ChildQuestionAttention.openDrafts(
-      [record(), record({ questionId: '00000000-0000-4000-8000-000000000002', status: 'answered', answer: 'yes' }), record({ questionId: '00000000-0000-4000-8000-000000000003', expiresAt: 5 })],
+      [
+        record(),
+        record({ questionId: '00000000-0000-4000-8000-000000000002', status: 'answered', answer: 'yes' }),
+        record({ questionId: '00000000-0000-4000-8000-000000000003', expiresAt: 5 }),
+      ],
       100,
     )
     expect(drafts).toEqual([
@@ -107,7 +111,11 @@ describe('agent-questions attention provider', () => {
         expect(yield* act({ item: { ...itemFor(receipt.questionId), source: 'other.source' }, verb: 'Answer', choiceId: 'no' })).toBeUndefined()
         expect(yield* act({ item: itemFor(receipt.questionId), verb: 'Answer', choiceId: 'maybe' })).toMatchObject({ ok: false })
         expect(yield* act({ item: itemFor(receipt.questionId), verb: 'Answer', choiceId: 'no' })).toMatchObject({ ok: true })
-        expect(yield* Fiber.join(waiting)).toEqual({ kind: 'answered', questionId: receipt.questionId, answer: ChildQuestionAttention.inboxAnswerText({ id: 'no', label: 'Wait' }) })
+        expect(yield* Fiber.join(waiting)).toEqual({
+          kind: 'answered',
+          questionId: receipt.questionId,
+          answer: ChildQuestionAttention.inboxAnswerText({ id: 'no', label: 'Wait' }),
+        })
         expect(yield* act({ item: itemFor(receipt.questionId), verb: 'Answer', choiceId: 'yes' })).toMatchObject({ ok: false })
       }).pipe(Effect.provide(services))
     }),

@@ -89,7 +89,10 @@ const hostEdge = Layer.mergeAll(
   SidebarSettings.layer.pipe(Layer.provideMerge(Settings.layer(threadSidebarSettings))),
 ).pipe(Layer.provideMerge(platform))
 
-const runtimeState = Layer.mergeAll(InflightTurns.layer, Recoveries.layer, NavigationCounter.layer).pipe(Layer.provideMerge(RecoveryStore.layer), Layer.provideMerge(StateFiles.layer))
+const runtimeState = Layer.mergeAll(InflightTurns.layer, Recoveries.layer, NavigationCounter.layer).pipe(
+  Layer.provideMerge(RecoveryStore.layer),
+  Layer.provideMerge(StateFiles.layer),
+)
 
 const restart = RestartDrain.layer.pipe(Layer.provideMerge(RestartControl.layerWith({ env: process.env, homeDirectory: homedir() })))
 

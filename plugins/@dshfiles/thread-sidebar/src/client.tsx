@@ -385,14 +385,14 @@ const INVENTORY_REFRESH_INTERVAL_MS = 60_000
 const SECTION_DRAG_THRESHOLD_PX = 5
 const UNASSIGNED_PROJECT = '__unassigned__'
 
-const sectionLabels: Record<SidebarSection, Parameters<ThreadSidebarTranslate>[0]> = {
+const sectionLabels = {
   pinned: 'threadSidebarPinned',
   active: 'threadSidebarActive',
   parked: 'threadSidebarParked',
   settled: 'threadSidebarSettled',
   inactive: 'threadSidebarInactive',
   archived: 'threadSidebarArchived',
-}
+} satisfies Record<SidebarSection, Parameters<ThreadSidebarTranslate>[0]>
 
 const isSidebarSection = (value: string | undefined): value is SidebarSection => SIDEBAR_SECTIONS.some(section => section === value)
 
@@ -405,14 +405,14 @@ const threadTabFocusEventSchema = Schema.StructWithRest(Schema.Struct({ sessionI
 const noticeClass = 'dshx:w-auto dshx:px-3 dshx:py-2 dshx:text-xs'
 const stickyHeaderClass = 'dshx:sticky dshx:top-0 dshx:z-10 dshx:bg-background'
 
-const sectionIcons: Record<SidebarSection, ReactNode> = {
+const sectionIcons = {
   pinned: <IconPinOutlineRegular size={14} />,
   active: <ActivityIcon className="dshx:size-3.5" />,
   parked: <IconPauseOutlineRegular size={14} />,
   settled: <IconCheckCircleOutlineRegular size={14} />,
   inactive: <CirclePauseIcon className="dshx:size-3.5" />,
   archived: <IconArchiveOutlineRegular size={14} />,
-}
+} satisfies Record<SidebarSection, ReactNode>
 
 const setIncludes = (values: readonly string[]): ReadonlySet<string> => new Set(values)
 
@@ -2794,7 +2794,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const collapsedSections = isBoard ? boardViewSettings.collapsedSections : preferences.collapsedSections
   const toggleGroup = (key: string): void => {
     // Status groups fold Done by default, so they store Done's open marker instead of its key (thread-status.ts).
-    const nextCollapsedGroups = key.startsWith(STATUS_GROUP_KEY_PREFIX) ? [...ThreadStatusModel.toggle(key, collapsedGroups)] : toggleCollapsedGroup(collapsedGroups, key)
+    const nextCollapsedGroups = key.startsWith(STATUS_GROUP_KEY_PREFIX)
+      ? [...ThreadStatusModel.toggle(key, collapsedGroups)]
+      : toggleCollapsedGroup(collapsedGroups, key)
     if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedGroups: nextCollapsedGroups }))
     else changePreferences({ collapsedGroups: nextCollapsedGroups })
   }
@@ -3843,7 +3845,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       })),
     ]
     if (threadView.groupBy === 'state') {
-      const observedAt = Date.now()
       const pinnedOrder = new Map(workspaceState.pinnedSessionIds.map((sessionId, index) => [sessionId, index]))
       const statusEntries = entries.map(entry => {
         const thread = entry.thread
@@ -3863,12 +3864,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             now,
           })
         const pinnedIndex = thread.kind === 'local' ? pinnedOrder.get(thread.session.id) : undefined
-        return {
-          thread,
-          status,
-          cameBackAt: transitionClock.current(sessionId, status.group, status.since, observedAt),
-          ...(pinnedIndex === undefined ? {} : { pinnedIndex }),
-        }
+        const statusEntry = { thread, status, cameBackAt: transitionClock.current(sessionId, status.group, status.since, now) }
+        return pinnedIndex === undefined ? statusEntry : { ...statusEntry, pinnedIndex }
       })
       return ThreadStatusModel.groupEntries(statusEntries).map(group => ({
         key: group.key,
@@ -4033,10 +4030,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       else openThread(sessionId)
       return
     }
-    void inbox.act(status.itemId, verb).then(
-      outcome => setNotice({ tone: outcome.ok ? 'success' : 'warning', message: outcome.message }),
-      () => setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarVerbFailed') }),
-    )
+    const itemId = status.itemId
+    const act = async (): Promise<void> => {
+      try {
+        const outcome = await inbox.act(itemId, verb)
+        setNotice({ tone: outcome.ok ? 'success' : 'warning', message: outcome.message })
+      } catch {
+        setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarVerbFailed') })
+      }
+    }
+    void act()
   }
   const asideOpener = useAsideOpen()
   const latestRowActions = useRef({
@@ -5342,7 +5345,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     group.label || (viewTabs.find(tab => tab.view.id === threadViewSettings.activeViewId)?.label ?? props.tSidebar('threadSidebarAllThreads'))
                   const groupCollapsed =
                     showHeader &&
-                    (group.key.startsWith(STATUS_GROUP_KEY_PREFIX) ? ThreadStatusModel.isCollapsed(group.key, collapsedGroups) : collapsedGroups.includes(group.key))
+                    (group.key.startsWith(STATUS_GROUP_KEY_PREFIX)
+                      ? ThreadStatusModel.isCollapsed(group.key, collapsedGroups)
+                      : collapsedGroups.includes(group.key))
                   return (
                     <section
                       className={cn(

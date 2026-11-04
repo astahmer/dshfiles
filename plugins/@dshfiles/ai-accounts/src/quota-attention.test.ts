@@ -14,7 +14,7 @@ import { createHostApiClient } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { Effect, Layer, ManagedRuntime } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { QUOTA_CONTINUATION_SOURCE, QuotaAttention } from './quota-attention.js'
+import { QUOTA_CONTINUATION_SOURCE, QuotaAttention } from './quota-attention-promise.js'
 import type { QuotaContinuationSummary } from './quota-continuation-model.js'
 import { createQuotaContinuationService } from './quota-continuation.js'
 

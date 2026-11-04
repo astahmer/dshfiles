@@ -62,11 +62,7 @@ const make = Effect.gen(function* () {
     }).pipe(Effect.catchCause(cause => Effect.logWarning('traces: inbox reconcile failed', cause)))
 
   yield* Stream.mergeAll(
-    [
-      Stream.succeed(true),
-      Stream.map(HostEvents.stream('dshfiles/attention/ready'), () => true),
-      Stream.map(Stream.tick(RECONCILE_INTERVAL), () => false),
-    ],
+    [Stream.succeed(true), Stream.map(HostEvents.stream('dshfiles/attention/ready'), () => true), Stream.map(Stream.tick(RECONCILE_INTERVAL), () => false)],
     { concurrency: 'unbounded' },
   ).pipe(Stream.runForEach(pass), DshxPlugin.detached, Effect.forkScoped)
 })

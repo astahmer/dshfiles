@@ -51,11 +51,12 @@ const subscribe = (listener: () => void): (() => void) => {
 }
 
 /** "Where did a page go?": one row per former left-nav entry, with an Open button when the page is installed. */
-export const MovedToDialog = (props: {
-  readonly panels: readonly DestinationPanel[]
-  readonly openEntry: (entry: MovedEntry) => void
-}): JSX.Element => {
-  const isOpen = useSyncExternalStore(subscribe, () => open, () => false)
+export const MovedToDialog = (props: { readonly panels: readonly DestinationPanel[]; readonly openEntry: (entry: MovedEntry) => void }): JSX.Element => {
+  const isOpen = useSyncExternalStore(
+    subscribe,
+    () => open,
+    () => false,
+  )
   const rows = entries(props.panels)
   return (
     <Dialog open={isOpen} onOpenChange={setOpen}>

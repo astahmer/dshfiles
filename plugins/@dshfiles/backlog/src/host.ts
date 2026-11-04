@@ -53,7 +53,10 @@ const backlogServices = Layer.mergeAll(ThreadStart.layer, TriageBackfill.layer, 
 )
 
 /** Every backlog service and background loop of one activation. */
-const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, BacklogAttention.layer).pipe(Layer.provideMerge(backlogServices), Layer.provideMerge(hostEdges))
+const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, BacklogAttention.layer).pipe(
+  Layer.provideMerge(backlogServices),
+  Layer.provideMerge(hostEdges),
+)
 
 const backlogHandlers = Api.handlers(backlogApi, {
   list: input => BacklogStore.use(store => store.list(input)),

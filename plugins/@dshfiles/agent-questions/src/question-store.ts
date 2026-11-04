@@ -17,7 +17,11 @@ export class QuestionStore extends Context.Service<
     Effect.gen(function* () {
       const storage = yield* StorageDomain
       const domain = yield* storage.open(parentQuestionDomain)
-      return QuestionStore.of({ questions: domain.table('questions'), feedback: domain.table('feedback'), changes: Stream.map(domain.changes, () => undefined) })
+      return QuestionStore.of({
+        questions: domain.table('questions'),
+        feedback: domain.table('feedback'),
+        changes: Stream.map(domain.changes, () => undefined),
+      })
     }),
   )
 }

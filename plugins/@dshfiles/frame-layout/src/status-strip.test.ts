@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { StatusStripModel, type StatusItem } from './status-strip.js'
 
-const item = (id: string, side: StatusItem['side'], order?: number): StatusItem => ({
-  id,
-  side,
-  label: id,
-  component: () => null,
-  ...(order === undefined ? {} : { order }),
-})
+const item = (id: string, side: StatusItem['side'], order?: number): StatusItem => {
+  const base: StatusItem = { id, side, label: id, component: () => null }
+  return order === undefined ? base : { ...base, order }
+}
 
 describe('status strip', () => {
   it('splits items by side and sorts each side by order, then registration', () => {

@@ -1,12 +1,5 @@
 import { createHash } from 'node:crypto'
-import type {
-  AttentionCounts,
-  AttentionDraft,
-  AttentionItem,
-  AttentionPublish,
-  AttentionSeverity,
-  AttentionView,
-} from './attention-api.js'
+import type { AttentionCounts, AttentionDraft, AttentionItem, AttentionPublish, AttentionSeverity, AttentionView } from './attention-api.js'
 
 /** Closed items (done or resolved) stay listed this long so the user can see and reopen them. */
 export const CLOSED_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
@@ -106,7 +99,9 @@ const resolve = (existing: AttentionItem, now: number): PublishOutcome =>
 
 export type UserTransitionRefusal = 'resolved' | 'snooze-in-past' | 'snooze-target-missing'
 
-export type UserTransition = { readonly ok: true; readonly item: AttentionItem; readonly changed: boolean } | { readonly ok: false; readonly refusal: UserTransitionRefusal }
+export type UserTransition =
+  | { readonly ok: true; readonly item: AttentionItem; readonly changed: boolean }
+  | { readonly ok: false; readonly refusal: UserTransitionRefusal }
 
 const done = (existing: AttentionItem, now: number): UserTransition => {
   if (existing.resolvedAt !== null) return { ok: false, refusal: 'resolved' }
@@ -147,10 +142,12 @@ const severityRank = { blocking: 0, failed: 1, ready: 2, info: 3 } as const sati
 const closedAt = (item: AttentionItem): number => Math.max(item.resolvedAt ?? 0, item.doneAt ?? 0)
 
 /** Blocking before failed, then the item that came back to you most recently. Closed items: most recently closed first. */
-const compareIn = (view: AttentionView) => (left: AttentionItem, right: AttentionItem): number => {
-  if (view === 'closed') return closedAt(right) - closedAt(left) || left.id.localeCompare(right.id)
-  return severityRank[left.severity] - severityRank[right.severity] || right.openedAt - left.openedAt || left.id.localeCompare(right.id)
-}
+const compareIn =
+  (view: AttentionView) =>
+  (left: AttentionItem, right: AttentionItem): number => {
+    if (view === 'closed') return closedAt(right) - closedAt(left) || left.id.localeCompare(right.id)
+    return severityRank[left.severity] - severityRank[right.severity] || right.openedAt - left.openedAt || left.id.localeCompare(right.id)
+  }
 
 const countsOf = (items: Iterable<AttentionItem>, mutedSources: ReadonlySet<string>, now: number): AttentionCounts => {
   const counts = { needsYou: 0, blocking: 0, other: 0, snoozed: 0, closed: 0, muted: 0 }

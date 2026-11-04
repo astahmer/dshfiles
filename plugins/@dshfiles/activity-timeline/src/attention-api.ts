@@ -65,7 +65,11 @@ export const attentionChoiceSchema = Schema.Struct({
 export type AttentionChoice = typeof attentionChoiceSchema.Type
 
 /** A source id: lowercase, dot-separated, owned by one provider (`agent-questions.child-question`). */
-export const attentionSourceSchema = Schema.String.check(Schema.isMinLength(3), Schema.isMaxLength(80), Schema.isPattern(/^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)+$/))
+export const attentionSourceSchema = Schema.String.check(
+  Schema.isMinLength(3),
+  Schema.isMaxLength(80),
+  Schema.isPattern(/^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)+$/),
+)
 
 const uniqueVerbs = Schema.Array(attentionVerbSchema).check(
   Schema.isMaxLength(ATTENTION_VERBS.length),
@@ -171,7 +175,9 @@ export const attentionApi = defineApi({
           }),
         ),
         limit: Schema.optionalKey(
-          Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 200 })).annotate({ description: 'Maximum items, 1 to 200; defaults to 100.' }),
+          Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 200 })).annotate({
+            description: 'Maximum items, 1 to 200; defaults to 100.',
+          }),
         ),
       }),
       output: attentionListSchema,
@@ -209,8 +215,7 @@ export const attentionApi = defineApi({
         untilChange: Schema.optionalKey(Schema.Boolean.annotate({ description: 'Snooze until the source publishes a changed state.' })),
       }),
       output: attentionItemSchema,
-      description:
-        'Snooze one inbox item until a time or until its source changes it. Reversible with attention_reopen. Run only when the user asked.',
+      description: 'Snooze one inbox item until a time or until its source changes it. Reversible with attention_reopen. Run only when the user asked.',
       tool: { name: 'attention_snooze', readOnly: false, render: compactJson },
     }),
     reopen: method({

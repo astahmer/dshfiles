@@ -206,339 +206,339 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
 
   return (
     <main className="dshx-root dshx:h-full dshx:min-h-0 dshx:bg-background dshx:text-foreground">
-    <Page
-      heading="Agents"
-      description="Configured @handles: instructions, a model route and a tool preset that start threads."
-      {...(list.isPending ? {} : { count: agents.length })}
-      actions={[{ id: 'new-agent', label: 'New agent', icon: <PlusIcon />, onSelect: startNew }]}
-      scroll
-      bodyClassName="dshx:grid dshx:grid-cols-[16rem_minmax(0,1fr)] dshx:items-start dshx:gap-4 dshx:@max-pane-compact:grid-cols-1"
-    >
-      <PageSection heading="Configured">
-        {list.isPending ? (
-          <Spinner className="dshx:mx-auto dshx:my-6" />
-        ) : agents.length === 0 ? (
-          <EntityList>
-            <EmptyState action={{ label: 'New agent', onSelect: startNew }}>No agents yet.</EmptyState>
-          </EntityList>
-        ) : (
-          <EntityList aria-label="Agents">
-            {agents.map(agent => (
-              <EntityRow
-                key={agent.handle}
-                role="listitem"
-                selected={selected === agent.handle}
-                className={cn(!agent.enabled && 'dshx:opacity-50')}
-                onSelect={() => {
-                  setCreating(false)
-                  setSelected(agent.handle)
-                  setConfirmingDelete(false)
-                  setNotice(null)
-                }}
-                heading={
-                  <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
-                    {agent.glyph === '' ? null : <span aria-hidden>{agent.glyph}</span>}
-                    <span className="dshx:truncate dshx:font-medium">{agent.name}</span>
-                  </span>
-                }
-                meta={<span>@{agent.handle}</span>}
-                {...(agent.description === '' ? {} : { description: agent.description })}
-              />
-            ))}
-          </EntityList>
-        )}
-      </PageSection>
-
-      <PageSection
-        heading={editing ? 'New agent' : (current?.name ?? 'Agent')}
-        description={
-          current === null
-            ? 'A handle, instructions, a model route and a tool preset.'
-            : `@${current.handle} · ${current.threadCount} thread${current.threadCount === 1 ? '' : 's'}`
-        }
-        actions={
-          <>
-            <Switch aria-label="Enabled" checked={draft.enabled} onCheckedChange={enabled => patch({ enabled })} />
-            <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
-              Save
-            </Button>
-          </>
-        }
-        className="dshx:gap-3"
+      <Page
+        heading="Agents"
+        description="Configured @handles: instructions, a model route and a tool preset that start threads."
+        {...(list.isPending ? {} : { count: agents.length })}
+        actions={[{ id: 'new-agent', label: 'New agent', icon: <PlusIcon />, onSelect: startNew }]}
+        scroll
+        bodyClassName="dshx:grid dshx:grid-cols-[16rem_minmax(0,1fr)] dshx:items-start dshx:gap-4 dshx:@max-pane-compact:grid-cols-1"
       >
-        {notice === null ? null : (
-          <p
-            role={notice.ok ? 'status' : 'alert'}
-            className={cn(
-              'dshx:rounded-md dshx:border dshx:px-2 dshx:py-1.5 dshx:text-xs',
-              notice.ok ? 'dshx:border-border dshx:text-muted-foreground' : 'dshx:border-destructive/60 dshx:text-destructive',
-            )}
-          >
-            {notice.ok ? 'Saved.' : notice.reason}
-          </p>
-        )}
+        <PageSection heading="Configured">
+          {list.isPending ? (
+            <Spinner className="dshx:mx-auto dshx:my-6" />
+          ) : agents.length === 0 ? (
+            <EntityList>
+              <EmptyState action={{ label: 'New agent', onSelect: startNew }}>No agents yet.</EmptyState>
+            </EntityList>
+          ) : (
+            <EntityList aria-label="Agents">
+              {agents.map(agent => (
+                <EntityRow
+                  key={agent.handle}
+                  role="listitem"
+                  selected={selected === agent.handle}
+                  className={cn(!agent.enabled && 'dshx:opacity-50')}
+                  onSelect={() => {
+                    setCreating(false)
+                    setSelected(agent.handle)
+                    setConfirmingDelete(false)
+                    setNotice(null)
+                  }}
+                  heading={
+                    <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
+                      {agent.glyph === '' ? null : <span aria-hidden>{agent.glyph}</span>}
+                      <span className="dshx:truncate dshx:font-medium">{agent.name}</span>
+                    </span>
+                  }
+                  meta={<span>@{agent.handle}</span>}
+                  {...(agent.description === '' ? {} : { description: agent.description })}
+                />
+              ))}
+            </EntityList>
+          )}
+        </PageSection>
 
-        <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
-          <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>Name</span>
-            <Input value={draft.name} maxLength={agentLimits.name} onChange={event => patch({ name: event.currentTarget.value })} />
-          </label>
-          <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>Handle</span>
-            <Input
-              value={draft.handle}
-              maxLength={32}
-              disabled={!editing && current !== null}
-              placeholder={Agents.handleFrom(draft.name)}
-              onChange={event => patch({ handle: event.currentTarget.value })}
-            />
-          </label>
-          <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>Glyph</span>
-            <Input value={draft.glyph} maxLength={8} onChange={event => patch({ glyph: event.currentTarget.value })} />
-          </label>
-          <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>Description</span>
-            <Input value={draft.description} maxLength={agentLimits.description} onChange={event => patch({ description: event.currentTarget.value })} />
-          </label>
-          <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>Memory scope</span>
-            <Input
-              value={draft.memoryScope ?? ''}
-              placeholder={Agents.defaultMemoryScope(editing ? Agents.handleFrom(draft.name || draft.handle) : (current?.handle ?? ''))}
-              onChange={event => patch({ memoryScope: event.currentTarget.value === '' ? null : event.currentTarget.value })}
-            />
-            <span className="dshx:text-[11px] dshx:text-muted-foreground">The notes this agent's threads read; empty keeps memory to the project.</span>
-          </label>
-        </div>
-
-        <label className="dshx:flex dshx:flex-col dshx:gap-1">
-          <span className={labelClass}>Instructions</span>
-          <Textarea
-            value={draft.instructions}
-            maxLength={agentLimits.instructions}
-            rows={6}
-            placeholder="How this agent works: role, constraints, the shape of a good answer."
-            onChange={event => patch({ instructions: event.currentTarget.value })}
-          />
-          <span className="dshx:self-end dshx:text-[11px] dshx:text-muted-foreground">
-            {draft.instructions.length}/{agentLimits.instructions}
-          </span>
-        </label>
-
-        <label className="dshx:flex dshx:flex-col dshx:gap-1">
-          <span className={labelClass}>Routine</span>
-          <Textarea
-            value={draft.routine}
-            maxLength={agentLimits.routine}
-            rows={2}
-            placeholder="Every weekday at 09:00, summarise open reviews."
-            onChange={event => patch({ routine: event.currentTarget.value })}
-          />
-          <span className="dshx:text-[11px] dshx:text-muted-foreground">
-            Carried into the opening message; the thread keeps it with its own schedule tools, not a timer.
-          </span>
-        </label>
-
-        <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
-          <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>Delegation (messages)</span>
-            <Combobox
-              label="Delegation (messages)"
-              matchTriggerWidth
-              onValueChange={value =>
-                patch({
-                  delegation: {
-                    messaging: value === 'none' ? 'none' : value === 'listed' ? 'listed' : 'any',
-                    handles: draft.delegation.handles,
-                    subagents: draft.delegation.subagents,
-                  },
-                })
-              }
-              options={delegationOptions}
-              value={draft.delegation.messaging}
-            />
-          </label>
-          <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>Peers (handles)</span>
-            <Input
-              value={draft.delegation.handles.join(', ')}
-              disabled={draft.delegation.messaging !== 'listed'}
-              placeholder="reviewer, planner"
-              onChange={event =>
-                patch({
-                  delegation: {
-                    messaging: draft.delegation.messaging,
-                    subagents: draft.delegation.subagents,
-                    handles: event.currentTarget.value
-                      .split(',')
-                      .map(handle => handle.trim().replace(/^@/u, ''))
-                      .filter(handle => handle !== ''),
-                  },
-                })
-              }
-            />
-          </label>
-          <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:self-end dshx:pb-1">
-            <Switch
-              aria-label="Subagents and workflows"
-              checked={draft.delegation.subagents}
-              onCheckedChange={subagents => patch({ delegation: { ...draft.delegation, subagents } })}
-            />
-            <span className="dshx:text-[12px]">Subagents and workflows</span>
-          </label>
-          <span className="dshx:self-end dshx:text-[11px] dshx:text-muted-foreground">
-            Constrains this agent's <code>dshx_comm_*</code> sends and its subagent/workflow calls; it does not replace DSH messaging.
-          </span>
-        </div>
-
-        <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
-          <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>Tools (preset)</span>
-            <Combobox
-              label="Tools (preset)"
-              matchTriggerWidth
-              onValueChange={value => patch({ preset: value === '' ? null : value })}
-              options={presetOptions}
-              searchAbove={0}
-              searchPlaceholder="Search presets…"
-              value={draft.preset ?? ''}
-            />
-          </label>
-          <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>Model route</span>
-            <Combobox
-              label="Model route"
-              matchTriggerWidth
-              onValueChange={value => {
-                const option = catalog.data?.options.find(candidate => candidate.key === value)
-                if (option === undefined) {
-                  patch({ route: null })
-                  return
-                }
-                const route =
-                  option.defaultEffort === undefined
-                    ? { provider: option.provider, model: option.model }
-                    : { provider: option.provider, model: option.model, reasoningEffort: option.defaultEffort }
-                patch({ route })
-              }}
-              options={routeOptions}
-              searchAbove={0}
-              searchPlaceholder="Search models…"
-              value={routeKey}
-            />
-          </label>
-          <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>Reasoning</span>
-            <Combobox
-              disabled={routeOption === undefined}
-              label="Reasoning"
-              matchTriggerWidth
-              onValueChange={value =>
-                patch({
-                  route:
-                    draft.route === null
-                      ? null
-                      : value === ''
-                        ? { provider: draft.route.provider, model: draft.route.model }
-                        : { provider: draft.route.provider, model: draft.route.model, reasoningEffort: value },
-                })
-              }
-              options={effortOptions}
-              value={draft.route?.reasoningEffort ?? ''}
-            />
-          </label>
-        </div>
-
-        {current === null ? null : (
-          <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-2">
-            <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-              <h3 className="dshx:text-sm dshx:font-semibold">Start a thread</h3>
-              {confirmingDelete ? (
-                <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-                  <span className="dshx:text-[11px] dshx:text-muted-foreground">Remove @{current.handle}?</span>
-                  <Button size="xs" variant="ghost" onClick={() => setConfirmingDelete(false)}>
-                    Cancel
-                  </Button>
-                  <Button size="xs" variant="destructive" onClick={() => remove.mutate(current.handle)} disabled={remove.isPending}>
-                    Remove
-                  </Button>
-                </span>
-              ) : (
-                <Button size="icon-sm" variant="ghost" aria-label="Remove agent" disabled={current.builtIn} onClick={() => setConfirmingDelete(true)}>
-                  <TrashIcon />
-                </Button>
-              )}
-            </div>
-            <Textarea
-              aria-label="Prompt"
-              rows={2}
-              value={prompt}
-              placeholder={`What should @${current.handle} do?`}
-              onChange={event => setPrompt(event.currentTarget.value)}
-            />
-            <div className="dshx:flex dshx:items-center dshx:gap-1.5">
-              <Combobox
-                label="Project"
-                matchTriggerWidth
-                onValueChange={setTarget}
-                options={targetOptions}
-                searchAbove={0}
-                searchPlaceholder="Search projects…"
-                triggerClassName="dshx:flex-1"
-                value={target}
-              />
-              <Button size="sm" variant="outline" onClick={() => dispatch.mutate()} disabled={dispatch.isPending}>
-                <SendIcon />
-                Start
+        <PageSection
+          heading={editing ? 'New agent' : (current?.name ?? 'Agent')}
+          description={
+            current === null
+              ? 'A handle, instructions, a model route and a tool preset.'
+              : `@${current.handle} · ${current.threadCount} thread${current.threadCount === 1 ? '' : 's'}`
+          }
+          actions={
+            <>
+              <Switch aria-label="Enabled" checked={draft.enabled} onCheckedChange={enabled => patch({ enabled })} />
+              <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
+                Save
               </Button>
+            </>
+          }
+          className="dshx:gap-3"
+        >
+          {notice === null ? null : (
+            <p
+              role={notice.ok ? 'status' : 'alert'}
+              className={cn(
+                'dshx:rounded-md dshx:border dshx:px-2 dshx:py-1.5 dshx:text-xs',
+                notice.ok ? 'dshx:border-border dshx:text-muted-foreground' : 'dshx:border-destructive/60 dshx:text-destructive',
+              )}
+            >
+              {notice.ok ? 'Saved.' : notice.reason}
+            </p>
+          )}
+
+          <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
+            <label className="dshx:flex dshx:flex-col dshx:gap-1">
+              <span className={labelClass}>Name</span>
+              <Input value={draft.name} maxLength={agentLimits.name} onChange={event => patch({ name: event.currentTarget.value })} />
+            </label>
+            <label className="dshx:flex dshx:flex-col dshx:gap-1">
+              <span className={labelClass}>Handle</span>
+              <Input
+                value={draft.handle}
+                maxLength={32}
+                disabled={!editing && current !== null}
+                placeholder={Agents.handleFrom(draft.name)}
+                onChange={event => patch({ handle: event.currentTarget.value })}
+              />
+            </label>
+            <label className="dshx:flex dshx:flex-col dshx:gap-1">
+              <span className={labelClass}>Glyph</span>
+              <Input value={draft.glyph} maxLength={8} onChange={event => patch({ glyph: event.currentTarget.value })} />
+            </label>
+            <label className="dshx:flex dshx:flex-col dshx:gap-1">
+              <span className={labelClass}>Description</span>
+              <Input value={draft.description} maxLength={agentLimits.description} onChange={event => patch({ description: event.currentTarget.value })} />
+            </label>
+            <label className="dshx:flex dshx:flex-col dshx:gap-1">
+              <span className={labelClass}>Memory scope</span>
+              <Input
+                value={draft.memoryScope ?? ''}
+                placeholder={Agents.defaultMemoryScope(editing ? Agents.handleFrom(draft.name || draft.handle) : (current?.handle ?? ''))}
+                onChange={event => patch({ memoryScope: event.currentTarget.value === '' ? null : event.currentTarget.value })}
+              />
+              <span className="dshx:text-[11px] dshx:text-muted-foreground">The notes this agent's threads read; empty keeps memory to the project.</span>
+            </label>
+          </div>
+
+          <label className="dshx:flex dshx:flex-col dshx:gap-1">
+            <span className={labelClass}>Instructions</span>
+            <Textarea
+              value={draft.instructions}
+              maxLength={agentLimits.instructions}
+              rows={6}
+              placeholder="How this agent works: role, constraints, the shape of a good answer."
+              onChange={event => patch({ instructions: event.currentTarget.value })}
+            />
+            <span className="dshx:self-end dshx:text-[11px] dshx:text-muted-foreground">
+              {draft.instructions.length}/{agentLimits.instructions}
+            </span>
+          </label>
+
+          <label className="dshx:flex dshx:flex-col dshx:gap-1">
+            <span className={labelClass}>Routine</span>
+            <Textarea
+              value={draft.routine}
+              maxLength={agentLimits.routine}
+              rows={2}
+              placeholder="Every weekday at 09:00, summarise open reviews."
+              onChange={event => patch({ routine: event.currentTarget.value })}
+            />
+            <span className="dshx:text-[11px] dshx:text-muted-foreground">
+              Carried into the opening message; the thread keeps it with its own schedule tools, not a timer.
+            </span>
+          </label>
+
+          <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
+            <label className="dshx:flex dshx:flex-col dshx:gap-1">
+              <span className={labelClass}>Delegation (messages)</span>
+              <Combobox
+                label="Delegation (messages)"
+                matchTriggerWidth
+                onValueChange={value =>
+                  patch({
+                    delegation: {
+                      messaging: value === 'none' ? 'none' : value === 'listed' ? 'listed' : 'any',
+                      handles: draft.delegation.handles,
+                      subagents: draft.delegation.subagents,
+                    },
+                  })
+                }
+                options={delegationOptions}
+                value={draft.delegation.messaging}
+              />
+            </label>
+            <label className="dshx:flex dshx:flex-col dshx:gap-1">
+              <span className={labelClass}>Peers (handles)</span>
+              <Input
+                value={draft.delegation.handles.join(', ')}
+                disabled={draft.delegation.messaging !== 'listed'}
+                placeholder="reviewer, planner"
+                onChange={event =>
+                  patch({
+                    delegation: {
+                      messaging: draft.delegation.messaging,
+                      subagents: draft.delegation.subagents,
+                      handles: event.currentTarget.value
+                        .split(',')
+                        .map(handle => handle.trim().replace(/^@/u, ''))
+                        .filter(handle => handle !== ''),
+                    },
+                  })
+                }
+              />
+            </label>
+            <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:self-end dshx:pb-1">
+              <Switch
+                aria-label="Subagents and workflows"
+                checked={draft.delegation.subagents}
+                onCheckedChange={subagents => patch({ delegation: { ...draft.delegation, subagents } })}
+              />
+              <span className="dshx:text-[12px]">Subagents and workflows</span>
+            </label>
+            <span className="dshx:self-end dshx:text-[11px] dshx:text-muted-foreground">
+              Constrains this agent's <code>dshx_comm_*</code> sends and its subagent/workflow calls; it does not replace DSH messaging.
+            </span>
+          </div>
+
+          <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
+            <label className="dshx:flex dshx:flex-col dshx:gap-1">
+              <span className={labelClass}>Tools (preset)</span>
+              <Combobox
+                label="Tools (preset)"
+                matchTriggerWidth
+                onValueChange={value => patch({ preset: value === '' ? null : value })}
+                options={presetOptions}
+                searchAbove={0}
+                searchPlaceholder="Search presets…"
+                value={draft.preset ?? ''}
+              />
+            </label>
+            <label className="dshx:flex dshx:flex-col dshx:gap-1">
+              <span className={labelClass}>Model route</span>
+              <Combobox
+                label="Model route"
+                matchTriggerWidth
+                onValueChange={value => {
+                  const option = catalog.data?.options.find(candidate => candidate.key === value)
+                  if (option === undefined) {
+                    patch({ route: null })
+                    return
+                  }
+                  const route =
+                    option.defaultEffort === undefined
+                      ? { provider: option.provider, model: option.model }
+                      : { provider: option.provider, model: option.model, reasoningEffort: option.defaultEffort }
+                  patch({ route })
+                }}
+                options={routeOptions}
+                searchAbove={0}
+                searchPlaceholder="Search models…"
+                value={routeKey}
+              />
+            </label>
+            <label className="dshx:flex dshx:flex-col dshx:gap-1">
+              <span className={labelClass}>Reasoning</span>
+              <Combobox
+                disabled={routeOption === undefined}
+                label="Reasoning"
+                matchTriggerWidth
+                onValueChange={value =>
+                  patch({
+                    route:
+                      draft.route === null
+                        ? null
+                        : value === ''
+                          ? { provider: draft.route.provider, model: draft.route.model }
+                          : { provider: draft.route.provider, model: draft.route.model, reasoningEffort: value },
+                  })
+                }
+                options={effortOptions}
+                value={draft.route?.reasoningEffort ?? ''}
+              />
+            </label>
+          </div>
+
+          {current === null ? null : (
+            <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-2">
+              <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
+                <h3 className="dshx:text-sm dshx:font-semibold">Start a thread</h3>
+                {confirmingDelete ? (
+                  <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+                    <span className="dshx:text-[11px] dshx:text-muted-foreground">Remove @{current.handle}?</span>
+                    <Button size="xs" variant="ghost" onClick={() => setConfirmingDelete(false)}>
+                      Cancel
+                    </Button>
+                    <Button size="xs" variant="destructive" onClick={() => remove.mutate(current.handle)} disabled={remove.isPending}>
+                      Remove
+                    </Button>
+                  </span>
+                ) : (
+                  <Button size="icon-sm" variant="ghost" aria-label="Remove agent" disabled={current.builtIn} onClick={() => setConfirmingDelete(true)}>
+                    <TrashIcon />
+                  </Button>
+                )}
+              </div>
+              <Textarea
+                aria-label="Prompt"
+                rows={2}
+                value={prompt}
+                placeholder={`What should @${current.handle} do?`}
+                onChange={event => setPrompt(event.currentTarget.value)}
+              />
+              <div className="dshx:flex dshx:items-center dshx:gap-1.5">
+                <Combobox
+                  label="Project"
+                  matchTriggerWidth
+                  onValueChange={setTarget}
+                  options={targetOptions}
+                  searchAbove={0}
+                  searchPlaceholder="Search projects…"
+                  triggerClassName="dshx:flex-1"
+                  value={target}
+                />
+                <Button size="sm" variant="outline" onClick={() => dispatch.mutate()} disabled={dispatch.isPending}>
+                  <SendIcon />
+                  Start
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {current === null ? null : (
-          <div className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-border dshx:p-2">
-            <h3 className="dshx:text-sm dshx:font-semibold">Threads started</h3>
-            {threads.isPending ? <Spinner className="dshx:mx-auto" /> : null}
-            {!threads.isPending && (threads.data ?? []).length === 0 ? (
-              <EmptyState className="dshx:py-3">No threads yet. Start one above; it stays listed here after a restart.</EmptyState>
-            ) : null}
-            {(threads.data ?? []).map(thread => (
-              <button
-                key={thread.sessionId}
-                type="button"
-                onClick={() => props.openThread(thread.sessionId)}
-                className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:py-1 dshx:text-left dshx:text-[12px] dshx:transition-colors dshx:hover:bg-accent"
-              >
-                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{thread.title}</span>
-                <span className="dshx:shrink-0 dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
-                  {new Date(thread.startedAt).toISOString().slice(0, 10)}
-                </span>
-              </button>
-            ))}
-            {(schedules.data ?? []).length === 0 ? null : <span className={cn(labelClass, 'dshx:pt-1')}>Routines</span>}
-            {(schedules.data ?? []).map(schedule => (
-              <button
-                key={schedule.id}
-                type="button"
-                onClick={() => props.openThread(schedule.sessionId)}
-                className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:py-1 dshx:text-left dshx:text-[12px] dshx:transition-colors dshx:hover:bg-accent"
-              >
-                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{schedule.title}</span>
-                <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{schedule.status === 'active' ? 'Active' : 'Inactive'}</span>
-              </button>
-            ))}
-          </div>
-        )}
+          {current === null ? null : (
+            <div className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-border dshx:p-2">
+              <h3 className="dshx:text-sm dshx:font-semibold">Threads started</h3>
+              {threads.isPending ? <Spinner className="dshx:mx-auto" /> : null}
+              {!threads.isPending && (threads.data ?? []).length === 0 ? (
+                <EmptyState className="dshx:py-3">No threads yet. Start one above; it stays listed here after a restart.</EmptyState>
+              ) : null}
+              {(threads.data ?? []).map(thread => (
+                <button
+                  key={thread.sessionId}
+                  type="button"
+                  onClick={() => props.openThread(thread.sessionId)}
+                  className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:py-1 dshx:text-left dshx:text-[12px] dshx:transition-colors dshx:hover:bg-accent"
+                >
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{thread.title}</span>
+                  <span className="dshx:shrink-0 dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
+                    {new Date(thread.startedAt).toISOString().slice(0, 10)}
+                  </span>
+                </button>
+              ))}
+              {(schedules.data ?? []).length === 0 ? null : <span className={cn(labelClass, 'dshx:pt-1')}>Routines</span>}
+              {(schedules.data ?? []).map(schedule => (
+                <button
+                  key={schedule.id}
+                  type="button"
+                  onClick={() => props.openThread(schedule.sessionId)}
+                  className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:py-1 dshx:text-left dshx:text-[12px] dshx:transition-colors dshx:hover:bg-accent"
+                >
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{schedule.title}</span>
+                  <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{schedule.status === 'active' ? 'Active' : 'Inactive'}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
-        {current === null ? null : (
-          <p className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-[11px] dshx:text-muted-foreground">
-            <RotateCcwIcon aria-hidden className="dshx:size-3" />
-            Mention it as @{current.handle} where a thread starts: a backlog comment or a start-thread dialog.
-          </p>
-        )}
-      </PageSection>
-    </Page>
+          {current === null ? null : (
+            <p className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-[11px] dshx:text-muted-foreground">
+              <RotateCcwIcon aria-hidden className="dshx:size-3" />
+              Mention it as @{current.handle} where a thread starts: a backlog comment or a start-thread dialog.
+            </p>
+          )}
+        </PageSection>
+      </Page>
     </main>
   )
 }

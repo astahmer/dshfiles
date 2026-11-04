@@ -129,7 +129,11 @@ const AddMemoryDialog = (props: {
             onChange={event => setText(event.currentTarget.value)}
             rows={3}
           />
-          {create.isError ? <p className="dshx:text-xs dshx:text-destructive">{errorMessage(create.error, 'The note could not be added. Check the project and text, then add it again.')}</p> : null}
+          {create.isError ? (
+            <p className="dshx:text-xs dshx:text-destructive">
+              {errorMessage(create.error, 'The note could not be added. Check the project and text, then add it again.')}
+            </p>
+          ) : null}
         </div>
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={() => props.onOpenChange(false)}>
@@ -204,99 +208,99 @@ export const MemoryPanel = (props: { readonly openThread: (sessionId: string) =>
   return (
     <TooltipProvider delayDuration={500}>
       <main className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground">
-      <Page
-        heading="Memory"
-        description={subtitleOf(tab)}
-        meta={
-          <>
-            {usage.data === undefined ? null : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="dshx:inline-flex">
-                    <Badge variant="secondary" className="dshx:text-xs dshx:font-normal">
-                      {usage.data.retrieval.active === 'hybrid'
-                        ? `Retrieval: hybrid (${usage.data.retrieval.model ?? 'embeddings'})`
-                        : usage.data.retrieval.requested === 'hybrid'
-                          ? 'Retrieval: BM25 (hybrid unavailable)'
-                          : 'Retrieval: BM25'}
-                    </Badge>
-                  </span>
-                </TooltipTrigger>
-                {usage.data.retrieval.reason === null ? null : <TooltipContent>{usage.data.retrieval.reason}</TooltipContent>}
-              </Tooltip>
-            )}
-            <Select value={project === '' ? 'all' : project} onValueChange={value => setProject(value === 'all' ? '' : value)}>
-              <SelectTrigger aria-label="Memory project" className={projectTrigger} size="sm">
-                <SelectValue>
-                  {selectedProject === undefined ? 'All projects' : `${PanelFormat.projectName(selectedProject.project)} · ${selectedProject.notes}`}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent align="start" className="dshx:max-w-80">
-                <SelectItem value="all">All projects</SelectItem>
-                {projectItems.map(item => (
-                  <SelectItem key={item.project} value={item.project}>
-                    {PanelFormat.projectName(item.project)} · {item.threads} threads · {item.notes} notes
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </>
-        }
-        primaryAction={{ id: 'add-memory', label: 'Add memory', icon: <PlusIcon />, onSelect: () => setAdding(true) }}
-        tabs={{
-          label: 'Memory views',
-          value: tab,
-          onValueChange: value => setTab(memoryTabOf(value)),
-          items: [
-            { value: 'notes', label: 'Notes' },
-            { value: 'threads', label: 'Threads' },
-            { value: 'analytics', label: 'Analytics' },
-          ],
-        }}
-        fill
-        className="dshx:min-h-0 dshx:flex-1"
-      >
-        {tab === 'notes' ? (
-          <NotesTab
-            project={project === '' ? undefined : project}
-            openThread={props.openThread}
-            focusNoteId={MemoryFocusModel.noteIdOf(focus)}
-            selectedId={selectedNoteId}
-            onSelect={setSelectedNoteId}
+        <Page
+          heading="Memory"
+          description={subtitleOf(tab)}
+          meta={
+            <>
+              {usage.data === undefined ? null : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="dshx:inline-flex">
+                      <Badge variant="secondary" className="dshx:text-xs dshx:font-normal">
+                        {usage.data.retrieval.active === 'hybrid'
+                          ? `Retrieval: hybrid (${usage.data.retrieval.model ?? 'embeddings'})`
+                          : usage.data.retrieval.requested === 'hybrid'
+                            ? 'Retrieval: BM25 (hybrid unavailable)'
+                            : 'Retrieval: BM25'}
+                      </Badge>
+                    </span>
+                  </TooltipTrigger>
+                  {usage.data.retrieval.reason === null ? null : <TooltipContent>{usage.data.retrieval.reason}</TooltipContent>}
+                </Tooltip>
+              )}
+              <Select value={project === '' ? 'all' : project} onValueChange={value => setProject(value === 'all' ? '' : value)}>
+                <SelectTrigger aria-label="Memory project" className={projectTrigger} size="sm">
+                  <SelectValue>
+                    {selectedProject === undefined ? 'All projects' : `${PanelFormat.projectName(selectedProject.project)} · ${selectedProject.notes}`}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent align="start" className="dshx:max-w-80">
+                  <SelectItem value="all">All projects</SelectItem>
+                  {projectItems.map(item => (
+                    <SelectItem key={item.project} value={item.project}>
+                      {PanelFormat.projectName(item.project)} · {item.threads} threads · {item.notes} notes
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          }
+          primaryAction={{ id: 'add-memory', label: 'Add memory', icon: <PlusIcon />, onSelect: () => setAdding(true) }}
+          tabs={{
+            label: 'Memory views',
+            value: tab,
+            onValueChange: value => setTab(memoryTabOf(value)),
+            items: [
+              { value: 'notes', label: 'Notes' },
+              { value: 'threads', label: 'Threads' },
+              { value: 'analytics', label: 'Analytics' },
+            ],
+          }}
+          fill
+          className="dshx:min-h-0 dshx:flex-1"
+        >
+          {tab === 'notes' ? (
+            <NotesTab
+              project={project === '' ? undefined : project}
+              openThread={props.openThread}
+              focusNoteId={MemoryFocusModel.noteIdOf(focus)}
+              selectedId={selectedNoteId}
+              onSelect={setSelectedNoteId}
+            />
+          ) : tab === 'threads' ? (
+            <ThreadsTab
+              project={project === '' ? undefined : project}
+              openThread={props.openThread}
+              focusThreadId={MemoryFocusModel.threadIdOf(focus)}
+              selectedId={selectedThreadId}
+              onSelect={setSelectedThreadId}
+              openNote={id => {
+                setTab('notes')
+                setSelectedNoteId(id)
+              }}
+            />
+          ) : (
+            <AnalyticsTab
+              project={project === '' ? undefined : project}
+              days={days}
+              onDaysChange={setDays}
+              usage={usage.data}
+              openThread={props.openThread}
+              openNote={id => {
+                setTab('notes')
+                setSelectedNoteId(id)
+              }}
+            />
+          )}
+          <AddMemoryDialog
+            open={adding}
+            onOpenChange={setAdding}
+            projects={projectItems}
+            defaultProject={project === '' ? defaultAddProject : project}
+            onCreated={noteCreated}
           />
-        ) : tab === 'threads' ? (
-          <ThreadsTab
-            project={project === '' ? undefined : project}
-            openThread={props.openThread}
-            focusThreadId={MemoryFocusModel.threadIdOf(focus)}
-            selectedId={selectedThreadId}
-            onSelect={setSelectedThreadId}
-            openNote={id => {
-              setTab('notes')
-              setSelectedNoteId(id)
-            }}
-          />
-        ) : (
-          <AnalyticsTab
-            project={project === '' ? undefined : project}
-            days={days}
-            onDaysChange={setDays}
-            usage={usage.data}
-            openThread={props.openThread}
-            openNote={id => {
-              setTab('notes')
-              setSelectedNoteId(id)
-            }}
-          />
-        )}
-        <AddMemoryDialog
-          open={adding}
-          onOpenChange={setAdding}
-          projects={projectItems}
-          defaultProject={project === '' ? defaultAddProject : project}
-          onCreated={noteCreated}
-        />
-      </Page>
+        </Page>
       </main>
     </TooltipProvider>
   )

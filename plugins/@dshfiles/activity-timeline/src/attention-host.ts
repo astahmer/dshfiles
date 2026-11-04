@@ -3,6 +3,7 @@ import { Clock, Effect, Layer, Option, Schema, Stream } from 'effect'
 import { workspaceActivity } from './adapters.js'
 import { ActivityTimeline } from './activity-timeline.js'
 import { attentionActOutcomeSchema, attentionApi, type AttentionActOutcome, type AttentionActRequest } from './attention-api.js'
+import { serialAttentionAct } from './attention-act-promise.js'
 import { AttentionInbox } from './attention-store.js'
 
 /** Announce at most four changes a second; badges read the counts the event carries. */
@@ -34,13 +35,12 @@ const act = Effect.fn('attention act')(function* (input: { readonly id: string; 
   const host = yield* HostContext
   const item = yield* AttentionInbox.use(inbox => inbox.get(input.id))
   yield* Effect.annotateCurrentSpan({ 'attention.source': item.source, 'attention.verb': input.verb })
-  if (item.resolvedAt !== null) return { ok: false, message: 'This item was already resolved by its source; nothing is left to do.' } satisfies AttentionActOutcome
-  if (!item.verbs.includes(input.verb)) return { ok: false, message: `This item does not offer ${input.verb}. Use one of: ${item.verbs.join(', ')}.` } satisfies AttentionActOutcome
+  if (item.resolvedAt !== null)
+    return { ok: false, message: 'This item was already resolved by its source; nothing is left to do.' } satisfies AttentionActOutcome
+  if (!item.verbs.includes(input.verb))
+    return { ok: false, message: `This item does not offer ${input.verb}. Use one of: ${item.verbs.join(', ')}.` } satisfies AttentionActOutcome
   const request: AttentionActRequest = { item, verb: input.verb, ...(input.choiceId !== undefined && { choiceId: input.choiceId }) }
-  const answered = yield* Effect.tryPromise({
-    try: () => host.ctx.serial('dshfiles/attention/act', request),
-    catch: cause => cause,
-  }).pipe(
+  const answered = yield* serialAttentionAct(host.ctx, request).pipe(
     Effect.map(value => Option.getOrUndefined(decodeOutcome(value))),
     Effect.catch(cause =>
       Effect.as(Effect.logWarning('attention: a provider failed to act', cause), {

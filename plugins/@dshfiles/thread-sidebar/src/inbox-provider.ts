@@ -49,7 +49,10 @@ const draftOf = (view: ThreadAttentionView): AttentionDraft | null => {
  * The thread record an inbox item was drawn from, when that item is still this thread's current draft: Done on an older
  * turn's item must not clear a newer finish.
  */
-const viewForDoneItem = (item: Pick<AttentionItem, 'source' | 'dedupeKey' | 'subject'>, views: Iterable<ThreadAttentionView>): ThreadAttentionView | undefined => {
+const viewForDoneItem = (
+  item: Pick<AttentionItem, 'source' | 'dedupeKey' | 'subject'>,
+  views: Iterable<ThreadAttentionView>,
+): ThreadAttentionView | undefined => {
   if (item.source !== FINISHED_TURN_SOURCE || item.subject.kind !== 'session') return undefined
   for (const view of views) {
     if (view.sessionId !== item.subject.id) continue

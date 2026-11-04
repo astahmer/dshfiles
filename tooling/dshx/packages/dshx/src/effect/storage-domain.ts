@@ -36,6 +36,7 @@ interface SharedHandle<Handle> {
  */
 const SHARED_HANDLES = Symbol.for('@dshfiles/dshx/StorageDomain/shared-handles')
 const sharedHandles = (): Map<string, SharedHandle<unknown>> => {
+  // SAFETY: the symbol key is private to this module, so only this function ever writes that globalThis slot.
   const holder = globalThis as { [SHARED_HANDLES]?: Map<string, SharedHandle<unknown>> }
   holder[SHARED_HANDLES] ??= new Map()
   return holder[SHARED_HANDLES]
@@ -43,6 +44,7 @@ const sharedHandles = (): Map<string, SharedHandle<unknown>> => {
 
 /** Shareable only while the table set and version match: a changed spec must open with its own schemas. */
 const fingerprintOf = (spec: DomainSpec): string =>
+  // SAFETY: version is an optional field some DomainSpec variants carry; reading it as unknown changes no behaviour.
   JSON.stringify([Object.keys(spec.tables).sort(), (spec as { readonly version?: unknown }).version ?? null, spec.global === undefined])
 
 /**
@@ -63,12 +65,7 @@ export const acquireSharedHandle = <Handle, R>(input: {
       const handles = sharedHandles()
       // SAFETY: entries under one key are only ever written below with this key's Handle type.
       const existing = handles.get(input.key) as SharedHandle<Handle> | undefined
-      if (
-        existing !== undefined &&
-        !existing.holders.has(input.holder) &&
-        existing.fingerprint === input.fingerprint &&
-        input.isLive(existing.handle)
-      ) {
+      if (existing !== undefined && !existing.holders.has(input.holder) && existing.fingerprint === input.fingerprint && input.isLive(existing.handle)) {
         existing.holders.add(input.holder)
         return Effect.succeed(existing)
       }
@@ -198,12 +195,14 @@ export class StorageDomain extends Context.Service<
           holder: host.ctx,
           fingerprint: fingerprintOf(spec),
           // The facility's diagnostic lookup returns its own untyped runtime object for the same handle.
+          // SAFETY: widening to unknown only compares identity, it asserts nothing about the shape.
           isLive: handle => (facility.get(spec.name) as unknown) === handle,
           open: Effect.tryPromise({
             try: () => facility.open(spec),
             catch: cause => new StorageDomainOpenFailed({ domain: spec.name, code: codeOf(cause), cause }),
           }),
-          close: opened => Effect.tryPromise(() => opened.close()).pipe(Effect.ignore({ log: 'Warn', message: `storage domain ${spec.name} did not close cleanly` })),
+          close: opened =>
+            Effect.tryPromise(() => opened.close()).pipe(Effect.ignore({ log: 'Warn', message: `storage domain ${spec.name} did not close cleanly` })),
         })
         const writeLock = yield* Semaphore.make(1)
         const changes = Stream.callback<DomainChanged>(queue =>

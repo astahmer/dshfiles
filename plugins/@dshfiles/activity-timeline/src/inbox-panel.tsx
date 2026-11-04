@@ -58,6 +58,19 @@ const statusOf = (item: AttentionItem, view: AttentionView): WorkStatus => {
   return 'ready'
 }
 
+const statusLabelOf = (status: WorkStatus, t: InboxTranslate): string => {
+  switch (status) {
+    case 'needs-you':
+      return t('severityBlocking')
+    case 'failed':
+      return t('severityFailed')
+    case 'ready':
+      return t('severityReady')
+    default:
+      return t('closed')
+  }
+}
+
 const InboxRow = (props: {
   readonly item: AttentionItem
   readonly view: AttentionView
@@ -76,7 +89,7 @@ const InboxRow = (props: {
   const open = props.view !== 'closed' && props.view !== 'muted'
   const undo = InboxView.undoOf(item, props.view)
   const status = statusOf(item, props.view)
-  const statusLabel = status === 'needs-you' ? t('severityBlocking') : status === 'failed' ? t('severityFailed') : status === 'ready' ? t('severityReady') : t('closed')
+  const statusLabel = statusLabelOf(status, t)
   const subjectLabel = item.subject.kind === 'session' ? props.sessionLabel(item.subject.id) : (item.subject.label ?? item.subject.id)
   return (
     <EntityRow

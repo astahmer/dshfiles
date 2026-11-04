@@ -85,7 +85,9 @@ export const StartPage = (props: StartPageProps): ReactElement => {
   const sections = props.sections.map(section => ({
     ...section,
     suggestions: section.suggestions.filter(
-      suggestion => normalizedQuery.length === 0 || `${suggestion.title} ${suggestion.description ?? ''} ${suggestion.keywords ?? ''}`.toLocaleLowerCase().includes(normalizedQuery),
+      suggestion =>
+        normalizedQuery.length === 0 ||
+        `${suggestion.title} ${suggestion.description ?? ''} ${suggestion.keywords ?? ''}`.toLocaleLowerCase().includes(normalizedQuery),
     ),
   }))
   const suggestions = sections.flatMap(section => section.suggestions)

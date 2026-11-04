@@ -1,3 +1,7 @@
+/**
+ * The Promise edge between the attention inbox and the imperative quota-continuation service: listing and resuming
+ * continuations are Promise calls, and the inbox act event is a Cordis serial handler.
+ */
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { attentionApi, type AttentionActOutcome, type AttentionActRequest, type AttentionDraft } from '@dshfiles/activity-timeline/attention-api'
 import { DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
@@ -35,7 +39,8 @@ const detailOf = (summary: QuotaContinuationSummary): string => {
 /** One waiting continuation as a blocking item about its thread; a queued one is already resuming. */
 const draftOf = (summary: QuotaContinuationSummary): AttentionDraft => ({
   dedupeKey: summary.continuationId,
-  subject: summary.title === undefined ? { kind: 'session', id: summary.sessionId } : { kind: 'session', id: summary.sessionId, label: clamp(summary.title, 200) },
+  subject:
+    summary.title === undefined ? { kind: 'session', id: summary.sessionId } : { kind: 'session', id: summary.sessionId, label: clamp(summary.title, 200) },
   reason: clamp(`Stopped by the ${routeOf(summary)} usage limit.`, 500),
   detail: clamp(detailOf(summary), 2000),
   severity: 'blocking',

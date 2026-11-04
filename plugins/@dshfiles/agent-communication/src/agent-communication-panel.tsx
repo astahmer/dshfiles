@@ -574,324 +574,314 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
               </Alert>
             ) : null}
             {tab === 'messages' ? (
-                <div className="dshx:grid dshx:gap-3 dshx:@min-[72rem]:grid-cols-[15rem_minmax(0,1fr)_18rem]">
-                  <Card className="dshx:min-w-0">
-                    <CardHeader className="dshx:pb-3">
-                      <CardTitle className="dshx:flex dshx:items-center dshx:gap-2">
-                        <HashIcon aria-hidden /> {t('channels')}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="dshx:flex dshx:flex-col dshx:gap-4 dshx:p-3 dshx:pt-0">
-                      <Button
-                        variant={selection.kind === 'all' ? 'secondary' : 'ghost'}
-                        disabled={sendMutation.isPending}
-                        className="dshx:justify-start"
-                        onClick={() => changeSelection({ kind: 'all' })}
-                      >
-                        <MessageSquareIcon aria-hidden /> {t('allConversations')}
-                      </Button>
-                      <div className="dshx:flex dshx:flex-col dshx:gap-1">
-                        <p className="dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
-                          {t('channels')}
-                        </p>
-                        {topicEntries.length === 0 ? <EmptyState className="dshx:py-3">{t('noTopics')}</EmptyState> : null}
-                        {topicEntries.map(([topic, subscribers]) => (
-                          <Button
-                            key={topic}
-                            variant={selection.kind === 'topic' && selection.topic === topic ? 'secondary' : 'ghost'}
-                            disabled={sendMutation.isPending}
-                            className="dshx:min-w-0 dshx:justify-start"
-                            onClick={() => changeSelection({ kind: 'topic', topic })}
-                          >
-                            <HashIcon aria-hidden />
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{labels.topic(topic)}</span>
-                              </TooltipTrigger>
-                              <TooltipContent>{topic}</TooltipContent>
-                            </Tooltip>
-                            <span className="dshx:text-xs dshx:text-muted-foreground">{subscribers}</span>
-                          </Button>
-                        ))}
-                      </div>
-                      <Separator />
-                      <div className="dshx:flex dshx:flex-col dshx:gap-1">
-                        <p className="dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
-                          {t('directMessages')}
-                        </p>
-                        <Select
-                          disabled={pickableAgents.length === 0 || sendMutation.isPending}
-                          onValueChange={agentId => changeSelection({ kind: 'direct', agentId })}
-                          value={selection.kind === 'direct' ? selection.agentId : ''}
+              <div className="dshx:grid dshx:gap-3 dshx:@min-[72rem]:grid-cols-[15rem_minmax(0,1fr)_18rem]">
+                <Card className="dshx:min-w-0">
+                  <CardHeader className="dshx:pb-3">
+                    <CardTitle className="dshx:flex dshx:items-center dshx:gap-2">
+                      <HashIcon aria-hidden /> {t('channels')}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="dshx:flex dshx:flex-col dshx:gap-4 dshx:p-3 dshx:pt-0">
+                    <Button
+                      variant={selection.kind === 'all' ? 'secondary' : 'ghost'}
+                      disabled={sendMutation.isPending}
+                      className="dshx:justify-start"
+                      onClick={() => changeSelection({ kind: 'all' })}
+                    >
+                      <MessageSquareIcon aria-hidden /> {t('allConversations')}
+                    </Button>
+                    <div className="dshx:flex dshx:flex-col dshx:gap-1">
+                      <p className="dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{t('channels')}</p>
+                      {topicEntries.length === 0 ? <EmptyState className="dshx:py-3">{t('noTopics')}</EmptyState> : null}
+                      {topicEntries.map(([topic, subscribers]) => (
+                        <Button
+                          key={topic}
+                          variant={selection.kind === 'topic' && selection.topic === topic ? 'secondary' : 'ghost'}
+                          disabled={sendMutation.isPending}
+                          className="dshx:min-w-0 dshx:justify-start"
+                          onClick={() => changeSelection({ kind: 'topic', topic })}
                         >
-                          <SelectTrigger aria-label={t('chooseAgent')} className="dshx:mx-1 dshx:w-[calc(100%-0.5rem)]" size="sm">
-                            <SelectValue placeholder={t('chooseAgent')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {pickableAgents.map(agent => (
-                              <SelectItem key={agent.id} value={agent.id}>
-                                {sessionLabel(agent.id)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {directThreads.length === 0 ? (
-                          <EmptyState className="dshx:py-3">{t('noDirectThreads')}</EmptyState>
-                        ) : null}
-                        {directThreads.map(([agentId, agent]) => (
-                          <Button
-                            key={agentId}
-                            variant={selection.kind === 'direct' && selection.agentId === agentId ? 'secondary' : 'ghost'}
-                            disabled={sendMutation.isPending}
-                            className="dshx:min-w-0 dshx:justify-start"
-                            onClick={() => changeSelection({ kind: 'direct', agentId })}
-                          >
-                            <MessageSquareIcon aria-hidden />
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{sessionLabel(agentId)}</span>
-                              </TooltipTrigger>
-                              <TooltipContent>{agentId}</TooltipContent>
-                            </Tooltip>
-                            {/* A dot, not a badge: the 15rem column needs its width for the thread title. */}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <StatusDot
-                                  aria-label={agent === undefined ? t('offlineUnknown') : agent.status === 'running' ? t('running') : t('idle')}
-                                  className={agent === undefined ? 'dshx:border dshx:border-muted-foreground' : undefined}
-                                  tone={agent === undefined ? undefined : agent.status === 'running' ? 'success' : 'muted'}
-                                />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {agent === undefined ? t('offlineUnknown') : agent.status === 'running' ? t('running') : t('idle')}
-                              </TooltipContent>
-                            </Tooltip>
-                          </Button>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                          <HashIcon aria-hidden />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{labels.topic(topic)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>{topic}</TooltipContent>
+                          </Tooltip>
+                          <span className="dshx:text-xs dshx:text-muted-foreground">{subscribers}</span>
+                        </Button>
+                      ))}
+                    </div>
+                    <Separator />
+                    <div className="dshx:flex dshx:flex-col dshx:gap-1">
+                      <p className="dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{t('directMessages')}</p>
+                      <Select
+                        disabled={pickableAgents.length === 0 || sendMutation.isPending}
+                        onValueChange={agentId => changeSelection({ kind: 'direct', agentId })}
+                        value={selection.kind === 'direct' ? selection.agentId : ''}
+                      >
+                        <SelectTrigger aria-label={t('chooseAgent')} className="dshx:mx-1 dshx:w-[calc(100%-0.5rem)]" size="sm">
+                          <SelectValue placeholder={t('chooseAgent')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {pickableAgents.map(agent => (
+                            <SelectItem key={agent.id} value={agent.id}>
+                              {sessionLabel(agent.id)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {directThreads.length === 0 ? <EmptyState className="dshx:py-3">{t('noDirectThreads')}</EmptyState> : null}
+                      {directThreads.map(([agentId, agent]) => (
+                        <Button
+                          key={agentId}
+                          variant={selection.kind === 'direct' && selection.agentId === agentId ? 'secondary' : 'ghost'}
+                          disabled={sendMutation.isPending}
+                          className="dshx:min-w-0 dshx:justify-start"
+                          onClick={() => changeSelection({ kind: 'direct', agentId })}
+                        >
+                          <MessageSquareIcon aria-hidden />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{sessionLabel(agentId)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>{agentId}</TooltipContent>
+                          </Tooltip>
+                          {/* A dot, not a badge: the 15rem column needs its width for the thread title. */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <StatusDot
+                                aria-label={agent === undefined ? t('offlineUnknown') : agent.status === 'running' ? t('running') : t('idle')}
+                                className={agent === undefined ? 'dshx:border dshx:border-muted-foreground' : undefined}
+                                tone={agent === undefined ? undefined : agent.status === 'running' ? 'success' : 'muted'}
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent>{agent === undefined ? t('offlineUnknown') : agent.status === 'running' ? t('running') : t('idle')}</TooltipContent>
+                          </Tooltip>
+                        </Button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  <Card className="dshx:min-w-0">
-                    <CardHeader className="dshx:flex-row dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
-                      <div className="dshx:min-w-0">
-                        <CardTitle className="dshx:truncate">{currentTitle}</CardTitle>
-                        <CardDescription>{t('messageCount', { count: messagePages[0]?.totalMatching ?? 0 })}</CardDescription>
-                      </div>
-                      <SearchInput
-                        className="dshx:w-full dshx:max-w-xs dshx:@max-pane-narrow:max-w-none"
-                        aria-label={t('search')}
-                        placeholder={t('searchPlaceholder')}
-                        value={search}
-                        onChange={event => setSearch(event.currentTarget.value)}
+                <Card className="dshx:min-w-0">
+                  <CardHeader className="dshx:flex-row dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
+                    <div className="dshx:min-w-0">
+                      <CardTitle className="dshx:truncate">{currentTitle}</CardTitle>
+                      <CardDescription>{t('messageCount', { count: messagePages[0]?.totalMatching ?? 0 })}</CardDescription>
+                    </div>
+                    <SearchInput
+                      className="dshx:w-full dshx:max-w-xs dshx:@max-pane-narrow:max-w-none"
+                      aria-label={t('search')}
+                      placeholder={t('searchPlaceholder')}
+                      value={search}
+                      onChange={event => setSearch(event.currentTarget.value)}
+                    />
+                  </CardHeader>
+                  <CardContent className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-3 dshx:pt-0">
+                    {messagesQuery.isPending ? <Spinner className="dshx:mx-auto dshx:my-3" /> : null}
+                    {messagesQuery.error !== null ? (
+                      <Alert variant="destructive">
+                        <AlertDescription>
+                          {errorMessage(messagesQuery.error, t('browseUnavailable'))} {t('hostRestartHint')}
+                        </AlertDescription>
+                      </Alert>
+                    ) : null}
+                    {messagesQuery.data !== undefined && messages.length === 0 ? (
+                      <EmptyState>{debouncedSearch.length > 0 ? t('noSearchResults') : t('noMessages')}</EmptyState>
+                    ) : null}
+                    <div ref={messagesScroll} className="dshx:flex dshx:max-h-[65vh] dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-1">
+                      <div key="messages-older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
+                      {messages.map(renderMessage)}
+                    </div>
+                    {messagesQuery.isFetchingNextPage ? (
+                      <p className="dshx:p-1 dshx:text-xs dshx:text-muted-foreground" role="status">
+                        {t('loadingOlder')}
+                      </p>
+                    ) : null}
+                    {messagesQuery.isFetchNextPageError ? (
+                      <Button variant="outline" onClick={loadOlderMessages}>
+                        {t('loadOlder')}
+                      </Button>
+                    ) : null}
+                    <form
+                      className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border dshx:pt-3"
+                      onSubmit={event => {
+                        event.preventDefault()
+                        submitMessage()
+                      }}
+                    >
+                      {selection.kind === 'all' ? (
+                        <Input
+                          aria-label={t('topicName')}
+                          placeholder={t('newChannel')}
+                          value={newTopic}
+                          maxLength={128}
+                          disabled={sendMutation.isPending}
+                          onChange={event => setNewTopic(event.currentTarget.value)}
+                        />
+                      ) : null}
+                      <Textarea
+                        aria-label={t('composePlaceholder')}
+                        placeholder={t('composePlaceholder')}
+                        value={draft}
+                        maxLength={12_000}
+                        disabled={sendMutation.isPending}
+                        onChange={event => setDraft(event.currentTarget.value)}
+                        onKeyDown={event => {
+                          if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') submitMessage()
+                        }}
+                        className="dshx:min-h-24 dshx:resize-y"
                       />
-                    </CardHeader>
-                    <CardContent className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-3 dshx:pt-0">
-                      {messagesQuery.isPending ? <Spinner className="dshx:mx-auto dshx:my-3" /> : null}
-                      {messagesQuery.error !== null ? (
+                      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+                        <span className="dshx:text-xs dshx:text-muted-foreground">{t('intent')}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={draftIntent === 'notice' ? 'secondary' : 'outline'}
+                          aria-pressed={draftIntent === 'notice'}
+                          disabled={sendMutation.isPending}
+                          onClick={() => setDraftIntent('notice')}
+                        >
+                          {t('notice')}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={draftIntent === 'request' ? 'secondary' : 'outline'}
+                          aria-pressed={draftIntent === 'request'}
+                          disabled={sendMutation.isPending}
+                          onClick={() => setDraftIntent('request')}
+                        >
+                          {t('request')}
+                        </Button>
+                      </div>
+                      <p className="dshx:text-xs dshx:text-muted-foreground">{t('intentHint')}</p>
+                      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
+                        <p className="dshx:text-xs dshx:text-muted-foreground">
+                          {selection.kind === 'topic'
+                            ? t('sendToTopic', { topic: labels.topic(selection.topic) })
+                            : selection.kind === 'direct'
+                              ? t('sendToAgent', { agent: sessionLabel(selection.agentId) })
+                              : t('newChannel')}
+                        </p>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={draft.trim().length === 0 || sendMutation.isPending || (selection.kind === 'all' && newTopic.trim().length === 0)}
+                        >
+                          <SendIcon aria-hidden /> {sendMutation.isPending ? t('sending') : t('send')}
+                        </Button>
+                      </div>
+                      {sendMutation.error !== null ? (
                         <Alert variant="destructive">
-                          <AlertDescription>
-                            {errorMessage(messagesQuery.error, t('browseUnavailable'))} {t('hostRestartHint')}
-                          </AlertDescription>
+                          <AlertDescription>{errorMessage(sendMutation.error, t('sendFailed'))}</AlertDescription>
                         </Alert>
                       ) : null}
-                      {messagesQuery.data !== undefined && messages.length === 0 ? (
-                        <EmptyState>{debouncedSearch.length > 0 ? t('noSearchResults') : t('noMessages')}</EmptyState>
-                      ) : null}
-                      <div ref={messagesScroll} className="dshx:flex dshx:max-h-[65vh] dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-1">
-                        <div key="messages-older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
-                        {messages.map(renderMessage)}
-                      </div>
-                      {messagesQuery.isFetchingNextPage ? (
-                        <p className="dshx:p-1 dshx:text-xs dshx:text-muted-foreground" role="status">
-                          {t('loadingOlder')}
+                      {receiptCount === null ? null : (
+                        <p role="status" className="dshx:text-xs dshx:text-muted-foreground">
+                          {t('sendReceipt', { count: receiptCount })}
                         </p>
-                      ) : null}
-                      {messagesQuery.isFetchNextPageError ? (
-                        <Button variant="outline" onClick={loadOlderMessages}>
-                          {t('loadOlder')}
-                        </Button>
-                      ) : null}
-                      <form
-                        className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border dshx:pt-3"
-                        onSubmit={event => {
-                          event.preventDefault()
-                          submitMessage()
-                        }}
-                      >
-                        {selection.kind === 'all' ? (
-                          <Input
-                            aria-label={t('topicName')}
-                            placeholder={t('newChannel')}
-                            value={newTopic}
-                            maxLength={128}
-                            disabled={sendMutation.isPending}
-                            onChange={event => setNewTopic(event.currentTarget.value)}
-                          />
-                        ) : null}
-                        <Textarea
-                          aria-label={t('composePlaceholder')}
-                          placeholder={t('composePlaceholder')}
-                          value={draft}
-                          maxLength={12_000}
-                          disabled={sendMutation.isPending}
-                          onChange={event => setDraft(event.currentTarget.value)}
-                          onKeyDown={event => {
-                            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') submitMessage()
-                          }}
-                          className="dshx:min-h-24 dshx:resize-y"
-                        />
-                        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-                          <span className="dshx:text-xs dshx:text-muted-foreground">{t('intent')}</span>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={draftIntent === 'notice' ? 'secondary' : 'outline'}
-                            aria-pressed={draftIntent === 'notice'}
-                            disabled={sendMutation.isPending}
-                            onClick={() => setDraftIntent('notice')}
-                          >
-                            {t('notice')}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={draftIntent === 'request' ? 'secondary' : 'outline'}
-                            aria-pressed={draftIntent === 'request'}
-                            disabled={sendMutation.isPending}
-                            onClick={() => setDraftIntent('request')}
-                          >
-                            {t('request')}
-                          </Button>
+                      )}
+                    </form>
+                  </CardContent>
+                </Card>
+
+                <Card className="dshx:min-w-0">
+                  <CardHeader>
+                    <CardTitle>{t('messageContext')}</CardTitle>
+                    <CardDescription>{selectedMessage === null ? currentTitle : formatTime(selectedMessage.createdAt)}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="dshx:flex dshx:flex-col dshx:gap-3">
+                    {selectedMessage === null ? (
+                      <EmptyState className="dshx:py-4">{t('selectConversation')}</EmptyState>
+                    ) : (
+                      <>
+                        <div>
+                          <p className="dshx:text-xs dshx:text-muted-foreground">{t('sender')}</p>
+                          <p className="dshx:break-all dshx:text-sm dshx:font-medium">{principalLabel(selectedMessage.sender, labels, t)}</p>
                         </div>
-                        <p className="dshx:text-xs dshx:text-muted-foreground">{t('intentHint')}</p>
-                        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
-                          <p className="dshx:text-xs dshx:text-muted-foreground">
-                            {selection.kind === 'topic'
-                              ? t('sendToTopic', { topic: labels.topic(selection.topic) })
-                              : selection.kind === 'direct'
-                                ? t('sendToAgent', { agent: sessionLabel(selection.agentId) })
-                                : t('newChannel')}
-                          </p>
-                          <Button
-                            type="submit"
-                            size="sm"
-                            disabled={draft.trim().length === 0 || sendMutation.isPending || (selection.kind === 'all' && newTopic.trim().length === 0)}
-                          >
-                            <SendIcon aria-hidden /> {sendMutation.isPending ? t('sending') : t('send')}
-                          </Button>
+                        <div>
+                          <p className="dshx:text-xs dshx:text-muted-foreground">{t('topic')}</p>
+                          <p className="dshx:break-all dshx:text-sm">{selectedMessage.topic ?? t('directMessages')}</p>
                         </div>
-                        {sendMutation.error !== null ? (
+                        <div>
+                          <p className="dshx:text-xs dshx:text-muted-foreground">{t('intent')}</p>
+                          <Badge variant={selectedMessage.intent === 'request' ? 'default' : 'outline'}>
+                            {selectedMessage.intent === 'request' ? t('request') : t('notice')}
+                          </Badge>
+                        </div>
+                        <div>
+                          <p className="dshx:text-xs dshx:text-muted-foreground">{t('priority')}</p>
+                          <Badge variant={selectedMessage.priority === 'urgent' ? 'destructive' : 'outline'}>
+                            {selectedMessage.priority === 'urgent' ? t('urgent') : t('normal')}
+                          </Badge>
+                        </div>
+                        <Separator />
+                        <p className="dshx:text-sm dshx:font-medium">{t('recipientDetails')}</p>
+                        {recipientQuery.isPending ? <Spinner className="dshx:mx-auto" /> : null}
+                        {recipientQuery.error !== null ? (
                           <Alert variant="destructive">
-                            <AlertDescription>{errorMessage(sendMutation.error, t('sendFailed'))}</AlertDescription>
+                            <AlertDescription>{errorMessage(recipientQuery.error, t('loadFailed'))}</AlertDescription>
                           </Alert>
                         ) : null}
-                        {receiptCount === null ? null : (
-                          <p role="status" className="dshx:text-xs dshx:text-muted-foreground">
-                            {t('sendReceipt', { count: receiptCount })}
-                          </p>
-                        )}
-                      </form>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="dshx:min-w-0">
-                    <CardHeader>
-                      <CardTitle>{t('messageContext')}</CardTitle>
-                      <CardDescription>
-                        {selectedMessage === null ? currentTitle : formatTime(selectedMessage.createdAt)}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="dshx:flex dshx:flex-col dshx:gap-3">
-                      {selectedMessage === null ? (
-                        <EmptyState className="dshx:py-4">{t('selectConversation')}</EmptyState>
-                      ) : (
-                        <>
-                          <div>
-                            <p className="dshx:text-xs dshx:text-muted-foreground">{t('sender')}</p>
-                            <p className="dshx:break-all dshx:text-sm dshx:font-medium">{principalLabel(selectedMessage.sender, labels, t)}</p>
-                          </div>
-                          <div>
-                            <p className="dshx:text-xs dshx:text-muted-foreground">{t('topic')}</p>
-                            <p className="dshx:break-all dshx:text-sm">{selectedMessage.topic ?? t('directMessages')}</p>
-                          </div>
-                          <div>
-                            <p className="dshx:text-xs dshx:text-muted-foreground">{t('intent')}</p>
-                            <Badge variant={selectedMessage.intent === 'request' ? 'default' : 'outline'}>
-                              {selectedMessage.intent === 'request' ? t('request') : t('notice')}
+                        {recipientQuery.data?.recipients.map(recipient => (
+                          <div
+                            key={`${recipient.principal.kind}:${recipient.principal.id}`}
+                            className="dshx:flex dshx:flex-col dshx:gap-1 dshx:border-t dshx:border-border dshx:pt-2"
+                          >
+                            <span className="dshx:break-all dshx:text-sm">
+                              {recipient.principal.kind === 'agent' ? sessionLabel(recipient.principal.id) : recipient.principal.id}
+                            </span>
+                            <span className="dshx:text-xs dshx:text-muted-foreground">
+                              {recipient.readAt === null ? t('notRead') : t('readAt', { time: formatTime(recipient.readAt) })}
+                            </span>
+                            <Badge className="dshx:w-fit" variant={recipient.acknowledgedAt === null ? 'outline' : 'secondary'}>
+                              {recipient.acknowledgedAt === null ? t('pending') : t('acknowledged')}
                             </Badge>
                           </div>
-                          <div>
-                            <p className="dshx:text-xs dshx:text-muted-foreground">{t('priority')}</p>
-                            <Badge variant={selectedMessage.priority === 'urgent' ? 'destructive' : 'outline'}>
-                              {selectedMessage.priority === 'urgent' ? t('urgent') : t('normal')}
-                            </Badge>
-                          </div>
-                          <Separator />
-                          <p className="dshx:text-sm dshx:font-medium">{t('recipientDetails')}</p>
-                          {recipientQuery.isPending ? <Spinner className="dshx:mx-auto" /> : null}
-                          {recipientQuery.error !== null ? (
-                            <Alert variant="destructive">
-                              <AlertDescription>{errorMessage(recipientQuery.error, t('loadFailed'))}</AlertDescription>
-                            </Alert>
-                          ) : null}
-                          {recipientQuery.data?.recipients.map(recipient => (
-                            <div
-                              key={`${recipient.principal.kind}:${recipient.principal.id}`}
-                              className="dshx:flex dshx:flex-col dshx:gap-1 dshx:border-t dshx:border-border dshx:pt-2"
-                            >
-                              <span className="dshx:break-all dshx:text-sm">
-                                {recipient.principal.kind === 'agent' ? sessionLabel(recipient.principal.id) : recipient.principal.id}
-                              </span>
-                              <span className="dshx:text-xs dshx:text-muted-foreground">
-                                {recipient.readAt === null ? t('notRead') : t('readAt', { time: formatTime(recipient.readAt) })}
-                              </span>
-                              <Badge className="dshx:w-fit" variant={recipient.acknowledgedAt === null ? 'outline' : 'secondary'}>
-                                {recipient.acknowledgedAt === null ? t('pending') : t('acknowledged')}
-                              </Badge>
-                            </div>
-                          ))}
-                          {recipientQuery.data?.recipients.length === 0 ? (
-                            <p className="dshx:text-xs dshx:text-muted-foreground">{t('noRecipientDetails')}</p>
-                          ) : null}
-                          {selectedMessage.sender.kind === 'agent' ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={sendMutation.isPending}
-                              onClick={() => changeSelection({ kind: 'direct', agentId: selectedMessage.sender.id })}
-                            >
-                              <MessageSquareIcon aria-hidden /> {t('directMessages')}
-                            </Button>
-                          ) : null}
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                        ))}
+                        {recipientQuery.data?.recipients.length === 0 ? (
+                          <p className="dshx:text-xs dshx:text-muted-foreground">{t('noRecipientDetails')}</p>
+                        ) : null}
+                        {selectedMessage.sender.kind === 'agent' ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={sendMutation.isPending}
+                            onClick={() => changeSelection({ kind: 'direct', agentId: selectedMessage.sender.id })}
+                          >
+                            <MessageSquareIcon aria-hidden /> {t('directMessages')}
+                          </Button>
+                        ) : null}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             ) : (
-                <div className="dshx:flex dshx:flex-col dshx:gap-3">
-                  {missingWorkspaceCount > 0 ? (
-                    <Alert variant="destructive">
-                      <AlertDescription>{t('missingWorkspaceSubscriptions', { count: missingWorkspaceCount })}</AlertDescription>
-                    </Alert>
-                  ) : null}
-                  <DiagnosticPanel
-                    data={diagnostics}
-                    labels={labels}
-                    t={t}
-                    busy={managementMutation.isPending}
-                    onAction={nextAction => {
-                      managementMutation.reset()
-                      setAction(nextAction)
-                    }}
-                  />
-                  {managementMutation.error !== null ? (
-                    <Alert variant="destructive">
-                      <AlertDescription>{errorMessage(managementMutation.error, t('loadFailed'))}</AlertDescription>
-                    </Alert>
-                  ) : null}
-                </div>
+              <div className="dshx:flex dshx:flex-col dshx:gap-3">
+                {missingWorkspaceCount > 0 ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{t('missingWorkspaceSubscriptions', { count: missingWorkspaceCount })}</AlertDescription>
+                  </Alert>
+                ) : null}
+                <DiagnosticPanel
+                  data={diagnostics}
+                  labels={labels}
+                  t={t}
+                  busy={managementMutation.isPending}
+                  onAction={nextAction => {
+                    managementMutation.reset()
+                    setAction(nextAction)
+                  }}
+                />
+                {managementMutation.error !== null ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{errorMessage(managementMutation.error, t('loadFailed'))}</AlertDescription>
+                  </Alert>
+                ) : null}
+              </div>
             )}
           </>
         )}

@@ -71,7 +71,11 @@ describe('jj-integration inbox drafts', () => {
     const failure = { path: '/repo-threads/thread-abc123', message: 'jj failed: lock held.', at: 1 }
     const failures = new Map([[failure.path, failure]])
     expect(LandAttention.draftsOf(repositories(thread()), failures).blocked).toEqual([
-      expect.objectContaining({ dedupeKey: '/repo-threads/thread-abc123:queued-land', severity: 'failed', detail: 'jj failed: lock held. Fix the cause, then Retry.' }),
+      expect.objectContaining({
+        dedupeKey: '/repo-threads/thread-abc123:queued-land',
+        severity: 'failed',
+        detail: 'jj failed: lock held. Fix the cause, then Retry.',
+      }),
     ])
     expect(LandAttention.draftsOf(repositories(thread({ unlanded: [] })), failures)).toEqual({ blocked: [], ready: [] })
   })

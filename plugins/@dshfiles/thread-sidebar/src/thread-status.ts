@@ -81,7 +81,8 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
   const inbox = input.inbox
   const labelFor = (labels: readonly ThreadAttentionLabel[]) => input.labels.find(label => labels.includes(label))
   // Archived and settled threads are stored away: they are Done whatever their last turn said.
-  if (input.archived || input.settled) return { status: 'done', detail: undefined, verb: undefined, itemId: undefined, since: input.settledAt ?? input.activityAt }
+  if (input.archived || input.settled)
+    return { status: 'done', detail: undefined, verb: undefined, itemId: undefined, since: input.settledAt ?? input.activityAt }
   const needsLabel = labelFor(NEEDS_YOU_LABELS)
   if (inbox?.severity === 'blocking' || needsLabel !== undefined) {
     const fromInbox = inbox?.severity === 'blocking'
@@ -152,7 +153,13 @@ const statusOf = (input: ThreadStatusInput, children: readonly Omit<ThreadStatus
       since: Math.max(...failed.map(child => child.since)),
     }
   } else if ((own.status === 'idle' || own.status === 'ready') && working.length > 0) {
-    rolled = { status: 'working', detail: `waiting on ${plural(working.length, 'subagent', 'subagents')}`, verb: undefined, itemId: undefined, since: own.since }
+    rolled = {
+      status: 'working',
+      detail: `waiting on ${plural(working.length, 'subagent', 'subagents')}`,
+      verb: undefined,
+      itemId: undefined,
+      since: own.since,
+    }
   } else if (own.status === 'working' && working.length > 0 && own.detail === undefined) {
     rolled = { ...own, detail: `${plural(working.length, 'subagent', 'subagents')} working` }
   }

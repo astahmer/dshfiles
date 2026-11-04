@@ -96,7 +96,10 @@ const make = Effect.gen(function* () {
    */
   const apply = <A>(
     operation: string,
-    plan: (current: InboxState, now: number) => { readonly result: A; readonly put: readonly AttentionItem[]; readonly mute?: { readonly source: string; readonly muted: boolean } },
+    plan: (
+      current: InboxState,
+      now: number,
+    ) => { readonly result: A; readonly put: readonly AttentionItem[]; readonly mute?: { readonly source: string; readonly muted: boolean } },
   ) =>
     SynchronizedRef.modifyEffect(state, current =>
       Effect.gen(function* () {
@@ -192,7 +195,10 @@ const make = Effect.gen(function* () {
     })
   })
 
-  type TransitionResult = { readonly kind: 'missing' } | { readonly kind: 'refused'; readonly outcome: Extract<UserTransition, { ok: false }> } | { readonly kind: 'item'; readonly item: AttentionItem }
+  type TransitionResult =
+    | { readonly kind: 'missing' }
+    | { readonly kind: 'refused'; readonly outcome: Extract<UserTransition, { ok: false }> }
+    | { readonly kind: 'item'; readonly item: AttentionItem }
 
   const userTransition = Effect.fnUntraced(function* (id: string, transition: (item: AttentionItem, now: number) => UserTransition) {
     const result = yield* apply<TransitionResult>('write', (current, now) => {
@@ -257,7 +263,10 @@ export class AttentionInbox extends Context.Service<
     readonly done: (input: { readonly id: string }) => Effect.Effect<AttentionItem, UserError>
     readonly snooze: (input: { readonly id: string; readonly until?: number; readonly untilChange?: boolean }) => Effect.Effect<AttentionItem, UserError>
     readonly reopen: (input: { readonly id: string }) => Effect.Effect<AttentionItem, UserError>
-    readonly muteSource: (input: { readonly source: string; readonly muted: boolean }) => Effect.Effect<{ readonly mutedSources: readonly string[] }, StoreError>
+    readonly muteSource: (input: {
+      readonly source: string
+      readonly muted: boolean
+    }) => Effect.Effect<{ readonly mutedSources: readonly string[] }, StoreError>
     /** Every committed change with the counts after it. */
     readonly changes: Stream.Stream<AttentionChange>
   }

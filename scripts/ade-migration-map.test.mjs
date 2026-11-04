@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { leftNavMoves, renderMigrationMap, renderMovedTo } from './ade-migration-map.mjs'
+import { AdeMigrationMapModel, renderMigrationMap, renderMovedTo } from './ade-migration-map.mjs'
 
 const feature = (plugin, id, surface, destination, currentSurface) => ({ plugin, id, title: `${id} title`, surface, destination, currentSurface })
 
@@ -36,11 +36,14 @@ test('lists every former left-nav entry once with its destinations, natives last
     feature('traces', 'alert-rules', 'attentionProvider', 'inbox', 'left-nav: Traces: Explorer › Alerts'),
     feature('traces', 'trace-explorer', 'destinationSection', 'observe', 'left-nav: Traces: Explorer'),
   ]
-  const moves = leftNavMoves(rows)
+  const moves = AdeMigrationMapModel.leftNavMoves(rows)
   assert.deepEqual(moves.slice(0, 2), [
     { entry: 'Traces: Explorer', destinations: ['inbox', 'observe'] },
     { entry: 'Usage: Analytics', destinations: ['observe'] },
   ])
-  assert.deepEqual(moves.slice(2).map(move => move.entry), ['Plugins', 'Schedules'])
+  assert.deepEqual(
+    moves.slice(2).map(move => move.entry),
+    ['Plugins', 'Schedules'],
+  )
   assert.match(renderMovedTo(rows), /\{ entry: 'Usage: Analytics', destinations: \['observe'\] \},/)
 })

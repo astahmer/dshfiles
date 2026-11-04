@@ -29,7 +29,9 @@ const jsonStorageHost = (root: string) =>
 
 const inboxIn = (root: string) => AttentionInbox.layer.pipe(Layer.provide(StorageDomain.layer), Layer.provide(jsonStorageHost(root)))
 
-const temporaryRoot = Effect.flatMap(FileSystem.FileSystem, fs => fs.makeTempDirectoryScoped({ prefix: 'attention-store-' })).pipe(Effect.provide(NodeServices.layer))
+const temporaryRoot = Effect.flatMap(FileSystem.FileSystem, fs => fs.makeTempDirectoryScoped({ prefix: 'attention-store-' })).pipe(
+  Effect.provide(NodeServices.layer),
+)
 
 const draft = (dedupeKey: string, overrides: Partial<AttentionDraft> = {}): AttentionDraft => ({
   dedupeKey,

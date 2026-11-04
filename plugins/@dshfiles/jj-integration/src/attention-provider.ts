@@ -1,11 +1,12 @@
 import { attentionApi, type AttentionActOutcome, type AttentionActRequest, type AttentionDraft } from '@dshfiles/activity-timeline/attention-api'
-import { DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
+import { DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Clock, Context, Effect, Layer, Queue, Ref, Stream } from 'effect'
 import type { RepositoryView, ThreadView } from './api.js'
 import { Landing, LandingMessages } from './landing.js'
 import { RepositoryViews } from './repository-views.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
+import { handleAttentionActs } from './attention-act-promise.js'
 
 /** Thread workspaces whose revisions conflict, or whose queued land stopped: Land is blocked. */
 export const LAND_BLOCKED_SOURCE = 'jj-integration.land-blocked'
@@ -105,7 +106,6 @@ const refused = (message: string): AttentionActOutcome => ({ ok: false, message 
 const pathOf = (request: AttentionActRequest): string => request.item.dedupeKey.replace(/:(?:conflict|queued-land|ready)$/u, '')
 
 const make = Effect.gen(function* () {
-  const host = yield* HostContext
   const views = yield* RepositoryViews
   const landing = yield* Landing
   const apis = yield* HostApis
@@ -145,18 +145,11 @@ const make = Effect.gen(function* () {
     return refused(LandingMessages.forResult(result) ?? `Nothing landed (${result.status}).`)
   })
 
-  const services = yield* Effect.context<never>()
-  const runAct = Effect.runPromiseWith(services)
   const owns = (source: string): boolean => source === LAND_BLOCKED_SOURCE || source === READY_TO_LAND_SOURCE
-  yield* Effect.acquireRelease(
-    Effect.sync(() =>
-      host.ctx.on('dshfiles/attention/act', request =>
-        owns(request.item.source)
-          ? runAct(act(request).pipe(Effect.catchCause(() => Effect.succeed(refused('Landing failed on the Host. Open the Land view and try there.')))))
-          : Promise.resolve(undefined),
-      ),
-    ),
-    dispose => Effect.sync(dispose),
+  yield* handleAttentionActs(request =>
+    owns(request.item.source)
+      ? act(request).pipe(Effect.catchCause(() => Effect.succeed(refused('Landing failed on the Host. Open the Land view and try there.'))))
+      : Effect.succeed(undefined),
   )
 
   yield* Stream.mergeAll(

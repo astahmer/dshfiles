@@ -156,7 +156,7 @@ const rowActionLabelKeys = {
 } as const satisfies Record<ThreadRowAction, Parameters<SidebarShellTranslate>[0]>
 
 /** The button each hover action draws, so Customize sidebar lists the action the row itself shows. */
-const rowActionIcons: Record<ThreadRowAction, ReactNode> = {
+const rowActionIcons = {
   resume: <RefreshCwIcon size={14} />,
   resumeDismiss: <XIcon size={14} />,
   aside: <PanelRightOpenIcon size={14} />,
@@ -166,7 +166,7 @@ const rowActionIcons: Record<ThreadRowAction, ReactNode> = {
   mute: <BellIcon size={14} />,
   archive: <IconArchiveOutlineRegular size={14} />,
   restore: <IconUnarchiveOutlineRegular size={14} />,
-}
+} satisfies Record<ThreadRowAction, ReactNode>
 
 const rowFieldKeys = [
   ['threadRowProject', 'threadSidebarRowProject'],
@@ -291,10 +291,10 @@ const readSidebarSplitBounds = (elements: {
   }
 }
 
-const expandedRowClass: Record<NavigationDensity, string> = {
+const expandedRowClass = {
   compact: 'dshx:h-[30px] dshx:gap-1.5 dshx:px-1.5',
   comfortable: 'dshx:h-[34px] dshx:gap-2 dshx:px-2',
-}
+} satisfies Record<NavigationDensity, string>
 
 const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const { collapsed, readFooterSnapshot, renderSlot, selectPanel, startSession, subscribeFooterSnapshot, toggleSidebar } = props
@@ -394,6 +394,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const refetchPluginUpdates = pluginUpdates.refetch
   const clientRevisionKey = useSyncExternalStore(props.subscribeClientRevisions, props.readClientRevisionKey, props.readClientRevisionKey)
   const clientRevisions = useMemo(
+    // SAFETY: clientRevisionKey is the JSON.stringify of this same [id, rev] pair list, built in this component.
     () => (JSON.parse(clientRevisionKey) as ReadonlyArray<readonly [string, string]>).map(([id, rev]) => ({ id, rev })),
     [clientRevisionKey],
   )
@@ -850,28 +851,24 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         }),
       ...(docking
         ? []
-        : DESTINATIONS.map(
-            (destination): PaletteAction => ({
-              id: `@dshfiles/thread-sidebar/destination/${destination.id}`,
-              group: 'destination',
-              label: `Go to ${destination.label}`,
-              aliases: [destination.label, destination.description],
-              run: () => {
-                window.dispatchEvent(new CustomEvent(SHOW_DESTINATION_EVENT, { detail: destination.id }))
-                recordNavigation({ destination: destination.id, surface: 'palette' })
-              },
-            }),
-          )),
-      ...(['fixed', 'docking'] as const).map(
-        (mode): PaletteAction => ({
-          id: `@dshfiles/thread-sidebar/action/layout-${mode}`,
-          group: 'command',
-          label: mode === 'fixed' ? 'Layout: fixed (rail and list)' : 'Layout: free docking',
-          aliases: mode === 'fixed' ? ['rail', 'fixed layout', 'destinations'] : ['docking', 'dockview', 'workbench left', 'movable panes'],
-          isSelected: () => preferences.layoutMode === mode,
-          run: () => updatePreferences({ layoutMode: mode }),
-        }),
-      ),
+        : DESTINATIONS.map((destination): PaletteAction => ({
+            id: `@dshfiles/thread-sidebar/destination/${destination.id}`,
+            group: 'destination',
+            label: `Go to ${destination.label}`,
+            aliases: [destination.label, destination.description],
+            run: () => {
+              window.dispatchEvent(new CustomEvent(SHOW_DESTINATION_EVENT, { detail: destination.id }))
+              recordNavigation({ destination: destination.id, surface: 'palette' })
+            },
+          }))),
+      ...(['fixed', 'docking'] as const).map((mode): PaletteAction => ({
+        id: `@dshfiles/thread-sidebar/action/layout-${mode}`,
+        group: 'command',
+        label: mode === 'fixed' ? 'Layout: fixed (rail and list)' : 'Layout: free docking',
+        aliases: mode === 'fixed' ? ['rail', 'fixed layout', 'destinations'] : ['docking', 'dockview', 'workbench left', 'movable panes'],
+        isSelected: () => preferences.layoutMode === mode,
+        run: () => updatePreferences({ layoutMode: mode }),
+      })),
       {
         id: '@dshfiles/thread-sidebar/action/moved-to',
         group: 'command',
@@ -1311,6 +1308,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 if (props.collapsed) props.toggleSidebar()
               },
             })}
+            // SAFETY: the destination shell only offers panel ids it read from this sidebar's panel metadata.
             selectPanel={panelId => selectPanel(panelId as SidebarPanelMetadata['id'])}
             startSession={() => startSession()}
             searchThreads={preferences.hiddenHeaderIds.includes('search') ? null : () => openPalette('threads')}
@@ -1330,133 +1328,136 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         <MovedToDialog
           panels={panels}
           openEntry={entry => {
+            // SAFETY: moved-to entries name registered sidebar panel ids.
             selectPanel(entry.panelId as SidebarPanelMetadata['id'])
             recordNavigation({ destination: entry.destination, section: entry.panelId, surface: 'moved-to' })
           }}
         />
         {docking ? (
-        <SidebarContentSeat renderSlot={props.renderSlot} collapsed={props.collapsed}>
-          <div
-            ref={headerRegionRef}
-            className={cn(
-              'dshx:w-full dshx:min-h-0',
-              props.collapsed
-                ? 'dshx:shrink dshx:overflow-y-auto dshx:[scrollbar-width:none]'
-                : iconRow
-                  ? 'dshx:shrink-0'
-                  : 'dshx:shrink dshx:overflow-y-auto dshx:overscroll-contain dshx:[scrollbar-width:thin]',
-            )}
-            id={headerRegionId}
-            style={
-              wide && !iconRow && effectiveHeaderHeight !== null ? { height: `${effectiveHeaderHeight}px`, flex: `0 0 ${effectiveHeaderHeight}px` } : undefined
-            }
-          >
-            {iconRow ? (
-              <nav aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
-                <NavigationIconRow
-                  items={navigationItems}
-                  overflow={preferences.navigationOverflow}
-                  onCustomize={openCustomize}
-                  settings={
-                    footerSnapshot.settingsId === null
-                      ? null
-                      : { label: text(props.t, 'threadSidebarHostSettings'), open: () => requestSettings(props.runCommand) }
-                  }
-                  onReorder={(fromIndex, toIndex) =>
-                    updatePreferences({
-                      headerOrder: SidebarOrganization.reorderVisibleEntry({
-                        orderedIds: orderedHeaderEntries.map(entry => entry.id),
-                        visibleIds: visibleHeaderEntries.map(entry => entry.id),
-                        fromVisible: fromIndex,
-                        toVisible: toIndex,
-                      }),
-                    })
-                  }
-                  labels={{
-                    more: text(props.t, 'threadSidebarMoreDestinations'),
-                    filter: text(props.t, 'threadSidebarFilterDestinations'),
-                    empty: text(props.t, 'threadSidebarNoDestinations'),
-                    customize: text(props.t, 'threadSidebarCustomize'),
-                    navigation: text(props.t, 'threadSidebarHeaderNavigation'),
-                  }}
-                />
-              </nav>
-            ) : (
-              <nav
-                className={cn('dshx:flex dshx:flex-col dshx:px-2 dshx:pb-2', preferences.navigationDensity === 'compact' ? 'dshx:gap-0.5' : 'dshx:gap-1')}
-                aria-label={text(props.t, 'threadSidebarHeaderNavigation')}
-              >
-                {navigationItems.map(item => (
+          <SidebarContentSeat renderSlot={props.renderSlot} collapsed={props.collapsed}>
+            <div
+              ref={headerRegionRef}
+              className={cn(
+                'dshx:w-full dshx:min-h-0',
+                props.collapsed
+                  ? 'dshx:shrink dshx:overflow-y-auto dshx:[scrollbar-width:none]'
+                  : iconRow
+                    ? 'dshx:shrink-0'
+                    : 'dshx:shrink dshx:overflow-y-auto dshx:overscroll-contain dshx:[scrollbar-width:thin]',
+              )}
+              id={headerRegionId}
+              style={
+                wide && !iconRow && effectiveHeaderHeight !== null
+                  ? { height: `${effectiveHeaderHeight}px`, flex: `0 0 ${effectiveHeaderHeight}px` }
+                  : undefined
+              }
+            >
+              {iconRow ? (
+                <nav aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
+                  <NavigationIconRow
+                    items={navigationItems}
+                    overflow={preferences.navigationOverflow}
+                    onCustomize={openCustomize}
+                    settings={
+                      footerSnapshot.settingsId === null
+                        ? null
+                        : { label: text(props.t, 'threadSidebarHostSettings'), open: () => requestSettings(props.runCommand) }
+                    }
+                    onReorder={(fromIndex, toIndex) =>
+                      updatePreferences({
+                        headerOrder: SidebarOrganization.reorderVisibleEntry({
+                          orderedIds: orderedHeaderEntries.map(entry => entry.id),
+                          visibleIds: visibleHeaderEntries.map(entry => entry.id),
+                          fromVisible: fromIndex,
+                          toVisible: toIndex,
+                        }),
+                      })
+                    }
+                    labels={{
+                      more: text(props.t, 'threadSidebarMoreDestinations'),
+                      filter: text(props.t, 'threadSidebarFilterDestinations'),
+                      empty: text(props.t, 'threadSidebarNoDestinations'),
+                      customize: text(props.t, 'threadSidebarCustomize'),
+                      navigation: text(props.t, 'threadSidebarHeaderNavigation'),
+                    }}
+                  />
+                </nav>
+              ) : (
+                <nav
+                  className={cn('dshx:flex dshx:flex-col dshx:px-2 dshx:pb-2', preferences.navigationDensity === 'compact' ? 'dshx:gap-0.5' : 'dshx:gap-1')}
+                  aria-label={text(props.t, 'threadSidebarHeaderNavigation')}
+                >
+                  {navigationItems.map(item => (
+                    <Button
+                      key={item.id}
+                      variant="ghost"
+                      className={cn(
+                        'dshx:w-full dshx:shrink-0 dshx:justify-start dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
+                        expandedRowClass[preferences.navigationDensity],
+                        preferences.navigationDensity === 'compact' ? 'dshx:text-sm' : 'dshx:text-base',
+                        item.active && 'dshx:bg-accent dshx:text-foreground',
+                      )}
+                      aria-label={item.label}
+                      aria-current={item.active ? 'page' : undefined}
+                      onClick={item.run}
+                    >
+                      {item.icon}
+                      <span className="dshx:truncate">{item.label}</span>
+                    </Button>
+                  ))}
                   <Button
-                    key={item.id}
                     variant="ghost"
                     className={cn(
-                      'dshx:w-full dshx:shrink-0 dshx:justify-start dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
+                      'dshx:w-full dshx:shrink-0 dshx:justify-start dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
                       expandedRowClass[preferences.navigationDensity],
-                      preferences.navigationDensity === 'compact' ? 'dshx:text-sm' : 'dshx:text-base',
-                      item.active && 'dshx:bg-accent dshx:text-foreground',
                     )}
-                    aria-label={item.label}
-                    aria-current={item.active ? 'page' : undefined}
-                    onClick={item.run}
+                    onClick={openCustomize}
                   >
-                    {item.icon}
-                    <span className="dshx:truncate">{item.label}</span>
+                    <SlidersHorizontalIcon className="dshx:size-4" aria-hidden="true" />
+                    {text(props.t, 'threadSidebarCustomize')}
                   </Button>
-                ))}
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    'dshx:w-full dshx:shrink-0 dshx:justify-start dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
-                    expandedRowClass[preferences.navigationDensity],
-                  )}
-                  onClick={openCustomize}
-                >
-                  <SlidersHorizontalIcon className="dshx:size-4" aria-hidden="true" />
-                  {text(props.t, 'threadSidebarCustomize')}
-                </Button>
-              </nav>
-            )}
-          </div>
+                </nav>
+              )}
+            </div>
 
-          {wide ? (
-            <button
-              ref={splitterRef}
-              type="button"
-              className="dshx:relative dshx:h-3 dshx:w-full dshx:shrink-0 dshx:cursor-row-resize dshx:touch-none dshx:select-none dshx:outline-none dshx:before:absolute dshx:before:top-1/2 dshx:before:left-1/2 dshx:before:h-0.5 dshx:before:w-7 dshx:before:-translate-x-1/2 dshx:before:-translate-y-1/2 dshx:before:rounded-full dshx:before:bg-muted-foreground/50 dshx:hover:before:bg-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:focus-visible:before:bg-foreground"
-              role="separator"
-              aria-label={text(props.t, 'threadSidebarResize')}
-              aria-orientation="horizontal"
-              aria-controls={`${headerRegionId} ${threadRegionId}`}
-              aria-valuemin={splitBounds.minimum}
-              aria-valuemax={splitBounds.maximum}
-              aria-valuenow={previewHeaderHeight === null ? splitBounds.value : Math.round(previewHeaderHeight)}
-              title={text(props.t, 'threadSidebarResizeHint')}
-              onPointerDown={startSplitterDrag}
-              onPointerMove={moveSplitter}
-              onPointerUp={finishSplitterDrag}
-              onPointerCancel={cancelSplitterDrag}
-              onLostPointerCapture={cancelSplitterDrag}
-              onKeyDown={resizeSplitterFromKeyboard}
-              onDoubleClick={resetSplit}
-            />
-          ) : null}
+            {wide ? (
+              <button
+                ref={splitterRef}
+                type="button"
+                className="dshx:relative dshx:h-3 dshx:w-full dshx:shrink-0 dshx:cursor-row-resize dshx:touch-none dshx:select-none dshx:outline-none dshx:before:absolute dshx:before:top-1/2 dshx:before:left-1/2 dshx:before:h-0.5 dshx:before:w-7 dshx:before:-translate-x-1/2 dshx:before:-translate-y-1/2 dshx:before:rounded-full dshx:before:bg-muted-foreground/50 dshx:hover:before:bg-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:focus-visible:before:bg-foreground"
+                role="separator"
+                aria-label={text(props.t, 'threadSidebarResize')}
+                aria-orientation="horizontal"
+                aria-controls={`${headerRegionId} ${threadRegionId}`}
+                aria-valuemin={splitBounds.minimum}
+                aria-valuemax={splitBounds.maximum}
+                aria-valuenow={previewHeaderHeight === null ? splitBounds.value : Math.round(previewHeaderHeight)}
+                title={text(props.t, 'threadSidebarResizeHint')}
+                onPointerDown={startSplitterDrag}
+                onPointerMove={moveSplitter}
+                onPointerUp={finishSplitterDrag}
+                onPointerCancel={cancelSplitterDrag}
+                onLostPointerCapture={cancelSplitterDrag}
+                onKeyDown={resizeSplitterFromKeyboard}
+                onDoubleClick={resetSplit}
+              />
+            ) : null}
 
-          <div
-            className={cn(
-              'dshx:w-full dshx:min-h-[120px] dshx:flex-1 dshx:overflow-hidden dshx:*:w-full dshx:*:min-w-0',
-              props.collapsed ? 'dshx:hidden' : 'dshx:flex',
-            )}
-            id={threadRegionId}
-          >
-            {props.renderSlot('sidebar.workspaces', {
-              wide,
-              expandSidebar: () => {
-                if (props.collapsed) props.toggleSidebar()
-              },
-            })}
-          </div>
-        </SidebarContentSeat>
+            <div
+              className={cn(
+                'dshx:w-full dshx:min-h-[120px] dshx:flex-1 dshx:overflow-hidden dshx:*:w-full dshx:*:min-w-0',
+                props.collapsed ? 'dshx:hidden' : 'dshx:flex',
+              )}
+              id={threadRegionId}
+            >
+              {props.renderSlot('sidebar.workspaces', {
+                wide,
+                expandSidebar: () => {
+                  if (props.collapsed) props.toggleSidebar()
+                },
+              })}
+            </div>
+          </SidebarContentSeat>
         ) : null}
 
         {customizeOpen && (wide || props.customizationTarget !== null) ? (
@@ -1709,7 +1710,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           {props.collapsed && reloadPendingLabel !== null ? (
             <Popover open={reloadPopoverOpen} onOpenChange={setReloadPopoverOpen}>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon-sm" className="dshx:shrink-0 dshx:text-warning" aria-label={reloadPendingLabel} title={reloadPendingLabel}>
+                <Button variant="ghost" size="icon-sm" className="dshx:shrink-0 dshx:text-warning" aria-label={reloadPendingLabel}>
                   <RotateCwIcon className="dshx:size-4" aria-hidden="true" />
                 </Button>
               </PopoverTrigger>

@@ -325,180 +325,177 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
           fill
           bodyClassName="dshx:gap-3"
         >
-        <section
-          aria-label={t('catalogFilters')}
-          className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2"
-        >
-          <Select disabled value={displayedMachineName}>
-            <SelectTrigger aria-label={t('machine')} className="dshx:w-56 dshx:@max-pane-narrow:w-full" title={t('machineSelectorHint')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={displayedMachineName}>{displayedMachineName}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            className="dshx:min-w-48 dshx:flex-1 dshx:justify-start dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:basis-full dshx:bg-muted/50 dshx:font-normal"
-            onClick={() => setPickerOpen(true)}
-            type="button"
-            variant="outline"
-          >
-            <FolderOpenIcon aria-hidden className="dshx:text-muted-foreground" />
-            {selection === null ? (
-              <span className="dshx:text-muted-foreground">{t('chooseProjectFolder')}</span>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="dshx:truncate">{selection.title}</span>
-                </TooltipTrigger>
-                <TooltipContent>{selection.canonicalPath}</TooltipContent>
-              </Tooltip>
-            )}
-          </Button>
-          <ToggleGroup
-            aria-label={t('secretScope')}
-            onValueChange={value => {
-              const next = scopes.find(candidate => candidate === value)
-              if (next === undefined) return
-              clearRevealed()
-              setScope(next)
-            }}
-            size="sm"
-            type="single"
-            value={scope}
-          >
-            {scopes.map(value => (
-              <ToggleGroupItem className="dshx:capitalize" key={value} value={value}>
-                {t(scopeLabelKeys[value])}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </section>
-        <div className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:gap-3">
-          {cwd === null && (
-            <Alert role="status" variant="info">
-              <AlertDescription>{t('globalOnlyNotice')}</AlertDescription>
-            </Alert>
-          )}
-          <SearchInput
-            className="dshx:h-9 dshx:bg-muted/50"
-            aria-label={t('filterAliases')}
-            onChange={event => {
-              clearRevealed()
-              setSearch(event.currentTarget.value)
-            }}
-            placeholder={t('filterPlaceholder')}
-            value={search}
-          />
-          {error !== null && (
-            <Alert className="dshx:pr-24" variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-              {listFailed && !copyMutation.isError && (
-                <Button
-                  className="dshx:absolute dshx:top-1/2 dshx:right-2 dshx:-translate-y-1/2"
-                  disabled={loading}
-                  onClick={() => void listQuery.refetch()}
-                  size="xs"
-                  type="button"
-                  variant="outline"
-                >
-                  {t('retry')}
-                </Button>
+          <section aria-label={t('catalogFilters')} className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2">
+            <Select disabled value={displayedMachineName}>
+              <SelectTrigger aria-label={t('machine')} className="dshx:w-56 dshx:@max-pane-narrow:w-full" title={t('machineSelectorHint')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={displayedMachineName}>{displayedMachineName}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              className="dshx:min-w-48 dshx:flex-1 dshx:justify-start dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:basis-full dshx:bg-muted/50 dshx:font-normal"
+              onClick={() => setPickerOpen(true)}
+              type="button"
+              variant="outline"
+            >
+              <FolderOpenIcon aria-hidden className="dshx:text-muted-foreground" />
+              {selection === null ? (
+                <span className="dshx:text-muted-foreground">{t('chooseProjectFolder')}</span>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="dshx:truncate">{selection.title}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>{selection.canonicalPath}</TooltipContent>
+                </Tooltip>
               )}
-            </Alert>
-          )}
-          {notice !== null && (
-            <Alert className="dshx:pr-10" role="status" variant="success">
-              <AlertDescription>{notice}</AlertDescription>
-              <Button
-                aria-label={t('dismissNotice')}
-                className="dshx:absolute dshx:top-1.5 dshx:right-1.5"
-                onClick={() => setNotice(null)}
-                size="icon-xs"
-                type="button"
-                variant="ghost"
-              >
-                <XIcon aria-hidden />
-              </Button>
-            </Alert>
-          )}
-        </div>
-        {showCatalog ? (
-          <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto" onKeyDown={focusRowFromKey}>
-            <SecretCatalogTable
-              actions={{
-                t,
-                revealed,
-                canActOnRow,
-                isRowBusy: row =>
-                  (copyMutation.isPending && copyMutation.variables?.rowId === row.id && copyMutation.variables?.cwd === cwd) ||
-                  (revealSnapshot.matches('loading') && revealSnapshot.context.request?.rowId === row.id),
-                copyPending: copyMutation.isPending,
-                isRevealing: row => revealSnapshot.matches('loading') && revealSnapshot.context.request?.rowId === row.id,
-                onReveal: row => void onReveal(row),
-                onRevealedBlur: () => {
-                  if (hideOnBlur) clearRevealed()
-                },
-                onHide: clearRevealed,
-                onCopy,
-                onEdit: row => openDialog({ mode: 'edit', row }),
-                onRemove: row => openDialog({ mode: 'remove', row }),
+            </Button>
+            <ToggleGroup
+              aria-label={t('secretScope')}
+              onValueChange={value => {
+                const next = scopes.find(candidate => candidate === value)
+                if (next === undefined) return
+                clearRevealed()
+                setScope(next)
               }}
-              append={
-                draftIds.length === 0
-                  ? undefined
-                  : draftIds.map(id => (
-                      <SecretQuickAddRow
-                        create={createFromDraft}
-                        environment={defaultEnvironment}
-                        hasProjectFolder={cwd !== null}
-                        key={id}
-                        onDiscard={() => removeDraft(id)}
-                        onSaved={alias => onDraftSaved(id, alias)}
-                        rows={rows}
-                        scope={createScope}
-                        t={t}
-                      />
-                    ))
-              }
-              hasAnyRows={rows.length > 0}
-              loading={loading}
-              rows={filteredRows}
+              size="sm"
+              type="single"
+              value={scope}
+            >
+              {scopes.map(value => (
+                <ToggleGroupItem className="dshx:capitalize" key={value} value={value}>
+                  {t(scopeLabelKeys[value])}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </section>
+          <div className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:gap-3">
+            {cwd === null && (
+              <Alert role="status" variant="info">
+                <AlertDescription>{t('globalOnlyNotice')}</AlertDescription>
+              </Alert>
+            )}
+            <SearchInput
+              className="dshx:h-9 dshx:bg-muted/50"
+              aria-label={t('filterAliases')}
+              onChange={event => {
+                clearRevealed()
+                setSearch(event.currentTarget.value)
+              }}
+              placeholder={t('filterPlaceholder')}
+              value={search}
             />
-            <div className="dshx:mt-3 dshx:inline-flex dshx:rounded-md dshx:shadow-xs">
-              <Button
-                className="dshx:rounded-r-none dshx:shadow-none"
-                disabled={loading && rows.length === 0}
-                onClick={addDraft}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                <PlusIcon aria-hidden />
-                {t('addSecret')}
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+            {error !== null && (
+              <Alert className="dshx:pr-24" variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+                {listFailed && !copyMutation.isError && (
                   <Button
-                    aria-label={t('moreWaysToAdd')}
-                    className="dshx:rounded-l-none dshx:border-l-0 dshx:shadow-none"
-                    size="icon-sm"
+                    className="dshx:absolute dshx:top-1/2 dshx:right-2 dshx:-translate-y-1/2"
+                    disabled={loading}
+                    onClick={() => void listQuery.refetch()}
+                    size="xs"
                     type="button"
                     variant="outline"
                   >
-                    <ChevronDownIcon aria-hidden />
+                    {t('retry')}
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="dshx-root">
-                  <DropdownMenuItem onSelect={() => openDialog({ mode: 'create' })}>
-                    <SlidersHorizontalIcon aria-hidden />
-                    {t('addWithDetails')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                )}
+              </Alert>
+            )}
+            {notice !== null && (
+              <Alert className="dshx:pr-10" role="status" variant="success">
+                <AlertDescription>{notice}</AlertDescription>
+                <Button
+                  aria-label={t('dismissNotice')}
+                  className="dshx:absolute dshx:top-1.5 dshx:right-1.5"
+                  onClick={() => setNotice(null)}
+                  size="icon-xs"
+                  type="button"
+                  variant="ghost"
+                >
+                  <XIcon aria-hidden />
+                </Button>
+              </Alert>
+            )}
           </div>
-        ) : null}
+          {showCatalog ? (
+            <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto" onKeyDown={focusRowFromKey}>
+              <SecretCatalogTable
+                actions={{
+                  t,
+                  revealed,
+                  canActOnRow,
+                  isRowBusy: row =>
+                    (copyMutation.isPending && copyMutation.variables?.rowId === row.id && copyMutation.variables?.cwd === cwd) ||
+                    (revealSnapshot.matches('loading') && revealSnapshot.context.request?.rowId === row.id),
+                  copyPending: copyMutation.isPending,
+                  isRevealing: row => revealSnapshot.matches('loading') && revealSnapshot.context.request?.rowId === row.id,
+                  onReveal: row => void onReveal(row),
+                  onRevealedBlur: () => {
+                    if (hideOnBlur) clearRevealed()
+                  },
+                  onHide: clearRevealed,
+                  onCopy,
+                  onEdit: row => openDialog({ mode: 'edit', row }),
+                  onRemove: row => openDialog({ mode: 'remove', row }),
+                }}
+                append={
+                  draftIds.length === 0
+                    ? undefined
+                    : draftIds.map(id => (
+                        <SecretQuickAddRow
+                          create={createFromDraft}
+                          environment={defaultEnvironment}
+                          hasProjectFolder={cwd !== null}
+                          key={id}
+                          onDiscard={() => removeDraft(id)}
+                          onSaved={alias => onDraftSaved(id, alias)}
+                          rows={rows}
+                          scope={createScope}
+                          t={t}
+                        />
+                      ))
+                }
+                hasAnyRows={rows.length > 0}
+                loading={loading}
+                rows={filteredRows}
+              />
+              <div className="dshx:mt-3 dshx:inline-flex dshx:rounded-md dshx:shadow-xs">
+                <Button
+                  className="dshx:rounded-r-none dshx:shadow-none"
+                  disabled={loading && rows.length === 0}
+                  onClick={addDraft}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <PlusIcon aria-hidden />
+                  {t('addSecret')}
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      aria-label={t('moreWaysToAdd')}
+                      className="dshx:rounded-l-none dshx:border-l-0 dshx:shadow-none"
+                      size="icon-sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <ChevronDownIcon aria-hidden />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="dshx-root">
+                    <DropdownMenuItem onSelect={() => openDialog({ mode: 'create' })}>
+                      <SlidersHorizontalIcon aria-hidden />
+                      {t('addWithDetails')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          ) : null}
         </Page>
         {pickerOpen && (
           <ProjectFolderPicker

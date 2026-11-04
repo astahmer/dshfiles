@@ -3,7 +3,7 @@ import { HostContext } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { defineHost } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
-import { Effect, Layer, ManagedRuntime } from 'effect'
+import { Layer, ManagedRuntime } from 'effect'
 import { describe, expect, it } from 'vitest'
 import type { BacklogSummaryView } from './api.js'
 import { BACKLOG_ATTENTION_SOURCE, BacklogAttention } from './attention-provider.js'
@@ -14,7 +14,14 @@ const user = { kind: 'user' } as const
 
 const summary = (overrides: Partial<BacklogSummaryView>): BacklogSummaryView =>
   // SAFETY: the provider reads only id, title, status, attention and activity.last.
-  ({ id: 7, title: 'Pick a cache key', status: 'doing', attention: 'needs-input', activity: { count: 1, agents: 1, comments: 0, last: null }, ...overrides }) as BacklogSummaryView
+  ({
+    id: 7,
+    title: 'Pick a cache key',
+    status: 'doing',
+    attention: 'needs-input',
+    activity: { count: 1, agents: 1, comments: 0, last: null },
+    ...overrides,
+  }) as BacklogSummaryView
 
 describe('backlog inbox provider', () => {
   it('states needs-input and blocked items as Needs you, waiting as Other, and nothing for closed or quiet items', () => {

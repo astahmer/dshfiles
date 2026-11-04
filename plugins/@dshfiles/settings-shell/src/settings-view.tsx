@@ -180,7 +180,11 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
           </button>
           <ul className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:p-0">
             {result.shortcuts.map(shortcut => (
-              <li className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:px-2 dshx:py-1.5 dshx:text-[14px]" data-settings-shortcut={shortcut.id} key={shortcut.id}>
+              <li
+                className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:px-2 dshx:py-1.5 dshx:text-[14px]"
+                data-settings-shortcut={shortcut.id}
+                key={shortcut.id}
+              >
                 <span className="dshx:min-w-0 dshx:truncate">
                   <Highlight query={props.query} text={shortcut.label} />
                 </span>
@@ -214,7 +218,9 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
 }
 
 /** What one entry shows: its heading, the page it links to, its section and the plugin settings merged into it. */
-const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; readonly groupLabel: string; readonly jevNamespaces: ReadonlySet<string> }): JSX.Element => {
+const EntryView = (
+  props: SettingsViewProps & { readonly entry: SettingsEntry; readonly groupLabel: string; readonly jevNamespaces: ReadonlySet<string> },
+): JSX.Element => {
   const { entry, t } = props
   const link = entry.link
   // A section draws its own rows; a lone plugin page draws its own heading, so the entry heading would repeat it.
@@ -229,7 +235,10 @@ const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; r
         </header>
       )}
       {link !== undefined && (
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:px-4 dshx:py-3" data-settings-link={link.panelId}>
+        <div
+          className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:px-4 dshx:py-3"
+          data-settings-link={link.panelId}
+        >
           <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
             <span className="dshx:text-[14px] dshx:text-foreground">{link.description}</span>
             <span className="dshx:text-[12px] dshx:text-muted-foreground">{t('entry.opensPage')}</span>
@@ -269,7 +278,9 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
   })
   const active = SettingsGroups.entryFor(props.groups, props.activeId) ?? props.groups[0]?.entries[0]
   const activeGroup = props.groups.find(group => group.entries.some(entry => entry.id === active?.id))?.group
-  const jevNamespaces = new Set(props.groups.flatMap(group => group.entries.filter(entry => entry.id === JEV_ENTRY_ID).flatMap(entry => entry.pages.map(page => page.ns))))
+  const jevNamespaces = new Set(
+    props.groups.flatMap(group => group.entries.filter(entry => entry.id === JEV_ENTRY_ID).flatMap(entry => entry.pages.map(page => page.ns))),
+  )
   const content = useRef<HTMLDivElement>(null)
   const countOf = (entry: SettingsEntry): number | undefined => {
     if (!searching) return undefined
@@ -281,7 +292,9 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
     const entry = SettingsGroups.entryFor(props.groups, id)
     const ids = entry === undefined ? [id] : [entry.id, entry.sectionId ?? '', ...entry.pages.map(page => page.pageId)]
     const group = searching
-      ? ids.map(candidate => content.current?.querySelector(`[data-results-page="${CSS.escape(candidate)}"]`)).find(element => element !== null && element !== undefined)
+      ? ids
+          .map(candidate => content.current?.querySelector(`[data-results-page="${CSS.escape(candidate)}"]`))
+          .find(element => element !== null && element !== undefined)
       : undefined
     if (group !== undefined && group !== null) group.scrollIntoView({ block: 'start' })
     else props.onSelect(id)
@@ -369,7 +382,10 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             </div>
           ))}
         </nav>
-        <div className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3" ref={content}>
+        <div
+          className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3"
+          ref={content}
+        >
           <div className="dshx:max-w-[880px]">
             {searching && <SearchResults {...props} result={result} />}
             {!searching && active !== undefined && (

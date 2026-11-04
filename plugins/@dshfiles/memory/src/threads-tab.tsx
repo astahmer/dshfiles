@@ -437,7 +437,11 @@ export const ThreadsTab = (props: {
             </span>
           </div>
         </div>
-        {threads.isError ? <p className="dshx:p-4 dshx:text-xs dshx:text-destructive">{errorMessage(threads.error, 'Threads are unavailable. Switch to another tab and back to reload them.')}</p> : null}
+        {threads.isError ? (
+          <p className="dshx:p-4 dshx:text-xs dshx:text-destructive">
+            {errorMessage(threads.error, 'Threads are unavailable. Switch to another tab and back to reload them.')}
+          </p>
+        ) : null}
         {threads.isSuccess && visible.length === 0 ? (
           <EmptyState>
             {debounced.length > 0 || status !== 'all' || source !== ''
@@ -538,7 +542,9 @@ export const ThreadsTab = (props: {
                   <Button size="sm" variant="outline" className="dshx:w-fit" onClick={() => redigest.mutate(selected.id)} disabled={redigest.isPending}>
                     <RefreshCwIcon className={redigest.isPending ? 'dshx:animate-spin' : undefined} /> Write digest now
                   </Button>
-                  {redigest.isError ? <p className="dshx:text-xs dshx:text-destructive">{errorMessage(redigest.error, 'The digest failed. Try it again.')}</p> : null}
+                  {redigest.isError ? (
+                    <p className="dshx:text-xs dshx:text-destructive">{errorMessage(redigest.error, 'The digest failed. Try it again.')}</p>
+                  ) : null}
                 </div>
               )}
             </div>

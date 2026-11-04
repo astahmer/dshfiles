@@ -33,7 +33,8 @@ const snoozeTarget = (choice: SnoozeChoice, now: number): { readonly until: numb
 }
 
 /** One glyph per severity; colour comes from the row, never from a new token (plan §4.7). */
-const severityGlyph = (severity: AttentionSeverity): string => (severity === 'blocking' ? '◆' : severity === 'failed' ? '✕' : severity === 'ready' ? '●' : '·')
+const SEVERITY_GLYPH = { blocking: '◆', failed: '✕', ready: '●', info: '·' } as const satisfies Record<AttentionSeverity, string>
+const severityGlyph = (severity: AttentionSeverity): string => SEVERITY_GLYPH[severity]
 
 const relativeAge = (at: number, now: number): string => {
   const seconds = Math.max(0, Math.round((now - at) / 1000))

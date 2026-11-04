@@ -132,18 +132,7 @@ const CurrentVersion = (props: { readonly t: ShellTranslate }): JSX.Element => {
 export default defineClient({
   name: '@dshfiles/settings-shell',
   locales: [shellLocale, welcomeLocale],
-  inject: [
-    'slots',
-    'connection',
-    'remote',
-    'remote.settings',
-    'remote.session',
-    'configForms',
-    'shortcuts',
-    'sessions',
-    'layout',
-    'modules',
-  ],
+  inject: ['slots', 'connection', 'remote', 'remote.settings', 'remote.session', 'configForms', 'shortcuts', 'sessions', 'layout', 'modules'],
   setup(ctx, decorate, metadata) {
     const t = ctx.locale.bind(SHELL_LOCALE_NAMESPACE)
     const connection = Schema.decodeUnknownSync(clientConnectionSchema)(ctx.get('connection'))
@@ -256,7 +245,9 @@ export default defineClient({
     const fieldTargetFor = (target: { readonly entryId: string; readonly fieldPath: readonly string[] }): FieldTarget | undefined => {
       const entry = SettingsGroups.entryForField(groups.getSnapshot(), target.entryId, target.fieldPath)
       const key = target.fieldPath[0]
-      const page = [...(entry?.pages ?? []), ...(entry?.hiddenPages ?? [])].find(candidate => candidate.ns === target.entryId && candidate.fields.some(field => field.path[0] === key))
+      const page = [...(entry?.pages ?? []), ...(entry?.hiddenPages ?? [])].find(
+        candidate => candidate.ns === target.entryId && candidate.fields.some(field => field.path[0] === key),
+      )
       if (page !== undefined) return { sectionId: page.pageId, fieldPath: target.fieldPath }
       // Not grouped yet (the settings mirror is still loading): the namespace's own page id still opens it later.
       return pluginPages.getSnapshot().some(candidate => candidate.ns === target.entryId)
@@ -346,7 +337,9 @@ export default defineClient({
     const shortcutsFor = (catalog: readonly ShortcutCatalogEntry[]): readonly ShortcutRow[] => {
       if (catalog !== shortcutSource) {
         shortcutSource = catalog
-        shortcutRows = catalog.filter(entry => entry.keys.length > 0).map(entry => ({ id: entry.id, label: entry.label, aliases: entry.aliases, keys: entry.keys }))
+        shortcutRows = catalog
+          .filter(entry => entry.keys.length > 0)
+          .map(entry => ({ id: entry.id, label: entry.label, aliases: entry.aliases, keys: entry.keys }))
       }
       return shortcutRows
     }
@@ -499,7 +492,17 @@ export default defineClient({
       }, [])
       const tabsLoaded = useObservable(mainTabsLoaded)
       if (!open || host === null) return null
-      const view = settingsViewProps({ renderSlot: props.renderSlot, t: props.t, groups: grouped, activeId, field, entries, target, query, shortcuts: shortcutsFor(catalog) })
+      const view = settingsViewProps({
+        renderSlot: props.renderSlot,
+        t: props.t,
+        groups: grouped,
+        activeId,
+        field,
+        entries,
+        target,
+        query,
+        shortcuts: shortcutsFor(catalog),
+      })
       // With main-tabs the strip closes the tab; without it the header keeps a way back to the previous view.
       return <SettingsTab {...view} host={host} onClose={tabsLoaded ? undefined : deps.closeSettings} />
     }

@@ -73,7 +73,8 @@ const en = {
   memoryBlock: 'Start block for {project}',
   memoryBlockEmpty: 'Memory adds nothing to a new thread of this project yet.',
   openMemory: 'Open the Memory panel',
-  unavailable: 'The capability catalog is unavailable: no loaded dshx Host serves it. Select Refresh; if it stays empty, restart DSH when no thread is working.',
+  unavailable:
+    'The capability catalog is unavailable: no loaded dshx Host serves it. Select Refresh; if it stays empty, restart DSH when no thread is working.',
   loading: 'Reading what the agent can use…',
   noMatch: 'Nothing matches.',
   unknownVersion: '—',

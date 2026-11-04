@@ -28,7 +28,11 @@ const signalsOf = (items: readonly AttentionItem[]): ReadonlyMap<string, InboxTh
     const verb = INLINE_VERBS.find((candidate: InlineVerb) => item.verbs.includes(candidate))
     const next: InboxThreadSignal = { itemId: item.id, severity, reason: item.reason, verb, openedAt: item.openedAt }
     const current = signals.get(item.subject.id)
-    if (current === undefined || SEVERITY_RANK[severity] > SEVERITY_RANK[current.severity] || (SEVERITY_RANK[severity] === SEVERITY_RANK[current.severity] && next.openedAt > current.openedAt)) {
+    if (
+      current === undefined ||
+      SEVERITY_RANK[severity] > SEVERITY_RANK[current.severity] ||
+      (SEVERITY_RANK[severity] === SEVERITY_RANK[current.severity] && next.openedAt > current.openedAt)
+    ) {
       signals.set(item.subject.id, next)
     }
   }

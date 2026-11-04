@@ -37,13 +37,13 @@ const decodeTurnEnd = Schema.decodeUnknownOption(turnEndEventSchema)
  * bookkeeping and `interrupted` continues in the next turn, so neither is a
  * completion to review.
  */
-const finishReasonByKind: Readonly<Record<string, AttentionFinishReason>> = {
-  completed: 'completed',
-  aborted: 'aborted',
-  blocked: 'blocked',
-  error: 'error',
-  'max-tokens': 'max-tokens',
-}
+const finishReasonByKind = new Map<string, AttentionFinishReason>([
+  ['completed', 'completed'],
+  ['aborted', 'aborted'],
+  ['blocked', 'blocked'],
+  ['error', 'error'],
+  ['max-tokens', 'max-tokens'],
+])
 
 const finishReasonFromEvent = (event: unknown): AttentionFinishReason | null => {
   const parsed = decodeTurnEnd(event)
@@ -51,7 +51,7 @@ const finishReasonFromEvent = (event: unknown): AttentionFinishReason | null => 
   const reason = parsed.value.data.reason
   // The Host shutting down disposes a running Agent: that turn resumes after the restart, it was not stopped by anyone.
   if (reason.kind === 'aborted' && reason.reason?.kind === 'disposed') return null
-  return finishReasonByKind[reason.kind] ?? null
+  return finishReasonByKind.get(reason.kind) ?? null
 }
 
 /** Monotone across Host restarts: a new record always outranks every stored version. */

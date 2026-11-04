@@ -45,7 +45,9 @@ export const createSettingsWorkbenchHub = (sources: {
       close,
       openSection: select,
       openSettingsTarget: target => {
-        const page = view.pluginPages.find(candidate => candidate.ns === target.entryId && candidate.fields.some(field => field.path[0] === target.fieldPath[0]))
+        const page = view.pluginPages.find(
+          candidate => candidate.ns === target.entryId && candidate.fields.some(field => field.path[0] === target.fieldPath[0]),
+        )
         if (page === undefined) return false
         select(page.pageId)
         setField({ sectionId: page.pageId, fieldPath: target.fieldPath })
@@ -54,16 +56,7 @@ export const createSettingsWorkbenchHub = (sources: {
     }
     return (
       <div className="dshx-root dshx:h-full dshx:min-h-0 dshx:w-full" data-settings-workbench-hub="" ref={setHost}>
-        {host !== null && (
-          <SettingsTab
-            {...view}
-            host={host}
-            sectionOwner={owner}
-            onClose={close}
-            onSelect={select}
-            onSearch={setQuery}
-          />
-        )}
+        {host !== null && <SettingsTab {...view} host={host} sectionOwner={owner} onClose={close} onSelect={select} onSearch={setQuery} />}
       </div>
     )
   }

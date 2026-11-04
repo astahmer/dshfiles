@@ -70,12 +70,10 @@ describe('thread status', () => {
   })
 
   it('groups in shell order and sorts by came-back time; Pinned keeps pin order', () => {
-    const entry = (thread: string, overrides: Partial<ThreadStatusInput>, cameBackAt: number, pinnedIndex?: number) => ({
-      thread,
-      status: ThreadStatusModel.statusOf(input(overrides)),
-      cameBackAt,
-      ...(pinnedIndex === undefined ? {} : { pinnedIndex }),
-    })
+    const entry = (thread: string, overrides: Partial<ThreadStatusInput>, cameBackAt: number, pinnedIndex?: number) => {
+      const base = { thread, status: ThreadStatusModel.statusOf(input(overrides)), cameBackAt }
+      return pinnedIndex === undefined ? base : { ...base, pinnedIndex }
+    }
     const groups = ThreadStatusModel.groupEntries([
       entry('old-ready', { unread: true }, 1),
       entry('new-ready', { unread: true }, 2),

@@ -91,26 +91,35 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void; readonl
       }}
       bodyClassName="dshx:mx-auto dshx:w-full dshx:max-w-[1500px]"
     >
-      {loading && board.accounts.length === 0 ? (
-        <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
-          <Spinner className="dshx:size-3.5" />
-          Loading quota history…
-        </p>
-      ) : board.accounts.length === 0 ? (
-        <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border" action={{ label: 'Open accounts', onSelect: props.onBack }}>
-          Enable an account with quota to see where it is heading.
-        </EmptyState>
-      ) : view === 'forecast' ? (
-        <ForecastBoardView.Board board={board} onSelect={setSelectedId} selectedId={selectedId} />
-      ) : view === 'pace' ? (
-        <PaceBoardView.Board accounts={pace} now={now} pointsById={pointsById} />
-      ) : view === 'table' ? (
-        <ForecastBoardView.Table board={board} />
-      ) : view === 'coverage' ? (
-        <CoverageBoardView.Board onSelect={setCoverageSelection} report={report} selection={coverageSelection} workHours={workHours} />
-      ) : (
-        <HandoffBoardView.Board now={now} plans={plans} workHours={workHours} />
-      )}
+      {(() => {
+        if (loading && board.accounts.length === 0) {
+          return (
+            <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
+              <Spinner className="dshx:size-3.5" />
+              Loading quota history…
+            </p>
+          )
+        }
+        if (board.accounts.length === 0) {
+          return (
+            <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border" action={{ label: 'Open accounts', onSelect: props.onBack }}>
+              Enable an account with quota to see where it is heading.
+            </EmptyState>
+          )
+        }
+        switch (view) {
+          case 'forecast':
+            return <ForecastBoardView.Board board={board} onSelect={setSelectedId} selectedId={selectedId} />
+          case 'pace':
+            return <PaceBoardView.Board accounts={pace} now={now} pointsById={pointsById} />
+          case 'table':
+            return <ForecastBoardView.Table board={board} />
+          case 'coverage':
+            return <CoverageBoardView.Board onSelect={setCoverageSelection} report={report} selection={coverageSelection} workHours={workHours} />
+          default:
+            return <HandoffBoardView.Board now={now} plans={plans} workHours={workHours} />
+        }
+      })()}
     </QuotaViewFrame>
   )
 }

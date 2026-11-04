@@ -1,11 +1,12 @@
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { attentionApi, type AttentionActOutcome, type AttentionActRequest, type AttentionDraft } from '@dshfiles/activity-timeline/attention-api'
-import { DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
+import { DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Clock, Effect, Layer, Ref, Stream } from 'effect'
 import { NativeQuestions } from './agent-host-promise.js'
 import { projectNativeQuestion, type NativeQuestionInboxItem } from './question-inbox.js'
 import { QuestionScan, type SessionQuestionTarget } from './question-scan.js'
+import { handleAttentionActs } from './attention-act-promise.js'
 
 /** The inbox source of native `ask_user_question` forms waiting in a running thread. */
 export const NATIVE_QUESTION_SOURCE = 'agent-questions.native-question'
@@ -71,7 +72,6 @@ const touchesForms = (event: SessionEvent, pendingCallIds: ReadonlySet<string>):
 const refused = (message: string): AttentionActOutcome => ({ ok: false, message })
 
 const make = Effect.gen(function* () {
-  const host = yield* HostContext
   const native = yield* NativeQuestions
   const scans = yield* QuestionScan
   const apis = yield* HostApis
@@ -117,23 +117,14 @@ const make = Effect.gen(function* () {
     return refused('The thread is not running, so it cannot receive an answer. Open the thread to resume it, then answer again.')
   })
 
-  const services = yield* Effect.context<never>()
-  const runAnswer = Effect.runPromiseWith(services)
-  yield* Effect.acquireRelease(
-    Effect.sync(() =>
-      host.ctx.on('dshfiles/attention/act', request =>
-        request.item.source === NATIVE_QUESTION_SOURCE
-          ? runAnswer(answer(request).pipe(Effect.catchCause(() => Effect.succeed(refused('Answering failed on the Host. Open the thread and answer there.')))))
-          : Promise.resolve(undefined),
-      ),
-    ),
-    dispose => Effect.sync(dispose),
+  yield* handleAttentionActs(request =>
+    request.item.source === NATIVE_QUESTION_SOURCE
+      ? answer(request).pipe(Effect.catchCause(() => Effect.succeed(refused('Answering failed on the Host. Open the thread and answer there.'))))
+      : Effect.succeed(undefined),
   )
 
   const formEvents = HostEvents.stream('session/event').pipe(
-    Stream.filterEffect(([, event]) =>
-      Effect.map(Ref.get(pending), current => touchesForms(event, new Set([...current.values()].map(item => item.callId)))),
-    ),
+    Stream.filterEffect(([, event]) => Effect.map(Ref.get(pending), current => touchesForms(event, new Set([...current.values()].map(item => item.callId))))),
   )
 
   yield* Stream.mergeAll(

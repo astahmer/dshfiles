@@ -42,6 +42,7 @@ describe('StorageDomain open after a reload', () => {
 
 /** A fake facility: one reserved name, refusing a second open until the first handle closes, like the native one. */
 const fakeFacility = () => {
+  // SAFETY: the open slot starts empty; the annotation only types it for later handles.
   const state = { open: undefined as { readonly id: number } | undefined, opens: 0, closes: 0 }
   return {
     state,
@@ -85,7 +86,14 @@ describe('StorageDomain shared handles across a plugin reload', () => {
     Effect.gen(function* () {
       const facility = fakeFacility()
       const acquire = () =>
-        acquireSharedHandle({ key: '@test/stale\u0000domain', holder: Symbol('activation'), fingerprint: 'v1', isLive: handle => facility.state.open === handle, open: facility.open, close: facility.close })
+        acquireSharedHandle({
+          key: '@test/stale\u0000domain',
+          holder: Symbol('activation'),
+          fingerprint: 'v1',
+          isLive: handle => facility.state.open === handle,
+          open: facility.open,
+          close: facility.close,
+        })
       const first = yield* Scope.make()
       const handle = yield* Scope.provide(first)(acquire())
       facility.state.open = undefined // the facility itself was reloaded and closed every domain
@@ -102,7 +110,14 @@ describe('StorageDomain shared handles across a plugin reload', () => {
     Effect.gen(function* () {
       const facility = fakeFacility()
       const acquire = (fingerprint: string) =>
-        acquireSharedHandle({ key: '@test/spec\u0000domain', holder: Symbol(fingerprint), fingerprint, isLive: handle => facility.state.open === handle, open: facility.open, close: facility.close })
+        acquireSharedHandle({
+          key: '@test/spec\u0000domain',
+          holder: Symbol(fingerprint),
+          fingerprint,
+          isLive: handle => facility.state.open === handle,
+          open: facility.open,
+          close: facility.close,
+        })
       const scope = yield* Scope.make()
       yield* Scope.provide(scope)(acquire('v1'))
       const fiber = yield* Effect.forkChild(Effect.exit(Scope.provide(scope)(acquire('v2'))))

@@ -158,10 +158,31 @@ export interface PageLink {
 
 export const PAGE_LINKS: readonly PageLink[] = [
   // The AI accounts section links its own page ("Open AI Accounts"); this link stands in only when that section is absent.
-  { panelId: 'ai-accounts', group: 'models', label: 'AI accounts', description: 'Sign in, order and manage accounts and their models.', order: 5, entry: ['ai-accounts', 'plugin:ai-accounts'] },
+  {
+    panelId: 'ai-accounts',
+    group: 'models',
+    label: 'AI accounts',
+    description: 'Sign in, order and manage accounts and their models.',
+    order: 5,
+    entry: ['ai-accounts', 'plugin:ai-accounts'],
+  },
   { panelId: 'mcp-servers', group: 'tools', label: 'MCP servers', description: 'Add, connect and authorize the tool servers agents use.', order: 0 },
-  { panelId: 'secret-catalog', group: 'security', label: 'Secrets', description: 'Credential aliases, never values.', order: 0, entry: ['plugin:secret-catalog'] },
-  { panelId: 'dshfiles-multi-host-hosts', group: 'hosts', label: 'Hosts', description: 'Add a host, test it and see which threads run there.', order: 0, entry: ['plugin:dshfiles-multi-host'] },
+  {
+    panelId: 'secret-catalog',
+    group: 'security',
+    label: 'Secrets',
+    description: 'Credential aliases, never values.',
+    order: 0,
+    entry: ['plugin:secret-catalog'],
+  },
+  {
+    panelId: 'dshfiles-multi-host-hosts',
+    group: 'hosts',
+    label: 'Hosts',
+    description: 'Add a host, test it and see which threads run there.',
+    order: 0,
+    entry: ['plugin:dshfiles-multi-host'],
+  },
   { panelId: 'plugins', group: 'plugins', label: 'Installed plugins', description: 'Every loaded plugin, its version and its own page.', order: 1 },
   { panelId: 'dshfiles-agents', group: 'agents', label: 'Agent definitions', description: 'Configured agents, their instructions and routes.', order: 0 },
 ]
@@ -257,7 +278,16 @@ const groupEntries = (input: {
 }): readonly GroupedEntries[] => {
   const entries = new Map<
     string,
-    { group: SettingsGroupId; label: string; order: number; sectionId?: string; pages: PluginSettingsPage[]; hiddenPages: PluginSettingsPage[]; link?: PageLink; keywords: string[] }
+    {
+      group: SettingsGroupId
+      label: string
+      order: number
+      sectionId?: string
+      pages: PluginSettingsPage[]
+      hiddenPages: PluginSettingsPage[]
+      link?: PageLink
+      keywords: string[]
+    }
   >()
   for (const section of input.sections) {
     const placement = placementOfSection(section.id)
@@ -282,7 +312,9 @@ const groupEntries = (input: {
       if (target === undefined || fields.length === 0) continue
       target.pages.push({ ...original, pageId: `${promotion.entry}:${original.ns}:${promotion.key}`, title: promotion.title, description: '', fields })
     }
-    const kept = original.fields.filter(field => !isPromoted(field) || !entries.has(PROMOTED_FIELDS.find(promotion => promotion.key === field.key)?.entry ?? ''))
+    const kept = original.fields.filter(
+      field => !isPromoted(field) || !entries.has(PROMOTED_FIELDS.find(promotion => promotion.key === field.key)?.entry ?? ''),
+    )
     const jev = kept.filter(isJevField)
     const rest = kept.filter(field => !isJevField(field))
     const title = pageTitle(original)
@@ -313,10 +345,24 @@ const groupEntries = (input: {
       target.keywords.push(page.ns, page.title)
       continue
     }
-    entries.set(page.pageId, { group: placement.group, label: page.title, order: placement.order ?? 200, pages: [page], hiddenPages: [], keywords: [page.ns, page.title] })
+    entries.set(page.pageId, {
+      group: placement.group,
+      label: page.title,
+      order: placement.order ?? 200,
+      pages: [page],
+      hiddenPages: [],
+      keywords: [page.ns, page.title],
+    })
   }
   if (jevPages.length > 0) {
-    entries.set(JEV_ENTRY_ID, { group: 'tools', label: 'Jev', order: 40, pages: jevPages, hiddenPages: [], keywords: ['jev', 'typesafe', 'classifier', ...jevPages.map(page => page.ns)] })
+    entries.set(JEV_ENTRY_ID, {
+      group: 'tools',
+      label: 'Jev',
+      order: 40,
+      pages: jevPages,
+      hiddenPages: [],
+      keywords: ['jev', 'typesafe', 'classifier', ...jevPages.map(page => page.ns)],
+    })
   }
   for (const link of PAGE_LINKS) {
     if (!input.panels.has(link.panelId)) continue
@@ -332,7 +378,15 @@ const groupEntries = (input: {
       target.keywords.push(link.panelId)
       continue
     }
-    entries.set(`link:${link.panelId}`, { group: link.group, label: link.label, order: link.order, pages: [], hiddenPages: [], link, keywords: [link.panelId, link.description] })
+    entries.set(`link:${link.panelId}`, {
+      group: link.group,
+      label: link.label,
+      order: link.order,
+      pages: [],
+      hiddenPages: [],
+      link,
+      keywords: [link.panelId, link.description],
+    })
   }
   const byGroup = new Map<SettingsGroupId, SettingsEntry[]>()
   for (const [id, entry] of entries) {
@@ -344,11 +398,11 @@ const groupEntries = (input: {
       pages: entry.pages,
       hiddenPages: entry.hiddenPages,
       keywords: entry.keywords.join(' '),
-      ...(entry.sectionId === undefined ? {} : { sectionId: entry.sectionId }),
-      ...(entry.link === undefined ? {} : { link: entry.link }),
     }
+    const withSection: SettingsEntry = entry.sectionId === undefined ? row : { ...row, sectionId: entry.sectionId }
+    const finished: SettingsEntry = entry.link === undefined ? withSection : { ...withSection, link: entry.link }
     const list = byGroup.get(entry.group) ?? []
-    list.push(row)
+    list.push(finished)
     byGroup.set(entry.group, list)
   }
   return SETTINGS_GROUPS.flatMap(group => {

@@ -99,16 +99,14 @@ describe('traces alert inbox provider', () => {
         mute: unused,
         feed: unused,
         snapshot: () =>
-          Effect.sync(
-            (): AlertsSnapshot => ({
-              rules,
-              firing: rules.filter(entry => entry.state.status === 'firing').length,
-              history: [],
-              latestEventId: 0,
-              lastEvaluatedAt: null,
-              intervalSeconds: 60,
-            }),
-          ),
+          Effect.sync((): AlertsSnapshot => ({
+            rules,
+            firing: rules.filter(entry => entry.state.status === 'firing').length,
+            history: [],
+            latestEventId: 0,
+            lastEvaluatedAt: null,
+            intervalSeconds: 60,
+          })),
       }),
     )
     const lastStated = async (count: number): Promise<readonly AttentionDraft[]> => {

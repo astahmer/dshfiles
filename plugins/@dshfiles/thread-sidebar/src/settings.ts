@@ -55,7 +55,9 @@ export const threadSidebarSettings = defineSettings({
       Schema.const('docking').description('Free docking: movable panes in the left column'),
     ])
       .default(DEFAULT_PREFERENCES.layoutMode)
-      .description('Layout of the left column. Free docking brings back the movable panes and your saved docking layout; switching back keeps it for next time.'),
+      .description(
+        'Layout of the left column. Free docking brings back the movable panes and your saved docking layout; switching back keeps it for next time.',
+      ),
     headerMode: Schema.union(['compact', 'expanded'] as const)
       .default(DEFAULT_PREFERENCES.headerMode)
       .description('Compact shows one scrollable icon row; expanded shows labels and folds into the icon row at 76px or less.'),

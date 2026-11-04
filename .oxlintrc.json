@@ -44,6 +44,7 @@
           "plugins/@dshfiles/plugin-ui/src/components/ui/**",
           "tooling/dshx/packages/**/src/**/index.ts",
           "tooling/dshx/packages/dshx/src/effect/plugin.ts",
+          "plugins/@dshfiles/workbench/src/registry.ts",
           "tooling/dshx/scripts/**",
           "tooling/dshx/e2e/support/**",
           "**/test/**",

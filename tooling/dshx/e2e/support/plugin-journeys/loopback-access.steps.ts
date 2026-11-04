@@ -201,7 +201,7 @@ const openNetworkSettings = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Account menu', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Settings', exact: true }).click()
   await page.getByRole('button', { name: 'Network access', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Network access', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Network access', exact: true }).last()).toBeVisible()
   await expect(page.getByRole('switch', { name: 'LAN access', exact: true })).toBeEnabled()
 }
 
@@ -300,7 +300,7 @@ Then('network choices are staged safely and loaded at the next isolated startup'
   await recordAssertion(page, 'network-access-settings-fit-narrow-panes', async () => {
     for (const width of [360, 480, 768, 1024]) {
       await page.setViewportSize({ width, height: 900 })
-      const section = page.getByRole('heading', { name: 'Network access', exact: true }).locator('..').locator('..')
+      const section = page.getByRole('heading', { name: 'Network access', exact: true }).last().locator('..').locator('..')
       await expect(section).toBeVisible()
       expect(await section.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
       await expect(page.getByRole('switch', { name: 'LAN access', exact: true })).toBeVisible()

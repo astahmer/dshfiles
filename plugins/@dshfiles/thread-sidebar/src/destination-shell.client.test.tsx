@@ -75,7 +75,11 @@ describe('DestinationShell', () => {
     setPhone(false)
     const shell = renderShell()
     const rail = screen.getByRole('tablist', { name: 'Destinations' })
-    expect(within(rail).getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Threads', 'Inbox', 'Land', 'Work', 'Agents', 'Observe', 'Knowledge', 'Settings'])
+    expect(
+      within(rail)
+        .getAllByRole('tab')
+        .map(tab => tab.textContent),
+    ).toEqual(['Threads', 'Inbox', 'Land', 'Work', 'Agents', 'Observe', 'Knowledge', 'Settings'])
     expect(screen.getByText('Thread list')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Board' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'New thread' })).toBeNull()
@@ -84,7 +88,11 @@ describe('DestinationShell', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Observe' }))
     expect(shell.record).toHaveBeenCalledWith({ destination: 'observe', surface: 'rail' })
     const pages = screen.getByRole('navigation', { name: 'Observe pages' })
-    expect(within(pages).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Usage', 'Traces'])
+    expect(
+      within(pages)
+        .getAllByRole('button')
+        .map(button => button.getAttribute('aria-label')),
+    ).toEqual(['Usage', 'Traces'])
     fireEvent.click(screen.getByRole('button', { name: 'Traces' }))
     expect(shell.selectPanel).toHaveBeenCalledWith('traces')
     expect(shell.record).toHaveBeenCalledWith({ destination: 'observe', section: 'traces', surface: 'index' })
@@ -118,7 +126,11 @@ describe('DestinationShell', () => {
     expect(screen.queryByRole('tablist')).toBeNull()
     expect(document.documentElement.hasAttribute('data-shell-phone-nav')).toBe(true)
     const bar = screen.getByRole('navigation', { name: 'Destinations' })
-    expect(within(bar).getAllByRole('button').map(button => button.textContent)).toEqual(['Threads', 'Inbox', 'New', 'More'])
+    expect(
+      within(bar)
+        .getAllByRole('button')
+        .map(button => button.textContent),
+    ).toEqual(['Threads', 'Inbox', 'New', 'More'])
     fireEvent.click(within(bar).getByRole('button', { name: 'Inbox' }))
     expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
     expect(shell.record).toHaveBeenCalledWith({ destination: 'inbox', surface: 'tab-bar' })

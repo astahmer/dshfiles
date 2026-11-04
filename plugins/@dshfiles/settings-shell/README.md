@@ -178,8 +178,8 @@ Deliberate differences from upstream:
 
 ## Settings (`dshfiles-settings-shell`)
 
-| Key      | Default | Meaning                                                                                                  |
-| -------- | ------- | -------------------------------------------------------------------------------------------------------- |
+| Key      | Default | Meaning                                                                                            |
+| -------- | ------- | -------------------------------------------------------------------------------------------------- |
 | `openIn` | `auto`  | Retired and hidden: Settings always opens as the page in the stage; a saved value still validates. |
 | `jevSecret` | `''` | The one TypeSafe Jev key (`secret:ALIAS[@env]`, Secret Catalog picker), read by Backlog and Memory. |
 
