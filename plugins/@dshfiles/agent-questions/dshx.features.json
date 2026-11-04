@@ -277,6 +277,61 @@
       ]
     },
     {
+      "id": "root-timed-questions",
+      "title": "Root timed questions keep the Agent working",
+      "summary": "With the web seed's tool-ask-user row in mode: timed, a root Agent's ask_user_question shows a counting-down card; when the foreground wait ends the Agent gets a pending result and keeps working, a later answer arrives as a user message tagged answer_to_pending_question, and stopping the turn withdraws the form.",
+      "surfaces": [
+        "client",
+        "integration"
+      ],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: native question card",
+      "configuration": [],
+      "states": [
+        "counting-down",
+        "pending-answerable",
+        "answered-late",
+        "stopped",
+        "after-host-restart"
+      ],
+      "failureModes": [
+        "The timed schema exists only where the profile selects it: the web seed's preset-standard row sets tool-ask-user mode: timed, and a profile without that row gets the blocking legacy schema.",
+        "While the card is open it takes the composer's place, so Stop generating is reachable only after closing the panel (\"reopen it from the tool call\").",
+        "After a Host restart the pending card is shown again, but the root Session is stopped; delivering an answer to a stopped root Session is a Host gap (see plans/dsh-host-gaps.md), so the journey proves the card survives, not that a post-restart answer reaches the Agent."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@deepseek-ai/dsh-tool-ask-user",
+          "boundary": "DSH's own timed ask_user_question tool and its userQuestions service; agent-questions only restyles its card and reads its projection.",
+          "deterministicFake": "The loopback fake Command Code provider issues the ask_user_question call and records the pending tool result and the late reply."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-questions.root-timed-question",
+          "featureFile": "tooling/dshx/e2e/features/agent-questions-timed.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agent-questions.root-timed-question-cancel",
+          "featureFile": "tooling/dshx/e2e/features/agent-questions-timed.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agent-questions.root-timed-question-restart",
+          "featureFile": "tooling/dshx/e2e/features/agent-questions-timed.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Native DSH tool behaviour exercised end to end; agent-questions starts no Host work of its own for it."
+        }
+      ]
+    },
+    {
       "id": "question-card-layout",
       "title": "Steady countdown and compact native question card",
       "summary": "Restyles the native async question card: a tabular, fixed-width countdown, a header that stacks under 480px, and a question clamped to three lines that expands on hover or focus.",
@@ -300,9 +355,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
-          "id": "agent-questions.question-card-layout-needs-model-turn",
-          "reason": "The card only renders while a model turn calls ask_user_question, which dshx dev reach steps cannot trigger; check it on a live question at 800px and 420px pane widths."
+          "kind": "gherkin",
+          "id": "agent-questions.question-card-countdown",
+          "featureFile": "tooling/dshx/e2e/features/agent-questions-timed.feature"
         }
       ],
       "telemetry": [
