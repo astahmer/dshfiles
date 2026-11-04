@@ -290,7 +290,7 @@ export const DestinationBar = (props: {
     if (
       showsSentThread ||
       newThreadId !== null ||
-      current.vcs !== 'jj' ||
+      current.vcs === 'none' ||
       !current.isolated ||
       current.projectWorkspaceId === null ||
       current.projectWorkspaceId === workspaceId
@@ -300,7 +300,8 @@ export const DestinationBar = (props: {
   }, [current, newThreadId, rootSelectionVisitId, services, showsSentThread, toggle.busy, workspaceId])
   const projectId = current?.projectWorkspaceId ?? workspaceId ?? ''
   const localProjectPath = services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === projectId)?.path
-  const isJj = current?.vcs === 'jj'
+  // jj and git repositories both offer isolation and a bookmark (git: branch) to start from.
+  const isJj = current !== undefined && current.vcs !== 'none'
   const isolated = toggle.pending?.isolate ?? toggle.deferredIsolation ?? current?.isolated === true
   const defaultBookmark = settings?.bookmark
   const bookmark = current === undefined ? null : WorkspaceToggle.startingBookmark({ destination: current, isolated, defaultBookmark })

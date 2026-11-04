@@ -36,6 +36,8 @@ interface SpawnSpec {
   readonly argv: readonly string[]
   readonly cwd?: string
   readonly signal?: AbortSignal
+  /** Merged over the test environment, as DSH's subprocess runtime merges it over its scrubbed parent environment. */
+  readonly env?: Readonly<Record<string, string | undefined>>
 }
 
 interface SessionState {
@@ -180,7 +182,7 @@ const start = async (
     }
     const [executable, ...args] = spec.argv
     if (executable === undefined) throw new Error('empty argv')
-    const child = spawn(executable, args, { cwd: spec.cwd, env })
+    const child = spawn(executable, args, { cwd: spec.cwd, env: { ...env, ...spec.env } })
     child.stdout.on('data', chunk => (stdout += String(chunk)))
     child.stderr.on('data', chunk => (stderr += String(chunk)))
     const abort = (): void => {

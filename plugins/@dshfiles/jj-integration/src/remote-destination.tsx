@@ -144,7 +144,7 @@ export const RemoteDestinationChips = (props: {
         <TooltipContent className="dshx:max-w-96">{destination.folder ?? t('chooseProject')}</TooltipContent>
       </Tooltip>
       {jj.isFetching ? <Spinner className="dshx:size-3.5" /> : null}
-      {remote?.vcs === 'jj' ? (
+      {remote?.vcs !== undefined && remote.vcs !== 'none' ? (
         <span className="dshx:inline-flex dshx:items-center dshx:rounded-md">
           <Popover open={branchOpen} onOpenChange={setBranchOpen}>
             <Tooltip>

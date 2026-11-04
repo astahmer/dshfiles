@@ -46,9 +46,9 @@ const make = Effect.gen(function* () {
     `${input.project?.title ?? path.basename(input.repoRoot)} · ${input.name}`
 
   const destinationAt = Effect.fnUntraced(function* (input: { readonly root: string; readonly isolated: boolean; readonly projectWorkspaceId: string | null }) {
-    const bookmarks = yield* threads.bookmarks(input.root)
+    const [bookmarks, vcs] = yield* Effect.all([threads.bookmarks(input.root), threads.vcsAt(input.root)], { concurrency: 'unbounded' })
     return {
-      vcs: 'jj',
+      vcs,
       isolated: input.isolated,
       projectWorkspaceId: input.projectWorkspaceId,
       bookmark: bookmarks.current,
@@ -97,7 +97,7 @@ const make = Effect.gen(function* () {
       .locate(cwd)
       .pipe(
         Effect.catchTag('NotARepository', () =>
-          Effect.fail(new NotARepository({ detail: 'Workspace isolation requires a Session inside a local jj repository.' })),
+          Effect.fail(new NotARepository({ detail: 'Workspace isolation requires a Session inside a local jj or git repository.' })),
         ),
       )
     if (location.threadName !== undefined) {
@@ -277,7 +277,7 @@ const make = Effect.gen(function* () {
 
   /** A deleted thread folder must not fail the next turn of a Session pinned to it: check the workspace out again first. */
   const restoreMissing = Effect.fn('thread lifecycle restore missing')(function* (input: { readonly path: string; readonly sessionId: string }) {
-    if (yield* exists(path.join(input.path, '.jj'))) return
+    if ((yield* exists(path.join(input.path, '.jj'))) || (yield* exists(path.join(input.path, '.git')))) return
     for (const workspace of yield* registry.list) {
       if (!(yield* exists(workspace.path)) || (yield* threads.threadsDirectory(workspace.path)) !== path.dirname(input.path)) continue
       const location = yield* views.bestEffortLocation(workspace.path)

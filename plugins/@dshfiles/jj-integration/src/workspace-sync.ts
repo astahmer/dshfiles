@@ -1,5 +1,5 @@
 import { DshxPlugin } from '@dshfiles/dshx/effect'
-import { Clock, Context, Duration, Effect, Layer, Option, Queue, Ref, Schema, Stream } from 'effect'
+import { Clock, Context, Duration, Effect, FileSystem, Layer, Option, Path, Queue, Ref, Schema, Stream } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import type { WorkspaceSyncView } from './api.js'
 import { ActivityLog } from './host-edges-promise.js'
@@ -81,6 +81,8 @@ export class WorkspaceSync extends Context.Service<
     Effect.gen(function* () {
       const settings = yield* JjSettings
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const fileSystem = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
       const activity = yield* ActivityLog
       const pending = yield* Ref.make<ReadonlyMap<string, WorkspaceSyncInput>>(new Map())
       const view = yield* Ref.make<WorkspaceSyncView | null>(null)
@@ -155,6 +157,8 @@ export class WorkspaceSync extends Context.Service<
         enqueue: Effect.fn('workspace sync enqueue')(function* (request: WorkspaceSyncRequest) {
           const workspace = (yield* settings.get).syncWorkspaceAfterLand.trim()
           if (workspace === '') return
+          // `dshx checkout sync` rebases a jj workspace; a git checkout's branch already fast-forwarded when it landed.
+          if (!(yield* fileSystem.exists(path.join(request.repoRoot, '.jj')).pipe(Effect.orElseSucceed(() => false)))) return
           const input: WorkspaceSyncInput = { ...request, workspace }
           yield* Ref.update(pending, current => new Map([...current, [input.repoRoot, input]]))
           yield* Ref.set(view, syncView(input, 'running', null, 0))

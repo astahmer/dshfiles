@@ -258,6 +258,95 @@ When('a disposable jj repository is chosen as the New thread project', async ({ 
   await expect(projectButton(page)).toHaveText('repo')
 })
 
+const gitAt = (cwd: string, home: string, args: readonly string[]): string => {
+  const result = spawnSync('git', args, {
+    cwd,
+    env: {
+      PATH: process.env.PATH ?? '',
+      HOME: home,
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_AUTHOR_NAME: 'JJ Integration E2E',
+      GIT_AUTHOR_EMAIL: 'jj-integration-e2e@example.invalid',
+      GIT_COMMITTER_NAME: 'JJ Integration E2E',
+      GIT_COMMITTER_EMAIL: 'jj-integration-e2e@example.invalid',
+    },
+    encoding: 'utf8',
+    shell: false,
+    timeout: 20_000,
+  })
+  if (result.error !== undefined) throw result.error
+  if (result.status !== 0) throw new Error(`Disposable git fixture command failed (${String(result.status)}): ${result.stderr}`)
+  return result.stdout
+}
+
+/** A plain git repository with no `.jj`: jj-integration serves it through its git backend. */
+const createGitRepository = async (page: Page): Promise<ThreadRepository> => {
+  const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), 'dshx-jj-integration-git-e2e-')))
+  const repositoryPath = join(temporaryRoot, 'repo')
+  await mkdir(repositoryPath)
+  try {
+    gitAt(repositoryPath, temporaryRoot, ['init', '-q', '-b', 'main'])
+    // The Host's git runs with the user's environment, so the identity it rebases with lives in the repository.
+    gitAt(repositoryPath, temporaryRoot, ['config', 'user.name', 'JJ Integration E2E'])
+    gitAt(repositoryPath, temporaryRoot, ['config', 'user.email', 'jj-integration-e2e@example.invalid'])
+    await writeFile(join(repositoryPath, 'README.md'), 'base\n')
+    gitAt(repositoryPath, temporaryRoot, ['add', '--all'])
+    gitAt(repositoryPath, temporaryRoot, ['commit', '-q', '-m', 'Base fixture'])
+    const baseCommitId = gitAt(repositoryPath, temporaryRoot, ['rev-parse', 'main']).trim()
+    const repository: ThreadRepository = {
+      temporaryRoot,
+      repositoryPath,
+      threadsPath: join(temporaryRoot, 'repo-threads'),
+      baseCommitId,
+      releaseCommitId: baseCommitId,
+    }
+    repositories.set(page, repository)
+    return repository
+  } catch (error) {
+    await rm(temporaryRoot, { recursive: true, force: true })
+    throw error
+  }
+}
+
+const gitWorktreePaths = (repository: ThreadRepository): readonly string[] =>
+  gitAt(repository.repositoryPath, repository.temporaryRoot, ['worktree', 'list', '--porcelain'])
+    .split('\n')
+    .filter(line => line.startsWith('worktree '))
+    .map(line => line.slice('worktree '.length))
+
+When('a disposable git-only repository is chosen as the New thread project', async ({ page }: { page: Page }) => {
+  const repository = await createGitRepository(page)
+  await chooseProjectPath(page, repository.repositoryPath)
+  await expect(projectButton(page)).toHaveText('repo')
+})
+
+Then('the destination bar offers the main branch in the shared git checkout', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jj-integration-git-destination-starts-on-main', () =>
+    expect(page.getByRole('button', { name: 'main', exact: true })).toBeVisible(),
+  )
+  await recordAssertion(page, 'jj-integration-git-destination-defaults-to-the-shared-checkout', async () => {
+    await expect(workspaceToggle(page)).not.toBeChecked()
+    expect(gitWorktreePaths(repository)).toEqual([repository.repositoryPath])
+    expect(existsSync(join(repository.repositoryPath, '.jj'))).toBe(false)
+  })
+})
+
+Then('the New thread runs in its own git worktree on main', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  const threadName = await currentThreadName(page)
+  const worktree = join(repository.threadsPath, threadName)
+  await recordAssertion(page, 'jj-integration-git-thread-is-a-worktree-on-main', async () => {
+    await expect(workspaceToggle(page)).toBeChecked()
+    await expect(page.getByRole('button', { name: 'main', exact: true })).toBeVisible()
+    await expect.poll(() => gitWorktreePaths(repository)).toContain(worktree)
+    expect(gitAt(worktree, repository.temporaryRoot, ['rev-parse', '--abbrev-ref', 'HEAD']).trim()).toBe(`dsh/${threadName}`)
+    expect(gitAt(worktree, repository.temporaryRoot, ['rev-parse', 'HEAD']).trim()).toBe(repository.baseCommitId)
+    expect(existsSync(join(repository.repositoryPath, '.jj'))).toBe(false)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the project is removed from the New thread picker', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
   await projectButton(page).click()

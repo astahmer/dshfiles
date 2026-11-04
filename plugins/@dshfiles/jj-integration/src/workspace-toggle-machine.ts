@@ -154,7 +154,7 @@ interface DefaultDestinationInput {
 
 const defaultDestinationMove = (input: DefaultDestinationInput): ToggleRequest | null => {
   const { destination } = input
-  if (destination.vcs !== 'jj') return null
+  if (destination.vcs === 'none') return null
   if (destination.isolateByDefault) return ownsIsolatedThreadWorkspace(destination) ? null : isolatingMove(input)
   if (destination.isolated) return { projectWorkspaceId: destination.projectWorkspaceId ?? input.workspaceId, leaving: null, leavingBase: null, isolate: false }
   return null
@@ -163,7 +163,7 @@ const defaultDestinationMove = (input: DefaultDestinationInput): ToggleRequest |
 /** A move into a fresh thread workspace of the same project, never back into the workspace the Session leaves. */
 const isolatingMove = (input: DefaultDestinationInput): ToggleRequest | null => {
   const { destination } = input
-  if (destination.vcs !== 'jj') return null
+  if (destination.vcs === 'none') return null
   const projectWorkspaceId = destination.projectWorkspaceId ?? input.workspaceId
   let move: ToggleRequest = { projectWorkspaceId, leaving: null, leavingBase: null, isolate: true }
   if (input.workspaceId !== projectWorkspaceId) move = { ...move, excludeSpareWorkspaceId: input.workspaceId }

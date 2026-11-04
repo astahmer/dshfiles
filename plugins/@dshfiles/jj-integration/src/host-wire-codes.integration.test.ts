@@ -220,7 +220,7 @@ describe.skipIf(!jjAvailable)('jj-integration wire error codes', () => {
           "error": "This agent Session has no working directory to isolate.",
         },
         "jj_thread_isolate: outside jj": {
-          "error": "Workspace isolation requires a Session inside a local jj repository.",
+          "error": "Workspace isolation requires a Session inside a local jj or git repository.",
         },
         "jj_thread_rebase: busy sibling session": {
           "error": "This workspace is still in use: “Busy thread” is still working; “Asking thread” is waiting for an answer. Land once every thread in it is idle.",

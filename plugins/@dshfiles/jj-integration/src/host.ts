@@ -27,6 +27,8 @@ import { ThreadWorkspaces } from './thread-workspaces.js'
 import { WorkspaceSync } from './workspace-sync.js'
 
 const JJ_TIMEOUT = Duration.minutes(2)
+const JJ_PROVIDER_PRIORITY = 100
+const GIT_PROVIDER_PRIORITY = 50
 const MAX_JJ_STDOUT_BYTES = 512 * 1024
 const MAX_JJ_STDERR_BYTES = 64 * 1024
 
@@ -95,7 +97,14 @@ const vcsProviderHandlers = Api.handlers(VcsProviders.contract('@dshfiles/jj-int
         Option.match(location, {
           onNone: () => ({ match: null }),
           onSome: found => ({
-            match: { vcs: 'jj', priority: 100, repoRoot: found.repoRoot, workspaceRoot: found.workspaceRoot, isolated: found.threadName !== undefined },
+            // jj keeps its priority; a git-only repository still beats @dshfiles/git-worktrees (10) because these threads can land.
+            match: {
+              vcs: found.vcs ?? 'jj',
+              priority: found.vcs === 'git' ? GIT_PROVIDER_PRIORITY : JJ_PROVIDER_PRIORITY,
+              repoRoot: found.repoRoot,
+              workspaceRoot: found.workspaceRoot,
+              isolated: found.threadName !== undefined,
+            },
           }),
         }),
       ),

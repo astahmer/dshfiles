@@ -199,7 +199,7 @@ export const jjIntegrationApi = defineApi({
         readOnly: true,
         render: output =>
           [
-            output.vcs === 'jj' ? 'Jujutsu repository' : 'No jj repository',
+            output.vcs === 'jj' ? 'Jujutsu repository' : output.vcs === 'git' ? 'Git repository' : 'No jj or git repository',
             output.isolated ? 'isolated thread workspace' : undefined,
             `bookmark ${output.bookmark ?? 'none'}`,
             output.bookmarks.length === 0 ? undefined : `available: ${output.bookmarks.join(', ')}`,

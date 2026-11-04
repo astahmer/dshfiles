@@ -77,7 +77,7 @@
         "missing"
       ],
       "failureModes": [
-        "A folder outside a jj repository offers no bookmark or isolation.",
+        "A folder outside a jj or git repository offers no bookmark or isolation.",
         "A thread workspace with revisions to rebase is never removed by the sweep."
       ],
       "externalDependencies": [
@@ -153,6 +153,111 @@
           "span": "jj <verb>",
           "file": "plugins/@dshfiles/jj-cli/src/jj.test.ts",
           "testName": "records one jj <verb> client span with value-free attributes and the exit code"
+        }
+      ]
+    },
+    {
+      "id": "git-thread-workspaces",
+      "title": "Thread workspaces in git-only repositories",
+      "summary": "The same isolate, status, rebase, discard, cleanup, snapshot and review-history flows run in a repository without .jj: a VCS backend port routes each call to the jj adapter when .jj exists (also colocated) and to a git adapter otherwise, which keeps one git worktree per thread on a dsh/<name> branch and lands by rebase plus a forward-only branch move.",
+      "surfaces": ["host", "client", "tool", "integration"],
+      "configuration": [
+        {
+          "key": "bookmark",
+          "defaultValue": "main",
+          "constraints": "In a git repository: the local branch (else origin/<name>) threads start from and land on.",
+          "coveredBy": ["jj-integration.git-land"]
+        },
+        {
+          "key": "threadsDirectory",
+          "defaultValue": "unset",
+          "constraints": "Shared with jj: empty uses <repository>-threads beside the repository.",
+          "coveredBy": ["jj-integration.git-provision"]
+        }
+      ],
+      "states": ["jj-backend", "git-backend", "needs-commit", "landed", "conflicted", "already-integrated"],
+      "failureModes": [
+        "Uncommitted edits in a git thread read as one undescribed working-tree revision, so landing asks for a commit instead of dropping them.",
+        "A rebase conflict is aborted and reported with its files; the worktree is left as it was.",
+        "When the target branch is checked out with edits that block a fast-forward, landing fails with a recovery hint and the branch does not move.",
+        "dshx checkout sync after a land is skipped in a git repository: the checked-out branch already fast-forwarded."
+      ],
+      "externalDependencies": [
+        {
+          "id": "git",
+          "boundary": "Fixed-argv git CLI through the DSH subprocess service, non-interactive, with bounded output and a two-minute timeout.",
+          "deterministicFake": "Real temporary git repositories in src/git-thread-workspaces.integration.test.ts and src/host-git.integration.test.ts; no git mock is used."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.git-destination-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.vcs-detector",
+          "file": "plugins/@dshfiles/jj-integration/src/vcs-detector.test.ts",
+          "testName": "prefers jj in a colocated checkout, picks git for a git-only one, and reads the nearest marker"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-provision",
+          "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
+          "testName": "provisions a git worktree on the bookmark and locates it as a git thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-land",
+          "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
+          "testName": "lands described commits by rebasing onto the moved bookmark and fast-forwarding the checked-out branch"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-land-refusals",
+          "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
+          "testName": "asks for a commit before landing uncommitted edits and reports conflicts without leaving a rebase behind"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-land-verified",
+          "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
+          "testName": "lands a verified candidate only after its checks pass, and refuses a stale source"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-discard",
+          "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
+          "testName": "keeps a thread with work unless forced, then removes its worktree and branch"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-snapshot",
+          "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
+          "testName": "snapshots and restores a worktree without moving HEAD or the real index"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-host-api",
+          "file": "plugins/@dshfiles/jj-integration/src/host-git.integration.test.ts",
+          "testName": "isolates, reports, lands and discards a thread through the same API a jj repository uses"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "git <verb>",
+          "file": "plugins/@dshfiles/jj-integration/src/git-cli.test.ts",
+          "testName": "records one git <verb> client span with value-free attributes and the exit code"
         }
       ]
     },

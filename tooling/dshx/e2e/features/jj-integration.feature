@@ -1,7 +1,7 @@
 Feature: jj thread workspaces
 
-  These journeys register a disposable jj repository as a project through the
-  real New thread picker. The Host provisions, discards and rebases thread
+  These journeys register a disposable jj repository (one journey: a git-only
+  repository) as a project through the real New thread picker. The Host provisions, discards and rebases thread
   workspaces in that repository; the agent's edits are stood in for by the jj CLI.
 
   @smoke
@@ -10,6 +10,14 @@ Feature: jj thread workspaces
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     Then the destination bar offers the main bookmark in the shared checkout
+
+  @scenario:jj-integration.git-destination-browser-journey
+  Scenario: A git-only repository gets the same destination bar and its own git worktree
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable git-only repository is chosen as the New thread project
+    Then the destination bar offers the main branch in the shared git checkout
+    When the New thread workspace toggle is turned on
+    Then the New thread runs in its own git worktree on main
 
   @scenario:jj-integration.configured-base-browser-journey
   Scenario: New chat uses configured main instead of the project checkout feature bookmark

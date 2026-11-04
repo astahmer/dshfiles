@@ -18,7 +18,7 @@ export const integrationProgressSchema = Schema.Struct({
 })
 
 export const destinationSchema = Schema.Struct({
-  vcs: Schema.Literals(['jj', 'none']),
+  vcs: Schema.Literals(['jj', 'git', 'none']),
   isolated: Schema.Boolean,
   projectWorkspaceId: Schema.NullOr(Schema.String),
   bookmark: Schema.NullOr(Schema.String),
