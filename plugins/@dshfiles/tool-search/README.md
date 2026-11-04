@@ -67,17 +67,32 @@ DSH_TOOL_SEARCH_MEASURE=1 fnm exec --using=22.23.3 pnpm --dir plugins/@dshfiles/
 
 A temporary instrumented build of the isolated full-profile scratch boot (211 active entries; all 56 bundles under test loaded) recorded a final global catalog of 203 tool schemas and 95,177 UTF-8 bytes of serialized schemas. The final report was the last of 204 registry snapshots. This measures schema payload size only—not provider tokenization or task quality. The opt-in `reportSchemaMetrics` config defaults to false and reports aggregate counts and byte totals only; it never logs schema names or contents.
 
-The same file includes an opt-in provider benchmark that runs the three synthetic tasks in both modes through OpenCode Go Alex at high reasoning. It is skipped unless `DSH_TOOL_SEARCH_PROVIDER_BENCHMARK=1`; tools return only fixture data and record note writes in memory. Each scenario caps requests at three direct or four progressive, disables retries, and caps output at 1,024 tokens. It reports schema bytes, local tool-token and context estimates, provider-reported usage, tool selection, and latency without logging prompts, response text, or credentials. It disables the default Harness identity and runtime-context snapshots so only the synthetic system instruction, prompts, and schemas are sent.
+## Provider benchmark (Codex)
 
-Run only when real provider usage is intended. Use `secret run` to inject project aliases; its leak guard scrubs known secret values from child stdout/stderr:
+The same file includes an opt-in A/B benchmark against a real Codex (ChatGPT subscription) account from `@dshfiles/ai-accounts`. It authenticates in-process through that plugin's `codexCredentialStore`, the same read/refresh path the live Host uses; the token never leaves the process. It is skipped unless `DSH_TOOL_SEARCH_PROVIDER_BENCHMARK=1`. Every tool answers from in-memory fixtures. Retries are off, each scenario is capped at 4 (direct) or 6 (progressive) requests, and a total request budget stops the run. Progressive mode uses the plugin defaults (`maxResults: 5`, nothing always visible).
+
+Catalogs: `real-335` registers the 335 real schemas the owned web-profile bundles serve (`tooling/dshx/e2e/fixtures/tool-schemas.json`), with six tasks phrased by intent so the tool must be found by meaning; `synthetic-603` and `synthetic-8` reuse the fixture above. Success means an accepted tool ran with acceptable arguments and the final answer contains the fixture fact.
 
 ```sh
-DSH_TOOL_SEARCH_PROVIDER_BENCHMARK=1 secret run -- fnm exec --using=22.23.3 pnpm --dir plugins/@dshfiles/tool-search exec vitest run src/provider-benchmark.test.ts
+DSH_TOOL_SEARCH_PROVIDER_BENCHMARK=1 DSH_TOOL_SEARCH_BENCHMARK_ACCOUNT=codex-alex2 DSH_TOOL_SEARCH_BENCHMARK_MODEL=gpt-6-luna \
+  DSH_TOOL_SEARCH_BENCHMARK_REQUEST_BUDGET=85 DSH_TOOL_SEARCH_BENCHMARK_OUTPUT=/tmp/tool-search-benchmark.json \
+  pnpm --dir plugins/@dshfiles/tool-search exec vitest run src/provider-benchmark.test.ts -t 'Codex provider'
 ```
 
-Both authorized provider attempts resolved the alias but OpenCode Go returned `AUTH` on the first direct request, with zero usage and no tool call; the second failed after 544 ms with zero provider tokens. The early-stop guard prevented the progressive and remaining tasks on each attempt. DSH account status reported OpenCode Go Alex signed in and healthy, so that status alone does not validate this API credential. Provider-backed A/B results remain unavailable; do not retry until the credential or route is corrected.
+Results on 2026-11-04, `codex-alex2` / `gpt-6-luna` / high, 85 provider requests (per-scenario mean ± sd; prompt = uncached input + cached input, both provider-reported):
 
-These synthetic tasks do not establish full-profile savings, cache impact, or production-level economics; do not enable progressive disclosure profile-wide from this fixture alone.
+| Catalog       | Mode        | Success | Requests |  Uncached input |    Cached input |   Output |  Model latency |
+| ------------- | ----------- | ------: | -------: | --------------: | --------------: | -------: | -------------: |
+| real-335      | direct      |   12/12 |    2 ± 1 | 16,529 ± 14,118 | 43,595 ± 24,840 |  80 ± 43 |  7.1 s ± 2.9 s |
+| real-335      | progressive |    9/12 |    4 ± 1 |   2,911 ± 1,774 |       331 ± 623 | 212 ± 84 | 14.6 s ± 7.3 s |
+| synthetic-603 | direct      |     2/2 |        2 |          16,520 |          16,192 |       34 |          7.5 s |
+| synthetic-603 | progressive |     2/2 |        3 |           1,132 |               0 |       71 |          5.6 s |
+| synthetic-8   | direct      |     1/1 |        2 |             588 |               0 |       41 |          4.1 s |
+| synthetic-8   | progressive |     1/1 |        3 |           1,073 |               0 |       72 |          5.7 s |
+
+On the real catalog, direct visibility sends about 27.7K provider tokens of schemas per request, but Codex serves most of it from the prompt cache (72% cached overall; 5 of 12 first requests were already cached from earlier scenarios). Progressive discovery cuts prompt tokens about 95% (60K → 3.2K per task) and cache-discounted input about 86% (20.9K → 2.9K, counting cached tokens at 10%), but it never benefits from caching, doubles requests and model latency, nearly triples output tokens, and lost 3 of 12 tasks: BM25 search did not map "task tracker" to `backlog_capture` within six searches, and twice did not map "ChatGPT subscription allowance" to `ai_accounts_quota` (once the model answered without a tool, once it used `usage_status`). Direct mode made no wrong tool choice. On the 8-tool catalog progressive discovery costs more tokens and latency.
+
+These runs use one route, short single-turn tasks and a bare system prompt; they do not measure long multi-turn sessions, where direct mode's cached schema prefix amortizes further, or subscription quota accounting of cached tokens.
 
 ## Checks
 
