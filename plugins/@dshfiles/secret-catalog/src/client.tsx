@@ -6,6 +6,7 @@ import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/clien
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import { SecretLinkReveal, type SecretLinkRevealProps } from '@dshfiles/backlog/secret-link-reveal'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ProjectFolderPicker } from '@dshfiles/workspace-folder-picker/picker'
@@ -14,6 +15,7 @@ import { SECRET_CATALOG_LOCALE_NAMESPACE, secretCatalogLocale } from './locales.
 import { SecretCatalogPanel } from './secret-catalog-panel.js'
 import { JevInlineSetup } from './jev-inline-setup.js'
 import { SecretInputOverlay } from './secret-input-overlay.js'
+import { SecretLinkRevealControl } from './secret-link-reveal.js'
 import { createWorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 
 const PANEL_ID = 'secret-catalog'
@@ -29,9 +31,18 @@ export default defineClient({
   name: '@dshfiles/secret-catalog',
   locales: [secretCatalogLocale],
   inject: ['slots', 'conversation', 'remote', 'remote.directoryPicker', 'remote.workspace', 'workspaces', 'layout'],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
     const pickerPorts = createWorkspacePickerPorts(ctx.remote)
     const translate = ctx.locale.bind(SECRET_CATALOG_LOCALE_NAMESPACE)
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) {
+      const Reveal = (props: SecretLinkRevealProps): JSX.Element => (
+        <PluginQueryProvider>
+          <SecretLinkRevealControl {...props} t={translate} />
+        </PluginQueryProvider>
+      )
+      plugin.provide(SecretLinkReveal, { Reveal: plugin.bind(Reveal) })
+    }
     const label = (): string => translate('viewSecrets')
     const workspaces = (): IWorkspaces => ctx.workspaces
     const workspaceFolders = (): readonly string[] =>

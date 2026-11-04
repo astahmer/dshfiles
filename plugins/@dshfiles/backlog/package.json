@@ -24,6 +24,10 @@
     "./settings": {
       "types": "./src/settings.ts",
       "default": "./dist/settings.js"
+    },
+    "./secret-link-reveal": {
+      "types": "./src/secret-link-reveal.tsx",
+      "default": "./dist/secret-link-reveal.js"
     }
   },
   "scripts": {

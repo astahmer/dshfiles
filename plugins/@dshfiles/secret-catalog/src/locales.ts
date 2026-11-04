@@ -156,8 +156,7 @@ const en = {
   refStateAliasOnlyElsewhere:
     '{reference} does not resolve: alias {alias} exists only in the {elsewhereScope} config of {folder}, which this setting cannot read. Settings resolve {writeScope} aliases.',
   refStateEnvironmentMissing: '{reference} does not resolve: alias {alias} has no {environment} value (it has {environments}).',
-  refStateAmbiguous:
-    '{reference} does not resolve: alias {alias} is defined in several scopes ({scopes}) and the Host will not guess. Remove one in Secrets.',
+  refStateAmbiguous: '{reference} does not resolve: alias {alias} is defined in several scopes ({scopes}) and the Host will not guess. Remove one in Secrets.',
   refStateValueUnreadable:
     '{reference} does not resolve: the {scope} alias exists, but its vault item could not be read. The item may be missing, or the vault locked.',
   refStateValueEmpty: '{reference} does not resolve: its {scope} vault item is empty.',
@@ -203,6 +202,10 @@ const en = {
   confirmDeleteItemAction: 'Confirm delete item',
   renameHint: 'Renaming moves the alias inside its owning config with secret mv. The Bitwarden item is unchanged.',
   dismissNotice: 'Dismiss',
+  hideAlias: 'Hide {alias}',
+  linkRevealMissing: 'Not in the Secret Catalog for this project. Add it there, or fix the reference.',
+  linkRevealAmbiguous: 'Set in several scopes ({scopes}); keep one in the Secret Catalog to reveal it here.',
+  linkRevealUnavailable: 'The Secret Catalog could not list aliases.',
 }
 
 const zh = {
@@ -400,6 +403,10 @@ const zh = {
   confirmDeleteItemAction: '确认删除条目',
   renameHint: '重命名会通过 secret mv 在所属配置中移动别名，Bitwarden 条目保持不变。',
   dismissNotice: '关闭',
+  hideAlias: '隐藏 {alias}',
+  linkRevealMissing: '此项目的密钥目录中没有该别名。请在那里添加，或修正引用。',
+  linkRevealAmbiguous: '在多个作用域中设置（{scopes}）；在密钥目录中只保留一个即可在此显示。',
+  linkRevealUnavailable: '密钥目录无法列出别名。',
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

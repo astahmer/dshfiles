@@ -3,7 +3,7 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/backlog',
-  modules: { api: 'src/api.ts', settings: 'src/settings.ts' },
+  modules: { api: 'src/api.ts', settings: 'src/settings.ts', 'secret-link-reveal': 'src/secret-link-reveal.tsx' },
   host: {
     entry: 'src/host.ts',
     bundleDependencies: [

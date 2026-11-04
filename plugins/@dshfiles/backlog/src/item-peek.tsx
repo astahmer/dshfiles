@@ -75,6 +75,7 @@ import { BacklogTextBox } from './text-box.js'
 import { actorThreadFor } from './actor-thread.js'
 import { BacklogTriage } from './triage.js'
 import { workspaceReferenceLabel } from './workspace-reference-label.js'
+import { SecretLinkRevealSlot } from './secret-link-reveal.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
@@ -903,6 +904,7 @@ const SnoozeMenu = (props: { readonly id: number; readonly snoozedUntil: number 
 
 const LinkRow = (props: {
   readonly itemId: number
+  readonly project: string | null
   readonly link: BacklogLink
   readonly thread: ComposerThread | undefined
   readonly threadLabel: string
@@ -966,6 +968,7 @@ const LinkRow = (props: {
       {link.type !== 'item' && link.type !== 'url' && open === undefined && (
         <span className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs">{linkLabel(link)}</span>
       )}
+      {link.type === 'secret' && <SecretLinkRevealSlot reference={linkLabel(link)} cwd={props.project} />}
       {link.type !== 'item' && link.type !== 'url' && open !== undefined && (
         <button type="button" onClick={open} className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-[13px] dshx:hover:underline">
           {link.type === 'thread' ? props.threadLabel : linkLabel(link)}
@@ -1272,6 +1275,7 @@ const PeekBody = (props: {
                     <LinkRow
                       key={`${link.type}:${link.target}`}
                       itemId={item.id}
+                      project={item.project}
                       link={link}
                       thread={link.type === 'thread' ? threadsById.get(link.target) : undefined}
                       threadLabel={link.type === 'thread' ? threadLabel(link.target) : linkLabel(link)}

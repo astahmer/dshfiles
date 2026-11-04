@@ -2155,6 +2155,66 @@
           "source": "api-dispatch"
         }
       ]
+    },
+    {
+      "id": "secret-link-reveal",
+      "title": "Reveal an item's secret link in place",
+      "summary": "An item that names a credential as `secret:ALIAS[@env]` shows a Reveal button beside that link in its Relationships. The Secret Catalog provides the control through the backlog's secret-link-reveal contract and reveals through its own reveal verb and policy (explicit click, hidden on Hide, Esc or after the configured seconds); the backlog never stores or receives the value. An alias the Catalog does not hold, or holds in several scopes, offers Open in Secrets instead of guessing.",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Rotate secret:GITHUB_TOKEN\"",
+        "press Enter",
+        "click text \"Rotate secret:GITHUB_TOKEN\"",
+        "expect complementary \"Item detail\"",
+        "expect button \"Reveal GITHUB_TOKEN\""
+      ],
+      "surfaces": [
+        "client",
+        "integration"
+      ],
+      "surface": "detail",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › item detail › Relationships",
+      "configuration": [],
+      "states": [
+        "masked",
+        "revealing",
+        "revealed",
+        "missing",
+        "ambiguous",
+        "catalog-absent"
+      ],
+      "failureModes": [
+        "Without the Secret Catalog loaded the link stays a plain secret:ALIAS reference and no value control renders.",
+        "A failed reveal says to unlock the vault and leaves the button to try again; a failed alias list offers Re-check."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/secret-catalog",
+          "boundary": "secret-link-reveal contract module: the Catalog provides the Reveal component and calls its own reveal verb.",
+          "deterministicFake": "tooling/dshx/e2e/support/fake-secret-cli.mjs serves synthetic values to the Catalog Host in the @fake-secret-cli journey."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.secret-link-reveal",
+          "featureFile": "tooling/dshx/e2e/features/backlog-secret-link.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.secret-link-target",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-link-reveal-model.test.ts",
+          "testName": "refuses the same alias in two scopes by name instead of guessing"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     }
   ],
   "kind": "bundle"
