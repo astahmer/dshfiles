@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto'
-import { Context, Effect, Layer, Schema } from 'effect'
+import { Cache, Context, Duration, Effect, Layer, Schema } from 'effect'
 import { GRAPH_PAGE_BYTE_BUDGET, GRAPH_PAGE_SIZE, REVISION_PAGE_SIZE, revisionSchema, type JujutsuState, type Revision } from './api.js'
 import { JujutsuOutputModel } from './core.js'
 import { OutputLimitExceeded } from './errors.js'
 import { GraphNavigationReads } from './graph-navigation-reads.js'
 import { GraphPage } from './graph-page.js'
 import { matchesRevisionSearch } from './graph.js'
-import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
+import { EVOLUTION_TEMPLATE, OPERATION_ID_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
 import { ReferenceGraphModel } from './reference-graph.js'
 import { Repositories } from './repositories.js'
 import { RepositoryIdentity, type RegisteredRepo } from './repository-identity.js'
@@ -15,6 +15,11 @@ import { makeEditTimeCache, makeRevisionDetailCache, RevisionReads } from './rev
 const MAX_WORKSPACE_HEAD_CANDIDATES = 32
 const EVOLUTION_LIMIT = 100
 const OPERATION_LIMIT = 1000
+/** Operations read first once a push scan is known: a new head usually adds a handful, so the full scan is rare. */
+const OPERATION_INCREMENT = 64
+/** Commits whose evolved flag is remembered per Host; one flag is a few bytes. */
+const EVOLVED_CACHE_LIMIT = 20_000
+const MAX_DISPLAY_LOADS = 64
 
 const commitIdSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/))
 
@@ -22,7 +27,19 @@ const commitIdSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{40}|[a
 const evolutionRowSchema = Schema.Struct({ commitId: commitIdSchema, predecessors: Schema.Array(commitIdSchema) })
 
 /** One `jj operation log` row from OPERATION_TEMPLATE. */
-const operationRowSchema = Schema.Struct({ description: Schema.String, attributes: Schema.String, time: Schema.String })
+const operationRowSchema = Schema.Struct({ id: Schema.String, description: Schema.String, attributes: Schema.String, time: Schema.String })
+
+interface LastPush {
+  readonly at: string | null
+  readonly description: string | null
+  readonly historyTruncated: boolean
+}
+
+/** The newest operation a last-push scan saw, and what it found from there back. */
+interface PushScan {
+  readonly headId: string
+  readonly push: LastPush
+}
 
 const remoteNamePattern = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/
 
@@ -42,6 +59,17 @@ const make = Effect.gen(function* () {
   const repositories = yield* Repositories
   const identity = yield* RepositoryIdentity
   const editTimeCache = makeEditTimeCache()
+  /**
+   * Whether a commit rewrote an earlier version is fixed when the commit is created: new successors never add
+   * predecessors to it. Keyed by repository identity and commit id, so a replaced repository never answers.
+   */
+  const evolvedFlags = new Map<string, boolean>()
+  const rememberEvolved = (key: string, evolved: boolean) => {
+    evolvedFlags.delete(key)
+    evolvedFlags.set(key, evolved)
+    if (evolvedFlags.size > EVOLVED_CACHE_LIMIT) evolvedFlags.delete(evolvedFlags.keys().next().value ?? '')
+  }
+  const pushScans = new Map<string, PushScan>()
   const detailCache = makeRevisionDetailCache()
 
   const revisionsByIds = Effect.fnUntraced(function* (repo: RegisteredRepo, commitIds: readonly string[]) {
@@ -58,29 +86,36 @@ const make = Effect.gen(function* () {
     return yield* Effect.fromResult(JujutsuOutputModel.parseJsonLines(result.stdout, revisionSchema))
   })
 
-  /** Which of these revisions rewrote an earlier version; a failed or partial evolution read marks none and says so. */
+  /**
+   * Which of these revisions rewrote an earlier version; a failed or partial evolution read marks none and says so.
+   * Flags already read for a commit are reused, so an unchanged page costs no jj process.
+   */
   const evolvedCommitIds = (repo: RegisteredRepo, revisions: readonly Revision[]) =>
     Effect.gen(function* () {
-      if (revisions.length === 0) return { commitIds: new Set<string>(), truncated: false }
+      const keyOf = (commitId: string) => repo.identity + '\0' + repo.root + '\0' + commitId
+      const commitIds = new Set<string>()
+      const unknown: string[] = []
+      for (const revision of revisions) {
+        const known = evolvedFlags.get(keyOf(revision.commitId))
+        if (known === undefined) unknown.push(revision.commitId)
+        else if (known) commitIds.add(revision.commitId)
+      }
+      if (unknown.length === 0) return { commitIds, truncated: false }
       const result = yield* repositories.run(repo)(
-        [
-          ignoreWorkingCopy,
-          'evolog',
-          '--no-graph',
-          '--revisions',
-          revisions.map(revision => revision.commitId).join('|'),
-          '--limit',
-          String(EVOLUTION_LIMIT),
-          '--template',
-          EVOLUTION_TEMPLATE,
-        ],
+        [ignoreWorkingCopy, 'evolog', '--no-graph', '--revisions', unknown.join('|'), '--limit', String(EVOLUTION_LIMIT), '--template', EVOLUTION_TEMPLATE],
         { outputLimit: 512_000 },
       )
       const rows = yield* Effect.fromResult(JujutsuOutputModel.parseJsonLines(JujutsuOutputModel.completeLines(result), evolutionRowSchema))
-      return {
-        commitIds: new Set(rows.filter(row => row.predecessors.length > 0).map(row => row.commitId)),
-        truncated: result.truncated || rows.length >= EVOLUTION_LIMIT,
+      const truncated = result.truncated || rows.length >= EVOLUTION_LIMIT
+      const rowsById = new Map(rows.map(row => [row.commitId, row]))
+      for (const commitId of unknown) {
+        const row = rowsById.get(commitId)
+        if (row === undefined) continue
+        if (row.predecessors.length > 0) commitIds.add(commitId)
+        // A commit's own entry is complete even when the log was cut later; only commits it reached are remembered.
+        rememberEvolved(keyOf(commitId), row.predecessors.length > 0)
       }
+      return { commitIds, truncated }
     }).pipe(Effect.orElseSucceed(() => ({ commitIds: new Set<string>(), truncated: true })))
 
   const readRevisions = Effect.fnUntraced(function* (repo: RegisteredRepo, limit: number) {
@@ -116,20 +151,48 @@ const make = Effect.gen(function* () {
         Effect.orElseSucceed(() => ({ names: [], configFingerprint: 'unavailable' })),
       )
 
-  const readLastPush = (repo: RegisteredRepo) =>
+  const operationLog = (repo: RegisteredRepo, limit: number) =>
     Effect.gen(function* () {
+      // `--ignore-working-copy op log` first makes it a view read, answered again at the same operation head.
       const result = yield* repositories.run(repo)(
-        ['--at-operation=@', '--ignore-working-copy', 'operation', 'log', '--no-graph', '--limit', String(OPERATION_LIMIT), '--template', OPERATION_TEMPLATE],
+        [ignoreWorkingCopy, 'op', 'log', '--at-operation=@', '--no-graph', '--limit', String(limit), '--template', OPERATION_ID_TEMPLATE],
         { outputLimit: 512_000 },
       )
       const operations = yield* Effect.fromResult(JujutsuOutputModel.parseJsonLines(JujutsuOutputModel.completeLines(result), operationRowSchema))
-      const push = operations.find(row => JujutsuOutputModel.isRecordedJjGitPush(row.attributes))
-      return {
-        at: push?.time ?? null,
-        description: push === undefined ? null : 'Recorded JJ git push command invocation',
-        historyTruncated: result.truncated || operations.length >= OPERATION_LIMIT,
+      return { operations, truncated: result.truncated || operations.length >= limit }
+    })
+
+  const pushIn = (operations: readonly (typeof operationRowSchema.Type)[], historyTruncated: boolean): LastPush => {
+    const push = operations.find(row => JujutsuOutputModel.isRecordedJjGitPush(row.attributes))
+    return { at: push?.time ?? null, description: push === undefined ? null : 'Recorded JJ git push command invocation', historyTruncated }
+  }
+
+  /**
+   * The newest recorded `jj git push`. Once a scan is known, a new head reads only its newest operations: when they
+   * reach the previous head, the previous answer stands for everything older; otherwise the full scan runs again.
+   */
+  const readLastPush = (repo: RegisteredRepo) =>
+    Effect.gen(function* () {
+      const scanKey = repo.identity + '\0' + repo.root
+      const previous = pushScans.get(scanKey)
+      const remember = (headId: string | undefined, push: LastPush): LastPush => {
+        if (headId !== undefined) pushScans.set(scanKey, { headId, push })
+        if (pushScans.size > MAX_DISPLAY_LOADS) pushScans.delete(pushScans.keys().next().value ?? '')
+        return push
       }
-    }).pipe(Effect.orElseSucceed(() => ({ at: null, description: null, historyTruncated: true })))
+      if (previous !== undefined) {
+        const recent = yield* operationLog(repo, OPERATION_INCREMENT)
+        const headId = recent.operations[0]?.id
+        const known = recent.operations.findIndex(row => row.id === previous.headId)
+        if (known >= 0) {
+          const newer = pushIn(recent.operations.slice(0, known), false)
+          return remember(headId, newer.at !== null ? { ...newer, historyTruncated: previous.push.historyTruncated } : previous.push)
+        }
+        if (!recent.truncated) return remember(headId, pushIn(recent.operations, false))
+      }
+      const full = yield* operationLog(repo, OPERATION_LIMIT)
+      return remember(full.operations[0]?.id, pushIn(full.operations, full.truncated))
+    }).pipe(Effect.orElseSucceed((): LastPush => ({ at: null, description: null, historyTruncated: true })))
 
   const snapshot = Effect.fn('jujutsu repository snapshot')(function* (repo: RegisteredRepo, limit: number) {
     // `status` is the only working-copy snapshot; every later read ignores the working copy so it sees that same `@`.
@@ -202,8 +265,21 @@ const make = Effect.gen(function* () {
     }
   })
 
+  /**
+   * Display loads of one repository and page size share one in-flight snapshot: panels, tools and polls that ask
+   * together pay one `status` and one set of reads. Nothing is kept once it settles, and a caller that leaves does not
+   * stop the others. Previews never use this path: `prepare` and `confirm` take their own fresh snapshot.
+   */
+  const displayLoads = yield* Cache.makeWith(
+    (key: string) => {
+      const [repoId = '', limit = ''] = key.split('\0')
+      return Effect.flatMap(repositories.resolve(repoId), repo => snapshot(repo, Number(limit)))
+    },
+    { capacity: MAX_DISPLAY_LOADS, timeToLive: () => Duration.zero },
+  )
+
   const load = Effect.fn('jujutsu repository load')(function* (input: { readonly repoId: string; readonly limit: number }) {
-    return (yield* snapshot(yield* repositories.resolve(input.repoId), input.limit)).state
+    return (yield* Cache.get(displayLoads, input.repoId + '\0' + String(input.limit))).state
   })
 
   const graphNavigation = Effect.fn('jujutsu graph navigation')(function* (repoId: string) {

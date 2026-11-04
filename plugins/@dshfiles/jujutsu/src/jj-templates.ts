@@ -22,8 +22,10 @@ export const REVISION_TEMPLATE =
   '\',"changeOffset":\' ++ coalesce(self.change_offset(), "0") ++ ' +
   '\',"evolved":false}\' ++ "\\n"'
 
-export const OPERATION_TEMPLATE =
-  '\'{"description":\' ++ self.description().first_line().escape_json() ++ ' +
+/** One operation per line, newest first: its id lets a later last-push scan stop where this one started. */
+export const OPERATION_ID_TEMPLATE =
+  '\'{"id":\' ++ self.id().short(128).escape_json() ++ ' +
+  '\',"description":\' ++ self.description().first_line().escape_json() ++ ' +
   '\',"attributes":\' ++ self.attributes().escape_json() ++ ' +
   '\',"time":\' ++ self.time().end().format("%+").escape_json() ++ \'}\' ++ "\\n"'
 

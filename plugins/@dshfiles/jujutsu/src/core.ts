@@ -184,7 +184,8 @@ const isRecordedJjGitPush = (attributes: string): boolean => {
   const args = attributes.split(/\r?\n/).find(line => /^args\s*:/i.test(line))
   if (args === undefined) return false
   const command = args.replace(/^args\s*:\s*/i, '').trimStart()
-  const tokens = command.split(/\s+/)
+  // jj records argv shell-quoted (`jj '--color=never' --no-pager git push`); compare the unquoted words.
+  const tokens = command.split(/\s+/).map(token => token.replace(/^'(.*)'$/u, '$1'))
   const executable = tokens.shift() ?? ''
   if (!/(?:^|[\\/])jj$/i.test(executable)) return false
   while (tokens[0] === '--color=never' || tokens[0] === '--no-pager') tokens.shift()

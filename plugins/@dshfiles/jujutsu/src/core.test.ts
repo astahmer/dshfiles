@@ -174,6 +174,8 @@ test('revision parser fails closed on malformed JSONL', () => {
 test('last-push detection requires JJ operation argv metadata', () => {
   assert.equal(JujutsuOutputModel.isRecordedJjGitPush('args: jj --color=never --no-pager git push --remote origin'), true)
   assert.equal(JujutsuOutputModel.isRecordedJjGitPush('args: /nix/store/jj/bin/jj git push'), true)
+  assert.equal(JujutsuOutputModel.isRecordedJjGitPush("args: jj '--color=never' --no-pager git push --remote origin"), true, 'jj 0.46 records argv shell-quoted')
+  assert.equal(JujutsuOutputModel.isRecordedJjGitPush("args: jj '--color=never' git push '--dry-run'"), false)
   assert.equal(JujutsuOutputModel.isRecordedJjGitPush('args: jj git push --dry-run --remote origin'), false)
   assert.equal(JujutsuOutputModel.isRecordedJjGitPush('args: jj git push --dry-run=true --remote origin'), false)
   assert.equal(JujutsuOutputModel.isRecordedJjGitPush('args: jj status'), false)

@@ -111,6 +111,70 @@ describe.skipIf(!jjAvailable)('jujutsu services', () => {
     }).pipe(Effect.scoped),
   )
 
+  it.effect('display loads share one in-flight snapshot and reuse evolution flags of an unchanged page', () =>
+    Effect.gen(function* () {
+      const spawned: string[] = []
+      const repo = yield* temporaryRepository
+      yield* Effect.gen(function* () {
+        const { id: repoId } = yield* Repositories.use(repositories => repositories.register(repo))
+        const load = RevisionReader.use(reader => reader.load({ repoId, limit: 10 }))
+        const count = (verb: string, from: number) => spawned.slice(from).filter(args => args.split(' ').includes(verb)).length
+
+        let mark = spawned.length
+        const together = yield* Effect.all([load, load, load, load], { concurrency: 'unbounded' })
+        expect(new Set(together.map(state => JSON.stringify(state))).size).toBe(1)
+        expect(count('status', mark)).toBe(1)
+        expect(count('evolog', mark)).toBe(1)
+
+        mark = spawned.length
+        yield* load
+        expect(count('status', mark)).toBe(1)
+        expect(count('evolog', mark)).toBe(0)
+
+        jj(repo, 'new', '-m', 'next')
+        mark = spawned.length
+        const next = yield* load
+        expect(next.revisions[0]?.description.trim()).toBe('next')
+        expect(count('evolog', mark)).toBe(1)
+      }).pipe(Effect.provide(servicesWith(countingSpawner(spawned))))
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('the last push is found again from only the operations newer than the previous scan', () =>
+    Effect.gen(function* () {
+      const spawned: string[] = []
+      const repo = yield* temporaryRepository
+      yield* withRemoteMain(repo)
+      yield* Effect.gen(function* () {
+        const { id: repoId } = yield* Repositories.use(repositories => repositories.register(repo))
+        const load = RevisionReader.use(reader => reader.load({ repoId, limit: 10 }))
+        const operationLimits = (from: number) =>
+          spawned
+            .slice(from)
+            .filter(args => args.includes(' op log '))
+            .map(args => args.split(' ')[args.split(' ').indexOf('--limit') + 1])
+
+        let mark = spawned.length
+        expect((yield* load).lastPushAt).toBeNull()
+        expect(operationLimits(mark)).toEqual(['1000'])
+
+        jj(repo, 'describe', '-m', 'pushed')
+        jj(repo, 'bookmark', 'set', 'main', '-r', '@')
+        jj(repo, 'git', 'push', '--remote', 'origin', '--bookmark', 'main')
+        mark = spawned.length
+        const pushed = yield* load
+        expect(pushed.lastPushAt).not.toBeNull()
+        expect(operationLimits(mark)).toEqual(['64'])
+
+        jj(repo, 'new', '-m', 'after the push')
+        mark = spawned.length
+        const later = yield* load
+        expect(later.lastPushAt).toBe(pushed.lastPushAt)
+        expect(operationLimits(mark)).toEqual(['64'])
+      }).pipe(Effect.provide(servicesWith(countingSpawner(spawned))))
+    }).pipe(Effect.scoped),
+  )
+
   it.effect('a shared composer read keeps running for the caller that stays when another one leaves', () =>
     Effect.gen(function* () {
       const repo = yield* temporaryRepository
