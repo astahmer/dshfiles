@@ -2,7 +2,10 @@ import type { ConnectionTestStep } from '../api.js'
 
 type ConnectionTestOutcome =
   | { readonly kind: 'passed'; readonly steps: readonly ConnectionTestStep[]; readonly dshVersion: string; readonly profile: string }
-  | { readonly kind: 'failed'; readonly message: string }
+  | { readonly kind: 'failed'; readonly steps: readonly ConnectionTestStep[]; readonly message: string }
+
+const stepLine = (step: ConnectionTestStep): string =>
+  `- ${step.step}: ${step.ok ? 'ok' : 'failed'} in ${step.ms} ms${step.message === undefined ? '' : ` — ${step.message}`}${step.code === undefined ? '' : ` (${step.code})`}`
 
 /** Plain-text report of one connection test, for pasting into an issue or a chat with the agent. */
 export const connectionDiagnostics = (input: {
@@ -11,20 +14,17 @@ export const connectionDiagnostics = (input: {
   readonly localVersion: string | undefined
   readonly outcome: ConnectionTestOutcome
 }): string => {
-  const lines = [
+  const result =
+    input.outcome.kind === 'failed'
+      ? `Result: failed — ${input.outcome.message}`
+      : `Result: passed · DSH ${input.outcome.dshVersion} · profile ${input.outcome.profile}`
+  return [
     `Host: ${input.sshTarget}`,
     `Remote DSH home: ${input.remoteHome}`,
     `This machine: DSH ${input.localVersion ?? 'unknown'}`,
     `Tested: ${new Date().toISOString()}`,
-  ]
-  if (input.outcome.kind === 'failed') return [...lines, `Result: failed — ${input.outcome.message}`].join('\n')
-  return [
-    ...lines,
-    `Result: passed · DSH ${input.outcome.dshVersion} · profile ${input.outcome.profile}`,
-    ...input.outcome.steps.map(
-      step =>
-        `- ${step.step}: ${step.ok ? 'ok' : 'failed'} in ${step.ms} ms${step.message === undefined ? '' : ` — ${step.message}`}${step.code === undefined ? '' : ` (${step.code})`}`,
-    ),
+    result,
+    ...input.outcome.steps.map(stepLine),
   ].join('\n')
 }
 

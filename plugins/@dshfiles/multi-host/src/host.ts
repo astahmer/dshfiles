@@ -257,12 +257,16 @@ const withRuntime = <A, E>(
   })
 
 /** Probe one SSH target and DSH home and pin its identity; shared by the add-host test and the save. */
+type QualifyStep = { step: ConnectionTestStep['step']; ok: boolean; ms: number; code?: string; message?: string }
+
 const qualifyRuntime = Effect.fn('multi-host runtime qualify')(function* (input: {
   readonly host: HostRecord
   readonly locator: RuntimeRecord['locator']
   readonly name: string
+  /** Receives each step as it settles, so a caller still sees the hops that ran when a later one fails. */
+  readonly steps?: Array<QualifyStep>
 }) {
-  const steps: Array<{ step: ConnectionTestStep['step']; ok: boolean; ms: number; code?: string; message?: string }> = []
+  const steps = input.steps ?? []
   const timed = <A, E, R>(step: ConnectionTestStep['step'], run: Effect.Effect<A, E, R>) =>
     Effect.gen(function* () {
       const startedAt = yield* Clock.currentTimeMillis
@@ -531,9 +535,10 @@ const handlers = Api.handlers(multiHostApi, {
         hidden: false,
         createdAt: new Date().toISOString(),
       }
-      return yield* qualifyRuntime({ host, locator, name: input.name }).pipe(
-        Effect.map(({ identity, steps }) => ({ ok: true as const, steps, identity })),
-        Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
+      const steps: Array<QualifyStep> = []
+      return yield* qualifyRuntime({ host, locator, name: input.name, steps }).pipe(
+        Effect.map(({ identity }) => ({ ok: true as const, steps, identity })),
+        Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error), steps })),
       )
     })
   }),

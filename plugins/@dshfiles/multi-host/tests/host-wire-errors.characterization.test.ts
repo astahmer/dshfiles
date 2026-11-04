@@ -206,4 +206,26 @@ describe('multi-host wire failures by class', () => {
     expect(outcome).toMatchObject(expected)
     if (outcome.shape !== 'success') expect(outcome.message.length).toBeGreaterThan(0)
   })
+
+  test('a failed connection test still reports the hops that ran', async () => {
+    const remoteHome = await mkdtemp(join(tmpdir(), 'multi-host-wire-remote-'))
+    temporary.push(remoteHome)
+    const response = await host.connection.requestApi({
+      packageId: '@dshfiles/multi-host',
+      apiId: 'multi-host',
+      method: 'testConnection',
+      version: 1,
+      input: sshTestInput(remoteHome),
+    })
+    const envelope = Schema.decodeUnknownSync(wireEnvelope)(await response.json())
+    if (!envelope.result.ok) throw new Error(envelope.result.error.message)
+    expect(envelope.result.value.output).toMatchObject({
+      ok: false,
+      code: 'runtime-not-running',
+      steps: [
+        { step: 'ssh', ok: true },
+        { step: 'runtime', ok: false, code: 'runtime-not-running' },
+      ],
+    })
+  })
 })

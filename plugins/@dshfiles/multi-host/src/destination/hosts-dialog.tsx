@@ -77,10 +77,10 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
         sshTarget: draft.sshTarget.trim(),
         remoteHome: draft.remoteHome.trim(),
       })
-      if (!result.ok) throw failure(result)
-      return result
+      return result.ok ? result : { ...result, steps: result.steps ?? [] }
     },
   })
+  const testFailure = test.data?.ok === false ? failure(test.data) : undefined
   const save = useMutation({
     mutationFn: async () => {
       const result = await api.saveSshHost({
@@ -102,9 +102,13 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
   const copyDiagnostics = useMutation({
     mutationFn: async () => {
       const outcome =
-        test.data !== undefined
+        test.data?.ok === true
           ? { kind: 'passed' as const, steps: test.data.steps, dshVersion: test.data.identity.dshVersion, profile: test.data.identity.profile }
-          : { kind: 'failed' as const, message: errorMessage(test.error, 'The connection test failed.') }
+          : {
+              kind: 'failed' as const,
+              steps: test.data?.steps ?? [],
+              message: testFailure?.message ?? errorMessage(test.error, 'The connection test failed.'),
+            }
       const report = connectionDiagnostics({
         sshTarget: draft.sshTarget.trim(),
         remoteHome: draft.remoteHome.trim(),
@@ -259,13 +263,21 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
             <li key={step.step} className="dshx:flex dshx:items-center dshx:gap-2">
               {step.ok ? <CheckIcon className="dshx:size-3.5 dshx:text-emerald-500" /> : <XIcon className="dshx:size-3.5 dshx:text-destructive" />}
               {stepLabels[step.step]} <span className="dshx:text-muted-foreground">{step.ms} ms</span>
+              {step.ok || step.message === undefined ? null : <span className="dshx:min-w-0 dshx:truncate dshx:text-destructive">{step.message}</span>}
             </li>
           ))}
-          <li className="dshx:text-muted-foreground">
-            DSH {test.data.identity.dshVersion} · profile {test.data.identity.profile}
-          </li>
+          {test.data.ok ? (
+            <li className="dshx:text-muted-foreground">
+              DSH {test.data.identity.dshVersion} · profile {test.data.identity.profile}
+            </li>
+          ) : null}
         </ul>
       ) : null}
+      {testFailure === undefined ? null : (
+        <Alert variant="destructive">
+          <AlertDescription>{testFailure.message}</AlertDescription>
+        </Alert>
+      )}
       {test.data !== undefined || test.isError ? (
         <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
           <Button type="button" size="sm" variant="ghost" className="dshx:h-7 dshx:px-2" onClick={() => copyDiagnostics.mutate()}>

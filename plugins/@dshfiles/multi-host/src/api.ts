@@ -15,8 +15,7 @@ const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Out
     readonly output: Output
     readonly tool?: ApiToolExposure<Output['Type']>
   },
-) =>
-  defineMethod(options)
+) => defineMethod(options)
 
 /** Model-facing text for a structured tool result. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
@@ -579,7 +578,7 @@ const effectMultiHostApi = defineApi({
       }),
       output: Schema.Union([
         Schema.Struct({ ok: Schema.Literal(true), steps: Schema.Array(connectionTestStepSchema), identity: runtimeIdentitySchema }),
-        failedSchema,
+        Schema.Struct({ ...failedSchema.fields, steps: Schema.optional(Schema.Array(connectionTestStepSchema)) }),
       ]),
       description:
         'Run the stepwise connection test for one host configuration (ssh, then runtime, then identity). Call only when the user asked to test that host.',

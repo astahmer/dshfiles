@@ -24,13 +24,22 @@ describe('connection diagnostics', () => {
     expect(report).toContain('- identity: failed in 4 ms — profile differs (mismatch)')
   })
 
-  test('a failed test keeps the error the Host reported', () => {
+  test('a failed test keeps the error the Host reported and the hops that ran', () => {
     const report = connectionDiagnostics({
       sshTarget: 'vps',
       remoteHome: '/home/deploy/.dsh',
       localVersion: undefined,
-      outcome: { kind: 'failed', message: 'No launch file was found (runtime-not-running)' },
+      outcome: {
+        kind: 'failed',
+        message: 'No launch file was found (runtime-not-running)',
+        steps: [
+          { step: 'ssh', ok: true, ms: 80 },
+          { step: 'runtime', ok: false, ms: 300, code: 'runtime-not-running', message: 'No launch file was found' },
+        ],
+      },
     })
+    expect(report).toContain('- ssh: ok in 80 ms')
+    expect(report).toContain('- runtime: failed in 300 ms — No launch file was found (runtime-not-running)')
     expect(report).toContain('This machine: DSH unknown')
     expect(report).toContain('Result: failed — No launch file was found (runtime-not-running)')
   })
