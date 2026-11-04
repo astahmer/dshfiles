@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "project-automations",
+      "title": "Start threads in a project on a schedule",
+      "summary": "Work › Automations lists per-project automations and creates, edits, pauses, resumes, runs now and deletes them. A schedule (cron, daily, weekly with an explicit IANA time zone, or every N minutes) starts a new thread in its project with its prompt, agent preset and model through the sessions API. Timing uses DSH's own Schedule domain, so DST gaps are skipped and repeated local times run once; a Host that was down catches up once, for the latest missed occurrence, and a resumed automation starts from its next target. Automations and the last 25 runs of each (trigger, outcome, thread, reason) live in plugin storage and survive Host restarts. Every verb is also an agent tool.",
+      "reach": ["click tab \"Work\"", "click button \"Automations\"", "expect heading \"Automations\""],
+      "surfaces": ["client", "host", "api", "tool", "storage"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Work › Automations",
+      "configuration": [],
+      "states": ["empty", "scheduled", "paused", "resumed", "due", "caught-up", "run-started", "run-failed", "deleted"],
+      "failureModes": [
+        "An unknown time zone, a malformed cron expression or an interval under one minute is refused at save with the Schedule domain's message.",
+        "A project that is no longer registered records a failed run that says to choose a project again.",
+        "A missing session-controller records a failed run naming the plugin to add; the schedule keeps its next target.",
+        "The Host must be running at the target time; while it is down nothing runs, and at boot each schedule runs once for its latest missed occurrence.",
+        "Without the Host plugin the page shows a restart-and-retry message instead of the list."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/session-controller",
+          "boundary": "Every run is one sessionsApi.create call (projectId, title, prompt, agentPreset, model) made in process as @dshfiles/project-automations.",
+          "deterministicFake": "src/automations-host.test.ts mounts a sessionsApi owner that records each create call."
+        },
+        {
+          "id": "@deepseek-ai/dsh-schedule",
+          "boundary": "Pure occurrence functions (create*ScheduleRecord, resolveRecurringOccurrence) from the installed DSH Schedule package; no Schedule service is used.",
+          "deterministicFake": "None needed: src/schedule.test.ts calls the real functions with fixed instants."
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "custom",
+          "span": "automation run",
+          "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
+          "testName": "starts one thread for the latest missed occurrence when a schedule is due, also after a restart, one span per run"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "project-automations.schedule-fires",
+          "featureFile": "tooling/dshx/e2e/features/project-automations.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "project-automations.crud",
+          "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
+          "testName": "creates, lists, pauses, resumes and deletes a scheduled automation, and lists only real projects"
+        },
+        {
+          "kind": "host-test",
+          "id": "project-automations.missed-runs",
+          "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
+          "testName": "starts one thread for the latest missed occurrence when a schedule is due, also after a restart, one span per run"
+        },
+        {
+          "kind": "host-test",
+          "id": "project-automations.run-now",
+          "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
+          "testName": "runs an automation now and records a start that failed with what to do next"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-automations.dialog",
+          "file": "plugins/@dshfiles/project-automations/src/automation-dialog.test.tsx",
+          "testName": "renders the schedule form and submits a daily automation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-automations.dst-gap",
+          "file": "plugins/@dshfiles/project-automations/src/schedule.test.ts",
+          "testName": "skips a local time that does not exist on the spring-forward day"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-automations.dst-overlap",
+          "file": "plugins/@dshfiles/project-automations/src/schedule.test.ts",
+          "testName": "runs a repeated local time once, at the earlier instant, on the fall-back day"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-automations.latest-missed",
+          "file": "plugins/@dshfiles/project-automations/src/schedule.test.ts",
+          "testName": "runs a fixed-rate rule once for the latest missed occurrence after downtime"
+        }
+      ]
+    },
+    {
+      "id": "project-automation-webhooks",
+      "title": "Start threads from signed webhooks",
+      "summary": "A webhook automation answers POST /automations/webhook/<id> on the DSH web server. The request must carry x-dsh-timestamp (Unix seconds) and x-dsh-signature: sha256=HMAC-SHA256(secret, \"<timestamp>.<raw body>\"), keyed with the value behind the automation's secret:ALIAS reference, resolved on the Host per request through the Secret Catalog. Requests more than 5 minutes off, replays inside that window, more than the automation's per-minute limit (and 120 per minute overall) and bodies over 256 KiB are refused. An accepted request starts a thread with the prompt template filled from a bounded, sanitized subset of the request ({{body.path}}, {{headers.name}}, never credential headers), followed by a note that inserted values are untrusted data. Refusals after the automation is found are recorded as rejected runs with what to fix.",
+      "reach": ["click tab \"Work\"", "click button \"Automations\"", "expect heading \"Automations\""],
+      "surfaces": ["client", "host", "integration", "storage"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: /automations/webhook/<id> route",
+      "configuration": [],
+      "states": [
+        "started",
+        "paused",
+        "missing-signature",
+        "malformed-signature",
+        "bad-signature",
+        "stale-timestamp",
+        "replayed",
+        "rate-limited",
+        "too-large",
+        "secret-unavailable",
+        "not-found"
+      ],
+      "failureModes": [
+        "An unknown automation id gets 404 naming where to copy the URL again.",
+        "A missing, malformed or wrong signature, a stale timestamp or a replay gets 401 with how to sign, and a rejected run.",
+        "A secret reference that does not resolve gets 503 for the sender and a rejected run naming the alias to fix in Secrets.",
+        "A paused automation gets 409 and a rejected run saying to resume it.",
+        "Over the per-minute limit gets 429 with Retry-After; the limit is counted before verification so a flood stays cheap, and a flood can delay genuine requests until it stops.",
+        "The replay window is held in memory: a request captured less than 5 minutes before a Host restart could be accepted once more after it."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/secret-catalog",
+          "boundary": "secretCatalogValues.resolve through @dshfiles/credential-port's SecretReferenceResolver, global aliases only; the value never leaves the Host or reaches storage, a run record or a span.",
+          "deterministicFake": "src/automations-host.test.ts provides a secretCatalogValues port with one synthetic alias; the e2e journey uses the fake secret CLI."
+        },
+        {
+          "id": "@dshfiles/session-controller",
+          "boundary": "An accepted request is one sessionsApi.create call made in process.",
+          "deterministicFake": "src/automations-host.test.ts mounts a sessionsApi owner that records each create call."
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        {
+          "kind": "custom",
+          "span": "automation webhook",
+          "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
+          "testName": "starts a thread from a signed webhook with a templated prompt and refuses forged, replayed and excess requests"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "project-automations.webhook-thread",
+          "featureFile": "tooling/dshx/e2e/features/project-automations.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "project-automations.webhook",
+          "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
+          "testName": "starts a thread from a signed webhook with a templated prompt and refuses forged, replayed and excess requests"
+        },
+        {
+          "kind": "host-test",
+          "id": "project-automations.webhook-secret-and-pause",
+          "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
+          "testName": "refuses a webhook whose secret does not resolve and a paused one, and records why"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-automations.hmac",
+          "file": "plugins/@dshfiles/project-automations/src/webhook-guards.test.ts",
+          "testName": "refuses a missing, malformed or wrong signature, a changed body and another secret"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-automations.replay-window",
+          "file": "plugins/@dshfiles/project-automations/src/webhook-guards.test.ts",
+          "testName": "refuses a request signed outside the replay window, before or after now"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-automations.rate-limit",
+          "file": "plugins/@dshfiles/project-automations/src/webhook-guards.test.ts",
+          "testName": "allows the limit per sliding window and says when to retry"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-automations.template",
+          "file": "plugins/@dshfiles/project-automations/src/webhook-guards.test.ts",
+          "testName": "fills body paths and named headers once, sanitized and clipped"
+        }
+      ]
+    }
+  ]
+}
