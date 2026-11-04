@@ -23,7 +23,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "oxlint src tests dshx.config.ts",
     "fmt": "oxfmt .",
-    "fmt:check": "oxfmt --check ."
+    "fmt:check": "oxfmt --check .",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
     "@dshfiles/dshx": "workspace:*",
