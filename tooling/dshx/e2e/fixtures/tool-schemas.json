@@ -7109,15 +7109,6 @@
       }
     },
     {
-      "name": "session_warming_status",
-      "description": "Prompt-cache warming: whether it is on, warm-ups spent in the last hour, and per thread its model, warm-ups since its last prompt, the next one, the last cache reads and why it stopped. Read-only.",
-      "parameters": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      }
-    },
-    {
       "name": "set_model_fallback_chain",
       "description": "Replace the ordered model fallback chain of one thread (sessionId) or the global default (no sessionId); chain null makes a thread follow the default again. Routes may cross providers. Run only when the user asked to change fallbacks.",
       "parameters": {

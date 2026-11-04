@@ -1,4 +1,0 @@
-# Loader ids share one namespace per profile, so the scope stays in the id.
-- insert:
-    - id: dshfiles-session-warming
-      name: '@dshfiles/session-warming'
