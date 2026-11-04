@@ -10,14 +10,14 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
-import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
+import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
+import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { HashIcon, MessageSquareIcon, RefreshCwIcon, SendIcon } from '@dshfiles/plugin-ui/icons'
@@ -100,11 +100,11 @@ const ActivityList = (props: {
   readonly t: AgentCommunicationTranslate
 }): JSX.Element => (
   <div className="dshx:flex dshx:flex-col">
-    {props.events.length === 0 ? <p className="dshx:p-4 dshx:text-sm dshx:text-muted-foreground">{props.t('noActivity')}</p> : null}
+    {props.events.length === 0 ? <EmptyState>{props.t('noActivity')}</EmptyState> : null}
     {props.events.map(event => (
       <div
         key={event.id}
-        className="dshx:grid dshx:gap-2 dshx:border-b dshx:border-border dshx:px-4 dshx:py-3 last:dshx:border-b-0 dshx:sm:grid-cols-[11rem_minmax(0,1fr)_auto] dshx:sm:items-center"
+        className="dshx:grid dshx:gap-2 dshx:border-b dshx:border-border dshx:px-4 dshx:py-3 dshx:last:border-b-0 dshx:grid-cols-[11rem_minmax(0,1fr)_auto] dshx:items-center dshx:@max-pane-compact:grid-cols-1 dshx:@max-pane-compact:items-start"
       >
         <time className="dshx:text-xs dshx:text-muted-foreground" dateTime={new Date(event.occurredAt).toISOString()}>
           {formatTime(event.occurredAt)}
@@ -145,7 +145,7 @@ const MessageRow = (props: {
   readonly disabled?: boolean
 }): JSX.Element => (
   <article
-    className={`dshx:rounded-lg dshx:border dshx:border-border dshx:p-3 dshx:sm:p-4 ${props.selected ? 'dshx:border-primary dshx:bg-accent/40' : 'dshx:bg-card'}`}
+    className={`dshx:rounded-lg dshx:border dshx:border-border dshx:p-4 dshx:@max-pane-narrow:p-3 ${props.selected ? 'dshx:border-primary dshx:bg-accent/40' : 'dshx:bg-card'}`}
     aria-current={props.selected ? 'true' : undefined}
   >
     <div className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-2">
@@ -164,7 +164,7 @@ const MessageRow = (props: {
       </div>
     </div>
     <div className="dshx:mt-3 dshx:rounded-md dshx:bg-muted/60 dshx:p-3">
-      <p className="dshx:mb-1 dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">{props.t('untrustedText')}</p>
+      <p className="dshx:mb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.t('untrustedText')}</p>
       <p className="dshx:whitespace-pre-wrap dshx:break-words dshx:text-sm">{props.message.text}</p>
     </div>
     <div className="dshx:mt-3 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
@@ -202,7 +202,7 @@ const DiagnosticPanel = (props: {
   const topicMap = new Map(diagnostics.topics.map(topic => [topic.topic, topic.subscribers]))
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-4">
-      <div className="dshx:grid dshx:grid-cols-2 dshx:gap-3 dshx:lg:grid-cols-4">
+      <div className="dshx:grid dshx:grid-cols-4 dshx:gap-3 dshx:@max-pane-compact:grid-cols-2">
         {[
           { label: t('agents'), value: diagnostics.agentCount },
           { label: t('channels'), value: diagnostics.topicCount },
@@ -222,14 +222,14 @@ const DiagnosticPanel = (props: {
           <AlertDescription>{t('missingWorkspaceSubscriptions', { count: missingWorkspace.length })}</AlertDescription>
         </Alert>
       )}
-      <div className="dshx:grid dshx:gap-4 dshx:xl:grid-cols-2">
+      <div className="dshx:grid dshx:gap-4 dshx:@min-[56rem]:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>{t('channels')}</CardTitle>
             <CardDescription>{t('topicSubscribers', { count: diagnostics.topics.reduce((sum, topic) => sum + topic.subscribers, 0) })}</CardDescription>
           </CardHeader>
           <CardContent className="dshx:p-0">
-            {diagnostics.topics.length === 0 ? <p className="dshx:p-4 dshx:text-sm dshx:text-muted-foreground">{t('noTopics')}</p> : null}
+            {diagnostics.topics.length === 0 ? <EmptyState>{t('noTopics')}</EmptyState> : null}
             {diagnostics.topics.map(topic => (
               <div
                 key={topic.topic}
@@ -252,7 +252,7 @@ const DiagnosticPanel = (props: {
             <CardDescription>{t('offlineUnknown')}</CardDescription>
           </CardHeader>
           <CardContent className="dshx:p-0">
-            {diagnostics.agents.length === 0 ? <p className="dshx:p-4 dshx:text-sm dshx:text-muted-foreground">{t('noLiveAgents')}</p> : null}
+            {diagnostics.agents.length === 0 ? <EmptyState>{t('noLiveAgents')}</EmptyState> : null}
             {diagnostics.agents.map(agent => (
               <div
                 key={agent.id}
@@ -476,6 +476,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     },
   })
   const t = props.t
+  const [tab, setTab] = useState<'messages' | 'diagnostics'>('messages')
+  const connected = diagnostics !== undefined && diagnosticsQuery.error === null
   const currentTopic = selection.kind === 'topic' ? selection.topic : null
   const currentDirectAgent = selection.kind === 'direct' ? selection.agentId : null
   const currentTitle =
@@ -531,17 +533,34 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
 
   return (
     <TooltipProvider>
-      <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-4 dshx:p-3 dshx:sm:p-5">
-        <PageHeader heading={t('title')} description={t('noTurnGuarantee')}>
-          <Badge variant={diagnostics !== undefined && diagnosticsQuery.error === null ? 'secondary' : 'destructive'}>
-            {diagnostics !== undefined && diagnosticsQuery.error === null ? t('connected') : t('unavailable')}
-          </Badge>
-          <Button variant="outline" size="sm" disabled={diagnosticsQuery.isFetching} onClick={() => void diagnosticsQuery.refetch()}>
-            <RefreshCwIcon aria-hidden /> {t('refresh')}
-          </Button>
-        </PageHeader>
-
-        {diagnosticsQuery.isPending ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('loading')}</p> : null}
+      <Page
+        heading={t('messages')}
+        description={t('noTurnGuarantee')}
+        meta={<Badge variant={connected ? 'secondary' : 'destructive'}>{connected ? t('connected') : t('unavailable')}</Badge>}
+        actions={[
+          {
+            id: 'refresh',
+            label: t('refresh'),
+            icon: <RefreshCwIcon aria-hidden />,
+            onSelect: () => void diagnosticsQuery.refetch(),
+            pending: diagnosticsQuery.isFetching,
+          },
+        ]}
+        {...(diagnostics === undefined
+          ? {}
+          : {
+              tabs: {
+                label: t('messages'),
+                value: tab,
+                onValueChange: (value: string) => setTab(value === 'diagnostics' ? 'diagnostics' : 'messages'),
+                items: [
+                  { value: 'messages', label: t('messages') },
+                  { value: 'diagnostics', label: t('diagnostics') },
+                ],
+              },
+            })}
+      >
+        {diagnosticsQuery.isPending ? <Spinner className="dshx:mx-auto dshx:my-6" /> : null}
         {diagnosticsQuery.error !== null ? (
           <Alert variant="destructive">
             <AlertDescription>{errorMessage(diagnosticsQuery.error, t('loadFailed'))}</AlertDescription>
@@ -554,13 +573,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                 <AlertDescription>{t('legacyHostWarning')}</AlertDescription>
               </Alert>
             ) : null}
-            <Tabs defaultValue="messages">
-              <TabsList>
-                <TabsTrigger value="messages">{t('messages')}</TabsTrigger>
-                <TabsTrigger value="diagnostics">{t('diagnostics')}</TabsTrigger>
-              </TabsList>
-              <TabsContent value="messages">
-                <div className="dshx:grid dshx:gap-3 dshx:xl:grid-cols-[15rem_minmax(0,1fr)_18rem]">
+            {tab === 'messages' ? (
+                <div className="dshx:grid dshx:gap-3 dshx:@min-[72rem]:grid-cols-[15rem_minmax(0,1fr)_18rem]">
                   <Card className="dshx:min-w-0">
                     <CardHeader className="dshx:pb-3">
                       <CardTitle className="dshx:flex dshx:items-center dshx:gap-2">
@@ -577,10 +591,10 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                         <MessageSquareIcon aria-hidden /> {t('allConversations')}
                       </Button>
                       <div className="dshx:flex dshx:flex-col dshx:gap-1">
-                        <p className="dshx:px-2 dshx:text-xs dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">
+                        <p className="dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
                           {t('channels')}
                         </p>
-                        {topicEntries.length === 0 ? <p className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:text-muted-foreground">{t('noTopics')}</p> : null}
+                        {topicEntries.length === 0 ? <EmptyState className="dshx:py-3">{t('noTopics')}</EmptyState> : null}
                         {topicEntries.map(([topic, subscribers]) => (
                           <Button
                             key={topic}
@@ -602,7 +616,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                       </div>
                       <Separator />
                       <div className="dshx:flex dshx:flex-col dshx:gap-1">
-                        <p className="dshx:px-2 dshx:text-xs dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">
+                        <p className="dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
                           {t('directMessages')}
                         </p>
                         <Select
@@ -622,7 +636,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                           </SelectContent>
                         </Select>
                         {directThreads.length === 0 ? (
-                          <p className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:text-muted-foreground">{t('noDirectThreads')}</p>
+                          <EmptyState className="dshx:py-3">{t('noDirectThreads')}</EmptyState>
                         ) : null}
                         {directThreads.map(([agentId, agent]) => (
                           <Button
@@ -659,13 +673,13 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                   </Card>
 
                   <Card className="dshx:min-w-0">
-                    <CardHeader className="dshx:gap-3 dshx:sm:flex-row dshx:sm:items-center dshx:sm:justify-between">
+                    <CardHeader className="dshx:flex-row dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
                       <div className="dshx:min-w-0">
                         <CardTitle className="dshx:truncate">{currentTitle}</CardTitle>
                         <CardDescription>{t('messageCount', { count: messagePages[0]?.totalMatching ?? 0 })}</CardDescription>
                       </div>
                       <SearchInput
-                        className="dshx:w-full dshx:sm:max-w-xs"
+                        className="dshx:w-full dshx:max-w-xs dshx:@max-pane-narrow:max-w-none"
                         aria-label={t('search')}
                         placeholder={t('searchPlaceholder')}
                         value={search}
@@ -673,7 +687,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                       />
                     </CardHeader>
                     <CardContent className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-3 dshx:pt-0">
-                      {messagesQuery.isPending ? <p className="dshx:p-3 dshx:text-sm dshx:text-muted-foreground">{t('loading')}</p> : null}
+                      {messagesQuery.isPending ? <Spinner className="dshx:mx-auto dshx:my-3" /> : null}
                       {messagesQuery.error !== null ? (
                         <Alert variant="destructive">
                           <AlertDescription>
@@ -682,9 +696,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                         </Alert>
                       ) : null}
                       {messagesQuery.data !== undefined && messages.length === 0 ? (
-                        <p className="dshx:p-4 dshx:text-sm dshx:text-muted-foreground">
-                          {debouncedSearch.length > 0 ? t('noSearchResults') : t('noMessages')}
-                        </p>
+                        <EmptyState>{debouncedSearch.length > 0 ? t('noSearchResults') : t('noMessages')}</EmptyState>
                       ) : null}
                       <div ref={messagesScroll} className="dshx:flex dshx:max-h-[65vh] dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-1">
                         <div key="messages-older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
@@ -787,12 +799,12 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                     <CardHeader>
                       <CardTitle>{t('messageContext')}</CardTitle>
                       <CardDescription>
-                        {selectedMessage === null ? currentTitle : `${selectedMessage.id.slice(0, 8)} · ${formatTime(selectedMessage.createdAt)}`}
+                        {selectedMessage === null ? currentTitle : formatTime(selectedMessage.createdAt)}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="dshx:flex dshx:flex-col dshx:gap-3">
                       {selectedMessage === null ? (
-                        <p className="dshx:text-sm dshx:text-muted-foreground">{t('selectConversation')}</p>
+                        <EmptyState className="dshx:py-4">{t('selectConversation')}</EmptyState>
                       ) : (
                         <>
                           <div>
@@ -817,7 +829,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                           </div>
                           <Separator />
                           <p className="dshx:text-sm dshx:font-medium">{t('recipientDetails')}</p>
-                          {recipientQuery.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('loading')}</p> : null}
+                          {recipientQuery.isPending ? <Spinner className="dshx:mx-auto" /> : null}
                           {recipientQuery.error !== null ? (
                             <Alert variant="destructive">
                               <AlertDescription>{errorMessage(recipientQuery.error, t('loadFailed'))}</AlertDescription>
@@ -857,11 +869,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                     </CardContent>
                   </Card>
                 </div>
-              </TabsContent>
-
-              <TabsContent value="diagnostics">
+            ) : (
                 <div className="dshx:flex dshx:flex-col dshx:gap-3">
-                  <p className="dshx:text-sm dshx:text-muted-foreground">{t('noTurnGuarantee')}</p>
                   {missingWorkspaceCount > 0 ? (
                     <Alert variant="destructive">
                       <AlertDescription>{t('missingWorkspaceSubscriptions', { count: missingWorkspaceCount })}</AlertDescription>
@@ -883,8 +892,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                     </Alert>
                   ) : null}
                 </div>
-              </TabsContent>
-            </Tabs>
+            )}
           </>
         )}
 
@@ -918,7 +926,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+      </Page>
     </TooltipProvider>
   )
 }

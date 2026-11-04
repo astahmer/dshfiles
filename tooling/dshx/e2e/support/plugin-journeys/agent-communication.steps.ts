@@ -3,27 +3,27 @@ import { globalPanelLink } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
-const communicationPanelButton = (page: Page) => globalPanelLink(page, 'Agent Communication: Messages')
+const communicationPanelButton = (page: Page) => globalPanelLink(page, 'Messages')
 
 When('the Agent communication panel is opened', async ({ page }: { page: Page }) => {
   await expect(communicationPanelButton(page)).toBeVisible()
   await communicationPanelButton(page).click()
-  await expect(page.getByRole('heading', { name: 'Communication', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Messages', exact: true, level: 1 })).toBeVisible()
 })
 
 Then('diagnostics show the connected Host and truthful activity history', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'communication-host-connection', async () => {
     await expect(page.getByText('Host connected', { exact: true })).toBeVisible()
-    await expect(page.getByText(/Browsing never starts, resumes, or redirects an Agent/)).toBeVisible()
+    await expect(page.getByText(/Browsing never starts, resumes, or redirects an agent/)).toBeVisible()
   })
   await page.getByRole('tab', { name: 'Diagnostics', exact: true }).click()
   await recordAssertion(page, 'communication-empty-tool-history', async () => {
-    await expect(page.getByText(/No Agent tool activity has been recorded yet/)).toBeVisible()
+    await expect(page.getByText(/No agent tool activity has been recorded yet/)).toBeVisible()
     await expect(page.getByText('No tool activity recorded yet.', { exact: true })).toBeVisible()
   })
   await page.getByRole('tab', { name: 'Messages', exact: true }).click()
   await recordAssertion(page, 'communication-empty-browser', async () => {
-    await expect(page.getByText('No messages in this conversation.', { exact: true })).toBeVisible()
+    await expect(page.getByText('No messages here yet.', { exact: true })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Search messages', exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
@@ -39,7 +39,7 @@ Then('a human post is browsable and remains passive', async ({ page }: { page: P
     await expect(page.getByText('A stored message, not an Agent turn.', { exact: true })).toBeVisible()
     await expect(page.getByText('Local browser user', { exact: true })).toBeVisible()
     await expect(page.getByText('Untrusted peer text', { exact: true })).toBeVisible()
-    await expect(page.getByText(/Browsing never starts, resumes, or redirects an Agent/)).toBeVisible()
+    await expect(page.getByText(/Browsing never starts, resumes, or redirects an agent/)).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
@@ -58,9 +58,9 @@ Then('a direct message remains unread until its recipient reads it', async ({ pa
   })
   await page.getByRole('button', { name: 'Message context', exact: true }).click()
   await recordAssertion(page, 'communication-browser-does-not-read-or-ack', async () => {
-    await expect(page.getByText('Not read by Agent', { exact: true })).toBeVisible()
+    await expect(page.getByText('Not read by agent', { exact: true })).toBeVisible()
     await expect(page.getByText('Pending', { exact: true })).toBeVisible()
-    await expect(page.getByText(/Browsing never starts, resumes, or redirects an Agent/)).toBeVisible()
+    await expect(page.getByText(/Browsing never starts, resumes, or redirects an agent/)).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

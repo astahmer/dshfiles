@@ -47,4 +47,4 @@ When a second DSH instance shares the same `DSH_HOME`, only one process can own 
 
 A report or activity-history gap is not proof of non-use. The Host bridge only reports Agents registered with DSH. Host source changes require a user-controlled restart; do not restart the live web profile as part of plugin development. See the [full communication design and activation guide](../../../tooling/dshx/docs/agent-communication.md).
 
-Open the reusable **Agent Communication: Messages** view from navigation or the Workbench chooser.
+Open the reusable **Messages** view from navigation or the Workbench chooser.
