@@ -29,9 +29,9 @@
     "build": "dshx build && vite build -c vite.editor.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "machine-diagram": "node scripts/machine-diagram.mjs",
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
-    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs",
-    "machine-diagram": "node scripts/machine-diagram.mjs"
+    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
     "@dshfiles/dshx": "workspace:*",
