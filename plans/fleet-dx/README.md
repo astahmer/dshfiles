@@ -18,11 +18,11 @@ feels different), b:184 (keep jj in sync across hosts).
 | 0   | Hosts panel works again: no-argument methods take `undefined`                                                                                                                                                                                                          | `jj:57018c09`; regression test; live Hosts page lists hosts after a Host restart                                                                                            | code done   |
 | 0b  | Quick wins: Copy diagnostics after Test connection; version-drift line on each Hosts row; README comparison refreshed                                                                                                                                                  | `jj:b1ab8405`, `jj:7051d9e1`; unit tests; browser check pending                                                                                                             | code done   |
 | 1   | **Fleet update dialog** (b:462): per-host DSH version and checkout revision, one "Update all" that runs `checkoutSync` → rebuild → runtime restart per host, live per-row state (waiting / updating / restarting / done / failed + Retry), threads on that host resume | A two-runtime scratch fleet updates from the dialog; a failing host shows its error and Retry; the version-drift line clears; agent tool `multi_host_update_all` mirrors it | partial     |
-| 2   | **Version-mismatch banner** in a remote thread's composer, with an Update button feeding milestone 1                                                                                                                                                                   | Banner appears only when versions differ; Update starts the single-host flow                                                                                                | not started |
+| 2   | **Version-mismatch banner** in a remote thread's composer, with an Update button feeding milestone 1                                                                                                                                                                   | Banner appears only when versions differ; Update starts the single-host flow                                                                                                | partial     |
 | 3   | **Remote subagents** (b:482): `subagent` / `backlog_start_thread` accept a host (or Auto) and run the child as a mirrored thread there; the parent receives its result                                                                                                 | Scratch: a parent thread on A starts a child on B through Auto; the child result arrives in A; stopping the parent stops the child                                          | not started |
 | 4   | **Per-step diagnosis on failure**: `testConnection` returns the steps it ran even when one fails; the host row and picker show which hop failed (SSH, runtime, identity) with its recovery                                                                             | Unit test per failing hop; dialog lists failed hop; Copy diagnostics includes it                                                                                            | partial     |
 | 5   | **Unreachable host polish**: a short disconnect grace delay before turning a host red; "Hide this host's threads" from the offline banner                                                                                                                              | No red flicker on a 2 s blip; hiding reuses the existing hidden-host flag                                                                                                   | not started |
-| 6   | **Open the exact thread on the host**: `runtimeOpenView` takes an optional Session id and opens `?thread=` on the remote UI                                                                                                                                            | Host UI opens on the mirrored thread, not the home screen                                                                                                                   | code done   |
+| 6   | **Open the exact thread on the host**: `runtimeOpenView` takes an optional Session id and opens `?thread=` on the remote UI                                                                                                                                            | Host UI opens on the mirrored thread, not the home screen                                                                                                                   | done        |
 | 7   | **Native remote questions and approvals** (b:117, b:183): answer them from the local thread                                                                                                                                                                            | Tracked as milestone 6 of [remote-thread-composer](../remote-thread-composer/README.md)                                                                                     | external    |
 | 8   | **Auto placement weights** and **same repo across hosts**: a per-host weight on the Hosts page used by the resource pool score; projects with the same origin URL grouped with a host badge                                                                            | Weighted pick unit-tested; a repo cloned on two hosts shows one project with two hosts                                                                                      | not started |
 | 9   | **Keep jj in sync across hosts** (b:184): fetch + rebase the remote checkout before a remote thread starts, opt-in per host                                                                                                                                            | Remote thread starts on the bookmark tip it would have locally                                                                                                              | not started |
@@ -38,35 +38,33 @@ update); 3 (remote subagents); 5, 8, 9 as polish. 7 follows its own plan.
 
 ## Resume here
 
-Milestones 0 and 0b are code-complete. Milestone 4 is partial: `testConnection`
-keeps its hops on failure and the Add host dialog shows them (Host test in
-`tests/host-wire-errors.characterization.test.ts`); the Hosts row and Run-on
-picker still show only the last error, because the runtime status path
-(`runtimeStatus`/`runtimePing`) records one `lastError`, not hops. After landing,
-build `@dshfiles/multi-host` in the canonical checkout, ask the user to restart
-the DSH host process, then confirm the Hosts page and the Run-on picker list
-hosts (confirmed after the 2026-11-04 restart: no new `multi-host/list` or
-`threadList` contract errors). Milestone 6 adds `sessionId` to `runtimeOpenView`
-and sets `?thread=`, which thread-sidebar opens on page load; an end-to-end check
-against a real host is still pending. A full-profile scratch DSH (`dshx dev up`
-with no `--plugin`) fails to boot here: multi-host stops with
-`HostServiceMissing: subprocess`; the live profile and a multi-host-only scratch
-boot fine.
+Done: 0, 0b, 6. Partial: 1, 2, 4.
 
-The subprocess boot failure is fixed (multi-host, annotations and git-worktrees
-inject `subprocess`; the workspace contract checks it). A full-profile scratch
-now gets past multi-host but still leaves the session controller and sidebar
-pending on `sessionQuery`: the scratch composition never activates
-`@dshfiles/session-search`, so full-profile browser checks of thread routes
-(including `?thread=`) still cannot run.
+- **4**: `testConnection` keeps its hops on failure and the Add host dialog shows
+  them; the Hosts row and Run-on picker still show only the runtime's last error
+  (`runtimeStatus`/`runtimePing` record one `lastError`, not hops).
+- **6**: DSH's sign-in answers the token link with a 303 to `./` and drops every
+  other parameter, so `runtimeOpenView` returns a token-free `threadUrl`; the
+  client fetches the launch URL to set the host's cookie, then opens the thread.
+  Proven in Chromium against a scratch DSH from another 127.0.0.1 origin. When the
+  page and the host have different machine names the tab opens the host home.
+- **1**: **Update hosts** and `multi_host_update` sync and rebuild each host and
+  report whether it needs a restart. Not done: restarting a host from here
+  (deliberately left to the user) and updating the DSH core version. Only commits
+  on `main@origin` reach a host.
+- **2**: a remote thread's header warns when its host runs another DSH core
+  version. No Update button: the core version is not something Update hosts
+  changes. Not seen in a browser yet (needs a mirrored thread from a second
+  runtime).
 
-Milestone 1 is partial: **Update hosts** on the Hosts page and the
-`multi_host_update` tool fetch each host and run its own `dshx checkout sync`
-(dry run first, then rebase, install and rebuild), report per host whether DSH
-needs a restart, and show the error with Retry. Not done: restarting a host from
-here (deliberately left to the user, since it ends that host's threads), and
-updating the DSH core version that the drift line reports. Only commits on
-`main@origin` reach a host. Next: milestone 2 (banner in a remote thread).
+Scratch: a full-profile `dshx dev up` now builds through Turbo, boots, creates
+threads and opens thread links (fixed: subprocess inject, session-controller's
+setup-time service snapshot, build order). `dshx dev doctor` still fails its
+host-log check on that profile: DSH prints "10 entries did not activate" before
+session-search registers `sessionQuery`, and those entries activate a moment
+later.
+
+Next: 3 (remote subagents), then 5, 8, 9.
 
 The [host-pool plan](../host-pool/README.md) still shows every milestone
 pending although Auto placement and the resource view shipped (b:346, b:356):
