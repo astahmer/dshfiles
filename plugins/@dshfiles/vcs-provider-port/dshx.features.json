@@ -7,6 +7,9 @@
       "title": "One port for version-control providers",
       "summary": "Providers serve the same dshx API id under their own owner; a caller asks every served provider which claims a path and uses the highest priority one to isolate a thread or snapshot and restore files.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
       "configuration": [],
       "states": ["claimed", "unclaimed", "no-provider"],
       "failureModes": [

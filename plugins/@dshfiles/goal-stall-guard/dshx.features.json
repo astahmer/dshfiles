@@ -6,6 +6,9 @@
       "title": "Pause goals after consecutive empty rounds",
       "summary": "Count only empty assistant goal rounds, reset after any meaningful content, and pause the active goal without blocking it.",
       "surfaces": ["client", "host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: goal rounds",
       "configuration": [
         {
           "key": "stallThreshold",
@@ -100,6 +103,9 @@
       "title": "Extend or close goals within bounded policy",
       "summary": "Add a narrowly scoped Host tool to extend an active goal on its exact final round and complete a round-limit-blocked goal only with evidence.",
       "surfaces": ["host", "integration"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: extend_goal_budget / complete_blocked_goal",
       "configuration": [],
       "states": ["active-final-round", "extended", "round-limit-blocked", "complete"],
       "failureModes": [

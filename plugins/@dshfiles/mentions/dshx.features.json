@@ -15,6 +15,9 @@
         "expect text \"Threads \u00b7 @f: files\""
       ],
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: @ menu files and threads",
       "configuration": [],
       "states": ["all", "thread-scope", "file-scope", "remote-threads", "drilled-directory", "empty"],
       "failureModes": [
@@ -91,6 +94,9 @@
         "expect link \"Referenced session*\""
       ],
       "surfaces": ["client"],
+      "surface": "entityProvider",
+      "destination": "threads",
+      "currentSurface": "composer and transcript: thread chips",
       "configuration": [],
       "states": ["composer-chip", "sent-chip", "reference-line", "new-tab"],
       "failureModes": [

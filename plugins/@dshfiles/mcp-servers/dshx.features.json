@@ -7,6 +7,9 @@
       "summary": "Create, edit, enable, connect, disconnect, refresh, and remove bounded stdio or Streamable HTTP server definitions while keeping credentials as references.",
       "reach": ["click button \"MCP Servers: Servers\"", "expect heading \"Global MCP servers\"", "expect combobox \"Transport\""],
       "surfaces": ["client", "host", "settings", "tool", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: MCP Servers: Servers",
       "configuration": [
         {
           "key": "servers",
@@ -139,6 +142,9 @@
         "expect option \"e2e_echo*\""
       ],
       "surfaces": ["client", "host", "tool", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: @ MCP mentions",
       "configuration": [],
       "states": ["unconfigured", "server-suggested", "tool-suggested", "referenced"],
       "failureModes": [
@@ -187,6 +193,9 @@
       "title": "Search curated providers and the MCP Registry",
       "summary": "Browse curated provider documentation and search the official Registry while handling unavailable or malformed catalog responses safely.",
       "surfaces": ["client", "host", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: MCP Servers: Servers › registry",
       "configuration": [],
       "states": ["curated", "searching", "results", "empty", "offline", "malformed"],
       "failureModes": ["Registry failure or oversized response is shown without adding a server.", "Only safe HTTPS catalog endpoints are requested."],
@@ -222,6 +231,9 @@
       "title": "Authorize remote OAuth servers",
       "summary": "Discover OAuth metadata, register a client, run PKCE/state validation, exchange and refresh grants, and clear grant state on sign-out.",
       "surfaces": ["client", "host", "integration", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: MCP Servers: Servers › OAuth",
       "configuration": [],
       "states": ["not-used", "needs-sign-in", "pending", "signed-in", "refreshing", "expired"],
       "failureModes": [
@@ -314,6 +326,9 @@
       "title": "Batch enable, disable and remove MCP servers",
       "summary": "Registered servers take checkbox selection with ranges and visible-only select-all; enabled or disabled servers change in one pass, and removing a selection always goes through a count-named confirmation that stops its native clients and drops their grants.",
       "surfaces": ["client"],
+      "surface": "rowAction",
+      "destination": "settings",
+      "currentSurface": "left-nav: MCP Servers: Servers › batch actions",
       "configuration": [],
       "states": ["unselected", "range-selected", "batch-enabled", "batch-disabled", "confirmed-removal"],
       "failureModes": [

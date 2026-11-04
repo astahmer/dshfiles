@@ -16,6 +16,9 @@
         "expect button \"Select model*\""
       ],
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: draft model selection",
       "configuration": [],
       "states": ["local-default", "local-staged", "catalog-loading", "catalog-error", "host-projected", "context-pressure", "handoff-check", "compacting"],
       "failureModes": [

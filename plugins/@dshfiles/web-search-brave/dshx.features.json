@@ -7,6 +7,9 @@
       "title": "Answer ctx.web searches with Brave Web Search",
       "summary": "A Brave backend for the web search seam: the API key setting holds a Secret Catalog reference resolved on the Host per search (falling back to BRAVE_API_KEY), results are stripped of markup, deduplicated by URL and mapped to sources.",
       "surfaces": ["host", "settings", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Brave web search",
       "configuration": [],
       "states": ["searching", "answered", "credential-missing", "rejected", "aborted"],
       "failureModes": [

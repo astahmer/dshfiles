@@ -6,6 +6,9 @@
       "title": "Keep disabled accounts visible and toggle routing from the usage popover",
       "summary": "Disabled saved accounts keep their measured quota percentage and reset time in muted grey, with a compact OFF label beneath the name, without increasing the preview row height. Clicking still opens the usage popover, where each account has an Enable account toggle using the same Switch component as Settings and sharing the existing saved-account operation. Explicit Hide is separate. Disabled accounts cannot be selected for thread routing or counted as the most critical enabled account. Missing measurements remain unavailable rather than invented; pending and failed saves stay visible without optimistic routing changes.",
       "surfaces": ["client", "host", "storage"],
+      "surface": "statusItem",
+      "destination": "none",
+      "currentSurface": "sidebar-footer: usage strip popover",
       "configuration": [],
       "states": ["enabled", "disabled", "saving", "failed", "explicitly-hidden"],
       "failureModes": [
@@ -58,6 +61,9 @@
       "title": "Use a sidebar account for this thread without reselecting its model",
       "summary": "Right-click a sidebar account to preview a thread-only selection. Keep the exact model when offered, otherwise use the deployment default if offered or the target's preferred available model, shown explicitly. Preserve compatible reasoning effort, the active request and the global default. A durable provider preference takes precedence over distribution without changing global order; normal failure recovery remains available. Suggest optional compaction only from a measured context estimate, with cost/detail-loss/cache caveats; never compact or send a message automatically.",
       "surfaces": ["client", "host", "storage"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "sidebar-footer: usage strip › Use this account for this thread",
       "configuration": [],
       "states": ["preview", "same-model", "default-model", "preferred-model", "confirmed", "stale", "unavailable", "compaction-suggested"],
       "failureModes": [
@@ -129,6 +135,9 @@
       "summary": "Minimal provider dialogs show common sign-in choices, with named credentials and custom CLI homes under More options. A pencil edits the provisional new-account name without changing route identity or restarting authentication. New profiles remain outside saved accounts and model routes until verification. Claude subscriptions use official CLI configuration status, not remote token validation.",
       "reach": ["click button \"Add AI account\"", "expect dialog \"Add account\""],
       "surfaces": ["client", "host", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "dialog: Add AI account",
       "configuration": [],
       "states": ["choosing", "preparing", "connecting", "waiting-for-provider", "staging-key", "verifying", "cancelled", "expired", "error", "connected"],
       "failureModes": [
@@ -176,6 +185,9 @@
       "summary": "Sidebar meters highlight actual wire-account metadata for the foreground chat, following distribution and failover. Idle chats show the last successful account; unknown sources are never inferred from model selection.",
       "reach": ["seed tool-call-thread", "expect group \"AI accounts usage*\""],
       "surfaces": ["client", "host", "storage"],
+      "surface": "statusItem",
+      "destination": "none",
+      "currentSurface": "sidebar-footer: usage strip meters",
       "configuration": [],
       "states": ["unknown", "attempting", "succeeded", "failed", "last-successful"],
       "failureModes": [
@@ -204,6 +216,9 @@
         "expect complementary \"Provider accounts\""
       ],
       "surfaces": ["client", "host", "settings", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: AI Accounts: Accounts",
       "configuration": [
         {
           "key": "saveMode",
@@ -266,6 +281,9 @@
       "summary": "Reference-faithful account rail and tabbed detail with inline rename, observed connection state, model reasoning/visibility/inheritance, same-provider priority, confirmed scoped sign-out, and real exact-account request analytics.",
       "reach": ["seed tool-call-thread", "click button \"AI Accounts: Accounts\"", "expect tab \"Models\""],
       "surfaces": ["client", "host", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: AI Accounts: Accounts › Models / Settings / Usage tabs",
       "configuration": [],
       "states": ["models", "settings", "usage", "inherited", "customized", "empty", "unavailable", "sign-out-confirmation"],
       "failureModes": [
@@ -289,6 +307,9 @@
       "summary": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
       "reach": ["seed tool-call-thread", "click button \"AI Accounts: Accounts\"", "expect tab \"Models\"", "expect searchbox \"Search models\""],
       "surfaces": ["client", "host", "settings", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: AI Accounts: Accounts › Models",
       "configuration": [
         {
           "key": "distribution",
@@ -422,6 +443,9 @@
       "summary": "Keep enabled non-hidden accounts visible in canonical order, including accounts whose quota is unavailable. Show Sign in again or Quota unavailable with the provider reason instead of inventing a percentage. Real quota meters retain tags, reset tooltips, active-wire highlighting and last-good transient-error policy; only explicit user hiding collapses an account. A compact settings button beside Add opens the AI Accounts page and closes any open usage popover.",
       "reach": ["expect group \"AI accounts usage\"", "click button \"AI accounts usage\"", "expect region \"AI account usage\""],
       "surfaces": ["client", "host", "settings"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "sidebar-footer: AI accounts usage",
       "configuration": [
         {
           "key": "usageRefreshSeconds",
@@ -556,6 +580,9 @@
       "summary": "Show or hide the tag beside each meter in the wide usage strip (Settings switch or the strip's context menu), and set each account's strip short name in AI Accounts settings; an account without one uses its picker tag, then its initials.",
       "reach": ["click button \"Settings\"", "click text \"AI Accounts\"", "expect switch \"Short names in the strip\""],
       "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: AI Accounts › strip short names",
       "configuration": [
         {
           "key": "usageShortNames",
@@ -605,6 +632,9 @@
       "title": "Review usage history and cost forecasts",
       "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, apply explicit price overrides, and estimate composer and completed-turn costs without persisting provider response payloads.",
       "surfaces": ["client", "host", "storage", "settings"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: AI Accounts: Usage history",
       "configuration": [
         {
           "key": "pricingRefreshHours",
@@ -689,6 +719,9 @@
         "expect text \"Enable an account with quota to see where it is heading.\""
       ],
       "surfaces": ["client", "host", "storage", "settings"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: AI Accounts: Quota forecast",
       "configuration": [
         {
           "key": "workHours",
@@ -782,6 +815,9 @@
       "title": "Route exhausted Luna accounts through Reserve",
       "summary": "Use the separate Reserve quota window and route to the Reserve model only after the weekly Luna window is spent.",
       "surfaces": ["client", "host", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: AI Accounts › failure recovery",
       "configuration": [
         {
           "key": "codexLunaReserve",
@@ -844,6 +880,9 @@
       "title": "Recover failed account requests per failure kind",
       "summary": "Retry, Luna Reserve, fail over to a compatible account, wait, shrink re-sent images, then fail or hand to DSH, configured per failure kind.",
       "surfaces": ["client", "host", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: AI Accounts › failure recovery",
       "configuration": [
         {
           "key": "failureRecovery",
@@ -906,6 +945,9 @@
       "title": "Retry exhausted quota when its reset arrives",
       "summary": "Explain exhausted provider limits inline, let the user resume with another available provider/account/model/reasoning effort (defaulting to the same model on another provider), and auto-resume one minute after a known reset from a checkbox beside Resume, on by default and overridable per thread.",
       "surfaces": ["client", "host", "settings", "storage"],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "transcript: usage-limit turn tail › Resume",
       "configuration": [
         {
           "key": "autoRetryQuotaDefault",
@@ -1009,6 +1051,9 @@
         "expect button \"Add account\""
       ],
       "surfaces": ["client", "settings"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: failed turn › Open AI Accounts",
       "configuration": [],
       "states": ["hidden-for-other-failures", "available-for-credential-failure", "accounts-panel-open"],
       "failureModes": [

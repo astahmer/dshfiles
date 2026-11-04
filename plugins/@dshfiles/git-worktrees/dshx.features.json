@@ -7,6 +7,9 @@
       "title": "Isolate threads in git worktrees",
       "summary": "As a VCS provider for plain git repositories, create a thread worktree on its own dsh/thread-… branch beside the repository when isolation is switched on, register it as a DSH project, list and remove it.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "settings: git worktree isolation (opt-in)",
       "configuration": [
         {
           "key": "isolate",
@@ -66,6 +69,9 @@
       "title": "Snapshot and restore a git workspace's files",
       "summary": "Record every tracked and untracked, non-ignored file as a commit kept under refs/dsh/snapshots/ without moving HEAD or the index, and put the files back to it, returning a snapshot of what they were.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: git file snapshots",
       "configuration": [],
       "states": ["snapshot", "restored"],
       "failureModes": ["A snapshot that is not a commit id is refused before any file changes.", "Ignored files are never recorded or touched."],

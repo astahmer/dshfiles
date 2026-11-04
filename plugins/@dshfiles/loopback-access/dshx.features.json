@@ -7,6 +7,9 @@
       "title": "Keep localhost available when LAN access is enabled",
       "summary": "Add loopback-only TCP listeners to the existing concrete LAN-bound Web server without replacing routing, authentication or origin checks. Print the actual localhost launch URL first and the available LAN/advertised addresses after startup settles. Native loopback-only binds remain unchanged.",
       "surfaces": ["host", "integration", "api", "tool"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: loopback listeners",
       "configuration": [],
       "states": ["starting", "native-loopback", "forwarding", "stopped", "failed"],
       "failureModes": [
@@ -58,6 +61,9 @@
       "summary": "Choose LAN access and a concrete interface address, and set an advanced port. Localhost stays enabled independently of LAN access. Save desired preferences without interrupting current connections; a later user-controlled restart loads them. Explicit CLI flags keep priority.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Network access\"", "expect switch \"LAN access\""],
       "surfaces": ["client", "host", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Network access",
       "configuration": [
         {
           "key": "lanEnabled",

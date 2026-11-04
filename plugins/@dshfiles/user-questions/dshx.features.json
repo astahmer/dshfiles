@@ -7,6 +7,9 @@
       "title": "An answered question form stays closed while its reply waits for admission",
       "summary": "Answering a continued ask_user_question form queues a user-question-reply in the Inbox. The step boundary claims that reply, emptying the Inbox several awaits before the admitted user message settles the question, and the native client republished the form for that gap, so the panel closed, came back, then closed. The fork records each call this Client answered until the Host stops listing it and keeps that form out of the composer seat; the tool call row can still reveal it.",
       "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: question form",
       "configuration": [],
       "states": ["answered-queued", "reply-claimed", "settled", "reply-discarded"],
       "failureModes": [

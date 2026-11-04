@@ -7,6 +7,9 @@
       "title": "Serve session search from a worker-owned index",
       "summary": "Replace the stock sessionQuery backend: searches are pure reads forwarded to a worker that owns the SQLite FTS5 index and ingests session logs incrementally, while list, read and title reads stay core's own code with cached folds.",
       "surfaces": ["host", "storage"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: session search index",
       "configuration": [],
       "states": ["ingesting", "indexed", "behind", "failed"],
       "failureModes": [

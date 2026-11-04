@@ -13,6 +13,9 @@
         "expect textbox \"Enter a folder path\""
       ],
       "surfaces": ["client", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Choose workspace › Add workspace",
       "configuration": [],
       "states": ["closed", "browsing", "selected", "busy"],
       "failureModes": [
@@ -53,6 +56,9 @@
         "expect textbox \"Repository URL\""
       ],
       "surfaces": ["client", "host", "tool"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Choose workspace › Add workspace › Clone repository",
       "configuration": [],
       "states": ["form", "cloning", "colocating", "registering", "succeeded", "failed", "cancelled"],
       "failureModes": [
@@ -109,6 +115,9 @@
       "summary": "Remove a project from the New thread picker without deleting its folder or files; threads lose their project grouping.",
       "reach": ["click button \"Choose workspace\"", "expect textbox \"Search projects or enter a folder path\""],
       "surfaces": ["client", "host", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Choose workspace › Remove",
       "configuration": [],
       "states": ["listed", "confirmation", "removed", "failed"],
       "failureModes": [
@@ -144,6 +153,9 @@
         "expect textbox \"Project name\""
       ],
       "surfaces": ["client", "host", "tool"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Choose workspace › Add workspace › New project",
       "configuration": [],
       "states": ["form", "creating", "created", "created-with-warning", "failed"],
       "failureModes": [

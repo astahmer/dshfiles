@@ -7,6 +7,9 @@
       "title": "One Host port for Sessions that live on another runtime",
       "summary": "A registry the Session controller provides and remote sources register into; ownership is claimed from list answers and re-checked through owns() only when a Session id is not cached.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
       "configuration": [],
       "states": ["registered", "claimed", "unowned", "forgotten"],
       "failureModes": [

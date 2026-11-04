@@ -16,6 +16,9 @@
         "expect text \"JJ workspace\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: Secret Catalog: Secrets",
       "configuration": [
         {
           "key": "defaultScope",
@@ -103,6 +106,9 @@
       "title": "Reveal on click and copy without revealing",
       "summary": "Hovering a masked value offers \"Click to reveal\"; a click reveals that one alias and environment through the Host, and it masks again after the configured timeout, on blur, Esc, scope change, refresh, or unmount. Copy goes through the Host CLI without revealing.",
       "surfaces": ["client", "host", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: Secret Catalog: Secrets › reveal",
       "configuration": [
         {
           "key": "revealSeconds",
@@ -183,6 +189,9 @@
         "expect menuitem \"Generate on this Host\""
       ],
       "surfaces": ["client", "host"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: Secret Catalog: Secrets › Add secret",
       "configuration": [
         {
           "key": "defaultEnvironment",
@@ -256,6 +265,9 @@
         "expect dialog \"Add secret\""
       ],
       "surfaces": ["client", "host", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: Secret Catalog: Secrets › Add with details",
       "configuration": [],
       "states": ["editing", "invalid", "creating", "renaming", "removing-alias", "deleting-vault-item", "collision"],
       "failureModes": [
@@ -357,6 +369,9 @@
         "expect textbox \"Secret value\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: secret-reference fields › Bind",
       "configuration": [],
       "states": ["offered", "editing-masked", "duplicate-detected", "existing-bound", "cancelled", "stored", "bound", "bind-failed"],
       "failureModes": [
@@ -422,6 +437,9 @@
         "expect button \"Set value\""
       ],
       "surfaces": ["client", "host", "settings", "tool", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: secret-reference fields › repair",
       "configuration": [],
       "states": [
         "resolved",
@@ -508,6 +526,9 @@
       "title": "Expose safe secret catalog tools to agents",
       "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve without returning its value.",
       "surfaces": ["tool", "host"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: secret_list / secret_get / secret_reference_status",
       "configuration": [],
       "states": ["metadata-listed", "exact-value-requested", "not-found", "ambiguous"],
       "failureModes": ["List never contains secret values.", "Ambiguous aliases and missing scopes fail closed."],
@@ -549,6 +570,9 @@
         "expect button \"Add and bind\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "plugins-page: View @dshfiles/backlog › Jev secret",
       "configuration": [],
       "states": ["setup-open", "key-stored-global", "reference-bound", "existing-key-replaced"],
       "failureModes": [
@@ -607,6 +631,9 @@
         "expect textbox \"Secret value\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: turn tail › Set up missing secrets",
       "configuration": [],
       "states": ["disabled-off", "key-needed-offer", "bound-reference-unresolved", "masked-form", "newest-turn-only", "key-stored-global", "reference-bound"],
       "failureModes": [

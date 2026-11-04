@@ -7,6 +7,9 @@
       "title": "Fetch public X post, photos, video samples, and thread posts",
       "summary": "Fetch a public post, quote, multiple photos, same-author thread follow-ups, and content-aware video samples with bounded frame and media budgets.",
       "surfaces": ["host", "integration"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: tweet_context",
       "configuration": [],
       "states": ["input-validation", "post-fetch", "video-download", "frame-sampling", "attachment-save", "ready", "failed"],
       "failureModes": [

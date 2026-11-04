@@ -7,6 +7,9 @@
       "summary": "Save, edit, delete, search, and insert bounded prompt snippets from one Host-owned library every browser shares, with revision checks against concurrent writers.",
       "reach": ["click button \"Prompts\"", "expect heading \"Saved prompts\""],
       "surfaces": ["client", "host", "storage"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Prompts",
       "configuration": [],
       "states": ["empty", "saved", "editing", "conflicted", "save-as-copy"],
       "failureModes": [
@@ -74,6 +77,9 @@
       "title": "Insert prompt text without submitting",
       "summary": "Insert into the captured composer cursor span, preserve existing attachments, and reject stale composer state without sending the message.",
       "surfaces": ["client", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Prompts › insert",
       "configuration": [],
       "states": ["captured", "inserted", "stale", "already-inserted"],
       "failureModes": [
@@ -100,6 +106,9 @@
       "title": "Browse recent text-only user messages",
       "summary": "Offer bounded recent loaded user text while excluding agent, tool, archived, and unsupported content.",
       "surfaces": ["client", "storage"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Prompts › recent",
       "configuration": [],
       "states": ["available", "evicted", "unavailable"],
       "failureModes": [
@@ -161,6 +170,9 @@
         "expect button \"Remove file note.txt\""
       ],
       "surfaces": ["client", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: draft attachments",
       "configuration": [],
       "states": ["released", "retained"],
       "failureModes": [

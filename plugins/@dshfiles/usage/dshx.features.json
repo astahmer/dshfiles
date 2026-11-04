@@ -7,6 +7,9 @@
       "title": "Incremental request and tool index from session logs",
       "summary": "Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, memory and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, plus privacy-reduced tool execution durations, outcomes and returned-text sizes. Reads only the Zstandard frames each log gained since the last pass. Costs join per-route, per-context-band list prices from the AI Accounts models.dev catalog at query time.",
       "surfaces": ["host", "storage", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: usage ledger",
       "configuration": [],
       "states": ["empty", "first-index", "incremental", "torn-frame", "unpriced-route", "catalog-refreshed"],
       "failureModes": [
@@ -118,6 +121,9 @@
         "expect heading \"Request log\""
       ],
       "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Usage: Analytics › Requests",
       "configuration": [],
       "states": ["empty", "loading", "filtered", "searched", "sorted", "thread-missing"],
       "failureModes": [
@@ -159,6 +165,9 @@
         "expect text \"Cache savings (estimate)\""
       ],
       "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Usage: Analytics › Charts",
       "configuration": [],
       "states": [
         "empty",
@@ -215,6 +224,9 @@
         "expect text \"Usage by API key · calendar month to date\""
       ],
       "surfaces": ["host", "storage", "integration", "client"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Usage: Analytics › Charts › Jev",
       "configuration": [],
       "states": ["empty", "recorded", "failed", "missing-token-usage"],
       "failureModes": [
@@ -288,6 +300,9 @@
         "expect text \"Every tool\""
       ],
       "surfaces": ["client", "storage", "integration"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Usage: Analytics › Tools & Jev",
       "configuration": [],
       "states": ["empty", "loading", "populated", "filtered-range", "measured-output", "unmeasured-output", "hourly-timeline", "daily-timeline"],
       "failureModes": [
@@ -347,6 +362,9 @@
       "title": "OTLP metrics export",
       "summary": "The read-only usage_otel_metrics Agent tool returns an OTLP/HTTP JSON metrics request from the local SQLite usage ledger. It includes model requests and token use, tool category/source counts and Jev requests per calling plugin with token counters and duration histograms. It never makes a network request; quota and Fast-mode history remain in AI Accounts storage.",
       "surfaces": ["host", "storage", "integration"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: usage_otel_metrics",
       "configuration": [],
       "states": ["empty", "populated", "bounded-range", "source-cap"],
       "failureModes": [

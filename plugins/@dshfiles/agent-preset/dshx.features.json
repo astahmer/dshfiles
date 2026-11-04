@@ -8,6 +8,9 @@
       "summary": "The native new-task preset chip changes a client-local draft's metadata without creating a Host Session or calling agentPresets.select for a nonexistent id. Settings defaults and both Creator routes use the same controller. Materialized blank Sessions retain the native Host selection path; started Sessions keep their recorded composition.",
       "reach": ["click button \"New thread\"", "expect button \"Standard mode\"", "click button \"Standard mode\"", "expect menuitem \"Creator mode*\""],
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Standard mode chip",
       "configuration": [],
       "states": ["local-default", "local-selection", "creator-staged", "host-blank", "started"],
       "failureModes": [

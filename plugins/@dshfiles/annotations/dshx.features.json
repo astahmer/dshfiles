@@ -7,6 +7,9 @@
       "title": "Pick an element and add it to the draft",
       "summary": "Pick an element in DSH, write a bounded note, and insert a source-linked block into the composer draft without sending it.",
       "surfaces": ["client", "host", "api", "tool"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Annotate an element",
       "configuration": [],
       "states": ["idle", "picking", "commenting", "saved", "stale", "resolved", "dismissed"],
       "failureModes": [
@@ -87,6 +90,9 @@
       "title": "Resolve an element to its source",
       "summary": "Map a captured CSS class or exact visible text to a file and line inside an owned plugin bundle through its client source map.",
       "surfaces": ["host", "api", "tool"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: annotations_source",
       "configuration": [],
       "states": ["resolved", "unresolved"],
       "failureModes": [
@@ -142,6 +148,9 @@
       "title": "Intake annotations from the browser extension",
       "summary": "Pair a pinned-origin browser extension through a two-minute single-use window, then accept its annotations over a token-authenticated loopback route and keep them unassigned until the user picks a thread.",
       "surfaces": ["host", "api"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: annotations_intake (browser extension)",
       "configuration": [],
       "states": ["unpaired", "pairing", "paired", "accepted", "rejected", "attached"],
       "failureModes": [
@@ -224,6 +233,9 @@
       "title": "Annotate an HTML preview",
       "summary": "Open a workspace HTML file in a sandboxed, instrumented preview and annotate an element inside it with the file as its source.",
       "surfaces": ["client", "host", "api"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "dialog: annotate an HTML preview",
       "configuration": [],
       "states": ["closed", "loading", "rendered", "picked", "saved"],
       "failureModes": [
@@ -269,6 +281,9 @@
       "title": "Pick on any page in a DSH-owned Chrome",
       "summary": "Launch a Chrome profile with a loopback debugging port, open a configured start URL, and inject the same bounded picker over the DevTools protocol — on the focused tab by default, or on a listed tab.",
       "surfaces": ["client", "host", "api"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Annotate an element › DSH-owned Chrome",
       "configuration": [
         {
           "key": "chromePath",

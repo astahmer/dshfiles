@@ -7,6 +7,9 @@
       "title": "One shared plugin stylesheet",
       "summary": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner.",
       "surfaces": ["client"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "client: shared stylesheet",
       "configuration": [],
       "states": ["sheet-injected", "sheet-missing"],
       "failureModes": [

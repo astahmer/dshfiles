@@ -7,6 +7,9 @@
       "title": "Digest idle threads from DSH's own session logs",
       "summary": "Once a thread has been idle for idleMs, build its digest from the session log (user requests, verbatim corrections and decisions, todos, goal, jj revision descriptions, final answer) without a model call; only a thread with no trail of its own gets one cheap call. Blank and trivial threads get no digest, identical digests are stored once, and message text is indexed without being copied.",
       "surfaces": ["host", "storage", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: memory digests",
       "configuration": [
         {
           "key": "idleMs",
@@ -166,6 +169,9 @@
       "title": "Start every thread with one frozen memory block",
       "summary": "At the first prompt assembly of each agent (subagents included), append a byte-bounded block to the end of the system prompt: a fixed instruction, notes, and thread pointers grouped by project and ranked by citations then recency. Jujutsu workspace paths resolve to their shared store's owning checkout, so isolated threads in one repository share project memory. The block is frozen per thread and identical across a project's threads until memory changes, so it stays in the cached prefix and is never re-emitted. Existing memory rows keep their prior project paths; normalization does not migrate them.",
       "surfaces": ["host", "integration", "settings"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: memory start block in the system prompt",
       "configuration": [
         {
           "key": "enabled",
@@ -240,6 +246,9 @@
       "title": "Search, read and note memory from any agent",
       "summary": "memory_search ranks (BM25, or hybrid with a configured local embedding provider) digests, valid notes and indexed messages (porter words plus trigram identifiers, BM25 fused by reciprocal rank, recency decay, project and note-type boosts); memory_read opens a digest, a note or a bounded raw excerpt; memory_note adds, supersedes (with a reason) or forgets (with a reason) notes typed user, feedback, project or reference. A `memory: <id>` citation in a reply counts as use and becomes an inline preview link. The three tools are dshx API methods (dshfiles-memory search, read, note) opted into the agent registry, and `preview` serves the link UI without logging a tool call.",
       "surfaces": ["host", "tool", "storage", "api"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: memory_search / memory_read / memory_note",
       "configuration": [
         {
           "key": "retrieval",
@@ -365,6 +374,9 @@
       "title": "Browse and clean up memory in the Memory panel",
       "summary": "A full Memory page with Notes, Threads and Analytics tabs: a searchable, filterable note list with a source-and-evidence detail pane (edit, forget, reversible archive, restore, superseded history, related memories), on-demand Jev relevance suggestions with explicit per-note archive actions, a thread digest list with digest/memories/citations/timeline detail, and an analytics dashboard with per-day activity, cost, recall, correctness and recent events.",
       "surfaces": ["client", "api"],
+      "surface": "destinationSection",
+      "destination": "knowledge",
+      "currentSurface": "left-nav: Memory: Browser",
       "configuration": [],
       "states": ["empty", "notes", "editing", "forgetting", "reviewing", "suggested", "archived", "restored", "history", "threads", "usage"],
       "failureModes": [
@@ -421,6 +433,9 @@
       "title": "Preview cited memory inline",
       "summary": "Memory citations in conversation messages are clickable links: the whole `memory: <id>` token carries the link and opens a compact, scrollable inline card that mirrors the Memory panel — tone and status badges, the note as its title, Source & evidence with the source thread, the Metadata grid, and Related and History tabs — with Copy and an Open in Memory button that takes the same item to the Memory page (a note opens its detail, a digest opens its row). Digests and bounded message excerpts use the same card, and a reference that no longer exists shows a dashed not-found state. Preview reads do not create synthetic memory-tool usage records.",
       "surfaces": ["client", "api"],
+      "surface": "entityProvider",
+      "destination": "knowledge",
+      "currentSurface": "transcript: memory: <id> reference card",
       "configuration": [],
       "states": ["idle", "loading", "note", "digest", "excerpt", "missing", "unavailable"],
       "failureModes": [
@@ -475,6 +490,9 @@
       "title": "Show what memory costs and whether it holds up",
       "summary": "Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the user correcting, an answer that cited memory. Cited memories can be rated 👍/👎. The Memory page's Analytics tab and the dshfiles-memory API (usage, citations, rateCitation) expose it.",
       "surfaces": ["client", "storage"],
+      "surface": "destinationSection",
+      "destination": "knowledge",
+      "currentSurface": "left-nav: Memory: Browser › Analytics",
       "configuration": [],
       "states": ["no-activity", "counted", "priced", "unpriced", "rated"],
       "failureModes": [
@@ -520,6 +538,9 @@
       "title": "Forget a selection of notes",
       "summary": "Valid notes carry a checkbox; Shift/Cmd select ranges and toggles, select-all covers the visible valid notes, and one confirmed action forgets the selection with a shared reason. Superseded and forgotten notes never get a checkbox.",
       "surfaces": ["client"],
+      "surface": "rowAction",
+      "destination": "knowledge",
+      "currentSurface": "left-nav: Memory: Browser › Select notes",
       "configuration": [],
       "states": ["unselected", "range-selected", "confirmed", "partially-forgotten"],
       "failureModes": [

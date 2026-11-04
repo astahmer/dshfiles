@@ -21,6 +21,9 @@
         "expect img \"red.png\""
       ],
       "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: image previews (and composer attachments)",
       "configuration": [],
       "states": ["draft", "preview", "loading", "navigating"],
       "failureModes": [

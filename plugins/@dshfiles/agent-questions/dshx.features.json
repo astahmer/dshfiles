@@ -12,6 +12,9 @@
         "expect text \"ask_parent_question\""
       ],
       "surfaces": ["tool", "host", "storage"],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "agent tool: ask_parent_question / answer_parent_question",
       "configuration": [],
       "states": ["pending", "answered", "cancelled", "expired", "interrupted"],
       "failureModes": ["A non-parent attempts to answer.", "A duplicate operation carries conflicting answer data."],
@@ -70,6 +73,9 @@
         "expect text \"ask_parent_question\""
       ],
       "surfaces": ["tool", "host", "storage"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: ask_parent_question expiry",
       "configuration": [],
       "states": ["recommended-expiry", "deferred", "cancelled", "expired"],
       "failureModes": ["Unsafe path, symlink, or overwrite is rejected.", "Repeated defer does not create duplicate records."],
@@ -123,6 +129,9 @@
         "expect text \"submit_markdown_feedback\""
       ],
       "surfaces": ["tool", "host", "storage"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: submit_markdown_feedback",
       "configuration": [],
       "states": ["submitted", "accepted", "rejected", "deferred", "stale"],
       "failureModes": [
@@ -190,6 +199,9 @@
         "expect text \"resolve_parent_feedback\""
       ],
       "surfaces": ["tool", "host", "storage"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: resolve_parent_feedback",
       "configuration": [],
       "states": ["batch-accepted", "batch-rejected", "partially-stale"],
       "failureModes": ["A batch above the maximum is rejected before mutation.", "A stale target cannot be automatically re-anchored."],
@@ -219,6 +231,9 @@
       "title": "Steady countdown and compact native question card",
       "summary": "Restyles the native async question card: a tabular, fixed-width countdown, a header that stacks under 480px, and a question clamped to three lines that expands on hover or focus.",
       "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: native question card",
       "configuration": [],
       "states": ["counting-down", "paused", "narrow-pane", "long-question"],
       "failureModes": [
@@ -251,6 +266,9 @@
         "expect text \"list_thread_questions\""
       ],
       "surfaces": ["tool", "host"],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "agent tool: list_thread_questions / answer_thread_question",
       "configuration": [],
       "states": ["native-open", "native-continued", "child-pending", "answer-queued", "expired", "unavailable"],
       "failureModes": [

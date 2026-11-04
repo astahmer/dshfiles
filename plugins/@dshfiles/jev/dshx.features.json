@@ -7,6 +7,9 @@
       "title": "Ask Jev one Noul question and record its usage",
       "summary": "Send one TypeSafe Jev classification over HttpClient with the shared request and answer schemas, return the probability and provider-reported tokens, and record every call in the usage plugin's Jev ledger.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
       "configuration": [],
       "states": ["answered", "rejected", "timed-out", "invalid-answer", "unrecorded"],
       "failureModes": [

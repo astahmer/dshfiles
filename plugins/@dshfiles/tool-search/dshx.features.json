@@ -6,6 +6,9 @@
       "title": "Search and disclose tools per agent",
       "summary": "Keep a bounded global tool surface per agent and progressively reveal ranked global tools through Native Tool Mode search.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: tool search (not mounted)",
       "configuration": [
         {
           "key": "alwaysVisible",

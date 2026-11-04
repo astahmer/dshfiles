@@ -14,6 +14,9 @@
         "expect button \"1 thread has work to rebase\""
       ],
       "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "home: New thread screen",
       "configuration": [
         {
           "key": "mark",

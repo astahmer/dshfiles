@@ -8,6 +8,9 @@
       "reach": ["seed tool-call-thread", "click button \"Collapse sidebar\"", "click button \"New tab\"", "expect region \"Choose a view\""],
       "summary": "The declared main-tabs/workbench-tabs public module re-exports the canonical workbench/tabs page-global snapshot/subscribe/actions bridge. Workbench adopts the existing actor's current set, computed status/unread/preview/pin/title/availability and scoped targets without opening tabs again. User actions drive that same actor; workbench aside moves preserve the actor tab and only accepted native independent-pane moves close the source. The owned stack always uses Workbench pane chrome, with no native-layout opt-out; its conversation actor stays enabled despite a legacy disabled standalone-strip preference. Normal sidebar opens keep separate Session-bound conversation tabs without a disposable preview, while panel opening modes remain configurable. The fullheight right pane retains its tabs while collapsed. The native strip and mount observer are removed without hiding shell.main; their original route remains only for absent-Workbench deployments. Semantic Start shows the same Choose a view / Search views chooser as a group's New tab, including one Settings Shell: Settings hub and qualified plugin views, but no separate Rich Composer/current-conversation clone. The thread list explicitly opens or focuses fixed Session-bound chat-and-editor tabs, including same-native-current reopen after closing all tabs; standalone fallback Start suggestions remain unchanged.",
       "surfaces": ["client", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "main-tabs: tab semantics",
       "configuration": [],
       "states": ["provider-absent", "provider-connected", "native-strip", "workbench-chrome", "workbench-window-scope", "provider-replaced"],
       "failureModes": [
@@ -140,6 +143,9 @@
         "expect radio \"right\""
       ],
       "surfaces": ["client", "integration", "storage", "settings"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "main-tabs: tab strip",
       "configuration": [
         {
           "key": "enabled",
@@ -518,6 +524,9 @@
         "expect option \"Jujutsu\""
       ],
       "surfaces": ["client", "integration"],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "main-tabs: New tab",
       "configuration": [],
       "states": ["start-shown", "start-replaced", "start-closed"],
       "failureModes": [
@@ -594,6 +603,9 @@
       "title": "Jump between tabs from the keyboard",
       "summary": "Close active tab closes the active tab without archiving its thread; it ships without a default because DSH's own page.close owns Mod+W, and is bound in Settings \u203a Shortcuts. Mod+1\u20268 jump to a tab and Mod+9 to the last one, Ctrl+Tab and Ctrl+Shift+Tab cycle (Desktop); the browser keeps those keys, so the Web defaults are Mod+Alt+1\u20269 and Mod+Alt+] / [. All are rebindable in Settings \u203a Shortcuts. Arrow keys, Enter and Delete work inside the focused strip. Mod+T (Web: Mod+Alt+T) opens a new tab.",
       "surfaces": ["client", "integration"],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "keyboard: tab jumps",
       "configuration": [],
       "states": ["bound", "unbound-on-conflict"],
       "failureModes": ["A default another command already owns leaves that tab command listed but unbound."],
@@ -638,6 +650,9 @@
       "title": "Keep tabs across reloads, per project or globally",
       "summary": "The tab set, order, pins, preview flag, active tab, and each scoped panel tab's scope and title survive a reload. Native fallback follows per-project sets unless the persistence setting shares one set; Workbench holds the adopted window scene while selecting conversations across projects, without merging dormant sets or rewriting preferences. An explicit persistence change can still select another scene. A reload that lands on the New thread screen reopens the saved active tab.",
       "surfaces": ["client", "storage", "settings"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "main-tabs: tab persistence",
       "configuration": [
         {
           "key": "persistence",
@@ -707,6 +722,9 @@
         "expect tab \"Backlog: Items*\""
       ],
       "surfaces": ["client", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "main-tabs: kept thread tab focus",
       "configuration": [],
       "states": ["main-view", "kept-thread-tab", "capture"],
       "failureModes": ["Typing in Backlog capture activates the retained thread tab."],

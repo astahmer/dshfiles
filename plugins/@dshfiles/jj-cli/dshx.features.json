@@ -7,6 +7,9 @@
       "title": "One Effect service that runs the Jujutsu CLI",
       "summary": "Resolve jj once, run it with --color=never --no-pager, bounded stdout and stderr, a timeout and kill-on-interrupt; return a non-zero exit as a value or fail with redacted arguments and stderr.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
       "configuration": [],
       "states": ["succeeded", "exited-non-zero", "timed-out", "truncated", "interrupted"],
       "failureModes": [
@@ -55,6 +58,9 @@
       "title": "Operation-head cache for jj view reads",
       "summary": "Answer repeated --ignore-working-copy view reads from the same operation head without spawning jj, share one in-flight read between callers, and miss as soon as an operation lands.",
       "surfaces": ["host"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
       "configuration": [],
       "states": ["hit", "miss", "shared", "uncached"],
       "failureModes": [

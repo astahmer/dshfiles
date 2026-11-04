@@ -7,6 +7,9 @@
       "title": "Agent preview browser",
       "summary": "Agent tools drive a headless Chromium on the DSH Host, one isolated browser context per thread: preview_open, preview_navigate, preview_snapshot (bounded accessibility text with element refs), preview_screenshot (image), preview_click, preview_type, preview_evaluate (off until the user enables it), preview_reveal, preview_close and preview_list. Top-level navigations are limited to allowed hosts, loopback by default. A thread's pages close after it idles or when it is disposed, and preview_open with reveal (or preview_reveal) shows the URL in the user's browser tab beside the thread.",
       "surfaces": ["host", "tool"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "agent tool: preview_open / preview_screenshot",
       "configuration": [],
       "states": ["no-pages", "page-open", "snapshot-truncated", "navigation-blocked", "evaluate-disabled", "page-limit", "launch-failed", "idle-closed"],
       "failureModes": [
@@ -95,6 +98,9 @@
       "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on \u2014 processes from its jobs or bash calls, and processes running inside its workspace \u2014 plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop.",
       "reach": ["click button \"Dev servers and previews\"", "expect region \"Dev servers\""],
       "surfaces": ["host", "tool", "client"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "thread-header: Dev servers and previews",
       "configuration": [],
       "states": ["hidden", "listed", "stop-armed", "stopped", "open-in-tab", "unsupported-platform"],
       "failureModes": [
@@ -157,6 +163,9 @@
       "title": "Offline HTML screenshots for other Host plugins",
       "summary": "The preview-render dshx contract (@dshfiles/preview/render-api) lets another Host plugin screenshot an untrusted HTML document in the preview Chromium: a fresh offline browser context per call with every request aborted, the document in an allow-scripts, opaque-origin srcdoc frame, an optional full-page capture up to 6000 pixels, and a JPEG returned as base64 within the API payload budget. Only plugin callers are served; html-render's html_render_screenshot is the agent tool over it.",
       "surfaces": ["host"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: preview-render contract",
       "configuration": [],
       "states": ["rendering", "captured", "refused"],
       "failureModes": [

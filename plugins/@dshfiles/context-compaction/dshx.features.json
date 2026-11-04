@@ -7,6 +7,9 @@
       "title": "Bounded compaction summaries",
       "summary": "Summarizes oversized conversation history in bounded, tool-balanced requests before the native durable compaction transaction commits.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: no UI",
       "configuration": [],
       "states": ["ready", "summarizing", "checkpoint-written", "summary-failed"],
       "failureModes": [

@@ -7,6 +7,9 @@
       "title": "Keep an idle thread's prompt cache warm, within a budget",
       "summary": "Opt-in: after a turn ends, re-send the thread's exact last model request with one output token every intervalMinutes, so the provider keeps its prefix cache; stop after maxWarmupsPerIdle per idle period, a rolling maxWarmupsPerHour across threads, a failure, or when the next turn starts.",
       "surfaces": ["host", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Session warming",
       "configuration": [
         {
           "key": "enabled",

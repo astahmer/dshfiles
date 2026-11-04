@@ -8,6 +8,9 @@
       "summary": "The Host listens on a loopback OTLP/HTTP port (4318 by default) and accepts POST /v1/traces in JSON and protobuf, gzip or deflate, from any OpenTelemetry exporter; spans are validated, bounded and stored with whole-trace retention. Plugin, external and both modes decide whether this receiver owns the port and whether it forwards to an external viewer. In plugin and both modes the receiver publishes its bound address in-process, so this Host's dshx spans and usage metrics arrive without OTEL_EXPORTER_OTLP_ENDPOINT; traces_status and the panel carry a diagnosis of why nothing arrives (exporter elsewhere or off, port held, external mode).",
       "reach": ["click button \"Traces: Explorer\"", "expect heading \"Traces\""],
       "surfaces": ["host", "storage", "tool", "client", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: OTLP receiver (read in left-nav: Traces: Explorer)",
       "configuration": [
         {
           "key": "mode",
@@ -193,6 +196,9 @@
         "expect complementary \"Span detail\""
       ],
       "surfaces": ["client", "host", "tool", "storage"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Traces: Explorer › Traces",
       "configuration": [],
       "states": ["empty", "listed", "filtered", "paged", "trace-open", "span-selected", "collapsed", "trace-missing"],
       "failureModes": [
@@ -269,6 +275,9 @@
         "expect region \"Request log\""
       ],
       "surfaces": ["client", "host", "tool", "storage"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "conversation-view: Traces / Requests tabs",
       "configuration": [],
       "states": ["empty", "summarized", "trace-open", "logs", "requests", "no-exporter"],
       "failureModes": [
@@ -325,6 +334,9 @@
       "summary": "The receiver also accepts POST /v1/logs (JSON or protobuf); the Logs tab searches stored records newest first by text, service, minimum severity and one attribute value, a record with a trace id opens its trace, and a span or trace opens only its own logs. GenAI content events keep only their body size unless redaction is turned off.",
       "reach": ["seed otlp-sample-trace", "click button \"Traces: Explorer\"", "click tab \"Logs\"", "expect list \"Logs\""],
       "surfaces": ["client", "host", "tool", "storage"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Traces: Explorer › Logs",
       "configuration": [
         {
           "key": "retentionLogs",
@@ -394,6 +406,9 @@
       "summary": "A service strip and an Operations tab summarize span volume, error rate and p50/p95/p99 latency per service and operation over a chosen window; an Errors tab groups error spans by service, operation, error type and message shape with counts, first and last seen and a sample trace.",
       "reach": ["click button \"Traces: Explorer\"", "click tab \"Operations\"", "expect combobox \"Window\""],
       "surfaces": ["client", "host", "tool"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Traces: Explorer › Operations / Errors",
       "configuration": [],
       "states": ["empty-window", "summarized", "errors-grouped"],
       "failureModes": [
@@ -449,6 +464,9 @@
       "summary": "A Service map tab draws every service seen in the window as a box with span count, error rate and p95, and every cross-service parent/child call as an arrow with call count and p50, red when a call failed; picking a service filters the trace list by it.",
       "reach": ["seed otlp-sample-trace", "click button \"Traces: Explorer\"", "click tab \"Service map\"", "expect img \"Service map\""],
       "surfaces": ["client", "host", "tool"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Traces: Explorer › Service map",
       "configuration": [],
       "states": ["empty", "services-only", "edges", "failing-edge", "cycle"],
       "failureModes": ["A call cycle between services still lays out and terminates.", "Services with no cross-service calls are drawn without edges."],
@@ -495,6 +513,9 @@
       "summary": "The receiver stores POST /v1/metrics (JSON or protobuf): gauges, sums, histograms, exponential histograms and summaries. The Metrics tab lists every metric per service with type, series count and last value, and charts the selected one per attribute set: gauges and sums as their value, cumulative counters as their increase between exports, distributions as their mean.",
       "reach": ["seed otlp-sample-trace", "click button \"Traces: Explorer\"", "click tab \"Metrics\"", "expect img \"Chart of*\""],
       "surfaces": ["client", "host", "tool", "storage"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Traces: Explorer › Metrics",
       "configuration": [
         {
           "key": "retentionMetricPoints",
@@ -563,6 +584,9 @@
         "expect list \"Firing alerts\""
       ],
       "surfaces": ["client", "host", "tool", "storage", "integration"],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "left-nav: Traces: Explorer › Alerts",
       "configuration": [],
       "states": ["ok", "firing", "resolved", "muted", "disabled", "no-data", "flapping", "owner-missing"],
       "failureModes": [
@@ -715,6 +739,9 @@
         "expect text \"execute_tool spans by gen_ai.tool.name, slowest p95 first.\""
       ],
       "surfaces": ["client", "host", "tool"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Traces: Explorer › Boards",
       "configuration": [],
       "states": ["empty", "grouped", "measured", "truncated", "drill-down", "saved", "applied"],
       "failureModes": [
@@ -789,6 +816,9 @@
         "expect tree \"Span waterfall\""
       ],
       "surfaces": ["client", "host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: browser interaction spans",
       "configuration": [],
       "states": ["forwarding", "off-without-target", "old-host"],
       "failureModes": [
@@ -849,6 +879,9 @@
       "summary": "A span's Open in thread (Traces panel) or Show in chat (thread Traces tab) opens its thread's Chat scrolled to and highlighting the turn, step or tool call it belongs to — the nearest span carrying dsh.turn, dsh.step and gen_ai.tool.call.id, so a plugin span lands on its tool call. Each Turn footer has a Trace button that opens the thread's Traces tab on that turn's trace. Both directions use the native Conversation View focus request (openView/viewRequest) and the owned Chat fork's @dshfiles/chat/chat-focus contract.",
       "reach": ["seed tool-call-thread", "seed otlp-session-turns", "click button \"Open the trace of turn*\"", "expect tree \"Span waterfall\""],
       "surfaces": ["client", "host"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: Open the trace of turn",
       "configuration": [],
       "states": ["turn-trace-pending", "turn-trace-open", "turn-trace-missing", "chat-focused", "thread-opened-focused"],
       "failureModes": [
@@ -916,6 +949,9 @@
       "summary": "Sums the dshx.cost.usd agent telemetry puts on model-call spans (never the turn span that repeats them): the thread Traces tab shows the thread's total and each turn's cost, the span panel a call's own cost, the Operations tab model calls per service and model with tokens and cost, and traces_session_summary / traces_search / traces_list_services return the same.",
       "reach": ["seed tool-call-thread", "seed otlp-session-turns", "click tab \"Traces\"", "expect region \"Thread telemetry summary\""],
       "surfaces": ["client", "host", "tool"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "conversation-view: Traces tab › cost",
       "configuration": [],
       "states": ["priced", "unpriced"],
       "failureModes": [

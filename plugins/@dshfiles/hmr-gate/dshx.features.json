@@ -8,6 +8,9 @@
       "summary": "A Plugins-page row names every plugin whose browser half rebuilt while its Host half still runs from before the rebuild, so the page keeps the last-good client code instead of running new client code against old Host code.",
       "reach": ["click button \"Plugins\"", "click button \"View HMR updates\"", "expect text \"Nothing is waiting*\""],
       "surfaces": ["client", "host", "settings"],
+      "surface": "statusItem",
+      "destination": "none",
+      "currentSurface": "plugins-page: View HMR updates",
       "configuration": [],
       "states": ["in-step", "deferred", "released"],
       "failureModes": [

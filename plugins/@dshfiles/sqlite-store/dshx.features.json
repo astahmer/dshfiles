@@ -7,6 +7,9 @@
       "title": "One SqlClient layer for a plugin-owned SQLite file",
       "summary": "Open a SQLite file in a private directory with WAL, busy timeout and synchronous pragmas, run Migrator migrations once per file, adopt a legacy PRAGMA user_version without re-running its steps, and keep the main file and its sidecars owner-only.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
       "configuration": [],
       "states": ["fresh", "adopted", "migrated", "newer-schema", "migration-failed"],
       "failureModes": [

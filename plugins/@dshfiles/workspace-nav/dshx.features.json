@@ -8,6 +8,9 @@
       "summary": "Every New thread entry point (the sidebar's +, the main-tabs +, the command palette, \u2318N, the hero project picker and the schedule dialog) switches the main view to a provisional blank Session immediately, so the composer accepts text while session/create is in flight. The Session Controller mints the identity, the Host creates or reuses it under that id, and the view follows the Host's identity if it declines the reuse. A refused creation shows the create-failed notice, drops the provisional row and returns the view to where it was.",
       "reach": ["click button \"New session\"", "expect button \"Send message\"", "expect text \"sample\""],
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: New thread draft",
       "configuration": [],
       "states": ["instant-composer", "created", "declined-reuse", "create-failed"],
       "failureModes": [

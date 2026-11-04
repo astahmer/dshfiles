@@ -28,6 +28,9 @@
         "expect button \"Remove file note.txt\""
       ],
       "surfaces": ["host", "client", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: new-thread destination bar",
       "configuration": [
         {
           "key": "isolateByDefault",
@@ -160,6 +163,9 @@
         "expect checkbox \"workspace\""
       ],
       "surfaces": ["host", "client", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: new-thread destination bar",
       "configuration": [],
       "states": ["previous-thread-workspace", "project-checkout"],
       "failureModes": [
@@ -251,6 +257,9 @@
         "expect text \"prepared while writing\""
       ],
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: New thread draft",
       "configuration": [],
       "states": ["opening", "deferred", "preparing", "committing", "switching", "settled"],
       "failureModes": [
@@ -425,6 +434,9 @@
         "expect button \"Download session log\""
       ],
       "surfaces": ["client"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "thread-header: Current thread workspace menu",
       "configuration": [],
       "states": ["thread-workspace", "shared-checkout", "to-rebase", "blocked", "session-log-in-menu"],
       "failureModes": [
@@ -477,6 +489,9 @@
         "expect button \"Settle this integrated thread\""
       ],
       "surfaces": ["host", "tool", "command", "client", "integration"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "thread-header: Current thread workspace › Integrate",
       "configuration": [
         {
           "key": "askAgentToFixLanding",
@@ -650,6 +665,9 @@
         "expect text \"Nothing to integrate\""
       ],
       "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: turn tail › Integrate into main",
       "configuration": [],
       "states": ["offer-shown", "offer-hidden-without-work", "offer-hidden-blocked", "offer-hidden-queued", "landing-from-turn-end"],
       "failureModes": [
@@ -711,6 +729,9 @@
         }
       ],
       "surfaces": ["client", "host", "integration"],
+      "surface": "destinationSection",
+      "destination": "land",
+      "currentSurface": "left-nav: JJ Integration: Thread integration",
       "states": [
         "loading",
         "no-repositories",
@@ -850,6 +871,9 @@
         "expect button \"Conflicts*\""
       ],
       "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "land",
+      "currentSurface": "left-nav: JJ Integration: Thread integration › Needs attention",
       "configuration": [],
       "states": ["attention-default", "all-view", "completed-count", "lifecycle-filter"],
       "failureModes": [
@@ -892,6 +916,9 @@
         "expect button \"Preview\""
       ],
       "surfaces": ["client"],
+      "surface": "detail",
+      "destination": "land",
+      "currentSurface": "left-nav: JJ Integration: Thread integration › row details",
       "configuration": [],
       "states": ["details-collapsed", "details-expanded", "single-blocker", "multiple-blockers", "preview-open"],
       "failureModes": [
@@ -926,6 +953,9 @@
       "summary": "A registered project with no thread workspace shows one plain sentence instead of empty groups, banners or filter tabs: the page never fabricates work, and the counts only appear once a workspace exists.",
       "reach": ["click button \"JJ Integration: Thread integration\"", "expect heading \"Thread integration\"", "expect text \"No thread workspaces.\""],
       "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "land",
+      "currentSurface": "left-nav: JJ Integration: Thread integration › empty state",
       "configuration": [],
       "states": ["no-threads", "no-filter-bar"],
       "failureModes": ["An empty project still renders group cards or a ready banner instead of one sentence."],
@@ -956,6 +986,9 @@
         "expect option \"No folder*\""
       ],
       "surfaces": ["host", "client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Choose workspace",
       "configuration": [],
       "states": ["projects", "everything", "workspaces"],
       "failureModes": ["Removed thread workspaces whose folders are gone are listed as projects.", "Thread workspaces are listed on the default Projects tab."],

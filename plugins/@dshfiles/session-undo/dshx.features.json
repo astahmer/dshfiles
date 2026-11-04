@@ -7,6 +7,9 @@
       "title": "Undo and redo a turn: conversation and files together",
       "summary": "Each turn start snapshots the thread's workspace through the VCS provider (a jj operation in a jj workspace, a snapshot commit in git) before any of its tool calls run. Undo restores that snapshot, continues in a fork of the conversation cut before the turn and archives the original; redo restores the files the undo replaced and brings the original back.",
       "surfaces": ["client", "host", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Undo last turn",
       "configuration": [],
       "states": ["no-checkpoint", "undoable", "undone", "redone", "running"],
       "failureModes": [

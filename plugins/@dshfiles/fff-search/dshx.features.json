@@ -7,6 +7,9 @@
       "title": "Answer agent grep and glob from a resident fff index",
       "summary": "On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a worker thread.",
       "surfaces": ["host", "tool"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: grep / glob",
       "configuration": [],
       "states": ["indexing", "warm", "idle-dropped", "worker-restarted"],
       "failureModes": [

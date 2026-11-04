@@ -7,6 +7,9 @@
       "title": "Search and select account models",
       "summary": "Search account-and-model routes in a two-pane composer picker: brand marks, the model name with a subtle service label, account tags with each account's colour and remaining quota (the same binding window as the AI Accounts strip), a six-bar reasoning-effort glyph with a hover legend, and a details pane for accounts, reasoning effort and the fallback chain; route handoff stays with the shared selection directory.",
       "surfaces": ["client", "host", "api", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: model picker",
       "configuration": [],
       "reach": [
         "seed tool-call-thread",
@@ -63,6 +66,9 @@
       "title": "Enable Fast mode on supported Codex models",
       "summary": "The composer picker shows Fast mode only for explicitly supported AI Accounts Codex models, as a switch on the inspected route's header and on that row's hover; the row control is mounted with the list so it never waits for a hover to answer. AI Accounts can enable it by default, with per-session route overrides, and adds the legacy service_tier=priority through pi-ai's supported payload hook. The composer shows a lightning icon while Fast mode is enabled.",
       "surfaces": ["client", "host", "api"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: model picker › Fast mode",
       "configuration": [],
       "states": ["hidden", "available", "enabled", "updating", "error"],
       "failureModes": [
@@ -97,6 +103,9 @@
       "title": "Swap to the next account offering the same model",
       "summary": "A swap button beside the composer model picker moves the Session to the next provider route, in catalog order, that offers the selected model id, keeping the reasoning effort when the target advertises it.",
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: model picker › account swap",
       "configuration": [
         {
           "key": "accountSwap",
@@ -164,6 +173,9 @@
         "expect list \"Fallback order\""
       ],
       "surfaces": ["client", "host"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: model picker › Fallback chain",
       "configuration": [],
       "states": ["unavailable", "follows-default", "thread-chain", "serving-fallback"],
       "failureModes": [

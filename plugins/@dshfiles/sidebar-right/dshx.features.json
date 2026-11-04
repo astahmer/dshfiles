@@ -15,6 +15,9 @@
         "expect tab \"Terminal*\""
       ],
       "surfaces": ["client", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "right-pane: native resources as workbench panels",
       "configuration": [],
       "states": ["native-absent-workbench-fallback", "workbench", "detached", "moved", "hidden", "closed", "cleanup-rejected"],
       "failureModes": [

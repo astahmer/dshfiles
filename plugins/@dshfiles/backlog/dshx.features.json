@@ -21,6 +21,9 @@
         "expect textbox \"Capture\""
       ],
       "surfaces": ["client", "host", "storage", "tool"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items",
       "configuration": [],
       "states": ["inbox", "triaged"],
       "failureModes": [
@@ -84,6 +87,9 @@
         "expect button \"Save Jev settings\""
       ],
       "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: Backlog: Items › Backlog settings",
       "configuration": [
         {
           "key": "dshfiles-backlog.jevEnabled",
@@ -147,6 +153,9 @@
         "expect article \"Item b:2\""
       ],
       "surfaces": ["client", "host"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › Feed",
       "configuration": [],
       "states": ["fresh", "stale", "dormant", "archived"],
       "failureModes": ["Dormant and archived items stay in search and backlinks; only the default feed hides them."],
@@ -206,6 +215,9 @@
       "title": "Rename an item in place",
       "summary": "Double-clicking an item in the feed, an Items row or a board card swaps its title for an inline editor; Enter or a click elsewhere saves, Escape leaves the item untouched, and the quick gesture never opens the peek or card detail.",
       "surfaces": ["client"],
+      "surface": "rowAction",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › rows",
       "configuration": [],
       "states": ["reading", "editing", "saved", "cancelled"],
       "failureModes": [
@@ -254,6 +266,9 @@
         "expect button \"Copy URL\""
       ],
       "surfaces": ["client", "host", "tool"],
+      "surface": "detail",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › Board / item detail",
       "configuration": [],
       "states": ["inbox", "todo", "doing", "done", "dropped"],
       "failureModes": ["An unknown item id answers not-found without writing."],
@@ -304,6 +319,9 @@
         "expect button \"Configure board columns\""
       ],
       "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › Board › Configure board columns",
       "configuration": [],
       "states": ["default-order", "custom-order", "hidden-column"],
       "failureModes": ["At least one board column remains visible; hiding columns does not change item status or remove items."],
@@ -351,6 +369,9 @@
         "expect text \"First selection item\""
       ],
       "surfaces": ["client"],
+      "surface": "rowAction",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › rows",
       "configuration": [],
       "states": ["unselected", "range-selected", "additive-selection", "batch-updated"],
       "failureModes": [
@@ -458,6 +479,9 @@
         "expect menuitem \"Delete permanently (2)\u2026\""
       ],
       "surfaces": ["client"],
+      "surface": "rowAction",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › row menu",
       "configuration": [],
       "states": ["single", "selection"],
       "failureModes": [
@@ -490,6 +514,9 @@
       "title": "Triage new items automatically",
       "summary": "With autoTriage on, each capture is triaged in the background and keeps the status it was captured with: Jev answers whether it is work to do (only when no kind was chosen) and whether it repeats the closest open item, and a configured cheap model, when set, is the sole judge and proposes kind, title, tags and duplicates using the user's past corrections as examples. A duplicate is recorded as a directional relation to its canonical item; when completed, it resolves that canonical item too unless the user set the canonical status by hand. A confident proposal applies as `system` and skips fields the user set by hand; a hesitant one waits on the item to be accepted or dismissed.",
       "surfaces": ["client", "host", "settings", "tool"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › capture",
       "configuration": [],
       "states": ["off", "proposed", "applied", "dismissed"],
       "verification": [
@@ -607,6 +634,9 @@
       "title": "Backfill triage on items captured before it was set up",
       "summary": "Triage only runs on capture, so the wand in the panel header backfills it: the oldest inbox/todo tasks no triage has looked at yet, 25 per run, one at a time. The dialog reports what it applied, left as suggestions, found unchanged and how many items remain, so a second run continues where it stopped. An agent runs the same pass with backlog_triage_backfill, optionally re-triaging inbox/todo tasks triage already looked at.",
       "surfaces": ["client", "host", "tool"],
+      "surface": "command",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › Backfill triage",
       "configuration": [],
       "states": ["untriaged", "applied", "suggested", "unchanged", "remaining", "not-configured"],
       "reach": [
@@ -689,6 +719,9 @@
       "title": "Move items from thread and revision signals",
       "summary": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked until a finished turn clears that same flag; a request for input that thread raised is settled as soon as its question is answered, by the user or by another Agent answering for them; with threadResolution on, Jev reads a finished reply and leaves a Done suggestion on the items it resolved, never a silent close. Signals only move forward and never over a status or attention the user set by hand.",
       "surfaces": ["host", "settings", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: thread and revision signals",
       "configuration": [],
       "states": ["linked", "started", "stalled", "suggested", "finished"],
       "failureModes": [
@@ -842,6 +875,9 @@
       "title": "Mention backlog items with @",
       "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; \u2026)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text.",
       "surfaces": ["client", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: @b: mentions",
       "configuration": [],
       "states": ["listed", "inserted", "sent", "rendered"],
       "failureModes": [
@@ -915,6 +951,9 @@
         "expect button \"Backlog item b:1\""
       ],
       "surfaces": ["client"],
+      "surface": "entityProvider",
+      "destination": "work",
+      "currentSurface": "transcript: b:<id> reference card",
       "configuration": [],
       "states": ["idle", "loading", "linked", "sent", "gallery-open", "navigating", "missing", "opened"],
       "failureModes": [
@@ -971,6 +1010,9 @@
       "title": "Search with reasons and saved views",
       "summary": "Relevance-ranked search over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators; each result says where it matched. Typing filters the current view in place (Feed, Items, Board, Inbox, Projects); Enter opens the ranked results view. Multi-select status chips show counts for the current search and narrow results. Views save a view and search to the plugin settings.",
       "surfaces": ["client", "host", "settings", "tool"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › search",
       "configuration": [],
       "states": ["browsing", "searching", "saved"],
       "failureModes": ["A settings write that the Host refuses drops the optimistic saved view."],
@@ -1033,6 +1075,9 @@
       "title": "Attention Inbox across items and threads",
       "summary": "One row per open backlog item combines attention, triage suggestions and (setting inboxThreads) linked unread thread reasons, with separate open and acknowledge actions for every thread. Filters and counts use unique items. Thread acknowledgement never resolves item attention or suggestions; answering a thread's question does settle its own request for input; done/dropped historical thread items stay excluded, and snoozed items return later.",
       "surfaces": ["client", "host", "settings", "integration"],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "left-nav: Backlog: Items › Inbox",
       "configuration": [],
       "states": ["unread", "acknowledged", "resolved", "snoozed"],
       "failureModes": ["Without thread-sidebar's attention API the Inbox shows backlog items only."],
@@ -1099,6 +1144,9 @@
       "title": "Backlog work in the Activity timeline",
       "summary": "Item creation, moves, links, comments, triage and requests for input are published as backlog.* events to @dshfiles/activity-timeline (setting publishActivity); the item log stays the source of truth and each item shows one condensed activity line.",
       "surfaces": ["host", "settings", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: backlog.* events into left-nav: Activity Timeline: Activity",
       "configuration": [],
       "states": ["published", "off"],
       "failureModes": ["Without the timeline plugin the events have no listener and nothing changes."],
@@ -1170,6 +1218,9 @@
         "expect img \"red.png\""
       ],
       "surfaces": ["client", "host", "storage"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › capture box",
       "configuration": [],
       "states": ["empty", "gallery", "images", "properties", "saved", "sending", "typing"],
       "failureModes": [
@@ -1242,6 +1293,9 @@
         "expect text \"sample\""
       ],
       "surfaces": ["client", "host", "storage"],
+      "surface": "detail",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › item detail",
       "states": ["reading", "editing", "mentioning", "attached", "saved", "routing"],
       "configuration": [
         {
@@ -1360,6 +1414,9 @@
         "expect text \"2 projects\""
       ],
       "surfaces": ["client", "host", "settings"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › project filter",
       "configuration": [],
       "states": ["all-projects", "one-project", "multiple-projects", "no-project", "remembered"],
       "failureModes": [
@@ -1409,6 +1466,9 @@
       "title": "File a thread capture under its project",
       "summary": "A capture made from a jj thread workspace is filed under the project checkout that workspace was cut from, not under the workspace folder. The Host asks jj-integration which project owns the workspace, so a custom threads directory or a legacy workspace name folds the same way; without jj-integration the path stays as given.",
       "surfaces": ["host", "storage", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: capture project resolution",
       "configuration": [],
       "states": ["project-workspace", "thread-workspace", "unregistered-folder"],
       "failureModes": [
@@ -1496,6 +1556,9 @@
         "expect tooltip \"Start a thread for this item\""
       ],
       "surfaces": ["client", "settings", "tool"],
+      "surface": "rowAction",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › Start thread",
       "configuration": [],
       "states": ["item-without-project", "item-project-registered", "item-project-unregistered", "send-at-once", "stays-in-backlog", "opened-on-request"],
       "failureModes": [
@@ -1609,6 +1672,9 @@
         "expect textbox \"Secret value\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: turn tail › Set up missing secrets",
       "configuration": [],
       "states": ["disabled", "missing-key", "offered", "editing-masked", "cancelled", "bound", "binding-failed", "catalog-unavailable"],
       "failureModes": [
@@ -1665,6 +1731,9 @@
         "expect menuitem \"Retrieve tweet content\""
       ],
       "surfaces": ["client", "host", "storage", "tool"],
+      "surface": "rowAction",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › row menu › tweet context",
       "configuration": [],
       "states": ["unmatched", "retrieving", "imported", "retryable-failure"],
       "failureModes": [

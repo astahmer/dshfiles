@@ -7,6 +7,9 @@
       "title": "/btw side chat",
       "summary": "/btw <question> forks the thread at its latest completed turn with the same model and route, asks the question there, and opens the fork in a right-sidebar tab where follow-ups continue. The fork is hidden from the thread sidebar and archived when its tab closes; the tab header shows how much of the first request the provider read from its prefix cache.",
       "surfaces": ["client"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: btw tab",
       "configuration": [],
       "states": ["forking", "configuring", "asking", "open", "archiving", "failed", "closed"],
       "failureModes": [
@@ -51,6 +54,9 @@
       "title": "Persisted /btw command chip",
       "summary": "A draft whose leading token is /btw persists as a command chip: the composer's restore path resolves the claim through the trigger pipeline's matchClaim (the /btw source answers the same claim matchEnter would), so a reload rebuilds the chip with its hint instead of throwing inside a client-store subscriber and leaving literal text behind.",
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: /btw chip",
       "configuration": [],
       "states": ["chip-typed", "persisted", "restored", "unrestorable"],
       "failureModes": [
@@ -97,6 +103,9 @@
         "expect dialog \"Ask a side question\""
       ],
       "surfaces": ["client"],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "palette: Ask a side question (btw)",
       "configuration": [],
       "states": ["unavailable", "idle", "asking", "failed", "unbound"],
       "failureModes": [

@@ -6,6 +6,9 @@
       "title": "Reorder pending messages",
       "summary": "Move a queued item up, down, or by drag while preserving its durable identity and respecting next-turn and next-step boundaries.",
       "surfaces": ["client", "host", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: queued messages",
       "configuration": [
         {
           "key": "expandByDefault",
@@ -71,6 +74,9 @@
       "title": "Edit queued messages in the composer",
       "summary": "Move a queued message's text and attachments into the main composer, show an editing placeholder in its place, and put the edited (Submit) or original (Cancel/Escape) message back at the same position.",
       "surfaces": ["client", "host"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: queued messages › edit",
       "configuration": [],
       "states": ["viewing", "loading", "editing", "submitting", "restoring", "failed"],
       "failureModes": [
@@ -160,6 +166,9 @@
       "title": "Preview queued message text",
       "summary": "Show a normalized one-line text preview, hide attachment payloads, and honor the configured character limit without splitting Unicode code points.",
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: queued messages › preview",
       "configuration": [
         {
           "key": "previewLength",
@@ -222,6 +231,9 @@
         "expect text \"first queued, with an image and a file\""
       ],
       "surfaces": ["client", "host", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: queued messages › Move to thread",
       "configuration": [],
       "states": ["idle", "picking", "loading", "removing", "delivering", "restoring", "settled"],
       "failureModes": [
@@ -300,6 +312,9 @@
       "summary": "Each queued message shows a small thumbnail for every image and a chip with the name for every other file, read from the session that holds them; a setting turns the previews off.",
       "reach": ["seed queue-preview-thread", "expect group \"2 attachments\"", "expect img \"red.png\"", "expect text \"note.txt\""],
       "surfaces": ["client", "settings"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: queued messages › attachment previews",
       "configuration": [
         {
           "key": "attachmentPreviews",

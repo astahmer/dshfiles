@@ -15,6 +15,9 @@
         "expect option \"Host default workspace\""
       ],
       "surfaces": ["client", "host", "storage", "tool"],
+      "surface": "destinationSection",
+      "destination": "agents",
+      "currentSurface": "left-nav: Agents: Directory",
       "configuration": [],
       "states": ["empty", "built-in-only", "editing", "enabled", "disabled", "thread-history", "delegation-listed"],
       "failureModes": [
@@ -125,6 +128,9 @@
       "title": "Mention an agent where a thread starts",
       "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was \u2014 the backlog reports the new thread in a toast whose Open action shows it \u2014 the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
       "surfaces": ["client", "host", "tool"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: @agent mention",
       "configuration": [],
       "states": ["idle", "mentioned", "dispatched", "reported"],
       "failureModes": [
@@ -186,6 +192,9 @@
       "title": "Preview an agent from its mention",
       "summary": "Every rendered @{handle} reference (and legacy @handle mention) that names a saved agent becomes a link: clicking it (or pressing Enter) opens a card above the reference with the agent's glyph, name, description, model route, tool preset, memory scope, delegation, routine, instructions and its recent threads, and an Open in Agents action selects it in the panel. The card follows the reference while the conversation scrolls; an unknown, removed or misspelled handle stays plain text, so an email address or a menu scope never becomes a link.",
       "surfaces": ["client"],
+      "surface": "entityProvider",
+      "destination": "agents",
+      "currentSurface": "dialog: agent reference preview card",
       "configuration": [],
       "states": ["known-agent", "disabled-agent", "removed-agent", "many-mentions", "thread-history"],
       "failureModes": [

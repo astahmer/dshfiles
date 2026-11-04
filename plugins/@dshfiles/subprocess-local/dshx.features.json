@@ -7,6 +7,9 @@
       "title": "Wait for detached process groups without probing every 15 ms",
       "summary": "Owned fork of the native local subprocess service: the group-exit poll backs off from 15 ms to 500 ms, so a job an agent detaches no longer costs the Host seconds of CPU while a short-lived tree is still seen at once.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: no UI",
       "configuration": [],
       "states": ["running", "group-alive", "exited"],
       "failureModes": [

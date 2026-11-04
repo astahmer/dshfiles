@@ -6,6 +6,9 @@
       "title": "Mark review files as viewed",
       "summary": "Toggle viewed state for one file in one review-session change and show the viewed progress count.",
       "surfaces": ["client", "api", "storage"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: native review tab › Viewed",
       "configuration": [],
       "states": ["unviewed", "viewed", "progress-updated"],
       "failureModes": [
@@ -73,6 +76,9 @@
       "title": "Retain viewed marks on the Host",
       "summary": "Keep the marks in the Host's durable diff_viewed domain, capped at the 2000 most recent, fall back to browser-held marks until the Host serves the API, and adopt those browser marks once.",
       "surfaces": ["host", "api", "storage", "client"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: diff_viewed storage",
       "configuration": [],
       "states": ["host-owned", "browser-fallback", "legacy-adopted", "retention-evicted"],
       "failureModes": [

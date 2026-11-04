@@ -7,6 +7,9 @@
       "title": "Review project and workspace changes by scope",
       "summary": "Choose a registered project or an existing JJ thread workspace from the shared searchable picker, recover from a missing workspace by choosing another folder, and optionally set a base bookmark; read its jj diff, group changed files with pulls.review's deterministic rules, and show every scope's diff in one scrollable review with locally persisted progress. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool.",
       "surfaces": ["client", "host"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "left-nav: pulls.review: Reviews",
       "configuration": [],
       "states": ["choose-project", "choose-workspace", "workspace-missing-recovery", "loading", "empty-diff", "scoped", "reviewed", "truncated", "failed"],
       "failureModes": [
@@ -115,6 +118,9 @@
       "title": "Summarize review scopes with the thread's own model",
       "summary": "One model call over the whole diff turns the deterministic scope summaries into short one-line-per-scope prose, using the provider the thread last requested with and the first model that provider offers.",
       "surfaces": ["client", "host"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "left-nav: pulls.review: Reviews › Summarize",
       "configuration": [],
       "states": ["idle", "summarizing", "summarized", "no-route", "unparsed", "failed"],
       "failureModes": [
@@ -190,6 +196,9 @@
       "title": "Mark a selection of changed files reviewed",
       "summary": "The review-wide selector covers files across every scope; per-file checkboxes can still extend or toggle the selection, and one action marks or clears it in the review progress the Host keeps for every browser. A plain click on Mark reviewed still toggles that file.",
       "surfaces": ["client"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "left-nav: pulls.review: Reviews › reviewed marks",
       "configuration": [],
       "states": ["unselected", "range-selected", "marked", "cleared"],
       "failureModes": [

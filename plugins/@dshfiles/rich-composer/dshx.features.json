@@ -7,6 +7,9 @@
       "title": "Dock an independently bound Conversation view",
       "summary": "Restore existing independently bound Conversation views without an extra composer. Per-thread occurrences remain addressable for saved layouts but are excluded from reusable view pickers. Fixed conversations also render the original authorized header through the owned public Factory: a single native header declaration, original session-targeted controls and native per-session child-view selection over the same resident editor. Native main mode shares the renderer; the Workbench-only host-corner clearance prevents row recovery from covering the original toolbar.",
       "surfaces": ["client"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "workbench: docked Conversation views",
       "configuration": [],
       "states": ["source-available", "panel-open", "session-unavailable", "panel-closed", "restored"],
       "failureModes": [
@@ -86,6 +89,9 @@
       "title": "Paste session mentions as reference chips",
       "summary": "Pasted canonical thread mentions keep their structured label and reference behavior in the composer.",
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: pasted thread mentions",
       "configuration": [],
       "states": ["composer-ready", "mention-pasted", "reference-chip-visible"],
       "failureModes": [
@@ -119,6 +125,9 @@
       "title": "Add inline references for image attachments",
       "summary": "When an image enters the composer, it gets an ordered inline reference in the draft so users can point to specific screenshots in their message.",
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: image references",
       "configuration": [],
       "states": ["composer-ready", "image-attached", "image-reference-visible"],
       "failureModes": [
@@ -163,6 +172,9 @@
       "title": "Reuse image references and open the selected image",
       "summary": "Attached images remain reusable @ candidates; repeated picks create distinct chips, and activating a chip opens that exact image in the attachment gallery.",
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: image reference chips",
       "configuration": [],
       "states": ["composer-ready", "images-attached", "image-reference-visible", "gallery-open"],
       "failureModes": [
@@ -212,6 +224,9 @@
       "title": "Rename a thread from its header title",
       "summary": "Clicking the current Session title in the main view header opens an in-place editor focused on the whole title. Enter or leaving the field commits the trimmed title through the Session rename API, Escape cancels, and a blank or unchanged draft closes without a Host call. The header keeps the breadcrumb shape, so ancestor crumbs still navigate and a subagent's lineage switcher is unchanged.",
       "surfaces": ["client"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-header: click title to rename",
       "configuration": [],
       "states": ["title-idle", "title-editing", "title-committed", "title-cancelled"],
       "failureModes": [
@@ -245,6 +260,9 @@
       "title": "Composer contract for other plugins",
       "summary": "Provides dshx's Composer contract: the composer on screen and whether it holds focus, the draft text to read, replace or insert at the caret, file, quote, note and line-comment chips, the next message's model and variant, and focus. Those chips keep their content in the chip, so a restored draft still sends them.",
       "surfaces": ["client"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "client: Composer contract",
       "configuration": [],
       "states": ["no-composer", "composer-current", "composer-focused"],
       "failureModes": [
@@ -277,6 +295,9 @@
       "title": "Recall earlier prompts with ArrowUp",
       "summary": "ArrowUp in an empty composer shows this thread's previous prompts from its loaded history, newest first; repeated ArrowUp goes older, ArrowDown goes newer and back to the empty draft, Escape restores the draft, and editing the recalled text ends recall.",
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: ArrowUp recall",
       "configuration": [],
       "states": ["idle", "recalling", "edited"],
       "failureModes": [
@@ -340,6 +361,9 @@
       "title": "Attach a large paste as a text file",
       "summary": "A text paste of 32 KiB or more becomes a pasted-<date>-<time>.txt file attachment through the composer's existing upload path, and a notice offers Paste as text to remove the file and insert the text instead.",
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: large paste as file",
       "configuration": [],
       "states": ["composer-ready", "pasted-as-file", "pasted-as-text"],
       "failureModes": [

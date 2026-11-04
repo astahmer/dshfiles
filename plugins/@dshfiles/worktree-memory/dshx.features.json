@@ -8,6 +8,9 @@
       "summary": "One page shows resident memory of DSH process trees grouped by workspace, plus current-user Node processes grouped by deterministic script labels, nearest app ancestor or immediate parent, and working directory. Node origin rows expose no argv or environment values, and their RSS excludes compressed or swapped memory. The sidebar entry carries a pressure dot and the detached total.",
       "reach": ["click button \"Worktree Memory: RAM\"", "expect text \"Node process origins\""],
       "surfaces": ["host", "tool", "client"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Worktree Memory: RAM",
       "configuration": [],
       "states": [
         "loading",

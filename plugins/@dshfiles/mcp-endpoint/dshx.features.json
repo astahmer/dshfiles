@@ -7,6 +7,9 @@
       "title": "Drive DSH threads from an outside agent over MCP",
       "summary": "Serve an MCP server (streamable HTTP, stateless, JSON responses) at /mcp on the DSH Web server. Claude Code, Codex or any MCP client with the bearer token can list projects and threads, read a thread's recent messages, create a thread with a first prompt and model, queue or steer a message, wait for the turn to end (at most 5 minutes) and stop a turn. Every tool is a sessions API call made as @dshfiles/mcp-endpoint.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: /mcp endpoint",
       "configuration": [],
       "states": ["no-token", "accepted", "unauthorized", "refused-remote", "refused-origin", "method-not-allowed"],
       "failureModes": [
@@ -74,6 +77,9 @@
         "expect button \"Rotate\""
       ],
       "surfaces": ["client", "host", "settings", "api", "tool"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: MCP endpoint",
       "configuration": [
         {
           "key": "lan-enabled",

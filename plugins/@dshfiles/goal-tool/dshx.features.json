@@ -7,6 +7,9 @@
       "title": "Accept admitted continued-form answers as direct goal authority",
       "summary": "The native goal-tool fork recognizes only an answered root-turn reply whose call id the user-question projection settled with a valid answer batch.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: goal tool fork",
       "configuration": [],
       "states": ["root-turn", "continued-question-settled", "goal-update-authorized", "rejected"],
       "failureModes": [

@@ -8,6 +8,9 @@
       "summary": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"General\""],
       "surfaces": ["client", "settings", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "sidebar: Account menu › Settings",
       "configuration": [],
       "states": ["closed", "open", "compact-navigation", "onboarding", "disconnected", "update-available"],
       "failureModes": [
@@ -46,6 +49,9 @@
       "summary": "The New tab chooser offers one Settings Shell: Settings hub with actual section navigation, search and native/plugin forms. Leaf sections remain registered for saved layouts and explicit links but are hidden from primary suggestions. The authorized shell renderer and ConfigForm remain the owners. Workbench pane chrome is mandatory; hidden right-pane tabs retain their state. Standalone dialog/tab/side-panel compatibility is unchanged.",
       "reach": ["click button \"Collapse sidebar\"", "click button \"New tab\"", "click button \"Settings Shell: Settings\"", "expect button \"General\""],
       "surfaces": ["client", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "main-tabs: New tab › Settings Shell: Settings",
       "configuration": [],
       "states": ["registered", "open", "label-updated", "source-removed", "disposed"],
       "failureModes": [
@@ -82,6 +88,9 @@
       "summary": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, shows a concise English TL;DR across newer releases, links to the official notes, and lets the user dismiss that release notice.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"Check for DSH updates\""],
       "surfaces": ["client", "host", "api", "tool", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "sidebar: Settings trigger release mark › General",
       "configuration": [],
       "states": ["checking", "up-to-date", "update-available", "summary-expanded", "dismissed", "comparison-unknown", "unavailable"],
       "failureModes": [
@@ -143,6 +152,9 @@
         "expect tab \"Settings\""
       ],
       "surfaces": ["client", "settings", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "main-tabs: Settings tab",
       "configuration": [
         {
           "key": "openIn",
@@ -192,6 +204,9 @@
         "expect button \"Back to all settings\""
       ],
       "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "right-pane: Settings",
       "configuration": [],
       "states": ["panel-collapsed", "list", "section", "searching", "narrow", "wide"],
       "failureModes": [
@@ -237,6 +252,9 @@
         "expect button \"Restore the dialog size\""
       ],
       "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "dialog: Settings",
       "configuration": [],
       "states": ["modal", "expanded", "moved-to-tab"],
       "failureModes": ["Escape clears a non-empty search before it closes the dialog."],
@@ -273,6 +291,9 @@
         "expect text \"1 Setting Found\""
       ],
       "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Search settings",
       "configuration": [],
       "states": ["empty-query", "results", "no-results"],
       "failureModes": [
@@ -313,6 +334,9 @@
         "expect switch \"Show coding view\""
       ],
       "surfaces": ["client", "settings", "tool"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Search settings › section controls",
       "configuration": [],
       "states": ["entry-results", "section-opened-at-target", "invalid-entries-skipped"],
       "failureModes": [
@@ -374,6 +398,9 @@
         "expect spinbutton \"Max tabs\""
       ],
       "surfaces": ["client", "settings", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: plugin pages",
       "configuration": [],
       "states": ["ready", "read-only", "unavailable", "refused"],
       "failureModes": ["A namespace whose plugin is not loaded shows its fields disabled with an explanation."],
@@ -412,6 +439,9 @@
         "expect button \"Reset to default\""
       ],
       "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Reset to default",
       "configuration": [],
       "states": ["default", "modified", "pending"],
       "failureModes": ["A refused value shows under its row and the row returns to the stored value."],
@@ -447,6 +477,9 @@
         "expect menuitem \"Copy path\""
       ],
       "surfaces": ["client", "settings", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Open configuration file",
       "configuration": [],
       "states": ["no-document", "document", "copied", "failed"],
       "failureModes": [

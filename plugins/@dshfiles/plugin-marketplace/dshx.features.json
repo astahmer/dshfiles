@@ -6,6 +6,9 @@
       "title": "Browse and filter the plugin catalog",
       "summary": "Search, filter by category and compatibility, sort, paginate, refresh, and open catalog entries without claiming unavailable detail or uninstall capabilities.",
       "surfaces": ["client", "host", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Built-in plugins › Framework Hub",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: Built-in plugins\"",
@@ -95,6 +98,9 @@
       "title": "Install a selected plugin with explicit consent",
       "summary": "Require two explicit confirmations, re-fetch exact package detail, execute fixed argv, show install status, and explain restart guidance without hot-loading or restarting DSH.",
       "surfaces": ["client", "host", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Built-in plugins › Framework Hub › Install",
       "configuration": [],
       "states": ["confirmation-required", "installing", "installed", "failed", "cancelled", "restart-required"],
       "failureModes": [

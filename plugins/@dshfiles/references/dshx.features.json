@@ -7,6 +7,9 @@
       "title": "Attach named outside directories and git repositories to a thread",
       "summary": "Save a reference (a directory read in place, or a git URL shallow-cloned under $DSH_HOME/references), attach it to a Session with /reference or the reference_* tools, and name every attached reference with its absolute path in that Session's runtime context.",
       "surfaces": ["host", "integration"],
+      "surface": "destinationSection",
+      "destination": "knowledge",
+      "currentSurface": "agent tool: reference_* and /reference (no UI)",
       "configuration": [],
       "states": ["saved", "attached", "detached", "removed", "clone-failed"],
       "failureModes": [

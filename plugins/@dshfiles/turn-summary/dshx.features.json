@@ -8,6 +8,9 @@
       "summary": "Under each finished turn, one line says what the agent did with tools: commands run, files edited, files read and searches. When commands failed, a red count opens a list naming each failed command and how it ended (exit code, signal, or a call the tool rejected). Each part can be switched off.",
       "reach": ["seed tool-call-thread", "expect text \"Tool finished.\""],
       "surfaces": ["client", "settings"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: turn summary line",
       "configuration": [
         {
           "key": "enabled",

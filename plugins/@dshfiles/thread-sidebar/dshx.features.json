@@ -18,6 +18,9 @@
         "expect button \"More sidebar destinations\""
       ],
       "surfaces": ["client", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "main-tabs: New tab › Thread Sidebar views",
       "configuration": [],
       "states": ["sidebar-present", "panel-open", "navigation-current", "declarer-unloaded"],
       "failureModes": [
@@ -111,6 +114,9 @@
         "expect button \"Group: Status\""
       ],
       "surfaces": ["client", "host", "settings", "storage", "integration"],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "left-nav: Thread Sidebar: Board",
       "configuration": [
         {
           "key": "threadRowDensity",
@@ -319,6 +325,9 @@
         "expect text \"Unsent project prompt\""
       ],
       "surfaces": ["client", "integration"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-list: project header › New chat",
       "configuration": [],
       "states": ["expanded-project", "collapsed-project", "blank-chat", "project-draft", "fresh-after-send"],
       "failureModes": [
@@ -376,6 +385,9 @@
         "expect banner \"This thread is archived.\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-list: Archive › Undo",
       "configuration": [
         {
           "key": "archiveUndoEnabled",
@@ -451,6 +463,9 @@
         "expect checkbox \"Show count on tab\""
       ],
       "surfaces": ["client", "storage"],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "thread-list: Thread list settings › Manage views",
       "configuration": [
         {
           "key": "groupBy",
@@ -771,6 +786,9 @@
         "expect checkbox \"Settle inactive threads\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Thread sidebar › idle policy",
       "configuration": [
         {
           "key": "autoSettleEnabled",
@@ -940,6 +958,9 @@
         "expect region \"Thread list settings\""
       ],
       "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "thread-list: Thread list settings › Remote group",
       "configuration": [],
       "states": ["integrated-by-default", "separate-remote", "reordered", "empty-sections-folded"],
       "failureModes": [
@@ -1009,6 +1030,9 @@
         "expect group \"Archive settled threads\""
       ],
       "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Thread sidebar › settled archive delay",
       "configuration": [
         {
           "key": "settledArchiveDelay",
@@ -1074,6 +1098,9 @@
         "expect img \"Muted\""
       ],
       "surfaces": ["client", "settings", "storage"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-list: row menu › Mute",
       "configuration": [
         {
           "key": "mutedThreads",
@@ -1146,6 +1173,9 @@
         "expect img \"Unread\""
       ],
       "surfaces": ["client", "host", "storage"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-list: row menu › Mark unread",
       "configuration": [],
       "states": ["read", "manual-unread"],
       "failureModes": [
@@ -1185,6 +1215,9 @@
         "expect text \"Turn finished\""
       ],
       "surfaces": ["client", "host", "storage", "integration"],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "thread-list: finished-turn unread marks",
       "configuration": [],
       "states": ["finished-unacknowledged", "acknowledged"],
       "failureModes": [
@@ -1246,6 +1279,9 @@
         "expect button \"In-app notification timeout\""
       ],
       "surfaces": ["client", "host", "settings", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Thread sidebar › notifications",
       "configuration": [
         {
           "key": "notificationCategories",
@@ -1352,6 +1388,9 @@
       "summary": "The Threads panel toolbar owns a Sidebar settings gear, not fixed app chrome. It opens the original Root-owned Customize sidebar editor inside that panel through an owned React portal seat, so gear and editor follow moves and remain usable with a hidden tab row or collapsed left column. Switch compact/expanded header and density, reorder and hide header/footer entries, and expose overflow through the selected menu or scrolling behavior using the same preferences authority. Standalone/global recovery remains available. The separate list-only sliders control is named Thread list settings; no duplicate preference model or native DOM reparenting is involved.",
       "reach": ["click button \"Sidebar settings\"", "expect heading \"Customize sidebar\"", "click button \"Move up: Settle\"", "expect checkbox \"Settle\""],
       "surfaces": ["client", "settings", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "thread-list: Sidebar settings › Customize sidebar",
       "configuration": [
         {
           "key": "headerMode",
@@ -1493,6 +1532,9 @@
         "expect option \"Settings\""
       ],
       "surfaces": ["client", "settings"],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "sidebar-footer: More menu",
       "configuration": [],
       "states": ["wide", "narrow", "collapsed", "hidden-entry", "entry-yielded-to-another-seat"],
       "failureModes": [
@@ -1550,6 +1592,9 @@
       "title": "Offer a page reload when the running client bundles are behind",
       "summary": "The sidebar foot reports the client bundle revisions the page runs against the Host's served graph; a page that missed a rebuild, reconnected to another release or lacks a newly added entry gets a Restart the page to apply updates banner immediately below the Restart DSH to apply updates banner, naming the plugins a reload would load, with the button that does it.",
       "surfaces": ["client", "host"],
+      "surface": "statusItem",
+      "destination": "none",
+      "currentSurface": "sidebar-footer: client reload banner",
       "configuration": [],
       "states": ["current", "stale-rebuild", "other-release", "added-entry"],
       "failureModes": [
@@ -1592,6 +1637,9 @@
         "expect option \"Palette search target*\""
       ],
       "surfaces": ["client", "host", "settings", "storage", "integration"],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "thread-list: Search threads",
       "configuration": [
         {
           "key": "paletteRecentLimit",
@@ -1685,6 +1733,9 @@
       "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a “parent thread unavailable” header instead of a top-level row, archive or restore that whole branch from the header, and copy credential-free thread URLs.",
       "reach": ["click button \"Thread list settings\"", "click button \"Finished subagents: Fold into “N finished”\"", "expect menuitemradio \"Hide them\""],
       "surfaces": ["client", "host", "settings", "integration"],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "thread-list: child threads",
       "configuration": [
         {
           "key": "maxChildren",
@@ -1846,6 +1897,9 @@
         "expect menuitem \"Settle\""
       ],
       "surfaces": ["client", "host", "storage", "integration"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-header: Pin / More menu",
       "configuration": [],
       "states": ["active", "pinned", "parked", "settled", "snoozed", "archived", "crowded"],
       "failureModes": [
@@ -1922,6 +1976,9 @@
         "expect text \"Restart DSH yourself to load them.\""
       ],
       "surfaces": ["client", "host", "integration"],
+      "surface": "statusItem",
+      "destination": "none",
+      "currentSurface": "sidebar-footer: Restart DSH to apply updates",
       "configuration": [],
       "states": ["unchanged", "client-only-update", "host-update-pending", "confirmation-required", "restarting"],
       "failureModes": [
@@ -2002,6 +2059,9 @@
       "title": "See threads a crash interrupted",
       "summary": "Every turn the Host opens is recorded in a small durable in-flight file and cleared when the turn ends, so the next Host process knows exactly which turns a crash, kill or shutdown timeout left open; it promotes them into the durable recovery store at boot, marked interrupted, and the sidebar lists them under Interrupted with Resume, Resume all and dismiss actions until the thread runs again.",
       "surfaces": ["client", "host", "api", "tool", "storage"],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "thread-list: interrupted threads",
       "configuration": [],
       "states": ["turn-open", "turn-closed", "interrupted", "managed-restart", "promoted", "resumed", "dismissed"],
       "failureModes": [
@@ -2082,6 +2142,9 @@
         "expect text \"Follow-up after @session:*\""
       ],
       "surfaces": ["client", "host", "integration"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-list: row menu › Mention",
       "configuration": [],
       "states": ["idle", "dragging", "captured", "resolving", "inserted", "unavailable", "failed"],
       "failureModes": [
@@ -2169,6 +2232,9 @@
         "expect option \"e2e-skill-mentions*\""
       ],
       "surfaces": ["client", "host", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: @ skills",
       "configuration": [],
       "states": ["loading", "suggested", "selected", "unavailable"],
       "failureModes": [
@@ -2208,6 +2274,9 @@
       "summary": "Threads whose last turn the provider refused for quota or a rate limit appear together with their reset countdown, a resume action, snooze choices and the auto-retry switch, reading the durable recoveries @dshfiles/ai-accounts owns.",
       "reach": ["seed quota-blocked-thread", "expect region \"Usage limit\"", "expect button \"Resume this thread\""],
       "surfaces": ["client", "integration"],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "thread-list: Usage limit group",
       "configuration": [],
       "states": ["hidden", "waiting", "ready", "snoozed", "unknown-reset"],
       "failureModes": [
@@ -2272,6 +2341,9 @@
         "expect button \"Settle\""
       ],
       "surfaces": ["client"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-list: row menu › Open in side panel",
       "configuration": [
         {
           "key": "hiddenRowActions",
@@ -2356,6 +2428,9 @@
       "title": "See which threads reference one thread",
       "summary": "Both thread menus open a Referenced by submenu listing the threads that point back at one thread: its forked and subagent children from the Host session headers, plus the threads whose messages pulled it in as referenced context, found by one bounded session-content lookup for the thread id. Mention rows need the Host's session-content index (the web profile's session-query-sqlite Loader row); without it the submenu lists forked and subagent threads only and says so. Rows open the referencing thread, and a lookup that cannot answer never holds the menu open.",
       "surfaces": ["client", "host", "integration"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-list: row menu › Referenced by",
       "configuration": [],
       "states": ["loading", "empty", "listed", "degraded"],
       "failureModes": [
@@ -2400,6 +2475,9 @@
       "title": "Read the thread inventory only while it is on screen",
       "summary": "The sidebar reads the JJ repository inventory when its thread region is visible and stops while the sidebar is collapsed, so a hidden sidebar buys no jj scan; the schedule is sixty seconds, in step with the sixty-second repository view the Host keeps.",
       "surfaces": ["client", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "thread-list: inventory reads",
       "configuration": [],
       "states": ["inventory-visible", "inventory-suspended"],
       "failureModes": [
@@ -2432,6 +2510,9 @@
       "title": "Navigate and multi-select threads from the keyboard",
       "summary": "ArrowUp/Down from a view preset enters its first/last visible row; row arrows switch to the focused thread immediately by default, or move row focus only when configured. Left and Right walk the section and child-thread tree, Shift+ArrowUp/Down selects a range from the last selected row, and the primary modifier toggles individual rows. A selection bar pins, settles, or archives every selected thread and clears with Escape.",
       "surfaces": ["client", "integration"],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "thread-list: keyboard navigation",
       "configuration": [
         {
           "key": "arrowKeysSwitchThread",
@@ -2510,6 +2591,9 @@
         "expect text \"Sidebar rename\""
       ],
       "surfaces": ["client", "integration"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-list: row menu › Edit title",
       "configuration": [],
       "states": ["title-idle", "title-editing", "title-committed", "title-cancelled"],
       "failureModes": [
@@ -2543,6 +2627,9 @@
       "summary": "A thread started in the wrong folder, or whose work moved to another repository, continues in a registered project: the row menu and the thread header menu open a Continue in project submenu listing the projects, and the agent tool thread_continue_in does the same. The conversation is forked into a new thread whose own working directory is that project's workspace (its isolated jj workspace when jj-integration isolates new threads), the new thread is told where it came from, the original thread is settled so it stays readable but runs no further step, and the new thread opens. An agent continuing its own thread keeps its running turn in the copy and stops after the call.",
       "reach": ["seed tool-call-thread", "rightclick text \"sample\"", "click menuitem \"Continue in project\"", "expect menuitem \"sample\""],
       "surfaces": ["client", "host", "integration"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-list: row menu › Continue in project",
       "configuration": [],
       "states": ["idle", "listing-projects", "continuing", "continued", "continued-unsettled", "failed"],
       "failureModes": [
@@ -2595,6 +2682,9 @@
       "title": "Remove, steer or edit a queued message as an Agent",
       "summary": "thread_queue_remove, thread_queue_steer and thread_queue_edit act on one queued message through the Session controller updateQueue verb the queue dock uses; an edit replaces the text in place, keeping the message id and position, and the Host refuses messages with images or files.",
       "surfaces": ["host"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: thread_queue_remove / thread_queue_steer / thread_queue_edit",
       "configuration": [],
       "states": ["queued", "removed", "steering", "edited"],
       "failureModes": [
@@ -2638,6 +2728,9 @@
       "title": "Open a prefilled new thread from a prompt link",
       "summary": "Opening the GUI with ?prompt=<text>, optionally &project=<id or path> and &model=<provider>/<model>, creates a new thread in that project, selects the model, fills its composer without sending, and removes the three parameters from the address.",
       "surfaces": ["client"],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "url: ?prompt= link",
       "configuration": [],
       "states": ["no-link", "opening", "draft-ready"],
       "failureModes": [

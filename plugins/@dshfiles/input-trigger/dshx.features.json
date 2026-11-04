@@ -23,6 +23,9 @@
         "expect option \"fix the deploy script*\""
       ],
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: @ menu",
       "configuration": [],
       "states": ["caret-token", "separator-closes", "quoted-multiword", "email-boundary", "slash-command"],
       "failureModes": [
@@ -61,6 +64,9 @@
       "title": "Restore a persisted command chip",
       "summary": "The controller answers a persisted command chip's claim by polling each source's matchClaim in roster order (skipping sources without the hook and sources bound to another trigger) and aborting with the caller's reason when the restore signal is already aborted. The conversation input shell calls resolveClaim unguarded while seeding a draft whose leading token is a / command, so an engine without it throws inside a client-store subscriber and never rebuilds the chip.",
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: command chips",
       "configuration": [],
       "states": ["polling", "claimed", "unclaimed", "aborted"],
       "failureModes": [
@@ -93,6 +99,9 @@
       "title": "Slash entries for dshx commands",
       "summary": "Lists every dshx Command that names a slash entry in the composer's / menu at the start of the draft. Picking one runs it and clears its token; sending a line that is exactly the entry runs it as a command claim.",
       "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: / menu",
       "configuration": [],
       "states": ["offered", "picked", "claimed"],
       "failureModes": ["A disabled or failing command reports its error as the composer's command notice instead of sending the line."],

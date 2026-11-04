@@ -7,6 +7,9 @@
       "title": "One Host service port for credentials kept in a secrets catalog",
       "summary": "Name the scopes a catalog can address and the calls a credential consumer makes, with compatible Promise and opt-in Effect APIs.",
       "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
       "configuration": [],
       "states": ["global", "project", "local", "rejected"],
       "failureModes": [

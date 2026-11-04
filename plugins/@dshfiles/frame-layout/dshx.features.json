@@ -8,6 +8,9 @@
       "summary": "The owned stack always gives shell.main to Workbench tabs, without a user-selectable native layout. The frame supplies its authorized keyed-main renderer, recursion guard and an absent-occupant native fallback. shell.dock owns a fullheight right pane across both grid rows; collapsing it hides persistent mounted tabs and a separate native resource carrier, never reveals native chrome. Registered DockPaneActions serve the main Pane options Open right pane item (closed only), pane-local Close pane icons and original keyboard control; the centre never offers Close right pane. Workbench owns quiet group chrome and real split groups; the frame adds no toolbar. ctx.frameBottom opens only the left/centre bottom row, preserving right-pane geometry.",
       "reach": ["expect button \"New session\""],
       "surfaces": ["client", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "shell: frame regions",
       "configuration": [],
       "states": ["native", "main-workbench", "main-empty-seat-fallback", "dock", "bottom-hidden", "bottom-open", "bottom-resized"],
       "failureModes": [
@@ -103,6 +106,9 @@
       "summary": "The layout bundle keeps dragged sidebar and right-panel widths in the browser, so a reload restores the sidebar's last open width and the right panel's px preference. Workbench separately owns visibility of its persistent fullheight right-pane tabs; frame geometry does not select native chrome.",
       "reach": ["expect button \"New session\""],
       "surfaces": ["client", "storage"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "shell: panel widths",
       "configuration": [],
       "states": ["default-width", "dragged", "reloaded"],
       "failureModes": [
@@ -148,6 +154,9 @@
       "summary": "Closing the left sidebar is remembered: a reload boots it collapsed, and reopening restores the last open width instead of the 280px contract default. The owned frameSidebar.show presentation port reveals it idempotently from live frame state, so repeated Reset layout calls cannot toggle it closed again.",
       "reach": ["expect button \"New session\""],
       "surfaces": ["client", "storage"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "shell: collapsed sidebar",
       "configuration": [],
       "states": ["open", "collapsed", "reloaded", "reopened"],
       "failureModes": [

@@ -8,6 +8,9 @@
       "summary": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took and when it started (\"1.2 s · 14:02:11\"). Wait calls also show elapsed time and an indeterminate bar, or a timeout countdown bar when an explicit limit is set. Users can interrupt through the existing composer controls.",
       "reach": ["seed tool-call-thread", "click text \"Completed in*\"", "click text \"Ran commands\"", "expect note \"Took*\""],
       "surfaces": ["client", "settings"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: tool call timing",
       "configuration": [
         {
           "key": "enabled",

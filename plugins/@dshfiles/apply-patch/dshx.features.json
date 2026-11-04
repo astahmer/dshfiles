@@ -7,6 +7,9 @@
       "title": "Edit a file the Agent inspected without the native read tool",
       "summary": "The apply_patch agent tool reads the file itself, records that read on the Host's observation policy, applies literal replacements in order with a whitespace-tolerant fallback, and writes once; it never creates a file.",
       "surfaces": ["host", "tool"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: apply_patch",
       "configuration": [],
       "states": ["exact", "fuzzy", "ambiguous", "missing", "written"],
       "failureModes": [

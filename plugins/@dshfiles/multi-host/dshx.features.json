@@ -6,6 +6,9 @@
       "title": "Register and identify local DSH runtimes",
       "summary": "Maintain a bounded host/runtime directory with stable runtime identity; add hosts with a searchable SSH destination picker, then edit, test, reconnect and remove them on the Hosts page.",
       "surfaces": ["client", "host", "settings", "storage", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "composer: Run on Local › Add host",
       "configuration": [
         {
           "key": "profile",
@@ -53,6 +56,9 @@
       "title": "Manage hosts on a dedicated page",
       "summary": "The Hosts page lists registered machines in destination-picker order, shows live one-minute load and memory use, and lets users open or copy a temporary remote-host link. Users can add existing folders or clone Git repositories with optional individually selected local-file copying. Auto selects the eligible runtime with the lowest normalized resource pressure; hosts can be hidden, reordered, reconnected, edited, or removed.",
       "surfaces": ["client", "host", "storage"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Multi-host: Hosts",
       "configuration": [],
       "states": [
         "empty",
@@ -160,6 +166,9 @@
       "title": "Connect to an SSH-managed runtime",
       "summary": "Discover a remote DSH through its launch file over SSH, verify pinned identity/capabilities, keep one pooled tunnel per runtime, and never accept unknown host keys or forward the agent.",
       "surfaces": ["client", "host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: SSH runtime tunnels",
       "configuration": [],
       "states": ["disconnected", "connecting", "authenticated", "stale", "refused"],
       "failureModes": [
@@ -203,6 +212,9 @@
       "title": "Use the native composer for remote threads",
       "summary": "The one-shot Auto destination selects the least-pressured visible remote host from fresh CPU and memory snapshots, then pins that runtime before folder selection; keep its model catalog, reasoning-effort picker, file attachments, and @ file references bound to the owning runtime, and follow/reply in the native chat.",
       "surfaces": ["client", "host", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Run on Local chip",
       "configuration": [],
       "states": [
         "auto-selecting",
@@ -285,6 +297,9 @@
       "title": "Open the host's own DSH UI",
       "summary": "Lease the pooled tunnel for a stable loopback origin and open the remote runtime's UI in a new tab.",
       "surfaces": ["client", "host", "integration"],
+      "surface": "rowAction",
+      "destination": "observe",
+      "currentSurface": "left-nav: Multi-host: Hosts › Open host UI",
       "configuration": [],
       "states": ["leased", "opened", "expired", "released"],
       "failureModes": ["A dropped tunnel retires the lease; the next open reconnects.", "Lease release never mutates the remote runtime."],
@@ -320,6 +335,9 @@
       "title": "Mention remote threads safely",
       "summary": "Remote thread references resolve only from recorded, authorized hosts; the host retrieves a bounded text-only snapshot and inserts it as explicitly untrusted read-only context before the native resolver handles local references.",
       "surfaces": ["host", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: @t: remote threads",
       "configuration": [],
       "states": ["local-reference", "remote-reference", "remote-snapshot-added", "remote-snapshot-unavailable"],
       "failureModes": [
@@ -365,6 +383,9 @@
       "title": "Every thread on every host",
       "summary": "The remote threads panel merges threads started from this DSH with the sessions each host reports, grouped by host: threads started on the host itself carry a muted badge, an offline host shows one unavailable line, and status is polled only while the list is open.",
       "surfaces": ["client", "host", "integration"],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "thread-list: All remote threads",
       "configuration": [],
       "states": ["empty", "listed", "host-started", "host-offline"],
       "failureModes": [
@@ -404,6 +425,9 @@
       "title": "Open a mirrored thread on its host",
       "summary": "The mirrored-thread header resolves its remote owner and opens that runtime's DSH home for native questions, approvals, terminals, and JJ tools. The remote DSH does not consume a Session deep link, so the user locates the thread there.",
       "surfaces": ["client", "host", "integration"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-header: Open mirrored thread on its host",
       "configuration": [],
       "states": ["local-thread-hidden", "remote-owner-resolved", "host-opened", "owner-unavailable", "popup-blocked"],
       "failureModes": [

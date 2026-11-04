@@ -14,6 +14,9 @@
         "expect region \"Plugins (*\""
       ],
       "surfaces": ["client", "host", "api"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "left-nav: Agent Toolkit: Capabilities",
       "configuration": [],
       "states": ["loading", "populated", "filtered", "no-thread", "catalog-unavailable", "owner-missing"],
       "failureModes": [
@@ -129,6 +132,9 @@
         "expect combobox \"Thread\""
       ],
       "surfaces": ["client"],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "palette: Open the agent toolkit",
       "configuration": [],
       "states": ["opened"],
       "failureModes": ["Without a thread the page falls back to global tools."],
