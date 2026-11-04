@@ -261,7 +261,7 @@ test('referencedPaths checks readable paths and ignores routes, build outputs an
   assert.deepEqual(HarnessAudit.referencedPaths(text).sort(), ['docs/absent.md', '~/a/b.md'])
 })
 
-const editLines = ({ id, path, edits }) =>
+const editLines = ({ id, path, edits, tool = 'edit' }) =>
   [
     record({ type: 'session', id, createdAt: 1_700_000_000_000, cwd: '/tmp/ws' }),
     record({ type: 'session/title', seq: 1, time: 1_700_000_000_100, data: { title: 'editing' } }),
@@ -275,7 +275,7 @@ const editLines = ({ id, path, edits }) =>
           turn: 1,
           step: 1,
           callId: `e${String(index)}`,
-          name: 'edit',
+          name: tool,
           arguments: JSON.stringify({ file_path: path, old_string: `a${String(index)}`, new_string: `b${String(index)}` }),
         },
       }),
@@ -296,7 +296,7 @@ const makeEditRoot = sessions => {
   sessions.forEach((session, index) => {
     write(
       join(home, 'sessions', `project-${String(index)}`, `session-${String(index)}`, 'session.jsonl'),
-      editLines({ id: `session-${String(index)}`, path: session.path, edits: session.edits }),
+      editLines({ id: `session-${String(index)}`, path: session.path, edits: session.edits, tool: session.tool }),
     )
   })
   return home
@@ -326,6 +326,20 @@ test('a file reworked in one Session is not a signal; the same file across Sessi
     ['rework:/tmp/ws/shared.ts'],
   )
   assert.equal(rework[0].sessions, 2)
+})
+
+test('reading the same file across Sessions is not rework', async () => {
+  const home = makeEditRoot([
+    { path: '/tmp/ref/Schema.ts', edits: 9, tool: 'read' },
+    { path: '/tmp/ref/Schema.ts', edits: 9, tool: 'read' },
+  ])
+  const out = join(home, 'report')
+  await run(['mine', `--dsh-home=${home}`, '--since=all', `--out=${out}`, '--quiet=true', '--no-cache=true'])
+  const report = await reportFrom(out)
+  assert.deepEqual(
+    report.signals.filter(signal => signal.kind === 'rework'),
+    [],
+  )
 })
 
 test('the ledger stores a finding whose evidence is a repository artifact, not a Session', async () => {
