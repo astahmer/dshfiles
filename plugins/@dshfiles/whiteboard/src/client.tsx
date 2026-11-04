@@ -46,9 +46,7 @@ export default defineClient({
   setup(ctx, decorate) {
     const api = createApiClient(ctx, whiteboardApi)
     ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => 'Whiteboard: Boards' }, () => (
-        <PresentationIcon aria-hidden size={18} />
-      )),
+      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => 'Whiteboard' }, () => <PresentationIcon aria-hidden size={18} />),
     )
     ctx.slots.inject('main', () =>
       ctx.slots.register(

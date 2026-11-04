@@ -87,6 +87,8 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   ['Memory: Browser', { destination: 'Knowledge', section: 'Memory' }],
   ['Resource Packs: Resources', { destination: 'Knowledge', section: 'Resources' }],
   ['Component gallery', { destination: 'Knowledge', section: 'Component gallery' }],
+  ['Whiteboard', { destination: 'Knowledge', section: 'Whiteboard' }],
+  ['Agent CLI threads', { destination: 'Knowledge', section: 'Agent CLI threads' }],
   ['AI Accounts: Accounts', { destination: 'Settings', section: 'AI accounts' }],
   ['MCP Servers: Servers', { destination: 'Settings', section: 'MCP servers' }],
   ['Secret Catalog: Secrets', { destination: 'Settings', section: 'Secrets' }],

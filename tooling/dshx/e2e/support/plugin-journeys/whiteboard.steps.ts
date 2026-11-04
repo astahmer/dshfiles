@@ -10,7 +10,7 @@ import { openGlobalPanel } from '../plugin-view-names.js'
 import { browserDiagnosticsFor, finishJourneyAssertions, profileFor, recordAssertion, reloadPastProviderSetup, visitIsolatedPluginProfile } from '../steps.js'
 
 const PROJECT_FOLDER = 'whiteboard-project'
-const PANEL = 'Whiteboard: Boards'
+const PANEL = 'Whiteboard'
 const navigationAborts = new WeakMap<Page, Set<number>>()
 const editorOpenings = new WeakMap<Page, number>()
 const reloadCancellations = new Set(['requestfailed: eventsource net::ERR_ABORTED', 'requestfailed: eventsource cancelled'])

@@ -9,7 +9,7 @@ const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task
 const PROJECT_DIRECTORY = join(DSHFILES_ROOT, 'plugins/@dshfiles/user-questions')
 const PREVIEW_TITLE = 'Lines per layout'
 const PREVIEW_HTML = [
-  "<style>.bars{display:flex;align-items:end;gap:8px;height:90px}.bars div{flex:1;background:var(--dsh-accent)}</style>",
+  '<style>.bars{display:flex;align-items:end;gap:8px;height:90px}.bars div{flex:1;background:var(--dsh-accent)}</style>',
   "<div class='bars'><div style='height:100%'></div><div style='height:64%'></div></div><p id='probe'>pending</p><script>",
   'const results = [];',
   'try { results.push(parent.document.title === undefined ? "parent-empty" : "parent-readable") } catch { results.push("parent-blocked") }',

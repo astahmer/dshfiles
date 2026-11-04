@@ -2212,7 +2212,8 @@
       "title": "Mirror backlog items in Linear or GitHub Issues",
       "summary": "Link an item to an existing Linear or GitHub issue, create one from it, or unlink it again from its row menu or the sync chip in its detail. Title, description, status and tags sync both ways against the last synced base of each side; a field both sides changed goes to the side that changed last and leaves a conflict note on the item. New comments are carried over once in each direction. Agents read the same state with backlog_sync_status and act with backlog_sync_now and backlog_link_remote when the user asked.",
       "reach": [
-        "click button \"Backlog: Items\"",
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Mirror this item in Linear\"",
         "press Enter",
         "rightclick article \"Item b:1\"",
@@ -2372,7 +2373,8 @@
       "title": "Configure remote sync backends and import issues",
       "summary": "Backlog settings › Remote sync holds one row per project and tracker (Linear team key or GitHub owner/repo, a secret:ALIAS key reference, an auto-sync interval, on/off), a Sync all now control, and Import an issue, which turns an existing Linear or GitHub issue into a linked item with its status, labels and comments. Agents import with backlog_import_remote when the user asked.",
       "reach": [
-        "click button \"Backlog: Items\"",
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
         "click button \"Backlog settings\"",
         "expect textbox \"Issue to import\"",
         "click button \"Add backend\"",

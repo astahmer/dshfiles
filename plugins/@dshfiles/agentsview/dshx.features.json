@@ -9,7 +9,7 @@
       "destination": "knowledge",
       "currentSurface": "left-nav: Agent CLI threads",
       "summary": "One page lists the sessions other agent CLIs recorded on this machine (Claude Code under ~/.claude/projects, Codex under ~/.codex/sessions), newest first, with title, working directory, branch, prompts, tool calls and token totals; filters them by agent and text, searches their messages, and opens one as a read-only transcript with tool calls, thinking and context messages behind toggles.",
-      "reach": ["click button \"Agent CLI threads\"", "expect text \"Threads other agent CLIs recorded on this machine*\""],
+      "reach": ["click tab \"Knowledge\"", "click button \"Agent CLI threads\"", "expect text \"Threads other agent CLIs recorded on this machine*\""],
       "surfaces": ["host", "tool", "storage", "client"],
       "configuration": [
         {

@@ -2,7 +2,7 @@
 
 ![A board an agent drew from Mermaid, converted into editable Excalidraw shapes](docs/screenshots/agent-diagrams.png)
 
-**Whiteboard: Boards** in the navigation: [Excalidraw](https://github.com/excalidraw/excalidraw) boards saved on the
+**Whiteboard** in the navigation: [Excalidraw](https://github.com/excalidraw/excalidraw) boards saved on the
 DSH Host, one list per registered project. Create a board, draw (autosaved), rename it, delete it to **Recently
 deleted** and restore it. Agents get the same verbs as tools and can draw from Mermaid.
 

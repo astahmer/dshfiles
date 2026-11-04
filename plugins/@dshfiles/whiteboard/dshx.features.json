@@ -22,11 +22,11 @@
       ],
       "title": "Project whiteboards",
       "summary": "Excalidraw boards stored per project on the Host: create, draw with autosave, rename, delete to Recently deleted and restore; the editor bundle loads only when a board opens.",
-      "reach": ["click button \"Whiteboard: Boards\"", "expect heading \"Whiteboards\""],
+      "reach": ["click tab \"Knowledge\"", "click button \"Whiteboard\"", "expect heading \"Whiteboards\""],
       "surfaces": ["client", "host", "tool", "api", "storage"],
       "surface": "destinationSection",
       "destination": "knowledge",
-      "currentSurface": "left-nav: Whiteboard: Boards",
+      "currentSurface": "left-nav: Whiteboard",
       "configuration": [],
       "states": ["no-project", "empty", "boards", "editing", "saving", "conflict", "save-failed", "recently-deleted", "editor-unavailable"],
       "failureModes": [
