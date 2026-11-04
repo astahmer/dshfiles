@@ -5,6 +5,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
@@ -76,6 +77,9 @@ const formatBytes = (bytes: number): string => {
   if (gigabytes >= 1) return `${gigabytes.toFixed(1)} GB`
   return `${String(Math.max(0, Math.round(bytes / 1024 ** 2)))} MB`
 }
+
+/** The last path segment, so a row names the folder and the tooltip carries the absolute path. */
+const baseName = (path: string): string => path.replace(/\/+$/, '').split('/').pop() || path
 
 const count = (value: number, one: WorktreeMemoryKey, many: WorktreeMemoryKey, t: WorktreeMemoryTranslate): string =>
   `${String(value)} ${t(value === 1 ? one : many)}`
@@ -438,7 +442,14 @@ const NodeOriginCard = (props: { readonly origin: NodeProcessOrigin; readonly t:
           {formatBytes(origin.rssBytes)} {props.t('rss')}
         </span>
       </div>
-      {origin.cwd === null ? null : <code className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{origin.cwd}</code>}
+      {origin.cwd === null ? null : (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:text-muted-foreground">{baseName(origin.cwd)}</span>
+          </TooltipTrigger>
+          <TooltipContent className="dshx:max-w-96 dshx:break-all">{origin.cwd}</TooltipContent>
+        </Tooltip>
+      )}
       <span className="dshx:text-xs dshx:text-muted-foreground">
         {count(origin.processCount, 'process', 'processes', props.t)} · {props.t('topPids')} {sampledPids}
       </span>
@@ -527,28 +538,34 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
 
   return (
     <div className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden">
-      <div
-        className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-5 dshx:@max-pane-narrow:p-3"
-        data-memory-scroll-region
-      >
-        <header className="dshx:flex dshx:flex-col dshx:gap-2">
-          <div className="dshx:flex dshx:items-center dshx:gap-2">
-            <MemoryStickIcon aria-hidden className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground" />
-            <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
-            <Badge variant="secondary" className="dshx:shrink-0" data-memory-pressure={value?.pressure ?? 'unknown'}>
-              <StatusDot size="sm" className={pressure.dot} />
-              {t(pressure.key)}
-            </Badge>
-            <span className="dshx:ml-auto dshx:text-lg dshx:font-semibold dshx:tabular-nums">
-              {value === undefined ? '—' : formatBytes(value.trackedBytes)}
-            </span>
-            <Button variant="ghost" size="icon" aria-label={t('refresh')} disabled={snapshot.isFetching} onClick={() => void snapshot.refetch()}>
-              {snapshot.isFetching ? <Spinner aria-hidden /> : <RefreshCwIcon aria-hidden />}
-            </Button>
-          </div>
-          <p className="dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{t('subtitle')}</p>
-          {value === undefined ? null : (
+      <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-y-auto" data-memory-scroll-region>
+        <Page
+          heading={t('title')}
+          description={t('subtitle')}
+          meta={
             <>
+              <Badge variant="muted" className="dshx:shrink-0" data-memory-pressure={value?.pressure ?? 'unknown'}>
+                <StatusDot size="sm" className={pressure.dot} />
+                {t(pressure.key)}
+              </Badge>
+              <Badge variant="muted" className="dshx:shrink-0 dshx:tabular-nums">
+                {value === undefined ? '—' : formatBytes(value.trackedBytes)}
+              </Badge>
+            </>
+          }
+          actions={[
+            {
+              id: 'refresh',
+              label: t('refresh'),
+              icon: <RefreshCwIcon aria-hidden />,
+              pending: snapshot.isFetching,
+              onSelect: () => void snapshot.refetch(),
+            },
+          ]}
+          className="dshx:min-h-0"
+        >
+          {value === undefined ? null : (
+            <div className="dshx:flex dshx:flex-col dshx:gap-2">
               <CategoryBar bytes={value.categoryBytes} total={value.trackedBytes} />
               <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1 dshx:text-xs dshx:text-muted-foreground">
                 {processCategoryValues.map(category =>
@@ -563,113 +580,130 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
                   {t('thisHost')} {formatBytes(value.hostBytes)} · {formatBytes(value.systemBytes)} {t('ofRam')}
                 </span>
               </div>
-            </>
-          )}
-        </header>
-
-        {value === undefined || !value.supported ? null : (
-          <section className="dshx:flex dshx:flex-col dshx:gap-2" data-node-process-summary data-node-process-count={String(nodeProcesses?.processCount ?? 0)}>
-            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-              <h2 className="dshx:text-sm dshx:font-semibold">{t('nodeProcesses')}</h2>
-              <Badge variant="outline" className="dshx:shrink-0">
-                {t('ruleBased')}
-              </Badge>
-              {nodeProcesses === undefined ? (
-                <span className="dshx:ml-auto dshx:text-xs dshx:text-muted-foreground">{t('nodeSummaryUnavailable')}</span>
-              ) : (
-                <span className="dshx:ml-auto dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">
-                  {count(nodeProcesses.processCount, 'process', 'processes', t)} · {formatBytes(nodeProcesses.rssBytes)} {t('rss')}
-                </span>
-              )}
             </div>
-            {nodeProcesses === undefined ? null : nodeProcesses.origins.length === 0 ? (
-              <p className="dshx:text-sm dshx:text-muted-foreground">{t('noNodeProcesses')}</p>
-            ) : (
-              <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@max-pane-compact:grid-cols-1">
-                {visibleNodeOrigins.map(origin => (
-                  <NodeOriginCard key={JSON.stringify([origin.name, origin.source, origin.cwd])} origin={origin} t={t} />
-                ))}
-              </div>
-            )}
-            {nodeProcesses === undefined || nodeProcesses.origins.length <= VISIBLE_NODE_ORIGINS ? null : (
-              <Button variant="ghost" size="sm" className="dshx:self-start" onClick={() => setShowAllNodeOrigins(!showAllNodeOrigins)}>
-                {showAllNodeOrigins ? t('showFewerNodeOrigins') : t('showMoreNodeOrigins', { count: nodeProcesses.origins.length })}
-              </Button>
-            )}
-            {nodeProcesses?.truncated ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('nodeOriginLimit')}</p> : null}
-          </section>
-        )}
-
-        {snapshot.isPending ? (
-          <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
-            <Spinner aria-hidden /> {t('loading')}
-          </p>
-        ) : null}
-        {snapshot.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(snapshot.error, t('loadFailed'))}</AlertDescription>
-          </Alert>
-        ) : null}
-        {value !== undefined && !value.supported ? (
-          <Alert>
-            <AlertDescription>{t('unsupported')}</AlertDescription>
-          </Alert>
-        ) : null}
-        {stop.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(stop.error, t('stopFailed'))}</AlertDescription>
-          </Alert>
-        ) : null}
-        {stopOutcome === null ? null : (
-          <p className="dshx:text-xs dshx:text-muted-foreground" role="status">
-            {t('stopSummary')} {stopOutcome.stopped + stopOutcome.viaJob}
-            {stopOutcome.refused === 0 ? '' : ` · ${String(stopOutcome.refused)} ${t('stopRefused')}`}
-            {stopOutcome.missing === 0 ? '' : ` · ${String(stopOutcome.missing)} ${t('stopMissing')}`}
-          </p>
-        )}
-        {value !== undefined && value.supported && groups.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noProcesses')}</p> : null}
-
-        <div className="dshx:flex dshx:flex-col dshx:gap-1">
-          {(showAll ? groups : groups.slice(0, VISIBLE_GROUPS)).map(group => (
-            <GroupCard
-              key={group.key}
-              group={group}
-              open={openKeys.has(group.key)}
-              onToggle={() => toggle(group.key)}
-              now={now}
-              threadLabel={sessionLabel}
-              onOpenThread={openThread}
-              controls={controls}
-              t={t}
-            />
-          ))}
-          {groups.length <= VISIBLE_GROUPS ? null : (
-            <button
-              type="button"
-              className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:px-3 dshx:py-2 dshx:text-left dshx:text-sm dshx:text-muted-foreground dshx:hover:bg-muted/60"
-              aria-expanded={showAll}
-              onClick={() => setShowAll(current => !current)}
-            >
-              <LayoutGridIcon aria-hidden className="dshx:size-4 dshx:shrink-0" />
-              {showAll ? (
-                t('showLess')
-              ) : (
-                <>
-                  <span className="dshx:min-w-0 dshx:truncate">
-                    {groups.length - VISIBLE_GROUPS} {t('showSmaller')} ·{' '}
-                    {groups
-                      .slice(VISIBLE_GROUPS)
-                      .map(group => (group.kind === 'elsewhere' ? t('elsewhere') : group.title))
-                      .join(', ')}
-                  </span>
-                  <span className="dshx:ml-auto dshx:shrink-0 dshx:tabular-nums">
-                    {formatBytes(groups.slice(VISIBLE_GROUPS).reduce((sum, group) => sum + group.bytes, 0))}
-                  </span>
-                </>
-              )}
-            </button>
           )}
-        </div>
+
+          {value === undefined || !value.supported ? null : (
+            <PageSection
+              heading={t('nodeProcesses')}
+              meta={
+                nodeProcesses === undefined
+                  ? t('nodeSummaryUnavailable')
+                  : `${count(nodeProcesses.processCount, 'process', 'processes', t)} · ${formatBytes(nodeProcesses.rssBytes)} ${t('rss')}`
+              }
+              actions={
+                <Badge variant="outline" className="dshx:shrink-0">
+                  {t('ruleBased')}
+                </Badge>
+              }
+              data-node-process-summary
+              data-node-process-count={String(nodeProcesses?.processCount ?? 0)}
+            >
+              {nodeProcesses === undefined ? null : nodeProcesses.origins.length === 0 ? (
+                <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('noNodeProcesses')}</EmptyState>
+              ) : (
+                <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@max-pane-compact:grid-cols-1">
+                  {visibleNodeOrigins.map(origin => (
+                    <NodeOriginCard key={JSON.stringify([origin.name, origin.source, origin.cwd])} origin={origin} t={t} />
+                  ))}
+                </div>
+              )}
+              {nodeProcesses === undefined || nodeProcesses.origins.length <= VISIBLE_NODE_ORIGINS ? null : (
+                <Button variant="ghost" size="sm" className="dshx:self-start" onClick={() => setShowAllNodeOrigins(!showAllNodeOrigins)}>
+                  {showAllNodeOrigins ? t('showFewerNodeOrigins') : t('showMoreNodeOrigins', { count: nodeProcesses.origins.length })}
+                </Button>
+              )}
+              {nodeProcesses?.truncated ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('nodeOriginLimit')}</p> : null}
+            </PageSection>
+          )}
+
+          {snapshot.isPending ? (
+            <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
+              <Spinner aria-hidden /> {t('loading')}
+            </p>
+          ) : null}
+          {snapshot.isError ? (
+            <Alert variant="destructive">
+              <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+                <span className="dshx:min-w-0 dshx:flex-1">{errorMessage(snapshot.error, t('loadFailed'))}</span>
+                <Button variant="outline" size="sm" disabled={snapshot.isFetching} onClick={() => void snapshot.refetch()}>
+                  {t('retry')}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {value !== undefined && !value.supported ? (
+            <Alert>
+              <AlertDescription>{t('unsupported')}</AlertDescription>
+            </Alert>
+          ) : null}
+          {stop.isError ? (
+            <Alert variant="destructive">
+              <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+                <span className="dshx:min-w-0 dshx:flex-1">
+                  {errorMessage(stop.error, t('stopFailed'))} {t('stopFailedRecovery')}
+                </span>
+                <Button variant="outline" size="sm" disabled={snapshot.isFetching} onClick={() => void snapshot.refetch()}>
+                  {t('refresh')}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {stopOutcome === null ? null : (
+            <p className="dshx:text-xs dshx:text-muted-foreground" role="status">
+              {t('stopSummary')} {stopOutcome.stopped + stopOutcome.viaJob}
+              {stopOutcome.refused === 0 ? '' : ` · ${String(stopOutcome.refused)} ${t('stopRefused')}`}
+              {stopOutcome.missing === 0 ? '' : ` · ${String(stopOutcome.missing)} ${t('stopMissing')}`}
+            </p>
+          )}
+          {value === undefined || !value.supported ? null : (
+            <PageSection heading={t('processTrees')} meta={count(groups.length, 'group', 'groups', t)}>
+              {groups.length === 0 ? <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('noProcesses')}</EmptyState> : null}
+
+              <div className="dshx:flex dshx:flex-col dshx:gap-1">
+                {(showAll ? groups : groups.slice(0, VISIBLE_GROUPS)).map(group => (
+                  <GroupCard
+                    key={group.key}
+                    group={group}
+                    open={openKeys.has(group.key)}
+                    onToggle={() => toggle(group.key)}
+                    now={now}
+                    threadLabel={sessionLabel}
+                    onOpenThread={openThread}
+                    controls={controls}
+                    t={t}
+                  />
+                ))}
+                {groups.length <= VISIBLE_GROUPS ? null : (
+                  <button
+                    type="button"
+                    className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:px-3 dshx:py-2 dshx:text-left dshx:text-sm dshx:text-muted-foreground dshx:hover:bg-muted/60"
+                    aria-expanded={showAll}
+                    onClick={() => setShowAll(current => !current)}
+                  >
+                    <LayoutGridIcon aria-hidden className="dshx:size-4 dshx:shrink-0" />
+                    {showAll ? (
+                      t('showLess')
+                    ) : (
+                      <>
+                        <span className="dshx:min-w-0 dshx:truncate">
+                          {groups.length - VISIBLE_GROUPS} {t('showSmaller')} ·{' '}
+                          {groups
+                            .slice(VISIBLE_GROUPS)
+                            .map(group => (group.kind === 'elsewhere' ? t('elsewhere') : group.title))
+                            .join(', ')}
+                        </span>
+                        <span className="dshx:ml-auto dshx:shrink-0 dshx:tabular-nums">
+                          {formatBytes(groups.slice(VISIBLE_GROUPS).reduce((sum, group) => sum + group.bytes, 0))}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </PageSection>
+          )}
+        </Page>
       </div>
 
       {value === undefined || listedTrees.length === 0 ? null : (
