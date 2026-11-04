@@ -3,10 +3,12 @@ import { useState } from 'react'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
+import { ExternalLinkIcon, TriangleAlertIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { multiHostApi } from './api.js'
 import { openRemoteView } from './open-remote-view.js'
+import { versionMismatch } from './destination/connection-diagnostics.js'
+import { multiHostQueries } from './destination/queries.js'
 
 export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => {
   const api = useApi(multiHostApi)
@@ -19,6 +21,8 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
       return result.runtimeId
     },
   })
+  const directory = useQuery({ ...multiHostQueries.directory(api), enabled: owner.data !== undefined && owner.data !== null })
+  const localIdentity = useQuery({ ...multiHostQueries.identity(api), enabled: owner.data !== undefined && owner.data !== null })
   const openHost = useMutation({
     mutationFn: async ({ runtimeId, tab }: { readonly runtimeId: string; readonly tab: Window }) => {
       try {
@@ -40,6 +44,8 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
   }
 
   const runtimeId = owner.data
+  const hostVersion = directory.data?.runtimes.find(runtime => runtime.id === runtimeId)?.identity?.dshVersion
+  const outdatedVersion = versionMismatch({ localVersion: localIdentity.data?.dshVersion, remoteVersion: hostVersion })
   const open = (): void => {
     setPopupBlocked(false)
     const tab = window.open('about:blank', '_blank')
@@ -58,6 +64,12 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
       </Button>
       {openHost.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(openHost.error, 'Could not open the remote host.')}</span> : null}
       {popupBlocked ? <span className="dshx:text-xs dshx:text-destructive">Allow pop-ups to open the remote host.</span> : null}
+      {outdatedVersion === undefined ? null : (
+        <span data-remote-host-version-drift="" className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-warning">
+          <TriangleAlertIcon className="dshx:size-3.5" aria-hidden />
+          This host runs DSH {outdatedVersion}; this machine runs {localIdentity.data?.dshVersion}. Update its DSH core on that machine, then restart it.
+        </span>
+      )}
     </div>
   )
 }
