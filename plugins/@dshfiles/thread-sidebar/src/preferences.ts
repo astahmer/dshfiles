@@ -256,11 +256,33 @@ const preferencesToMigrate = (local: SidebarPreferences, host: SidebarPreference
   return patch
 }
 
+/**
+ * Browser values the migration leaves behind: the Host already holds a different,
+ * non-default value, so the copy is skipped. Deleting the browser copy would lose
+ * them, so the caller keeps it as a backup when this is non-empty.
+ */
+const preferencesSkippedByMigration = (local: SidebarPreferences, host: SidebarPreferences): (keyof SidebarPreferences)[] => {
+  const same = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right)
+  const patch = preferencesToMigrate(local, host)
+  return Object.keys(DEFAULT_PREFERENCES)
+    .filter(isPreferenceKey)
+    .filter(key => !(key in patch) && !same(local[key], host[key]) && !same(local[key], DEFAULT_PREFERENCES[key]))
+}
+
 const isPreferenceKey = (key: string): key is keyof SidebarPreferences => key in DEFAULT_PREFERENCES
 
 /** Browser copy used only while the Host settings namespace is unavailable; null when absent or invalid. */
 export const storedPreferences = createStoredValue({
   key: PREFERENCES_STORAGE_KEY,
+  schema: storedPreferencesSchema,
+  fallback: null,
+})
+
+/** Browser copy kept after a migration that skipped some of its values; never read back automatically. */
+export const UNMIGRATED_PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1.unmigrated'
+
+export const storedUnmigratedPreferences = createStoredValue({
+  key: UNMIGRATED_PREFERENCES_STORAGE_KEY,
   schema: storedPreferencesSchema,
   fallback: null,
 })
@@ -272,5 +294,6 @@ export class SidebarPreferencesModel {
   static readonly decode = decodePreferences
   static readonly isPreferenceKey = isPreferenceKey
   static readonly preferencesToMigrate = preferencesToMigrate
+  static readonly preferencesSkippedByMigration = preferencesSkippedByMigration
   static readonly toggleCollapsedSection = toggleCollapsedSection
 }

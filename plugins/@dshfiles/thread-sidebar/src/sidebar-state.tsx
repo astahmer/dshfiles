@@ -6,7 +6,7 @@ import { PaletteBridge } from './palette-bridge.js'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
 import { DEFAULT_PREFERENCES, type SidebarPreferences } from './organization.js'
-import { SidebarPreferencesModel, storedPreferences } from './preferences.js'
+import { SidebarPreferencesModel, storedPreferences, storedUnmigratedPreferences } from './preferences.js'
 import { SidebarPreferencesMachine, type SidebarPreferencesMachineClient } from './preferences-machine.js'
 import { threadSidebarSettings } from './settings.js'
 
@@ -69,6 +69,10 @@ export const usePreferences = (): PreferencesSnapshot & {
         return !results.includes(false)
       },
       removeLocal: () => storedPreferences.remove(),
+      archiveLocal: local => {
+        // Remove the live key only once the backup is written, so a full store never loses both.
+        if (storedUnmigratedPreferences.set(local)) storedPreferences.remove()
+      },
     }),
     [settingsRef],
   )

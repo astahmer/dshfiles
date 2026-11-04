@@ -7,6 +7,8 @@ export interface SidebarPreferencesMachineClient {
   readonly readHost: () => SidebarPreferences | null
   readonly writeHost: (patch: Partial<SidebarPreferences>) => Promise<boolean>
   readonly removeLocal: () => void
+  /** Keep the browser copy under a backup key, then remove it from the live key. */
+  readonly archiveLocal: (local: SidebarPreferences) => void
 }
 
 interface HostWriteOperation {
@@ -83,12 +85,17 @@ const performOperation = async (input: PreferencesOperationInput): Promise<Prefe
   if (host === null) return { id: operation.id, kind: 'migration', outcome: 'unavailable' }
 
   const patch = SidebarPreferencesModel.preferencesToMigrate(local, host)
+  // Values the Host already overrides are not copied; keep them rather than delete the only copy.
+  const retire = (): void => {
+    if (SidebarPreferencesModel.preferencesSkippedByMigration(local, host).length > 0) input.client.archiveLocal(local)
+    else input.client.removeLocal()
+  }
   if (Object.keys(patch).length === 0) {
-    input.client.removeLocal()
+    retire()
     return { id: operation.id, kind: 'migration', outcome: 'empty' }
   }
   if (!(await input.client.writeHost(patch))) return { id: operation.id, kind: 'migration', outcome: 'failed' }
-  input.client.removeLocal()
+  retire()
   return { id: operation.id, kind: 'migration', outcome: 'migrated' }
 }
 
