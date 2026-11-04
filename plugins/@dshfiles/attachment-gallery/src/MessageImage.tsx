@@ -4,6 +4,7 @@ import { LoaderCircleIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import type { MessageImageGallery } from '@dshfiles/chat/message-images'
 import { ImageLightbox, type ImageLightboxLabels, type LightboxImage } from '@dshfiles/plugin-ui/components/image-lightbox'
 import styles from './MessageImage.module.css'
+import { historicalImageQueue, type ImageLoadQueue } from './image-load-queue.js'
 
 type MessageImageSource = MessageImagesProps['images'][number]
 type MessageImageLoader = MessageImagesProps['loadImage']
@@ -45,9 +46,40 @@ function singleFit(dimensions: ImageDimensions) {
   }
 }
 
+/** How far outside the viewport an image starts loading, so scrolling rarely meets a placeholder. */
+const NEAR_VIEWPORT_MARGIN = '800px 0px'
+
+/**
+ * Latch to true once the element comes near the viewport. Without
+ * IntersectionObserver (old engines) every image counts as near, which is the
+ * previous behaviour.
+ */
+function useNearViewport(enabled: boolean): [(element: HTMLElement | null) => void, boolean] {
+  const [near, setNear] = useState(() => typeof IntersectionObserver === 'undefined')
+  const [element, setElement] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!enabled || near || element === null || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          setNear(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: NEAR_VIEWPORT_MARGIN },
+    )
+    observer.observe(element)
+    return () => {
+      observer.disconnect()
+    }
+  }, [enabled, near, element])
+  return [setElement, near]
+}
+
 function MessageImage({
   image,
   load,
+  queue,
   variant,
   labels,
   onLoaded,
@@ -55,6 +87,7 @@ function MessageImage({
 }: {
   image: MessageImageSource
   load: MessageImageLoader
+  queue: ImageLoadQueue
   variant: ImageVariant
   labels: ImageLabels
   onLoaded: (url: string) => void
@@ -71,14 +104,20 @@ function MessageImage({
     setAttempt(value => value + 1)
   }, [])
   const dimensions = sourceDimensions(image)
+  // Bytes are read only once the image nears the viewport: a mounted page of
+  // history no longer starts one Session read per attachment.
+  const [observe, near] = useNearViewport(attachment !== undefined && loaded === null)
   const fit = variant === 'single' ? (dimensions === undefined ? { width: 240, height: 240, objectPosition: 'center' } : singleFit(dimensions)) : undefined
 
   useEffect(() => {
     if (attachment === undefined) return
+    const cached = load.peek?.(attachment) ?? null
+    if (!near && cached === null) return
     let live = true
     setError(false)
-    setLoaded(load.peek?.(attachment) ?? null)
-    void load(attachment)
+    setLoaded(cached)
+    const scheduled = queue.schedule(() => load(attachment), 'visible')
+    void scheduled.promise
       .then(url => {
         if (!live) return
         setLoaded(url)
@@ -89,8 +128,9 @@ function MessageImage({
       })
     return () => {
       live = false
+      scheduled.cancel()
     }
-  }, [attachment, load, attempt])
+  }, [attachment, load, queue, attempt, near])
 
   const src = preview?.url ?? loaded
   const label = sourceLabel(image, labels.image)
@@ -111,6 +151,7 @@ function MessageImage({
 
   return (
     <button
+      ref={observe}
       type="button"
       className={styles.frame}
       data-variant={variant}
@@ -141,9 +182,12 @@ export function ImageGallery({
   thumbnail = false,
   labels,
   gallery,
+  queue = historicalImageQueue,
 }: {
   images: readonly MessageImageSource[]
   load: MessageImageLoader
+  /** Bounded read queue; the client-wide queue by default. */
+  queue?: ImageLoadQueue
   align: 'start' | 'end'
   compact?: boolean
   thumbnail?: boolean
@@ -179,8 +223,10 @@ export function ImageGallery({
       const key = sourceKey(image, index)
       if (loadedUrls[key] !== undefined || pendingLoads.current.has(key)) return
       pendingLoads.current.add(key)
-      void load(image.attachment)
-        .then(url => {
+      // Prefetches yield to on-screen images, and run through the same bound.
+      void queue
+        .schedule(() => load(image.attachment), 'prefetch')
+        .promise.then(url => {
           if (live) recordLoaded(key, url)
         })
         .catch(() => undefined)
@@ -191,7 +237,7 @@ export function ImageGallery({
     return () => {
       live = false
     }
-  }, [group, load, loadedUrls, previewIndex, recordLoaded])
+  }, [group, load, loadedUrls, previewIndex, queue, recordLoaded])
 
   if (images.length === 0) return null
   return (
@@ -204,6 +250,7 @@ export function ImageGallery({
               key={sourceKey(image, groupIndex)}
               image={image}
               load={load}
+              queue={queue}
               variant={variant}
               labels={labels}
               onLoaded={url => {
