@@ -31,7 +31,6 @@
     "plugins/@dshfiles/backlog/src/backlog-panel.tsx": 2,
     "plugins/@dshfiles/diff-viewed/src/viewed-marks.ts": 2,
     "plugins/@dshfiles/jj-integration/src/client.tsx": 1,
-    "plugins/@dshfiles/plugin-marketplace/tests/self-bootstrap.smoke.ts": 1,
     "plugins/@dshfiles/settings-shell/src/client.tsx": 1,
     "plugins/@dshfiles/settings-shell/src/schema-form/settings-form.tsx": 2,
     "plugins/@dshfiles/thread-sidebar/src/client.tsx": 3,

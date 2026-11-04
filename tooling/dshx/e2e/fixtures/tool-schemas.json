@@ -30,7 +30,6 @@
     "@dshfiles/memory",
     "@dshfiles/model-effort-picker",
     "@dshfiles/multi-host",
-    "@dshfiles/plugin-marketplace",
     "@dshfiles/policies",
     "@dshfiles/preview",
     "@dshfiles/project-checks",

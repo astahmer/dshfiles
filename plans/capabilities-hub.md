@@ -2,7 +2,7 @@
 
 ## Context
 
-- Current [web profile](../profiles/web/package.json#L38-L83) already includes `dshmarket`, Framework Hub (`@dshfiles/plugin-marketplace`), and `@dshfiles/mcp-servers`.
+- Current [web profile](../profiles/web/package.json#L38-L83) already includes `dshmarket` and `@dshfiles/mcp-servers`.
 - [Agent Toolkit](../plugins/@dshfiles/agent-toolkit/README.md#L3-L18) inventories capabilities available to a Session; it is not a global catalog or installer. DSH marketplace “Skills” entries are DSH plugins that manage skills, not skills.sh `SKILL.md` content.
 - Official [skills.sh API docs](https://www.skills.sh/docs/api) describe catalog endpoints, but unauthenticated search returned 401 and requires Vercel OIDC. Official [CLI docs](https://www.skills.sh/docs/cli) document `npx skills add`; telemetry can be disabled with `DISABLE_TELEMETRY=1`.
 - Existing DSH managers own different trust surfaces: agent skill instructions, MCP tools/credentials, and executable DSH plugins must remain separate.

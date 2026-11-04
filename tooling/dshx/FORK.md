@@ -39,7 +39,8 @@ Upstream's dshx.io site (`apps/framework-hub`), its operations CLI and prompt,
 changesets, release and SEO scripts, GitHub workflows, and the npm publishing
 documentation were deleted: nothing here publishes. Protocol-1 (DSH `0.1.x`)
 was retired with its fixture and smoke script. The marketplace reference plugin
-moved to `plugins/@dshfiles/plugin-marketplace`. `DECISIONS.md` is upstream's
+moved to `plugins/@dshfiles/plugin-marketplace` and was removed on 2026-11-04 in favour of the
+adopted `dshmarket` bundle. `DECISIONS.md` is upstream's
 decision log, kept as history.
 
 ## Native development dependencies

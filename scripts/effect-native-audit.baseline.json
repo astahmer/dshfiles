@@ -407,18 +407,6 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
-  "@dshfiles/plugin-marketplace": {
-    "layerEmpty": 0,
-    "promiseAdapters": 0,
-    "moduleState": 0,
-    "timers": 0,
-    "childProcess": 0,
-    "nodeFs": 0,
-    "globalFetch": 0,
-    "testMocks": 0,
-    "runOutsideEdges": 0,
-    "syncDecodeInEffect": 0
-  },
   "@dshfiles/policies": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
