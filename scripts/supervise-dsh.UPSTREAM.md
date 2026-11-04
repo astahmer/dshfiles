@@ -44,6 +44,14 @@ another sidebar, update mechanism or launcher command.
   required by the reload feature and were not approved here.
 - Output is buffered by complete lines so split launch-URL writes are handled;
   the request identity, URL mode and non-restart exits are tested.
+- Every step logs one `[dsh-supervisor]` line: each preparation step, the Host
+  pid and run id, how it exited, and why it is or is not restarted.
+- A Host that wrote this run's request file but is still running 30 s later is
+  stopped (SIGTERM to its process group, SIGKILL 5 s later) and restarted. DSH
+  0.2.1-rc.2 can finish `appExit` without exiting the process (b:9); the
+  Thread sidebar forces that exit itself after 10 s, and this is the backstop
+  for a Host that hangs before its guard runs. A request file without a
+  matching run id still never restarts anything.
 
 ## Honest limits
 
