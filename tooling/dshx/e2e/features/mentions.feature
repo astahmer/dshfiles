@@ -10,7 +10,7 @@ Feature: Ranked @ mentions and thread links
     When a Command Code account backed by a local fake provider is added
     And threads named "deploy" and "fix the deploy script" are started
     And a new thread composer types "@deploy"
-    Then the first mention row is the thread "deploy" under the heading "Threads & files · @t: threads · @f: files · @skill: · @mcp: · @b: backlog"
+    Then the first mention row is the thread "deploy" under the heading "Threads & files · @t: threads · @f: files · @agent: · @skill: · @mcp: · @b: backlog"
     When a new thread composer types "@\"fix the"
     Then a mention row includes the thread "fix the deploy script"
     When a new thread composer types "@t:"

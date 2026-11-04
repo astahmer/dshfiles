@@ -8,7 +8,14 @@ const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
 
 const newThreadComposer = (page: Page) => page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
 const mentionRows = (page: Page) => page.getByRole('listbox').getByRole('option')
-const threadHeader = (page: Page, title: string) => page.locator('[data-conversation-session]:visible').getByText(title, { exact: true }).first()
+// `data-conversation-session` is the rich-composer fork's marker; a composition with the native conversation names the
+// shown thread in its Session hierarchy header instead.
+const threadHeader = (page: Page, title: string) =>
+  page
+    .locator('[data-conversation-session]:visible')
+    .getByText(title, { exact: true })
+    .or(page.getByRole('navigation', { name: 'Session hierarchy' }).getByText(title, { exact: true }))
+    .first()
 
 // A click while the previous turn settles can be dropped, so the New-thread screen is awaited and the click retried.
 const openNewThread = async (page: Page): Promise<void> => {
@@ -32,12 +39,17 @@ const startThread = async (page: Page, text: string): Promise<void> => {
 
 const typeInNewThread = async (page: Page, text: string): Promise<void> => {
   await openNewThread(page)
-  // The New-thread screen reuses its blank Session, draft included.
-  await newThreadComposer(page).click()
-  await page.keyboard.press('ControlOrMeta+A')
-  await page.keyboard.press('Backspace')
-  await expect(newThreadComposer(page)).toHaveText('')
-  await newThreadComposer(page).pressSequentially(text)
+  // The New-thread screen reuses its blank Session, draft included, and restores that draft asynchronously: keys typed
+  // while the restore lands are overwritten ("@deploy" became "eploy"), and a token without its `@` opens no menu.
+  // Type again until the composer holds exactly the text, so the menu reflects the whole token.
+  await expect(async () => {
+    await newThreadComposer(page).click()
+    await page.keyboard.press('ControlOrMeta+A')
+    await page.keyboard.press('Backspace')
+    await expect(newThreadComposer(page)).toHaveText('', { timeout: 2_000 })
+    await newThreadComposer(page).pressSequentially(text)
+    await expect(newThreadComposer(page)).toHaveText(text, { timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
   await expect(mentionRows(page).first()).toBeVisible()
 }
 
@@ -110,7 +122,8 @@ Then('the composer holds a native reference chip', async ({ page }: { page: Page
 When('a new thread mentions {string} and is sent', async ({ page }: { page: Page }, title: string) => {
   await typeInNewThread(page, `@t:${title.split(' ')[0] ?? ''}`)
   await mentionRows(page).filter({ hasText: title }).first().click()
-  await newThreadComposer(page).pressSequentially(' what changed there?')
+  // The fake provider titles a thread "Fake thread title" unless the message names one; name it so it can be found again.
+  await newThreadComposer(page).pressSequentially(' what changed there? [[title Mention sender: what changed]]')
   await newThreadComposer(page).press('Enter')
   await expect(page.getByRole('textbox', { name: THREAD_COMPOSER, exact: true })).toBeVisible()
 })
@@ -133,7 +146,7 @@ Then('the thread {string} is shown', async ({ page }: { page: Page }, title: str
 })
 
 When('the sending thread is shown again and its thread chip is Cmd-clicked', async ({ page }: { page: Page }) => {
-  await page.getByText('Mention target what changed there?', { exact: false }).first().click()
+  await page.getByRole('treeitem', { name: /Mention sender: what changed/ }).click()
   const chip = page.locator('[role="link"][data-dshfiles-session-link]:has([data-ref-chip="session"]):visible')
   await expect(chip).toHaveCount(1)
   await chip.click({ modifiers: ['ControlOrMeta'] })

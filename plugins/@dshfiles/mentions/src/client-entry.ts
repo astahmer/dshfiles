@@ -9,6 +9,7 @@ import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FileReferenceCandidate } from '@deepseek-ai/dsh-file-reference/types'
 import type { SessionReferenceMentionCandidate } from '@deepseek-ai/dsh-session-reference'
 import { InlineReferences } from '@dshfiles/chat/inline-references'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { createApiClient, defineClient, LinkHandler } from '@dshfiles/dshx/client'
 import { MainTabs } from '@dshfiles/main-tabs/tabs-contract'
 import { multiHostApi } from '@dshfiles/multi-host/api'
@@ -153,7 +154,12 @@ export default defineClient({
               query.scope === 'thread'
                 ? Promise.resolve([])
                 : (async () => {
-                    const ownership = await multiHost.sessionRuntime({ sessionId: session.sessionId }, { signal: request.signal })
+                    // Without multi-host loaded every Session is local: the missing route must not reject the whole lookup,
+                    // or the thread rows that do not depend on it vanish with the file rows.
+                    const ownership = await multiHost.sessionRuntime({ sessionId: session.sessionId }, { signal: request.signal }).catch((error: unknown) => {
+                      if (error instanceof Error && isApiOwnerMissing(error)) return { ok: true as const, runtimeId: null }
+                      throw error
+                    })
                     if (!ownership.ok) return []
                     if (ownership.runtimeId === null) {
                       const result = await ctx.remote.fileReferences.list(session.sessionId, query.text, request.signal)
