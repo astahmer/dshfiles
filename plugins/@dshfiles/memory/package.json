@@ -37,6 +37,7 @@
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/agents": "workspace:*",
     "@dshfiles/ai-accounts": "workspace:*",
+    "@dshfiles/chat": "workspace:*",
     "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/jev": "workspace:*",
     "@dshfiles/optmem-core": "workspace:*",

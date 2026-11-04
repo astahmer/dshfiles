@@ -8,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { agentsApi } from '@dshfiles/agents/contract'
+import { InlineReferences } from '@dshfiles/chat/inline-references'
 import { createApiClient, defineClient, LinkHandler } from '@dshfiles/dshx/client'
 import type {} from '@dshfiles/input-trigger/client'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
@@ -25,7 +26,7 @@ import { backlogUserTextRule } from './backlog-user-text.js'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
 import { BACKLOG_PANEL_ID } from './panel-draft.js'
-import { installBacklogReferenceLinks } from './backlog-reference-links.js'
+import { backlogInlineReference } from './backlog-inline-reference.js'
 import { BacklogReferenceOverlay } from './backlog-reference-overlay.jsx'
 import { BacklogNotices, BacklogNoticeToast } from './notices.js'
 import { defaultTargetFor, StartThreadForm, type StartThreadCatalog, type StartThreadOutcome, type StartThreadRequest } from './start-thread.js'
@@ -38,7 +39,7 @@ export default defineClient({
   name: '@dshfiles/backlog',
   inject: ['slots', 'layout', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'inputTriggers', 'uiConversation'],
   setup(ctx, decorate, metadata) {
-    ctx.effect(() => installBacklogReferenceLinks(), 'backlog reference links')
+    metadata?.plugin?.add(InlineReferences, backlogInlineReference)
     ctx.effect(() => ctx.uiConversation.userText.register(backlogUserTextRule), 'backlog: sent mentions render as chips')
     const api = createApiClient(ctx, backlogApi)
     ctx.effect(() => {

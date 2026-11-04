@@ -6,7 +6,6 @@
  * matchers while it renders a message and places the returned nodes as React children, so no plugin scans or rewrites
  * the transcript DOM after the fact. Without providers Chat renders exactly what the native renderer produced.
  */
-import { MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import { defineRegistry, useRegistry, type Subscribable } from '@dshfiles/dshx/client'
 import {
   Component,
@@ -14,11 +13,9 @@ import {
   Fragment,
   isValidElement,
   cloneElement,
-  memo,
   useContext,
   useMemo,
   useSyncExternalStore,
-  type ComponentProps,
   type ErrorInfo,
   type ReactElement,
   type ReactNode,
@@ -322,6 +319,7 @@ const useVocabularyVersion = (items: readonly InlineReference[]): string => {
   return useSyncExternalStore(subscribe, snapshot, snapshot)
 }
 
+/** The providers, Session scope and block cache for one rendering component. */
 const useTransformState = (): TransformState => {
   const scope = useContext(ScopeContext)
   const items = useRegistry(InlineReferences)
@@ -341,21 +339,6 @@ const createState = (items: readonly InlineReference[], scope: InlineReferenceSc
 /** Apply providers to a rendered Markdown tree; reuse one state across renders to keep the block cache. */
 const transform = (tree: ReactNode, state: TransformState): ReactNode => (state.items.length === 0 ? tree : transformNode(tree, 'prose', '', state))
 
-type MarkdownTextProps = ComponentProps<typeof MarkdownText>
-/** The native renderer's own function: calling it keeps its streaming cache, whose frozen blocks reach the cache above. */
-const renderMarkdownText = MarkdownText.type
-
-/**
- * The native Markdown renderer with inline references applied to its text runs. Fenced code, links and controls are
- * left alone; inline code is offered as the `code` surface. While a message streams, the renderer's frozen blocks
- * keep their element identity, so their transformed blocks come from the cache and only the growing tail re-matches.
- */
-export const InlineReferenceMarkdown = memo(function InlineReferenceMarkdown(props: MarkdownTextProps): ReactNode {
-  const state = useTransformState()
-  const output = renderMarkdownText(props)
-  return transform(output, state)
-})
-
 /** A plain text run (a summary line) with inline references applied. */
 export const InlineReferenceText = (props: { readonly text: string; readonly surface: InlineReferenceSurface }): ReactNode => {
   const state = useTransformState()
@@ -370,4 +353,8 @@ export class InlineReferenceModel {
   static readonly segment = segment
   static readonly transform = transform
   static readonly state = createState
+  static readonly useState = useTransformState
+  /** Segment one run and render it, the way Chat does; for a provider's own tests. */
+  static readonly renderText = (text: string, items: readonly InlineReference[], context: InlineReferenceContext): ReactNode[] =>
+    renderPieces(segment(text, items, context))
 }

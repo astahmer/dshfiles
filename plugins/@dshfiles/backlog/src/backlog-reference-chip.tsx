@@ -1,7 +1,7 @@
 import { ClipboardListIcon, CopyIcon } from '@dshfiles/plugin-ui/icons'
 import { useRef } from 'react'
 import { BacklogReference } from './backlog-reference.js'
-import { previewBacklogReference } from './backlog-reference-links.js'
+import { previewBacklogReference } from './backlog-inline-reference.js'
 
 interface BacklogReferenceChipProps {
   readonly id: number

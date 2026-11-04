@@ -30,6 +30,7 @@
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
+    "@dshfiles/chat": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",

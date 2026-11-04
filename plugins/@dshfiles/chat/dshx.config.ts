@@ -9,6 +9,7 @@ export default defineConfig({
     'pinned-tool-calls': 'src/pinned-tool-calls.ts',
     'message-images': 'src/message-images.ts',
     'inline-references': 'src/inline-references.tsx',
+    'inline-reference-markdown': 'src/inline-reference-markdown.tsx',
   },
   client: {
     entry: 'src/client-entry.tsx',

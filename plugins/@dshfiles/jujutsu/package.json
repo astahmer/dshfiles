@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/chat": "workspace:*",
     "@dshfiles/jj-cli": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",

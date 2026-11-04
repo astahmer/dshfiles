@@ -1092,6 +1092,9 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: '>=0.2.1-rc.2 <0.3.0-0'
         version: 0.2.1-rc.2(cfc185dcf599a1b50b7c8f3bb0df144e)
+      '@dshfiles/chat':
+        specifier: workspace:*
+        version: link:../chat
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
@@ -1713,6 +1716,9 @@ importers:
       '@dshfiles/agents':
         specifier: workspace:*
         version: link:../agents
+      '@dshfiles/chat':
+        specifier: workspace:*
+        version: link:../chat
       '@dshfiles/credential-port':
         specifier: workspace:*
         version: link:../credential-port
@@ -3239,6 +3245,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: 'catalog:'
         version: 3.18.4
+      '@dshfiles/chat':
+        specifier: workspace:*
+        version: link:../chat
       '@dshfiles/jj-cli':
         specifier: workspace:*
         version: link:../jj-cli
@@ -3724,6 +3733,9 @@ importers:
       '@dshfiles/ai-accounts':
         specifier: workspace:*
         version: link:../ai-accounts
+      '@dshfiles/chat':
+        specifier: workspace:*
+        version: link:../chat
       '@dshfiles/credential-port':
         specifier: workspace:*
         version: link:../credential-port
@@ -3839,6 +3851,9 @@ importers:
 
   plugins/@dshfiles/mentions:
     dependencies:
+      '@dshfiles/chat':
+        specifier: workspace:*
+        version: link:../chat
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx

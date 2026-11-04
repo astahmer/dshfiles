@@ -42,6 +42,10 @@
     "./inline-references": {
       "types": "./src/inline-references.tsx",
       "default": "./dist/inline-references.js"
+    },
+    "./inline-reference-markdown": {
+      "types": "./src/inline-reference-markdown.tsx",
+      "default": "./dist/inline-reference-markdown.js"
     }
   },
   "scripts": {

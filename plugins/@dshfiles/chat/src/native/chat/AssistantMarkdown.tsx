@@ -8,7 +8,7 @@ import type { MarkdownFileMentions, MarkdownPathImages } from '@deepseek-ai/dsh-
 import type { ReasoningBlockTiming } from '../contract/chat-nodes.ts'
 import type { ChatNodeOwnerProps, ChatViewSlotProps, UseDisclosure, UsePresentation, UseGroupAction } from '../contract/slots.ts'
 import type { AssistantBlock } from '../contract/snapshot.ts'
-import { InlineReferenceMarkdown } from '../../inline-references.tsx'
+import { InlineReferenceMarkdown } from '../../inline-reference-markdown.tsx'
 import { markdownLabels } from '../markdown-labels.ts'
 import { ReasoningRow } from './ReasoningRow.tsx'
 import css from './AssistantMarkdown.module.css'
