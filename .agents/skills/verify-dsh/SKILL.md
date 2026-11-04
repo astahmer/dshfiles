@@ -44,7 +44,10 @@ dshx dev doctor          # exit 1 on any failed check; each failure prints its f
 
 Isolation, both processes alive and still ours, the auto-stop watchdog running,
 URL authenticates, every plugin entry active and every bundle under test loaded,
-no error lines in the host log.
+no error lines in the host log. DSH's boot "N entries did not activate" warning
+counts only while an entry it names is still not active: dependents of a service
+registered after an async start (the owned session search) activate a moment
+later and are reported as such.
 
 ## Drive
 
