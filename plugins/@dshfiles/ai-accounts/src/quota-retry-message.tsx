@@ -193,7 +193,7 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
                 <Button disabled={busy} onClick={() => resume.mutate()} size="xs" type="button">
                   {resume.isPending ? 'Queueing…' : 'Resume with this selection'}
                 </Button>
-                <span className="dshx:text-xs dshx:text-muted-foreground">This selects the Session’s next route and updates the default for new Sessions.</span>
+                <span className="dshx:text-xs dshx:text-muted-foreground">This selects the thread’s next route and updates the default for new threads.</span>
               </div>
             </div>
           ) : null}

@@ -54,7 +54,7 @@ export const NativeProvidersList = (props: {
                 onClick={() => props.onSelect?.(provider.entryId)}
                 type="button"
               >
-                <span className="dshx:grid dshx:size-11 dshx:shrink-0 dshx:place-items-center dshx:rounded-lg dshx:bg-info dshx:text-primary-foreground">
+                <span className="dshx:grid dshx:size-11 dshx:shrink-0 dshx:place-items-center dshx:rounded-lg dshx:bg-muted dshx:text-muted-foreground">
                   <BoxIcon className="dshx:size-7" />
                 </span>
                 <span className="dshx:min-w-0">

@@ -126,7 +126,7 @@ export const RuntimePathsSection = (props: {
         <>
           <PathField
             ariaLabel="CODEX_HOME"
-            hint="Shared sessions, skills and plugins."
+            hint="Shared threads, skills and plugins."
             label="CODEX_HOME"
             onChange={homePath => setDraft({ ...draft, homePath })}
             placeholder="~/.codex"

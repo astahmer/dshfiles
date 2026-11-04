@@ -75,7 +75,7 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
         ? undefined
         : {
             amount: CostEstimateModel.formatEstimate(session),
-            description: `Estimated session cost ${CostEstimateModel.formatEstimate(session)}. Estimate from published API prices, not an invoice.`,
+            description: `Estimated thread cost ${CostEstimateModel.formatEstimate(session)}. Estimate from published API prices, not an invoice.`,
             rows: [
               ...(session.tokens.uncachedInputTokens + session.tokens.cacheReadTokens + session.tokens.cacheWriteTokens > 0
                 ? [{ tokens: undefined, amount: undefined }]
@@ -115,7 +115,7 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
     <HoverCard closeDelay={80} openDelay={150}>
       <HoverCardTrigger asChild>
         <button
-          aria-label={`Estimated session cost ${CostEstimateModel.formatEstimate(session)}`}
+          aria-label={`Estimated thread cost ${CostEstimateModel.formatEstimate(session)}`}
           className="dshx-root dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-full dshx:px-2 dshx:py-px dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:tabular-nums dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50"
           type="button"
         >
@@ -125,7 +125,7 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
       </HoverCardTrigger>
       <HoverCardContent align="center" className="dshx-root dshx:flex dshx:w-80 dshx:flex-col dshx:gap-3 dshx:p-3 dshx:text-xs" side="top">
         <header className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2">
-          <span className="dshx:font-semibold">Estimated session cost</span>
+          <span className="dshx:font-semibold">Estimated thread cost</span>
           <span className="dshx:font-semibold dshx:tabular-nums">{CostEstimateModel.formatEstimate(session)}</span>
         </header>
         <dl className="dshx:grid dshx:grid-cols-[1fr_auto_auto] dshx:gap-x-3 dshx:gap-y-1 dshx:tabular-nums">

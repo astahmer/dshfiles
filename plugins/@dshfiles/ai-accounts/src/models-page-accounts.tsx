@@ -214,7 +214,7 @@ export const ModelsPageAccounts = (): JSX.Element | null => {
         </ul>
         {file !== null && file.accounts.length === 0 ? <p className="dshx:text-xs dshx:text-muted-foreground">No accounts yet.</p> : null}
         <div className="dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-1.5">
-          <h4 className="dshx:text-xs dshx:font-semibold dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">Native providers</h4>
+          <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">Native providers</h4>
           <NativeProvidersList />
         </div>
       </section>

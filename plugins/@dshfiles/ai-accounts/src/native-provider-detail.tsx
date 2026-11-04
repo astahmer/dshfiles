@@ -36,12 +36,12 @@ export const NativeProviderDetail = (props: {
   return (
     <section aria-label="Selected built-in provider" className="dshx:@container dshx:min-w-0 dshx:rounded-xl dshx:border dshx:bg-card">
       <header className="dshx:flex dshx:items-center dshx:gap-4 dshx:p-6">
-        <span className="dshx:grid dshx:size-16 dshx:place-items-center dshx:rounded-lg dshx:bg-info dshx:text-primary-foreground">
+        <span className="dshx:grid dshx:size-16 dshx:place-items-center dshx:rounded-lg dshx:bg-muted dshx:text-muted-foreground">
           <BoxIcon className="dshx:size-10" />
         </span>
         <div className="dshx:min-w-0 dshx:flex-1">
           <h2 className="dshx:truncate dshx:text-2xl dshx:font-semibold">{provider.label}</h2>
-          <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">Built-in provider · {provider.entryId}</p>
+          <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">Built-in provider</p>
         </div>
         <span className="dshx:text-xs dshx:text-success">{nativeProviderStatus(provider, query.data?.liveReload ?? false)}</span>
         <Switch
@@ -58,7 +58,7 @@ export const NativeProviderDetail = (props: {
         }}
         value={props.section}
       >
-        <TabsList aria-label="Provider sections" className="dshx:mx-4 dshx:h-12 dshx:gap-6 dshx:@max-pane-narrow:gap-0" variant="line">
+        <TabsList aria-label="Provider sections" className="dshx:mx-4 dshx:mb-3">
           <TabsTrigger value="models">
             <LayersIcon />
             Models
@@ -75,7 +75,7 @@ export const NativeProviderDetail = (props: {
         <TabsContent className="dshx:min-w-0 dshx:border-t dshx:p-5" value="models">
           <h3 className="dshx:mb-2 dshx:text-sm dshx:font-semibold">Provider routes</h3>
           <p className="dshx:mb-4 dshx:text-xs dshx:text-muted-foreground">
-            This built-in provider owns its model catalog. It is separate from a saved AI Accounts profile.
+            This built-in provider owns its model catalog. It is separate from a saved account.
           </p>
           <ul className="dshx:divide-y dshx:rounded-lg dshx:border">
             {provider.routes.map(id => (

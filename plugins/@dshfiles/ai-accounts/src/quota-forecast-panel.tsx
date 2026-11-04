@@ -1,8 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Empty, EmptyDescription, EmptyHeader } from '@dshfiles/plugin-ui/components/ui/empty'
+import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { ChevronLeftIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useMemo, useState } from 'react'
@@ -67,68 +65,51 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.
   }
   const headline = headlineByView[view]()
 
-  return (
-    <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:w-full dshx:flex-col dshx:gap-5 dshx:overflow-auto dshx:px-6 dshx:py-5 dshx:@max-pane-narrow:px-3">
-      <Tabs
-        className="dshx:mx-auto dshx:flex dshx:w-full dshx:max-w-[1500px] dshx:flex-col dshx:gap-5"
-        onValueChange={value => setView(value === 'pace' || value === 'table' || value === 'coverage' || value === 'handoff' ? value : 'forecast')}
-        value={view}
-      >
-        <header className="dshx:flex dshx:flex-wrap dshx:items-end dshx:justify-between dshx:gap-4">
-          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:items-start dshx:gap-1">
-            <Button className="dshx:-ml-2 dshx:text-muted-foreground" onClick={props.onBack} size="xs" type="button" variant="ghost">
-              <ChevronLeftIcon />
-              AI Accounts
-            </Button>
-            <h1 className="dshx:text-xl dshx:font-semibold dshx:tracking-tight">{headline.title}</h1>
-            <p className="dshx:text-sm dshx:text-muted-foreground">{headline.subtitle}</p>
-          </div>
-          <div className="dshx:flex dshx:items-center dshx:gap-2">
-            <Button disabled={refreshing} onClick={() => void refresh()} size="sm" type="button" variant="ghost">
-              {refreshing ? <Spinner /> : <RefreshCwIcon />}
-              <span className="dshx:@max-pane-narrow:sr-only">Refresh</span>
-            </Button>
-            <TabsList>
-              <TabsTrigger value="forecast">Forecast</TabsTrigger>
-              <TabsTrigger value="pace">Pace</TabsTrigger>
-              <TabsTrigger value="table">Table</TabsTrigger>
-              <TabsTrigger value="coverage">Coverage</TabsTrigger>
-              <TabsTrigger value="handoff">Hand-off</TabsTrigger>
-            </TabsList>
-          </div>
-        </header>
+  const views: readonly { readonly value: View; readonly label: string }[] = [
+    { value: 'forecast', label: 'Forecast' },
+    { value: 'pace', label: 'Pace' },
+    { value: 'table', label: 'Table' },
+    { value: 'coverage', label: 'Coverage' },
+    { value: 'handoff', label: 'Hand-off' },
+  ]
 
-        {loading && board.accounts.length === 0 ? (
-          <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
-            <Spinner className="dshx:size-3.5" />
-            Loading quota history…
-          </p>
-        ) : board.accounts.length === 0 ? (
-          <Empty className="dshx:flex-none dshx:border">
-            <EmptyHeader>
-              <EmptyDescription>Enable an account with quota to see where it is heading.</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          <>
-            <TabsContent value="forecast">
-              <ForecastBoardView.Board board={board} onSelect={setSelectedId} selectedId={selectedId} />
-            </TabsContent>
-            <TabsContent value="pace">
-              <PaceBoardView.Board accounts={pace} now={now} pointsById={pointsById} />
-            </TabsContent>
-            <TabsContent value="table">
-              <ForecastBoardView.Table board={board} />
-            </TabsContent>
-            <TabsContent value="coverage">
-              <CoverageBoardView.Board onSelect={setCoverageSelection} report={report} selection={coverageSelection} workHours={workHours} />
-            </TabsContent>
-            <TabsContent value="handoff">
-              <HandoffBoardView.Board now={now} plans={plans} workHours={workHours} />
-            </TabsContent>
-          </>
-        )}
-      </Tabs>
-    </main>
+  return (
+    <Page
+      scroll
+      heading={headline.title}
+      description={headline.subtitle}
+      actions={[
+        { id: 'back', label: 'Accounts', icon: <ChevronLeftIcon aria-hidden />, onSelect: props.onBack },
+        { id: 'refresh', label: 'Refresh', icon: <RefreshCwIcon aria-hidden />, pending: refreshing, onSelect: () => void refresh() },
+      ]}
+      tabs={{
+        label: 'Forecast views',
+        value: view,
+        onValueChange: value => setView(value === 'pace' || value === 'table' || value === 'coverage' || value === 'handoff' ? value : 'forecast'),
+        items: views,
+      }}
+      bodyClassName="dshx:mx-auto dshx:w-full dshx:max-w-[1500px]"
+    >
+      {loading && board.accounts.length === 0 ? (
+        <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
+          <Spinner className="dshx:size-3.5" />
+          Loading quota history…
+        </p>
+      ) : board.accounts.length === 0 ? (
+        <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border" action={{ label: 'Open accounts', onSelect: props.onBack }}>
+          Enable an account with quota to see where it is heading.
+        </EmptyState>
+      ) : view === 'forecast' ? (
+        <ForecastBoardView.Board board={board} onSelect={setSelectedId} selectedId={selectedId} />
+      ) : view === 'pace' ? (
+        <PaceBoardView.Board accounts={pace} now={now} pointsById={pointsById} />
+      ) : view === 'table' ? (
+        <ForecastBoardView.Table board={board} />
+      ) : view === 'coverage' ? (
+        <CoverageBoardView.Board onSelect={setCoverageSelection} report={report} selection={coverageSelection} workHours={workHours} />
+      ) : (
+        <HandoffBoardView.Board now={now} plans={plans} workHours={workHours} />
+      )}
+    </Page>
   )
 }

@@ -32,7 +32,7 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
       }
       if (input.duration === undefined) {
         const result = await accounts.resumeQuotaContinuation({ continuationId: input.continuationId })
-        return result.accepted ? 'Recovery prompt queued.' : 'This recovery was superseded or its Session is unavailable.'
+        return result.accepted ? 'Recovery prompt queued.' : 'This recovery was superseded or its thread is unavailable.'
       }
       const result = await accounts.snoozeQuotaContinuation({ continuationId: input.continuationId, duration: input.duration })
       return result.updated ? 'Recovery timing updated.' : 'This recovery is already queued or no longer active.'
@@ -84,9 +84,7 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
         </p>
       )}
       {visible.length === 0 ? (
-        <p className="dshx:text-xs dshx:text-muted-foreground">
-          {loading ? 'Checking for blocked Sessions…' : 'No pending quota recoveries for this account.'}
-        </p>
+        <p className="dshx:text-xs dshx:text-muted-foreground">{loading ? 'Checking for blocked threads…' : 'No pending quota recoveries for this account.'}</p>
       ) : (
         <ItemGroup className="dshx:gap-1.5">
           {visible.map(item => {

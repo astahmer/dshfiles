@@ -1,10 +1,9 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
-import { Empty, EmptyDescription, EmptyHeader } from '@dshfiles/plugin-ui/components/ui/empty'
+import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
@@ -95,7 +94,7 @@ const CurrentQuota = (props: { accountId: string; usage: AccountsUsage | null })
 }
 
 const HistoryCard = (props: { readonly heading: string; readonly description: string; readonly children: ReactNode }): JSX.Element => (
-  <Card className="dshx:mx-auto dshx:w-full dshx:max-w-[1500px] dshx:gap-3 dshx:py-4">
+  <Card className="dshx:w-full dshx:gap-3 dshx:py-4">
     <CardHeader className="dshx:gap-1 dshx:px-4">
       <CardTitle className="dshx:text-sm">{props.heading}</CardTitle>
       <CardDescription className="dshx:text-xs">{props.description}</CardDescription>
@@ -222,65 +221,63 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
   const resetCount = points.at(-1)?.bankedResets ?? 0
 
   return (
-    <main className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:w-full dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:px-6 dshx:py-5">
-      <header className="dshx:mx-auto dshx:flex dshx:w-full dshx:max-w-[1500px] dshx:flex-wrap dshx:items-end dshx:justify-between dshx:gap-4">
-        <div className="dshx:flex dshx:flex-col dshx:items-start dshx:gap-1">
-          <Button className="dshx:-ml-2 dshx:text-muted-foreground" onClick={props.onBack} size="xs" type="button" variant="ghost">
-            <ChevronLeftIcon />
-            AI Accounts
-          </Button>
-          <h1 className="dshx:text-xl dshx:font-semibold dshx:tracking-tight">Usage history</h1>
-          <p className="dshx:text-sm dshx:text-muted-foreground">
-            Quota snapshots, observed depletion pace, and banked reset changes for each configured account.
-          </p>
-        </div>
-        <div className="dshx:flex dshx:flex-wrap dshx:items-end dshx:gap-2">
-          <LabelledSelect
-            ariaLabel="Usage history account"
-            label="Account"
-            onChange={nextId => {
-              setChosenId(nextId)
-            }}
-            options={(file?.accounts ?? []).map(account => ({ value: account.instanceId, label: account.displayName || account.instanceId }))}
-            value={selectedId}
-          />
-          <LabelledSelect
-            ariaLabel="Usage history range"
-            label="Range"
-            onChange={value => {
-              const nextDays = Number(value)
-              setDays(nextDays)
-            }}
-            options={RANGE_OPTIONS.map(option => ({ value: String(option), label: `${String(option)} days` }))}
-            value={String(days)}
-          />
-          <Button disabled={recordNow.isPending || selectedId === ''} onClick={() => recordNow.mutate()} size="sm" type="button" variant="outline">
-            {recordNow.isPending ? <Spinner /> : <RefreshCwIcon />}
-            {recordNow.isPending ? 'Recording…' : 'Record now'}
-          </Button>
-        </div>
-      </header>
+    <Page
+      scroll
+      heading="Usage history"
+      description="Quota snapshots, observed depletion pace, and banked reset changes for each configured account."
+      actions={[
+        { id: 'back', label: 'Accounts', icon: <ChevronLeftIcon aria-hidden />, onSelect: props.onBack },
+        {
+          id: 'record',
+          label: recordNow.isPending ? 'Recording…' : 'Record now',
+          icon: <RefreshCwIcon aria-hidden />,
+          pending: recordNow.isPending,
+          disabled: selectedId === '',
+          onSelect: () => recordNow.mutate(),
+        },
+      ]}
+      bodyClassName="dshx:mx-auto dshx:w-full dshx:max-w-[1500px] dshx:gap-4"
+    >
+      <div className="dshx:flex dshx:flex-wrap dshx:items-end dshx:gap-2">
+        <LabelledSelect
+          ariaLabel="Usage history account"
+          label="Account"
+          onChange={nextId => {
+            setChosenId(nextId)
+          }}
+          options={(file?.accounts ?? []).map(account => ({ value: account.instanceId, label: account.displayName || account.instanceId }))}
+          value={selectedId}
+        />
+        <LabelledSelect
+          ariaLabel="Usage history range"
+          label="Range"
+          onChange={value => {
+            const nextDays = Number(value)
+            setDays(nextDays)
+          }}
+          options={RANGE_OPTIONS.map(option => ({ value: String(option), label: `${String(option)} days` }))}
+          value={String(days)}
+        />
+      </div>
 
       {shownNotice === null ? null : (
-        <Alert className="dshx:mx-auto dshx:max-w-[1500px]" role="status" variant="info">
+        <Alert role="status" variant="info">
           <AlertDescription>{shownNotice}</AlertDescription>
         </Alert>
       )}
       {loading && points.length === 0 ? (
-        <p className="dshx:mx-auto dshx:flex dshx:w-full dshx:max-w-[1500px] dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
+        <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
           <Spinner className="dshx:size-3.5" />
           Loading usage history…
         </p>
       ) : null}
       {selected === undefined ? (
-        <Empty className="dshx:mx-auto dshx:w-full dshx:max-w-[1500px] dshx:flex-none dshx:border">
-          <EmptyHeader>
-            <EmptyDescription>Add an account to start collecting usage history.</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border" action={{ label: 'Open accounts', onSelect: props.onBack }}>
+          Add an account to start collecting usage history.
+        </EmptyState>
       ) : (
         <>
-          <Collapsible className="dshx:mx-auto dshx:w-full dshx:max-w-[1500px] dshx:rounded-lg dshx:border dshx:bg-card">
+          <Collapsible className="dshx:rounded-lg dshx:border dshx:bg-card">
             <CollapsibleTrigger className="dshx:group dshx:flex dshx:w-full dshx:items-center dshx:justify-between dshx:gap-2 dshx:px-4 dshx:py-2.5 dshx:text-left dshx:text-sm dshx:font-medium">
               Collection and retention
               <ChevronDownIcon className="dshx:size-4 dshx:text-muted-foreground dshx:transition-transform dshx:group-data-[state=open]:rotate-180" />
@@ -418,6 +415,6 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
           </HistoryCard>
         </>
       )}
-    </main>
+    </Page>
   )
 }

@@ -150,12 +150,8 @@ export const AccountDetail = (props: {
         }}
         value={props.activeSection}
       >
-        <div className="dshx:border-b dshx:px-4">
-          <TabsList
-            aria-label="Account sections"
-            className="dshx:h-12 dshx:gap-6 dshx:p-0 dshx:@max-pane-narrow:w-full dshx:@max-pane-narrow:gap-0"
-            variant="line"
-          >
+        <div className="dshx:min-w-0 dshx:overflow-x-auto dshx:px-4 dshx:pb-0.5">
+          <TabsList aria-label="Account sections">
             {(
               [
                 { id: 'models', label: 'Models', Icon: LayersIcon },
@@ -163,11 +159,7 @@ export const AccountDetail = (props: {
                 { id: 'usage', label: 'Usage', Icon: BarChart3Icon },
               ] as const
             ).map(tab => (
-              <TabsTrigger
-                className="dshx:gap-2 dshx:px-3 dshx:font-medium dshx:data-[state=active]:text-info dshx:data-[state=active]:after:bg-info dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:px-2 dshx:@max-pane-narrow:text-xs"
-                key={tab.id}
-                value={tab.id}
-              >
+              <TabsTrigger className="dshx:flex-none" key={tab.id} value={tab.id}>
                 <tab.Icon className="dshx:size-4" />
                 {tab.label}
               </TabsTrigger>
@@ -190,7 +182,7 @@ export const AccountDetail = (props: {
               <AccountInlineSettings draft={draft} file={props.file} state={props.state} onConnect={connect} />
             </>
           ) : (
-            <p className="dshx:py-6 dshx:text-sm dshx:text-muted-foreground">Cursor tracks quota here. Models and sessions use the Cursor Agent runtime.</p>
+            <p className="dshx:py-6 dshx:text-sm dshx:text-muted-foreground">Cursor tracks quota here. Its models and threads use the Cursor Agent runtime.</p>
           )}
         </TabsContent>
         <TabsContent className="dshx:min-w-0 dshx:p-4" value="settings">

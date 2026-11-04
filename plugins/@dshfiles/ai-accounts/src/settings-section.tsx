@@ -663,8 +663,8 @@ const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write:
   }
 
   return (
-    <Group description="Estimated cost per session beside the composer stats, priced from models.dev. An estimate, never an invoice." heading="Cost estimates">
-      <Row hint="Shows ≈$ beside the token stats; hover it for the breakdown." label="Show session cost">
+    <Group description="Estimated cost per thread beside the composer stats, priced from models.dev. An estimate, never an invoice." heading="Cost estimates">
+      <Row hint="Shows ≈$ beside the token stats; hover it for the breakdown." label="Show thread cost">
         {id => (
           <Switch
             checked={preferences.costEstimates}
@@ -811,7 +811,7 @@ const FailureRecoveryGroup = (props: { readonly readOnly: boolean; readonly writ
               </Row>
             ) : null}
             {shows('failover') ? (
-              <Row hint="The failed account cools down; the conversation returns to it once it recovers." label="Fail over to the next account">
+              <Row hint="The failed account cools down; the thread returns to it once it recovers." label="Fail over to the next account">
                 {id => <Switch checked={current.failover} disabled={props.readOnly} id={id} onCheckedChange={value => update(kind, 'failover', value)} />}
               </Row>
             ) : null}

@@ -65,7 +65,7 @@ const ThreadAccountDialog = (props: { readonly sessionId: string; readonly insta
           <DialogDescription>
             {switching.isSuccess
               ? 'Upcoming requests target the selected account. An in-flight request, other threads and your default model are unchanged. Your configured recovery still applies if this account cannot serve.'
-              : 'Keep this conversation and change only the account used for its next request. No message is sent automatically.'}
+              : 'Keep this thread and change only the account used for its next request. No message is sent automatically.'}
           </DialogDescription>
         </DialogHeader>
         {preview.isPending ? (
@@ -92,7 +92,7 @@ const ThreadAccountDialog = (props: { readonly sessionId: string; readonly insta
             {plan.context?.suggestCompaction === true ? (
               <Alert>
                 <Minimize2Icon className="dshx:size-4" />
-                <AlertTitle>Consider compacting this long conversation</AlertTitle>
+                <AlertTitle>Consider compacting this long thread</AlertTitle>
                 <AlertDescription className="dshx:space-y-2">
                   <p>
                     Estimated current context: ~{Math.round(plan.context.estimatedTokens).toLocaleString()} tokens
@@ -104,7 +104,7 @@ const ThreadAccountDialog = (props: { readonly sessionId: string; readonly insta
                     guaranteed.
                   </p>
                   <p>
-                    This account switch does not compact the conversation. Native automatic-compaction settings still apply to later requests. Use the existing{' '}
+                    This account switch does not compact the thread. Native automatic-compaction settings still apply to later requests. Use the existing{' '}
                     <code>/compact</code> command when you choose. Native compaction may use the configured summarizer or the previous request’s account, not
                     necessarily the account selected here.
                   </p>

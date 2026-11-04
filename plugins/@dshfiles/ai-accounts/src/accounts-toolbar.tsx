@@ -2,7 +2,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
-import { CopyIcon, MoreHorizontalIcon, PlusIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { CopyIcon, MoreHorizontalIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { useEffect, useId, useRef } from 'react'
@@ -25,10 +25,9 @@ export const AccountsToolbar = (props: {
   readonly file: AccountsFile
   readonly search: string
   readonly onSearchChange: (value: string) => void
-  readonly onAddAccount: () => void
 }): JSX.Element => {
   const searchRef = useRef<HTMLInputElement>(null)
-  const headerRef = useRef<HTMLElement>(null)
+  const headerRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent): void => {
       if (!(event.metaKey || event.ctrlKey) || event.key.toLocaleLowerCase() !== 'k' || event.altKey || event.shiftKey) return
@@ -41,17 +40,7 @@ export const AccountsToolbar = (props: {
     return () => document.removeEventListener('keydown', focusSearch, true)
   }, [])
   return (
-    <header ref={headerRef} className="dshx:flex dshx:flex-col dshx:gap-5 dshx:pb-1">
-      <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3">
-        <div className="dshx:min-w-0">
-          <h1 className="dshx:text-2xl dshx:font-semibold dshx:tracking-tight">AI Accounts</h1>
-          <p className="dshx:mt-1 dshx:text-sm dshx:text-muted-foreground">Manage your accounts and model settings.</p>
-        </div>
-        <Button className="dshx:h-10 dshx:shrink dshx:bg-info dshx:text-primary-foreground dshx:hover:bg-info/90" onClick={props.onAddAccount} type="button">
-          <PlusIcon />
-          Add account
-        </Button>
-      </div>
+    <div ref={headerRef} className="dshx:flex dshx:flex-col dshx:pb-1">
       <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
         <div className="dshx:relative dshx:min-w-0 dshx:flex-1">
           <SearchIcon aria-hidden className="dshx:pointer-events-none dshx:absolute dshx:top-3 dshx:left-3 dshx:size-4 dshx:text-muted-foreground" />
@@ -112,6 +101,6 @@ export const AccountsToolbar = (props: {
           </PopoverContent>
         </Popover>
       </div>
-    </header>
+    </div>
   )
 }
