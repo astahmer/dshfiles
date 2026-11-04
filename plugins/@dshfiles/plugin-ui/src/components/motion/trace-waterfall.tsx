@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils.js'
 import { SparklesIcon } from '../../icons.js'
 import {
   GrowRow,
+  useLeavingRows,
   StatStrip,
   TimeAxisLabels,
   TimeGrid,
@@ -65,7 +66,9 @@ export function TraceWaterfall({ subtitle, spans, live, startedAt, selectedId, o
   const settled = spans.reduce((max, span) => Math.max(max, span.end ?? span.start), 0)
   const now = Math.max(useTraceClock(live, startedAt, settled), settled)
   const [collapsed, toggle] = useCollapsedSet(defaultCollapsed)
-  const rows = flattenTree(spans, collapsed)
+  const visibleRows = flattenTree(spans, collapsed)
+  // Rows hidden by a collapse fold away instead of vanishing, so the rows below slide up.
+  const { rows: shownRows, drop } = useLeavingRows(visibleRows, row => row.node.id)
 
   const step = niceStep(now * 1.2, 4)
   const domain = useSpringNumber(Math.max(Math.ceil(fitDomain(now, 1.2) / step) * step, 2), springs.gentle)
@@ -151,7 +154,7 @@ export function TraceWaterfall({ subtitle, spans, live, startedAt, selectedId, o
           </span>
         </div>
         <div role="rowgroup" className="dshx:flex dshx:flex-col dshx:py-1">
-          {rows.map(row => {
+          {shownRows.map(({ item: row, leaving }) => {
             const span = row.node
             const end = endOf(span)
             const running = span.end === undefined && live
@@ -162,6 +165,8 @@ export function TraceWaterfall({ subtitle, spans, live, startedAt, selectedId, o
             return (
               <GrowRow
                 key={span.id}
+                leaving={leaving}
+                onLeft={() => drop(span.id)}
                 role="row"
                 aria-selected={onSelectSpan ? selected : undefined}
                 onClick={onSelectSpan ? () => onSelectSpan(span.id) : undefined}

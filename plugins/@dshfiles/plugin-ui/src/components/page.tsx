@@ -169,7 +169,22 @@ const PageHeaderRow = (props: {
  * into the overflow menu below 42rem.
  */
 export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
-  { heading, description, count, meta, primaryAction, actions, overflowLabel, tabs, scroll = false, fill = false, bodyClassName, className, children, ...props },
+  {
+    heading,
+    description,
+    count,
+    meta,
+    primaryAction,
+    actions,
+    overflowLabel,
+    tabs,
+    scroll = false,
+    fill = false,
+    bodyClassName,
+    className,
+    children,
+    ...props
+  },
   forwardedRef,
 ) {
   const rootRef = React.useRef<HTMLDivElement | null>(null)

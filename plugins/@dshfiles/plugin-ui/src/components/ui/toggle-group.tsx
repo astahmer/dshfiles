@@ -32,6 +32,7 @@ function ToggleGroup({
       data-variant={variant}
       data-size={size}
       data-spacing={spacing}
+      // SAFETY: CSSProperties has no index for custom properties; --gap is a CSS variable the gap utility reads.
       style={{ '--gap': spacing } as React.CSSProperties}
       className={cn(
         'dshx:group/toggle-group dshx:flex dshx:w-fit dshx:items-center dshx:gap-[--spacing(var(--gap))] dshx:rounded-md dshx:data-[spacing=default]:data-[variant=outline]:shadow-xs',

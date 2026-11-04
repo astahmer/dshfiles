@@ -1,3 +1,4 @@
+/* oxlint-disable ui-guidance/no-native-title -- jsdom stand-ins for the Host primitives, which render their `title` prop natively; tests must see the same attribute. */
 /**
  * Test double for `@deepseek-ai/dsh-client-ui-primitives`.
  *

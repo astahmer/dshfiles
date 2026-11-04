@@ -35,13 +35,15 @@ const money = (value: number) => `$${value.toFixed(2)}`
  */
 export function AgentCursors({ cursors, children, className, ...props }: AgentCursorsProps) {
   const [leaving, setLeaving] = React.useState<readonly AgentCursor[]>([])
-  const previous = React.useRef<readonly AgentCursor[]>(cursors)
-  React.useEffect(() => {
+  const [previous, setPrevious] = React.useState<readonly AgentCursor[]>(cursors)
+  // Derived during render, not in an effect: a removed cursor keeps its mark (same key) and starts its exit in the
+  // same commit, instead of vanishing for one frame and remounting.
+  if (previous !== cursors) {
     const ids = new Set(cursors.map(cursor => cursor.id))
-    const gone = previous.current.filter(cursor => !ids.has(cursor.id))
-    previous.current = cursors
-    if (gone.length > 0) setLeaving(list => [...list.filter(cursor => !ids.has(cursor.id)), ...gone])
-  }, [cursors])
+    const gone = previous.filter(cursor => !ids.has(cursor.id))
+    setPrevious(cursors)
+    setLeaving(list => [...list.filter(cursor => !ids.has(cursor.id) && !gone.some(left => left.id === cursor.id)), ...gone])
+  }
   const drop = React.useCallback((id: string) => setLeaving(list => list.filter(cursor => cursor.id !== id)), [])
   const overlay = React.useRef<HTMLDivElement>(null)
   const bounds = useSize(overlay)
@@ -55,11 +57,12 @@ export function AgentCursors({ cursors, children, className, ...props }: AgentCu
         aria-label="Agents at work"
         className="dshx:pointer-events-none dshx:absolute dshx:inset-0 dshx:z-10 dshx:overflow-hidden"
       >
-        {cursors.map(cursor => (
-          <CursorMark key={cursor.id} cursor={cursor} bounds={bounds} />
-        ))}
-        {leaving.map(cursor => (
-          <CursorMark key={`leaving-${cursor.id}`} cursor={cursor} bounds={bounds} leaving onLeft={drop} />
+        {/* One keyed list, so a cursor moving between present and leaving keeps its mark. */}
+        {[
+          ...cursors.map(cursor => ({ cursor, gone: false })),
+          ...leaving.filter(cursor => !cursors.some(present => present.id === cursor.id)).map(cursor => ({ cursor, gone: true })),
+        ].map(({ cursor, gone }) => (
+          <CursorMark key={cursor.id} cursor={cursor} bounds={bounds} leaving={gone} onLeft={drop} />
         ))}
       </div>
     </div>

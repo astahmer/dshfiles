@@ -15,58 +15,67 @@ export interface RollingNumberProps extends Omit<React.HTMLAttributes<HTMLSpanEl
  */
 export function RollingNumber({ value, format = defaultFormat, className, ...props }: RollingNumberProps) {
   const text = format(value)
-  const previous = React.useRef(text)
-  const direction = React.useRef<1 | -1>(1)
-  const last = React.useRef(value)
-  if (last.current !== value) {
-    direction.current = value >= last.current ? 1 : -1
-    last.current = value
+  const [direction, setDirection] = React.useState<1 | -1>(1)
+  const [last, setLast] = React.useState(value)
+  if (last !== value) {
+    setDirection(value >= last ? 1 : -1)
+    setLast(value)
   }
-  const before = previous.current
-  React.useEffect(() => {
-    previous.current = text
-  }, [text])
-  // Align from the right so units and the ones digit line up while the number grows.
-  const width = Math.max(before.length, text.length)
-  const next = text.padStart(width, ' ')
-  const old = before.padStart(width, ' ')
+  // Keyed from the right, so the ones digit keeps its slot while the number grows or shrinks.
   return (
     <span className={cn('dshx:inline-flex dshx:tabular-nums', className)} {...props}>
       <span className="dshx:sr-only">{text}</span>
       <span aria-hidden className="dshx:inline-flex">
-        {Array.from(next).map((char, index) =>
-          char === ' ' ? null : <RollingChar key={width - index} char={char} from={old[index] ?? ' '} direction={direction.current} />,
-        )}
+        {Array.from(text).map((char, index) => (
+          <RollingChar key={text.length - index} char={char} direction={direction} />
+        ))}
       </span>
     </span>
   )
 }
 
-function RollingChar({ char, from, direction }: { readonly char: string; readonly from: string; readonly direction: 1 | -1 }) {
+/**
+ * One rolling glyph. It remembers the glyph it showed, so a parent re-render in the middle of a roll (a ticking clock
+ * nearby) neither cuts the roll short nor drops the outgoing digit. It clips with `clip-path` rather than
+ * `overflow: hidden`, which would move an inline-block's baseline to its bottom edge and lift the digits off the line.
+ */
+function RollingChar({ char, direction }: { readonly char: string; readonly direction: 1 | -1 }) {
   const ref = React.useRef<HTMLSpanElement>(null)
   const prevRef = React.useRef<HTMLSpanElement>(null)
-  const changed = char !== from && from !== ' '
+  const [shown, setShown] = React.useState(char)
+  const [outgoing, setOutgoing] = React.useState<string | null>(null)
+  if (shown !== char) {
+    setOutgoing(shown)
+    setShown(char)
+  }
   React.useLayoutEffect(() => {
-    if (!changed || ref.current == null || prevRef.current == null) return
+    if (ref.current == null || prevRef.current == null) return
     const offset = direction === 1 ? '100%' : '-100%'
     const back = direction === 1 ? '-100%' : '100%'
-    const a = animate(ref.current, { transform: [`translateY(${offset})`, 'translateY(0%)'], opacity: [0, 1] }, motionSafe(springs.snappy))
-    const b = animate(prevRef.current, { transform: ['translateY(0%)', `translateY(${back})`], opacity: [1, 0] }, motionSafe(springs.snappy))
+    const incoming = animate(ref.current, { transform: [`translateY(${offset})`, 'translateY(0%)'], opacity: [0, 1] }, motionSafe(springs.snappy))
+    const leaving = animate(prevRef.current, { transform: ['translateY(0%)', `translateY(${back})`], opacity: [1, 0] }, motionSafe(springs.snappy))
+    let current = true
+    void leaving.finished.then(() => {
+      if (current) setOutgoing(null)
+    })
     return () => {
-      a.complete()
-      b.complete()
+      current = false
+      incoming.complete()
+      leaving.complete()
     }
-  }, [char, changed, direction])
+    // Only a new glyph starts a roll; clearing the outgoing glyph must not restart it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown])
   return (
-    <span className="dshx:relative dshx:inline-block dshx:overflow-hidden">
+    <span className="dshx:relative dshx:inline-block dshx:[clip-path:inset(0)]">
       <span ref={ref} className="dshx:inline-block">
-        {char}
+        {shown}
       </span>
-      {changed ? (
-        <span ref={prevRef} className="dshx:absolute dshx:inset-0 dshx:inline-block dshx:opacity-0">
-          {from}
+      {outgoing === null ? null : (
+        <span ref={prevRef} className="dshx:absolute dshx:inset-0 dshx:inline-block">
+          {outgoing}
         </span>
-      ) : null}
+      )}
     </span>
   )
 }

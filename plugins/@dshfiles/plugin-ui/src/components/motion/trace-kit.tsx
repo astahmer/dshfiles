@@ -612,13 +612,38 @@ const guideClass = [
 
 const clampIndex = (index: number, length: number) => Math.min(Math.max(0, index), length - 1)
 
+export interface GrowRowProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** The row was removed: it folds its height to 0 and fades, then calls `onLeft` so the list can drop it. */
+  readonly leaving?: boolean
+  readonly onLeft?: () => void
+}
+
 /**
- * A table row that opens on mount: its height grows from 0 while it fades in, so the rows below slide down instead of
- * jumping, and nothing is drawn over a neighbour. Removal is immediate (no ghost of the old row is left behind).
- * Reduced motion shows it at once.
+ * A table row that opens on mount and folds on removal: its height grows from 0 while it fades in, so the rows below
+ * slide down, and a removed row (see `useLeavingRows`) folds back to 0 so they slide up. The row keeps its own slot
+ * while it changes height, so nothing is drawn over a neighbour. Reduced motion shows and removes rows at once.
  */
-export function GrowRow({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function GrowRow({ className, children, leaving = false, onLeft, ...props }: GrowRowProps) {
   const ref = React.useRef<HTMLDivElement>(null)
+  const onLeftRef = React.useRef(onLeft)
+  onLeftRef.current = onLeft
+  React.useLayoutEffect(() => {
+    const element = ref.current
+    if (!leaving || element == null) return
+    const height = element.getBoundingClientRect().height
+    element.style.overflow = 'hidden'
+    // A folding row is no longer part of the table: keep focus and clicks out of it.
+    element.inert = true
+    const controls = animate(element, { height: [height, 0], opacity: [1, 0] }, motionSafe({ duration: 0.2, ease: easings.in }))
+    let current = true
+    void controls.finished.then(() => {
+      if (current) onLeftRef.current?.()
+    })
+    return () => {
+      current = false
+      controls.stop()
+    }
+  }, [leaving])
   React.useLayoutEffect(() => {
     const element = ref.current
     if (element == null) return
@@ -637,10 +662,68 @@ export function GrowRow({ className, children, ...props }: React.HTMLAttributes<
     }
   }, [])
   return (
-    <div ref={ref} className={className} {...props}>
+    <div ref={ref} className={cn(className, leaving && 'dshx:pointer-events-none')} aria-hidden={leaving || undefined} {...props}>
       {children}
     </div>
   )
+}
+
+export interface LeavingRow<T> {
+  readonly item: T
+  readonly leaving: boolean
+}
+
+interface GoneRow<T> {
+  readonly item: T
+  /** Keys of the rows it followed, nearest first, so it folds in its old place even if its neighbour left too. */
+  readonly after: readonly string[]
+}
+
+/**
+ * Keeps rows that disappeared from `items` (a collapsed parent's children, a filtered-out span) in the list, flagged
+ * `leaving`, until their `GrowRow` has folded and calls `drop(key)`. Derived during render, so a removed row never
+ * blinks out for a frame first.
+ */
+export interface LeavingRows<T> {
+  readonly rows: readonly LeavingRow<T>[]
+  readonly drop: (key: string) => void
+}
+
+export function useLeavingRows<T>(items: readonly T[], keyOf: (item: T) => string): LeavingRows<T> {
+  // Compared by keys, not identity: callers rebuild the row array on every render.
+  const signature = items.map(keyOf).join('\u0000')
+  const [previous, setPrevious] = React.useState({ signature, items })
+  const [gone, setGone] = React.useState<readonly GoneRow<T>[]>([])
+  const keyOfRef = React.useRef(keyOf)
+  keyOfRef.current = keyOf
+  if (previous.signature !== signature) {
+    const keys = new Set(items.map(keyOf))
+    const removed: GoneRow<T>[] = []
+    const seen: string[] = []
+    for (const item of previous.items) {
+      const key = keyOf(item)
+      if (!keys.has(key)) removed.push({ item, after: [...seen].reverse() })
+      seen.push(key)
+    }
+    const removedKeys = new Set(removed.map(row => keyOf(row.item)))
+    setPrevious({ signature, items })
+    setGone(list => [...list.filter(row => !keys.has(keyOf(row.item)) && !removedKeys.has(keyOf(row.item))), ...removed])
+  }
+  const drop = React.useCallback((key: string) => setGone(list => list.filter(row => keyOfRef.current(row.item) !== key)), [])
+  const rows: LeavingRow<T>[] = items.map(item => ({ item, leaving: false }))
+  const present = new Set(items.map(keyOf))
+  for (const row of gone) {
+    if (present.has(keyOf(row.item))) continue
+    let at = 0
+    for (const key of row.after) {
+      const index = rows.findIndex(candidate => keyOf(candidate.item) === key)
+      if (index === -1) continue
+      at = index + 1
+      break
+    }
+    rows.splice(at, 0, { item: row.item, leaving: true })
+  }
+  return { rows, drop }
 }
 
 export interface TreeLabelProps {

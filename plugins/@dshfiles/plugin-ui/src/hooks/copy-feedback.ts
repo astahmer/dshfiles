@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState } from 'react'
 const COPIED_MS = 1_500
 
 /** Copies through the Host clipboard and reports `copied` for 1.5 s after a successful write, so a button can swap its glyph or label. */
-export const useCopyFeedback = (): { readonly copied: boolean; readonly copy: (text: string) => Promise<boolean> } => {
+export interface CopyFeedback {
+  readonly copied: boolean
+  readonly copy: (text: string) => Promise<boolean>
+}
+
+export const useCopyFeedback = (): CopyFeedback => {
   const [copied, setCopied] = useState(false)
   useEffect(() => {
     if (!copied) return

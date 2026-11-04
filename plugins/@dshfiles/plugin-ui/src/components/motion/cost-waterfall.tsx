@@ -6,6 +6,7 @@ import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js'
 import { RollingNumber } from './text.js'
 import {
   GrowRow,
+  useLeavingRows,
   TraceStatusBadge,
   TreeLabel,
   flattenTree,
@@ -131,9 +132,10 @@ export function CostWaterfall({
   const formatValue = metric === 'cost' ? formatCost : formatTokens
   const failed = steps.some(item => item.error !== undefined)
 
-  const rows = flattenTree(steps, collapsed)
+  // Rows hidden by a collapse fold away instead of vanishing, so the rows below slide up.
+  const { rows, drop } = useLeavingRows(flattenTree(steps, collapsed), row => row.node.id)
   const items: React.ReactNode[] = []
-  for (const row of rows) {
+  for (const { item: row, leaving } of rows) {
     const item = row.node
     const t = totalsOf(item)
     const running = item.end === undefined && live
@@ -143,6 +145,8 @@ export function CostWaterfall({
     items.push(
       <GrowRow
         key={item.id}
+        leaving={leaving}
+        onLeft={() => drop(item.id)}
         role="row"
         aria-expanded={hasDetails ? isOpen : undefined}
         tabIndex={hasDetails ? 0 : undefined}
@@ -218,7 +222,7 @@ export function CostWaterfall({
         </div>
       </GrowRow>,
     )
-    if (isOpen && hasDetails) {
+    if (isOpen && hasDetails && !leaving) {
       items.push(
         <GrowRow
           key={`${item.id}:details`}

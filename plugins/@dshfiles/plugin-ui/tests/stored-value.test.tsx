@@ -16,7 +16,7 @@ const countSchema = {
 }
 
 const stringSchema = {
-  // oxlint-disable-next-line antislop/no-unknown-parameters -- This is the decode boundary: the schema parses the stored JSON value.
+  // oxlint-disable-next-line antislop/no-unknown-parameters, antislop/no-runtime-typeof -- This is the decode boundary: the schema parses the stored JSON value.
   safeParse: (value: unknown): ParseResult<string> => (typeof value === 'string' ? { success: true, data: value } : { success: false }),
 }
 

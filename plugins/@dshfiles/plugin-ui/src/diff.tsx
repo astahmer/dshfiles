@@ -53,6 +53,7 @@ const isDarkTheme = (): boolean => document.body.hasAttribute('data-ds-dark-them
 const useDshDarkTheme = (): boolean => useSyncExternalStore(subscribeToDarkTheme, isDarkTheme, () => false)
 
 // The library renders inside shadow roots, so only inherited custom properties reach it.
+// SAFETY: CSSProperties has no index for custom properties; every key here is a --diffs-* variable.
 const DIFF_FONT_STYLE = {
   '--diffs-font-family': 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
   '--diffs-header-font-family': 'inherit',

@@ -17,7 +17,7 @@ const docker: DynamicImportLanguageRegistration = () => import('@shikijs/langs/d
  * because dshx emits one client module. JavaScript reuses the TypeScript grammars, which highlight it correctly.
  * Grammars that embed others (HTML, GraphQL, Lua, XML) stay out because each drags in a second large grammar.
  */
-export const bundledLanguages: Record<string, DynamicImportLanguageRegistration> = {
+export const bundledLanguages = {
   typescript,
   ts: typescript,
   mts: typescript,
@@ -52,7 +52,7 @@ export const bundledLanguages: Record<string, DynamicImportLanguageRegistration>
   diff: () => import('@shikijs/langs/diff'),
   docker,
   dockerfile: docker,
-}
+} satisfies Record<string, DynamicImportLanguageRegistration>
 
 export const createHighlighter = createBundledHighlighter({
   langs: bundledLanguages,

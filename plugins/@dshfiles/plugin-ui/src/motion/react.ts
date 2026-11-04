@@ -144,37 +144,72 @@ export function useElapsed(active: boolean): number {
   return elapsed
 }
 
+interface LayoutPoint {
+  readonly x: number
+  readonly y: number
+}
+
+/** Layout position from the offsetParent chain: ignores transforms and the scroll of ancestors outside the chain. */
+const documentOffset = (element: HTMLElement): LayoutPoint => {
+  let x = 0
+  let y = 0
+  for (let node: Element | null = element; node instanceof HTMLElement; node = node.offsetParent) {
+    x += node.offsetLeft
+    y += node.offsetTop
+  }
+  return { x, y }
+}
+
+/** Where `child` sits inside `container`, as laid out (not as currently painted). */
+const layoutWithin = (child: HTMLElement, container: HTMLElement): LayoutPoint => {
+  const inner = documentOffset(child)
+  const outer = documentOffset(container)
+  return { x: inner.x - outer.x, y: inner.y - outer.y }
+}
+
+/** The translation an interrupted FLIP left on the element, so the next one starts where it is painted. */
+const currentTranslation = (element: HTMLElement): LayoutPoint => {
+  const transform = getComputedStyle(element).transform
+  if (transform === '' || transform === 'none' || typeof DOMMatrixReadOnly === 'undefined') return { x: 0, y: 0 }
+  const matrix = new DOMMatrixReadOnly(transform)
+  return { x: matrix.m41, y: matrix.m42 }
+}
+
 /**
  * FLIP children of the ref'd container whenever `deps` change: each child tagged `data-flip-key` animates from its
- * previous box to its new one. Children that appear get the `enterPreset`. Works for reorders, inserts and wraps.
+ * previous place to its new one. Children that appear get the `enterPreset`. Works for reorders, inserts and wraps.
+ *
+ * Places are layout offsets inside the container, so scrolling the page or a pane between two changes does not
+ * offset the rows, and an interrupted move continues from where it is painted instead of jumping.
  */
 export function useFlip<T extends HTMLElement>(
   ref: React.RefObject<T>,
   deps: React.DependencyList,
   options: AnimationOptions & { readonly enterPreset?: MotionPreset | null } = {},
 ): void {
-  const boxes = React.useRef(new Map<string, DOMRect>())
+  const places = React.useRef(new Map<string, LayoutPoint>())
   const optionsRef = React.useRef(options)
   optionsRef.current = options
   React.useLayoutEffect(() => {
     const container = ref.current
     if (container == null) return
     const { enterPreset = 'riseIn', ...rest } = optionsRef.current
-    const next = new Map<string, DOMRect>()
+    const next = new Map<string, LayoutPoint>()
     const fresh: Element[] = []
     const controls: AnimationPlaybackControls[] = []
     for (const child of Array.from(container.querySelectorAll<HTMLElement>('[data-flip-key]'))) {
       const key = child.dataset.flipKey
       if (key === undefined) continue
-      const box = child.getBoundingClientRect()
-      next.set(key, box)
-      const before = boxes.current.get(key)
+      const place = layoutWithin(child, container)
+      next.set(key, place)
+      const before = places.current.get(key)
       if (before === undefined) {
-        if (boxes.current.size > 0) fresh.push(child)
+        if (places.current.size > 0) fresh.push(child)
         continue
       }
-      const dx = before.left - box.left
-      const dy = before.top - box.top
+      const painted = currentTranslation(child)
+      const dx = before.x + painted.x - place.x
+      const dy = before.y + painted.y - place.y
       if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue
       controls.push(
         animate(
@@ -184,13 +219,13 @@ export function useFlip<T extends HTMLElement>(
         ),
       )
     }
-    if (enterPreset !== null && fresh.length > 0) {
-      const played = enter(fresh, enterPreset, { stagger: 0.04 })
-      if (played) controls.push(played)
-    }
-    boxes.current = next
+    const entering = enterPreset !== null && fresh.length > 0 ? enter(fresh, enterPreset, { stagger: 0.04 }) : null
+    places.current = next
     return () => {
-      for (const c of controls) c.complete()
+      // A move stops where it is painted, so the next change reads that and continues from there; an enter finishes,
+      // so no row is left half faded.
+      for (const c of controls) c.stop()
+      entering?.complete()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)

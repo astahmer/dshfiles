@@ -91,7 +91,7 @@
     "ui-guidance/no-native-title": [
       "warn",
       {
-        "allowComponents": ["AlertDialog", "ChartFrame", "Dialog", "Modal", "OnboardingModal", "Panel", "Section", "TitleField"]
+        "allowComponents": ["AlertDialog", "ChartFrame", "Dialog", "DisclosureRow", "Modal", "OnboardingModal", "Panel", "Section", "TitleField"]
       }
     ],
     "no-unused-vars": [

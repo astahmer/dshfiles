@@ -1,6 +1,6 @@
 import type { Column, ReactTable, RowData, SortDirection, TableFeatures } from '@tanstack/react-table'
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table.js'
 import { cn } from './lib/utils.js'
 
@@ -9,7 +9,7 @@ export * from '@tanstack/react-table'
 interface SortableColumn {
   readonly getCanSort: () => boolean
   readonly getIsSorted: () => false | SortDirection
-  readonly getToggleSortingHandler: () => ((event: unknown) => void) | undefined
+  readonly getToggleSortingHandler: () => ((event: MouseEvent<HTMLElement>) => void) | undefined
 }
 
 const isSortable = <TFeatures extends TableFeatures, TData extends RowData>(
@@ -55,10 +55,7 @@ export const DataTable = <TFeatures extends TableFeatures, TData extends RowData
                 return (
                   <TableHead
                     aria-sort={ariaSort(direction)}
-                    className={cn(
-                      'dshx:h-9 dshx:px-4 dshx:text-xs dshx:font-medium dshx:text-muted-foreground',
-                      props.cellClassName?.(column.id),
-                    )}
+                    className={cn('dshx:h-9 dshx:px-4 dshx:text-xs dshx:font-medium dshx:text-muted-foreground', props.cellClassName?.(column.id))}
                     colSpan={header.colSpan}
                     key={header.id}
                     scope="col"

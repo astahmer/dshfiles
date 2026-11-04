@@ -3,6 +3,7 @@ import * as React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PresenceList } from '../src/components/motion/presence-list.js'
 import { RollingNumber } from '../src/components/motion/text.js'
+import { useLeavingRows } from '../src/components/motion/trace-kit.js'
 import { motionSafe, springs } from '../src/motion/index.js'
 
 const setReducedMotion = (reduced: boolean) => {
@@ -41,6 +42,35 @@ describe('motion layer', () => {
     const { container, rerender } = render(<RollingNumber value={1280} />)
     rerender(<RollingNumber value={1310} />)
     expect(container.querySelector('.dshx\\:sr-only')?.textContent).toBe((1310).toLocaleString())
+  })
+
+  it('rolls digits without overflow clipping, which would lift them off the text baseline', () => {
+    setReducedMotion(false)
+    const { container, rerender } = render(<RollingNumber value={7} />)
+    rerender(<RollingNumber value={8} />)
+    expect(container.querySelector('[class*="overflow-hidden"]')).toBeNull()
+    expect(container.querySelector('[class*="clip-path"]')).not.toBeNull()
+  })
+
+  it('keeps rows removed together in their old order and place until they fold', () => {
+    const Rows = ({ keys }: { readonly keys: readonly string[] }) => {
+      const state = useLeavingRows(keys, key => key)
+      return (
+        <ol>
+          {state.rows.map(row => (
+            <li key={row.item}>
+              <button type="button" onClick={() => state.drop(row.item)}>{`${row.item}${row.leaving ? '-' : ''}`}</button>
+            </li>
+          ))}
+        </ol>
+      )
+    }
+    const { container, rerender } = render(<Rows keys={['p', 'a', 'b', 'q']} />)
+    rerender(<Rows keys={['p', 'q']} />)
+    const text = () => Array.from(container.querySelectorAll('li'), li => li.textContent).join(' ')
+    expect(text()).toBe('p a- b- q')
+    act(() => screen.getByRole('button', { name: 'a-' }).click())
+    expect(text()).toBe('p b- q')
   })
 })
 
