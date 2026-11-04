@@ -41,9 +41,11 @@ export interface SecretCliRequest {
 const sessionVariable = (name: string) => Config.option(Config.NonEmptyString(name))
 
 const sessionEnvironment = Effect.gen(function* () {
+  const home = yield* sessionVariable('HOME')
   const bitwardenSession = yield* sessionVariable('BW_SESSION')
   const sessionFile = yield* sessionVariable('SECRET_SESSION_FILE')
   return {
+    ...Option.match(home, { onNone: () => ({}), onSome: value => ({ HOME: value }) }),
     ...Option.match(bitwardenSession, { onNone: () => ({}), onSome: value => ({ BW_SESSION: value }) }),
     ...Option.match(sessionFile, { onNone: () => ({}), onSome: value => ({ SECRET_SESSION_FILE: value }) }),
   }

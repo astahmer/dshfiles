@@ -36,7 +36,7 @@ if (mode === 'huge') { process.stdout.write('x'.repeat(1_100_000)); return }
 if (mode === 'hang') { fs.writeFileSync(process.env.SECRET_SESSION_FILE, String(process.pid)); setInterval(() => {}, 1000); return }
 let stdin = ''
 process.stdin.on('data', chunk => { stdin += chunk })
-process.stdin.on('end', () => process.stdout.write(JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), stdin, bwSession: process.env.BW_SESSION ?? null, sessionFile: process.env.SECRET_SESSION_FILE ?? null, foreign: process.env.SYNTHETIC_FOREIGN_SECRET ?? null }) + '\\n'))
+process.stdin.on('end', () => process.stdout.write(JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), stdin, bwSession: process.env.BW_SESSION ?? null, sessionFile: process.env.SECRET_SESSION_FILE ?? null, home: process.env.HOME ?? null, foreign: process.env.SYNTHETIC_FOREIGN_SECRET ?? null }) + '\\n'))
 `
 
 const Report = Schema.fromJsonString(
@@ -46,6 +46,7 @@ const Report = Schema.fromJsonString(
     stdin: Schema.String,
     bwSession: Schema.NullOr(Schema.String),
     sessionFile: Schema.NullOr(Schema.String),
+    home: Schema.NullOr(Schema.String),
     foreign: Schema.NullOr(Schema.String),
   }),
 )
@@ -76,7 +77,7 @@ const isAlive = (pid: number): boolean => {
 }
 
 describe.skipIf(process.platform === 'win32')('managed secret CLI', () => {
-  it.live('uses argv, pipes manual values on stdin, and forwards only the CLI session inputs', () =>
+  it.live('uses argv, pipes manual values on stdin, and forwards only required CLI environment', () =>
     withCli(({ cli, directory }) =>
       Effect.gen(function* () {
         const output = yield* cli.run({
@@ -92,6 +93,7 @@ describe.skipIf(process.platform === 'win32')('managed secret CLI', () => {
           stdin: 'synthetic-secret-value',
           bwSession: 'synthetic-session-token',
           sessionFile: '/private/tmp/synthetic-secret-session',
+          home: '/private/tmp/synthetic-home',
           foreign: null,
         })
         expect(yield* FileSystem.FileSystem.use(fileSystem => fileSystem.realPath(directory))).toBe(report.cwd)
@@ -100,6 +102,7 @@ describe.skipIf(process.platform === 'win32')('managed secret CLI', () => {
       Effect.provide(
         ConfigProvider.layer(
           ConfigProvider.fromUnknown({
+            HOME: '/private/tmp/synthetic-home',
             BW_SESSION: 'synthetic-session-token',
             SECRET_SESSION_FILE: '/private/tmp/synthetic-secret-session',
             SYNTHETIC_FOREIGN_SECRET: 'must-not-be-forwarded',
