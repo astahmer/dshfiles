@@ -208,9 +208,12 @@ All cache work must specify its owner, full key, byte/count budget, external-cha
 
 **Evidence and workload.** [Details](../../plugins/@dshfiles/jujutsu/src/revision-reads.ts#L75-L102) performs existence validation, paths, patch, evolution and file stats as five serial processes. The post-validation content reads are independent for a pinned commit; their current critical path sums independent process latency. No representative detail timing was collected.
 
-- [ ] Run independent reads with an explicit bounded process policy after validation, or load fast file metadata before optional patch/evolution expansion.
-- [ ] Share in-flight reads and byte-capped LRU caches for immutable commit content using repository identity, commit and read options.
-- [ ] Test and measure before promoting.
+- [x] Run independent reads with an explicit bounded process policy after validation, or load fast file metadata before optional patch/evolution expansion.
+- [x] Share in-flight reads and byte-capped LRU caches for immutable commit content using repository identity, commit and read options.
+- [x] Test and measure before promoting.
+- **Receipt (2026-11-04, `jj:osxlnztr`, unlanded in the `plans-jujutsu` JJ workspace):** after the visibility check, [`RevisionReads.details`](../../plugins/@dshfiles/jujutsu/src/revision-reads.ts) reads paths, patch and file stats together with evolution (four jj processes at most, `DETAIL_READ_CONCURRENCY`). Content a commit id fixes (files, stats, patch) sits in a 24 MiB / 64-entry LRU keyed by repository identity, root and commit id; one patch never takes more than a quarter of the budget. Evolution is reused for 5 s only (new successors). Failures are never stored, and visibility is checked on every call, so a hidden or GC'd commit is still refused. In-flight sharing already comes from jj-cli's `JjViewReads` (per operation head). `Repositories.resolve` now confirms the root with an `--ignore-working-copy root` view read, answered again at the same head; its identity checks are unchanged.
+  Measured with real jj on the dshfiles store (scratch vitest probe through the plugin's own layers, A/B alternating 3 × 7 rounds, same machine load): cold detail p50 **391–439 ms → 156–302 ms** (6 processes either way, now concurrent); repeated detail **2 processes, 83–126 ms → 0 processes, 4–14 ms**. Tests in [revision-reads.integration.test.ts](../../plugins/@dshfiles/jujutsu/src/revision-reads.integration.test.ts): cache reuse and the 5 s evolution window, repository isolation, no caching of a failed read, LRU byte eviction, peak concurrency of 4.
+- **Remaining:** first-files latency was not measured separately (the API returns one payload); no live-Host p95 (the change is unlanded).
 
 **Guards.** Evolution is not immutable merely because the queried commit id is: new successors/operation visibility can change it. Give evolution an operation/generation key or bounded freshness. Invalidate unavailable/GC'd commits and replaced repository identities; preserve truncation and cancellation, without permanently caching errors.
 
@@ -220,10 +223,14 @@ All cache work must specify its owner, full key, byte/count budget, external-cha
 
 **Evidence and workload.** [Snapshot loading](../../plugins/@dshfiles/jujutsu/src/host.ts#L330-L396) runs snapshotting status, four parallel reads, then evolution: six processes. Last-push discovery scans up to 1,000 operation entries/512 KB each time. [Display loads](../../plugins/@dshfiles/jujutsu/src/host.ts#L679-L682) always invoke this path, as do [prepare/confirm](../../plugins/@dshfiles/jujutsu/src/host.ts#L740-L753). The path already avoids repeated working-copy snapshotting after status; it lacks a shared Host display load and stable adjunct reuse. Actual poll frequency and cost are unmeasured.
 
-- [ ] Add per-repository display-load single-flight; cache remotes/last push/evolution against the correct operation/config generation.
-- [ ] Evaluate incremental operation-log traversal until a known point instead of rescanning the same 1,000 entries.
-- [ ] Keep mutation validation on a separately fresh snapshot/fingerprint path.
-- [ ] Test and measure before promoting.
+- [x] Add per-repository display-load single-flight; cache remotes/last push/evolution against the correct operation/config generation.
+- [x] Evaluate incremental operation-log traversal until a known point instead of rescanning the same 1,000 entries.
+- [x] Keep mutation validation on a separately fresh snapshot/fingerprint path.
+- [x] Test and measure before promoting.
+- **Receipt (2026-11-04, `jj:zykqktlt`, unlanded):** display `load`s of one repository and page size share one in-flight snapshot through an Effect `Cache` with zero time-to-live (a leaving caller does not stop the others; nothing is kept once it settles). The evolved flag is remembered per repository identity and commit id (a commit's predecessors are fixed at creation), so an unchanged page runs no `evolog`. The last-push scan is an `--ignore-working-copy op log` view read (cached per operation head) and, once a scan is known, reads only the newest 64 operations, falling back to the full 1,000 when they do not reach the previous head. Remote configuration is still read fresh. `prepare`/`confirm` never use the shared display load; since `jj:xsklnzqw` (T2) confirmation re-reads only what the action names after a fresh `status`.
+  Found on the way: jj 0.46 records argv shell-quoted (`jj '--color=never' … git push`), so last-push detection never matched pushes made through the runner; fixed in `isRecordedJjGitPush`.
+  Measured as in H14: **four concurrent loads 20 jj processes, 383–818 ms → 2 processes, 104–173 ms**; a sequential load on this busy store 7 → 6 processes (other agents move the operation head between loads, so `status`, remote list and the op-log increment still run). Tests in [jujutsu-services.integration.test.ts](../../plugins/@dshfiles/jujutsu/src/jujutsu-services.integration.test.ts): four loads → one `status` and one `evolog`, an unchanged page → no `evolog`, last push found from a 64-entry increment after a real `jj git push`.
+- **Remaining:** remote list still runs every load (needed for fresh config fingerprints); operation-log bytes per load and live-Host display p95 were not measured.
 
 **Guards.** Never authorize preview confirmation from a display TTL. Preserve repository identity checks, fresh remote-config fingerprinting and history-truncation flags. Invalidate on own mutations and external operation/config changes; account for concurrent cancellation without killing other consumers.
 
