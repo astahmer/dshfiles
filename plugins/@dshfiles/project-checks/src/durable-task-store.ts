@@ -1,5 +1,6 @@
 import { SqliteStore } from '@dshfiles/sqlite-store'
 import { Context, Effect, Exit, FileSystem, Layer, Option, Path, Predicate, Schedule, Schema, Scope } from 'effect'
+import { flow } from 'effect/Function'
 import { Reactivity } from 'effect/reactivity'
 import { SqlClient, SqlError } from 'effect/sql'
 import { homedir } from 'node:os'
@@ -31,6 +32,8 @@ const TaskKeyRow = Schema.Struct({ task_id: Schema.String, action_id: Schema.Str
 const CountRow = Schema.Struct({ count: Schema.Number })
 const TaskIdRow = Schema.Struct({ task_id: Schema.String })
 const decodeRows = <S extends Schema.Top & { readonly DecodingServices: never }>(schema: S) => Schema.decodeUnknownEffect(Schema.Array(schema))
+// Only a row that fails its schema is a defect; a busy statement must stay a failure the lock retry can see.
+const decodeRowsOrDie = <S extends Schema.Top & { readonly DecodingServices: never }>(schema: S) => flow(decodeRows(schema), Effect.orDie)
 
 /** Walks a wrapped failure chain for SQLite's busy/locked signal. */
 const isLockTimeout = (error: unknown): boolean => {
@@ -186,8 +189,7 @@ export class DurableTaskStore extends Context.Service<
 
       const readTask = (taskId: string) =>
         sql`SELECT payload FROM tasks WHERE task_id = ${taskId}`.pipe(
-          Effect.flatMap(decodeRows(PayloadRow)),
-          Effect.orDie,
+          Effect.flatMap(decodeRowsOrDie(PayloadRow)),
           Effect.flatMap(rows => (rows[0] === undefined ? Effect.succeedNone : Effect.asSome(decodeTaskJson(rows[0].payload).pipe(Effect.orDie)))),
         )
 
@@ -225,8 +227,7 @@ export class DurableTaskStore extends Context.Service<
 
       const all = statement('list')(
         sql`SELECT payload FROM tasks ORDER BY created_at, task_id`.pipe(
-          Effect.flatMap(decodeRows(PayloadRow)),
-          Effect.orDie,
+          Effect.flatMap(decodeRowsOrDie(PayloadRow)),
           Effect.flatMap(rows => Effect.forEach(rows, row => decodeTaskJson(row.payload).pipe(Effect.orDie))),
         ),
       )
@@ -238,8 +239,7 @@ export class DurableTaskStore extends Context.Service<
           Effect.gen(function* () {
             const keys =
               yield* sql`SELECT task_id, action_id, action_fingerprint FROM task_keys WHERE session_id = ${task.sessionId} AND idempotency_key = ${task.idempotencyKey}`.pipe(
-                Effect.flatMap(decodeRows(TaskKeyRow)),
-                Effect.orDie,
+                Effect.flatMap(decodeRowsOrDie(TaskKeyRow)),
               )
             const existingKey = keys[0]
             if (existingKey !== undefined) {
@@ -250,12 +250,11 @@ export class DurableTaskStore extends Context.Service<
               if (Option.isNone(existing)) return yield* new IdempotencyKeyConflict({ reason: 'expired' })
               return existing.value
             }
-            const count = (yield* sql`SELECT COUNT(*) AS count FROM tasks`.pipe(Effect.flatMap(decodeRows(CountRow)), Effect.orDie))[0]?.count ?? 0
+            const count = (yield* sql`SELECT COUNT(*) AS count FROM tasks`.pipe(Effect.flatMap(decodeRowsOrDie(CountRow))))[0]?.count ?? 0
             if (count >= limit) {
               const removable =
                 yield* sql`SELECT task_id FROM tasks WHERE status IN ('succeeded', 'failed', 'cancelled', 'timed-out') ORDER BY updated_at, task_id`.pipe(
-                  Effect.flatMap(decodeRows(TaskIdRow)),
-                  Effect.orDie,
+                  Effect.flatMap(decodeRowsOrDie(TaskIdRow)),
                 )
               const toRemove = removable.slice(0, count - limit + 1)
               if (count - toRemove.length >= limit) return yield* new TaskHistoryFull({ limit })
@@ -293,8 +292,7 @@ export class DurableTaskStore extends Context.Service<
               return yield* Effect.die(new TaskStoreCorrupted({ reason: 'receipt-mismatch' }))
             yield* sql`INSERT OR IGNORE INTO attempt_receipts (task_id, attempt_id, session_id, finished_at, payload) VALUES (${taskId}, ${attemptId}, ${receipt.sessionId}, ${receipt.finishedAt}, ${payload})`
             const existing = yield* sql`SELECT payload FROM attempt_receipts WHERE task_id = ${taskId} AND attempt_id = ${attemptId}`.pipe(
-              Effect.flatMap(decodeRows(PayloadRow)),
-              Effect.orDie,
+              Effect.flatMap(decodeRowsOrDie(PayloadRow)),
             )
             if (existing[0]?.payload !== payload) return yield* Effect.die(new TaskStoreCorrupted({ reason: 'receipt-conflict' }))
           }),
@@ -304,8 +302,7 @@ export class DurableTaskStore extends Context.Service<
       const findAttemptReceipt = Effect.fn('project-checks attempt receipt find')((taskId: string, attemptId: string) =>
         statement('find-receipt')(
           sql`SELECT payload FROM attempt_receipts WHERE task_id = ${taskId} AND attempt_id = ${attemptId}`.pipe(
-            Effect.flatMap(decodeRows(PayloadRow)),
-            Effect.orDie,
+            Effect.flatMap(decodeRowsOrDie(PayloadRow)),
             Effect.flatMap(rows => (rows[0] === undefined ? Effect.succeedNone : Effect.asSome(decodeReceiptJson(rows[0].payload).pipe(Effect.orDie)))),
           ),
         ),
@@ -323,7 +320,7 @@ export class DurableTaskStore extends Context.Service<
           (input.sessionId === undefined
             ? sql`SELECT payload FROM attempt_receipts WHERE finished_at > ${since} ORDER BY finished_at DESC, task_id, attempt_id LIMIT ${limit}`
             : sql`SELECT payload FROM attempt_receipts WHERE session_id = ${input.sessionId} AND finished_at > ${since} ORDER BY finished_at DESC, task_id, attempt_id LIMIT ${limit}`
-          ).pipe(Effect.flatMap(decodeRows(PayloadRow)), Effect.orDie),
+          ).pipe(Effect.flatMap(decodeRowsOrDie(PayloadRow))),
         )
         return yield* Effect.forEach(rows, row => decodeReceiptJson(row.payload).pipe(Effect.orDie))
       })
