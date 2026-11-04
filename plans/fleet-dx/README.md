@@ -17,7 +17,7 @@ feels different), b:184 (keep jj in sync across hosts).
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | 0   | Hosts panel works again: no-argument methods take `undefined`                                                                                                                                                                                                          | `jj:57018c09`; regression test; live Hosts page lists hosts after a Host restart                                                                                            | code done   |
 | 0b  | Quick wins: Copy diagnostics after Test connection; version-drift line on each Hosts row; README comparison refreshed                                                                                                                                                  | `jj:b1ab8405`, `jj:7051d9e1`; unit tests; browser check pending                                                                                                             | code done   |
-| 1   | **Fleet update dialog** (b:462): per-host DSH version and checkout revision, one "Update all" that runs `checkoutSync` → rebuild → runtime restart per host, live per-row state (waiting / updating / restarting / done / failed + Retry), threads on that host resume | A two-runtime scratch fleet updates from the dialog; a failing host shows its error and Retry; the version-drift line clears; agent tool `multi_host_update_all` mirrors it | not started |
+| 1   | **Fleet update dialog** (b:462): per-host DSH version and checkout revision, one "Update all" that runs `checkoutSync` → rebuild → runtime restart per host, live per-row state (waiting / updating / restarting / done / failed + Retry), threads on that host resume | A two-runtime scratch fleet updates from the dialog; a failing host shows its error and Retry; the version-drift line clears; agent tool `multi_host_update_all` mirrors it | partial     |
 | 2   | **Version-mismatch banner** in a remote thread's composer, with an Update button feeding milestone 1                                                                                                                                                                   | Banner appears only when versions differ; Update starts the single-host flow                                                                                                | not started |
 | 3   | **Remote subagents** (b:482): `subagent` / `backlog_start_thread` accept a host (or Auto) and run the child as a mirrored thread there; the parent receives its result                                                                                                 | Scratch: a parent thread on A starts a child on B through Auto; the child result arrives in A; stopping the parent stops the child                                          | not started |
 | 4   | **Per-step diagnosis on failure**: `testConnection` returns the steps it ran even when one fails; the host row and picker show which hop failed (SSH, runtime, identity) with its recovery                                                                             | Unit test per failing hop; dialog lists failed hop; Copy diagnostics includes it                                                                                            | partial     |
@@ -51,7 +51,22 @@ and sets `?thread=`, which thread-sidebar opens on page load; an end-to-end chec
 against a real host is still pending. A full-profile scratch DSH (`dshx dev up`
 with no `--plugin`) fails to boot here: multi-host stops with
 `HostServiceMissing: subprocess`; the live profile and a multi-host-only scratch
-boot fine. Next: milestone 1.
+boot fine.
+
+The subprocess boot failure is fixed (multi-host, annotations and git-worktrees
+inject `subprocess`; the workspace contract checks it). A full-profile scratch
+now gets past multi-host but still leaves the session controller and sidebar
+pending on `sessionQuery`: the scratch composition never activates
+`@dshfiles/session-search`, so full-profile browser checks of thread routes
+(including `?thread=`) still cannot run.
+
+Milestone 1 is partial: **Update hosts** on the Hosts page and the
+`multi_host_update` tool fetch each host and run its own `dshx checkout sync`
+(dry run first, then rebase, install and rebuild), report per host whether DSH
+needs a restart, and show the error with Retry. Not done: restarting a host from
+here (deliberately left to the user, since it ends that host's threads), and
+updating the DSH core version that the drift line reports. Only commits on
+`main@origin` reach a host. Next: milestone 2 (banner in a remote thread).
 
 The [host-pool plan](../host-pool/README.md) still shows every milestone
 pending although Auto placement and the resource view shipped (b:346, b:356):
