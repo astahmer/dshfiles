@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "thread-export",
+      "title": "Export a thread to a portable .dshthread bundle",
+      "summary": "A thread's row menu (Export…) and the command palette (Export this thread…) build one gzip file holding the thread's whole Session log — messages, tool calls and results, title, model — and every attachment it cites, stored once by sha256. The browser downloads it in chunks; the agent tool writes it to an absolute Host path. No Session id, working directory or credential is needed to replay it.",
+      "surfaces": ["client", "host", "tool"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread row menu: Export… (also command palette: Export this thread…)",
+      "configuration": [],
+      "states": ["preparing", "downloaded", "attachments-missing", "failed"],
+      "failureModes": [
+        "A thread this machine does not store is refused with a pointer to the sidebar.",
+        "An attachment the store can no longer read is left out and counted, instead of failing the export.",
+        "The agent tool refuses a relative path and an existing file, so it never overwrites one.",
+        "A staged download the browser abandons expires after 15 minutes."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "seed tool-call-thread",
+        "rightclick text \"Fake thread title\" at 24,10",
+        "click menuitem \"Export…\"",
+        "expect dialog \"Export thread\"",
+        "expect text \"Saved *\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-transfer.export",
+          "featureFile": "tooling/dshx/e2e/features/thread-transfer.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-transfer.bundle-content",
+          "file": "plugins/@dshfiles/thread-transfer/src/bundle.test.ts",
+          "testName": "collects each attachment once by content, keeps no host path, and describes the thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-transfer.missing-attachment",
+          "file": "plugins/@dshfiles/thread-transfer/src/bundle.test.ts",
+          "testName": "records an attachment the source could not read instead of failing the export"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-transfer.export-file",
+          "file": "plugins/@dshfiles/thread-transfer/src/transfer-service.test.ts",
+          "testName": "writes and reads bundle files on the Host for the agent tools, into the home folder by default"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "thread-import",
+      "title": "Import a .dshthread bundle as a new thread",
+      "summary": "Import thread… in the command palette uploads a bundle, previews its title, message, event and attachment counts and model, and refuses one this DSH cannot replay (another bundle version or Session log format, a damaged log, an attachment failing its checksum). On import the attachments are saved into this machine's store, their references rewritten, and the log stored as a new thread with a fresh id in the chosen project, an existing folder or the home folder; the thread opens. The agent tools inspect and import a bundle file on the Host.",
+      "surfaces": ["client", "host", "tool"],
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "command palette: Import thread…",
+      "configuration": [],
+      "states": ["picking", "uploading", "previewed", "incompatible", "imported", "failed"],
+      "failureModes": [
+        "A file that is not a bundle, or a bundle from another format or DSH Session log format, is refused before anything is stored, with what to change.",
+        "A missing folder or an unknown project is refused with a pointer to the destination picker.",
+        "A log this DSH stores but cannot replay is archived and reported, never left as a thread that fails to open.",
+        "Sub-agent threads are not carried: the parent's tool results that summarize them are."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "click button \"Open command palette\"",
+        "click option \"Import thread*\"",
+        "expect dialog \"Import thread\"",
+        "expect button \"Choose a .dshthread file\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-transfer.export-import",
+          "featureFile": "tooling/dshx/e2e/features/thread-transfer.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-transfer.round-trip",
+          "file": "plugins/@dshfiles/thread-transfer/src/transfer-service.test.ts",
+          "testName": "exports a thread on one machine and imports it on another as a new thread in a chosen project"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-transfer.bundle-round-trip",
+          "file": "plugins/@dshfiles/thread-transfer/src/bundle.test.ts",
+          "testName": "round-trips through the file encoding and rewrites references to the importing store"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-transfer.incompatible",
+          "file": "plugins/@dshfiles/thread-transfer/src/bundle.test.ts",
+          "testName": "names what keeps a bundle from replaying here"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-transfer.refusals",
+          "file": "plugins/@dshfiles/thread-transfer/src/transfer-service.test.ts",
+          "testName": "refuses an unknown thread, a missing folder and an expired transfer with a recovery hint"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    }
+  ]
+}
