@@ -4,9 +4,10 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { sendMessage } from '../threads.js'
 
-const feedRows = (page: Page) => page.getByRole('button', { name: /^(Agent|Communication|Integration|Workspace|System) .+ \d{2}:\d{2}:\d{2} / })
+// Feed rows are kit EntityRows: summary first, then the source chip and the time.
+const feedRows = (page: Page) => page.getByRole('button', { name: /.+ (Agent|Communication|Integration|Workspace|System) .*\d{2}:\d{2}:\d{2}/ })
 const rowTitles = async (page: Page): Promise<readonly string[]> =>
-  (await feedRows(page).allInnerTexts()).map(text => text.split('\n')[1] ?? '').filter(title => title.length > 0)
+  (await feedRows(page).locator('[data-slot="entity-row-title"]').allInnerTexts()).map(title => title.trim()).filter(title => title.length > 0)
 
 export const openActivity = async (page: Page): Promise<void> => {
   await openGlobalPanel(page, 'Activity Timeline: Activity')

@@ -1,6 +1,8 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
-import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
+import { EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
+import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
+import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
@@ -28,12 +30,11 @@ const statsKey = ['activity-timeline', 'stats'] as const
 /** A stable empty page, so a feed with nothing loaded keeps the merge memo from re-evaluating every render. */
 const NO_ITEMS: readonly CondensedItem[] = []
 
-const badgeVariant = (item: CondensedItem): 'default' | 'secondary' | 'outline' | 'destructive' => {
-  if (item.level === 'attention') return 'destructive'
-  if (item.source === 'integration') return 'default'
-  if (item.source === 'communication') return 'secondary'
-  return 'outline'
-}
+/** Dark cockpit: only attention gets colour; the source stays a neutral chip. */
+const badgeVariant = (item: CondensedItem): 'outline' | 'destructive' => (item.level === 'attention' ? 'destructive' : 'outline')
+
+/** Attention events are agent errors and failed or blocked work, so they read as Failed; the rest are informational. */
+const itemStatus = (item: CondensedItem): WorkStatus => (item.level === 'attention' ? 'failed' : 'idle')
 
 /**
  * A clock alone is ambiguous the moment a timeline spans more than one day:
@@ -50,9 +51,6 @@ const formatTime = (at: number, now: number = Date.now()): string => {
 /** The unambiguous spelling, for a hover or an event detail. */
 const formatExact = (at: number): string => new Date(at).toLocaleString()
 
-const levelMarker = (level: CondensedItem['level']): string =>
-  level === 'attention' ? 'dshx:bg-destructive' : level === 'notable' ? 'dshx:bg-primary' : 'dshx:bg-muted-foreground/40'
-
 const ActivityRow = (props: {
   readonly item: CondensedItem
   readonly selected: boolean
@@ -60,25 +58,22 @@ const ActivityRow = (props: {
   readonly sessionLabel: (sessionId: string) => string
   readonly onSelect: (item: CondensedItem) => void
 }): JSX.Element => (
-  <button
-    type="button"
-    onClick={() => props.onSelect(props.item)}
-    className={`dshx:flex dshx:w-full dshx:items-start dshx:gap-3 dshx:rounded-md dshx:border dshx:px-3 dshx:py-2 dshx:text-left ${props.selected ? 'dshx:border-primary dshx:bg-accent/40' : 'dshx:border-transparent dshx:hover:bg-accent/30'}`}
-  >
-    <span className={`dshx:mt-1.5 dshx:h-2 dshx:w-2 dshx:shrink-0 dshx:rounded-full ${levelMarker(props.item.level)}`} aria-hidden />
-    <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
-      <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+  <EntityRow
+    status={itemStatus(props.item)}
+    statusDecorative
+    selected={props.selected}
+    onSelect={() => props.onSelect(props.item)}
+    heading={props.item.summary}
+    meta={
+      <>
         <Badge variant={badgeVariant(props.item)}>{props.t(props.item.source)}</Badge>
-        <span className="dshx:break-words dshx:text-sm">{props.item.summary}</span>
         {props.item.count > 1 ? <Badge variant="outline">{props.item.count}×</Badge> : null}
-      </span>
-      <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
         <span title={formatExact(props.item.at)}>{formatTime(props.item.at)}</span>
         {props.item.sessionId === null ? null : <span className="dshx:truncate">{props.sessionLabel(props.item.sessionId)}</span>}
         {props.item.correlationId === null ? null : <span>correlation {props.item.correlationId}</span>}
-      </span>
-    </span>
-  </button>
+      </>
+    }
+  />
 )
 
 export const ActivityTimelinePanel = (props: {
@@ -262,175 +257,171 @@ export const ActivityTimelinePanel = (props: {
   }
 
   return (
-    <div className="dshx-root dshx:@container">
-      <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-5 dshx:@max-pane-narrow:p-3">
-        <PageHeader heading={t('title')} description={t('subtitle')}>
-          <Badge variant="secondary">
+    <Page
+      heading={t('title')}
+      description={t('subtitle')}
+      meta={
+        <>
+          <Badge variant="muted">
             {statsQuery.data?.retained ?? 0} {t('retained')}
           </Badge>
-          <Badge variant={statsQuery.data !== undefined && statsQuery.data.attention > 0 ? 'destructive' : 'outline'}>
+          <Badge variant={statsQuery.data !== undefined && statsQuery.data.attention > 0 ? 'destructive' : 'muted'}>
             {statsQuery.data?.attention ?? 0} {t('attention')}
           </Badge>
-          <Badge variant="outline">
+          <Badge variant="muted">
             {statsQuery.data?.duplicates ?? 0} {t('duplicates')}
           </Badge>
-          <Button variant="outline" size="sm" disabled={feedQuery.isFetching} onClick={() => void feedQuery.refetch()}>
-            <RefreshCwIcon aria-hidden /> {t('refresh')}
-          </Button>
-        </PageHeader>
-        {/* Below the compact tier the search takes its own line and the filters scroll sideways instead of wrapping. */}
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:items-stretch">
-          <SearchInput
-            className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0"
-            aria-label={t('search')}
-            placeholder={t('searchPlaceholder')}
-            value={search}
-            onChange={event => setSearch(event.currentTarget.value)}
-          />
-          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:@max-pane-compact:overflow-x-auto dshx:@max-pane-compact:pb-1">
-            {(['session', 'communication', 'integration'] as const).map(source => (
-              <Button
-                key={source}
-                size="sm"
-                variant={sources.includes(source) ? 'secondary' : 'outline'}
-                aria-pressed={sources.includes(source)}
-                onClick={() => toggleSource(source)}
-              >
-                {t(source)}
-              </Button>
-            ))}
+        </>
+      }
+      actions={[
+        { id: 'refresh', label: t('refresh'), icon: <RefreshCwIcon aria-hidden />, disabled: feedQuery.isFetching, onSelect: () => void feedQuery.refetch() },
+      ]}
+    >
+      {/* Below the compact tier the search takes its own line and the filters scroll sideways instead of wrapping. */}
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:items-stretch">
+        <SearchInput
+          className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0"
+          aria-label={t('search')}
+          placeholder={t('searchPlaceholder')}
+          value={search}
+          onChange={event => setSearch(event.currentTarget.value)}
+        />
+        <div className="dshx:flex dshx:min-w-0 dshx:max-w-full dshx:items-center dshx:gap-2 dshx:@max-pane-compact:overflow-x-auto dshx:@max-pane-compact:pb-1">
+          {(['session', 'communication', 'integration'] as const).map(source => (
             <Button
+              key={source}
               size="sm"
-              variant={attentionOnly ? 'destructive' : 'outline'}
-              aria-pressed={attentionOnly}
-              onClick={() => setAttentionOnly(value => !value)}
+              variant={sources.includes(source) ? 'secondary' : 'outline'}
+              aria-pressed={sources.includes(source)}
+              onClick={() => toggleSource(source)}
             >
-              {t('attentionOnly')}
+              {t(source)}
             </Button>
-            <Button size="sm" variant={detailed ? 'secondary' : 'outline'} aria-pressed={detailed} onClick={() => setDetailed(value => !value)}>
-              {t('detailed')}
-            </Button>
-          </div>
-        </div>
-        {feedQuery.error === null && olderMutation.error === null ? null : (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(feedQuery.error ?? olderMutation.error, t('loadFailed'))}</AlertDescription>
-          </Alert>
-        )}
-        <div className="dshx:grid dshx:min-h-0 dshx:gap-3 dshx:@4xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <Card className="dshx:min-w-0">
-            <CardHeader className="dshx:flex dshx:flex-row dshx:items-center dshx:justify-between dshx:gap-2 dshx:pb-2">
-              <CardTitle className="dshx:text-sm">{t('title')}</CardTitle>
-              <div className="dshx:flex dshx:items-center dshx:gap-2">
-                {pendingNew > 0 ? (
-                  <Button size="sm" variant="secondary" onClick={jumpToLatest}>
-                    {t('newEvents')} ({pendingNew})
-                  </Button>
-                ) : null}
-                {cursor === null || !olderMutation.isError ? null : (
-                  <Button size="sm" variant="outline" onClick={loadOlder}>
-                    {t('loadOlder')}
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="dshx:p-2">
-              <div
-                ref={scrollRef}
-                onScroll={event => {
-                  const target = event.currentTarget
-                  nearBottomRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 80
-                  if (nearBottomRef.current) setPendingNew(0)
-                }}
-                className="dshx:flex dshx:h-[62vh] dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:pr-1"
-              >
-                {items.length === 0 && !feedQuery.isPending ? (
-                  <p className="dshx:p-3 dshx:text-sm dshx:text-muted-foreground">
-                    {debouncedSearch.length === 0 && sources.length === 0 && !attentionOnly ? t('noActivity') : t('noMatch')}
-                  </p>
-                ) : null}
-                <div key="activity-older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
-                {items.map(item => (
-                  <ActivityRow key={item.id} item={item} selected={selected?.id === item.id} t={t} sessionLabel={sessionLabel} onSelect={setSelected} />
-                ))}
-              </div>
-              {olderMutation.isPending ? (
-                <p className="dshx:p-1 dshx:text-xs dshx:text-muted-foreground" role="status">
-                  {t('loadingOlder')}
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
-          <Card className="dshx:min-w-0">
-            <CardHeader className="dshx:pb-2">
-              <CardTitle className="dshx:text-sm">{t('detail')}</CardTitle>
-            </CardHeader>
-            <CardContent className="dshx:flex dshx:max-h-[62vh] dshx:flex-col dshx:gap-2 dshx:overflow-y-auto dshx:text-sm">
-              {selected === null ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('emptyDetail')}</p> : null}
-              {selected !== null && selected.kind === 'group' ? (
-                <>
-                  <p className="dshx:text-sm dshx:font-medium">{selected.summary}</p>
-                  <p className="dshx:text-xs dshx:text-muted-foreground">
-                    {t('groupMembers')}: {selected.eventIds.length} {t('events')}
-                  </p>
-                  <Button size="sm" variant="outline" onClick={() => setDetailed(true)}>
-                    {t('detailed')}
-                  </Button>
-                </>
-              ) : null}
-              {selectedEvent === undefined ? null : (
-                <>
-                  <p className="dshx:break-words dshx:text-sm dshx:font-medium">{selectedEvent.summary}</p>
-                  <p className="dshx:text-xs dshx:text-muted-foreground" title={formatExact(selectedEvent.at)}>
-                    {selectedEvent.type} · {formatTime(selectedEvent.at)} · {formatExact(selectedEvent.at)}
-                  </p>
-                  {selectedEvent.detail === null ? null : <p className="dshx:break-words dshx:text-xs">{selectedEvent.detail}</p>}
-                  {selectedEvent.sessionId === null ? null : (
-                    <Button size="sm" variant="outline" onClick={() => openEventSession(selectedEvent)}>
-                      {t('openSession')}
-                    </Button>
-                  )}
-                  {navigationError.length === 0 ? null : (
-                    <Alert variant="destructive">
-                      <AlertDescription>{navigationError}</AlertDescription>
-                    </Alert>
-                  )}
-                  <Separator />
-                  <p className="dshx:text-xs dshx:font-semibold">{t('metadata')}</p>
-                  <pre className="dshx:overflow-x-auto dshx:rounded dshx:bg-muted/60 dshx:p-2 dshx:text-[11px]">
-                    {JSON.stringify(selectedEvent.metadata, null, 2)}
-                  </pre>
-                  <p className="dshx:text-xs dshx:font-semibold">{t('references')}</p>
-                  <div className="dshx:flex dshx:flex-wrap dshx:gap-1">
-                    {selectedEvent.references.map(reference => (
-                      <Badge key={`${reference.kind}:${reference.id}`} variant="outline">
-                        {reference.kind}: {reference.kind === 'session' ? sessionLabel(reference.id) : reference.id.slice(0, 12)}
-                      </Badge>
-                    ))}
-                    {selectedEvent.references.length === 0 ? <span className="dshx:text-xs dshx:text-muted-foreground">—</span> : null}
-                  </div>
-                  <p className="dshx:text-xs dshx:font-semibold">{t('related')}</p>
-                  {(relatedQuery.data?.events ?? []).length < 2 ? (
-                    <p className="dshx:text-xs dshx:text-muted-foreground">—</p>
-                  ) : (
-                    <div className="dshx:flex dshx:flex-col dshx:gap-1">
-                      {(relatedQuery.data?.events ?? []).slice(0, 20).map(event => (
-                        <span key={event.id} className="dshx:text-xs" title={formatExact(event.at)}>
-                          {formatTime(event.at)} · {event.summary}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <p className="dshx:text-xs dshx:text-muted-foreground">
-                    {t('provenance')}: {t(selectedEvent.provenance)}
-                  </p>
-                </>
-              )}
-              <p className="dshx:mt-auto dshx:text-[11px] dshx:text-muted-foreground">{t('routineHidden')}</p>
-            </CardContent>
-          </Card>
+          ))}
+          <Button size="sm" variant={attentionOnly ? 'destructive' : 'outline'} aria-pressed={attentionOnly} onClick={() => setAttentionOnly(value => !value)}>
+            {t('attentionOnly')}
+          </Button>
+          <Button size="sm" variant={detailed ? 'secondary' : 'outline'} aria-pressed={detailed} onClick={() => setDetailed(value => !value)}>
+            {t('detailed')}
+          </Button>
         </div>
       </div>
-    </div>
+      {feedQuery.error === null && olderMutation.error === null ? null : (
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage(feedQuery.error ?? olderMutation.error, t('loadFailed'))}</AlertDescription>
+        </Alert>
+      )}
+      <div className="dshx:grid dshx:min-h-0 dshx:gap-3 dshx:@4xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <Card className="dshx:min-w-0">
+          <CardHeader className="dshx:flex dshx:flex-row dshx:items-center dshx:justify-between dshx:gap-2 dshx:pb-2">
+            <CardTitle className="dshx:text-sm">{t('title')}</CardTitle>
+            <div className="dshx:flex dshx:items-center dshx:gap-2">
+              {pendingNew > 0 ? (
+                <Button size="sm" variant="secondary" onClick={jumpToLatest}>
+                  {t('newEvents')} ({pendingNew})
+                </Button>
+              ) : null}
+              {cursor === null || !olderMutation.isError ? null : (
+                <Button size="sm" variant="outline" onClick={loadOlder}>
+                  {t('loadOlder')}
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="dshx:p-2">
+            <div
+              ref={scrollRef}
+              onScroll={event => {
+                const target = event.currentTarget
+                nearBottomRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 80
+                if (nearBottomRef.current) setPendingNew(0)
+              }}
+              className="dshx:flex dshx:h-[62vh] dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:pr-1"
+            >
+              {items.length === 0 && !feedQuery.isPending ? (
+                <EmptyState>{debouncedSearch.length === 0 && sources.length === 0 && !attentionOnly ? t('noActivity') : t('noMatch')}</EmptyState>
+              ) : null}
+              <div key="activity-older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
+              {items.map(item => (
+                <ActivityRow key={item.id} item={item} selected={selected?.id === item.id} t={t} sessionLabel={sessionLabel} onSelect={setSelected} />
+              ))}
+            </div>
+            {olderMutation.isPending ? (
+              <p className="dshx:p-1 dshx:text-xs dshx:text-muted-foreground" role="status">
+                {t('loadingOlder')}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+        <Card className="dshx:min-w-0">
+          <CardHeader className="dshx:pb-2">
+            <CardTitle className="dshx:text-sm">{t('detail')}</CardTitle>
+          </CardHeader>
+          <CardContent className="dshx:flex dshx:max-h-[62vh] dshx:flex-col dshx:gap-2 dshx:overflow-y-auto dshx:text-sm">
+            {selected === null ? <EmptyState>{t('emptyDetail')}</EmptyState> : null}
+            {selected !== null && selected.kind === 'group' ? (
+              <>
+                <p className="dshx:text-sm dshx:font-medium">{selected.summary}</p>
+                <p className="dshx:text-xs dshx:text-muted-foreground">
+                  {t('groupMembers')}: {selected.eventIds.length} {t('events')}
+                </p>
+                <Button size="sm" variant="outline" onClick={() => setDetailed(true)}>
+                  {t('detailed')}
+                </Button>
+              </>
+            ) : null}
+            {selectedEvent === undefined ? null : (
+              <>
+                <p className="dshx:break-words dshx:text-sm dshx:font-medium">{selectedEvent.summary}</p>
+                <p className="dshx:text-xs dshx:text-muted-foreground" title={formatExact(selectedEvent.at)}>
+                  {selectedEvent.type} · {formatTime(selectedEvent.at)} · {formatExact(selectedEvent.at)}
+                </p>
+                {selectedEvent.detail === null ? null : <p className="dshx:break-words dshx:text-xs">{selectedEvent.detail}</p>}
+                {selectedEvent.sessionId === null ? null : (
+                  <Button size="sm" variant="outline" onClick={() => openEventSession(selectedEvent)}>
+                    {t('openSession')}
+                  </Button>
+                )}
+                {navigationError.length === 0 ? null : (
+                  <Alert variant="destructive">
+                    <AlertDescription>{navigationError}</AlertDescription>
+                  </Alert>
+                )}
+                <Separator />
+                <p className="dshx:text-xs dshx:font-semibold">{t('metadata')}</p>
+                <pre className="dshx:overflow-x-auto dshx:rounded dshx:bg-muted/60 dshx:p-2 dshx:text-xs">
+                  {JSON.stringify(selectedEvent.metadata, null, 2)}
+                </pre>
+                <p className="dshx:text-xs dshx:font-semibold">{t('references')}</p>
+                <div className="dshx:flex dshx:flex-wrap dshx:gap-1">
+                  {selectedEvent.references.map(reference => (
+                    <Badge key={`${reference.kind}:${reference.id}`} variant="outline">
+                      {reference.kind}: {reference.kind === 'session' ? sessionLabel(reference.id) : reference.id.slice(0, 12)}
+                    </Badge>
+                  ))}
+                  {selectedEvent.references.length === 0 ? <span className="dshx:text-xs dshx:text-muted-foreground">—</span> : null}
+                </div>
+                <p className="dshx:text-xs dshx:font-semibold">{t('related')}</p>
+                {(relatedQuery.data?.events ?? []).length < 2 ? (
+                  <p className="dshx:text-xs dshx:text-muted-foreground">—</p>
+                ) : (
+                  <div className="dshx:flex dshx:flex-col dshx:gap-1">
+                    {(relatedQuery.data?.events ?? []).slice(0, 20).map(event => (
+                      <span key={event.id} className="dshx:text-xs" title={formatExact(event.at)}>
+                        {formatTime(event.at)} · {event.summary}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="dshx:text-xs dshx:text-muted-foreground">
+                  {t('provenance')}: {t(selectedEvent.provenance)}
+                </p>
+              </>
+            )}
+            <p className="dshx:mt-auto dshx:text-xs dshx:text-muted-foreground">{t('routineHidden')}</p>
+          </CardContent>
+        </Card>
+      </div>
+    </Page>
   )
 }

@@ -5,7 +5,7 @@ export const BACKGROUND_JOBS_LOCALE_NAMESPACE = 'dshfiles.backgroundJobs'
 
 const en = {
   title: 'Jobs',
-  subtitle: 'Every background job across Sessions: live ones from the job registry, finished ones from the session logs.',
+  subtitle: 'Every background job across threads: live ones from the job registry, finished ones from thread logs.',
   loading: 'Loading…',
   loadFailed: 'Background jobs could not be loaded.',
   refresh: 'Refresh',

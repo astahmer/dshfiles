@@ -10,11 +10,12 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
-import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
+import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
+import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
+import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
-import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -22,7 +23,6 @@ import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
 import { ChevronDownIcon, ChevronRightIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import type { ISessions, SessionTarget } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -92,6 +92,16 @@ const formatStarted = (at: number, now: number): string => {
   return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${time}`
 }
 
+/** Job states on the shared vocabulary; the badge keeps the exact job status as detail text. */
+const WORK_STATUS = {
+  running: 'working',
+  stopping: 'working',
+  completed: 'done',
+  killed: 'done',
+  interrupted: 'done',
+  failed: 'failed',
+} as const satisfies Record<JobStatus, WorkStatus>
+
 const statusVariant = (status: JobStatus): 'default' | 'secondary' | 'outline' | 'destructive' => {
   if (status === 'failed') return 'destructive'
   if (isLiveStatus(status)) return 'secondary'
@@ -149,61 +159,68 @@ const JobLine = (props: {
   const Chevron = open ? ChevronDownIcon : ChevronRightIcon
   const running = isLiveStatus(row.status)
   return (
-    <div
-      className={cn('dshx:flex dshx:flex-col dshx:rounded-md dshx:border', props.selected ? 'dshx:border-info/60 dshx:bg-info/8' : 'dshx:border-border')}
+    <EntityRow
+      role="listitem"
       data-job-id={row.id}
-    >
-      <div className="dshx:flex dshx:items-start dshx:gap-2 dshx:px-3 dshx:py-2">
-        {running ? (
-          <input
-            type="checkbox"
-            aria-label={`${props.t('selectJob')} ${row.id}`}
-            checked={props.selected}
-            onClick={event => {
-              if (!event.shiftKey && !event.metaKey && !event.ctrlKey) return
-              modifiedCheckboxClick.current = true
-              event.stopPropagation()
-              if (event.shiftKey) props.onRangeSelection(row.id)
-              else props.onToggleSelection(row.id)
-            }}
-            onChange={() => {
-              if (modifiedCheckboxClick.current) {
-                modifiedCheckboxClick.current = false
-                return
-              }
-              props.onToggleSelection(row.id)
-            }}
-            className="dshx:mt-1 dshx:size-3.5 dshx:shrink-0 dshx:accent-[var(--color-info)]"
-          />
-        ) : (
-          <span aria-hidden className="dshx:mt-1 dshx:w-3.5 dshx:shrink-0" />
-        )}
-        <Button variant="ghost" size="icon" aria-label={open ? props.t('hideOutput') : props.t('showOutput')} onClick={() => setOpen(current => !current)}>
-          <Chevron aria-hidden />
-        </Button>
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
-          <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <Badge variant="outline">{props.t(CATEGORY_KEY[row.category])}</Badge>
-            <Badge variant={statusVariant(row.status)}>
-              {running ? <Spinner aria-hidden className="dshx:size-3" /> : null}
-              {props.t(STATUS_KEY[row.status])}
-              {row.detail === null ? '' : ` · ${row.detail}`}
-            </Badge>
-            <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
-              {row.kind} · {durationLabel(row, props.now)} · {formatStarted(row.startedAt, props.now)}
-            </span>
-          </div>
-          <TooltipProvider delayDuration={500}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <code className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs">{row.label}</code>
-              </TooltipTrigger>
-              <TooltipContent>{row.label}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{row.owner === null ? row.id : props.sessionLabel(row.owner)}</span>
-        </div>
-        {running ? (
+      status={WORK_STATUS[row.status]}
+      statusDecorative
+      selected={props.selected}
+      leading={
+        <>
+          {running ? (
+            <input
+              type="checkbox"
+              aria-label={`${props.t('selectJob')} ${row.id}`}
+              checked={props.selected}
+              onClick={event => {
+                if (!event.shiftKey && !event.metaKey && !event.ctrlKey) return
+                modifiedCheckboxClick.current = true
+                event.stopPropagation()
+                if (event.shiftKey) props.onRangeSelection(row.id)
+                else props.onToggleSelection(row.id)
+              }}
+              onChange={() => {
+                if (modifiedCheckboxClick.current) {
+                  modifiedCheckboxClick.current = false
+                  return
+                }
+                props.onToggleSelection(row.id)
+              }}
+              className="dshx:size-3.5 dshx:shrink-0 dshx:accent-[var(--color-info)]"
+            />
+          ) : (
+            <span aria-hidden className="dshx:w-3.5 dshx:shrink-0" />
+          )}
+          <Button variant="ghost" size="icon-xs" aria-label={open ? props.t('hideOutput') : props.t('showOutput')} onClick={() => setOpen(current => !current)}>
+            <Chevron aria-hidden />
+          </Button>
+        </>
+      }
+      heading={
+        <TooltipProvider delayDuration={500}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <code className="dshx:block dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs">{row.label}</code>
+            </TooltipTrigger>
+            <TooltipContent>{row.label}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      }
+      meta={
+        <>
+          <Badge variant="outline">{props.t(CATEGORY_KEY[row.category])}</Badge>
+          <Badge variant={statusVariant(row.status)}>
+            {props.t(STATUS_KEY[row.status])}
+            {row.detail === null ? '' : ` · ${row.detail}`}
+          </Badge>
+          <span className="dshx:truncate">
+            {row.kind} · {durationLabel(row, props.now)} · {formatStarted(row.startedAt, props.now)}
+          </span>
+        </>
+      }
+      description={row.owner === null ? row.id : props.sessionLabel(row.owner)}
+      trailing={
+        running ? (
           <Button
             variant={props.armed ? 'default' : 'outline'}
             size="sm"
@@ -213,10 +230,11 @@ const JobLine = (props: {
           >
             {props.t(props.armed ? 'stopConfirm' : 'stop')}
           </Button>
-        ) : null}
-      </div>
+        ) : null
+      }
+    >
       {open ? <OutputPane row={row} t={props.t} /> : null}
-    </div>
+    </EntityRow>
   )
 }
 
@@ -369,208 +387,208 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
   }, [rows, group, labelOf, t])
 
   return (
-    <div className="dshx-root dshx:@container">
-      <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-5 dshx:@max-pane-narrow:p-3">
-        <PageHeader heading={t('title')} description={t('subtitle')}>
-          <Badge variant="secondary">
+    <Page
+      heading={t('title')}
+      description={t('subtitle')}
+      meta={
+        <>
+          <Badge variant="muted">
             {value?.runningCount ?? 0} {t('running')}
           </Badge>
-          <Badge variant="outline">
+          <Badge variant="muted">
             {value?.finishedCount ?? 0} {t('finished')}
           </Badge>
-          <Badge variant="outline">
+          <Badge variant="muted">
             {value?.indexing.historyRows ?? 0} {t('historyRows')}
           </Badge>
-          <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
-            <RefreshCwIcon aria-hidden /> {t('refresh')}
-          </Button>
-        </PageHeader>
+        </>
+      }
+      actions={[{ id: 'refresh', label: t('refresh'), icon: <RefreshCwIcon aria-hidden />, pending: refresh.isPending, onSelect: () => refresh.mutate() }]}
+    >
+      {value !== undefined && !value.liveAvailable ? (
+        <Alert>
+          <AlertDescription>{t('liveUnavailable')}</AlertDescription>
+        </Alert>
+      ) : null}
+      {value === undefined ? null : <IndexingNotice board={value} t={t} />}
+      {stopError === null ? null : (
+        <Alert variant="destructive">
+          <AlertDescription>{stopError}</AlertDescription>
+        </Alert>
+      )}
 
-        {value !== undefined && !value.liveAvailable ? (
-          <Alert>
-            <AlertDescription>{t('liveUnavailable')}</AlertDescription>
-          </Alert>
-        ) : null}
-        {value === undefined ? null : <IndexingNotice board={value} t={t} />}
-        {stopError === null ? null : (
-          <Alert variant="destructive">
-            <AlertDescription>{stopError}</AlertDescription>
-          </Alert>
-        )}
-
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:items-stretch">
-          <ToggleGroup
-            aria-label={t('scopeAll')}
-            size="sm"
-            type="single"
-            value={scope}
-            onValueChange={next => {
-              if (next === 'running' || next === 'finished' || next === 'all') setScope(next)
-            }}
-          >
-            <ToggleGroupItem value="running">{t('scopeRunning')}</ToggleGroupItem>
-            <ToggleGroupItem value="finished">{t('scopeFinished')}</ToggleGroupItem>
-            <ToggleGroupItem value="all">{t('scopeAll')}</ToggleGroupItem>
-          </ToggleGroup>
-          <SearchInput
-            className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0"
-            aria-label={t('search')}
-            placeholder={t('searchPlaceholder')}
-            value={search}
-            onChange={event => setSearch(event.currentTarget.value)}
-          />
-          <Select value={group} onValueChange={next => setGroup(next === 'category' || next === 'none' ? next : 'session')}>
-            <SelectTrigger aria-label={t('groupBy')} className="dshx:w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="session">{t('groupSession')}</SelectItem>
-              <SelectItem value="category">{t('groupCategory')}</SelectItem>
-              <SelectItem value="none">{t('groupNone')}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
-          <span className="dshx:text-xs dshx:text-muted-foreground">{t('categories')}</span>
-          {jobCategoryValues.map(category => (
-            <Button key={category} size="sm" variant={categories.includes(category) ? 'secondary' : 'ghost'} onClick={() => toggleCategory(category)}>
-              {t(CATEGORY_KEY[category])}
-              <span className="dshx:ml-1 dshx:text-xs dshx:text-muted-foreground">{value?.categoryCounts[category] ?? 0}</span>
-            </Button>
-          ))}
-          {categories.length === 0 ? null : (
-            <Button size="sm" variant="ghost" onClick={() => setCategories([])}>
-              {t('clearCategories')}
-            </Button>
-          )}
-        </div>
-
-        {stoppableIds.length === 0 ? null : (
-          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
-            <input
-              type="checkbox"
-              aria-label={t('selectAllStoppable')}
-              checked={ListSelectionModel.isComplete({ state: selection, orderedIds: stoppableIds })}
-              onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds: stoppableIds }))}
-              className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
-            />
-            <span className="dshx:text-muted-foreground">{t('selectAllStoppable')}</span>
-          </div>
-        )}
-
-        <Separator />
-
-        {board.isPending ? (
-          <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
-            <Spinner aria-hidden /> {t('loading')}
-          </p>
-        ) : null}
-        {board.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(board.error, t('loadFailed'))}</AlertDescription>
-          </Alert>
-        ) : null}
-        {board.isSuccess && rows.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noJobs')}</p> : null}
-        {value !== undefined && value.hasMore ? (
-          <p className="dshx:text-xs dshx:text-muted-foreground">
-            {value.total - rows.length} {t('moreMatched')}
-          </p>
-        ) : null}
-
-        <div className="dshx:flex dshx:flex-col dshx:gap-4">
-          {groups.map(section => (
-            <section key={section.key} className="dshx:flex dshx:flex-col dshx:gap-2">
-              <div className="dshx:flex dshx:items-center dshx:gap-2">
-                <h2 className="dshx:text-sm dshx:font-medium">{section.label}</h2>
-                <Badge variant="outline">{section.rows.length}</Badge>
-                {group === 'session' && section.key.startsWith('session-') ? (
-                  <TooltipProvider delayDuration={500}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={sessionTarget(props.sessions, section.key) === undefined}
-                          onClick={() => {
-                            const target = sessionTarget(props.sessions, section.key)
-                            if (target !== undefined) props.uiWorkspace.openSession(target)
-                          }}
-                        >
-                          {t('openSession')}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{sessionTarget(props.sessions, section.key) === undefined ? t('sessionUnavailable') : t('openSession')}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                ) : null}
-              </div>
-              <div className="dshx:flex dshx:flex-col dshx:gap-2">
-                {section.rows.map(row => (
-                  <JobLine
-                    key={row.id}
-                    row={row}
-                    now={now}
-                    t={t}
-                    armed={armed === row.id}
-                    stopping={stopping === row.id && stop.isPending}
-                    selected={selectedJobIds.has(row.id)}
-                    onToggleSelection={toggleJobSelection}
-                    onRangeSelection={extendJobSelection}
-                    sessionLabel={labelOf}
-                    onArm={target => setArmed(target.id)}
-                    onStop={target => {
-                      setStopping(target.id)
-                      setStopError(null)
-                      stop.mutate(target)
-                    }}
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
-
-        {selection.ids.length === 0 ? null : (
-          <div className="dshx:sticky dshx:bottom-2 dshx:z-30 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-2 dshx:pl-3 dshx:text-[13px] dshx:shadow-lg">
-            <span className="dshx:mr-2 dshx:tabular-nums">{t('selectedCount', { count: selection.ids.length })}</span>
-            <Button size="sm" variant="destructive" onClick={() => setConfirmingStop(true)}>
-              {t('stopSelected')}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={clearSelection}>
-              {t('clearSelection')}
-            </Button>
-          </div>
-        )}
-
-        <AlertDialog
-          open={confirmingStop}
-          onOpenChange={open => {
-            if (!open && !batchStopping) setConfirmingStop(false)
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:items-stretch">
+        <ToggleGroup
+          aria-label={t('scopeAll')}
+          size="sm"
+          type="single"
+          value={scope}
+          onValueChange={next => {
+            if (next === 'running' || next === 'finished' || next === 'all') setScope(next)
           }}
         >
-          <AlertDialogContent className="dshx-root" size="sm">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="dshx:text-sm">{t('stopSelectedTitle', { count: selection.ids.length })}</AlertDialogTitle>
-              <AlertDialogDescription>{t('stopSelectedDescription')}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={batchStopping}>{t('cancel')}</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                disabled={batchStopping || selection.ids.length === 0}
-                onClick={event => {
-                  event.preventDefault()
-                  void stopSelected()
-                }}
-              >
-                {batchStopping ? t('stopping') : t('stopSelectedConfirm', { count: selection.ids.length })}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+          <ToggleGroupItem value="running">{t('scopeRunning')}</ToggleGroupItem>
+          <ToggleGroupItem value="finished">{t('scopeFinished')}</ToggleGroupItem>
+          <ToggleGroupItem value="all">{t('scopeAll')}</ToggleGroupItem>
+        </ToggleGroup>
+        <SearchInput
+          className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0"
+          aria-label={t('search')}
+          placeholder={t('searchPlaceholder')}
+          value={search}
+          onChange={event => setSearch(event.currentTarget.value)}
+        />
+        <Select value={group} onValueChange={next => setGroup(next === 'category' || next === 'none' ? next : 'session')}>
+          <SelectTrigger aria-label={t('groupBy')} className="dshx:w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="session">{t('groupSession')}</SelectItem>
+            <SelectItem value="category">{t('groupCategory')}</SelectItem>
+            <SelectItem value="none">{t('groupNone')}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
-    </div>
+
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1 dshx:@max-pane-compact:flex-nowrap dshx:@max-pane-compact:overflow-x-auto dshx:@max-pane-compact:pb-1">
+        <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{t('categories')}</span>
+        {jobCategoryValues.map(category => (
+          <Button key={category} size="sm" variant={categories.includes(category) ? 'secondary' : 'ghost'} onClick={() => toggleCategory(category)}>
+            {t(CATEGORY_KEY[category])}
+            <span className="dshx:ml-1 dshx:text-xs dshx:text-muted-foreground">{value?.categoryCounts[category] ?? 0}</span>
+          </Button>
+        ))}
+        {categories.length === 0 ? null : (
+          <Button size="sm" variant="ghost" onClick={() => setCategories([])}>
+            {t('clearCategories')}
+          </Button>
+        )}
+      </div>
+
+      {stoppableIds.length === 0 ? null : (
+        <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
+          <input
+            type="checkbox"
+            aria-label={t('selectAllStoppable')}
+            checked={ListSelectionModel.isComplete({ state: selection, orderedIds: stoppableIds })}
+            onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds: stoppableIds }))}
+            className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
+          />
+          <span className="dshx:text-muted-foreground">{t('selectAllStoppable')}</span>
+        </div>
+      )}
+
+      {board.isPending ? (
+        <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
+          <Spinner aria-hidden /> {t('loading')}
+        </p>
+      ) : null}
+      {board.isError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage(board.error, t('loadFailed'))}</AlertDescription>
+        </Alert>
+      ) : null}
+      {board.isSuccess && rows.length === 0 ? <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">{t('noJobs')}</EmptyState> : null}
+      {value !== undefined && value.hasMore ? (
+        <p className="dshx:text-xs dshx:text-muted-foreground">
+          {value.total - rows.length} {t('moreMatched')}
+        </p>
+      ) : null}
+
+      <div className="dshx:flex dshx:flex-col dshx:gap-4">
+        {groups.map(section => (
+          <PageSection
+            key={section.key}
+            heading={section.label}
+            meta={section.rows.length}
+            actions={
+              group === 'session' && section.key.startsWith('session-') ? (
+                <TooltipProvider delayDuration={500}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={sessionTarget(props.sessions, section.key) === undefined}
+                        onClick={() => {
+                          const target = sessionTarget(props.sessions, section.key)
+                          if (target !== undefined) props.uiWorkspace.openSession(target)
+                        }}
+                      >
+                        {t('openSession')}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{sessionTarget(props.sessions, section.key) === undefined ? t('sessionUnavailable') : t('openSession')}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : null
+            }
+          >
+            <EntityList>
+              {section.rows.map(row => (
+                <JobLine
+                  key={row.id}
+                  row={row}
+                  now={now}
+                  t={t}
+                  armed={armed === row.id}
+                  stopping={stopping === row.id && stop.isPending}
+                  selected={selectedJobIds.has(row.id)}
+                  onToggleSelection={toggleJobSelection}
+                  onRangeSelection={extendJobSelection}
+                  sessionLabel={labelOf}
+                  onArm={target => setArmed(target.id)}
+                  onStop={target => {
+                    setStopping(target.id)
+                    setStopError(null)
+                    stop.mutate(target)
+                  }}
+                />
+              ))}
+            </EntityList>
+          </PageSection>
+        ))}
+      </div>
+
+      {selection.ids.length === 0 ? null : (
+        <div className="dshx:sticky dshx:bottom-2 dshx:z-30 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-2 dshx:pl-3 dshx:text-[13px] dshx:shadow-lg">
+          <span className="dshx:mr-2 dshx:tabular-nums">{t('selectedCount', { count: selection.ids.length })}</span>
+          <Button size="sm" variant="destructive" onClick={() => setConfirmingStop(true)}>
+            {t('stopSelected')}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={clearSelection}>
+            {t('clearSelection')}
+          </Button>
+        </div>
+      )}
+
+      <AlertDialog
+        open={confirmingStop}
+        onOpenChange={open => {
+          if (!open && !batchStopping) setConfirmingStop(false)
+        }}
+      >
+        <AlertDialogContent className="dshx-root" size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="dshx:text-sm">{t('stopSelectedTitle', { count: selection.ids.length })}</AlertDialogTitle>
+            <AlertDialogDescription>{t('stopSelectedDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={batchStopping}>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={batchStopping || selection.ids.length === 0}
+              onClick={event => {
+                event.preventDefault()
+                void stopSelected()
+              }}
+            >
+              {batchStopping ? t('stopping') : t('stopSelectedConfirm', { count: selection.ids.length })}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Page>
   )
 }
 

@@ -6,7 +6,7 @@
       "id": "jobs-board",
       "title": "Cross-Session background jobs board",
       "summary": "One page lists every background job of every Session: running jobs projected live from the job registry, finished or interrupted ones from the session logs, classified into deterministic categories derived from the job kind and label.",
-      "reach": ["click button \"Background Jobs: Jobs\"", "expect text \"Every background job across Sessions*\""],
+      "reach": ["click button \"Background Jobs: Jobs\"", "expect text \"Every background job across threads*\""],
       "surfaces": ["host", "tool", "storage", "client"],
       "surface": "destinationSection",
       "destination": "observe",

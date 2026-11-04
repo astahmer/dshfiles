@@ -78,7 +78,8 @@ Then('the board shows that job with its label clamped to the bound', async ({ pa
   await recordAssertion(page, 'background-jobs-clamps-an-oversized-live-label', async () => {
     const row = page.locator('[data-job-id]').filter({ hasText: 'oversized-label' }).first()
     await expect(row).toBeVisible({ timeout: 45_000 })
-    const label = await row.locator('code').getAttribute('title')
+    // The full label is the row's code text; hover help is a kit Tooltip, not a native title.
+    const label = await row.locator('code').textContent()
     expect(label?.startsWith('sleep 120;')).toBe(true)
     expect((label ?? '').length).toBeLessThanOrEqual(WIRE_BOUND)
     await expect(page.getByRole('alert').filter({ hasText: 'API schema validation failed' })).toHaveCount(0)
