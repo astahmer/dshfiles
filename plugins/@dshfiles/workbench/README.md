@@ -102,7 +102,7 @@ The same controls remain reachable at 360, 480, 768 and 1024 pixels, including w
 - `register({ id, title, component, dockDefault? })` on the page-global registry
   (`@dshfiles/workbench/registry`), from any plugin.
 - Main-page tab titles drop the `Plugin: ` prefix of their navigation label. A plugin that knows a better name adds a
-  `PanelTitles` entry (`{ panelId, title }`, a dshx registry in `@dshfiles/workbench/registry`); `@dshfiles/main-tabs`
+  `PanelTitles` entry (`{ panelId, title }`, a dshx registry in `@dshfiles/workbench/panel-titles`); `@dshfiles/main-tabs`
   provides the shell's destination section labels this way.
 - `dockDefault` remains readable for existing contributor/layout compatibility. Fresh right and bottom panes start with a **New tab** chooser; a saved layout still wins.
 - Layouts persist per surface in `localStorage`: `dshfiles.workbench.layout.v1` (main),

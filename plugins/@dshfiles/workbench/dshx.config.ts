@@ -6,6 +6,7 @@ export default defineConfig({
   name: '@dshfiles/workbench',
   modules: {
     registry: 'src/registry.ts',
+    'panel-titles': 'src/panel-titles.ts',
     tabs: 'src/tabs.ts',
     'close-button-position': 'src/close-button-position.ts',
     'conversation-header': 'src/conversation-header.ts',
