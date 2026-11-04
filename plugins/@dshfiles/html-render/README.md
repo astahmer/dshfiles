@@ -95,6 +95,14 @@ Residual risk: a script or a clicked link can still navigate its own frame to an
 which could carry data the page itself holds. The page never holds DSH data, so this leaks at most what the agent put in
 it.
 
+## Question previews
+
+The question form ([`@dshfiles/user-questions`](../user-questions)) declares a `QuestionHtmlPreview` registry for the
+` ```html preview ` fences an `ask_user_question` question may carry; this plugin provides it, so those previews
+render in the same sandboxed card described under Isolation, 220 px tall to leave room for the options, and with the
+same 512 KB cap (a larger preview is refused in place with a recovery path). The dependency points from here to the
+form; without this plugin the form shows the fence as code.
+
 ## Verify
 
 ```sh

@@ -2,6 +2,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import { PinnedToolCalls } from '@dshfiles/chat/pinned-tool-calls'
+import { QuestionHtmlPreview } from '@dshfiles/user-questions/html-preview'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import { useMemo } from 'react'
@@ -9,6 +10,7 @@ import * as Schema from 'effect/Schema'
 import { HtmlPageCard, HtmlPageFailed, HtmlPagePending } from './html-page-card.js'
 import type { HtmlPage } from './html-page.js'
 import { HTML_PREVIEW_TOOL, HTML_RENDER_TOOL, HtmlPageModel, htmlPageSchema } from './html-page.js'
+import { QuestionHtmlPreviewCard } from './question-preview.js'
 
 const REGISTRANT = '@dshfiles/html-render'
 const titleArgs = Schema.Struct({ title: Schema.optional(Schema.String), path: Schema.optional(Schema.String) })
@@ -53,8 +55,8 @@ const HtmlRenderToolView = (props: ToolCallViewProps): JSX.Element => {
   }, [argsRaw])
   const page = settledPage(props)
   if (page !== undefined) return <HtmlPageCard page={page} />
-  if (props.phase === 'result') return <HtmlPageFailed reason={errorText(props)} title={title} />
-  return <HtmlPagePending title={title} />
+  if (props.phase === 'result') return <HtmlPageFailed reason={errorText(props)} pageTitle={title} />
+  return <HtmlPagePending pageTitle={title} />
 }
 
 export default defineClientPlugin({
@@ -65,5 +67,7 @@ export default defineClientPlugin({
       api.ui.register({ name: 'tool.call.toolview', key: toolName, registrant: REGISTRANT, locale: 'conversation' }, HtmlRenderToolView)
       api.add(PinnedToolCalls, { toolName })
     }
+    // The question form's ```html preview blocks render in the same sandboxed card.
+    api.add(QuestionHtmlPreview, { Component: QuestionHtmlPreviewCard })
   },
 })

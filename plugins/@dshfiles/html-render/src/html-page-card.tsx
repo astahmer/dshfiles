@@ -126,19 +126,21 @@ export const HtmlPageCard = (props: { readonly page: HtmlPage }): JSX.Element =>
 }
 
 /** The call before its page settles: still streaming arguments or running. */
-export const HtmlPagePending = (props: { readonly title: string | undefined }): JSX.Element => (
+export const HtmlPagePending = (props: { readonly pageTitle: string | undefined }): JSX.Element => (
   <div className="dshx-root dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:py-1 dshx:text-sm dshx:text-muted-foreground" data-html-render-pending="">
     <LoaderCircleIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:animate-spin" />
-    <span className="dshx:min-w-0 dshx:truncate">{props.title === undefined ? 'Rendering HTML page…' : `Rendering ${props.title}…`}</span>
+    <span className="dshx:min-w-0 dshx:truncate">{props.pageTitle === undefined ? 'Rendering HTML page…' : `Rendering ${props.pageTitle}…`}</span>
   </div>
 )
 
 /** A refused call: the tool's own error, which already names the fix (size, empty field). */
-export const HtmlPageFailed = (props: { readonly title: string | undefined; readonly reason: string }): JSX.Element => (
+export const HtmlPageFailed = (props: { readonly pageTitle: string | undefined; readonly reason: string }): JSX.Element => (
   <div className="dshx-root dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-2 dshx:py-1 dshx:text-sm" data-html-render-failed="" role="alert">
     <TriangleAlertIcon aria-hidden className="dshx:mt-0.5 dshx:size-3.5 dshx:shrink-0 dshx:text-destructive" />
     <span className="dshx:min-w-0">
-      <span className="dshx:font-medium dshx:text-foreground">{props.title === undefined ? 'HTML page not published' : `${props.title} not published`}</span>
+      <span className="dshx:font-medium dshx:text-foreground">
+        {props.pageTitle === undefined ? 'HTML page not published' : `${props.pageTitle} not published`}
+      </span>
       <span className="dshx:block dshx:text-muted-foreground">{props.reason}</span>
     </span>
   </div>
