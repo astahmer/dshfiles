@@ -1,5 +1,4 @@
 import Schema from '@deepseek-ai/schemastery'
-import * as EffectSchema from 'effect/Schema'
 import { defineSettings } from '@dshfiles/dshx/settings'
 import {
   ATTENTION_COLOR_OPTIONS,
@@ -10,10 +9,37 @@ import {
   THREAD_ROW_ACTIONS,
 } from './organization.js'
 import { THREAD_DELAYS } from './thread-delays.js'
-import { THREAD_NOTIFICATION_PLACEMENTS, threadNotificationCategoriesSchema } from './thread-notifications.js'
+import {
+  DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
+  THREAD_NOTIFICATION_CATEGORIES,
+  THREAD_NOTIFICATION_PLACEMENTS,
+  type ThreadNotificationCategoryPreferences,
+} from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS } from './thread-view-preferences.js'
 
 const ids = (): Schema<string[]> => Schema.array(Schema.string()).default([]).hidden()
+
+/**
+ * Plain Schemastery only: the Host serializes this schema (`toJSON`) and every
+ * browser rebuilds and runs it before it marks the namespace ready. A
+ * `Schema.transform` closure does not survive that trip (its imports are gone
+ * in the browser), so validation threw, the namespace never became ready, and
+ * every sidebar preference fell back to per-browser storage.
+ */
+const notificationCategory = (fallback: ThreadNotificationCategoryPreferences): Schema<ThreadNotificationCategoryPreferences> =>
+  Schema.object({
+    delivery: Schema.union(['off', 'in-app', 'system', 'both'] as const).default(fallback.delivery),
+    sound: Schema.boolean().default(fallback.sound),
+    soundPreset: Schema.union(['soft', 'chime', 'bright', 'low'] as const).default(fallback.soundPreset),
+    volume: Schema.number().min(0).max(1).default(fallback.volume),
+  }).default({ ...fallback })
+
+const notificationCategories = Schema.object(
+  // SAFETY: the entries map every THREAD_NOTIFICATION_CATEGORIES member exactly once, which is the asserted key set.
+  Object.fromEntries(THREAD_NOTIFICATION_CATEGORIES.map(category => [category, notificationCategory(DEFAULT_THREAD_NOTIFICATION_CATEGORIES[category])])) as {
+    [Category in (typeof THREAD_NOTIFICATION_CATEGORIES)[number]]: Schema<ThreadNotificationCategoryPreferences>
+  },
+)
 
 /** Schemastery validates mutable arrays, so the saved-view default is cloned field by field. */
 const threadViewsDefault = {
@@ -85,9 +111,7 @@ export const threadSidebarSettings = defineSettings({
       .default(DEFAULT_PREFERENCES.includeSubagentAttention)
       .description('Include child session attention in groups, thread-row labels, and desktop alerts.'),
     desktopNotificationsEnabled: Schema.boolean().default(DEFAULT_PREFERENCES.desktopNotificationsEnabled).hidden(),
-    notificationCategories: Schema.transform(Schema.any(), value => EffectSchema.decodeUnknownSync(threadNotificationCategoriesSchema)(value))
-      .default(DEFAULT_PREFERENCES.notificationCategories)
-      .hidden(),
+    notificationCategories: notificationCategories.hidden(),
     notificationPlacement: Schema.union(THREAD_NOTIFICATION_PLACEMENTS).default(DEFAULT_PREFERENCES.notificationPlacement).hidden(),
     notificationDurationSeconds: Schema.natural().max(60).default(DEFAULT_PREFERENCES.notificationDurationSeconds).hidden(),
     resumeAfterRestart: Schema.boolean()
