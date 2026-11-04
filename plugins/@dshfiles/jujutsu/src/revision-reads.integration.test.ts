@@ -3,11 +3,11 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Effect } from 'effect'
+import { Clock, Effect } from 'effect'
 import { onTestFinished, test } from 'vitest'
 import { JujutsuCommandFailed } from './errors.ts'
 import type { JjRun } from './jujutsu-commands.ts'
-import { makeEditTimeCache, RevisionReads } from './revision-reads.ts'
+import { makeEditTimeCache, makeRevisionDetailCache, RevisionReads } from './revision-reads.ts'
 
 const jjAt =
   (cwd: string, home: string) =>
@@ -38,6 +38,16 @@ const scratchRepo = async (): Promise<{ readonly repo: string; readonly jj: (arg
     Effect.try({ try: () => ({ stdout: jj(args), truncated: false }), catch: cause => new JujutsuCommandFailed({ exitCode: 1, cause }) })
   return { repo, jj, run }
 }
+
+const clockAt = (millis: number): Clock.Clock => ({
+  currentTimeMillisUnsafe: () => millis,
+  currentTimeMillis: Effect.succeed(millis),
+  currentTimeNanosUnsafe: () => BigInt(millis) * 1_000_000n,
+  currentTimeNanos: Effect.succeed(BigInt(millis) * 1_000_000n),
+  monotonicTimeNanosUnsafe: () => BigInt(millis) * 1_000_000n,
+  monotonicTimeNanos: Effect.succeed(BigInt(millis) * 1_000_000n),
+  sleep: () => Effect.void,
+})
 
 const workingCopyCommitId = (jj: (argv: readonly string[]) => string): string =>
   jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@', '--template', 'commit_id']).trim()
@@ -218,4 +228,87 @@ test('edit times read in one batch keep divergent copies of one change apart', {
   )
   assert.deepEqual(batched, separate)
   assert.notEqual(batched[0]?.editedAt, batched[1]?.editedAt)
+})
+
+test('details reuse a commit’s immutable content from the cache but reread evolution once it is stale', async () => {
+  const { repo, jj, run } = await scratchRepo()
+  await writeFile(join(repo, 'cached.txt'), 'one\n')
+  jj(['status'])
+  const commitId = workingCopyCommitId(jj)
+  const verbs: string[] = []
+  const counted: JjRun = (args, options) => {
+    verbs.push(args.find(arg => !arg.startsWith('-')) ?? '')
+    return run(args, options)
+  }
+  const cache = makeRevisionDetailCache()
+
+  const first = await Effect.runPromise(RevisionReads.details(counted, commitId, { cache, cacheKey: 'repo' }))
+  assert.deepEqual([...verbs].sort(), ['diff', 'diff', 'evolog', 'log', 'log'])
+  verbs.length = 0
+  const second = await Effect.runPromise(RevisionReads.details(counted, commitId, { cache, cacheKey: 'repo' }))
+  assert.deepEqual(verbs, ['log'], 'only the visibility check runs while content and evolution are cached')
+  assert.deepEqual(second, first)
+  assert.equal(cache.stats().entries, 1)
+
+  verbs.length = 0
+  const later = await Effect.runPromise(
+    RevisionReads.details(counted, commitId, { cache, cacheKey: 'repo' }).pipe(Effect.provideService(Clock.Clock, clockAt(Date.now() + 6_000))),
+  )
+  assert.deepEqual(verbs.sort(), ['evolog', 'log'], 'evolution can gain successors, so it is reread after its freshness window')
+  assert.deepEqual(later.files, first.files)
+
+  verbs.length = 0
+  await Effect.runPromise(RevisionReads.details(counted, commitId, { cache, cacheKey: 'other repository' }))
+  assert.ok(verbs.includes('diff'), 'another repository identity never answers from this one')
+})
+
+test('a failed detail read leaves nothing cached', async () => {
+  const { repo, jj, run } = await scratchRepo()
+  await writeFile(join(repo, 'flaky.txt'), 'one\n')
+  jj(['status'])
+  const commitId = workingCopyCommitId(jj)
+  const failing: JjRun = (args, options) =>
+    args.includes('diff') && args.includes('--git') ? Effect.fail(new JujutsuCommandFailed({ exitCode: 1 })) : run(args, options)
+  const cache = makeRevisionDetailCache()
+
+  await Effect.runPromise(Effect.flip(RevisionReads.details(failing, commitId, { cache, cacheKey: 'repo' })))
+  assert.equal(cache.stats().entries, 0)
+  const recovered = await Effect.runPromise(RevisionReads.details(run, commitId, { cache, cacheKey: 'repo' }))
+  assert.deepEqual(
+    recovered.files.map(file => file.path),
+    ['flaky.txt'],
+  )
+})
+
+test('the detail cache evicts the least recently used content past its byte budget', () => {
+  const content = (size: number) => ({ files: [], additions: 0, deletions: 0, patch: 'x'.repeat(size), truncated: false })
+  const cache = makeRevisionDetailCache({ bytes: 8_000, entries: 10 })
+  for (const key of ['a', 'b', 'c']) cache.rememberContent(key, content(900))
+  assert.ok(cache.content('a') !== undefined)
+  cache.rememberContent('d', content(900))
+  cache.rememberContent('e', content(900))
+  assert.equal(cache.content('b'), undefined, 'b was the least recently used once a was read again')
+  assert.ok(['a', 'c', 'd', 'e'].every(key => cache.content(key) !== undefined))
+  assert.ok(cache.stats().bytes <= 8_000)
+  cache.rememberContent('huge', content(1_200))
+  assert.equal(cache.content('huge'), undefined, 'one patch never takes over a quarter of the budget')
+})
+
+test('details read content and evolution concurrently after validation', async () => {
+  const { repo, jj, run } = await scratchRepo()
+  await writeFile(join(repo, 'parallel.txt'), 'one\n')
+  jj(['status'])
+  const commitId = workingCopyCommitId(jj)
+  let running = 0
+  let peak = 0
+  const slow: JjRun = (args, options) =>
+    Effect.gen(function* () {
+      running += 1
+      peak = Math.max(peak, running)
+      yield* Effect.sleep('20 millis')
+      return yield* run(args, options)
+    }).pipe(Effect.ensuring(Effect.sync(() => (running -= 1))))
+
+  await Effect.runPromise(RevisionReads.details(slow, commitId))
+  assert.equal(peak, 4, 'paths, patch, file stats and evolution run together, never more')
 })

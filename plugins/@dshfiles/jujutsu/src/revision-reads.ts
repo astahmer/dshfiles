@@ -1,4 +1,4 @@
-import { Effect, Option, Schema } from 'effect'
+import { Clock, Effect, Option, Schema } from 'effect'
 import type { FileStat, RevisionDetails } from './api.js'
 import { JujutsuMutationModel, JujutsuOutputModel } from './core.js'
 import { OutputLimitExceeded, RevisionNotFound } from './errors.js'
@@ -109,29 +109,137 @@ const resolveCommitId = Effect.fnUntraced(function* (run: JjRun, reference: stri
   return yield* new RevisionNotFound({ reason: 'multiple', reference, candidates: ids.map(id => id.slice(0, 12)) })
 })
 
-const details = Effect.fnUntraced(function* (run: JjRun, reference: string) {
-  const commitId = yield* resolveCommitId(run, reference)
-  yield* run([ignoreWorkingCopy, 'log', '--no-graph', '--revisions', commitId, '--limit', '1', '--template', 'commit_id'], { outputLimit: 1_000 }).pipe(
-    Effect.catchTag('JujutsuCommandFailed', cause => Effect.fail(new RevisionNotFound({ reason: 'unavailable', reference: commitId, candidates: [], cause }))),
+/** The part of a revision's details that a commit id fixes for good: its files, stats and patch against its parents. */
+type RevisionContent = Omit<RevisionDetails, 'evolution'>
+
+const DETAIL_CACHE_BYTES = 24 * 1024 * 1024
+const DETAIL_CACHE_ENTRIES = 64
+/** Evolution gains entries when an operation rewrites the revision, so it is only reused briefly (simultaneous selections). */
+const EVOLUTION_FRESHNESS_MS = 5_000
+const EVOLUTION_CACHE_ENTRIES = 64
+/** Content reads after validation: paths, patch, file stats and evolution; four jj processes at most per detail. */
+const DETAIL_READ_CONCURRENCY = 4
+
+const contentBytes = (content: RevisionContent): number =>
+  content.patch.length * 2 + content.files.reduce((sum, file) => sum + file.path.length * 2 + 96, 0) + 128
+
+/**
+ * Byte-capped LRU of immutable revision content, keyed by repository identity and commit id, plus a short-lived
+ * evolution entry per commit. Only complete successes are stored; a failed read leaves nothing behind.
+ */
+export interface RevisionDetailCache {
+  readonly content: (key: string) => RevisionContent | undefined
+  readonly rememberContent: (key: string, content: RevisionContent) => void
+  readonly evolution: (key: string, now: number) => string | undefined
+  readonly rememberEvolution: (key: string, evolution: string, now: number) => void
+  readonly stats: () => { readonly entries: number; readonly bytes: number }
+}
+
+export const makeRevisionDetailCache = (limits: { readonly bytes?: number; readonly entries?: number } = {}): RevisionDetailCache => {
+  const maxBytes = limits.bytes ?? DETAIL_CACHE_BYTES
+  const maxEntries = limits.entries ?? DETAIL_CACHE_ENTRIES
+  const contents = new Map<string, { readonly content: RevisionContent; readonly bytes: number }>()
+  const evolutions = new Map<string, { readonly text: string; readonly at: number }>()
+  let bytes = 0
+  const evict = () => {
+    while (contents.size > maxEntries || bytes > maxBytes) {
+      const oldest = contents.keys().next()
+      if (oldest.done === true) return
+      bytes -= contents.get(oldest.value)?.bytes ?? 0
+      contents.delete(oldest.value)
+    }
+  }
+  return {
+    content: key => {
+      const entry = contents.get(key)
+      if (entry === undefined) return undefined
+      contents.delete(key)
+      contents.set(key, entry)
+      return entry.content
+    },
+    rememberContent: (key, content) => {
+      const size = contentBytes(content)
+      if (size > maxBytes / 4) return
+      bytes -= contents.get(key)?.bytes ?? 0
+      contents.delete(key)
+      contents.set(key, { content, bytes: size })
+      bytes += size
+      evict()
+    },
+    evolution: (key, now) => {
+      const entry = evolutions.get(key)
+      if (entry === undefined) return undefined
+      if (now - entry.at > EVOLUTION_FRESHNESS_MS) {
+        evolutions.delete(key)
+        return undefined
+      }
+      return entry.text
+    },
+    rememberEvolution: (key, text, now) => {
+      evolutions.delete(key)
+      evolutions.set(key, { text, at: now })
+      if (evolutions.size > EVOLUTION_CACHE_ENTRIES) evolutions.delete(evolutions.keys().next().value ?? '')
+    },
+    stats: () => ({ entries: contents.size, bytes }),
+  }
+}
+
+const readContent = Effect.fnUntraced(function* (run: JjRun, commitId: string) {
+  const [changedPaths, patch, stats] = yield* Effect.all(
+    [paths(run, commitId), run([ignoreWorkingCopy, 'diff', '--revisions', commitId, '--git']), fileStats(run, [commitId])],
+    { concurrency: DETAIL_READ_CONCURRENCY },
   )
-  const changedPaths = yield* paths(run, commitId)
-  const patch = yield* run([ignoreWorkingCopy, 'diff', '--revisions', commitId, '--git'])
-  const evolution = yield* run([ignoreWorkingCopy, 'evolog', '--no-graph', '--revisions', commitId, '--limit', '30'], { outputLimit: 118_000 })
-  const stats = yield* fileStats(run, [commitId])
   const statByPath = new Map(stats.revisions[0]?.files.map(file => [file.path, file]) ?? [])
   const files = JujutsuOutputModel.parsePatchStats(patch.stdout, changedPaths, patch.truncated).map(file => ({
     ...file,
     status: statByPath.get(file.path)?.status ?? JujutsuOutputModel.fileStatusLetter('modified'),
     conflict: statByPath.get(file.path)?.conflict ?? false,
   }))
-  const revisionDetails: RevisionDetails = {
+  const content: RevisionContent = {
     files,
     additions: files.reduce((sum, file) => sum + file.additions, 0),
     deletions: files.reduce((sum, file) => sum + file.deletions, 0),
     patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
     truncated: patch.truncated,
-    evolution: evolution.truncated ? evolution.stdout + '\n[evolution output truncated]' : evolution.stdout,
   }
+  return content
+})
+
+const readEvolution = Effect.fnUntraced(function* (run: JjRun, commitId: string) {
+  const evolution = yield* run([ignoreWorkingCopy, 'evolog', '--no-graph', '--revisions', commitId, '--limit', '30'], { outputLimit: 118_000 })
+  return evolution.truncated ? evolution.stdout + '\n[evolution output truncated]' : evolution.stdout
+})
+
+/**
+ * One revision's details. After the commit is proven visible, its content (paths, patch, file stats) and evolution
+ * are read concurrently, so the critical path is the slowest read instead of their sum. Content is immutable for a
+ * commit id and may come from `cache`; evolution can gain successors and is reused only for a few seconds.
+ */
+const details = Effect.fnUntraced(function* (
+  run: JjRun,
+  reference: string,
+  options: { readonly cache?: RevisionDetailCache | undefined; readonly cacheKey?: string | undefined } = {},
+) {
+  const commitId = yield* resolveCommitId(run, reference)
+  yield* run([ignoreWorkingCopy, 'log', '--no-graph', '--revisions', commitId, '--limit', '1', '--template', 'commit_id'], { outputLimit: 1_000 }).pipe(
+    Effect.catchTag('JujutsuCommandFailed', cause => Effect.fail(new RevisionNotFound({ reason: 'unavailable', reference: commitId, candidates: [], cause }))),
+  )
+  const key = options.cacheKey === undefined ? undefined : options.cacheKey + '\0' + commitId
+  const now = yield* Clock.currentTimeMillis
+  const cachedContent = key === undefined ? undefined : options.cache?.content(key)
+  const cachedEvolution = key === undefined ? undefined : options.cache?.evolution(key, now)
+  const [content, evolution] = yield* Effect.all(
+    [
+      cachedContent === undefined ? readContent(run, commitId) : Effect.succeed(cachedContent),
+      cachedEvolution === undefined ? readEvolution(run, commitId) : Effect.succeed(cachedEvolution),
+    ],
+    { concurrency: 2 },
+  )
+  if (key !== undefined && options.cache !== undefined) {
+    if (cachedContent === undefined) options.cache.rememberContent(key, content)
+    if (cachedEvolution === undefined) options.cache.rememberEvolution(key, evolution, yield* Clock.currentTimeMillis)
+  }
+  const revisionDetails: RevisionDetails = { ...content, evolution }
   return revisionDetails
 })
 

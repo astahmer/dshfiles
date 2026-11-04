@@ -10,7 +10,7 @@ import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-
 import { ReferenceGraphModel } from './reference-graph.js'
 import { Repositories } from './repositories.js'
 import { RepositoryIdentity, type RegisteredRepo } from './repository-identity.js'
-import { makeEditTimeCache, RevisionReads } from './revision-reads.js'
+import { makeEditTimeCache, makeRevisionDetailCache, RevisionReads } from './revision-reads.js'
 
 const MAX_WORKSPACE_HEAD_CANDIDATES = 32
 const EVOLUTION_LIMIT = 100
@@ -42,6 +42,7 @@ const make = Effect.gen(function* () {
   const repositories = yield* Repositories
   const identity = yield* RepositoryIdentity
   const editTimeCache = makeEditTimeCache()
+  const detailCache = makeRevisionDetailCache()
 
   const revisionsByIds = Effect.fnUntraced(function* (repo: RegisteredRepo, commitIds: readonly string[]) {
     const result = yield* repositories.run(repo)([
@@ -268,7 +269,9 @@ const make = Effect.gen(function* () {
   })
 
   const details = Effect.fn('jujutsu revision details')(function* (input: { readonly repoId: string; readonly commitId: string }) {
-    return yield* RevisionReads.details(repositories.run(yield* repositories.resolve(input.repoId)), input.commitId)
+    const repo = yield* repositories.resolve(input.repoId)
+    // A replaced repository at the same path has another identity, so its commits never answer from this one's cache.
+    return yield* RevisionReads.details(repositories.run(repo), input.commitId, { cache: detailCache, cacheKey: repo.identity + '\0' + repo.root })
   })
 
   const fileStats = Effect.fn('jujutsu revision files')(function* (input: { readonly repoId: string; readonly commitIds: readonly string[] }) {

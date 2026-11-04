@@ -90,7 +90,9 @@ export class Repositories extends Context.Service<
         if (Option.isNone(registered)) return yield* new RepositoryNotFound({ repoId })
         const repo = registered.value
         yield* identity.verify(repo)
-        const confirmation = yield* run(repo)(['root'], { outputLimit: ROOT_OUTPUT_LIMIT })
+        // A view read: answered again from the same operation head without a jj process; the identity checks around
+        // it (before, and in the runner before and after) still prove the directory is the registered one.
+        const confirmation = yield* run(repo)(['--ignore-working-copy', 'root'], { outputLimit: ROOT_OUTPUT_LIMIT })
         const reportedRoot = confirmation.stdout.trim()
         const mismatch = new RepositoryMoved({ reason: 'root-mismatch' })
         if (confirmation.truncated || !path.isAbsolute(reportedRoot)) return yield* mismatch
