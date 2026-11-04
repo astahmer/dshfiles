@@ -11,8 +11,8 @@ Resume here: see the progress table in §11.
 | --- | --- | --- |
 | 0. Ground truth | done | Catalog `surface`/`destination`/`currentSurface` on all 339 features, checked by `features:check`; [migration map](migration-map.md) via `pnpm ade:migration-map`. [Baseline](baseline/README.md): 41 WebKit shots (desktop, 390×844 phone, 3 dark) with 30 defects. Usage data records agent tools only, not navigation, so it cannot pick the rail: keep the seven destinations and add a client navigation counter in Phase 3. Follow-ups: journey 3 (question card) did not render in scratch (reach drift?); scratch `dev up` in a fresh workspace needs a plugin build first and `DSHX_DSH_EXECUTABLE` |
 | 1. Language and kit | in progress | 1a done: page kit in plugin-ui (`Page`, `PageSection`, `EmptyState`, `StatusGlyph`, `EntityRow`), [DESIGN.md](../../DESIGN.md), `node --run check:copy` ratchet (286 hits), Activity/Jobs/MCP migrated. 1b running in three batches (observe, agents, land plugins). Follow-up: verification-evidence e2e fails at a native-sidebar step after its Activity checks (not yet re-run on main) |
-| 2. One inbox | in progress | 2a attention contract + store in activity-timeline, Inbox UI, 2 providers (`ade-inbox`); 2b other providers pending |
-| 3. Shell and navigation | not started | |
+| 2. One inbox | in progress | 2a done: `@dshfiles/activity-timeline/attention-api` contract + Host store (dedupe, resolve, snooze until time/change, done/reopen, mute), `attention_*` agent tools, Inbox page with the only Needs-you badge, providers agent-questions (child→parent questions answerable in place) and thread-sidebar (finished/failed turns). 2b open: native question forms, jj conflicts, quota continuations, traces alerts, backlog, hmr-gate providers; unify thread-sidebar unread dot with the inbox; ⌥J; Host web push. Browser journey for agent-question items unproven in scratch (core tool scheduler error), proven Host-level |
+| 3. Shell and navigation | in progress | 3a rail, destinations, nav counter, phone tab bar, moved-to map (`ade-shell`) |
 | 4. Thread loop | not started | |
 | 5. Observe and configure | not started | |
 | 6. Phone | not started | |
