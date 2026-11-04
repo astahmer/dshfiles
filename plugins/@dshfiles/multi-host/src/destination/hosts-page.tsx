@@ -5,6 +5,10 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
+import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
+import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -16,15 +20,14 @@ import {
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
-  ServerIcon,
   Trash2Icon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { multiHostApi, type HostSummary, type ResourcePoolEntry, type RuntimeSummary } from '../api.js'
 import { remoteDirectoryPicker } from './remote-folders.js'
-import { HostDialog, hostState, StatusDot, type HostDraft } from './hosts-dialog.js'
+import { HostDialog, hostState, type HostDraft } from './hosts-dialog.js'
 import { moveHostId, shiftHostId } from './host-order.js'
 import { CloneProjectDialog } from './clone-project-dialog.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
@@ -78,6 +81,35 @@ const ResourceUsage = (props: { readonly hostName: string; readonly resource: Re
   )
 }
 
+/** An icon-only row control with a kit tooltip instead of a native `title`. */
+const IconAction = (props: {
+  readonly label: string
+  readonly hint: string
+  readonly onClick: () => void
+  readonly disabled?: boolean
+  readonly destructive?: boolean
+  readonly children: ReactNode
+}) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <Button
+        size="icon"
+        variant={props.destructive === true ? 'destructive' : 'ghost'}
+        className="dshx:size-7"
+        aria-label={props.label}
+        disabled={props.disabled === true}
+        onClick={props.onClick}
+      >
+        {props.children}
+      </Button>
+    </TooltipTrigger>
+    <TooltipContent>{props.hint}</TooltipContent>
+  </Tooltip>
+)
+
+/** Hosts on the one status vocabulary: a healthy or idle host is quiet, only a failed one is coloured. */
+const hostWorkStatus = (tone: 'online' | 'idle' | 'error'): WorkStatus => (tone === 'error' ? 'failed' : 'idle')
+
 const HostRow = (props: {
   readonly api: MultiHostClient
   readonly host: HostSummary
@@ -105,7 +137,7 @@ const HostRow = (props: {
   const [popupBlocked, setPopupBlocked] = useState(false)
   const reconnect = useMutation({
     mutationFn: async () => {
-      if (runtime === undefined) throw new Error('This host has no runtime.')
+      if (runtime === undefined) throw new Error('This host has no runtime. Edit the host to set its remote DSH home, then reconnect.')
       const result = await api.runtimeReconnect({ runtimeId: runtime.id })
       if (!result.ok) throw failure(result)
     },
@@ -113,7 +145,7 @@ const HostRow = (props: {
   })
   const remoteView = useMutation({
     mutationFn: async ({ action, tab }: { readonly action: 'copy' | 'open'; readonly tab?: Window }) => {
-      if (runtime === undefined) throw new Error('This host has no runtime.')
+      if (runtime === undefined) throw new Error('This host has no runtime. Edit the host to set its remote DSH home, then reconnect.')
       if (action === 'open' && tab === undefined) throw new Error('Allow pop-ups to open the remote host.')
       const view = await api.runtimeOpenView({ runtimeId: runtime.id })
       if (action === 'open') {
@@ -122,18 +154,34 @@ const HostRow = (props: {
         tab.location.href = view.launchUrl
         return 'opened'
       }
-      if (!(await writeClipboard(view.launchUrl))) throw new Error('Could not copy the remote host link.')
+      if (!(await writeClipboard(view.launchUrl))) throw new Error('Could not copy the remote host link. Use Open host instead.')
       return 'copied'
     },
     onError: (_error, variables) => variables.tab?.close(),
   })
+  const openHost = (): void => {
+    setPopupBlocked(false)
+    const tab = window.open('about:blank', '_blank')
+    if (tab === null) {
+      setPopupBlocked(true)
+      return
+    }
+    remoteView.mutate({ action: 'open', tab })
+  }
+  const target = (
+    <Badge variant="outline" className="dshx:shrink-0 dshx:font-mono dshx:text-[11px]">
+      {host.connector.kind === 'ssh' ? host.connector.sshTarget : 'this machine'}
+    </Badge>
+  )
   return (
-    <li
+    <EntityRow
+      role="listitem"
       data-testid={`host-row-${host.id}`}
+      status={hostWorkStatus(state.tone)}
+      statusDecorative
       className={cn(
-        'dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-start dshx:gap-2 dshx:rounded-lg dshx:border dshx:bg-background dshx:p-3',
         props.dragging && 'dshx:opacity-50',
-        props.dropTarget && 'dshx:border-primary dshx:ring-2 dshx:ring-primary/30',
+        props.dropTarget && 'dshx:ring-2 dshx:ring-ring/40 dshx:ring-inset',
         host.hidden && 'dshx:bg-muted/30',
       )}
       onDragOver={event => {
@@ -145,160 +193,153 @@ const HostRow = (props: {
         event.preventDefault()
         props.onDrop()
       }}
-    >
-      <button
-        type="button"
-        draggable
-        aria-label={`Reorder ${host.name}`}
-        title="Drag to reorder"
-        className="dshx:mt-0.5 dshx:flex dshx:size-6 dshx:shrink-0 dshx:cursor-grab dshx:items-center dshx:justify-center dshx:rounded dshx:border-0 dshx:bg-transparent dshx:text-muted-foreground dshx:hover:bg-accent active:dshx:cursor-grabbing"
-        onDragStart={event => {
-          event.dataTransfer.effectAllowed = 'move'
-          event.dataTransfer.setData('text/plain', host.id)
-          props.onDragStart()
-        }}
-        onDragEnd={props.onDragEnd}
-      >
-        <GripVerticalIcon className="dshx:size-4" />
-      </button>
-      <div className="dshx:flex dshx:min-w-0 dshx:basis-40 dshx:flex-1 dshx:flex-col dshx:gap-1">
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2">
-          <ServerIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
-          <span className={cn('dshx:min-w-0 dshx:truncate dshx:font-medium', host.hidden && 'dshx:text-muted-foreground')}>{host.name}</span>
-          <Badge variant="outline" className="dshx:shrink-0 dshx:font-mono dshx:text-[11px]">
-            {host.connector.kind === 'ssh' ? host.connector.sshTarget : 'this machine'}
-          </Badge>
+      leading={
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              draggable
+              aria-label={`Reorder ${host.name}`}
+              className="dshx:flex dshx:size-6 dshx:shrink-0 dshx:cursor-grab dshx:items-center dshx:justify-center dshx:rounded dshx:border-0 dshx:bg-transparent dshx:text-muted-foreground dshx:hover:bg-accent dshx:active:cursor-grabbing"
+              onDragStart={event => {
+                event.dataTransfer.effectAllowed = 'move'
+                event.dataTransfer.setData('text/plain', host.id)
+                props.onDragStart()
+              }}
+              onDragEnd={props.onDragEnd}
+            >
+              <GripVerticalIcon className="dshx:size-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Drag to reorder</TooltipContent>
+        </Tooltip>
+      }
+      heading={<span className={cn('dshx:font-medium', host.hidden && 'dshx:text-muted-foreground')}>{host.name}</span>}
+      meta={
+        <>
+          {runtime?.remoteHome === undefined ? (
+            target
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>{target}</TooltipTrigger>
+              <TooltipContent>Remote DSH home: {runtime.remoteHome}</TooltipContent>
+            </Tooltip>
+          )}
           {host.hidden ? (
             <Badge variant="secondary" className="dshx:shrink-0 dshx:text-[10px]">
               Hidden
             </Badge>
           ) : null}
-        </div>
-        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
-          <StatusDot tone={state.tone} />
-          <span className="dshx:min-w-0 dshx:truncate" title={state.label}>
-            {state.label}
-          </span>
-          {runtime?.remoteHome === undefined ? null : (
-            <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:@max-pane-compact:hidden">{runtime.remoteHome}</span>
-          )}
           {props.resource?.stale ? (
             <Badge variant="outline" className="dshx:shrink-0 dshx:text-[10px]">
               Stale
             </Badge>
           ) : null}
-        </div>
-        {props.resource === undefined ? null : <ResourceUsage hostName={host.name} resource={props.resource} />}
-        {reconnect.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(reconnect.error, 'Reconnect failed.')}</span> : null}
-        {remoteView.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(remoteView.error, 'Remote host link failed.')}</span> : null}
-        {popupBlocked ? <span className="dshx:text-xs dshx:text-destructive">Allow pop-ups to open the remote host.</span> : null}
-        {remoteView.data === 'copied' ? (
-          <span role="status" className="dshx:text-xs dshx:text-success">
-            Remote host link copied.
-          </span>
-        ) : null}
-      </div>
-      <div className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1 dshx:@max-pane-compact:ml-0 dshx:@max-pane-compact:basis-full">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="dshx:size-7"
-          aria-label={`Move ${host.name} up`}
-          title="Move up"
-          disabled={props.index === 0}
-          onClick={() => props.onMove('up')}
-        >
-          <ChevronUpIcon className="dshx:size-3.5" />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="dshx:size-7"
-          aria-label={`Move ${host.name} down`}
-          title="Move down"
-          disabled={props.index === props.count - 1}
-          onClick={() => props.onMove('down')}
-        >
-          <ChevronDownIcon className="dshx:size-3.5" />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="dshx:size-7"
-          aria-label={host.hidden ? `Show ${host.name}` : `Hide ${host.name}`}
-          title={host.hidden ? 'Show in the destination picker' : 'Hide from the destination picker; keeps its records'}
-          onClick={() => props.onHide(!host.hidden)}
-        >
-          {host.hidden ? <EyeOffIcon className="dshx:size-3.5" /> : <EyeIcon className="dshx:size-3.5" />}
-        </Button>
-        {host.connector.kind === 'ssh' ? (
-          <>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={runtime === undefined || remoteView.isPending}
-              onClick={() => {
-                setPopupBlocked(false)
-                const tab = window.open('about:blank', '_blank')
-                if (tab === null) {
-                  setPopupBlocked(true)
-                  return
-                }
-                remoteView.mutate({ action: 'open', tab })
-              }}
-            >
-              <ExternalLinkIcon className="dshx:size-3.5" />
-              Open host
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="dshx:size-7"
-              aria-label={`Copy ${host.name} link`}
-              title="Copy remote host link"
-              disabled={runtime === undefined || remoteView.isPending}
-              onClick={() => remoteView.mutate({ action: 'copy' })}
-            >
-              <CopyIcon className="dshx:size-3.5" />
-            </Button>
-            <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onAddProject}>
-              <PlusIcon className="dshx:size-3.5" />
-              Add folder
-            </Button>
-            <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onCloneProject}>
-              <PlusIcon className="dshx:size-3.5" />
-              Clone project
-            </Button>
-          </>
-        ) : null}
-        <Button
-          size="icon"
-          variant="ghost"
-          className="dshx:size-7"
-          aria-label={`Reconnect ${host.name}`}
-          title="Reconnect"
-          disabled={runtime === undefined || reconnect.isPending}
-          onClick={() => reconnect.mutate()}
-        >
-          {reconnect.isPending ? <Spinner className="dshx:size-3.5" /> : <RefreshCwIcon className="dshx:size-3.5" />}
-        </Button>
-        {host.connector.kind === 'ssh' ? (
-          <Button size="icon" variant="ghost" className="dshx:size-7" aria-label={`Edit ${host.name}`} title="Edit" onClick={props.onEdit}>
-            <PencilIcon className="dshx:size-3.5" />
-          </Button>
-        ) : null}
-        <Button
-          size="icon"
-          variant={confirming ? 'destructive' : 'ghost'}
-          className="dshx:size-7"
-          aria-label={confirming ? `Confirm remove ${host.name}` : `Remove ${host.name}`}
-          title={confirming ? 'Click again to remove; remote data stays' : 'Remove'}
-          onClick={() => (confirming ? props.onRemove() : setConfirming(true))}
-        >
-          <Trash2Icon className="dshx:size-3.5" />
-        </Button>
-      </div>
-    </li>
+        </>
+      }
+      description={
+        <>
+          <span className="dshx:min-w-0 dshx:truncate">{state.label}</span>
+          {props.resource === undefined ? null : <ResourceUsage hostName={host.name} resource={props.resource} />}
+          {reconnect.isError ? (
+            <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-destructive">
+              {errorMessage(reconnect.error, 'Reconnect failed.')}
+              <Button size="xs" variant="outline" onClick={() => reconnect.mutate()} disabled={reconnect.isPending}>
+                Try again
+              </Button>
+            </span>
+          ) : null}
+          {remoteView.isError ? (
+            <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-destructive">
+              {errorMessage(remoteView.error, 'Remote host link failed.')}
+              <Button size="xs" variant="outline" onClick={() => reconnect.mutate()} disabled={runtime === undefined || reconnect.isPending}>
+                Reconnect
+              </Button>
+            </span>
+          ) : null}
+          {popupBlocked ? (
+            <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-destructive">
+              Allow pop-ups to open the remote host, or copy its link instead.
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => remoteView.mutate({ action: 'copy' })}
+                disabled={runtime === undefined || remoteView.isPending}
+              >
+                Copy link
+              </Button>
+            </span>
+          ) : null}
+          {remoteView.data === 'copied' ? (
+            <span role="status" className="dshx:text-success">
+              Remote host link copied.
+            </span>
+          ) : null}
+        </>
+      }
+      trailing={
+        <>
+          <IconAction label={`Move ${host.name} up`} hint="Move up" disabled={props.index === 0} onClick={() => props.onMove('up')}>
+            <ChevronUpIcon className="dshx:size-3.5" />
+          </IconAction>
+          <IconAction label={`Move ${host.name} down`} hint="Move down" disabled={props.index === props.count - 1} onClick={() => props.onMove('down')}>
+            <ChevronDownIcon className="dshx:size-3.5" />
+          </IconAction>
+          <IconAction
+            label={host.hidden ? `Show ${host.name}` : `Hide ${host.name}`}
+            hint={host.hidden ? 'Show in the destination picker' : 'Hide from the destination picker; keeps its records'}
+            onClick={() => props.onHide(!host.hidden)}
+          >
+            {host.hidden ? <EyeOffIcon className="dshx:size-3.5" /> : <EyeIcon className="dshx:size-3.5" />}
+          </IconAction>
+          {host.connector.kind === 'ssh' ? (
+            <>
+              <Button size="sm" variant="outline" disabled={runtime === undefined || remoteView.isPending} onClick={openHost}>
+                <ExternalLinkIcon className="dshx:size-3.5" />
+                Open host
+              </Button>
+              <IconAction
+                label={`Copy ${host.name} link`}
+                hint="Copy remote host link"
+                disabled={runtime === undefined || remoteView.isPending}
+                onClick={() => remoteView.mutate({ action: 'copy' })}
+              >
+                <CopyIcon className="dshx:size-3.5" />
+              </IconAction>
+              <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onAddProject}>
+                <PlusIcon className="dshx:size-3.5" />
+                Add folder
+              </Button>
+              <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onCloneProject}>
+                <PlusIcon className="dshx:size-3.5" />
+                Clone project
+              </Button>
+            </>
+          ) : null}
+          <IconAction
+            label={`Reconnect ${host.name}`}
+            hint="Reconnect"
+            disabled={runtime === undefined || reconnect.isPending}
+            onClick={() => reconnect.mutate()}
+          >
+            {reconnect.isPending ? <Spinner className="dshx:size-3.5" /> : <RefreshCwIcon className="dshx:size-3.5" />}
+          </IconAction>
+          {host.connector.kind === 'ssh' ? (
+            <IconAction label={`Edit ${host.name}`} hint="Edit" onClick={props.onEdit}>
+              <PencilIcon className="dshx:size-3.5" />
+            </IconAction>
+          ) : null}
+          <IconAction
+            label={confirming ? `Confirm remove ${host.name}` : `Remove ${host.name}`}
+            hint={confirming ? 'Click again to remove; remote data stays' : 'Remove'}
+            destructive={confirming}
+            onClick={() => (confirming ? props.onRemove() : setConfirming(true))}
+          >
+            <Trash2Icon className="dshx:size-3.5" />
+          </IconAction>
+        </>
+      }
+    />
   )
 }
 
@@ -371,40 +412,38 @@ export const HostsPage = () => {
     reorder.mutate(ids)
   }
 
+  const hiddenCount = hosts.filter(host => host.hidden).length
+  const retryAlert = (input: { readonly message: string; readonly retry: () => void; readonly label?: string }) => (
+    <Alert variant="destructive">
+      <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
+        <span className="dshx:min-w-0">{input.message}</span>
+        <Button size="xs" variant="outline" onClick={input.retry}>
+          {input.label ?? 'Try again'}
+        </Button>
+      </AlertDescription>
+    </Alert>
+  )
+
   return (
-    <main
-      data-testid="dshfiles-hosts-page"
-      className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground"
-    >
-      <header className="dshx:flex dshx:items-start dshx:gap-3 dshx:px-5 dshx:pt-5 dshx:pb-3 dshx:@max-pane-narrow:px-3 dshx:@max-pane-narrow:pt-3">
-        <div className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-2xl dshx:bg-primary/10 dshx:text-primary dshx:ring-1 dshx:ring-primary/15 dshx:@max-pane-narrow:hidden">
-          <ServerIcon className="dshx:size-6" />
-        </div>
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
-          <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <h1 className="dshx:text-xl dshx:font-semibold dshx:leading-tight">Hosts</h1>
-            <Badge variant="outline" className="dshx:border-transparent dshx:bg-muted dshx:text-[10px] dshx:text-muted-foreground">
-              {hosts.length === 0 ? 'none' : `${hosts.length} registered`}
-              {hosts.some(host => host.hidden) ? ` · ${hosts.filter(host => host.hidden).length} hidden` : ''}
-            </Badge>
-            <Button size="sm" className="dshx:ml-auto" onClick={() => setForm(blankDraft)}>
-              <PlusIcon className="dshx:size-4" />
-              Add host
-            </Button>
-          </div>
-        </div>
-      </header>
-      <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:px-5 dshx:pb-6">
-        {directory.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(directory.error, 'Hosts are unavailable.')}</AlertDescription>
-          </Alert>
-        ) : null}
-        {resourcePool.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(resourcePool.error, 'Host resources are unavailable.')}</AlertDescription>
-          </Alert>
-        ) : null}
+    <TooltipProvider>
+      <Page
+        data-testid="dshfiles-hosts-page"
+        scroll
+        className="dshx:bg-background dshx:text-foreground"
+        heading="Hosts"
+        description="Machines threads can run on. Hidden hosts keep their records but leave the destination picker."
+        meta={
+          <Badge variant="secondary" className="dshx:text-[11px] dshx:font-normal">
+            {hosts.length === 0 ? 'none' : `${hosts.length} registered`}
+            {hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ''}
+          </Badge>
+        }
+        primaryAction={{ id: 'add-host', label: 'Add host', icon: <PlusIcon className="dshx:size-4" />, onSelect: () => setForm(blankDraft) }}
+      >
+        {directory.isError ? retryAlert({ message: errorMessage(directory.error, 'Hosts are unavailable.'), retry: () => void directory.refetch() }) : null}
+        {resourcePool.isError
+          ? retryAlert({ message: errorMessage(resourcePool.error, 'Host resources are unavailable.'), retry: () => void resourcePool.refetch() })
+          : null}
         {resourcePool.data?.selected === null ? (
           <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:px-3 dshx:py-2 dshx:text-sm">
             <span className="dshx:font-medium">Auto destination</span>
@@ -416,102 +455,115 @@ export const HostsPage = () => {
             <Badge variant="secondary">{resourcePool.data.selected.hostName}</Badge>
           </div>
         )}
-        {hide.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(hide.error, 'The host visibility could not be saved.')}</AlertDescription>
-          </Alert>
-        ) : null}
-        {reorder.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(reorder.error, 'The host order could not be saved.')}</AlertDescription>
-          </Alert>
-        ) : null}
-        {remove.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(remove.error, 'The host could not be removed.')}</AlertDescription>
-          </Alert>
-        ) : null}
-        {addProject.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{errorMessage(addProject.error, 'The remote project could not be added.')}</AlertDescription>
-          </Alert>
-        ) : null}
+        {hide.isError
+          ? retryAlert({
+              message: errorMessage(hide.error, 'The host visibility could not be saved.'),
+              retry: () => {
+                if (hide.variables !== undefined) hide.mutate(hide.variables)
+              },
+            })
+          : null}
+        {reorder.isError
+          ? retryAlert({
+              message: errorMessage(reorder.error, 'The host order could not be saved.'),
+              retry: () => {
+                if (reorder.variables !== undefined) reorder.mutate(reorder.variables)
+              },
+            })
+          : null}
+        {remove.isError
+          ? retryAlert({
+              message: errorMessage(remove.error, 'The host could not be removed.'),
+              retry: () => {
+                if (remove.variables !== undefined) remove.mutate(remove.variables)
+              },
+            })
+          : null}
+        {addProject.isError
+          ? retryAlert({
+              message: errorMessage(addProject.error, 'The remote project could not be added.'),
+              retry: () => {
+                if (addProject.variables !== undefined) addProject.mutate(addProject.variables)
+              },
+            })
+          : null}
         {directory.isPending ? <Spinner aria-label="Loading hosts" /> : null}
         {!directory.isPending && ordered.length === 0 ? (
-          <p className="dshx:rounded-lg dshx:border dshx:border-dashed dshx:p-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
-            No hosts yet. Add an SSH destination to run threads on another machine.
-          </p>
-        ) : null}
-        <ul className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Registered hosts">
-          {ordered.map((host, index) => (
-            <HostRow
-              key={host.id}
-              api={api}
-              host={host}
-              runtime={runtimeFor(host)}
-              resource={resourcePool.data?.hosts.find(entry => entry.hostId === host.id)}
-              index={index}
-              count={ordered.length}
-              dragging={draggedId === host.id}
-              dropTarget={dropId === host.id && draggedId !== null && draggedId !== host.id}
-              onDragStart={() => setDraggedId(host.id)}
-              onDragEnd={() => {
-                setDraggedId(null)
-                setDropId(null)
-              }}
-              onDragOver={() => setDropId(host.id)}
-              onDrop={() => {
-                if (draggedId === null || draggedId === host.id) return
-                const next = moveHostId({ ids: order, id: draggedId, toIndex: index })
-                setDraggedId(null)
-                setDropId(null)
-                if (next !== order) commitOrder(next)
-              }}
-              onMove={direction => {
-                const next = shiftHostId({ ids: order, id: host.id, direction })
-                if (next !== order) commitOrder(next)
-              }}
-              onHide={hidden => hide.mutate({ id: host.id, hidden })}
-              onAddProject={() => setProjectRuntimeId(runtimeFor(host)?.id ?? null)}
-              onCloneProject={() => setCloneRuntimeId(runtimeFor(host)?.id ?? null)}
-              onEdit={() =>
-                setForm({
-                  hostId: host.id,
-                  name: host.name,
-                  sshTarget: host.connector.kind === 'ssh' ? host.connector.sshTarget : '',
-                  remoteHome: runtimeFor(host)?.remoteHome ?? '',
-                })
-              }
-              onRemove={() => remove.mutate(host.id)}
-            />
-          ))}
-        </ul>
-      </div>
-      <CloneProjectDialog
-        api={api}
-        runtime={directory.data?.runtimes.find(runtime => runtime.id === cloneRuntimeId)}
-        hostName={hosts.find(host => directory.data?.runtimes.find(runtime => runtime.id === cloneRuntimeId)?.hostId === host.id)?.name}
-        onClose={() => setCloneRuntimeId(null)}
-      />
-      {projectRuntime !== undefined && projectHost !== undefined ? (
-        <ProjectFolderPicker
-          projects={[]}
-          directoryPicker={remoteDirectoryPicker(api, projectRuntime.id)}
-          onRegisterWorkspace={async canonicalPath => {
-            const result = await api.runtimeOpenFolder({ runtimeId: projectRuntime.id, path: canonicalPath })
-            if (!result.ok) throw failure(result)
-            return { workspaceId: result.workspaceId, title: canonicalPath.split('/').filter(Boolean).at(-1) ?? canonicalPath, canonicalPath }
-          }}
-          onSelect={(selection: ProjectFolderSelection) => addProject.mutate({ runtimeId: projectRuntime.id, path: selection.canonicalPath })}
-          onClose={() => setProjectRuntimeId(null)}
-          mode="directories"
-          disabled={addProject.isPending}
-          showNativePicker={false}
-          machineName={projectHost.name}
-          heading={`Add project · ${projectHost.name}`}
+          <EntityList aria-label="Registered hosts">
+            <EmptyState>No hosts yet. Use Add host to register an SSH destination and run threads on another machine.</EmptyState>
+          </EntityList>
+        ) : (
+          <EntityList aria-label="Registered hosts">
+            {ordered.map((host, index) => (
+              <HostRow
+                key={host.id}
+                api={api}
+                host={host}
+                runtime={runtimeFor(host)}
+                resource={resourcePool.data?.hosts.find(entry => entry.hostId === host.id)}
+                index={index}
+                count={ordered.length}
+                dragging={draggedId === host.id}
+                dropTarget={dropId === host.id && draggedId !== null && draggedId !== host.id}
+                onDragStart={() => setDraggedId(host.id)}
+                onDragEnd={() => {
+                  setDraggedId(null)
+                  setDropId(null)
+                }}
+                onDragOver={() => setDropId(host.id)}
+                onDrop={() => {
+                  if (draggedId === null || draggedId === host.id) return
+                  const next = moveHostId({ ids: order, id: draggedId, toIndex: index })
+                  setDraggedId(null)
+                  setDropId(null)
+                  if (next !== order) commitOrder(next)
+                }}
+                onMove={direction => {
+                  const next = shiftHostId({ ids: order, id: host.id, direction })
+                  if (next !== order) commitOrder(next)
+                }}
+                onHide={hidden => hide.mutate({ id: host.id, hidden })}
+                onAddProject={() => setProjectRuntimeId(runtimeFor(host)?.id ?? null)}
+                onCloneProject={() => setCloneRuntimeId(runtimeFor(host)?.id ?? null)}
+                onEdit={() =>
+                  setForm({
+                    hostId: host.id,
+                    name: host.name,
+                    sshTarget: host.connector.kind === 'ssh' ? host.connector.sshTarget : '',
+                    remoteHome: runtimeFor(host)?.remoteHome ?? '',
+                  })
+                }
+                onRemove={() => remove.mutate(host.id)}
+              />
+            ))}
+          </EntityList>
+        )}
+        <CloneProjectDialog
+          api={api}
+          runtime={directory.data?.runtimes.find(runtime => runtime.id === cloneRuntimeId)}
+          hostName={hosts.find(host => directory.data?.runtimes.find(runtime => runtime.id === cloneRuntimeId)?.hostId === host.id)?.name}
+          onClose={() => setCloneRuntimeId(null)}
         />
-      ) : null}
-      <HostDialog api={api} draft={form} onOpenChange={open => (open ? undefined : setForm(null))} />
-    </main>
+        {projectRuntime !== undefined && projectHost !== undefined ? (
+          <ProjectFolderPicker
+            projects={[]}
+            directoryPicker={remoteDirectoryPicker(api, projectRuntime.id)}
+            onRegisterWorkspace={async canonicalPath => {
+              const result = await api.runtimeOpenFolder({ runtimeId: projectRuntime.id, path: canonicalPath })
+              if (!result.ok) throw failure(result)
+              return { workspaceId: result.workspaceId, title: canonicalPath.split('/').filter(Boolean).at(-1) ?? canonicalPath, canonicalPath }
+            }}
+            onSelect={(selection: ProjectFolderSelection) => addProject.mutate({ runtimeId: projectRuntime.id, path: selection.canonicalPath })}
+            onClose={() => setProjectRuntimeId(null)}
+            mode="directories"
+            disabled={addProject.isPending}
+            showNativePicker={false}
+            machineName={projectHost.name}
+            heading={`Add project · ${projectHost.name}`}
+          />
+        ) : null}
+        <HostDialog api={api} draft={form} onOpenChange={open => (open ? undefined : setForm(null))} />
+      </Page>
+    </TooltipProvider>
   )
 }

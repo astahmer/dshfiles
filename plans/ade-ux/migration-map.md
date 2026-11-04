@@ -39,6 +39,7 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | AI Accounts: Usage history | Observe | ai-accounts/usage-history-and-pricing → Observe (destinationSection) |
 | Background Jobs: Jobs | Observe | background-jobs/batch-stop-jobs → Observe (rowAction)<br>background-jobs/jobs-board → Observe (destinationSection) |
 | Backlog: Items | Work, Inbox, Settings | backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/project-scope → Work (destinationSection)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/tweet-context-enrichment → Work (rowAction) |
+| Hosts | Observe | multi-host/host-management → Observe (destinationSection)<br>multi-host/isolated-runtime-views → Observe (rowAction) |
 | Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
 | JJ Integration: Thread integration | Land | jj-integration/thread-integration-attention-view → Land (destinationSection)<br>jj-integration/thread-integration-empty → Land (destinationSection)<br>jj-integration/thread-integration-row-details → Land (detail)<br>jj-integration/thread-workspaces-panel → Land (destinationSection) |
 | Jujutsu: Revision graph | Land, No place of its own | jujutsu/graph-navigation → Land (destinationSection)<br>jujutsu/panel-scopes → No place of its own (infrastructure)<br>jujutsu/previewed-revision-mutations → Land (rowAction)<br>jujutsu/revision-detail-and-diff → Land (detail)<br>jujutsu/revision-graph → Land (destinationSection)<br>jujutsu/workspace-at-revision → Land (rowAction)<br>jujutsu/workspace-cleanup → Land (command)<br>jujutsu/workspace-overflow → Land (rowAction)<br>jujutsu/workspace-removal → Land (rowAction) |
@@ -46,7 +47,6 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | MCP Servers: Servers | Settings | mcp-servers/batch-server-actions → Settings (rowAction)<br>mcp-servers/oauth-authorization → Settings (settingsSection)<br>mcp-servers/registry-catalog → Settings (settingsSection)<br>mcp-servers/server-configuration → Settings (settingsSection) |
 | Memory | Knowledge | memory/batch-forget-notes → Knowledge (rowAction)<br>memory/memory-panel → Knowledge (destinationSection)<br>memory/usage-telemetry → Knowledge (destinationSection) |
 | Messages | Agents | agent-communication/agent-directory → Agents (destinationSection)<br>agent-communication/human-browser → Agents (destinationSection)<br>agent-communication/passive-messaging → Agents (destinationSection) |
-| Multi-host: Hosts | Observe | multi-host/host-management → Observe (destinationSection)<br>multi-host/isolated-runtime-views → Observe (rowAction) |
 | pulls.review: Reviews | Thread panel | pulls-review/ai-scope-summaries → Thread panel (threadFacet)<br>pulls-review/batch-reviewed-marks → Thread panel (threadFacet)<br>pulls-review/thread-review-scopes → Thread panel (threadFacet) |
 | Resource Packs: Resources | Knowledge | resource-packs/local-properties → Knowledge (destinationSection) |
 | Secrets | Settings | secret-catalog/alias-mutations → Settings (settingsSection)<br>secret-catalog/bounded-secret-reveal → Settings (settingsSection)<br>secret-catalog/inline-quick-add → Settings (settingsSection)<br>secret-catalog/scoped-alias-catalog → Settings (settingsSection) |
@@ -216,7 +216,7 @@ rail destination; 20 features.
 | ai-accounts/quota-forecast: Forecast when each account runs out, whether a kind kept an account free, and the order to use them in | destinationSection | left-nav: AI Accounts: Quota forecast |
 | ai-accounts/usage-history-and-pricing: Review usage history and cost forecasts | destinationSection | left-nav: AI Accounts: Usage history |
 | background-jobs/jobs-board: Cross-Session background jobs board | destinationSection | left-nav: Background Jobs: Jobs |
-| multi-host/host-management: Manage hosts on a dedicated page | destinationSection | left-nav: Multi-host: Hosts |
+| multi-host/host-management: Manage hosts on a dedicated page | destinationSection | left-nav: Hosts |
 | traces/boards-and-saved-views: Boards and saved views | destinationSection | left-nav: Traces: Explorer › Boards |
 | traces/log-explorer: Log search with trace correlation | destinationSection | left-nav: Traces: Explorer › Logs |
 | traces/metric-charts: Metric list with one chart per metric | destinationSection | left-nav: Traces: Explorer › Metrics |
@@ -229,7 +229,7 @@ rail destination; 20 features.
 | usage/usage-request-log: Request log | destinationSection | left-nav: Usage: Analytics › Requests |
 | worktree-memory/memory-board: Process memory and Node origins | destinationSection | left-nav: Worktree Memory: RAM |
 | background-jobs/batch-stop-jobs: Stop a selection of running jobs | rowAction | left-nav: Background Jobs: Jobs › batch stop |
-| multi-host/isolated-runtime-views: Open the host's own DSH UI | rowAction | left-nav: Multi-host: Hosts › Open host UI |
+| multi-host/isolated-runtime-views: Open the host's own DSH UI | rowAction | left-nav: Hosts › Open host UI |
 
 ### Knowledge
 

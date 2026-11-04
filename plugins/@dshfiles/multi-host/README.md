@@ -10,7 +10,7 @@ Manage hosts on a dedicated page:
 
 ![Manage remote hosts and inspect the resource pressure used by Auto placement](docs/screenshots/host-management.png)
 
-The dedicated reusable hosts page is **Multi-host: Hosts** in navigation and the Workbench chooser.
+The dedicated reusable hosts page is **Hosts** in navigation and the Workbench chooser.
 
 ## Using it
 

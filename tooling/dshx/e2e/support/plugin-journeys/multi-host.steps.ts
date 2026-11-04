@@ -431,7 +431,7 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
 
 When('the scratch remote is added from the host UI', async ({ page }: { readonly page: Page }) => {
   const pair = pairFor(page)
-  await page.getByRole('button', { name: 'Multi-host: Hosts', exact: true }).click()
+  await page.getByRole('button', { name: 'Hosts', exact: true }).click()
   await expect(page.getByTestId('dshfiles-hosts-page')).toBeVisible()
   await page.getByRole('button', { name: 'Add host', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Add host', exact: true })
@@ -544,7 +544,7 @@ When('the native composer sends a prompt to the remote Session', async ({ page }
 })
 
 When('the Hosts page is opened', async ({ page }: { readonly page: Page }) => {
-  await page.getByRole('button', { name: 'Multi-host: Hosts', exact: true }).click()
+  await page.getByRole('button', { name: 'Hosts', exact: true }).click()
   await expect(page.getByTestId('dshfiles-hosts-page')).toBeVisible()
 })
 

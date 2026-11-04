@@ -58,7 +58,7 @@
       "surfaces": ["client", "host", "storage"],
       "surface": "destinationSection",
       "destination": "observe",
-      "currentSurface": "left-nav: Multi-host: Hosts",
+      "currentSurface": "left-nav: Hosts",
       "configuration": [],
       "states": [
         "empty",
@@ -300,7 +300,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "observe",
-      "currentSurface": "left-nav: Multi-host: Hosts › Open host UI",
+      "currentSurface": "left-nav: Hosts › Open host UI",
       "configuration": [],
       "states": ["leased", "opened", "expired", "released"],
       "failureModes": ["A dropped tunnel retires the lease; the next open reconnects.", "Lease release never mutates the remote runtime."],

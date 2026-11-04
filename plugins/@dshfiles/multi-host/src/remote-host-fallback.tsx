@@ -34,7 +34,7 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
   if (owner.data === null) return null
   if (owner.data === undefined) {
     if (isApiOwnerMissing(owner.error)) {
-      return <span className="dshx:text-xs dshx:text-muted-foreground">Remote host links need a newer multi-host Host.</span>
+      return <span className="dshx:text-xs dshx:text-muted-foreground">Remote host links need a newer DSH Host. Restart DSH when it is idle to load it.</span>
     }
     return null
   }

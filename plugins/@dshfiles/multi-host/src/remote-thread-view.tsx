@@ -1,8 +1,8 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
-import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
-import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { ServerIcon } from '@dshfiles/plugin-ui/icons'
+import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
+import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { errorMessage, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { multiHostApi } from './api.js'
@@ -19,7 +19,7 @@ const age = (updatedAt: number, now: number): string => {
 
 /**
  * Every thread on every registered host, grouped by host. A row opens the Session in this client's own chat and
- * composer: the Host mirrors the remote Session, so this panel is a list, not a second conversation viewer.
+ * composer: the Host mirrors the remote Session, so this panel is a list, not a second thread viewer.
  */
 export const RemoteThreadView = (props: { readonly onOpenSession: (sessionId: SessionId) => void }) => {
   const api = useApi(multiHostApi)
@@ -46,60 +46,59 @@ export const RemoteThreadView = (props: { readonly onOpenSession: (sessionId: Se
         : result.isError
           ? errorMessage(result.error, 'The host did not answer.')
           : undefined
-    return message === undefined ? [] : [{ runtimeId: runtime.id, hostName: hostNameFor(runtime.id, runtime.name), message }]
+    return message === undefined
+      ? []
+      : [{ runtimeId: runtime.id, hostName: hostNameFor(runtime.id, runtime.name), message, retry: () => void result.refetch() }]
   })
   const inventory = mergeInventory({ startedHere: threads.data?.threads ?? [], statuses: inventoryStatuses })
   const grouped = new Map<string, InventoryRow[]>()
   for (const row of inventory) grouped.set(row.hostName, [...(grouped.get(row.hostName) ?? []), row])
 
   return (
-    <div className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-6" data-remote-thread-inventory="">
-      <h2 className="dshx:text-sm dshx:font-semibold">Remote threads</h2>
+    <Page
+      scroll
+      data-remote-thread-inventory=""
+      heading="Remote threads"
+      description="Threads on every registered host. Open one to continue it in this window."
+      count={inventory.length}
+    >
       {unavailable.map(host => (
-        <p key={host.runtimeId} className="dshx:text-xs dshx:text-muted-foreground">
-          {host.hostName} unavailable: {host.message}
+        <p key={host.runtimeId} role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">
+          <span className="dshx:min-w-0">
+            {host.hostName} is unavailable: {host.message}
+          </span>
+          <Button size="xs" variant="outline" onClick={host.retry}>
+            Try again
+          </Button>
         </p>
       ))}
       {inventory.length === 0 && unavailable.length === 0 ? (
-        <p className="dshx:text-sm dshx:text-muted-foreground">Pick a host in the New thread bar and send a message to start one.</p>
+        <EntityList>
+          <EmptyState>No remote threads yet. Pick a host in the New thread bar and send a message to start one.</EmptyState>
+        </EntityList>
       ) : null}
       {[...grouped].map(([hostName, rows]) => (
-        <section key={hostName} aria-label={`Threads on ${hostName}`} className="dshx:flex dshx:flex-col dshx:gap-1">
-          <h3 className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:px-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
-            <ServerIcon className="dshx:size-3" />
-            {hostName}
-          </h3>
-          {rows.map(row => (
-            <button
-              key={row.runtimeId + '\u0000' + row.sessionId}
-              type="button"
-              title={row.cwd ?? row.sessionId}
-              className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:p-2 dshx:text-left dshx:text-sm dshx:hover:bg-accent"
-              onClick={() => props.onOpenSession(row.sessionId as SessionId)}
-            >
-              <ServerIcon className="dshx:size-3.5 dshx:shrink-0" />
-              <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-                <span className="dshx:truncate">{rowLabel(row)}</span>
-                {row.cwd === undefined || row.title === undefined ? null : (
-                  <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{row.cwd}</span>
-                )}
-              </span>
-              {row.startedHere ? null : (
-                <Badge variant="secondary" className="dshx:shrink-0 dshx:font-normal dshx:text-muted-foreground dshx:@max-pane-compact:hidden">
-                  started on host
-                </Badge>
-              )}
-              {row.running ? (
-                <Badge variant="outline" className="dshx:shrink-0 dshx:gap-1">
-                  <Spinner className="dshx:size-3" />
-                  Working
-                </Badge>
-              ) : null}
-              <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{age(row.updatedAt, Date.now())}</span>
-            </button>
-          ))}
-        </section>
+        <PageSection key={hostName} heading={hostName} meta={rows.length} aria-label={`Threads on ${hostName}`}>
+          <EntityList>
+            {rows.map(row => (
+              <EntityRow
+                key={row.runtimeId + '\u0000' + row.sessionId}
+                role="listitem"
+                status={row.running ? 'working' : 'idle'}
+                heading={rowLabel(row)}
+                meta={
+                  <>
+                    {row.title === undefined ? null : <span className="dshx:min-w-0 dshx:truncate">{folderName(row.cwd)}</span>}
+                    {row.startedHere ? null : <span className="dshx:@max-pane-compact:hidden">started on host</span>}
+                    <span className="dshx:tabular-nums">{age(row.updatedAt, Date.now())}</span>
+                  </>
+                }
+                onSelect={() => props.onOpenSession(row.sessionId as SessionId)}
+              />
+            ))}
+          </EntityList>
+        </PageSection>
       ))}
-    </div>
+    </Page>
   )
 }

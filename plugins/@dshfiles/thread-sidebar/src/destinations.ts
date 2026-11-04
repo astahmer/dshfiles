@@ -82,7 +82,7 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
   { panelId: 'traces', destination: 'observe', label: 'Traces', description: 'Spans, logs, metrics and alerts.', order: 5, formerLabels: ['Traces: Explorer'] },
   { panelId: 'dshfiles-background-jobs', destination: 'observe', label: 'Jobs', description: 'Background jobs on this host.', order: 6, formerLabels: ['Background Jobs: Jobs'] },
   { panelId: 'dshfiles-worktree-memory', destination: 'observe', label: 'RAM', description: 'Memory used per workspace.', order: 7, formerLabels: ['Worktree Memory: RAM'] },
-  { panelId: 'dshfiles-multi-host-hosts', destination: 'observe', label: 'Hosts', description: 'Machines threads run on.', order: 8, formerLabels: ['Multi-host: Hosts'] },
+  { panelId: 'dshfiles-multi-host-hosts', destination: 'observe', label: 'Hosts', description: 'Machines threads run on.', order: 8, formerLabels: ['Multi-host: Hosts', 'Hosts'] },
   { panelId: 'dshfiles-memory-panel', destination: 'knowledge', label: 'Memory', description: 'Notes and thread digests.', order: 1, formerLabels: ['Memory: Browser', 'Memory'] },
   { panelId: 'dshfiles-resources', destination: 'knowledge', label: 'Resources', description: 'Resource packs and their properties.', order: 2, formerLabels: ['Resource Packs: Resources'] },
   { panelId: 'ai-accounts', destination: 'settings', label: 'AI accounts', description: 'Accounts, models and routing.', order: 1, formerLabels: ['AI Accounts: Accounts'] },
