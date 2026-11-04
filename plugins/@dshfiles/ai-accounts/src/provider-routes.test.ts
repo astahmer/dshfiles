@@ -34,6 +34,19 @@ describe('explicit credential source route propagation', () => {
   })
 })
 
+describe('Mistral subscription routes', () => {
+  it('builds a keyed Mistral route that defaults to MISTRAL_API_KEY and keeps its login source', async () => {
+    const { AccountDraftModel } = await import('./account-draft.js')
+    const { configFromAccountsFile } = await import('./account-config.js')
+    const vibe = { ...AccountDraftModel.newAccountDraft({ kind: 'mistral', existing: [] }), apiKeyEnv: '', authSource: 'cli' as const }
+    const config = configFromAccountsFile({ distribution: 'priority', cooldownMs: 0, shadowRoot: '/synthetic/shadows', accounts: [vibe] })
+    const built = ProviderRoutes.buildRoutes(config)
+    const mistral = built.routes.get(vibe.instanceId)
+    expect(mistral).toMatchObject({ kind: 'mistral', authSource: 'cli', apiKeyEnv: '' })
+    expect(mistral?.kind === 'mistral' && ProviderRoutes.keyEnvFor(mistral)).toBe('MISTRAL_API_KEY')
+  })
+})
+
 describe('managed setup Codex routes', () => {
   it('builds the enabled route directly in the private scratch home created by the Host', async () => {
     const home = mkdtempSync(join(tmpdir(), 'dsh-managed-route-'))

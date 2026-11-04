@@ -7,6 +7,7 @@ const methods = {
   'opencode-go': ['key', 'reference'],
   commandcode: ['key', 'cli', 'reference'],
   cursor: ['key', 'cli', 'reference'],
+  mistral: ['cli', 'key', 'reference'],
 } as const satisfies Record<AccountKind, readonly AccountConnectionMethod[]>
 const labels = {
   device: 'Sign in in the browser',
@@ -28,6 +29,8 @@ export class AccountConnectionMethodModel {
     if (existing !== undefined && existing.apiKeyEnv.trim() !== '') return 'reference'
     if (kind === 'claude') return 'subscription'
     if (existing !== undefined && (kind === 'commandcode' || kind === 'cursor')) return 'cli'
+    // A Le Chat/Vibe plan key is minted by Mistral Vibe's browser sign-in, so its login is the first choice.
+    if (kind === 'mistral') return 'cli'
     return 'key'
   }
 }

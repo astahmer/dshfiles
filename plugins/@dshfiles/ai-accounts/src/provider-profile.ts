@@ -10,6 +10,7 @@ import type { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencod
 import type { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
 import type { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
 import type { createCommandCodeProvider } from './commandcode-provider.js'
+import type { createMistralProvider } from './mistral-provider.js'
 
 /** DeepSeek's documented default effort when thinking is on and the request names none. */
 const DEEPSEEK_DEFAULT_EFFORT = 'high'
@@ -89,6 +90,7 @@ export class ProviderProfileModel {
       | ReturnType<typeof anthropicProvider>
       | ReturnType<typeof githubCopilotProvider>
       | ReturnType<typeof createCommandCodeProvider>
+      | ReturnType<typeof createMistralProvider>
     readonly provider: string
     readonly displayName: string
     readonly additionalModelIds: readonly string[]

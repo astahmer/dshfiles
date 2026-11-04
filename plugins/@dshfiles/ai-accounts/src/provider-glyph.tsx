@@ -48,6 +48,13 @@ export const ProviderGlyph = (props: { readonly kind: AccountKind; readonly clas
           />
         </svg>
       )
+    case 'mistral':
+      // Mistral's stepped block "M", drawn on a 5×5 grid.
+      return (
+        <svg aria-label={label} className={className} role="img" style={style} viewBox="0 0 5 5">
+          <path d="M0 0h1v5H0zM4 0h1v5H4zM1 1h1v1H1zM3 1h1v1H3zM2 2h1v1H2zM1 2h1v1H1zM3 2h1v1H3z" fill="currentColor" />
+        </svg>
+      )
     case 'cursor':
       return <MousePointer2Icon aria-label={label} className={className} role="img" style={style} />
   }

@@ -101,6 +101,7 @@ const KIND_PROVIDERS: Readonly<Record<string, readonly string[]>> = {
   codex: ['openai'],
   claude: ['anthropic'],
   'opencode-go': ['opencode-go'],
+  mistral: ['mistral'],
 }
 
 /** DSH route ids whose models.dev provider has another name. */

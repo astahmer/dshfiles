@@ -274,6 +274,11 @@ export const createAccountSessionService = (input: {
       return {
         reason: `${account.kind === 'cursor' ? 'Cursor Agent' : 'Command Code'} currently uses a shared global CLI login. Run ${account.kind === 'cursor' ? 'cursor-agent logout' : 'cmd logout'} manually; DSH cannot safely scope that command to this profile.`,
       }
+    if (account.kind === 'mistral')
+      return {
+        reason:
+          'Mistral uses a Mistral Vibe login (~/.vibe/.env) or a named key reference that DSH does not own. Revoke the key in console.mistral.ai or remove it from ~/.vibe/.env.',
+      }
     return { reason: EXTERNAL }
   }
   const capability = async (instanceId: string): Promise<AccountSessionCapability> => {

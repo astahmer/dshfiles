@@ -3,12 +3,14 @@ import { COMMANDCODE_KIND as CC_KIND, DEFAULT_COMMANDCODE_KEY_ENV } from './comm
 import { ClaudeAccountModel } from './claude-account.js'
 import { CodexHomeError, type CodexHomeLayout } from './codex-home.js'
 import { AccountHomePolicy } from './account-home-policy.js'
+import { DEFAULT_MISTRAL_KEY_ENV, MISTRAL_KIND as M_KIND } from './mistral-account.js'
 
 export const CODEX_KIND = 'codex'
 export const OPENCODE_KIND = 'opencode-go'
 export const COMMANDCODE_KIND = CC_KIND
 export const CLAUDE_KIND = 'claude'
 export const GITHUB_COPILOT_KIND = 'github-copilot'
+export const MISTRAL_KIND = M_KIND
 
 const SLUG_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
 
@@ -27,7 +29,7 @@ export interface CodexRoute {
 }
 
 export interface KeyedRoute {
-  readonly kind: typeof OPENCODE_KIND | typeof COMMANDCODE_KIND
+  readonly kind: typeof OPENCODE_KIND | typeof COMMANDCODE_KIND | typeof MISTRAL_KIND
   readonly instanceId: string
   readonly displayName: string
   readonly apiKeyEnv: string
@@ -80,7 +82,13 @@ export class ProviderRoutes {
   }
 
   static keyEnvFor = (route: KeyedRoute): string =>
-    route.apiKeyEnv.trim().length > 0 ? route.apiKeyEnv.trim() : route.kind === COMMANDCODE_KIND ? DEFAULT_COMMANDCODE_KEY_ENV : 'OPENCODE_API_KEY'
+    route.apiKeyEnv.trim().length > 0
+      ? route.apiKeyEnv.trim()
+      : route.kind === COMMANDCODE_KIND
+        ? DEFAULT_COMMANDCODE_KEY_ENV
+        : route.kind === MISTRAL_KIND
+          ? DEFAULT_MISTRAL_KEY_ENV
+          : 'OPENCODE_API_KEY'
 
   /**
    * `takenProviders` are provider ids another plugin already registered. DSH rejects a duplicate adapter for the whole
@@ -115,7 +123,7 @@ export class ProviderRoutes {
       })
     }
     for (const account of config.opencodeAccounts) {
-      const kind = account.kind === COMMANDCODE_KIND ? COMMANDCODE_KIND : OPENCODE_KIND
+      const kind = account.kind === COMMANDCODE_KIND ? COMMANDCODE_KIND : account.kind === MISTRAL_KIND ? MISTRAL_KIND : OPENCODE_KIND
       const instanceId = ProviderRoutes.normalizeInstanceId(account.instanceId, kind)
       routes.set(instanceId, {
         kind,
