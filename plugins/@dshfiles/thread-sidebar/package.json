@@ -48,6 +48,10 @@
     "./destinations": {
       "types": "./src/destinations.ts",
       "default": "./dist/destinations.js"
+    },
+    "./thread-row-actions": {
+      "types": "./src/thread-row-actions.ts",
+      "default": "./dist/thread-row-actions.js"
     }
   },
   "scripts": {

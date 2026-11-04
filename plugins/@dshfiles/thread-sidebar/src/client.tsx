@@ -24,7 +24,8 @@ import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-ch
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { useInboxThreadSignals } from './inbox-signals.js'
 import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusGroup } from './thread-status.js'
-import { useApi, useApiQuery, usePlugin } from '@dshfiles/dshx/client'
+import { useApi, useApiQuery, usePlugin, useRegistry } from '@dshfiles/dshx/client'
+import { ThreadRowActions, type ThreadRowActionTarget } from './thread-row-actions.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { startInteraction } from '@dshfiles/dshx/tracing/client'
@@ -842,6 +843,22 @@ const openRegisteredPanelAside = (panelId: string): void => {
   registry.open(panelId)
 }
 
+/** Rows other plugins register for one thread's menu, in their order; nothing when none applies. */
+const RegisteredThreadRowActions = (props: { readonly target: ThreadRowActionTarget }): JSX.Element | null => {
+  const actions = useRegistry(ThreadRowActions)
+  const shown = actions.filter(action => action.isAvailable?.(props.target) ?? true).toSorted((left, right) => (left.order ?? 0) - (right.order ?? 0))
+  if (shown.length === 0) return null
+  return (
+    <>
+      {shown.map(action => (
+        <ContextMenuItem key={action.id} data-thread-row-action={action.id} onSelect={() => action.run(props.target)}>
+          {typeof action.label === 'string' ? action.label : action.label()}
+        </ContextMenuItem>
+      ))}
+    </>
+  )
+}
+
 const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   const { session, unread, archived, pinned, parked, settled } = props
   const t = props.actions.translate
@@ -901,6 +918,7 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
           <ThreadReferencesItems sessionId={session.id} t={t} openThread={props.actions.open} Item={ContextMenuItem} />
         </ContextMenuSubContent>
       </ContextMenuSub>
+      <RegisteredThreadRowActions target={{ sessionId: session.id, workspaceId: props.workspaceId, archived, running: session.running }} />
       <ContextMenuSeparator />
       <ContextMenuItem disabled={unread} onSelect={() => props.actions.markUnread(session.id)}>
         {t('threadSidebarMarkUnread')}

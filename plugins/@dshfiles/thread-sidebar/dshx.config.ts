@@ -6,7 +6,8 @@ export default defineConfig({
   host: { entry: 'src/host.ts' },
   client: { entry: 'src/client-entry.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   // Other plugins read the same attention records through this contract, ask the Host to settle a thread
-  // through auto-settle-api, and thread-listing plugins share the Host snapshot selectors.
+  // through auto-settle-api, thread-listing plugins share the Host snapshot selectors, and thread-row-actions
+  // lets other plugins add rows to a thread's context menu.
   modules: {
     'attention-api': 'src/attention-api.ts',
     'auto-settle-api': 'src/auto-settle-api.ts',
@@ -17,6 +18,7 @@ export default defineConfig({
     'thread-mention': 'src/thread-mention.ts',
     // The shell's rail destinations and the section registry plugins add their pages to (plans/ade-ux §4.2).
     destinations: 'src/destinations.ts',
+    'thread-row-actions': 'src/thread-row-actions.ts',
   },
   build: { sourcemap: true, declarations: true, minify: true },
 })
