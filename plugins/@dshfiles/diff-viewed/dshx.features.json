@@ -8,7 +8,7 @@
       "surfaces": ["client", "api", "storage"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "right-pane: native review tab › Viewed",
+      "currentSurface": "right-pane: native review tab \u203a Viewed",
       "configuration": [],
       "states": ["unviewed", "viewed", "progress-updated"],
       "failureModes": [
@@ -145,6 +145,51 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "revision-range-marks",
+      "title": "One viewed-marks store for turns and revision ranges",
+      "summary": "Keep the thread Changes facet's and the Review page's per-file viewed marks next to the per-turn marks, keyed by workspace, base, head commit and path, with batch writes, per-range reads, a separate 5000-mark bound and the changes_viewed_files / changes_mark_viewed agent tools.",
+      "surfaces": ["host", "api", "storage", "tool"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: diff_viewed storage",
+      "configuration": [],
+      "states": ["unviewed", "viewed", "batch-marked", "batch-unmarked", "range-evicted"],
+      "failureModes": [
+        "A storage write that fails reports which operation failed and leaves the marks the caller saw unchanged; retry or reload.",
+        "Range marks past their bound drop the least recently written range marks, never a turn mark."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "diff-viewed.revision-range-marks",
+          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.revision-range-marks-unit-batch",
+          "file": "plugins/@dshfiles/diff-viewed/src/marks-store.test.ts",
+          "testName": "range marks are batched, read per range, kept out of the turn snapshot and reversible"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.revision-range-marks-unit-bound",
+          "file": "plugins/@dshfiles/diff-viewed/src/marks-store.test.ts",
+          "testName": "range marks are trimmed on their own bound and never evict turn marks"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     }

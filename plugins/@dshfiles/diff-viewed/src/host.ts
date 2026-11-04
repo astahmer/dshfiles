@@ -12,6 +12,8 @@ export default DshxPlugin.make({
     Api.bind(diffViewedApi, {
       state: () => ViewedMarks.use(marks => marks.snapshot),
       toggle: input => ViewedMarks.use(marks => marks.toggle(input)),
+      rangeState: input => ViewedMarks.use(marks => marks.rangeState(input)),
+      set: input => ViewedMarks.use(marks => marks.set(input)),
     }),
   ],
 })

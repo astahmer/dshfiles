@@ -22,6 +22,25 @@ its own `localStorage` marks and hands them to the Host once it does. The Host
 forgets summaries when a Session is disposed or the Host restarts, so a mark is
 only useful as long as the review it belongs to.
 
+## One viewed-marks store
+
+This plugin owns the only viewed-marks store. Besides the per-turn marks above, it keeps
+**revision-range marks**: one file of one workspace's diff between a base (`main`, `@-`, a fork
+point) and a head commit, keyed `["range", workspacePath, base, head, path]`. The thread
+**Changes** facet and the Review page ([pulls-review](../pulls-review/README.md)) read and write
+them through the `@dshfiles/diff-viewed/marks-api` module:
+
+- `rangeState({ workspacePath, base, head })` — the viewed paths of that range (agent tool
+  `changes_viewed_files`, read-only).
+- `set({ targets, viewed })` — mark up to 4,000 turn or range files viewed or not viewed in one
+  write (agent tool `changes_mark_viewed`; `viewed: false` reverses it).
+
+A new head commit is a new review, so its files start not viewed, the same rule as a new turn.
+Range marks have their own bound (5,000, least recently written dropped first), so they never
+evict turn marks; `state` still returns turn marks only, so the review tab's poll stays small.
+The Review page's earlier marks (pulls-review's `reviewed` record) move here once on its first
+load; see the pulls-review README.
+
 ## Port notes
 
 Ported from the 0.1-era `/diff-viewed` command, which had no diff surface to

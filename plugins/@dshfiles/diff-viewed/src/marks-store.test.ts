@@ -10,7 +10,7 @@ import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import { TestClock } from 'effect/testing'
-import { viewedKey } from './marks-api.js'
+import { viewedKey, ViewedKeys } from './marks-api.js'
 import { type ViewedMark, ViewedMarks, viewedMarksDomain } from './marks-store.js'
 
 const storageHost = Layer.effect(
@@ -112,6 +112,61 @@ describe('ViewedMarks', () => {
       const stored = yield* storedKeys
       expect(stored.length).toBe(3)
       expect(stored).not.toContain(viewedKey({ ...file, seq: 0 }))
+    }).pipe(Effect.provide(storage)),
+  )
+
+  it.effect('range marks are batched, read per range, kept out of the turn snapshot and reversible', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(7_000)
+      const range = { workspacePath: '/repo/thread-abc123', base: 'main', head: 'abcdef012345' }
+      const target = (path: string) => ({ kind: 'range' as const, ...range, path })
+      yield* withMarks(
+        Effect.gen(function* () {
+          const marks = yield* ViewedMarks
+          const written = yield* marks.set({ targets: [target('a.ts'), target('b.ts'), target('a.ts')], viewed: true })
+          expect(written.changed).toBe(2)
+          expect((yield* marks.rangeState(range)).paths).toEqual(['a.ts', 'b.ts'])
+          expect((yield* marks.rangeState({ ...range, head: 'other' })).paths).toEqual([])
+          expect((yield* marks.snapshot).marks).toEqual([])
+          yield* marks.toggle(file)
+          expect((yield* marks.snapshot).marks).toEqual([viewedKey(file)])
+        }),
+      )
+      expect([...(yield* storedKeys)].sort()).toEqual([ViewedKeys.range(range, 'a.ts'), ViewedKeys.range(range, 'b.ts'), viewedKey(file)].sort())
+      yield* withMarks(
+        Effect.gen(function* () {
+          const marks = yield* ViewedMarks
+          expect((yield* marks.rangeState(range)).paths).toEqual(['a.ts', 'b.ts'])
+          const before = (yield* marks.rangeState(range)).revision
+          const undone = yield* marks.set({ targets: [target('a.ts')], viewed: false })
+          expect(undone.changed).toBe(1)
+          expect(undone.revision).toBeGreaterThan(before)
+          expect((yield* marks.rangeState(range)).paths).toEqual(['b.ts'])
+          expect((yield* marks.set({ targets: [target('a.ts')], viewed: false })).changed).toBe(0)
+          // A batch can also mark a turn's files.
+          yield* marks.set({ targets: [{ kind: 'turn', ...file, seq: 8 }], viewed: true })
+          expect((yield* marks.snapshot).marks).toContain(viewedKey({ ...file, seq: 8 }))
+        }),
+      )
+    }).pipe(Effect.provide(storage)),
+  )
+
+  it.effect('range marks are trimmed on their own bound and never evict turn marks', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(9_000)
+      const range = { workspacePath: '/repo', base: '@-', head: 'h1' }
+      yield* Effect.scoped(
+        Effect.provide(
+          Effect.gen(function* () {
+            const marks = yield* ViewedMarks
+            yield* marks.toggle(file)
+            yield* marks.set({ targets: ['a', 'b', 'c'].map(path => ({ kind: 'range' as const, ...range, path })), viewed: true })
+            expect((yield* marks.rangeState(range)).paths).toEqual(['b', 'c'])
+            expect((yield* marks.snapshot).marks).toEqual([viewedKey(file)])
+          }),
+          ViewedMarks.layerWithBound(5, 2),
+        ),
+      )
     }).pipe(Effect.provide(storage)),
   )
 
