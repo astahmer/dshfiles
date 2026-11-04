@@ -68,6 +68,25 @@ describe('plugin feature metadata', () => {
     expect(withTelemetry({ telemetry: [{ kind: 'custom', span: 'jj <subcommand>', file: 'x.test.ts', testName: 'y' }] })).toEqual([])
   })
 
+  it('accepts known presentation fields and rejects unknown values or contradictory pairs', () => {
+    const withPresentation = (patch: { readonly surface?: string; readonly destination?: string; readonly currentSurface?: string }) =>
+      featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, ...patch }] })
+    expect(withPresentation({})).toEqual([])
+    expect(withPresentation({ surface: 'composerContribution', destination: 'composer', currentSurface: 'composer: queued messages' })).toEqual([])
+    expect(withPresentation({ surface: 'detail', destination: 'observe', currentSurface: 'left-nav: Usage: Analytics' })).toEqual([])
+    expect(withPresentation({ surface: 'sidebarPanel' })).toEqual([expect.stringContaining('surface')])
+    expect(withPresentation({ destination: 'home' })).toEqual([expect.stringContaining('destination')])
+    expect(withPresentation({ currentSurface: '' })).toEqual([expect.stringContaining('currentSurface')])
+    expect(withPresentation({ surface: 'threadFacet', destination: 'observe' })).toEqual([
+      expect.stringContaining('surface threadFacet lands in destination thread-panel, not observe'),
+    ])
+    expect(withPresentation({ surface: 'detail', destination: 'thread-panel' })).toEqual([
+      expect.stringContaining('destination thread-panel holds only threadFacet contributions, not detail'),
+    ])
+    expect(withPresentation({ surface: 'agentToolOnly', destination: 'work' })).toEqual([expect.stringContaining('lands in destination none')])
+    expect(withPresentation({ surface: 'command', destination: 'none' })).toEqual([])
+  })
+
   it('accepts reach steps a scratch DSH can run and rejects ones it cannot', () => {
     const withReach = (reach: readonly string[]) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, reach }] })
     expect(

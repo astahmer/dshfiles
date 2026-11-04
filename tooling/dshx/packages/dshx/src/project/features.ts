@@ -14,6 +14,85 @@ const scenarioIdSchema = Schema.String.check(Schema.isPattern(idPattern))
 
 export const DshxFeatureSurfaceSchema = Schema.Literals(['client', 'host', 'tool', 'command', 'api', 'settings', 'storage', 'integration'])
 
+/**
+ * The presentation contract kind a feature contributes in the unified ADE shell (plans/ade-ux §5): where the shell
+ * puts it, independent of the runtime `surfaces` that implement it. `agentToolOnly` is a capability with no UI of
+ * its own beyond the agent tool; `infrastructure` is plumbing the user never addresses directly.
+ */
+export const DSHX_PRESENTATION_SURFACES = [
+  'command',
+  'destinationSection',
+  'threadFacet',
+  'detail',
+  'rowDecorator',
+  'rowAction',
+  'transcriptCard',
+  'composerContribution',
+  'statusItem',
+  'settingsSection',
+  'attentionProvider',
+  'entityProvider',
+  'agentToolOnly',
+  'infrastructure',
+] as const
+export const DshxPresentationSurfaceSchema = Schema.Literals(DSHX_PRESENTATION_SURFACES)
+export type DshxPresentationSurface = (typeof DSHX_PRESENTATION_SURFACES)[number]
+
+/**
+ * The shell region a feature lands in (plans/ade-ux §4.2 rail destinations, plus the thread panel, composer and
+ * transcript that belong to the active thread). `none` is for features with no place of their own: agent-tool-only
+ * capabilities, infrastructure, palette-only commands and status-strip items.
+ */
+export const DSHX_DESTINATIONS = [
+  'threads',
+  'inbox',
+  'land',
+  'work',
+  'agents',
+  'observe',
+  'knowledge',
+  'settings',
+  'thread-panel',
+  'composer',
+  'transcript',
+  'none',
+] as const
+export const DshxDestinationSchema = Schema.Literals(DSHX_DESTINATIONS)
+export type DshxDestination = (typeof DSHX_DESTINATIONS)[number]
+
+/** Presentation fields `features:check` requires on every feature that is not in its grandfather baseline. */
+export const DSHX_PRESENTATION_FIELDS = ['surface', 'destination', 'currentSurface'] as const
+
+/**
+ * A surface that only one destination can hold. Other surfaces may land in any destination; `agentToolOnly` and
+ * `infrastructure` have no destination of their own.
+ */
+const destinationBySurface = new Map<DshxPresentationSurface, DshxDestination>([
+  ['threadFacet', 'thread-panel'],
+  ['transcriptCard', 'transcript'],
+  ['composerContribution', 'composer'],
+  ['settingsSection', 'settings'],
+  ['attentionProvider', 'inbox'],
+  ['agentToolOnly', 'none'],
+  ['infrastructure', 'none'],
+])
+
+/** Destinations that belong to the active thread's own regions and take exactly one contribution kind. */
+const surfaceByDestination = new Map<DshxDestination, DshxPresentationSurface>([
+  ['thread-panel', 'threadFacet'],
+  ['transcript', 'transcriptCard'],
+  ['composer', 'composerContribution'],
+])
+
+/** Issues for a surface/destination pair that contradict each other, e.g. a thread facet outside the thread panel. */
+const presentationPairIssue = (surface: DshxPresentationSurface, destination: DshxDestination): string | undefined => {
+  const required = destinationBySurface.get(surface)
+  if (required !== undefined && required !== destination) return `surface ${surface} lands in destination ${required}, not ${destination}`
+  const only = surfaceByDestination.get(destination)
+  if (only !== undefined && only !== surface) return `destination ${destination} holds only ${only} contributions, not ${surface}`
+  return undefined
+}
+
 const verificationSchema = Schema.Union([
   strictStruct({ kind: Schema.Literal('gherkin'), id: scenarioIdSchema, featureFile: Schema.String.check(Schema.isMinLength(1)) }),
   strictStruct({
@@ -197,6 +276,12 @@ export const DshxFeatureSchema = strictStruct({
     ),
   ),
   reach: Schema.optional(reachSchema),
+  /** Presentation contract kind in the unified shell; see {@link DSHX_PRESENTATION_SURFACES}. */
+  surface: Schema.optional(DshxPresentationSurfaceSchema),
+  /** Shell destination the feature lands in; see {@link DSHX_DESTINATIONS}. */
+  destination: Schema.optional(DshxDestinationSchema),
+  /** Where the feature lives today, as a user finds it (e.g. `left-nav: AI Accounts: Usage history`); feeds the migration map. */
+  currentSurface: Schema.optional(Schema.String.check(Schema.isMinLength(3))),
 })
 
 export const DshxFeatureCatalogSchema = strictStruct({
@@ -226,6 +311,10 @@ export const featureCatalogIssues = (value: unknown): readonly string[] => {
     for (const verification of feature.verification) {
       if (verificationIds.has(verification.id)) issues.push(`features.${feature.id}.verification.${verification.id}: duplicate verification id`)
       verificationIds.add(verification.id)
+    }
+    if (feature.surface !== undefined && feature.destination !== undefined) {
+      const pairIssue = presentationPairIssue(feature.surface, feature.destination)
+      if (pairIssue !== undefined) issues.push(`features.${feature.id}.destination: ${pairIssue}`)
     }
     if (feature.surfaces.includes('tool') && !feature.telemetry.some(entry => entry.kind === 'automatic' && entry.source === 'agent-tool')) {
       issues.push(`features.${feature.id}.telemetry: a tool surface emits execute_tool spans; list { kind: automatic, source: agent-tool }`)

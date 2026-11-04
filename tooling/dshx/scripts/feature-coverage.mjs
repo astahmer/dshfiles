@@ -1,7 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { featureCatalogIssues } from '../packages/dshx/src/project/features.ts'
+import { DSHX_PRESENTATION_FIELDS, featureCatalogIssues } from '../packages/dshx/src/project/features.ts'
 import { readPackageRelative, telemetryIssues } from './telemetry-coverage.mjs'
 
 const argumentsList = process.argv.slice(2)
@@ -15,6 +15,12 @@ const workspaceRoot = resolve((rootIndex >= 0 ? argumentsList[rootIndex + 1] : u
 const pluginsRoot = resolve(workspaceRoot, 'plugins/@dshfiles')
 const featureRoot = resolve(workspaceRoot, 'tooling/dshx/e2e/features')
 const isReportMode = mode === '--report'
+/**
+ * Features that predate the presentation fields (`surface`, `destination`, `currentSurface`), as `<package>#<feature id>`.
+ * The list only shrinks: a new feature must declare the fields, and an entry whose feature now declares them, or no
+ * longer exists, fails the check until it is removed.
+ */
+const presentationBaselinePath = resolve(workspaceRoot, 'tooling/dshx/feature-presentation-baseline.json')
 
 const isWithin = (root, target) => {
   const relativePath = relative(root, target)
@@ -93,7 +99,22 @@ const collectScenarioTags = async () => {
   return { featureFiles, tags, scenarioTags, misplacedTags }
 }
 
+const readPresentationBaseline = async () => {
+  const source = await readFile(presentationBaselinePath, 'utf8').catch(error => {
+    if (error?.code === 'ENOENT') return undefined
+    throw error
+  })
+  if (source === undefined) return new Set()
+  const parsed = JSON.parse(source)
+  if (!Array.isArray(parsed?.missing) || parsed.missing.some(entry => typeof entry !== 'string')) {
+    throw new Error(`${relative(workspaceRoot, presentationBaselinePath)} must be { "missing": ["<package>#<feature id>", ...] }.`)
+  }
+  return new Set(parsed.missing)
+}
+
 const packages = await collectPackages()
+const presentationBaseline = await readPresentationBaseline()
+const presentationSeen = new Set()
 const { featureFiles, tags: allScenarioTags, scenarioTags, misplacedTags } = await collectScenarioTags()
 const errors = []
 const catalogs = []
@@ -123,6 +144,8 @@ for (const plugin of packages) {
   const schemaIssues = featureCatalogIssues(rawCatalog)
   if (schemaIssues.length > 0) {
     for (const issue of schemaIssues) errors.push(`${plugin.name}: ${featureReference} ${issue}`)
+    // An unreadable catalog cannot prove its baseline entries stale; report only the schema issues.
+    for (const key of presentationBaseline) if (key.startsWith(`${plugin.name}#`)) presentationSeen.add(key)
     continue
   }
   const parsed = rawCatalog
@@ -133,6 +156,20 @@ for (const plugin of packages) {
   if (parsed.kind === 'library' && hasBundleMetadata) featureIssues.push('library catalog cannot be attached to a DSH bundle package')
   if (parsed.kind === 'infrastructure' && !hasBundleMetadata) featureIssues.push('infrastructure catalog requires package DSH bundle metadata')
   for (const feature of parsed.features) {
+    const presentationKey = `${plugin.name}#${feature.id}`
+    const missingPresentation = DSHX_PRESENTATION_FIELDS.filter(field => feature[field] === undefined)
+    if (presentationBaseline.has(presentationKey)) {
+      presentationSeen.add(presentationKey)
+      if (missingPresentation.length === 0) {
+        featureIssues.push(
+          `feature ${feature.id} now declares ${DSHX_PRESENTATION_FIELDS.join(', ')}; remove ${presentationKey} from tooling/dshx/feature-presentation-baseline.json`,
+        )
+      }
+    } else if (missingPresentation.length > 0) {
+      featureIssues.push(
+        `feature ${feature.id} must declare ${missingPresentation.join(', ')} (presentation surface, shell destination and where it lives today; see plans/ade-ux/README.md §5)`,
+      )
+    }
     const kinds = new Set(feature.verification.map(item => item.kind))
     if (parsed.kind === 'bundle' && !kinds.has('gherkin') && !kinds.has('not-applicable')) {
       featureIssues.push(`bundle feature ${feature.id} needs a Gherkin browser scenario or an explicit not-applicable rationale`)
@@ -171,6 +208,10 @@ for (const plugin of packages) {
   for (const [kind, count] of Object.entries(telemetry.counts)) telemetryCounts[kind] += count
   for (const issue of featureIssues) errors.push(`${plugin.name}: ${issue}`)
   catalogs.push({ ...plugin, catalog: parsed })
+}
+
+for (const key of presentationBaseline) {
+  if (!presentationSeen.has(key)) errors.push(`tooling/dshx/feature-presentation-baseline.json lists ${key}, which is not a catalog feature; remove it.`)
 }
 
 for (const [verificationId, featureFile] of expectedGherkin) {

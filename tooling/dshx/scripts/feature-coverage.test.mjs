@@ -31,6 +31,9 @@ const withFixture = async callback => {
           title: 'Boot a disposable profile',
           summary: 'Start a temporary profile with this bundle enabled.',
           surfaces: ['host'],
+          surface: 'detail',
+          destination: 'observe',
+          currentSurface: 'left-nav: Demo: Profiles',
           configuration: [{ key: 'timeoutMs', defaultValue: '30000', constraints: 'Positive integer milliseconds.', coveredBy: ['demo.boot-profile'] }],
           states: ['starting', 'ready', 'failed'],
           failureModes: ['The Host fails before publishing the bundle.'],
@@ -140,6 +143,63 @@ const spanTest = (body = "using recorder = recordSpans()\n    await run()\n    e
   `import { recordSpans } from '@dshfiles/dshx/tracing'\n\ntest('records the demo sync span', async () => {\n    ${body}\n})\n\ntest('another test', () => {})\n`
 
 const customEntry = { kind: 'custom', span: 'demo sync', file: 'plugins/@dshfiles/demo/src/sync.test.ts', testName: 'records the demo sync span' }
+
+const baselineFile = root => resolve(root, 'tooling/dshx/feature-presentation-baseline.json')
+
+test('requires presentation fields on a feature the baseline does not grandfather', async () => {
+  await withFixture(async ({ root, catalogFile }) => {
+    await editCatalog(catalogFile, catalog => {
+      delete catalog.features[0].surface
+      delete catalog.features[0].currentSurface
+    })
+    const missing = runCheck(root)
+    assert.equal(missing.status, 1)
+    assert.match(missing.stderr, /feature boot-profile must declare surface, currentSurface/)
+
+    await mkdir(resolve(root, 'tooling/dshx'), { recursive: true })
+    await writeFile(baselineFile(root), JSON.stringify({ missing: ['@dshfiles/demo#boot-profile'] }))
+    const grandfathered = runCheck(root)
+    assert.equal(grandfathered.status, 0, grandfathered.stderr)
+  })
+})
+
+test('fails a baseline entry once its feature declares the fields or no longer exists', async () => {
+  await withFixture(async ({ root }) => {
+    await mkdir(resolve(root, 'tooling/dshx'), { recursive: true })
+    await writeFile(baselineFile(root), JSON.stringify({ missing: ['@dshfiles/demo#boot-profile', '@dshfiles/demo#gone'] }))
+    const result = runCheck(root)
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /remove @dshfiles\/demo#boot-profile from tooling\/dshx\/feature-presentation-baseline\.json/)
+    assert.match(result.stderr, /lists @dshfiles\/demo#gone, which is not a catalog feature/)
+  })
+})
+
+test('rejects unknown presentation values and contradictory pairs', async () => {
+  await withFixture(async ({ root, catalogFile }) => {
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].surface = 'sidebarPanel'
+    })
+    const unknownSurface = runCheck(root)
+    assert.equal(unknownSurface.status, 1)
+    assert.match(unknownSurface.stderr, /features\.0\.surface: Expected "command"/)
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].surface = 'detail'
+      catalog.features[0].destination = 'home'
+    })
+    const unknownDestination = runCheck(root)
+    assert.equal(unknownDestination.status, 1)
+    assert.match(unknownDestination.stderr, /features\.0\.destination: Expected "threads"/)
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].surface = 'threadFacet'
+      catalog.features[0].destination = 'observe'
+    })
+    const contradictory = runCheck(root)
+    assert.equal(contradictory.status, 1)
+    assert.match(contradictory.stderr, /surface threadFacet lands in destination thread-panel, not observe/)
+  })
+})
 
 test('requires a telemetry entry on every feature', async () => {
   await withFixture(async ({ root, catalogFile }) => {
