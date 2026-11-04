@@ -10,6 +10,7 @@ import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertio
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFolder } from '../threads.js'
 import { materializeNonblankThread } from '../thread-composer.js'
+import { ThreadSidebarJourney } from '../thread-list-grouping.js'
 
 const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 const workbenchNavigation = (page: Page): Locator =>
@@ -205,11 +206,13 @@ const setThreadStatusFilters = async (
   await page.keyboard.press('Escape')
 }
 
-// The shipped default view is Done grouped by date, which has no Active, Parked or Pinned section headers; journeys that
-// assert a status section switch to the status-grouped All threads view first, as a user would.
+// All threads ships grouped by status (Needs you, Working, Ready, Idle, Done); journeys that assert an Active, Parked or
+// Pinned section header pick the drag-to-arrange sections ("Arrange manually") first, as a user would.
 const showThreadsByStatus = async (page: Page): Promise<void> => {
+  const railThreads = page.getByRole('tab', { name: 'Threads', exact: true })
+  if ((await railThreads.count()) > 0 && (await railThreads.first().getAttribute('aria-selected')) !== 'true') await railThreads.first().click()
   await threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true }).getByRole('button', { name: 'All threads', exact: true }).click()
-  await expect(threadSidebar(page).getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
+  await ThreadSidebarJourney.arrangeManually(page)
 }
 
 const selectThreadViewValue = async (page: Page, triggerName: string, value: string, scope: Locator = threadSidebar(page)): Promise<void> => {
@@ -694,11 +697,12 @@ Then('the board shows only columns, grouped and filtered independently from the 
   })
   await recordAssertion(page, 'thread-sidebar-board-keeps-independent-view-state', async () => {
     // The sidebar keeps the list; the page carries the board's own view controls.
-    await expect(threadSidebar(page).getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
-    await expect(board.getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
+    await expect(threadSidebar(page).getByRole('button', { name: 'Group: Arrange manually', exact: true })).toBeVisible()
+    // The board keeps the drag-to-arrange sections as its columns; the list defaults to the status grouping.
+    await expect(board.getByRole('button', { name: 'Group: Arrange manually', exact: true })).toBeVisible()
   })
 
-  await selectThreadViewValue(page, 'Group: Status', 'Project', board)
+  await selectThreadViewValue(page, 'Group: Arrange manually', 'Project', board)
   await selectThreadViewValue(page, 'Filter: None', 'Working', board)
   await selectThreadViewValue(page, 'Filter: Working', 'Subagent threads', board)
   const projectFilter = board.getByRole('combobox', { name: 'Project filter', exact: true })
@@ -708,13 +712,13 @@ Then('the board shows only columns, grouped and filtered independently from the 
   await expect(board.getByRole('button', { name: 'Group: Project', exact: true })).toBeVisible()
   await expect(board.getByRole('button', { name: 'Filter: Working · Subagent threads', exact: true })).toBeVisible()
   await expect(board.getByRole('combobox', { name: 'Project filter', exact: true })).toHaveText('Unassigned')
-  await expect(threadSidebar(page).getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Group: Arrange manually', exact: true })).toBeVisible()
   await expect(threadSidebar(page).getByRole('combobox', { name: 'Project filter', exact: true })).toHaveText('All projects')
 
   await page.reload()
   const reloadedSidebar = threadSidebar(page)
   await expect(reloadedSidebar).toBeVisible()
-  await expect(reloadedSidebar.getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
+  await expect(reloadedSidebar.getByRole('button', { name: 'Group: Arrange manually', exact: true })).toBeVisible()
   await expect(reloadedSidebar.getByRole('combobox', { name: 'Project filter', exact: true })).toHaveText('All projects')
 
   await openThreadBoard(page)
@@ -1012,7 +1016,7 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   // any other blank composer before the refresh, or the Archived filter would find nothing.
   await selectBlankThreadAwayFrom(page, archivedThreadId)
 
-  await selectThreadViewValue(page, 'Group: Status', 'Date')
+  await selectThreadViewValue(page, 'Group: Arrange manually', 'Date')
   await selectThreadViewValue(page, 'Filter: None', 'Archived')
   await selectThreadViewValue(page, 'Filter: Archived', 'Main threads')
   await expect(targetRow).toBeVisible()
@@ -2114,7 +2118,7 @@ Then('the blocked session is listed only in the Usage limit group when grouped b
     if (sessionId === null) throw new Error('The blocked thread is not selected.')
 
     await showThreadsByStatus(page)
-    await selectThreadViewValue(page, 'Group: Status', 'Date')
+    await selectThreadViewValue(page, 'Group: Arrange manually', 'Date')
     await expect(threadSidebar(page).getByRole('button', { name: 'Group: Date', exact: true })).toBeVisible()
     const group = page.getByRole('region', { name: 'Usage limit', exact: true })
     await expect(group.locator(`[data-thread-id="${sessionId}"]`)).toBeVisible()

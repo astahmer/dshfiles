@@ -47,6 +47,7 @@ export type ThreadSidebarTranslate = TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NA
 const threadStatusFilterValues = THREAD_STATUS_FILTER_OPTIONS.filter((value): value is ThreadStatusFilter => value !== 'all')
 
 const groupLabelKeys = {
+  state: 'threadSidebarGroupState',
   project: 'threadSidebarGroupProject',
   date: 'threadSidebarGroupDate',
   status: 'threadSidebarGroupStatus',
@@ -276,7 +277,7 @@ export const ThreadViewManager = (props: ThreadViewManagerProps): JSX.Element =>
       id: `custom-${id}`,
       name: '',
       enabled: true,
-      groupBy: 'status',
+      groupBy: 'state',
       statusFilters: [],
       sourceFilter: 'all',
     })

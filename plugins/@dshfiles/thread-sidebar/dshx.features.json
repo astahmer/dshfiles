@@ -375,6 +375,149 @@
       ]
     },
     {
+      "id": "status-grouped-thread-list",
+      "title": "See every thread grouped by what it needs from you",
+      "summary": "All threads is grouped by the ADE status vocabulary: Pinned on top, then Needs you, Working, Ready, Idle and Done (Done folded; a thread idle for 72 hours folds into Done unless pinned). Within a group the newest return comes first. Needs you and Failed are a projection of the inbox (open items about the thread) plus the questions, approvals, usage limits and interrupted turns the sidebar already sees, and a parent rolls up its subagents so it never looks finished while a child waits or failed. Each row shows a status glyph, the title, the agent preset, muted project and host chips, the elapsed time and one inline verb when it needs you (Answer and Approve open the thread; Retry, Resume and Land run the inbox item's verb). Group › Arrange manually brings back the drag-to-arrange sections; saved views keep their own grouping.",
+      "reach": [
+        "expect region \"Threads\"",
+        "click button \"Group: Status\"",
+        "expect text \"Arrange manually\"",
+        "press Escape",
+        "expect button \"Group: Status\""
+      ],
+      "surfaces": [
+        "client",
+        "integration"
+      ],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "thread-list: All threads › Group: Status",
+      "configuration": [
+        {
+          "key": "threadViews.views[all-threads].groupBy",
+          "defaultValue": "state",
+          "constraints": "One of state (Status), project, date, status (Arrange manually) or none; a saved choice is kept.",
+          "choices": [
+            "state",
+            "project",
+            "date",
+            "status",
+            "none"
+          ],
+          "coveredBy": [
+            "thread-sidebar.status-grouping-defaults"
+          ]
+        }
+      ],
+      "states": [
+        "pinned",
+        "needs-you",
+        "failed",
+        "working",
+        "ready",
+        "idle",
+        "done",
+        "subagent-rolled-up"
+      ],
+      "failureModes": [
+        "Without the inbox plugin the groups still follow the sidebar's own attention labels; only provider verbs (Retry, Land) on inbox items are missing.",
+        "A verb the provider refuses shows its message as a sidebar notice, with what to do instead.",
+        "Rows move between groups as their state changes; Arrange manually is the opt-out."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/activity-timeline",
+          "boundary": "attention-api module: list (needs-you, other) refreshed by the changed event, and act for provider verbs.",
+          "deterministicFake": "Item-to-signal mapping pinned in src/inbox-signals.test.ts; status mapping in src/thread-status.test.ts."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.status-grouping-mapping",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-status.test.ts",
+          "testName": "projects the inbox: a blocking item is Needs you with its verb and reason"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.status-grouping-rollup",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-status.test.ts",
+          "testName": "rolls subagents up: a waiting or failed child lifts its parent, a running child keeps it Working"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.status-grouping-order",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-status.test.ts",
+          "testName": "groups in shell order and sorts by came-back time; Pinned keeps pin order"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.status-grouping-done-fold",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-status.test.ts",
+          "testName": "starts Done folded and stores its open marker when opened"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.status-grouping-inbox-signals",
+          "file": "plugins/@dshfiles/thread-sidebar/src/inbox-signals.test.ts",
+          "testName": "keeps the most urgent open item per thread, with its first provider verb"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.status-grouping-defaults",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view-preferences.test.ts",
+          "testName": "keeps a saved All threads view on its manual sections and still recognizes it as the old default"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.status-grouping-browser",
+          "reason": "Walked by this feature's reach and captured at desktop and 390x844 WebKit in a scratch DSH (plans/ade-ux/phase3b); the section journeys in thread-sidebar.feature run with Arrange manually."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "working-status-item",
+      "title": "See how many threads are working in the status strip",
+      "summary": "The status strip shows \"N working\" for top-level threads with a running turn, colourless, and hides it while nothing runs. On a phone it is one line in the Status chip's list.",
+      "reach": [
+        "expect region \"Threads\""
+      ],
+      "surfaces": [
+        "client"
+      ],
+      "surface": "statusItem",
+      "destination": "none",
+      "currentSurface": "status-strip: N working",
+      "configuration": [],
+      "states": [
+        "hidden-idle",
+        "working"
+      ],
+      "failureModes": [
+        "Without frame-layout as the layout owner the item is registered but nothing renders it."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.working-status-item-browser",
+          "reason": "Captured in a scratch DSH at desktop and 390x844 WebKit (plans/ade-ux/phase3b); a fake-provider run is needed to hold a turn open for a Gherkin scenario."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: it counts running threads from the session store the browser already holds."
+        }
+      ]
+    },
+    {
       "id": "project-header-chat",
       "title": "Start a chat from a project group header",
       "summary": "Open a fresh local New chat from a project header. All threads shows the selected blank immediately; typing saves a distinct unsent draft before sending. Reopen any of several project drafts from their rows, without creating saved empty conversations.",
@@ -833,7 +976,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.view-controls-unit-preference-defaults",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-view-preferences.test.ts",
-          "testName": "ships exactly the requested three defaults with Done active"
+          "testName": "ships three defaults with All threads active and grouped by status (plan §4.3)"
         },
         {
           "kind": "unit-test",
@@ -3300,7 +3443,7 @@
     {
       "id": "finished-turn-inbox",
       "title": "Finished turns in the Inbox",
-      "summary": "Each unacknowledged finished turn becomes an Inbox item: Ready for a completed, stopped or blocked turn, Failed for an error or the output token limit, plus one Ready item for a thread marked unread by hand. Opening the thread acknowledges it and resolves the item.",
+      "summary": "Each unacknowledged finished turn becomes an Inbox item: Ready for a completed, stopped or blocked turn, Failed for an error or the output token limit, plus one Ready item for a thread marked unread by hand. Opening the thread acknowledges it and resolves the item. Done on the item in the Inbox acknowledges the same turn here, so the row loses its unread dot too; Done on an older turn leaves a newer finish unread.",
       "reach": [
         "fill textbox \"commands, @ files or s*\" \"[[call bash {\\\"command\\\":\\\"echo inbox\\\",\\\"description\\\":\\\"Inbox check\\\"}]]\"",
         "press Enter",
@@ -3324,7 +3467,8 @@
         "failed",
         "manually-unread",
         "acknowledged",
-        "inbox-absent"
+        "inbox-absent",
+        "done-in-inbox"
       ],
       "failureModes": [
         "Each finished turn is its own occurrence, so a later turn shows again after an earlier one was marked done.",
@@ -3343,6 +3487,12 @@
           "id": "thread-sidebar.finished-turn-inbox-drafts",
           "file": "plugins/@dshfiles/thread-sidebar/src/inbox-provider.test.ts",
           "testName": "states each unacknowledged turn as its own ready or failed occurrence and a hand-made unread mark as one item"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.finished-turn-inbox-done",
+          "file": "plugins/@dshfiles/thread-sidebar/src/inbox-provider.test.ts",
+          "testName": "matches Done in the inbox to the thread record only while the item is its current turn"
         },
         {
           "kind": "not-applicable",

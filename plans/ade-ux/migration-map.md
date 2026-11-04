@@ -6,13 +6,13 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-355 features from 88 plugins.
+359 features from 88 plugins.
 
 ## Counts
 
 | Destination | agentToolOnly | attentionProvider | command | composerContribution | destinationSection | detail | entityProvider | infrastructure | rowAction | settingsSection | statusItem | threadFacet | transcriptCard | Total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Threads |  |  |  |  | 9 |  | 1 |  | 12 |  |  |  |  | 22 |
+| Threads |  |  |  |  | 10 |  | 1 |  | 12 |  |  |  |  | 23 |
 | Inbox |  | 18 |  |  | 1 |  |  |  |  |  |  |  |  | 19 |
 | Land |  |  | 1 |  | 6 | 2 | 1 |  | 4 |  |  |  |  | 14 |
 | Work |  |  | 1 |  | 7 | 2 | 1 |  | 5 |  |  |  |  | 16 |
@@ -23,7 +23,7 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  | 17 |  | 17 |
 | Composer |  |  |  | 46 |  |  |  |  |  |  |  |  |  | 46 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  | 17 | 17 |
-| No place of its own | 17 |  | 15 |  |  |  |  | 90 |  |  | 5 |  |  | 127 |
+| No place of its own | 17 |  | 15 |  |  |  |  | 91 |  |  | 7 |  |  | 130 |
 
 ## By current left-nav entry
 
@@ -79,11 +79,12 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | plugins-page | 2 | No place of its own 1, Settings 1 |
 | right-pane | 5 | No place of its own 2, Thread panel 2, Settings 1 |
 | settings | 24 | Settings 22, No place of its own 2 |
-| shell | 6 | No place of its own 4, Threads 2 |
+| shell | 7 | No place of its own 5, Threads 2 |
 | sidebar | 2 | Settings 2 |
-| sidebar-footer | 7 | No place of its own 5, Composer 1, Observe 1 |
+| sidebar-footer | 3 | No place of its own 3 |
+| status-strip | 6 | No place of its own 4, Composer 1, Observe 1 |
 | thread-header | 7 | Thread panel 3, Threads 3, No place of its own 1 |
-| thread-list | 20 | Threads 14, Inbox 3, No place of its own 2, Settings 1 |
+| thread-list | 21 | Threads 15, Inbox 3, No place of its own 2, Settings 1 |
 | toast | 1 | No place of its own 1 |
 | transcript | 21 | Transcript 17, Inbox 1, Knowledge 1, Land 1, Work 1 |
 | url | 1 | No place of its own 1 |
@@ -93,7 +94,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 
 ### Threads
 
-rail destination (default); 22 features.
+rail destination (default); 23 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -102,6 +103,7 @@ rail destination (default); 22 features.
 | thread-sidebar/destination-rail: Switch destinations from the rail | destinationSection | shell: Navigation list (21 entries) and collapsed icon rail |
 | thread-sidebar/phone-tab-bar: Navigate from a bottom tab bar on a phone | destinationSection | shell: collapsed icon rail at phone width |
 | thread-sidebar/section-order: Group remote threads with each view | destinationSection | thread-list: Thread list settings › Remote group |
+| thread-sidebar/status-grouped-thread-list: See every thread grouped by what it needs from you | destinationSection | thread-list: All threads › Group: Status |
 | thread-sidebar/thread-children-and-links: Browse child sessions and share thread URLs | destinationSection | thread-list: child threads |
 | thread-sidebar/thread-classification: Organize threads by workspace and status | destinationSection | left-nav: Thread Sidebar: Board |
 | thread-sidebar/thread-keyboard-navigation: Navigate and multi-select threads from the keyboard | destinationSection | thread-list: keyboard navigation |
@@ -210,7 +212,7 @@ rail destination; 20 features.
 | --- | --- | --- |
 | activity-timeline/activity-feed: Unified agent activity feed | destinationSection | left-nav: Activity Timeline: Activity |
 | activity-timeline/verification-receipts: Inspect verification receipts in the Activity Timeline | destinationSection | left-nav: Activity Timeline: Activity › receipt detail |
-| ai-accounts/quota-dashboard: Read provider quota and usage status | destinationSection | sidebar-footer: AI accounts usage |
+| ai-accounts/quota-dashboard: Read provider quota and usage status | destinationSection | status-strip: Quota › usage popover |
 | ai-accounts/quota-forecast: Forecast when each account runs out, whether a kind kept an account free, and the order to use them in | destinationSection | left-nav: AI Accounts: Quota forecast |
 | ai-accounts/usage-history-and-pricing: Review usage history and cost forecasts | destinationSection | left-nav: AI Accounts: Usage history |
 | background-jobs/jobs-board: Cross-Session background jobs board | destinationSection | left-nav: Background Jobs: Jobs |
@@ -327,7 +329,7 @@ run row, chips, `/` and `@` sources; 46 features.
 | --- | --- | --- |
 | agent-preset/draft-preset-selection: Choose an agent preset before typing | composerContribution | composer: Standard mode chip |
 | agents/agent-mentions: Mention an agent where a thread starts | composerContribution | composer: @agent mention |
-| ai-accounts/thread-account-switch: Use a sidebar account for this thread without reselecting its model | composerContribution | sidebar-footer: usage strip › Use this account for this thread |
+| ai-accounts/thread-account-switch: Use a sidebar account for this thread without reselecting its model | composerContribution | status-strip: Quota › Use this account for this thread |
 | annotations/chrome-picker: Pick on any page in a DSH-owned Chrome | composerContribution | composer: Annotate an element › DSH-owned Chrome |
 | annotations/pick-element: Pick an element and add it to the draft | composerContribution | composer: Annotate an element |
 | backlog/backlog-mentions: Mention backlog items with @ | composerContribution | composer: @b: mentions |
@@ -398,7 +400,7 @@ cards inline in the active thread; 17 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 127 features.
+palette commands, status items, agent tools, infrastructure; 130 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -458,6 +460,7 @@ palette commands, status items, agent tools, infrastructure; 127 features.
 | frame-layout/panel-seats: Hand the frame's regions to plugin surfaces | infrastructure | shell: frame regions |
 | frame-layout/panel-width-persistence: Persist the frame's dragged panel widths | infrastructure | shell: panel widths |
 | frame-layout/phone-navigation-seat: Give the stage the full width on a phone | infrastructure | shell: frame columns at phone width |
+| frame-layout/status-strip: One status strip at the bottom of the frame | infrastructure | shell: status strip |
 | git-worktrees/git-file-snapshots: Snapshot and restore a git workspace's files | infrastructure | host: git file snapshots |
 | git-worktrees/git-thread-worktrees: Isolate threads in git worktrees | infrastructure | settings: git worktree isolation (opt-in) |
 | goal-stall-guard/pause-stalled-goals: Pause goals after consecutive empty rounds | infrastructure | host: goal rounds |
@@ -524,11 +527,13 @@ palette commands, status items, agent tools, infrastructure; 127 features.
 | workbench/sidebar-preview-tab: Account Preview is a regular movable docked view | infrastructure | workbench: AI Accounts: Preview tab |
 | workbench/single-tab-rows: Hide a single tab row without hiding its view | infrastructure | workbench: Hide tab row |
 | workbench/window-floating: Root-pane windows float across the application | infrastructure | workbench: Float panel |
-| ai-accounts/active-chat-account: See which account serves the active chat | statusItem | sidebar-footer: usage strip meters |
-| ai-accounts/disabled-account-preview: Keep disabled accounts visible and toggle routing from the usage popover | statusItem | sidebar-footer: usage strip popover |
+| ai-accounts/active-chat-account: See which account serves the active chat | statusItem | status-strip: Quota meters |
+| ai-accounts/disabled-account-preview: Keep disabled accounts visible and toggle routing from the usage popover | statusItem | status-strip: Quota popover |
 | hmr-gate/plugins-row: Plugin updates waiting for a Host restart | statusItem | plugins-page: View HMR updates |
+| hmr-gate/restart-status-item: See a pending Host restart in the status strip | statusItem | status-strip: Restart pending |
 | thread-sidebar/client-reload-banner: Offer a page reload when the running client bundles are behind | statusItem | sidebar-footer: client reload banner |
 | thread-sidebar/pending-host-restart: Warn when a host restart is required | statusItem | sidebar-footer: Restart DSH to apply updates |
+| thread-sidebar/working-status-item: See how many threads are working in the status strip | statusItem | status-strip: N working |
 
 ## Ambiguous choices
 

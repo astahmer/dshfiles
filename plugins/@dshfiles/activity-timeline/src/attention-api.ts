@@ -21,6 +21,11 @@ declare module '@deepseek-ai/cordis' {
      * owns `source` returns an outcome; one that does not own it returns `undefined` so the next listener answers.
      */
     'dshfiles/attention/act'(request: AttentionActRequest): Promise<AttentionActOutcome | undefined>
+    /**
+     * The user marked an item Done in the inbox. The provider that owns `item.source` may clear its own matching state
+     * (thread-sidebar acknowledges the finished turn, so the row's unread dot goes too); others ignore it.
+     */
+    'dshfiles/attention/done'(payload: { readonly item: AttentionItem }): void
   }
 }
 

@@ -48,7 +48,7 @@ test('opens and saves a named view on plain HTTP without crypto.randomUUID', asy
     name: 'Later',
     enabled: true,
     showCount: true,
-    groupBy: 'status',
+    groupBy: 'state',
     statusFilters: [],
     sourceFilter: 'all',
   })

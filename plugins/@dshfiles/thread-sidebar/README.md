@@ -1,5 +1,7 @@
 # Thread Sidebar
 
+![All threads grouped by status: Needs you, Ready and Idle, with the status strip below](docs/screenshots/status-grouped-thread-list.png)
+
 ![The fixed layout: a labelled rail of destinations beside the thread list](docs/screenshots/destination-rail.png)
 
 ![On a phone the rail becomes a bottom tab bar; More lists the other destinations](docs/screenshots/phone-tab-bar.png)
@@ -39,6 +41,32 @@ shown ones reorder around it. The project picker scopes rows to one workspace or
 unassigned sessions.
 
 The reusable board page is **Thread Sidebar: Board** (Threads › Board in the rail).
+
+**Status grouping (default).** **All threads** groups rows by the ADE status vocabulary (plan `plans/ade-ux` §4.3,
+§4.7; `src/thread-status.ts`): **Pinned** on top, then **Needs you**, **Working**, **Ready**, **Idle** and **Done**.
+Done starts folded, and a thread nobody touched for 72 hours folds into it on its own unless it is pinned. Within a
+group the newest return to you comes first: the time the thread entered its group (the inbox item's opening, the
+finish, the settle), refined live while the page is open. Needs you and Failed (which shares the Needs you group) are a
+projection of the inbox: an open `@dshfiles/activity-timeline/attention-api` item whose subject is the thread
+(`src/inbox-signals.ts`), plus the questions, approvals, usage limits and interrupted turns this sidebar already
+classifies. Each row shows the kit's `StatusGlyph` (Working spins without colour; only Needs you, Failed and Ready
+draw the eye), the title, a muted second line with why it needs you, the agent preset, project and host, the elapsed
+time, and one inline verb when it needs you: **Answer** and **Approve** open the thread, where the card is answered in
+place; **Retry**, **Resume** and **Land** on an inbox item run that item's own verb through the inbox's `act`.
+Subagents stay nested one level under their parent and roll up into it ("2 subagents need you", "waiting on 1
+subagent"), so a parent never looks finished while a child waits or failed. **Group › Arrange manually** brings back
+the drag-to-arrange sections below; a saved view keeps whatever grouping it was saved with, so only a new profile
+starts on the status list. The row uses `StatusGlyph` rather than the whole `EntityRow`: the list row is also a
+native drag source, a context-menu trigger, an inline rename field and a hover-action strip, which `EntityRow` does
+not compose.
+
+**Inbox and unread agree both ways.** Opening a thread acknowledges its finished turn, which resolves its inbox item;
+marking that item **Done** in the Inbox acknowledges the same turn here (the inbox emits `dshfiles/attention/done`),
+so the row's unread dot clears too. Done on an older turn's item leaves a newer finish unread.
+
+**Status strip item.** With `@dshfiles/frame-layout` as the frame, the sidebar adds the strip's "N working" item
+(top-level threads with a running turn; hidden while none run). In the fixed layout the account preview moved from
+above the sidebar footer into the strip's Quota item; free docking still seats it there.
 
 **Fixed layout and destinations (default).** The left column is a labelled rail of eight destinations (plan
 `plans/ade-ux` §4.2): Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings. Threads shows this thread

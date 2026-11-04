@@ -89,7 +89,14 @@ export const attentionHandlers = Api.handlers(attentionApi, {
       yield* providerOnly(call, 'reconcile')
       return yield* AttentionInbox.use(inbox => inbox.reconcile({ source: input.source, items: input.items.filter(item => item.severity !== 'info') }))
     }),
-  done: input => AttentionInbox.use(inbox => inbox.done(input)),
+  done: input =>
+    Effect.gen(function* () {
+      const host = yield* HostContext
+      const item = yield* AttentionInbox.use(inbox => inbox.done(input))
+      // Tell the item's provider, so its own unread state (a thread row's dot) clears with the inbox (plan §4.8).
+      yield* Effect.sync(() => host.ctx.emit('dshfiles/attention/done', { item }))
+      return item
+    }),
   snooze: input => AttentionInbox.use(inbox => inbox.snooze(input)),
   reopen: input => AttentionInbox.use(inbox => inbox.reopen(input)),
   muteSource: input => AttentionInbox.use(inbox => inbox.muteSource(input)),

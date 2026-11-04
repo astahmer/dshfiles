@@ -1,7 +1,12 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ThreadAttentionLabel } from './attention-presentation.js'
 
-export const THREAD_GROUP_BY_OPTIONS = ['project', 'date', 'status', 'none'] as const
+/**
+ * `state` is the ADE status grouping (Pinned, Needs you, Working, Ready, Idle, Done; plan `plans/ade-ux` §4.3) and the
+ * default. `status` is the older drag-to-arrange sections (Pinned, Active, Parked, Inactive, Settled, Archived), kept as
+ * "Arrange manually" because status sorting makes rows move.
+ */
+export const THREAD_GROUP_BY_OPTIONS = ['state', 'project', 'date', 'status', 'none'] as const
 export type ThreadGroupBy = (typeof THREAD_GROUP_BY_OPTIONS)[number]
 
 export const THREAD_STATUS_FILTER_OPTIONS = [
@@ -264,7 +269,7 @@ const threadDateGroup = (updatedAt: number, now: number): ThreadDateGroup => {
 }
 
 const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedAt'>>(options: {
-  readonly groupBy: Exclude<ThreadGroupBy, 'status'>
+  readonly groupBy: Exclude<ThreadGroupBy, 'status' | 'state'>
   readonly entries: readonly ThreadViewEntry<Thread>[]
   readonly workspaceTitles: ReadonlyMap<string, string>
   readonly localProjectIds: ReadonlySet<string>

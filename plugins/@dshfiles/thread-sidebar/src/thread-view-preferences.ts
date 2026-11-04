@@ -45,7 +45,8 @@ export const DEFAULT_THREAD_VIEW_PRESETS = [
   {
     id: ALL_THREADS_VIEW_ID,
     name: null,
-    groupBy: 'status',
+    // The ADE status grouping (plan §4.3); "Arrange manually" (`status`) stays one Group menu choice away.
+    groupBy: 'state',
     statusFilters: [],
     sourceFilter: 'all',
     enabled: true,
@@ -70,7 +71,8 @@ export const DEFAULT_THREAD_VIEW_PRESETS = [
 
 export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
   views: [...DEFAULT_THREAD_VIEW_PRESETS],
-  activeViewId: DONE_VIEW_ID,
+  // All threads, grouped by status, is the list a new profile opens on; a saved choice keeps its own view.
+  activeViewId: ALL_THREADS_VIEW_ID,
   showGroupControl: true,
   showFilterControl: true,
 }
@@ -362,10 +364,18 @@ const matchesPreviousFiveViewDefaults = (settings: ThreadViewSettings): boolean 
     ),
   )
 
+/** The three built-in views as shipped before the status grouping became the All threads default. */
+const PRE_STATE_GROUPING_PRESETS: readonly ThreadViewPreset[] = [
+  { ...DEFAULT_THREAD_VIEW_PRESETS[0], groupBy: 'status' },
+  DEFAULT_THREAD_VIEW_PRESETS[1],
+  DEFAULT_THREAD_VIEW_PRESETS[2],
+]
+
 const isDefaultThreadViewSettings = (settings: ThreadViewSettings): boolean =>
   settings.showGroupControl &&
   settings.showFilterControl &&
   (matchesDefaultPresets(upgradeShippedViewFilters(settings), DEFAULT_THREAD_VIEW_PRESETS) ||
+    matchesDefaultPresets(upgradeShippedViewFilters(settings), PRE_STATE_GROUPING_PRESETS) ||
     matchesDefaultPresets(settings, PREVIOUS_DEFAULT_THREAD_VIEW_PRESETS) ||
     matchesPreviousFiveViewDefaults(settings)) &&
   settings.views.some(view => view.id === settings.activeViewId)

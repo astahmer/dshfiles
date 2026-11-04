@@ -1,4 +1,4 @@
-import { attentionApi, type AttentionDraft } from '@dshfiles/activity-timeline/attention-api'
+import { attentionApi, type AttentionDraft, type AttentionItem } from '@dshfiles/activity-timeline/attention-api'
 import { DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Effect, Layer, Stream } from 'effect'
@@ -45,6 +45,19 @@ const draftOf = (view: ThreadAttentionView): AttentionDraft | null => {
   return null
 }
 
+/**
+ * The thread record an inbox item was drawn from, when that item is still this thread's current draft: Done on an older
+ * turn's item must not clear a newer finish.
+ */
+const viewForDoneItem = (item: Pick<AttentionItem, 'source' | 'dedupeKey' | 'subject'>, views: Iterable<ThreadAttentionView>): ThreadAttentionView | undefined => {
+  if (item.source !== FINISHED_TURN_SOURCE || item.subject.kind !== 'session') return undefined
+  for (const view of views) {
+    if (view.sessionId !== item.subject.id) continue
+    return draftOf(view)?.dedupeKey === item.dedupeKey ? view : undefined
+  }
+  return undefined
+}
+
 const draftsOf = (views: Iterable<ThreadAttentionView>): readonly AttentionDraft[] =>
   [...views].flatMap(view => {
     const draft = draftOf(view)
@@ -64,6 +77,25 @@ const make = Effect.gen(function* () {
     yield* inbox.reconcile({ source: FINISHED_TURN_SOURCE, items: [...items] })
   })
 
+  /**
+   * Done in the inbox is read here too (plan §4.8, both ways): the thread's finished turn is acknowledged, so its row
+   * loses the unread dot, and the next reconcile resolves the item. A hand unread mark is cleared the same way.
+   */
+  const acknowledgeDone = Effect.fn('thread-sidebar attention done')(function* (item: AttentionItem) {
+    const view = viewForDoneItem(item, (yield* attention.snapshot).sessions)
+    yield* Effect.annotateCurrentSpan({ 'attention.matched': view !== undefined })
+    if (view === undefined) return
+    if (view.finishedAt !== null) yield* attention.acknowledge({ sessionId: view.sessionId, version: view.version })
+    else yield* attention.clearUnread({ sessionId: view.sessionId, version: view.version })
+  })
+  yield* HostEvents.stream('dshfiles/attention/done').pipe(
+    Stream.runForEach(([payload]) =>
+      acknowledgeDone(payload.item).pipe(Effect.catchCause(cause => Effect.logWarning('thread-sidebar: inbox done not applied', cause))),
+    ),
+    DshxPlugin.detached,
+    Effect.forkScoped,
+  )
+
   yield* Stream.mergeAll([Stream.succeed(undefined), Stream.map(HostEvents.stream('dshfiles/attention/ready'), () => undefined), attention.changes], {
     concurrency: 'unbounded',
   }).pipe(
@@ -78,4 +110,5 @@ const make = Effect.gen(function* () {
 export class FinishedTurnAttention {
   static readonly layer = Layer.effectDiscard(make)
   static readonly draftsOf = draftsOf
+  static readonly viewForDoneItem = viewForDoneItem
 }

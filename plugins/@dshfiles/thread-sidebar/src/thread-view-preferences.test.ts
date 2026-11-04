@@ -21,17 +21,27 @@ const attentionView: ThreadViewPreset = {
 }
 
 describe('thread view preferences', () => {
-  it('ships exactly the requested three defaults with Done active', () => {
+  it('ships three defaults with All threads active and grouped by status (plan §4.3)', () => {
     expect(DEFAULT_THREAD_VIEW_SETTINGS).toEqual({
       views: [
-        { id: ALL_THREADS_VIEW_ID, name: null, enabled: true, groupBy: 'status', statusFilters: [], sourceFilter: 'all' },
+        { id: ALL_THREADS_VIEW_ID, name: null, enabled: true, groupBy: 'state', statusFilters: [], sourceFilter: 'all' },
         { id: WORKING_VIEW_ID, name: null, enabled: true, groupBy: 'status', statusFilters: ['working'], sourceFilter: 'all' },
         { id: DONE_VIEW_ID, name: null, enabled: true, groupBy: 'date', statusFilters: ['not-running', 'attention'], sourceFilter: 'main' },
       ],
-      activeViewId: DONE_VIEW_ID,
+      activeViewId: ALL_THREADS_VIEW_ID,
       showGroupControl: true,
       showFilterControl: true,
     })
+  })
+
+  it('keeps a saved All threads view on its manual sections and still recognizes it as the old default', () => {
+    const saved: ThreadViewSettings = {
+      ...DEFAULT_THREAD_VIEW_SETTINGS,
+      views: [{ ...DEFAULT_THREAD_VIEW_PRESETS[0], groupBy: 'status' }, DEFAULT_THREAD_VIEW_PRESETS[1], DEFAULT_THREAD_VIEW_PRESETS[2]],
+      activeViewId: DONE_VIEW_ID,
+    }
+    expect(ThreadViewPreferencesModel.decodeThreadViewSettings(saved)?.views[0]?.groupBy).toBe('status')
+    expect(ThreadViewPreferencesModel.isDefaultThreadViewSettings(saved)).toBe(true)
   })
 
   it('decodes the exact legacy browser document without restoring removed tabs or losing custom Done', () => {
@@ -44,7 +54,8 @@ describe('thread view preferences', () => {
     expect(migrated).toEqual({
       ...JSON.parse(raw),
       views: [
-        DEFAULT_THREAD_VIEW_PRESETS[0],
+        // The stored grouping is honoured: only a new profile starts on the status grouping.
+        { ...DEFAULT_THREAD_VIEW_PRESETS[0], groupBy: 'status' },
         DEFAULT_THREAD_VIEW_PRESETS[1],
         {
           id: 'custom-548d9702-a284-4342-94bb-122a540a4492',
@@ -315,7 +326,7 @@ describe('thread view preferences', () => {
   it('migrates legacy preferences without losing the active grouping and filters', () => {
     expect(ThreadViewPreferencesModel.decodeThreadViewSettings({ groupBy: 'date', statusFilter: 'archived', sourceFilter: 'main' })).toMatchObject({
       views: [
-        { id: ALL_THREADS_VIEW_ID, groupBy: 'status', statusFilters: [], sourceFilter: 'all' },
+        { id: ALL_THREADS_VIEW_ID, groupBy: 'state', statusFilters: [], sourceFilter: 'all' },
         { id: WORKING_VIEW_ID, groupBy: 'status', statusFilters: ['working'], sourceFilter: 'all' },
         { id: DONE_VIEW_ID, groupBy: 'date', statusFilters: ['not-running', 'attention'], sourceFilter: 'main' },
         { id: LEGACY_CURRENT_VIEW_ID, name: null, groupBy: 'date', statusFilters: ['archived'], sourceFilter: 'main', enabled: true },
@@ -343,7 +354,7 @@ describe('thread view preferences', () => {
       activeViewId: attentionView.id,
     }
     expect(ThreadViewPreferencesModel.decodeThreadViewSettings(legacySettings)?.views).toEqual([
-      DEFAULT_THREAD_VIEW_PRESETS[0],
+      { ...DEFAULT_THREAD_VIEW_PRESETS[0], groupBy: 'status' },
       { ...DEFAULT_THREAD_VIEW_PRESETS[1], statusFilters: ['working'] },
       { ...attentionView },
     ])
@@ -437,7 +448,7 @@ describe('thread view preferences', () => {
     expect(updated.views[0]?.name).toBe('Everything')
     const added = ThreadViewPreferencesModel.saveThreadView(updated, attentionView)
     expect(added.views.at(-1)).toEqual(attentionView)
-    expect(added.activeViewId).toBe(DONE_VIEW_ID)
+    expect(added.activeViewId).toBe(ALL_THREADS_VIEW_ID)
   })
 })
 

@@ -21,6 +21,9 @@ import { RemoteThreadItem, RemoteThreadsSection } from './remote-threads-section
 import { RemoteThreadInventoryModel, useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
+import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
+import { useInboxThreadSignals } from './inbox-signals.js'
+import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusGroup } from './thread-status.js'
 import { useApi, useApiQuery, usePlugin } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
@@ -357,6 +360,7 @@ const attentionColorLabelKeys = {
 } satisfies Record<AttentionColor, Parameters<ThreadSidebarTranslate>[0]>
 
 const threadGroupLabelKeys = {
+  state: 'threadSidebarGroupState',
   status: 'threadSidebarGroupStatus',
   project: 'threadSidebarGroupProject',
   date: 'threadSidebarGroupDate',
@@ -492,6 +496,8 @@ interface RowActions {
   readonly rename: (sessionId: SessionSummary['id'], title: string) => void
   readonly cancelRename: () => void
   readonly setAutoSettleOverride: (sessionId: SessionSummary['id'], override: AutoSettleOverride) => void
+  /** The row's one inline verb (plan §4.3): an inbox item's provider verb, a sidebar Resume, or open the thread. */
+  readonly actOnStatus: (sessionId: SessionSummary['id'], status: ThreadStatus) => void
   readonly translate: ThreadSidebarTranslate
 }
 
@@ -549,9 +555,58 @@ interface ThreadRowProps {
   /** Set only when the open thread is one of this row's children, so other rows skip re-rendering. */
   readonly selectedChildId: SessionSummary['id'] | undefined
   readonly actions: RowActions
+  /**
+   * Status grouping only: the row's ADE status (glyph, detail, inline verb), with its subagents rolled up. Undefined
+   * keeps the older dot-and-label row for the other groupings.
+   */
+  readonly workStatus?: ThreadStatus | undefined
+  /** Each child's own status, for the nested subagent rows under a status-grouped parent. */
+  readonly childStatuses?: ReadonlyMap<SessionSummary['id'], ThreadStatus> | undefined
+  /** The agent preset the thread runs, shown as a muted chip. */
+  readonly agent?: string | undefined
 }
 
+const workStatusLabelKeys = {
+  working: 'threadSidebarStateWorking',
+  'needs-you': 'threadSidebarStateNeedsYou',
+  failed: 'threadSidebarStateFailed',
+  ready: 'threadSidebarStateReady',
+  idle: 'threadSidebarStateIdle',
+  done: 'threadSidebarStateDone',
+} as const satisfies Record<WorkStatus, Parameters<ThreadSidebarTranslate>[0]>
+
+const statusGroupLabelKeys = {
+  pinned: 'threadSidebarPinned',
+  'needs-you': 'threadSidebarStateNeedsYou',
+  working: 'threadSidebarStateWorking',
+  ready: 'threadSidebarStateReady',
+  idle: 'threadSidebarStateIdle',
+  done: 'threadSidebarStateDone',
+} as const satisfies Record<ThreadStatusGroup, Parameters<ThreadSidebarTranslate>[0]>
+
+const inlineVerbLabelKeys = {
+  Answer: 'threadSidebarVerbAnswer',
+  Approve: 'threadSidebarVerbApprove',
+  Retry: 'threadSidebarVerbRetry',
+  Resume: 'threadSidebarVerbResume',
+  Land: 'threadSidebarVerbLand',
+} as const satisfies Record<InlineVerb, Parameters<ThreadSidebarTranslate>[0]>
+
 const NO_CHILDREN: readonly SessionSummary[] = []
+
+/**
+ * The agent preset a thread runs, from the Host's `agentPreset` projection; the deployment default reads as no agent.
+ * A configured `@handle` per thread needs the agents plugin to provide it (plans/ade-ux/phase3b, follow-up).
+ */
+const BUILT_IN_PRESETS: ReadonlySet<string> = new Set(['default', 'standard', 'plan', 'ask', 'auto'])
+
+const agentPresetOf = (session: SessionSummary): string | undefined => {
+  const values = session.projectionValues
+  if (values === undefined || !('agentPreset' in values)) return undefined
+  const preset = values.agentPreset
+  // The shipped presets are the mode a thread runs in (shown by the composer), not an agent.
+  return typeof preset === 'string' && preset.length > 0 && !BUILT_IN_PRESETS.has(preset) ? preset : undefined
+}
 
 const finishedSubagentsLabels = {
   show: 'threadSidebarFinishedSubagentsShow',
@@ -615,6 +670,8 @@ const ChildThreadList = (props: {
   readonly attentionLabels: ReadonlyMap<SessionSummary['id'], ThreadAttentionLabel>
   readonly rowStyle: RowStyle
   readonly actions: RowActions
+  /** Status grouping: each child's ADE status replaces its dot and label. */
+  readonly childStatuses?: ReadonlyMap<SessionSummary['id'], ThreadStatus> | undefined
 }): JSX.Element => {
   const t = props.actions.translate
   const [finishedShown, setFinishedShown] = useState(false)
@@ -630,7 +687,8 @@ const ChildThreadList = (props: {
     compact ? 'dshx:h-6 dshx:text-xs' : 'dshx:h-7 dshx:text-sm',
   )
   const renderChild = (child: SessionSummary): JSX.Element => {
-    const attentionLabel = props.attentionLabels.get(child.id)
+    const childStatus = props.childStatuses?.get(child.id)
+    const attentionLabel = childStatus === undefined ? props.attentionLabels.get(child.id) : undefined
     return (
       <li key={child.id}>
         <button
@@ -649,16 +707,34 @@ const ChildThreadList = (props: {
           onClick={() => props.actions.open(child.id)}
           onDoubleClick={() => keepThreadTab(child.id)}
         >
-          <SessionStatusDot
-            session={child}
-            unread={props.unreadSessionIds.has(child.id)}
-            unreadLabel={t('threadSidebarUnread')}
-            attentionLabel={attentionLabel}
-            attentionColors={props.rowStyle.attentionColors}
-          />
-          <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground', props.unreadSessionIds.has(child.id) && 'dshx:font-semibold')}>
+          {childStatus === undefined ? (
+            <SessionStatusDot
+              session={child}
+              unread={props.unreadSessionIds.has(child.id)}
+              unreadLabel={t('threadSidebarUnread')}
+              attentionLabel={attentionLabel}
+              attentionColors={props.rowStyle.attentionColors}
+            />
+          ) : (
+            <StatusGlyph
+              status={childStatus.status}
+              label={
+                childStatus.status === 'ready' && props.unreadSessionIds.has(child.id) ? t('threadSidebarUnread') : t(workStatusLabelKeys[childStatus.status])
+              }
+            />
+          )}
+          <span
+            className={cn(
+              'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
+              (childStatus === undefined ? props.unreadSessionIds.has(child.id) : childStatus.status === 'ready') && 'dshx:font-semibold',
+              childStatus?.status === 'done' && 'dshx:text-muted-foreground',
+            )}
+          >
             {child.displayTitle}
           </span>
+          {childStatus === undefined || (childStatus.status !== 'needs-you' && childStatus.status !== 'failed') ? null : (
+            <span className="dshx:shrink-0 dshx:text-[10px] dshx:font-medium dshx:text-muted-foreground">{t(workStatusLabelKeys[childStatus.status])}</span>
+          )}
           {attentionLabel === undefined ? null : (
             <span
               className={cn(
@@ -943,7 +1019,15 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const showMachine = rowStyle.machine && props.machine !== undefined
   const showPath = rowStyle.path && session.cwd !== undefined && session.cwd.length > 0
   const workspaceLabel = workspaceNameLabel(props.workspaceName, props.workspaceTitle)
-  const metaLine = showProject || showMachine || showPath || childCount > 0
+  const workStatus = props.workStatus
+  const inlineVerb = workStatus?.verb
+  const showAgent = workStatus !== undefined && props.agent !== undefined
+  // Why it needs you leads the second line, so the title keeps the first line to itself.
+  const statusDetail =
+    workStatus === undefined || (workStatus.status !== 'needs-you' && workStatus.status !== 'failed' && workStatus.detail === undefined)
+      ? undefined
+      : (workStatus.detail ?? t(workStatusLabelKeys[workStatus.status]))
+  const metaLine = showProject || showMachine || showPath || childCount > 0 || showAgent || statusDetail !== undefined
   const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.rebasedAt !== undefined || props.integrationQueuedAt !== undefined
   const openAside = useAsideOpen()
   /**
@@ -1099,9 +1183,11 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             <button
               type="button"
               draggable
+              data-work-status={workStatus?.status}
               className={cn(
                 'dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
+                inlineVerb !== undefined && 'dshx:pr-20',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
               )}
               data-thread-id={session.id}
@@ -1113,7 +1199,13 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             >
               {headLine ? (
                 <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-                  {rowStyle.statusDot ? (
+                  {workStatus !== undefined ? (
+                    <StatusGlyph
+                      status={workStatus.status}
+                      // An unread Ready row keeps the accessible name the dot had, so "Unread" still finds it.
+                      label={workStatus.status === 'ready' && unread ? t('threadSidebarUnread') : t(workStatusLabelKeys[workStatus.status])}
+                    />
+                  ) : rowStyle.statusDot ? (
                     <SessionStatusDot
                       session={session}
                       unread={unread}
@@ -1127,12 +1219,14 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     className={cn(
                       'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
                       compact ? 'dshx:text-sm' : 'dshx:text-base',
-                      unread && 'dshx:font-semibold',
+                      // Dark cockpit: in the status list only Ready rows are bold and Done rows are muted.
+                      (workStatus === undefined ? unread : workStatus.status === 'ready') && 'dshx:font-semibold',
+                      workStatus?.status === 'done' && 'dshx:text-muted-foreground',
                     )}
                   >
                     {rowStyle.title ? session.displayTitle : null}
                   </span>
-                  {props.attentionLabel === undefined ? null : (
+                  {workStatus !== undefined || props.attentionLabel === undefined ? null : (
                     <span
                       className={cn(
                         'dshx:shrink-0 dshx:text-xs dshx:font-medium',
@@ -1155,14 +1249,15 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       {t('threadSidebarRebased')}
                     </Badge>
                   )}
-                  {rowStyle.time ? (
+                  {rowStyle.time && inlineVerb === undefined ? (
                     <span
                       className={cn(
                         'dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
-                        session.running && 'dshx:font-medium dshx:text-info',
+                        // The status list's spinner already says Working; the time stays colourless there.
+                        workStatus === undefined && session.running && 'dshx:font-medium dshx:text-info',
                       )}
                     >
-                      {`${session.running ? `${t('threadSidebarWorking')} · ` : ''}${props.age}`}
+                      {`${workStatus === undefined && session.running ? `${t('threadSidebarWorking')} · ` : ''}${props.age}`}
                     </span>
                   ) : null}
                 </span>
@@ -1175,6 +1270,22 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     childCount > 0 && 'dshx:pr-16',
                   )}
                 >
+                  {statusDetail === undefined ? null : (
+                    <span
+                      className={cn(
+                        'dshx:min-w-0 dshx:max-w-[60%] dshx:shrink dshx:truncate',
+                        (workStatus?.status === 'needs-you' || workStatus?.status === 'failed') && 'dshx:text-foreground',
+                      )}
+                      data-testid="thread-row-status-detail"
+                    >
+                      {statusDetail}
+                    </span>
+                  )}
+                  {showAgent ? (
+                    <span className="dshx:shrink-0 dshx:truncate dshx:max-w-[35%]" data-testid="thread-row-agent">
+                      @{props.agent}
+                    </span>
+                  ) : null}
                   {showProject ? (
                     <span
                       className={cn(
@@ -1247,6 +1358,19 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               )}
             </button>
           ) : null}
+          {inlineVerb === undefined || workStatus === undefined || props.renaming ? null : (
+            <Button
+              type="button"
+              size="xs"
+              variant={workStatus.status === 'ready' ? 'outline' : 'default'}
+              className="dshx:absolute dshx:top-1.5 dshx:right-1.5 dshx:h-6 dshx:px-2"
+              data-testid="thread-row-verb"
+              data-verb={inlineVerb}
+              onClick={() => props.actions.actOnStatus(session.id, workStatus)}
+            >
+              {t(inlineVerbLabelKeys[inlineVerb])}
+            </Button>
+          )}
           {nearViewport && !props.renaming ? (
             <div
               data-testid="thread-row-actions"
@@ -1269,6 +1393,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             attentionLabels={props.childAttentionLabels}
             rowStyle={rowStyle}
             actions={props.actions}
+            childStatuses={props.childStatuses}
           />
         ) : null}
       </article>
@@ -2632,7 +2757,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const collapsedGroups = isBoard ? boardViewSettings.collapsedGroups : preferences.collapsedGroups
   const collapsedSections = isBoard ? boardViewSettings.collapsedSections : preferences.collapsedSections
   const toggleGroup = (key: string): void => {
-    const nextCollapsedGroups = toggleCollapsedGroup(collapsedGroups, key)
+    // Status groups fold Done by default, so they store Done's open marker instead of its key (thread-status.ts).
+    const nextCollapsedGroups = key.startsWith(STATUS_GROUP_KEY_PREFIX) ? [...ThreadStatusModel.toggle(key, collapsedGroups)] : toggleCollapsedGroup(collapsedGroups, key)
     if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedGroups: nextCollapsedGroups }))
     else changePreferences({ collapsedGroups: nextCollapsedGroups })
   }
@@ -3076,6 +3202,86 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     return labels
   }, [attentionLabelsBySession, sectionEntries, threadTree])
+  // The ADE status grouping (plan §4.3, §4.7): each row's status is a projection of the inbox plus the attention this
+  // sidebar already classifies, with subagents rolled up into their parent.
+  const stateGrouping = threadView.groupBy === 'state'
+  const inbox = useInboxThreadSignals({ enabled: stateGrouping && sessionState.phase === 'ready' })
+  const childStatusById = useMemo(() => {
+    const statuses = new Map<SessionSummary['id'], ThreadStatus>()
+    if (!stateGrouping) return statuses
+    for (const entry of [...childThreadEntries, ...detachedThreadEntries]) {
+      statuses.set(
+        entry.session.id,
+        ThreadStatusModel.statusOf({
+          running: entry.session.running,
+          pinned: false,
+          archived: archivedSessionIds.has(entry.session.id),
+          settled: settledSessionIds.has(entry.session.id),
+          unread: attention.records.has(entry.session.id),
+          labels: attentionLabelsBySession.get(entry.session.id) ?? [],
+          inbox: inbox.signals.get(entry.session.id),
+          activityAt: entry.activity.updatedAt,
+          settledAt: preferences.settledAt[entry.session.id],
+          now,
+        }),
+      )
+    }
+    return statuses
+  }, [
+    archivedSessionIds,
+    attention.records,
+    attentionLabelsBySession,
+    childThreadEntries,
+    detachedThreadEntries,
+    inbox.signals,
+    now,
+    preferences.settledAt,
+    settledSessionIds,
+    stateGrouping,
+  ])
+  const threadStatusById = useMemo(() => {
+    const statuses = new Map<SessionSummary['id'], ThreadStatus>()
+    if (!stateGrouping) return statuses
+    for (const entry of sectionEntries) {
+      const children = (threadTree.childrenByRoot.get(entry.session.id) ?? NO_CHILDREN).flatMap(child => {
+        const status = childStatusById.get(child.id)
+        return status === undefined ? [] : [status]
+      })
+      statuses.set(
+        entry.session.id,
+        ThreadStatusModel.statusOf(
+          {
+            running: entry.session.running,
+            pinned: pinnedSessionIds.has(entry.session.id),
+            archived: archivedSessionIds.has(entry.session.id),
+            settled: settledSessionIds.has(entry.session.id),
+            unread: attention.records.has(entry.session.id),
+            labels: attentionLabelsBySession.get(entry.session.id) ?? [],
+            inbox: inbox.signals.get(entry.session.id),
+            activityAt: entry.activity.updatedAt,
+            settledAt: preferences.settledAt[entry.session.id],
+            now,
+          },
+          children,
+        ),
+      )
+    }
+    return statuses
+  }, [
+    archivedSessionIds,
+    attention.records,
+    attentionLabelsBySession,
+    childStatusById,
+    inbox.signals,
+    now,
+    pinnedSessionIds,
+    preferences.settledAt,
+    sectionEntries,
+    settledSessionIds,
+    stateGrouping,
+    threadTree,
+  ])
+  const transitionClock = useRef(ThreadStatusModel.createTransitionClock())
   const threadViewAttentionEntries = useMemo(() => {
     // A tab's dot follows the dots its rows draw, and a row's dot shows only its own state: a child's label lights
     // the tab only in views that list that child.
@@ -3280,10 +3486,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       usageLimitRows,
     ],
   )
-  // The board shows only columns: recovery threads stay in their status column instead of a group above it.
-  const hoistedInterruptedRows = isBoard ? EMPTY_HOISTED_SESSIONS : statusFilteredInterruptedRows
-  const hoistedNeedsResumeRows = isBoard ? EMPTY_HOISTED_SESSIONS : statusFilteredNeedsResumeRows
-  const hoistedUsageLimitRows = isBoard ? EMPTY_HOISTED_USAGE_LIMIT_ROWS : statusFilteredUsageLimitRows
+  // The board shows only columns: recovery threads stay in their status column instead of a group above it. The status
+  // grouping does the same: interrupted and usage-limited threads are Needs you rows with a Resume verb.
+  const hoistedInterruptedRows = isBoard || stateGrouping ? EMPTY_HOISTED_SESSIONS : statusFilteredInterruptedRows
+  const hoistedNeedsResumeRows = isBoard || stateGrouping ? EMPTY_HOISTED_SESSIONS : statusFilteredNeedsResumeRows
+  const hoistedUsageLimitRows = isBoard || stateGrouping ? EMPTY_HOISTED_USAGE_LIMIT_ROWS : statusFilteredUsageLimitRows
   const hasHoistedGroups = hoistedInterruptedRows.length > 0 || hoistedNeedsResumeRows.length > 0 || hoistedUsageLimitRows.length > 0
   const statusFilteredRecoveryRows = useMemo(
     () => [...hoistedInterruptedRows, ...hoistedNeedsResumeRows, ...hoistedUsageLimitRows.map(row => row.session)],
@@ -3599,6 +3806,42 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         activityAt: thread.updatedAt,
       })),
     ]
+    if (threadView.groupBy === 'state') {
+      const observedAt = Date.now()
+      const pinnedOrder = new Map(workspaceState.pinnedSessionIds.map((sessionId, index) => [sessionId, index]))
+      const statusEntries = entries.map(entry => {
+        const thread = entry.thread
+        const sessionId = thread.kind === 'local' ? thread.session.id : `${thread.remote.runtimeId}:${thread.remote.sessionId}`
+        const status =
+          (thread.kind === 'local' ? (threadStatusById.get(thread.session.id) ?? childStatusById.get(thread.session.id)) : undefined) ??
+          ThreadStatusModel.statusOf({
+            running: thread.kind === 'local' ? thread.session.running : thread.remote.running,
+            pinned: thread.kind === 'local' && pinnedSessionIds.has(thread.session.id),
+            archived: false,
+            settled: false,
+            unread: false,
+            labels: [],
+            inbox: undefined,
+            activityAt: entry.activityAt,
+            settledAt: undefined,
+            now,
+          })
+        const pinnedIndex = thread.kind === 'local' ? pinnedOrder.get(thread.session.id) : undefined
+        return {
+          thread,
+          status,
+          cameBackAt: transitionClock.current(sessionId, status.group, status.since, observedAt),
+          ...(pinnedIndex === undefined ? {} : { pinnedIndex }),
+        }
+      })
+      return ThreadStatusModel.groupEntries(statusEntries).map(group => ({
+        key: group.key,
+        label: tSidebar(statusGroupLabelKeys[group.group]),
+        showHeader: true,
+        projectId: undefined,
+        threads: group.threads,
+      }))
+    }
     const workspaceTitles = new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title]))
     for (const thread of visibleRemoteThreads) {
       if (thread.workspaceId !== undefined && thread.workspaceTitle !== undefined) workspaceTitles.set(thread.workspaceId, thread.workspaceTitle)
@@ -3617,7 +3860,19 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       },
       now,
     })
-  }, [attentionIds, displayWorkspaces, now, tSidebar, threadView.groupBy, visibleRemoteThreads, visibleThreadEntries])
+  }, [
+    attentionIds,
+    childStatusById,
+    displayWorkspaces,
+    now,
+    pinnedSessionIds,
+    tSidebar,
+    threadStatusById,
+    threadView.groupBy,
+    visibleRemoteThreads,
+    visibleThreadEntries,
+    workspaceState.pinnedSessionIds,
+  ])
 
   const rowStyle = useMemo<RowStyle>(
     () => ({
@@ -3726,8 +3981,30 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   ]
   const activeFilterSummary = activeFilterLabels.length === 0 ? props.tSidebar('threadSidebarFilterNone') : activeFilterLabels.join(' · ')
 
+  /**
+   * A row's inline verb. Answer and Approve open the thread, where the question or approval card is answered in place;
+   * Retry, Resume and Land on an inbox item run that item's provider verb through the inbox, exactly as the Inbox page
+   * does; a Resume the sidebar itself classified (interrupted turn) resumes it here.
+   */
+  const actOnStatus = (sessionId: SessionSummary['id'], status: ThreadStatus): void => {
+    const verb = status.verb
+    if (verb === undefined || verb === 'Answer' || verb === 'Approve') {
+      openThread(sessionId)
+      return
+    }
+    if (status.itemId === undefined) {
+      if (verb === 'Resume' && recoverySessionIds.has(sessionId)) void resumeRecoverySession(sessionId)
+      else openThread(sessionId)
+      return
+    }
+    void inbox.act(status.itemId, verb).then(
+      outcome => setNotice({ tone: outcome.ok ? 'success' : 'warning', message: outcome.message }),
+      () => setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarVerbFailed') }),
+    )
+  }
   const asideOpener = useAsideOpen()
   const latestRowActions = useRef({
+    actOnStatus,
     openThread,
     openAside: asideOpener,
     selection: () => selectionRef.current,
@@ -3762,6 +4039,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     changePreferences,
   })
   latestRowActions.current = {
+    actOnStatus,
     openThread,
     openAside: asideOpener,
     selection: () => selectionRef.current,
@@ -3937,6 +4215,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           autoSettleDisabledSessionIds: next.autoSettleDisabledSessionIds,
         })
       },
+      actOnStatus: (sessionId, status) => latestRowActions.current.actOnStatus(sessionId, status),
       translate: (...args) => latestRowActions.current.props.tSidebar(...args),
     }
   }, [])
@@ -4124,6 +4403,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         allChildrenShown={expandedParents.has(session.id)}
         selectedChildId={childRow.selectedChildId}
         actions={rowActions}
+        workStatus={stateGrouping ? (threadStatusById.get(session.id) ?? childStatusById.get(session.id)) : undefined}
+        childStatuses={stateGrouping ? childStatusById : undefined}
+        agent={stateGrouping ? agentPresetOf(session) : undefined}
       />
     )
   }
@@ -5020,7 +5302,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   const showHeader = group.showHeader || (!isBoard && hasHoistedGroups)
                   const groupLabel =
                     group.label || (viewTabs.find(tab => tab.view.id === threadViewSettings.activeViewId)?.label ?? props.tSidebar('threadSidebarAllThreads'))
-                  const groupCollapsed = showHeader && collapsedGroups.includes(group.key)
+                  const groupCollapsed =
+                    showHeader &&
+                    (group.key.startsWith(STATUS_GROUP_KEY_PREFIX) ? ThreadStatusModel.isCollapsed(group.key, collapsedGroups) : collapsedGroups.includes(group.key))
                   return (
                     <section
                       className={cn(

@@ -12,6 +12,7 @@ import { selectModelForNewThread } from '../threads.js'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
+import { ThreadSidebarJourney } from '../thread-list-grouping.js'
 
 interface ThreadRepository {
   readonly temporaryRoot: string
@@ -1044,6 +1045,7 @@ When('the thread is settled from the rebase notice', async ({ page }: { page: Pa
 
 Then('the thread appears in the Settled sidebar section', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'All threads', exact: true }).click()
+  await ThreadSidebarJourney.arrangeManually(page)
   const settledSection = page.getByRole('region', { name: 'Threads', exact: true }).getByRole('button', { name: 'Settled (1)', exact: true })
   await recordAssertion(page, 'jj-integration-rebased-thread-can-be-settled-from-notice', () => expect(settledSection).toBeVisible())
   await finishJourneyAssertions(page)
