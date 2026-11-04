@@ -428,6 +428,8 @@ export class SidebarRightController implements ISidebarRight {
   openWorkbenchPage(kind: string, beforePublish: (sessionId: SessionId, tabId: TabId) => void): boolean {
     if (!this.isWorkbench() || this.tabs.get(kind) === undefined) return false
     const sessionId = this.mounted.getSnapshot()
+    // A thread that just came on screen may not have rendered its seat yet; mint its store as `require` does.
+    if (sessionId !== undefined && this.actionsFor(sessionId) === undefined) this.host.mint?.(sessionId)
     const actions = sessionId === undefined ? undefined : this.actionsFor(sessionId)
     if (sessionId === undefined || actions === undefined) return false
     this.placeTab(sessionId, actions, kind, {}, tabId => beforePublish(sessionId, tabId))

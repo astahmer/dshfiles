@@ -28,7 +28,7 @@ function dockPane(): DockPaneActions {
   }
 }
 
-function sidebar(host: Pick<SidebarRightHost, 'workbench' | 'dock'> = {}) {
+function sidebar(host: Pick<SidebarRightHost, 'workbench' | 'dock' | 'mint'> = {}) {
   const ctx = new Context()
   const types = new SidebarRightTabRegistry(ctx)
   types.register({ id: 'file-owner', kind: 'file', patterns: ['dsh-resource://file/**'], title: () => 'File' })
@@ -236,6 +236,23 @@ it('refuses Workbench page allocation without a mounted adopted Session or regis
   expect(admission).not.toHaveBeenCalled()
   const native = sidebar()
   expect(native.controller.openWorkbenchPage('terminal', admission)).toBe(false)
+})
+
+it('mints the store of a thread that came on screen before its seat rendered, so a Workbench facet pick lands in it', () => {
+  const handle = createSidebarRightStore(() => ({ kind: 'guide', title: 'Start' }))
+  // SAFETY: a stable identity for a Session whose seat has not rendered yet.
+  const sessionId = 'arriving-thread' as SessionId
+  let owner: ReturnType<typeof sidebar> | undefined
+  const mint = vi.fn((id: SessionId) => {
+    if (owner !== undefined) releases.push(owner.adopt(id, handle.create(id)))
+  })
+  owner = sidebar({ workbench: () => true, dock: () => dockPane(), mint })
+  owner.show(sessionId)
+  const admission = vi.fn()
+  expect(owner.controller.openWorkbenchPage('file', admission)).toBe(true)
+  expect(mint).toHaveBeenCalledWith(sessionId)
+  expect(admission).toHaveBeenCalledWith(sessionId, expect.any(String))
+  expect(owner.controller.tabsIn(sessionId).some(tab => tab.kind === 'file')).toBe(true)
 })
 
 it('does not fall back to native state before dock registration or after dock disposal', () => {

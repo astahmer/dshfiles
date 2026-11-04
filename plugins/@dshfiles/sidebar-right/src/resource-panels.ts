@@ -42,6 +42,15 @@ export class SidebarResourcePanelModel {
     return `dshfiles-resource/${encodeURIComponent(sessionId)}/${encodeURIComponent(tabId)}`
   }
 
+  /**
+   * Whether a record is the single page of its kind (`openTab(kind)` without `multiple`), as opposed to an addressed
+   * resource or one of several pages. Only such a page means the same thing in every thread, so only it may follow
+   * the on-screen thread.
+   */
+  static isPage(panel: Pick<SidebarResourcePanel, 'kind' | 'address'>): boolean {
+    return panel.address === `sidebar://${panel.kind}`
+  }
+
   static create(): SidebarResourcePanels {
     const sessions = new Map<string, { readonly panels: readonly SidebarResourcePanel[]; readonly close: (tabId: string) => void }>()
     const listeners = new Set<() => void>()

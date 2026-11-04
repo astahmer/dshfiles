@@ -5,8 +5,16 @@
       "id": "conversation-header",
       "title": "Keep the original conversation toolbar and child views inside each thread",
       "summary": "Every fixed conversation hosts the original Rich Composer header inside its own retained SessionProvider: title/mode, contributed workspace utilities, Pin and thread actions, and native Chat/Trajectory/Traces/Requests navigation when those providers are present. The original header child has one declarer behind a reusable owned Factory, shared with native mode; no borrowed renderer or global-following duplicate is used. Native selected views drive the existing content/composer instead of a forced Chat view. The original right-sidebar opener uses the registered Workbench dock actions, not the hidden native carrier. Outer Workbench tab layout, original blank hero and independent view-only panels retain their owners.",
-      "reach": ["seed tool-call-thread", "expect button \"More thread actions\"", "expect tab \"Chat\"", "expect tab \"Trajectory\""],
-      "surfaces": ["client", "integration"],
+      "reach": [
+        "seed tool-call-thread",
+        "expect button \"More thread actions\"",
+        "expect tab \"Chat\"",
+        "expect tab \"Trajectory\""
+      ],
+      "surfaces": [
+        "client",
+        "integration"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "thread-header: conversation toolbar",
@@ -26,7 +34,13 @@
         "Header actions address the panel's retained Session, never whichever other conversation happens to be globally selected."
       ],
       "externalDependencies": [],
-      "verification": [{ "kind": "gherkin", "id": "workbench.conversation-header", "featureFile": "tooling/dshx/e2e/features/workbench-chat-header.feature" }],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "workbench.conversation-header",
+          "featureFile": "tooling/dshx/e2e/features/workbench-chat-header.feature"
+        }
+      ],
       "telemetry": [
         {
           "kind": "not-applicable",
@@ -51,19 +65,35 @@
         "click option \"Toggle the right pane*\"",
         "expect region \"Choose a view\""
       ],
-      "surfaces": ["client", "integration", "storage"],
+      "surfaces": [
+        "client",
+        "integration",
+        "storage"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: right pane",
       "configuration": [],
-      "states": ["populated", "other-tab-remains", "last-closed", "reopened-empty", "view-adopted", "restored-hidden", "floating-owned"],
+      "states": [
+        "populated",
+        "other-tab-remains",
+        "last-closed",
+        "reopened-empty",
+        "view-adopted",
+        "restored-hidden",
+        "floating-owned"
+      ],
       "failureModes": [
         "Only the right-region empty close policy changes; the main grid stays permanent and left/bottom behavior is unchanged.",
         "Floating panels still belong to their source API, so an empty grid with a live float does not hide that source pane."
       ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "workbench.last-right-tab-close", "featureFile": "tooling/dshx/e2e/features/workbench-right-close.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.last-right-tab-close",
+          "featureFile": "tooling/dshx/e2e/features/workbench-right-close.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workbench.right-final-native-close",
@@ -102,19 +132,34 @@
         "click button \"Show tab row\"",
         "expect tab \"Thread Sidebar: Threads\""
       ],
-      "surfaces": ["client", "storage", "integration"],
+      "surfaces": [
+        "client",
+        "storage",
+        "integration"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: Hide tab row",
       "configuration": [],
-      "states": ["single-shown", "single-hidden", "restored-hidden", "multi-shown", "single-again-shown", "explicitly-recovered"],
+      "states": [
+        "single-shown",
+        "single-hidden",
+        "restored-hidden",
+        "multi-shown",
+        "single-again-shown",
+        "explicitly-recovered"
+      ],
       "failureModes": [
         "The native edge-shell variant does not restore hideHeader and is not offered this action; owned root/nested Workbenches use ordinary grid groups.",
         "Content context menus are not intercepted; the tab/blank row, local content control and global command are the presentation entry points."
       ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "workbench.single-tab-row", "featureFile": "tooling/dshx/e2e/features/workbench-tab-rows.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.single-tab-row",
+          "featureFile": "tooling/dshx/e2e/features/workbench-tab-rows.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workbench.single-tab-native-json",
@@ -135,7 +180,10 @@
         }
       ],
       "telemetry": [
-        { "kind": "not-applicable", "reason": "Client-only native group-header presentation in the existing layout serializer; no Host I/O or execution." }
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only native group-header presentation in the existing layout serializer; no Host I/O or execution."
+        }
       ]
     },
     {
@@ -148,20 +196,40 @@
         "click menuitem \"Hide tab row\"",
         "expect button \"Add AI account\""
       ],
-      "surfaces": ["client", "storage", "integration"],
+      "surfaces": [
+        "client",
+        "storage",
+        "integration"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: AI Accounts: Preview tab",
       "configuration": [],
-      "states": ["legacy-fixed", "ordinary-left-group", "content-only", "moved", "closed", "explicitly-reopened", "standalone-fallback"],
+      "states": [
+        "legacy-fixed",
+        "ordinary-left-group",
+        "content-only",
+        "moved",
+        "closed",
+        "explicitly-reopened",
+        "standalone-fallback"
+      ],
       "failureModes": [
         "Mixed or unnamed preview contributors use the existing truthful Thread Sidebar: Plugin previews label, not a guessed account-specific owner.",
         "The one-time browser migration marker only controls initial seating; native layout JSON remains the actual placement and tab-row owner."
       ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "workbench.sidebar-preview-tab", "featureFile": "tooling/dshx/e2e/features/workbench-tab-rows.feature" },
-        { "kind": "gherkin", "id": "workbench.sidebar-preview-legacy-migration", "featureFile": "tooling/dshx/e2e/features/workbench-tab-rows.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.sidebar-preview-tab",
+          "featureFile": "tooling/dshx/e2e/features/workbench-tab-rows.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.sidebar-preview-legacy-migration",
+          "featureFile": "tooling/dshx/e2e/features/workbench-tab-rows.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workbench.preview-once-seating",
@@ -186,13 +254,29 @@
       "id": "window-floating",
       "title": "Root-pane windows float across the application",
       "summary": "Float panel and native Shift-float keep the same pane API, panel and renderer but move native chrome and persistent content through window coordinates. Main, left, right and bottom floats can leave their source pane, overlap with native chrome/body interleaving and per-window focus order, resize and reload, and their tabs can dock through the existing cross-region owner. Nested paint-contained surfaces remain local. Hiding a source pane retains native descendant visibility semantics rather than inventing another floating resource owner.",
-      "reach": ["rightclick tab \"Thread Sidebar: Threads\"", "click menuitem \"Float panel\"", "expect button \"Search threads\""],
-      "surfaces": ["client", "integration", "storage"],
+      "reach": [
+        "rightclick tab \"Thread Sidebar: Threads\"",
+        "click menuitem \"Float panel\"",
+        "expect button \"Search threads\""
+      ],
+      "surfaces": [
+        "client",
+        "integration",
+        "storage"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: Float panel",
       "configuration": [],
-      "states": ["docked", "window-floating", "overlapping", "resized", "restored", "redocked", "nested-local"],
+      "states": [
+        "docked",
+        "window-floating",
+        "overlapping",
+        "resized",
+        "restored",
+        "redocked",
+        "nested-local"
+      ],
       "failureModes": [
         "Only root Dockviews escape ordinary frame-column overflow; registered nested content keeps its paint containment.",
         "Legacy local float coordinates may shift on first use of window space, but native viewport bounds keep the window reachable without resetting the layout."
@@ -216,8 +300,16 @@
           "id": "workbench.window-wide-floating",
           "featureFile": "tooling/dshx/e2e/features/workbench-floating.feature"
         },
-        { "kind": "gherkin", "id": "workbench.floating-overlap-order", "featureFile": "tooling/dshx/e2e/features/workbench-floating.feature" },
-        { "kind": "gherkin", "id": "workbench.floating-source-offset", "featureFile": "tooling/dshx/e2e/features/workbench-floating.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.floating-overlap-order",
+          "featureFile": "tooling/dshx/e2e/features/workbench-floating.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.floating-source-offset",
+          "featureFile": "tooling/dshx/e2e/features/workbench-floating.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workbench.window-float-native-draft",
@@ -237,14 +329,27 @@
           "testName": "clamps existing floats on viewport resize through the unchanged source API"
         }
       ],
-      "telemetry": [{ "kind": "not-applicable", "reason": "Presentation-only native floating geometry; no new Host I/O, execution or durable resource owner." }]
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Presentation-only native floating geometry; no new Host I/O, execution or durable resource owner."
+        }
+      ]
     },
     {
       "id": "main-conversation",
       "title": "Workbench as the main conversation surface",
       "summary": "One fixed Session-bound conversation tab contains both native chat history and the real text-input editor. Sidebar clicks open a closed conversation as a new kept tab or focus its existing tab; other tabs never follow global selection. Closing all tabs leaves the docked chooser, not a resurrected global conversation. Legacy global-following aliases retire without changing fixed tab identity. Genuinely empty fixed Sessions use the native centered welcome, workspace/model controls and original composer; unsent drafts do not turn them into active transcripts. Loading history settles without a false welcome, and the first real turn becomes normal scrollable chat without replacing the editor.",
-      "reach": ["seed tool-call-thread", "click button \"New thread\"", "expect text \"Into the Unknown\""],
-      "surfaces": ["client", "integration", "settings"],
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"New thread\"",
+        "expect text \"Into the Unknown\""
+      ],
+      "surfaces": [
+        "client",
+        "integration",
+        "settings"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: main conversation tab",
@@ -253,18 +358,49 @@
           "key": "mainSurface",
           "defaultValue": "workbench",
           "constraints": "Hidden legacy decode-only field; explicit native values no longer select a renderer. The centre always uses the Workbench.",
-          "choices": ["native", "workbench"],
-          "coveredBy": ["workbench.main-hosts-the-conversation", "workbench.default-main-surface"]
+          "choices": [
+            "native",
+            "workbench"
+          ],
+          "coveredBy": [
+            "workbench.main-hosts-the-conversation",
+            "workbench.default-main-surface"
+          ]
         }
       ],
-      "states": ["workbench", "thread-selected", "empty-welcome", "history-settling", "active-chat", "legacy-preference-migrated"],
-      "failureModes": ["The owned frame is required; the surface never re-declares main or recursively hosts its legacy workbench key."],
+      "states": [
+        "workbench",
+        "thread-selected",
+        "empty-welcome",
+        "history-settling",
+        "active-chat",
+        "legacy-preference-migrated"
+      ],
+      "failureModes": [
+        "The owned frame is required; the surface never re-declares main or recursively hosts its legacy workbench key."
+      ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "workbench.main-hosts-the-conversation", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.fixed-conversation-lifecycle", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.long-conversation-scroll", "featureFile": "tooling/dshx/e2e/features/workbench-scroll.feature" },
-        { "kind": "gherkin", "id": "workbench.empty-thread-welcome", "featureFile": "tooling/dshx/e2e/features/workbench-welcome.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.main-hosts-the-conversation",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.fixed-conversation-lifecycle",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.long-conversation-scroll",
+          "featureFile": "tooling/dshx/e2e/features/workbench-scroll.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.empty-thread-welcome",
+          "featureFile": "tooling/dshx/e2e/features/workbench-welcome.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workbench.fixed-welcome-editor-owner",
@@ -295,33 +431,81 @@
           "file": "plugins/@dshfiles/workbench/src/conversation-panels.test.ts",
           "testName": "retires all legacy global-following clones without changing a fixed conversation identity"
         },
-        { "kind": "gherkin", "id": "workbench.legacy-disabled-conversation-tabs", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.responsive-main", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.default-main-surface", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.switch-performance", "featureFile": "tooling/dshx/e2e/features/workbench-performance.feature" }
+        {
+          "kind": "gherkin",
+          "id": "workbench.legacy-disabled-conversation-tabs",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.responsive-main",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.default-main-surface",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.switch-performance",
+          "featureFile": "tooling/dshx/e2e/features/workbench-performance.feature"
+        }
       ],
-      "telemetry": [{ "kind": "not-applicable", "reason": "Client-only frame rendering and existing Session reference ownership; no new Host I/O." }]
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only frame rendering and existing Session reference ownership; no new Host I/O."
+        }
+      ]
     },
     {
       "id": "main-panel-sources",
       "title": "Choose plugin views and one Settings hub",
       "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use producer-declared Plugin: View names, including Settings Shell: Settings and AI Accounts: Preview. Conversations open only from the thread list or New thread, never as a separate Rich Composer/current-conversation choice. Search matches full qualified names; special ordering uses stable IDs. Restored reusable panels refresh their captions without changing IDs or remounting, while user conversation, scoped and resource titles remain untouched. Empty right/bottom panes and semantic Start use the same chooser; Settings leaves and runtime occurrences are not primary suggestions.",
-      "reach": ["click button \"New tab\"", "expect region \"Choose a view\""],
-      "surfaces": ["client", "integration"],
+      "reach": [
+        "click button \"New tab\"",
+        "expect region \"Choose a view\""
+      ],
+      "surfaces": [
+        "client",
+        "integration"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "main-tabs: New tab chooser",
       "configuration": [],
-      "states": ["available", "open", "closed", "source-removed"],
+      "states": [
+        "available",
+        "open",
+        "closed",
+        "source-removed"
+      ],
       "failureModes": [
         "Foreign child slots remain in their original assemblies unless their declarer opts in; unavailable sources are not reconstructed from private props."
       ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "workbench.add-a-main-panel", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.repeated-plugin-views", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.new-tab-chooser", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.plugin-view-names", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.add-a-main-panel",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.repeated-plugin-views",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.new-tab-chooser",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.plugin-view-names",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workbench.qualified-chooser-names",
@@ -358,8 +542,16 @@
           "file": "plugins/@dshfiles/workbench/src/tab-panels.test.tsx",
           "testName": "projects keyboard Start tabs into the same New tab chooser without changing actor identity"
         },
-        { "kind": "gherkin", "id": "workbench.reusable-view-picker", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.every-pane-views", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.reusable-view-picker",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.every-pane-views",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workbench.plus-after-tabs",
@@ -367,23 +559,54 @@
           "testName": "places the plus immediately after tabs before the flexible row spacer"
         }
       ],
-      "telemetry": [{ "kind": "not-applicable", "reason": "Client-only source projection; existing ConfigForm writes keep their Host spans." }]
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only source projection; existing ConfigForm writes keep their Host spans."
+        }
+      ]
     },
     {
       "id": "all-region-drag",
       "title": "Drag panels across centre right and bottom",
       "summary": "Real tab drags move one owned panel across all root regions, including an empty target, and each region restores its persisted arrangement.",
-      "reach": ["click button \"Collapse sidebar\"", "click button \"Pane options\"", "expect menuitem \"Toggle the bottom panel\""],
-      "surfaces": ["client", "integration", "storage"],
+      "reach": [
+        "click button \"Collapse sidebar\"",
+        "click button \"Pane options\"",
+        "expect menuitem \"Toggle the bottom panel\""
+      ],
+      "surfaces": [
+        "client",
+        "integration",
+        "storage"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: panel drag",
       "configuration": [],
-      "states": ["centre", "right", "bottom", "reloaded"],
-      "failureModes": ["Cross-instance targets require embedder adoption and empty-target handling; a source copy must not survive a successful move."],
+      "states": [
+        "centre",
+        "right",
+        "bottom",
+        "reloaded"
+      ],
+      "failureModes": [
+        "Cross-instance targets require embedder adoption and empty-target handling; a source copy must not survive a successful move."
+      ],
       "externalDependencies": [],
-      "verification": [{ "kind": "gherkin", "id": "workbench.drag-across-all-regions", "featureFile": "tooling/dshx/e2e/features/workbench.feature" }],
-      "telemetry": [{ "kind": "not-applicable", "reason": "Browser presentation-only drag and local layout persistence." }]
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "workbench.drag-across-all-regions",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Browser presentation-only drag and local layout persistence."
+        }
+      ]
     },
     {
       "id": "main-tab-parity",
@@ -399,18 +622,43 @@
         "click radio \"right\"",
         "expect radio \"right\""
       ],
-      "surfaces": ["client", "integration", "storage", "settings"],
+      "surfaces": [
+        "client",
+        "integration",
+        "storage",
+        "settings"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: tab semantics",
       "configuration": [],
-      "states": ["preview", "kept", "pinned", "unread", "closed"],
-      "failureModes": ["The renderer must not become a second navigation actor or remount a thread whenever status changes."],
+      "states": [
+        "preview",
+        "kept",
+        "pinned",
+        "unread",
+        "closed"
+      ],
+      "failureModes": [
+        "The renderer must not become a second navigation actor or remount a thread whenever status changes."
+      ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "workbench.tab-semantics", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.repeated-close-navigation", "featureFile": "tooling/dshx/e2e/features/workbench-close.feature" },
-        { "kind": "gherkin", "id": "workbench.cross-project-chooser", "featureFile": "tooling/dshx/e2e/features/workbench-scope.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.tab-semantics",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.repeated-close-navigation",
+          "featureFile": "tooling/dshx/e2e/features/workbench-close.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.cross-project-chooser",
+          "featureFile": "tooling/dshx/e2e/features/workbench-scope.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workbench.window-chooser-identity",
@@ -436,7 +684,12 @@
           "testName": "adopts the canonical container selection during a stale panel-flag notification"
         }
       ],
-      "telemetry": [{ "kind": "not-applicable", "reason": "Client-only projection of actor-owned tab semantics and existing thread attention." }]
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only projection of actor-owned tab semantics and existing thread attention."
+        }
+      ]
     },
     {
       "id": "terminal-pages",
@@ -449,12 +702,24 @@
         "click button \"Terminal: Terminal\"",
         "expect tab \"Terminal*\""
       ],
-      "surfaces": ["client", "integration", "storage"],
+      "surfaces": [
+        "client",
+        "integration",
+        "storage"
+      ],
       "surface": "threadFacet",
       "destination": "thread-panel",
       "currentSurface": "main-tabs: New tab › Terminal: Terminal",
       "configuration": [],
-      "states": ["available", "opened", "moved", "hidden", "restored", "closed", "session-unavailable"],
+      "states": [
+        "available",
+        "opened",
+        "moved",
+        "hidden",
+        "restored",
+        "closed",
+        "session-unavailable"
+      ],
       "failureModes": [
         "The native terminal provider and a conversation/workspace context are required; an unavailable provider shows guidance rather than inventing a Session or PTY.",
         "Cancelled unseated launch intents close only their exact newly created native occurrence and never open another pane.",
@@ -462,7 +727,11 @@
       ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "workbench.terminal-picker-lifecycle", "featureFile": "tooling/dshx/e2e/features/workbench-terminal.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.terminal-picker-lifecycle",
+          "featureFile": "tooling/dshx/e2e/features/workbench-terminal.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workbench.terminal-exact-admission",
@@ -484,6 +753,71 @@
       ]
     },
     {
+      "id": "thread-facets",
+      "title": "Open thread facets from any pane's view chooser",
+      "summary": "Every pane's Choose a view lists the native right-pane page types that offer a guide entry (Changes, Cost, Jobs, Workspace files, Jujutsu, Editor, Land) under Thread panels, with their guide title, description, icon and order. Picking one opens that page for the on-screen thread in the chooser's own pane; its body renders through the sidebar.right.pane.tab seat with the thread's sessionId. An open facet follows the thread on screen: switching threads puts the new thread's page in the same place, and while no thread is on screen (a new-thread draft, a destination page) the facet keeps its place.",
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"New tab\"",
+        "expect group \"Thread panels\"",
+        "click button \"Cost*\"",
+        "expect text \"List-price estimates of this thread*\""
+      ],
+      "surfaces": [
+        "client",
+        "integration"
+      ],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "workbench: Choose a view › Thread panels",
+      "configuration": [],
+      "states": [
+        "listed",
+        "no-thread",
+        "opened",
+        "following",
+        "kept-without-thread",
+        "closed"
+      ],
+      "failureModes": [
+        "With no thread on screen the rows are disabled and the chooser says to open a thread; nothing is asked of the native owner.",
+        "Only the single page of a kind follows the thread; addressed resources (a file, one of several terminals) stay with the thread that opened them.",
+        "Each thread keeps its own native page record, so a facet closed while another thread is on screen can reappear when its thread returns."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "workbench.thread-facets-follow",
+          "featureFile": "tooling/dshx/e2e/features/workbench-thread-facets.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.thread-facets-launchers",
+          "file": "plugins/@dshfiles/workbench/src/thread-facets.test.tsx",
+          "testName": "registers launchers that track the guide and open the page for the on-screen thread in the chosen pane"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.thread-facets-chooser",
+          "file": "plugins/@dshfiles/workbench/src/thread-facets.test.tsx",
+          "testName": "lists facets under Thread panels with their description, disabled until a thread is on screen"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.native-page-mint",
+          "file": "plugins/@dshfiles/sidebar-right/src/workbench-dock.test.ts",
+          "testName": "mints the store of a thread that came on screen before its seat rendered, so a Workbench facet pick lands in it"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only presentation: launchers read the native guide registry and admit native page records into Dockview panes; no Host I/O or new API."
+        }
+      ]
+    },
+    {
       "id": "native-resource-panels",
       "title": "Host native preview diff and terminal resources as panels",
       "summary": "The owned sidebar-right declarer supplies addressable real tab occurrences, retaining their Session resource lifecycle while their presentation docks in the workbench.",
@@ -495,38 +829,76 @@
         "click option \"New terminal*\"",
         "expect tab \"Terminal*\""
       ],
-      "surfaces": ["client", "integration", "storage"],
+      "surfaces": [
+        "client",
+        "integration",
+        "storage"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "right-pane: native preview, diff and terminal resources",
       "configuration": [],
-      "states": ["preview", "review", "terminal", "hidden", "restored"],
+      "states": [
+        "preview",
+        "review",
+        "terminal",
+        "hidden",
+        "restored"
+      ],
       "failureModes": [
         "Without the owned sidebar-right cooperation native resources retain their original native surface; the workbench never fakes a tab occurrence or terminal lifecycle."
       ],
       "externalDependencies": [],
-      "verification": [{ "kind": "gherkin", "id": "workbench.slots-stay-compatible", "featureFile": "tooling/dshx/e2e/features/workbench.feature" }],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "workbench.slots-stay-compatible",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        }
+      ],
       "telemetry": [
-        { "kind": "not-applicable", "reason": "Client-only presentation bridge; resource loading and terminal work remain in their existing providers." }
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only presentation bridge; resource loading and terminal work remain in their existing providers."
+        }
       ]
     },
     {
       "id": "nested-surfaces",
       "title": "Split panes into Dockview groups and restore legacy layouts",
       "summary": "Pane options Split right and Split down create actual Dockview groups with chooser tabs. Existing nested-container layouts remain restorable, movable and resettable, but no control creates new nested containers.",
-      "reach": ["click button \"Pane options\"", "click menuitem \"Split right\"", "expect region \"Choose a view\""],
-      "surfaces": ["client", "integration", "storage"],
+      "reach": [
+        "click button \"Pane options\"",
+        "click menuitem \"Split right\"",
+        "expect region \"Choose a view\""
+      ],
+      "surfaces": [
+        "client",
+        "integration",
+        "storage"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: Pane options › Split",
       "configuration": [],
-      "states": ["chooser", "split-right", "split-down", "legacy-nested-restored", "moved-out", "restored"],
+      "states": [
+        "chooser",
+        "split-right",
+        "split-down",
+        "legacy-nested-restored",
+        "moved-out",
+        "restored"
+      ],
       "failureModes": [
         "Container cycles are rejected; every child surface needs an independent stable path and named-layout capture rather than relying on the parent's Dockview JSON."
       ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "workbench.nested-surfaces", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.nested-surfaces",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workbench.nested-capture-ownership",
@@ -534,14 +906,29 @@
           "testName": "lets the deepest surface split an internal drag before an outer capture target can claim its overlay"
         }
       ],
-      "telemetry": [{ "kind": "not-applicable", "reason": "Browser-only split groups, legacy nested layout identity and local persistence; no new Host work." }]
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Browser-only split groups, legacy nested layout identity and local persistence; no new Host work."
+        }
+      ]
     },
     {
       "id": "dockable-panel-layouts",
       "title": "Arrange plugin panels in independent layouts",
       "summary": "Quiet group chrome has New tab after tabs and Pane options at the far right, without a Workbench heading or persistent toolbar. Pane options groups Split right/down, Layouts, Move tab to, Reset layout and bottom toggling. Splits are Dockview groups; saved layouts win. Scratchpad and Ticker remain developer fixtures.",
-      "reach": ["click button \"Collapse sidebar\"", "click button \"Pane options\"", "click menuitem \"Layouts\"", "expect dialog \"Saved layouts\""],
-      "surfaces": ["client", "integration", "storage", "settings"],
+      "reach": [
+        "click button \"Collapse sidebar\"",
+        "click button \"Pane options\"",
+        "click menuitem \"Layouts\"",
+        "expect dialog \"Saved layouts\""
+      ],
+      "surfaces": [
+        "client",
+        "integration",
+        "storage",
+        "settings"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "workbench: Pane options › Layouts",
@@ -550,18 +937,34 @@
           "key": "headerToggle",
           "defaultValue": "false",
           "constraints": "Hidden legacy decode-only field; the main Pane options opener is offered only while the right pane is closed.",
-          "choices": ["true", "false"],
-          "coveredBy": ["workbench.surface-layouts"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "workbench.surface-layouts"
+          ]
         },
         {
           "key": "demoPanels",
           "defaultValue": "false",
           "constraints": "Boolean; offer the Scratchpad and Ticker developer fixtures in the New tab chooser.",
-          "choices": ["true", "false"],
-          "coveredBy": ["workbench.default-layout"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "workbench.default-layout"
+          ]
         }
       ],
-      "states": ["tabbed", "split", "floating", "closed", "reset"],
+      "states": [
+        "tabbed",
+        "split",
+        "floating",
+        "closed",
+        "reset"
+      ],
       "failureModes": [
         "Malformed persisted layout falls back to defaults.",
         "An unavailable registered plugin remains a closable placeholder and recovers when it registers."
@@ -588,8 +991,16 @@
           "id": "workbench.surface-layouts",
           "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
-        { "kind": "gherkin", "id": "workbench.quiet-pane-chrome", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.last-root-safety", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.quiet-pane-chrome",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.last-root-safety",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workbench.centre-float-survival",
@@ -669,7 +1080,12 @@
         "click button \"Expand sidebar\"",
         "expect button \"Close pane\""
       ],
-      "surfaces": ["client", "integration", "storage", "settings"],
+      "surfaces": [
+        "client",
+        "integration",
+        "storage",
+        "settings"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: right pane and bottom panel",
@@ -678,18 +1094,36 @@
           "key": "rightPanel",
           "defaultValue": "native",
           "constraints": "Hidden legacy migration input: dock initializes an open pane and native a closed pane once. It never selects native chrome or overrides subsequent browser-local visibility.",
-          "choices": ["native", "dock"],
-          "coveredBy": ["workbench.global-dock"]
+          "choices": [
+            "native",
+            "dock"
+          ],
+          "coveredBy": [
+            "workbench.global-dock"
+          ]
         },
         {
           "key": "bottomPanel",
           "defaultValue": "hidden",
           "constraints": "One of hidden or shown; applies live to the bottom row below left and centre, never underneath the full-height right pane.",
-          "choices": ["hidden", "shown"],
-          "coveredBy": ["workbench.bottom-panel"]
+          "choices": [
+            "hidden",
+            "shown"
+          ],
+          "coveredBy": [
+            "workbench.bottom-panel"
+          ]
         }
       ],
-      "states": ["closed", "dock", "bottom-open", "panel-moved", "layout-saved", "layout-applied", "reloaded"],
+      "states": [
+        "closed",
+        "dock",
+        "bottom-open",
+        "panel-moved",
+        "layout-saved",
+        "layout-applied",
+        "reloaded"
+      ],
       "failureModes": [
         "The owned frame must supply the main, right and bottom seats before this plugin activates.",
         "A rejected saved dock layout falls back to an empty tabbed pane; reusable views remain available from its picker.",
@@ -708,8 +1142,16 @@
           "id": "workbench.global-dock",
           "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
-        { "kind": "gherkin", "id": "workbench.unified-surfaces", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.right-pane-toggle", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.unified-surfaces",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.right-pane-toggle",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
         {
           "kind": "gherkin",
           "id": "workbench.bottom-panel",
@@ -779,20 +1221,39 @@
       "id": "layout-recovery",
       "title": "Recover all panes and semantic tabs",
       "summary": "Reset always reveals the left chat list and selects the authorized current-conversation view in a docked centre group, even when a tool was active or views were floating, moved or absent. Root, nested and project-scoped layouts reset together without changing chat tabs, drafts, pins or named layouts. A global command-palette recovery remains available independently of centre controls.",
-      "surfaces": ["client", "storage"],
+      "surfaces": [
+        "client",
+        "storage"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: Pane options › Reset layout",
-      "reach": ["click button \"Pane options\"", "click menuitem \"Reset layout\"", "expect button \"New tab\""],
+      "reach": [
+        "click button \"Pane options\"",
+        "click menuitem \"Reset layout\"",
+        "expect button \"New tab\""
+      ],
       "configuration": [],
-      "states": ["moved", "reset", "reloaded"],
+      "states": [
+        "moved",
+        "reset",
+        "reloaded"
+      ],
       "failureModes": [
         "Per-pane defaults cannot recover cross-pane semantic placements; reset cancels pending handoffs before rebuilding main and left defaults."
       ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "workbench.layout-recovery", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
-        { "kind": "gherkin", "id": "workbench.reset-visible-current-chat", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "gherkin",
+          "id": "workbench.layout-recovery",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.reset-visible-current-chat",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workbench.reset-docked-conversation",
@@ -800,19 +1261,34 @@
           "testName": "never lets a floating active group capture the reset conversation"
         }
       ],
-      "telemetry": [{ "kind": "not-applicable", "reason": "Browser-only presentation reset; existing Session and semantic tab owners are unchanged." }]
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Browser-only presentation reset; existing Session and semantic tab owners are unchanged."
+        }
+      ]
     },
     {
       "id": "early-panel-registration",
       "title": "Queue panel-open requests before mount",
       "summary": "Retain stable panel registrations and early open requests until the matching dock view mounts.",
-      "surfaces": ["client", "integration"],
+      "surfaces": [
+        "client",
+        "integration"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: panel registration",
       "configuration": [],
-      "states": ["registered", "queued-open", "mounted", "placeholder"],
-      "failureModes": ["A duplicate or missing panel identity cannot silently replace another registration."],
+      "states": [
+        "registered",
+        "queued-open",
+        "mounted",
+        "placeholder"
+      ],
+      "failureModes": [
+        "A duplicate or missing panel identity cannot silently replace another registration."
+      ],
       "externalDependencies": [],
       "verification": [
         {

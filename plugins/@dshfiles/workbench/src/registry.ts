@@ -13,6 +13,23 @@ export interface WorkbenchPanelProps {
   readonly visible?: boolean
 }
 
+export interface ThreadFacetObservable<T> {
+  readonly subscribe: (listener: () => void) => () => void
+  readonly getSnapshot: () => T
+}
+
+/** A native right-pane page type offered as a thread facet, read from its guide entry. */
+export interface ThreadFacet {
+  /** The native page kind a pick opens for the on-screen thread. */
+  readonly kind: string
+  readonly order: number
+  readonly title: () => string
+  readonly description?: () => string
+  readonly icon?: ComponentType<{ readonly size?: number | undefined; readonly className?: string | undefined }>
+  /** The thread a pick would open the facet for; a chooser disables the row while none is on screen. */
+  readonly onScreen?: ThreadFacetObservable<string | undefined>
+}
+
 /** A reusable plugin view: every docking pane accepts this same renderer contract. */
 export interface WorkbenchPanelDefinition {
   /** Stable across reloads: saved layouts refer to panels by this id. Prefix it with the owning plugin. */
@@ -48,6 +65,8 @@ export interface WorkbenchPanelDefinition {
   readonly showInContextMenu?: boolean
   /** Whether this panel appears in the side-panel workbench's empty state by default. */
   readonly showInEmptyState?: boolean
+  /** A launcher for a thread facet: choosers list it under Thread panels with its guide description and icon. */
+  readonly threadFacet?: ThreadFacet
 }
 
 const panelIdSchema = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/u))

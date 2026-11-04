@@ -38,14 +38,16 @@ import { createWorkbenchThreadPanel, WORKBENCH_CONVERSATION_SLOT, WORKBENCH_THRE
 import { WorkbenchTabDocking, workbenchTabs } from './tabs.js'
 import { canMovePanelToRegion, createNestedSurfaceRegistry, type NestedSurfaceProps } from './nested-surfaces.js'
 import { decodeNestedSurfacePath, nestedLayoutStores } from './layout-store.js'
-import { sidebarResourcePanels } from '@dshfiles/sidebar-right/resource-panels'
+import { sidebarResourcePanels, type SidebarResourcePanel } from '@dshfiles/sidebar-right/resource-panels'
 import { ResourcePanelHost } from './resource-panel-host.js'
 import { createWorkbenchTerminalSource } from './terminal-source.js'
+import { createNativePageAdmission } from './native-page-admission.js'
+import { ThreadFacets } from './thread-facets.js'
 import { captureLayoutArrangement, restoreLayoutArrangement } from './layout-arrangements.js'
 import { SavedLayouts, savedLayouts, type SavedLayout } from './saved-layouts.js'
 import { workbenchSettings } from './settings.js'
 import { WorkbenchView, type WorkbenchPanelDrop } from './workbench-view.js'
-import { NewViewTabs } from './new-view.js'
+import { NewViewTabs, type NewViewSelection } from './new-view.js'
 import { NewThreadSource } from './new-thread-source.js'
 import { TabRows } from './tab-row-visibility.js'
 import { SidebarPreviewMigration } from './sidebar-preview-migration.js'
@@ -93,6 +95,20 @@ export default defineClient({
         unregister()
       }
     }, 'workbench: native terminal launcher')
+    const facetAdmission = createNativePageAdmission(sidebarResourcePanels(), registry)
+    const threadFacets = ThreadFacets.create({
+      guide: { subscribe: listener => ctx.sidebarRightTabs.subscribe(listener), getSnapshot: () => ctx.sidebarRightTabs.guide() },
+      onScreen: { subscribe: listener => ctx.sidebarRight.mounted.subscribe(listener), getSnapshot: () => ctx.sidebarRight.mounted.getSnapshot() },
+      registry,
+      admission: facetAdmission,
+    })
+    ctx.effect(() => {
+      const stop = threadFacets.start()
+      return () => {
+        facetAdmission.clear()
+        stop()
+      }
+    }, 'workbench: thread facet launchers')
     const nativeAside = createResettableAsidePlacement<DockviewApi>((api, panelId) => {
       const definition = registry.get(panelId)
       if (definition !== undefined) WorkbenchLayout.openPanel(api, definition)
@@ -632,11 +648,39 @@ export default defineClient({
       openInRegion(to, panelId)
     }
 
+    /** Native resource records the Workbench presents, by panel id; the resource effect below owns their lifetime. */
+    const resourceRegistrations = new Map<string, { dispose: () => void; revision: number; record: SidebarResourcePanel }>()
+    /**
+     * A facet the on-screen thread already shows (one page per kind) moves into the chooser's group instead of opening
+     * a second copy; the native owner would only reveal its existing page and leave the chooser in place.
+     */
+    const revealFacetPage = (definition: WorkbenchPanelDefinition, api: DockviewApi, target: NewViewSelection = {}): boolean => {
+      const kind = definition.threadFacet?.kind
+      const onScreen = ctx.sidebarRight.mounted.getSnapshot()
+      if (kind === undefined || onScreen === undefined) return false
+      const page = [...resourceRegistrations.values()].find(
+        entry => entry.record.kind === kind && entry.record.sessionId === onScreen && threadFacets.follows(entry.record),
+      )
+      const region = regions.entries().find(([, candidate]) => candidate === api)?.[0]
+      if (page === undefined || region === undefined) return false
+      // A page still queued for a pane that has not mounted (a closed right pane) is seated here instead.
+      for (const queued of pendingOpen.values()) queued.delete(page.record.id)
+      const group = target.group !== undefined && api.groups.includes(target.group) ? target.group : undefined
+      adoptPanel(
+        group === undefined
+          ? { region, api, panelId: page.record.id }
+          : { region, api, panelId: page.record.id, position: { referenceGroup: group, direction: 'within' } },
+      )
+      return NewViewTabs.completeSelection(api, page.record.id, target)
+    }
+
     /** Where an "Add panel" goes: the definition moves here if another region shows it. */
     const openIn =
       (region: WorkbenchRegionId) =>
       (definition: WorkbenchPanelDefinition, api: DockviewApi, target?: { readonly group?: DockviewGroupPanel; readonly replacePanelId?: string }): void => {
         if (terminalSource.open(definition, api, target)) return
+        if (revealFacetPage(definition, api, target)) return
+        if (threadFacets.open(definition, api, target)) return
         if (newThreadSource.open(definition, api, target)) return
         if (
           target === undefined &&
@@ -681,14 +725,109 @@ export default defineClient({
     }, 'workbench: nested surface identities')
     ctx.effect(() => {
       const resources = sidebarResourcePanels()
-      const registrations = new Map<string, { dispose: () => void; revision: number }>()
+      const registrations = resourceRegistrations
+      const placedIn = (id: string) => regions.entries().find(([, api]) => api.getPanel(id) !== undefined)
+      /** Where each facet kind was last shown: a page that arrives after its predecessor left lands there, not in a hidden right pane. */
+      const facetHome = new Map<string, WorkbenchRegionId>()
+      const release = (id: string): void => {
+        const registration = registrations.get(id)
+        const region = placedIn(id)?.[0]
+        if (registration !== undefined && region !== undefined && threadFacets.follows(registration.record)) facetHome.set(registration.record.kind, region)
+        for (const [, api] of regions.entries()) api.getPanel(id)?.api.close()
+        registration?.dispose()
+        registrations.delete(id)
+      }
+      /**
+       * A thread facet follows the on-screen thread: the new thread's page takes the place of the previous thread's
+       * page of the same kind (same pane, same tab position), so switching threads re-binds an open Cost, Jobs or
+       * Changes facet instead of closing it (and the right pane with it). The previous thread keeps its native record.
+       */
+      const takeFacetPlace = (resource: SidebarResourcePanel): boolean => {
+        if (!threadFacets.follows(resource) || resource.sessionId !== ctx.sidebarRight.mounted.getSnapshot()) return false
+        for (const [id, registration] of registrations) {
+          if (id === resource.id || registration.record.kind !== resource.kind || registration.record.sessionId === resource.sessionId) continue
+          const placed = placedIn(id)
+          const previous = placed?.[1].getPanel(id)
+          if (placed === undefined || previous === undefined) continue
+          const [region, api] = placed
+          if (api.getPanel(resource.id) === undefined)
+            api.addPanel({
+              id: resource.id,
+              component: WORKBENCH_COMPONENT,
+              title: resource.title,
+              position: { referencePanel: previous, direction: 'within' },
+              // Shown only where the previous thread's page was the visible tab of its group.
+              inactive: !previous.api.isVisible,
+            })
+          previous.api.close()
+          if (!resources.list().some(entry => entry.id === id)) {
+            registrations.get(id)?.dispose()
+            registrations.delete(id)
+          }
+          following.delete(id)
+          facetHome.set(resource.kind, region)
+          closeElsewhere(region, resource.id)
+          return true
+        }
+        return false
+      }
+      /**
+       * Pages of a thread that left the screen, kept in place until the on-screen thread's page of the same kind
+       * replaces them; `askedFor` is the thread their page was already requested for, so each thread is asked once.
+       */
+      const following = new Map<string, { askedFor: string | undefined }>()
+      let rebindQueued = false
+      let settleTimer: ReturnType<typeof setTimeout> | undefined
+      /** A kept page whose replacement never arrived gives its place up; while no thread is on screen it stays. */
+      const settle = (): void => {
+        settleTimer = undefined
+        const onScreen = ctx.sidebarRight.mounted.getSnapshot()
+        for (const id of [...following.keys()]) {
+          const registration = registrations.get(id)
+          if (registration === undefined || placedIn(id) === undefined || resources.list().some(entry => entry.id === id)) {
+            following.delete(id)
+            continue
+          }
+          if (onScreen === undefined || registration.record.sessionId === onScreen) continue
+          following.delete(id)
+          release(id)
+        }
+      }
+      const rebind = (): void => {
+        rebindQueued = false
+        const onScreen = ctx.sidebarRight.mounted.getSnapshot()
+        // No thread on screen (a new-thread draft, a destination page): the facet keeps its place and its last
+        // thread's body until a thread comes on screen, which runs `sync` again.
+        if (onScreen === undefined) return
+        for (const [id, state] of [...following]) {
+          const registration = registrations.get(id)
+          if (registration === undefined || placedIn(id) === undefined) {
+            following.delete(id)
+            continue
+          }
+          if (state.askedFor === onScreen || registration.record.sessionId === onScreen) continue
+          state.askedFor = onScreen
+          // The on-screen thread's page of this kind arrives through `sync`, possibly after this call returns (the
+          // native store publishes on its own schedule); `sync` then puts it in this page's place.
+          if (!(resources.openPage?.(registration.record.kind, () => undefined) ?? false)) {
+            following.delete(id)
+            release(id)
+          }
+        }
+        if (following.size > 0 && settleTimer === undefined) settleTimer = setTimeout(settle, 2_000)
+      }
       const sync = (): void => {
         const entries = resources.list()
+        const workbench = ctx.get('mainSurface')?.mode() === 'workbench'
+        const onScreen = ctx.sidebarRight.mounted.getSnapshot()
         for (const [id, registration] of registrations) {
-          if (ctx.get('mainSurface')?.mode() !== 'workbench' || entries.some(entry => entry.id === id)) continue
-          for (const [, api] of regions.entries()) api.getPanel(id)?.api.close()
-          registration.dispose()
-          registrations.delete(id)
+          if (!workbench || entries.some(entry => entry.id === id)) continue
+          if (threadFacets.follows(registration.record) && onScreen !== registration.record.sessionId && placedIn(id) !== undefined) {
+            if (!following.has(id)) following.set(id, { askedFor: undefined })
+            continue
+          }
+          following.delete(id)
+          release(id)
         }
         for (const resource of entries) {
           const previous = registrations.get(resource.id)
@@ -701,23 +840,36 @@ export default defineClient({
             beforeClose: () => resources.close(resource.id),
           })
           previous?.dispose()
-          registrations.set(resource.id, { dispose, revision: resource.navigationRevision })
+          registrations.set(resource.id, { dispose, revision: resource.navigationRevision, record: resource })
           if (terminalSource.admit(resource.id)) continue
-          if (ctx.get('mainSurface')?.mode() === 'workbench') {
-            const owner = regions.entries().find(([, api]) => api.getPanel(resource.id) !== undefined)
+          if (facetAdmission.admit(resource.id)) continue
+          if (workbench) {
+            const owner = placedIn(resource.id)
+            if (owner === undefined && takeFacetPlace(resource)) continue
             // Startup projection is passive; only the declarer's explicit
             // place/focus action reveals a closed pane after admission.
-            openInRegion(owner?.[0] ?? savedRegionOf(resource.id) ?? 'right', resource.id, false)
+            const home = threadFacets.follows(resource) ? facetHome.get(resource.kind) : undefined
+            openInRegion(owner?.[0] ?? savedRegionOf(resource.id) ?? home ?? 'right', resource.id, false)
           }
+        }
+        if (following.size > 0 && onScreen !== undefined && !rebindQueued) {
+          rebindQueued = true
+          // After every Session's projection settled: a thread that came on screen may publish its own page next.
+          queueMicrotask(rebind)
         }
       }
       const off = resources.subscribe(sync)
       const offMode = ctx.get('mainSurface')?.subscribe(sync)
+      const offScreen = ctx.sidebarRight.mounted.subscribe(sync)
       sync()
       return () => {
         off()
         offMode?.()
+        offScreen()
+        if (settleTimer !== undefined) clearTimeout(settleTimer)
+        following.clear()
         for (const entry of registrations.values()) entry.dispose()
+        registrations.clear()
       }
     }, 'workbench: authorized resource panels')
 

@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-377 features from 85 plugins.
+381 features from 86 plugins.
 
 ## Counts
 
@@ -15,15 +15,15 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Threads |  |  |  |  | 9 |  | 1 |  | 12 | 1 |  |  |  |  | 23 |
 | Inbox |  | 18 |  |  | 1 |  |  |  |  |  |  |  |  |  | 19 |
 | Land |  |  | 1 |  | 6 | 2 | 1 |  | 4 |  |  |  |  |  | 14 |
-| Work |  |  | 1 |  | 7 | 3 | 1 |  | 5 |  |  |  |  |  | 17 |
+| Work |  |  | 1 |  | 8 | 3 | 1 |  | 5 |  |  |  |  |  | 18 |
 | Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  |  | 5 |
 | Observe |  |  |  |  | 21 | 1 |  |  | 2 |  |  |  |  |  | 24 |
 | Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  |  | 6 |
 | Settings |  |  |  |  |  |  |  |  | 1 |  | 40 |  |  |  | 41 |
-| Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 23 |  | 23 |
-| Composer |  |  |  | 53 |  |  |  |  |  |  |  |  |  |  | 53 |
+| Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 24 |  | 24 |
+| Composer |  |  |  | 54 |  |  |  |  |  |  |  |  |  |  | 54 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 19 | 19 |
-| No place of its own | 19 |  | 17 |  |  |  |  | 90 |  |  |  | 7 |  |  | 133 |
+| No place of its own | 19 |  | 17 |  |  |  |  | 91 |  |  |  | 7 |  |  | 134 |
 
 ## By current left-nav entry
 
@@ -53,6 +53,7 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | Thread Sidebar: Board | Threads | thread-sidebar/thread-classification → Threads (destinationSection) |
 | Traces: Explorer | Inbox, Observe | traces/alert-rules → Inbox (attentionProvider)<br>traces/boards-and-saved-views → Observe (destinationSection)<br>traces/log-explorer → Observe (destinationSection)<br>traces/metric-charts → Observe (destinationSection)<br>traces/service-map → Observe (destinationSection)<br>traces/trace-explorer → Observe (destinationSection)<br>traces/trace-insights → Observe (destinationSection) |
 | Usage: Analytics | Observe | usage/usage-activity-report → Observe (destinationSection)<br>usage/usage-charts → Observe (destinationSection)<br>usage/usage-jev-card → Observe (destinationSection)<br>usage/usage-request-log → Observe (destinationSection) |
+| Work | Work | project-automations/project-automations → Work (destinationSection) |
 | Worktree Memory: RAM | Observe | worktree-memory/memory-board → Observe (destinationSection) |
 | Plugins (native) | Settings | Settings › Plugins (native page, not in a catalog) |
 | Schedules (native) | Work | Work › schedules (native page, not in a catalog) |
@@ -66,15 +67,15 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | agent tool | 23 | No place of its own 18, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
 | agent tools | 1 | No place of its own 1 |
 | client | 11 | No place of its own 11 |
-| composer | 54 | Composer 51, Thread panel 2, Settings 1 |
+| composer | 55 | Composer 52, Thread panel 2, Settings 1 |
 | composer and transcript | 1 | Threads 1 |
 | conversation-view | 2 | Thread panel 2 |
 | dialog | 4 | Agents 1, No place of its own 1, Settings 1, Thread panel 1 |
-| host | 44 | No place of its own 44 |
+| host | 45 | No place of its own 45 |
 | Host contract | 1 | Inbox 1 |
 | Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
 | keyboard | 3 | No place of its own 3 |
-| left-nav | 88 | Observe 21, Work 16, Land 13, Inbox 12, Settings 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
+| left-nav | 89 | Observe 21, Work 17, Land 13, Inbox 12, Settings 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 10 | No place of its own 7, Thread panel 2, Settings 1 |
 | observe | 2 | Observe 2 |
 | palette | 13 | No place of its own 13 |
@@ -87,11 +88,10 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | status-strip | 6 | No place of its own 4, Composer 1, Observe 1 |
 | thread-header | 7 | Thread panel 3, Threads 3, No place of its own 1 |
 | thread-list | 22 | Threads 16, Inbox 3, No place of its own 2, Settings 1 |
-| thread-panel | 2 | Thread panel 2 |
 | toast | 1 | No place of its own 1 |
 | transcript | 24 | Transcript 19, Inbox 1, Knowledge 1, Land 1, Thread panel 1, Work 1 |
 | url | 1 | No place of its own 1 |
-| workbench | 13 | No place of its own 12, Settings 1 |
+| workbench | 16 | No place of its own 12, Thread panel 3, Settings 1 |
 
 ## By destination
 
@@ -174,7 +174,7 @@ rail destination; 14 features.
 
 ### Work
 
-rail destination; 17 features.
+rail destination; 18 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -186,6 +186,7 @@ rail destination; 17 features.
 | backlog/project-scope: File and scope items by project | destinationSection | left-nav: Backlog › project filter |
 | backlog/rich-capture: A chat-sized capture box with files, properties and references | destinationSection | left-nav: Backlog › capture box |
 | backlog/search-and-views: Search with reasons and saved views | destinationSection | left-nav: Backlog › search |
+| project-automations/project-automations: Start threads in a project on a schedule | destinationSection | left-nav: Work › Automations |
 | backlog/board-links-and-history: Board, links, backlinks and history | detail | left-nav: Backlog › Board / item detail |
 | backlog/rich-item-text: Write descriptions and replies like a capture | detail | left-nav: Backlog › item detail |
 | backlog/secret-link-reveal: Reveal an item's secret link in place | detail | left-nav: Backlog › item detail › Relationships |
@@ -302,13 +303,13 @@ rail destination (bottom); 41 features.
 
 ### Thread panel
 
-facets of the active thread; 23 features.
+facets of the active thread; 24 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | agent-toolkit/agent-toolkit-page: Agent toolkit page | threadFacet | left-nav: Agent Toolkit: Capabilities |
 | annotations/preview-file: Annotate an HTML preview | threadFacet | dialog: annotate an HTML preview |
-| background-jobs/thread-jobs-facet: Thread panel Jobs facet | threadFacet | thread-panel: Jobs tab |
+| background-jobs/thread-jobs-facet: Thread panel Jobs facet | threadFacet | workbench: Choose a view › Thread panels › Jobs |
 | btw/btw-side-chat: /btw side chat | threadFacet | right-pane: btw tab |
 | diff-viewed/review-file-markers: Mark review files as viewed | threadFacet | right-pane: native review tab › Viewed |
 | editor/workspace-editor: Browse and edit workspace files | threadFacet | main-tabs: New tab › Editor: Files |
@@ -327,12 +328,13 @@ facets of the active thread; 23 features.
 | pulls-review/turn-card-opens-changes: A turn's Edited files card opens Changes on that turn | threadFacet | transcript: Edited N files card |
 | traces/span-cost: List-price cost on traces | threadFacet | conversation-view: Traces tab › cost |
 | traces/thread-traces-tab: Per-thread Traces tab | threadFacet | conversation-view: Traces / Requests tabs |
-| usage/thread-cost-facet: Thread panel Cost facet | threadFacet | thread-panel: Cost tab |
+| usage/thread-cost-facet: Thread panel Cost facet | threadFacet | workbench: Choose a view › Thread panels › Cost |
 | workbench/terminal-pages: Open native terminals from any pane's view chooser | threadFacet | main-tabs: New tab › Terminal: Terminal |
+| workbench/thread-facets: Open thread facets from any pane's view chooser | threadFacet | workbench: Choose a view › Thread panels |
 
 ### Composer
 
-run row, chips, `/` and `@` sources; 53 features.
+run row, chips, `/` and `@` sources; 54 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -378,6 +380,7 @@ run row, chips, `/` and `@` sources; 53 features.
 | rich-composer/paste-session-mentions: Paste session mentions as reference chips | composerContribution | composer: pasted thread mentions |
 | rich-composer/prompt-recall: Recall earlier prompts with ArrowUp | composerContribution | composer: ArrowUp recall |
 | send-after-upload/send-after-upload: Send when the attachment upload finishes | composerContribution | composer: Sending when upload finishes pill |
+| session-undo/turn-rewind: Rewind to before any recorded turn, files included | composerContribution | composer: Rewind to an earlier turn |
 | session-undo/turn-undo-redo: Undo and redo a turn: conversation and files together | composerContribution | composer: Undo last turn |
 | thread-sidebar/skill-mentions: Find human-invocable skills from @ autocomplete | composerContribution | composer: @ skills |
 | workspace-folder-picker/directory-only-mode: Start directly in the Host folder browser | composerContribution | Hosts › Add folder (directory-only picker) |
@@ -418,7 +421,7 @@ cards inline in the active thread; 19 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 133 features.
+palette commands, status items, agent tools, infrastructure; 134 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -511,6 +514,7 @@ palette commands, status items, agent tools, infrastructure; 133 features.
 | plugin-ui/schema-validated-persistent-values: Persist schema-validated client values | infrastructure | client: library |
 | plugin-ui/typed-forms-and-accessible-tables: Compose validated forms and accessible data tables | infrastructure | client: library |
 | preview/render-html: Offline HTML screenshots for other Host plugins | infrastructure | host: preview-render contract |
+| project-automations/project-automation-webhooks: Start threads from signed webhooks | infrastructure | host: /automations/webhook/<id> route |
 | project-checks/activity-projection: Project check receipts appear safely in the Activity Timeline | infrastructure | host: receipts into left-nav: Activity Timeline: Activity |
 | pulls-review/review-marks-migration: Move the Review page's marks into the one viewed-marks store | infrastructure | host: pulls-review reviewed record |
 | request-messages/dispatch-request-messages: Dispatch agent/request-messages on stock DSH | infrastructure | host: no UI |

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, realpath, rm } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { After, Then, When } from '../bdd.js'
@@ -87,7 +87,8 @@ When('a disposable terminal workspace has a selected real conversation', async (
   const workspace = join(root, 'terminal-project')
   await mkdir(workspace)
   const bootThreadId = new URL(page.url()).searchParams.get('thread')
-  await pane(page, 'left').getByRole('button', { name: 'New thread', exact: true }).filter({ visible: true }).click()
+  // The rail layout puts New thread in the sidebar header, outside any Workbench pane.
+  await page.getByRole('button', { name: 'New thread', exact: true }).filter({ visible: true }).first().click()
   // Boot already shows a blank conversation, so New thread opens a second one; wait for it before using its chip.
   if (bootThreadId !== null) await expect.poll(() => new URL(page.url()).searchParams.get('thread')).not.toBe(bootThreadId)
   await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
@@ -227,7 +228,9 @@ After(async ({ page }: { page: Page }) => {
   if (state === undefined) return
   journeys.delete(page)
   // Delete only the absolute scratch directory this scenario actually created.
-  if (dirname(state.root) !== tmpdir() || !basename(state.root).startsWith('dshx-workbench-terminal-'))
+  // createScratchDirectory resolves the temp root (macOS: /var -> /private/var), so compare against both spellings.
+  const roots = [tmpdir(), await realpath(tmpdir())]
+  if (!roots.includes(dirname(state.root)) || !basename(state.root).startsWith('dshx-workbench-terminal-'))
     throw new Error('Unexpected terminal scratch cleanup target')
   await rm(state.root, { recursive: true, force: true })
 })

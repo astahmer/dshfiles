@@ -1,0 +1,13 @@
+Feature: Thread facets in every Workbench pane
+
+  @scenario:workbench.thread-facets-follow
+  Scenario: The right pane chooser opens Cost and Jobs for the thread on screen and they follow thread switches
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/main-tabs, @dshfiles/thread-sidebar, @dshfiles/workspace-folder-picker, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/usage, @dshfiles/background-jobs" is booted
+    When the unified Workbench is ready
+    And a disposable terminal workspace has a selected real conversation
+    And the "right" pane opens the "Cost" thread facet from its view chooser
+    And the "right" pane opens the "Jobs" thread facet from its view chooser
+    Then the "right" pane shows the "Cost" and "Jobs" facets for the thread on screen
+    When another thread comes on screen
+    Then the "right" pane shows the "Cost" and "Jobs" facets for the thread on screen
+    And the workbench main acceptance journey is complete

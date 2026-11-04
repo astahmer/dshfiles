@@ -81,4 +81,6 @@ not offer plugin tab types such as Cost and Jobs. Contract needed from the sideb
 - Picking one opens the kind as a page for the stage's thread (`openTab(kind)` semantics), and the body renders through
   the `sidebar.right.pane.tab` seat with the thread's `sessionId`, exactly as the native shell does.
 
-Until then the facets are reachable only in compositions that use the native right pane.
+Implemented in `jj:mmrvzukm` (workbench + sidebar-right): every chooser lists these types under **Thread panels**, a pick
+opens the page for the on-screen thread in the chooser's pane, and open facets re-bind when the thread on screen
+changes. Evidence: [facets/](facets/README.md).
