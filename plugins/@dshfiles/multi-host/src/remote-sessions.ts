@@ -61,7 +61,7 @@ export class RemoteSessions extends Context.Service<
       const pool = yield* RuntimePool
       const directory = yield* HostDirectory
       const threads = yield* RemoteThreads
-      const discoveries = yield* FiberMap.make<string, RuntimeTarget | undefined>()
+      const discoveries = yield* FiberMap.make<string, RuntimeTarget | undefined, never>()
       const remembered = yield* Ref.make(new Map<string, RuntimeTarget>())
       const recent = yield* Ref.make<{ readonly key: string; readonly at: number; readonly rows: readonly SessionSummary[] } | undefined>(undefined)
 
@@ -123,8 +123,24 @@ export class RemoteSessions extends Context.Service<
         return owner.value
       })
 
-      /** Concurrent lookups of one Session share a single discovery. */
-      const runtimeFor = (sessionId: string) => Effect.flatMap(FiberMap.run(discoveries, sessionId, lookup(sessionId), { onlyIfMissing: true }), Fiber.join)
+      /**
+       * Concurrent lookups of one Session share a single discovery. `run` with `onlyIfMissing` hands a second caller an
+       * interrupted fiber rather than the running one, so the running discovery is looked up and joined first.
+       */
+      const runningDiscovery = (sessionId: string) => FiberMap.getUnsafe(discoveries, sessionId)
+      const runtimeFor = (sessionId: string) =>
+        Effect.flatMap(
+          Effect.suspend(() =>
+            Option.match(runningDiscovery(sessionId), {
+              onNone: () =>
+                Effect.map(FiberMap.run(discoveries, sessionId, lookup(sessionId), { onlyIfMissing: true }), started =>
+                  Option.getOrElse(runningDiscovery(sessionId), () => started),
+                ),
+              onSome: Effect.succeed,
+            }),
+          ),
+          Fiber.join,
+        )
       const requireRuntime = (sessionId: string) =>
         Effect.flatMap(runtimeFor(sessionId), runtime =>
           runtime === undefined ? Effect.fail(new SessionOwnerMissing({ sessionId })) : Effect.succeed(runtime),

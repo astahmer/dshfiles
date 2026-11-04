@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer, Stream } from 'effect'
 import { Connectors } from '../src/connectors/connectors.js'
@@ -159,6 +159,17 @@ describe('RemoteSessions', () => {
       expect(test.calls).toEqual([{ method: 'list', args: { _request: { projections: ['title'] } } }])
       expect(yield* sessions.source.owns('session-remote' as SessionId)).toBe(true)
       expect(yield* sessions.source.owns('session-unknown' as SessionId)).toBe(false)
+    }).pipe(Effect.provide(services(test)))
+  })
+
+  it.effect('answers concurrent ownership lookups of one Session from a single discovery', () => {
+    const test = fixture()
+    return Effect.gen(function* () {
+      const sessions = yield* RemoteSessions
+      const remote = SessionId('session-remote')
+      const answers = yield* Effect.all([sessions.source.owns(remote), sessions.source.owns(remote)], { concurrency: 'unbounded' })
+      expect(answers).toEqual([true, true])
+      expect(test.calls.filter(call => call.method === 'list')).toHaveLength(1)
     }).pipe(Effect.provide(services(test)))
   })
 
