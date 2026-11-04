@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-371 features from 84 plugins.
+377 features from 85 plugins.
 
 ## Counts
 
@@ -15,15 +15,15 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Threads |  |  |  |  | 9 |  | 1 |  | 12 | 1 |  |  |  |  | 23 |
 | Inbox |  | 18 |  |  | 1 |  |  |  |  |  |  |  |  |  | 19 |
 | Land |  |  | 1 |  | 6 | 2 | 1 |  | 4 |  |  |  |  |  | 14 |
-| Work |  |  | 1 |  | 7 | 2 | 1 |  | 5 |  |  |  |  |  | 16 |
+| Work |  |  | 1 |  | 7 | 3 | 1 |  | 5 |  |  |  |  |  | 17 |
 | Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  |  | 5 |
 | Observe |  |  |  |  | 21 | 1 |  |  | 2 |  |  |  |  |  | 24 |
 | Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  |  | 6 |
 | Settings |  |  |  |  |  |  |  |  | 1 |  | 40 |  |  |  | 41 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 23 |  | 23 |
-| Composer |  |  |  | 51 |  |  |  |  |  |  |  |  |  |  | 51 |
-| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 17 | 17 |
-| No place of its own | 19 |  | 17 |  |  |  |  | 89 |  |  |  | 7 |  |  | 132 |
+| Composer |  |  |  | 53 |  |  |  |  |  |  |  |  |  |  | 53 |
+| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 19 | 19 |
+| No place of its own | 19 |  | 17 |  |  |  |  | 90 |  |  |  | 7 |  |  | 133 |
 
 ## By current left-nav entry
 
@@ -38,7 +38,7 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | AI Accounts: Quota forecast | Observe | ai-accounts/quota-forecast → Observe (destinationSection) |
 | AI Accounts: Usage history | Observe | ai-accounts/usage-history-and-pricing → Observe (destinationSection) |
 | Background Jobs: Jobs | Observe | background-jobs/batch-stop-jobs → Observe (rowAction)<br>background-jobs/jobs-board → Observe (destinationSection) |
-| Backlog | Work, Inbox, Settings | backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/project-scope → Work (destinationSection)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/tweet-context-enrichment → Work (rowAction) |
+| Backlog | Work, Inbox, Settings | backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/project-scope → Work (destinationSection)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/secret-link-reveal → Work (detail)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/tweet-context-enrichment → Work (rowAction) |
 | Hosts | Observe | multi-host/fleet-update → Observe (destinationSection)<br>multi-host/host-management → Observe (destinationSection)<br>multi-host/host-settings → Observe (detail)<br>multi-host/isolated-runtime-views → Observe (rowAction) |
 | Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
 | Land | Land | jj-integration/thread-integration-attention-view → Land (destinationSection)<br>jj-integration/thread-integration-empty → Land (destinationSection)<br>jj-integration/thread-integration-row-details → Land (detail)<br>jj-integration/thread-workspaces-panel → Land (destinationSection) |
@@ -65,8 +65,8 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | --- | ---: | --- |
 | agent tool | 23 | No place of its own 18, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
 | agent tools | 1 | No place of its own 1 |
-| client | 10 | No place of its own 10 |
-| composer | 52 | Composer 49, Thread panel 2, Settings 1 |
+| client | 11 | No place of its own 11 |
+| composer | 54 | Composer 51, Thread panel 2, Settings 1 |
 | composer and transcript | 1 | Threads 1 |
 | conversation-view | 2 | Thread panel 2 |
 | dialog | 4 | Agents 1, No place of its own 1, Settings 1, Thread panel 1 |
@@ -74,7 +74,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | Host contract | 1 | Inbox 1 |
 | Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
 | keyboard | 3 | No place of its own 3 |
-| left-nav | 87 | Observe 21, Work 15, Land 13, Inbox 12, Settings 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
+| left-nav | 88 | Observe 21, Work 16, Land 13, Inbox 12, Settings 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 10 | No place of its own 7, Thread panel 2, Settings 1 |
 | observe | 2 | Observe 2 |
 | palette | 13 | No place of its own 13 |
@@ -89,7 +89,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | thread-list | 22 | Threads 16, Inbox 3, No place of its own 2, Settings 1 |
 | thread-panel | 2 | Thread panel 2 |
 | toast | 1 | No place of its own 1 |
-| transcript | 22 | Transcript 17, Inbox 1, Knowledge 1, Land 1, Thread panel 1, Work 1 |
+| transcript | 24 | Transcript 19, Inbox 1, Knowledge 1, Land 1, Thread panel 1, Work 1 |
 | url | 1 | No place of its own 1 |
 | workbench | 13 | No place of its own 12, Settings 1 |
 
@@ -174,7 +174,7 @@ rail destination; 14 features.
 
 ### Work
 
-rail destination; 16 features.
+rail destination; 17 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -188,6 +188,7 @@ rail destination; 16 features.
 | backlog/search-and-views: Search with reasons and saved views | destinationSection | left-nav: Backlog › search |
 | backlog/board-links-and-history: Board, links, backlinks and history | detail | left-nav: Backlog › Board / item detail |
 | backlog/rich-item-text: Write descriptions and replies like a capture | detail | left-nav: Backlog › item detail |
+| backlog/secret-link-reveal: Reveal an item's secret link in place | detail | left-nav: Backlog › item detail › Relationships |
 | backlog/reference-preview: Preview a referenced item from a conversation | entityProvider | transcript: b:<id> reference card |
 | backlog/inline-title-edit: Rename an item in place | rowAction | left-nav: Backlog › rows |
 | backlog/multi-select-items: Select items in ranges and batch-edit them | rowAction | left-nav: Backlog › rows |
@@ -331,10 +332,12 @@ facets of the active thread; 23 features.
 
 ### Composer
 
-run row, chips, `/` and `@` sources; 51 features.
+run row, chips, `/` and `@` sources; 53 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
+| agent-plan/live-activity-strip: Live activity strip beside the composer controls | composerContribution | composer: activity strip |
+| agent-plan/pinned-step: Current plan step pinned beside the composer | composerContribution | composer: plan chip beside plan mode |
 | agent-preset/draft-preset-selection: Choose an agent preset before typing | composerContribution | composer: Standard mode chip |
 | agents/agent-mentions: Mention an agent where a thread starts | composerContribution | composer: @agent mention |
 | ai-accounts/thread-account-switch: Use a sidebar account for this thread without reselecting its model | composerContribution | status-strip: Quota › Use this account for this thread |
@@ -389,10 +392,12 @@ run row, chips, `/` and `@` sources; 51 features.
 
 ### Transcript
 
-cards inline in the active thread; 17 features.
+cards inline in the active thread; 19 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
+| agent-plan/failure-card: Retry and Ask to fix under failed turns | transcriptCard | transcript: turn error row |
+| agent-plan/plan-card: Plan card for todo_write | transcriptCard | transcript: todo_write tool card |
 | agent-questions/question-card-layout: Steady countdown and compact native question card | transcriptCard | transcript: native question card |
 | ai-accounts/credential-recovery: Open credential setup from failed turns | transcriptCard | transcript: failed turn › Open AI Accounts |
 | attachment-gallery/image-gallery-navigation: Navigate image previews | transcriptCard | transcript: image previews (and composer attachments) |
@@ -408,12 +413,12 @@ cards inline in the active thread; 17 features.
 | test-runs/test-run-card: Vitest runs as a test-results card | transcriptCard | transcript: Vitest results card |
 | tool-meta/tool-call-timing: Start time and duration on every tool call | transcriptCard | transcript: tool call timing |
 | traces/trace-transcript-links: Span ↔ transcript links | transcriptCard | transcript: Open the trace of turn |
-| turn-summary/turn-summary-line: A summary line under each finished turn | transcriptCard | transcript: turn summary line |
+| turn-summary/turn-summary-line: A summary footer under each finished turn | transcriptCard | transcript: turn summary footer |
 | user-questions/answered-question-stays-closed: An answered question form stays closed while its reply waits for admission | transcriptCard | transcript: question form |
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 132 features.
+palette commands, status items, agent tools, infrastructure; 133 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -463,6 +468,7 @@ palette commands, status items, agent tools, infrastructure; 132 features.
 | backlog/lifecycle-signals: Move items from thread and revision signals | infrastructure | host: thread and revision signals |
 | backlog/shared-activity: Backlog work in the Activity timeline | infrastructure | host: backlog.* events into left-nav: Activity Timeline: Activity |
 | chat/focus-from-plugin: Scroll to a turn, step or tool call on request | infrastructure | client: chat focus contract |
+| chat/inline-references: Render inline references from other plugins | infrastructure | client: inline-reference registry |
 | command-palette/action-registry: Register and invoke typed palette actions | infrastructure | palette: action registry |
 | command-palette/frecency-ranking: Rank recently used actions and files | infrastructure | palette: ranking |
 | command-palette/performance-budget: Keep palette ranking within the interaction budget | infrastructure | palette: ranking budget |
