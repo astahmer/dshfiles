@@ -165,7 +165,7 @@ export const buildPlugin = async (projectRoot: string, packageId: string): Promi
  * Build several bundles in one Turbo run, which builds each one's workspace dependencies first (a dshx module another
  * bundle imports must exist before that bundle builds) and replays unchanged ones from the shared cache.
  */
-export const buildPlugins = async (packageIds: readonly string[]): Promise<void> =>
+const buildPlugins = async (packageIds: readonly string[]): Promise<void> =>
   runBuild({
     command: 'pnpm',
     args: ['exec', 'node', 'scripts/turbo.mjs', 'run', 'build', '--output-logs=errors-only', ...packageIds.map(packageId => `--filter=${packageId}`)],
@@ -197,4 +197,5 @@ export class LocalBundleModel {
   static readonly listLocalBootBundles = listLocalBootBundles
   static readonly resolveLocalBundles = resolveLocalBundles
   static readonly withSharedStylesheet = withSharedStylesheet
+  static readonly buildPlugins = buildPlugins
 }

@@ -28,7 +28,13 @@ const readyFacts = (checkout: Partial<RemoteFacts['checkout']> = {}): RemoteFact
   },
 })
 
-const envelope = (data: Record<string, unknown>) =>
+type SyncOverrides = {
+  readonly conflicts?: readonly string[]
+  readonly rebuilt?: { readonly dshx: boolean; readonly plugins: readonly string[] }
+  readonly restart?: { readonly needed: boolean; readonly reasons: readonly string[] }
+}
+
+const envelope = (data: SyncOverrides) =>
   JSON.stringify({
     schemaVersion: 1,
     command: 'checkout sync',

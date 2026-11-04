@@ -19,6 +19,48 @@ const outcomeOf = (result: UpdateResult): RowOutcome => {
   return { ok: true, text: result.restartNeeded ? `${result.detail} · restart DSH on this host to load it` : result.detail, pending: false }
 }
 
+type RowState = 'busy' | 'failed' | 'pending' | 'done'
+
+const rowStateOf = (input: { readonly busy: boolean; readonly failed: boolean; readonly pending: boolean }): RowState => {
+  if (input.busy) return 'busy'
+  if (input.failed) return 'failed'
+  if (input.pending) return 'pending'
+  return 'done'
+}
+
+const statusTextOf = (input: { readonly updating: boolean; readonly checking: boolean; readonly text: string }): string => {
+  if (input.updating) return 'Updating: fetching, rebasing and rebuilding…'
+  if (input.checking) return 'Checking…'
+  return input.text
+}
+
+const failureOf = (input: {
+  readonly update: { readonly isError: boolean; readonly error: unknown }
+  readonly check: { readonly isError: boolean; readonly error: unknown }
+}): string | undefined => {
+  if (input.update.isError) return errorMessage(input.update.error, 'The update failed.')
+  if (input.check.isError) return errorMessage(input.check.error, 'The check failed.')
+  return undefined
+}
+
+const RowAction = (props: { readonly state: RowState; readonly onRetry: () => void }) => {
+  switch (props.state) {
+    case 'busy':
+      return <Spinner className="dshx:size-4" />
+    case 'failed':
+      return (
+        <Button size="sm" variant="outline" className="dshx:h-7" onClick={props.onRetry}>
+          <RotateCwIcon className="dshx:size-3.5" />
+          Retry
+        </Button>
+      )
+    case 'pending':
+      return <TriangleAlertIcon className="dshx:size-4 dshx:text-warning" aria-label="Update available" />
+    case 'done':
+      return <CheckIcon className="dshx:size-4 dshx:text-success" aria-label="Up to date" />
+  }
+}
+
 const FleetUpdateRow = (props: { readonly api: MultiHostClient; readonly host: HostSummary; readonly updateRequest: number }) => {
   const { api, host } = props
   const check = useQuery({
@@ -37,37 +79,30 @@ const FleetUpdateRow = (props: { readonly api: MultiHostClient; readonly host: H
   }, [props.updateRequest, checked?.pending, update])
 
   const shown = update.data !== undefined ? outcomeOf(update.data) : checked
-  const failure = update.isError ? errorMessage(update.error, 'The update failed.') : check.isError ? errorMessage(check.error, 'The check failed.') : undefined
-  const busy = check.isFetching || update.isPending
+  const failure = failureOf({ update, check })
+  const state = rowStateOf({
+    busy: check.isFetching || update.isPending,
+    failed: failure !== undefined || shown?.ok === false,
+    pending: shown?.pending === true,
+  })
+  const statusText = statusTextOf({ updating: update.isPending, checking: check.isFetching, text: failure ?? shown?.text ?? '' })
+  const retry = (): void => {
+    if (update.isError || update.data !== undefined) {
+      update.mutate()
+      return
+    }
+    void check.refetch()
+  }
   return (
     <li data-testid={`fleet-update-${host.id}`} className="dshx:flex dshx:items-start dshx:gap-2 dshx:rounded-lg dshx:border dshx:p-3">
       <ServerIcon className="dshx:mt-0.5 dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
       <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
         <span className="dshx:truncate dshx:font-medium">{host.name}</span>
-        <span
-          role="status"
-          className={failure !== undefined || shown?.ok === false ? 'dshx:text-xs dshx:text-destructive' : 'dshx:text-xs dshx:text-muted-foreground'}
-        >
-          {update.isPending ? 'Updating: fetching, rebasing and rebuilding…' : check.isFetching ? 'Checking…' : (failure ?? shown?.text ?? '')}
+        <span role="status" className={state === 'failed' ? 'dshx:text-xs dshx:text-destructive' : 'dshx:text-xs dshx:text-muted-foreground'}>
+          {statusText}
         </span>
       </div>
-      {busy ? (
-        <Spinner className="dshx:size-4" />
-      ) : failure !== undefined || shown?.ok === false ? (
-        <Button
-          size="sm"
-          variant="outline"
-          className="dshx:h-7"
-          onClick={() => (update.isError || update.data !== undefined ? update.mutate() : void check.refetch())}
-        >
-          <RotateCwIcon className="dshx:size-3.5" />
-          Retry
-        </Button>
-      ) : shown?.pending === true ? (
-        <TriangleAlertIcon className="dshx:size-4 dshx:text-warning" aria-label="Update available" />
-      ) : (
-        <CheckIcon className="dshx:size-4 dshx:text-success" aria-label="Up to date" />
-      )}
+      <RowAction state={state} onRetry={retry} />
     </li>
   )
 }
