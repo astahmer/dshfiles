@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { renderMigrationMap } from './ade-migration-map.mjs'
+import { leftNavMoves, renderMigrationMap, renderMovedTo } from './ade-migration-map.mjs'
 
 const feature = (plugin, id, surface, destination, currentSurface) => ({ plugin, id, title: `${id} title`, surface, destination, currentSurface })
 
@@ -27,4 +27,20 @@ test('escapes table pipes and is deterministic regardless of input order', () =>
 
 test('refuses a destination the shell does not have', () => {
   assert.throws(() => renderMigrationMap([feature('x', 'y', 'detail', 'home', 'left-nav: X')]), /unknown destination: x\/y=home/)
+})
+
+test('lists every former left-nav entry once with its destinations, natives last', () => {
+  const rows = [
+    feature('usage', 'usage-charts', 'destinationSection', 'observe', 'left-nav: Usage: Analytics › Charts'),
+    feature('usage', 'usage-log', 'destinationSection', 'observe', 'left-nav: Usage: Analytics'),
+    feature('traces', 'alert-rules', 'attentionProvider', 'inbox', 'left-nav: Traces: Explorer › Alerts'),
+    feature('traces', 'trace-explorer', 'destinationSection', 'observe', 'left-nav: Traces: Explorer'),
+  ]
+  const moves = leftNavMoves(rows)
+  assert.deepEqual(moves.slice(0, 2), [
+    { entry: 'Traces: Explorer', destinations: ['inbox', 'observe'] },
+    { entry: 'Usage: Analytics', destinations: ['observe'] },
+  ])
+  assert.deepEqual(moves.slice(2).map(move => move.entry), ['Plugins', 'Schedules'])
+  assert.match(renderMovedTo(rows), /\{ entry: 'Usage: Analytics', destinations: \['observe'\] \},/)
 })

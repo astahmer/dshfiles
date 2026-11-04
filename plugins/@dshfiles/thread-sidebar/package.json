@@ -40,6 +40,10 @@
     "./thread-mention": {
       "types": "./src/thread-mention.ts",
       "default": "./dist/thread-mention.js"
+    },
+    "./destinations": {
+      "types": "./src/destinations.ts",
+      "default": "./dist/destinations.js"
     }
   },
   "scripts": {
