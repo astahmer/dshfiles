@@ -2343,7 +2343,7 @@ importers:
         version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
-        version: 0.2.1-rc.2(03aeead0ec8c146d3890db8cd905c2c9)
+        version: 0.2.1-rc.2(dbbc032c9895bff35b74e9a5d27e3426)
       '@deepseek-ai/dsh-client-ui-layout':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
@@ -2816,10 +2816,10 @@ importers:
     devDependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.1.0(effect@4.1.0)(redis@6.3.1(@opentelemetry/api@1.9.1))
+        version: 4.1.0(effect@4.1.0)(redis@6.3.1)
       '@effect/vitest':
         specifier: 'catalog:'
-        version: 4.1.0(effect@4.1.0)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.19.20)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.19.20)(yaml@2.9.0)))
+        version: 4.1.0(effect@4.1.0)(vitest@4.1.11)
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.20
@@ -2828,7 +2828,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.19.20)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.19.20)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.19.20)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2)
 
   plugins/@dshfiles/git-worktrees:
     dependencies:
@@ -5177,6 +5177,9 @@ importers:
       '@dshfiles/diff-viewed':
         specifier: workspace:*
         version: link:../diff-viewed
+      '@dshfiles/git-cli':
+        specifier: workspace:*
+        version: link:../git-cli
       '@dshfiles/jj-cli':
         specifier: workspace:*
         version: link:../jj-cli
@@ -5189,6 +5192,9 @@ importers:
       '@dshfiles/project-checks':
         specifier: workspace:*
         version: link:../project-checks
+      '@dshfiles/vcs-provider-port':
+        specifier: workspace:*
+        version: link:../vcs-provider-port
       '@dshfiles/workspace-folder-picker':
         specifier: workspace:*
         version: link:../workspace-folder-picker
@@ -7691,7 +7697,7 @@ importers:
         version: link:../../../tooling/dshx/packages/dshx
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.1.0(effect@4.1.0)(redis@6.3.1(@opentelemetry/api@1.9.1))
+        version: 4.1.0(effect@4.1.0)(redis@6.3.1)
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.20

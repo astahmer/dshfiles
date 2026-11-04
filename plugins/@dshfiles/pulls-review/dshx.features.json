@@ -5,7 +5,7 @@
     {
       "id": "thread-review-scopes",
       "title": "Review project and workspace changes by scope",
-      "summary": "Choose a registered project or an existing JJ thread workspace from the shared searchable picker, recover from a missing workspace by choosing another folder, and optionally set a base bookmark; read its jj diff, group changed files with pulls.review's deterministic rules, and show every scope's diff in one scrollable review with progress kept in diff-viewed's one viewed-marks store. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool. The page stays the cross-project view; Open in thread opens the thread's Changes facet.",
+      "summary": "Choose a registered project or an existing JJ thread workspace from the shared searchable picker, recover from a missing workspace by choosing another folder, and optionally set a base bookmark; read its jj diff (or, in a git-only repository, its git diff from the merge base with the bookmark, uncommitted and untracked files included), group changed files with pulls.review's deterministic rules, and show every scope's diff in one scrollable review with progress kept in diff-viewed's one viewed-marks store. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool. The page stays the cross-project view; Open in thread opens the thread's Changes facet.",
       "surfaces": ["client", "host"],
       "surface": "threadFacet",
       "destination": "thread-panel",
@@ -15,13 +15,19 @@
       "failureModes": [
         "A missing workspace, a workspace without a jj repository, no resolvable base bookmark, or a missing jj binary is reported with its own reason instead of an empty diff.",
         "jj stderr never reaches the client; a failed command is classified, not quoted.",
-        "A patch larger than the Host cap, or one with more files than one message carries, is flagged as truncated and clipped rather than silently shortened or rejected."
+        "A patch larger than the Host cap, or one with more files than one message carries, is flagged as truncated and clipped rather than silently shortened or rejected.",
+        "In a git-only repository the same reasons apply with git wording; a saved range holds commit ids, and a revision that would read as a git option is refused as a missing base."
       ],
       "externalDependencies": [
         {
           "id": "jujutsu",
           "boundary": "The jj CLI in the resolved thread workspace.",
           "deterministicFake": "The e2e journey provisions a disposable jj repository; unit tests inject a scripted jj runner and check the real CLI output separately."
+        },
+        {
+          "id": "git",
+          "boundary": "The git CLI through @dshfiles/git-cli in a git-only thread workspace; a live review snapshots the worktree into a throwaway index, never the real one.",
+          "deterministicFake": "Real temporary git repositories and worktrees in tests/git-output.spec.ts; no git mock is used."
         }
       ],
       "reach": [
@@ -29,7 +35,7 @@
         "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
         "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/pulls\"",
         "press Enter",
-        "expect text \"pulls.review \u00b7 main..@*\"",
+        "expect text \"pulls.review · main..@*\"",
         "click tab \"Land\"",
         "click button \"Review\"",
         "expect heading \"Review\"",
@@ -86,6 +92,24 @@
         },
         {
           "kind": "unit-test",
+          "id": "pulls-review.thread-review-scopes-git-live",
+          "file": "plugins/@dshfiles/pulls-review/tests/git-output.spec.ts",
+          "testName": "reviews a git worktree from its merge base with main, uncommitted and untracked files included"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.thread-review-scopes-git-saved-range",
+          "file": "plugins/@dshfiles/pulls-review/tests/git-output.spec.ts",
+          "testName": "reviews a saved land range of commit ids from the repository root"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.thread-review-scopes-git-refusals",
+          "file": "plugins/@dshfiles/pulls-review/tests/git-output.spec.ts",
+          "testName": "lists git base branches when the base is missing and refuses a revision that looks like an option"
+        },
+        {
+          "kind": "unit-test",
           "id": "pulls-review.thread-review-scopes-unit-reviewed-key",
           "file": "plugins/@dshfiles/pulls-review/tests/reviewed.spec.ts",
           "testName": "separates the same path across workspaces, bases and revisions"
@@ -111,6 +135,12 @@
           "span": "pulls-review review",
           "file": "plugins/@dshfiles/pulls-review/src/effect-span.test.ts",
           "testName": "records review and summary spans through the dshx tracer bridge"
+        },
+        {
+          "kind": "custom",
+          "span": "git <verb>",
+          "file": "plugins/@dshfiles/git-cli/src/git.test.ts",
+          "testName": "records one git <verb> client span with value-free attributes and the exit code"
         }
       ]
     },

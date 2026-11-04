@@ -35,10 +35,12 @@
   },
   "dependencies": {
     "@dshfiles/diff-viewed": "workspace:*",
+    "@dshfiles/git-cli": "workspace:*",
     "@dshfiles/jj-cli": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-checks": "workspace:*",
+    "@dshfiles/vcs-provider-port": "workspace:*",
     "@dshfiles/workspace-folder-picker": "workspace:*",
     "@effect/platform-node": "catalog:",
     "@pulls.review/core": "0.3.3",

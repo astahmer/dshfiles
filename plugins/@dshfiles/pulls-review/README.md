@@ -80,6 +80,21 @@ rule-based adapter (MIT): no model call, no GitHub token, and the same rules the
 site uses, so a scope reads `Code` / `Tests` / `Docs` / `Config` /
 `Dependencies` / `Generated` / `Other` here exactly as it does there.
 
+### Git-only repositories
+
+A workspace whose nearest repository marker is `.git` with no `.jj` (see `VcsDetector` in
+[`vcs-provider-port`](../vcs-provider-port/README.md)) is read through git instead, by the `ReviewGit` adapter of the
+same review port (`src/review-backend.ts`), over [`@dshfiles/git-cli`](../git-cli/README.md):
+
+- **Live review:** `git diff <merge-base with base>` to a snapshot of the worktree, built in a throwaway index, so
+  uncommitted and untracked (non-ignored) files count and neither `HEAD` nor the real index moves. The range reads
+  `<base>..HEAD`, and the base candidates are `main`, `master`, `trunk`, then `origin/main`, `origin/master`, `origin/trunk`.
+  Unlike jj (a two-tree diff from the bookmark), git diffs from the merge base, so commits that reached `main` after the
+  thread started do not show up as reverts.
+- **Saved ranges:** jj-integration's git backend records commit ids as `baseChangeId`/`tipChangeId`, and
+  `fromChangeId`/`toChangeId` take them as is (`git diff <from> <to>`).
+- Failure reasons keep their names (`jj-missing` means the VCS executable is missing); the messages say git.
+
 The panel shows the range and totals, then every changed-file diff in one
 scrollable view. Each diff header carries its scope and summary, and a per-file
 action marks that file reviewed. The review-wide selector can batch-mark files

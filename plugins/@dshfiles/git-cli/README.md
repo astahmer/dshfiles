@@ -27,7 +27,8 @@ Every run:
 
 - runs `git -c core.quotePath=false …` with stdin ignored and `GIT_TERMINAL_PROMPT=0`, no editor and no pager, so it
   never waits for a terminal; `command.env` adds variables over the spawner's environment (a scratch `GIT_INDEX_FILE`);
-- caps stdout at 512 KB (a longer one fails as `output-truncated`) and stderr at 64 KB;
+- caps stdout at 512 KB (`maxStdoutBytes`; a longer one fails as `output-truncated`, or with `onStdoutLimit: 'truncate'`
+  keeps the head and sets `stdoutTruncated`) and stderr at 64 KB;
 - stops after two minutes (`timeout` per command or layer) and kills the process, with a 1.5 s grace;
 - is one `git <verb>` client span (first subcommand word) with value-free attributes: executable, up to two subcommand
   words, flag names, argument count and `process.exit.code`. Paths and values never reach a span.

@@ -11,11 +11,15 @@ export interface GitCommand {
   /** Variables merged over the spawner's environment, such as a scratch `GIT_INDEX_FILE` or a commit identity. */
   readonly env?: Readonly<Record<string, string>> | undefined
   readonly timeout?: Duration.Input | undefined
+  readonly maxStdoutBytes?: number | undefined
+  /** `fail` (default) fails as `output-truncated`; `truncate` keeps the first bytes and sets `stdoutTruncated`. */
+  readonly onStdoutLimit?: 'fail' | 'truncate' | undefined
 }
 
 export interface GitOutput {
   readonly exitCode: number
   readonly stdout: string
+  readonly stdoutTruncated: boolean
   /** Raw stderr; `GitCommandFailed.stderr` is the redacted copy that may leave the Host. */
   readonly stderr: string
 }
@@ -77,13 +81,13 @@ export class Git extends Context.Service<
   static readonly make = Effect.fnUntraced(function* (options: GitOptions) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const executable = options.executable ?? 'git'
-    const maxStdoutBytes = options.maxStdoutBytes ?? DEFAULT_MAX_STDOUT_BYTES
     const maxStderrBytes = options.maxStderrBytes ?? DEFAULT_MAX_STDERR_BYTES
 
     const bounded = (command: GitCommand): Effect.Effect<GitOutput, GitRunFailed> => {
       const args = ['-c', 'core.quotePath=false', ...command.args]
       const verb = GitArgs.verb(command.args)
       const timeout = Duration.fromInputUnsafe(command.timeout ?? options.timeout ?? DEFAULT_TIMEOUT)
+      const maxStdoutBytes = command.maxStdoutBytes ?? options.maxStdoutBytes ?? DEFAULT_MAX_STDOUT_BYTES
       return Effect.gen(function* () {
         const handle = yield* spawner
           .spawn(
@@ -101,8 +105,8 @@ export class Git extends Context.Service<
           { concurrency: 'unbounded' },
         ).pipe(Effect.mapError(cause => new GitRunFailed({ verb, reason: 'output-read-failed', cause })))
         yield* Effect.annotateCurrentSpan({ 'process.exit.code': exitCode })
-        if (stdout.truncated) return yield* new GitRunFailed({ verb, reason: 'output-truncated' })
-        return { exitCode, stdout: stdout.text, stderr: stderr.text } satisfies GitOutput
+        if (stdout.truncated && command.onStdoutLimit !== 'truncate') return yield* new GitRunFailed({ verb, reason: 'output-truncated' })
+        return { exitCode, stdout: stdout.text, stdoutTruncated: stdout.truncated, stderr: stderr.text } satisfies GitOutput
       }).pipe(Effect.scoped, Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.fail(new GitRunFailed({ verb, reason: 'timed-out' })) }))
     }
 

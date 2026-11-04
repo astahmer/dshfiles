@@ -4,10 +4,12 @@ import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
 import { HostCommands } from '@dshfiles/dshx/effect/host-commands'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { SessionId } from '@dshfiles/dshx/ids'
+import { Git } from '@dshfiles/git-cli'
 import { Jj } from '@dshfiles/jj-cli'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer, Option, Schema } from 'effect'
 import { pullsReviewApi } from './api.js'
+import { ReviewGit } from './git.js'
 import { ReviewJj } from './jj.js'
 import { reviewReportText } from './report.js'
 import { ReviewWorkspace } from './review.js'
@@ -32,9 +34,12 @@ const pullsCommand = Layer.effectDiscard(
   }),
 )
 
-const jjLayer = ReviewJj.layer.pipe(Layer.provide(Jj.layer), Layer.provide(Layer.mergeAll(DshChildProcessSpawner.layer, NodeFileSystem.layer, NodePath.layer)))
+const platformLayer = Layer.mergeAll(DshChildProcessSpawner.layer, NodeFileSystem.layer, NodePath.layer)
+const jjLayer = ReviewJj.layer.pipe(Layer.provide(Jj.layer), Layer.provide(platformLayer))
+/** The git adapter: a thread workspace in a git-only repository reviews through git instead of jj. */
+const gitLayer = ReviewGit.layer.pipe(Layer.provide(Git.layer), Layer.provide(platformLayer))
 
-const reviewLayer = Layer.provideMerge(ReviewWorkspace.layer, Layer.merge(jjLayer, NodeFileSystem.layer))
+const reviewLayer = Layer.provideMerge(ReviewWorkspace.layer, Layer.mergeAll(jjLayer, gitLayer, NodeFileSystem.layer))
 
 const pullsReviewLayer = Layer.provideMerge(pullsCommand, Layer.provideMerge(PullsReviewSummary.layer, Layer.merge(reviewLayer, SummaryRoutes.layer)))
 
