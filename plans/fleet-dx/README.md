@@ -19,7 +19,7 @@ feels different), b:184 (keep jj in sync across hosts).
 | 0b  | Quick wins: Copy diagnostics after Test connection; version-drift line on each Hosts row; README comparison refreshed                                                                                                                                                  | `jj:b1ab8405`, `jj:7051d9e1`; unit tests; browser check pending                                                                                                             | code done   |
 | 1   | **Fleet update dialog** (b:462): per-host DSH version and checkout revision, one "Update all" that runs `checkoutSync` → rebuild → runtime restart per host, live per-row state (waiting / updating / restarting / done / failed + Retry), threads on that host resume | A two-runtime scratch fleet updates from the dialog; a failing host shows its error and Retry; the version-drift line clears; agent tool `multi_host_update_all` mirrors it | partial     |
 | 2   | **Version-mismatch banner** in a remote thread's composer, with an Update button feeding milestone 1                                                                                                                                                                   | Banner appears only when versions differ; Update starts the single-host flow                                                                                                | partial     |
-| 3   | **Remote subagents** (b:482): `subagent` / `backlog_start_thread` accept a host (or Auto) and run the child as a mirrored thread there; the parent receives its result                                                                                                 | Scratch: a parent thread on A starts a child on B through Auto; the child result arrives in A; stopping the parent stops the child                                          | not started |
+| 3   | **Remote subagents** (b:482): `subagent` / `backlog_start_thread` accept a host (or Auto) and run the child as a mirrored thread there; the parent receives its result                                                                                                 | Scratch: a parent thread on A starts a child on B through Auto; the child result arrives in A; stopping the parent stops the child                                          | partial     |
 | 4   | **Per-step diagnosis on failure**: `testConnection` returns the steps it ran even when one fails; the host row and picker show which hop failed (SSH, runtime, identity) with its recovery                                                                             | Unit test per failing hop; dialog lists failed hop; Copy diagnostics includes it                                                                                            | partial     |
 | 5   | **Unreachable host polish**: a short disconnect grace delay before turning a host red; "Hide this host's threads" from the offline banner                                                                                                                              | No red flicker on a 2 s blip; hiding reuses the existing hidden-host flag                                                                                                   | not started |
 | 6   | **Open the exact thread on the host**: `runtimeOpenView` takes an optional Session id and opens `?thread=` on the remote UI                                                                                                                                            | Host UI opens on the mirrored thread, not the home screen                                                                                                                   | done        |
@@ -38,7 +38,7 @@ update); 3 (remote subagents); 5, 8, 9 as polish. 7 follows its own plan.
 
 ## Resume here
 
-Done: 0, 0b, 6. Partial: 1, 2, 4.
+Done: 0, 0b, 6. Partial: 1, 2, 3, 4.
 
 - **4**: `testConnection` keeps its hops on failure and the Add host dialog shows
   them; the Hosts row and Run-on picker still show only the runtime's last error
@@ -57,14 +57,21 @@ Done: 0, 0b, 6. Partial: 1, 2, 4.
   changes. Not seen in a browser yet (needs a mirrored thread from a second
   runtime).
 
+- **3**: `multi_host_delegate` starts a task as a thread on a named host or on
+  Auto, polls its transcript every 3 s and returns the final answer, `failed`,
+  `waiting` (question on the host) or `running` with the thread id after
+  `waitSeconds`; cancelling the call stops the remote turn. Proven against two
+  scratch DSHs (B registered on A as a local runtime). Not done: the core
+  `subagent` tool and `backlog_start_thread` cannot take a host (core tools), and
+  the parent thread does not show the remote child in its subagent list.
+
 Scratch: a full-profile `dshx dev up` now builds through Turbo, boots, creates
 threads and opens thread links (fixed: subprocess inject, session-controller's
-setup-time service snapshot, build order). `dshx dev doctor` still fails its
-host-log check on that profile: DSH prints "10 entries did not activate" before
-session-search registers `sessionQuery`, and those entries activate a moment
-later.
+setup-time service snapshot, build order). `dshx dev doctor` accepts DSH's boot
+"entries did not activate" warning when every entry it names is active by the
+time doctor runs (session-search registers `sessionQuery` after an async start).
 
-Next: 3 (remote subagents), then 5, 8, 9.
+Next: 5, 8, 9.
 
 The [host-pool plan](../host-pool/README.md) still shows every milestone
 pending although Auto placement and the resource view shipped (b:346, b:356):
