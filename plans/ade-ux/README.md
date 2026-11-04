@@ -9,9 +9,9 @@ Resume here: see the progress table in §11.
 
 | Phase | State | Revision / notes |
 | --- | --- | --- |
-| 0. Ground truth | not started | |
-| 1. Language and kit | not started | |
-| 2. One inbox | not started | |
+| 0. Ground truth | in progress | baseline screenshots (workspace `ade-baseline`); catalog `surface`/`destination` + migration map (`ade-catalog`) |
+| 1. Language and kit | in progress | 1a page kit, DESIGN.md, copy ratchet, 3 pilot pages (`ade-kit`); 1b remaining pages pending |
+| 2. One inbox | in progress | 2a attention contract + store in activity-timeline, Inbox UI, 2 providers (`ade-inbox`); 2b other providers pending |
 | 3. Shell and navigation | not started | |
 | 4. Thread loop | not started | |
 | 5. Observe and configure | not started | |
