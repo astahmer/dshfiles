@@ -1577,7 +1577,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 </PopoverContent>
               </Popover>
             )}
-            <SidebarPreviewFallback renderSlot={props.renderSlot} contentOverridden={contentOverridden} />
+            {/* The fixed layout's status strip carries the account preview (plans/ade-ux §4.1 R5); free docking keeps the
+                footer preview seat, which Workbench also offers as a movable view. */}
+            {docking ? <SidebarPreviewFallback renderSlot={props.renderSlot} contentOverridden={contentOverridden} /> : null}
           </div>
         ) : null}
 

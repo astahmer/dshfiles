@@ -20,6 +20,10 @@
       "types": "./src/regions.ts",
       "default": "./dist/regions.js"
     },
+    "./status-strip": {
+      "types": "./src/status-strip.ts",
+      "default": "./dist/status-strip.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },

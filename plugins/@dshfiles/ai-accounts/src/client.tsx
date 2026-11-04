@@ -16,7 +16,8 @@ import { createAccountSetupController } from './account-setup-controller.js'
 import { AccountSetupOverlay } from './account-setup-dialog.js'
 import { useServingAccount, type UseServingAccountSessions } from './use-serving-account.js'
 import type { CredentialSetupPort } from './credential-setup-port.js'
-import { QuotaFooter, QuotaStrip } from './quota-footer.js'
+import { QuotaStrip } from './quota-footer.js'
+import { QuotaStatusItem } from './quota-status-item.js'
 import { ThreadAccountSurface } from './thread-account-dialog.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
 import { QuotaForecastPanel } from './quota-forecast-panel.js'
@@ -32,7 +33,6 @@ import { QuotaAutoResumeToggle } from './quota-auto-resume-toggle.js'
 import { QuotaRetryMessage } from './quota-retry-message.js'
 import { AiAccountsSettingsSection } from './settings-section.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
-import { useSyncExternalStore } from 'react'
 
 /**
  * The accounts page is a main panel with its own sidebar row, the same shape the
@@ -113,32 +113,6 @@ export default defineClientPlugin({
         <QuotaForecastPanel onBack={openAccounts} />
       </PluginQueryProvider>
     )
-    const subscribeStripSeat = (listener: () => void): (() => void) => ctx.slots.subscribe('sidebar.footer.above', listener)
-    const stripSeated = (): boolean => ctx.slots.entriesOfSlot('sidebar.footer.above').some(entry => entry.options.id === USAGE_STRIP_ID)
-    const ConnectedQuotaFooter = (props: {
-      readonly wide: boolean
-      readonly seated: boolean
-      readonly useSessions: UseServingAccountSessions
-    }): JSX.Element => {
-      const serving = useServingAccount(props.useSessions)
-      return (
-        <ThreadAccountSurface key={serving.sessionId} sessionId={serving.sessionId}>
-          {choose => (
-            <QuotaFooter
-              {...(choose === undefined ? {} : { onUseForThread: choose })}
-              onOpenAccounts={openAccounts}
-              onOpenUsageHistory={openUsageHistory}
-              onAddAccount={() => openSetup()}
-              onConnectAccount={reconnect}
-              stripSeated={props.seated}
-              wide={props.wide}
-              activeAccountId={serving.activeAccountId}
-              activeAccountRunning={serving.running}
-            />
-          )}
-        </ThreadAccountSurface>
-      )
-    }
     const ConnectedQuotaStrip = (props: { readonly useSessions: UseServingAccountSessions }): JSX.Element => {
       const serving = useServingAccount(props.useSessions)
       return (
@@ -155,14 +129,6 @@ export default defineClientPlugin({
             />
           )}
         </ThreadAccountSurface>
-      )
-    }
-    const QuotaFooterView = (props: { readonly wide: boolean; readonly useSessions: UseServingAccountSessions }): JSX.Element => {
-      const seated = useSyncExternalStore(subscribeStripSeat, stripSeated)
-      return (
-        <PluginQueryProvider>
-          <ConnectedQuotaFooter wide={props.wide} seated={seated} useSessions={props.useSessions} />
-        </PluginQueryProvider>
       )
     }
     const QuotaStripView = (props: { readonly useSessions: UseServingAccountSessions }): JSX.Element => (
@@ -219,19 +185,10 @@ export default defineClientPlugin({
     // The Models page only draws rows for settings namespaces, which accounts
     // are not, so they join it through its footer seat.
     api.ui.register({ name: 'settings.models.footer', id: 'ai-accounts-models', order: 0, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, ModelsPageAccountsView)
-    // The footer owns its whole surface, so quota lives there as a compact
-    // disclosure: the number you want without opening the panel.
-    api.ui.register(
-      {
-        name: 'sidebar.footer.action',
-        id: 'ai-accounts-quota',
-        order: 2,
-        label: 'AI Accounts: Usage menu',
-        locale: AI_ACCOUNTS_LOCALE_NAMESPACE,
-      },
-      QuotaFooterView,
-    )
-    // Only the thread sidebar declares this seat; registration waits for it, and the footer action yields the wide strip to it.
+    // Quota lives in the frame's status strip now (plans/ade-ux §4.1 R5), as one item instead of the sidebar footer's
+    // menu and preview strip; frame-layout renders nothing for it when another frame owns the layout.
+    ctx.effect(() => QuotaStatusItem.register(api, props => <QuotaStripView useSessions={props.useSessions} />))
+    // The same strip stays a movable Workbench view in free docking, where the thread sidebar still seats it above its foot.
     api.ui.register(
       { name: 'sidebar.footer.above', id: USAGE_STRIP_ID, order: 0, label: 'AI Accounts: Preview', locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
       QuotaStripView,

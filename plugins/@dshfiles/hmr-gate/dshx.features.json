@@ -122,6 +122,43 @@
           "source": "api-dispatch"
         }
       ]
+    },
+    {
+      "id": "restart-status-item",
+      "title": "See a pending Host restart in the status strip",
+      "summary": "While a rebuilt plugin waits for a Host restart, the status strip shows \"Restart pending\" (with the plugin count when several wait). It offers no restart verb: restarting stays the user's decision, and the Plugins page row explains what would apply.",
+      "reach": [
+        "expect region \"Threads\""
+      ],
+      "surfaces": [
+        "client"
+      ],
+      "surface": "statusItem",
+      "destination": "none",
+      "currentSurface": "status-strip: Restart pending",
+      "configuration": [],
+      "states": [
+        "hidden",
+        "pending-one",
+        "pending-many"
+      ],
+      "failureModes": [
+        "Without frame-layout the item is registered but not shown; the Plugins page row and the Inbox item still report the pending restart."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "hmr-gate.restart-status-item-browser",
+          "reason": "Needs a deferred Host rebuild frame; walked with the pending-restart seed in a scratch DSH rather than a Gherkin scenario."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: it reads the deferred packages the hmr-gate event stream already delivered."
+        }
+      ]
     }
   ]
 }

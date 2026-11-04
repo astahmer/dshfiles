@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@dshfiles/activity-timeline": "workspace:*",
+    "@dshfiles/frame-layout": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "effect": "catalog:",
     "zod": "catalog:"

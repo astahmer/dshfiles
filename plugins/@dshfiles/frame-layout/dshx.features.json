@@ -218,20 +218,13 @@
       "id": "phone-navigation-seat",
       "title": "Give the stage the full width on a phone",
       "summary": "When the left-column occupant marks the document with data-shell-phone-nav, a frame narrower than 640px drops the sidebar and right tracks, hides the sidebar drag handle and shortens itself by --dsh-phone-nav-height so the occupant's bottom tab bar never covers the composer. Without the mark the frame keeps upstream behaviour.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "shell: frame columns at phone width",
       "configuration": [],
-      "states": [
-        "desktop",
-        "phone"
-      ],
-      "failureModes": [
-        "An occupant that sets the mark without drawing navigation would hide the thread list; only the thread sidebar's fixed layout sets it."
-      ],
+      "states": ["desktop", "phone"],
+      "failureModes": ["An occupant that sets the mark without drawing navigation would hide the thread list; only the thread sidebar's fixed layout sets it."],
       "externalDependencies": [],
       "verification": [
         {
@@ -244,6 +237,48 @@
         {
           "kind": "not-applicable",
           "reason": "A CSS rule in the client frame; it runs no Host work."
+        }
+      ]
+    },
+    {
+      "id": "status-strip",
+      "title": "One status strip at the bottom of the frame",
+      "summary": "A thin row under every column where plugins add at most one text-first item each through the @dshfiles/frame-layout/status-strip registry: global items on the left, items about the open thread on the right. It stays empty (zero height) until an item is added, an item that throws hides only itself, and on a phone-width frame it collapses to one Status chip that opens the items as a list.",
+      "reach": ["expect region \"Threads\""],
+      "surfaces": ["client", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "shell: status strip",
+      "configuration": [],
+      "states": ["empty", "full", "compact-closed", "compact-open", "item-failed"],
+      "failureModes": [
+        "A second item from the same plugin id is ignored, so one plugin cannot fill the strip.",
+        "A provider whose component throws is hidden by its own boundary and logged; the frame keeps rendering."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.status-strip-arrange",
+          "file": "plugins/@dshfiles/frame-layout/src/status-strip.test.ts",
+          "testName": "splits items by side and sorts each side by order, then registration"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.status-strip-one-per-plugin",
+          "file": "plugins/@dshfiles/frame-layout/src/status-strip.test.ts",
+          "testName": "keeps one item per plugin: the first registration wins"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "frame-layout.status-strip-browser",
+          "reason": "Captured at desktop 1440x900 and WebKit 390x844 in a scratch DSH with the quota, working and restart items (plans/ade-ux/phase3b); no Gherkin scenario yet."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only layout: the strip renders registry items and does no Host work."
         }
       ]
     }

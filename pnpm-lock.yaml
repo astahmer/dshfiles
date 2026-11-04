@@ -1122,6 +1122,9 @@ importers:
       '@dshfiles/credential-port':
         specifier: workspace:*
         version: link:../credential-port
+      '@dshfiles/frame-layout':
+        specifier: workspace:*
+        version: link:../frame-layout
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -2719,6 +2722,9 @@ importers:
       '@dshfiles/activity-timeline':
         specifier: workspace:*
         version: link:../activity-timeline
+      '@dshfiles/frame-layout':
+        specifier: workspace:*
+        version: link:../frame-layout
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -6534,6 +6540,9 @@ importers:
       '@dshfiles/command-palette':
         specifier: workspace:*
         version: link:../command-palette
+      '@dshfiles/frame-layout':
+        specifier: workspace:*
+        version: link:../frame-layout
       '@dshfiles/input-trigger':
         specifier: workspace:*
         version: link:../input-trigger
@@ -6679,9 +6688,6 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
-      '@dshfiles/frame-layout':
-        specifier: workspace:*
-        version: link:../frame-layout
       '@dshfiles/rich-composer':
         specifier: workspace:*
         version: link:../rich-composer

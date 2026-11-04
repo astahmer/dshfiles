@@ -20,6 +20,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { createApiClient, defineClient, hasHostCommandRegistry, runHostCommand } from '@dshfiles/dshx/client'
+import { StatusItems, type StatusItemProps } from '@dshfiles/frame-layout/status-strip'
+import { WorkingStatusItem } from './working-status-item.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -258,6 +260,16 @@ export default defineClient({
 
     const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
     const translate = ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)
+    if (plugin !== undefined) {
+      // The status strip's "N working" item; frame-layout owns the strip and renders nothing when it is not the frame.
+      const WorkingItem = (props: StatusItemProps): JSX.Element | null => (
+        <WorkingStatusItem {...props} label={count => translate('threadSidebarWorkingCount', { count })} />
+      )
+      ctx.effect(
+        () => plugin.add(StatusItems, { id: '@dshfiles/thread-sidebar', side: 'global', order: 10, label: 'Working', component: plugin.bind(WorkingItem) }),
+        'thread-sidebar: working status item',
+      )
+    }
     const skillMentions = createSkillMentionSource({
       isSubagent: sessionId => ctx.sessions.subagentAddress(sessionId) !== undefined,
       rank: rankByName,

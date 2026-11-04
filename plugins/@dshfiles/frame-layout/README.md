@@ -4,6 +4,10 @@
 
 ![On a phone the stage takes the full width above the sidebar's own tab bar](docs/screenshots/phone-navigation-seat.png)
 
+![The status strip along the bottom of the frame, here with the Quota item](docs/screenshots/status-strip.png)
+
+![On a phone the strip is one Status chip that opens its items](docs/screenshots/status-strip-phone.png)
+
 DSH's three-column AppFrame, forked so the frame's dragged panel widths and collapsed sidebar survive a reload.
 
 ## Use
@@ -86,6 +90,25 @@ The frame owns the whole geometry and exposes one seat per region to plugins:
   handle rides its top edge and a reload reopens it where the user left it. `ctx.frameBottom.height()`
   reports the rendered height (0 while hidden). The occupant registers into the layout contract's own
   `shell.bottom` slot and fills the row it is given. Workbench opens an empty row with the same New tab chooser as other panes; its own far-right Close pane icon hides it.
+
+### The status strip
+
+Local delta (plan `plans/ade-ux` §4.1 R5): a third grid row, 24 px, across every column. Plugins add at most one
+text-first item each through the `@dshfiles/frame-layout/status-strip` dshx module:
+
+```ts
+import { StatusItems, type StatusItemProps } from '@dshfiles/frame-layout/status-strip'
+
+const Item = (props: StatusItemProps) => <span className="dshx-root">3 working</span>
+plugin.add(StatusItems, { id: '@dshfiles/my-plugin', side: 'global', label: 'Working', component: plugin.bind(Item) })
+```
+
+`side: 'global'` items sit on the left, `'thread'` items (about the thread on the stage) on the right; `order` sorts
+within a side and the first registration per `id` wins, so one plugin cannot fill the strip. A component receives
+`compact` (phone width) and the frame's `useSessions`, and returns null while it has nothing to say; one that throws
+hides only itself. The row is zero-height until an item is added. Below 640 px it collapses to one **Status** chip that
+opens the items as a list above it. frame-layout owns this registry because it depends on no plugin, so any provider
+(ai-accounts, thread-sidebar, hmr-gate) can depend on it without closing a cycle.
 
 ### The main-surface seat
 

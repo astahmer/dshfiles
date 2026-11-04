@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { defineClient } from '@dshfiles/dshx/client'
+import { StatusItems } from '@dshfiles/frame-layout/status-strip'
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
@@ -88,11 +89,34 @@ const HmrGateRow = (props: { readonly view: 'summary' | 'page' }): JSX.Element |
   )
 }
 
+/**
+ * The status strip's one restart item (plan §4.1 R5, §6 "one status item + one inbox item from hmr-gate"): it names how
+ * many plugins wait for a Host restart and stays hidden while none do. Restarting stays the user's decision, so the item
+ * has no verb; the Plugins page row explains it.
+ */
+const RestartStatusItem = (): JSX.Element | null => {
+  const packages = useSyncExternalStore(subscribe, snapshot, snapshot)
+  const summary = summaryText(packages)
+  if (summary === undefined) return null
+  return (
+    <span className="dshx-root" data-testid="status-item-restart" aria-label={summary}>
+      {packages.length === 1 ? 'Restart pending' : `Restart pending · ${String(packages.length)} plugins`}
+    </span>
+  )
+}
+
 export default defineClient({
   name: '@dshfiles/hmr-gate',
   // `modules` is the client module table the frames drive; `slots` seats the row.
   inject: ['modules', 'slots'],
-  setup(ctx) {
+  setup(ctx, _decorate, metadata) {
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) {
+      ctx.effect(
+        () => plugin.add(StatusItems, { id: '@dshfiles/hmr-gate', side: 'global', order: 90, label: 'Restart', component: plugin.bind(RestartStatusItem) }),
+        'hmr-gate: restart status item',
+      )
+    }
     const receive = (data: string): void => {
       let decoded: JsonValue
       try {

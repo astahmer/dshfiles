@@ -78,7 +78,9 @@ describe('frame row geometry', () => {
     expect(bottom.gridArea).toBe('2 / 1 / 3 / 3')
     expect(bottom.top).toBe('0px')
     expect(bottom.bottom).toBe('auto')
-    expect(getComputedStyle(element('handle', 'rightbar')).gridRow).toBe('1 / -1')
+    // Full height down to the status strip row, which spans every column below the right pane.
+    expect(getComputedStyle(element('handle', 'rightbar')).gridRow).toBe('1 / 3')
+    expect(getComputedStyle(element('statusStrip')).gridArea).toBe('3 / 1 / 4 / -1')
   })
 })
 

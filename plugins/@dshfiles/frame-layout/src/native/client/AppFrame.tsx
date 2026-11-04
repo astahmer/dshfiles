@@ -21,6 +21,7 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-slots'
 import { BOTTOM_DEFAULT, BOTTOM_MAX_RATIO, BOTTOM_MIN, CENTER_MIN, clampWidth, computeColumns, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT } from './columns.ts'
 import { DocumentTitle } from './DocumentTitle.tsx'
+import { StatusStrip } from './StatusStrip.tsx'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
 import { MainSurfaceRendering } from '../../main-surface.ts'
@@ -160,6 +161,9 @@ function DragHandle(props: {
     />
   )
 }
+
+/** Below this frame width the status strip collapses to one chip (the phone breakpoint of AppFrame.module.css). */
+const PHONE_STRIP_WIDTH = 640
 
 /** The three-column frame (see module doc). */
 export function AppFrame({
@@ -339,7 +343,7 @@ export function AppFrame({
         gridTemplateColumns:
           `${cols.sidebar}px minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr) minmax(0px, ${rightbarMax}px)`,
         ...(bottomHeight.current > 0
-          ? { gridTemplateRows: `minmax(0, 1fr) ${bottomHeight.current}px`, '--dsh-bottom-height': `${bottomHeight.current}px` }
+          ? { gridTemplateRows: `minmax(0, 1fr) ${bottomHeight.current}px auto`, '--dsh-bottom-height': `${bottomHeight.current}px` }
           : {}),
       }}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
@@ -366,6 +370,8 @@ export function AppFrame({
           {bottomRow}
         </div>
       )}
+      {/* Local delta (dshfiles): the status strip row; empty until a plugin adds a StatusItems entry. */}
+      <StatusStrip narrow={viewport < PHONE_STRIP_WIDTH} useSessions={useSessions} />
       <div className={css.overlayLayer} data-shell-overlay>
         {overlays}
       </div>

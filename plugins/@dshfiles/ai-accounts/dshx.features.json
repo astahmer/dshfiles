@@ -12,7 +12,7 @@
       ],
       "surface": "statusItem",
       "destination": "none",
-      "currentSurface": "sidebar-footer: usage strip popover",
+      "currentSurface": "status-strip: Quota popover",
       "configuration": [],
       "states": [
         "enabled",
@@ -91,7 +91,7 @@
       ],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "sidebar-footer: usage strip › Use this account for this thread",
+      "currentSurface": "status-strip: Quota › Use this account for this thread",
       "configuration": [],
       "states": [
         "preview",
@@ -289,7 +289,7 @@
       ],
       "surface": "statusItem",
       "destination": "none",
-      "currentSurface": "sidebar-footer: usage strip meters",
+      "currentSurface": "status-strip: Quota meters",
       "configuration": [],
       "states": [
         "unknown",
@@ -661,7 +661,7 @@
       ],
       "surface": "destinationSection",
       "destination": "observe",
-      "currentSurface": "sidebar-footer: AI accounts usage",
+      "currentSurface": "status-strip: Quota › usage popover",
       "configuration": [
         {
           "key": "usageRefreshSeconds",
