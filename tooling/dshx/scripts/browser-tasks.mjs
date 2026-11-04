@@ -63,7 +63,7 @@ const taskEnvironment = {
 
 const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-/** Cucumber expression to a whole-line RegExp, for the parameter types this suite uses. */
+/** Cucumber expression to a whole-line RegExp, for the parameter types and optional text this suite uses. */
 export const cucumberExpressionPattern = expression => {
   const parameterTypes = { string: `(?:"(?:[^"\\\\]|\\\\.)*"|'(?:[^'\\\\]|\\\\.)*')`, int: '-?\\d+', float: '-?\\d*\\.?\\d+', word: '[^\\s]+', '': '.*' }
   let pattern = ''
@@ -82,7 +82,16 @@ export const cucumberExpressionPattern = expression => {
       index = end
       continue
     }
-    if (character === '(' || character === '/') return undefined
+    if (character === '(') {
+      // Optional text, as in `{int} element(s)`: Cucumber matches it with or without the parenthesised part.
+      const end = expression.indexOf(')', index)
+      const optional = expression.slice(index + 1, end)
+      if (end === -1 || /[{}()/\\]/.test(optional)) return undefined
+      pattern += `(?:${escapeRegExp(optional)})?`
+      index = end
+      continue
+    }
+    if (character === '/') return undefined
     pattern += escapeRegExp(character)
   }
   return new RegExp(`^${pattern}$`)

@@ -102,6 +102,13 @@ test('a {string} parameter matches Gherkin strings with escaped quotes', () => {
   assert.ok(!pattern.test('the fake model is asked to nothing'))
 })
 
+test('optional text in a step expression matches with or without it', () => {
+  const pattern = cucumberExpressionPattern('whiteboard {string} is listed with {int} element(s)')
+  assert.ok(pattern.test('whiteboard "Map" is listed with 1 element'))
+  assert.ok(pattern.test('whiteboard "Map" is listed with 2 elements'))
+  assert.ok(!pattern.test('whiteboard "Map" is listed with 2 elementz'))
+})
+
 test('an escaped slash in a step expression is a literal slash', () => {
   const [definition] = parseStepDefinitions(String.raw`When('the \\/goto command is opened', async () => {})`)
   assert.ok(cucumberExpressionPattern(definition.expression).test('the /goto command is opened'))
