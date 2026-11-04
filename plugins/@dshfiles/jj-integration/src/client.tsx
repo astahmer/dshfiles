@@ -91,6 +91,14 @@ const isSendButton = (target: EventTarget | null): boolean => {
   return button !== null && /(?:^|\s)\S*_primary(?:\s|$)/u.test(button.className)
 }
 
+/** The slice of `@dshfiles/session-controller`'s `ctx.sessionDrafts` this plugin reads, without depending on it. */
+interface SessionDraftWorkspaces {
+  readonly list: {
+    getSnapshot(): Readonly<Record<string, { readonly workspaceId?: string } | undefined>>
+    subscribe(listener: () => void): () => void
+  }
+}
+
 export default defineClient({
   name: '@dshfiles/jj-integration',
   locales: [jjIntegrationLocale],
@@ -106,6 +114,7 @@ export default defineClient({
     'remote',
     'remote.directoryPicker',
     'remote.workspace',
+    'sessionDrafts',
   ],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(JJ_INTEGRATION_LOCALE_NAMESPACE)
@@ -215,18 +224,27 @@ export default defineClient({
         ),
       'jj-integration: move the side-panel view to the main area',
     )
+    // A New thread is a local draft until its first content: the Host does not list it in any workspace yet, so the
+    // draft store is the only place that knows which workspace the composer opened in. Optional: without the owned
+    // session controller every New thread is a Host Session and the workspace list answers alone.
+    const sessionDrafts = (): SessionDraftWorkspaces | undefined => ctx.get('sessionDrafts') as SessionDraftWorkspaces | undefined
     const composerNavigation = createComposerWorkspaceNavigation({
       selectedWorkspace: () => {
         const sessions = ctx.sessions.list.getSnapshot()
         const current = mainViewSessionId(sessions)
-        return ctx.workspaces.list.getSnapshot().items.find(workspace => current !== undefined && workspace.sessionIds.includes(current))?.workspaceId
+        if (current === undefined) return undefined
+        const draftWorkspaceId = sessionDrafts()?.list.getSnapshot()[current]?.workspaceId
+        if (draftWorkspaceId !== undefined) return draftWorkspaceId
+        return ctx.workspaces.list.getSnapshot().items.find(workspace => workspace.sessionIds.includes(current))?.workspaceId
       },
       subscribe: listener => {
         const unsubscribeSessions = ctx.sessions.list.subscribe(listener)
         const unsubscribeWorkspaces = ctx.workspaces.list.subscribe(listener)
+        const unsubscribeDrafts = sessionDrafts()?.list.subscribe(listener)
         return () => {
           unsubscribeSessions()
           unsubscribeWorkspaces()
+          unsubscribeDrafts?.()
         }
       },
       captureReferences: () => captureComposerReferences(),
