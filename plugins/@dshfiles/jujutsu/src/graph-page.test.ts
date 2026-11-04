@@ -129,3 +129,12 @@ test('graph search quotes user text before building a revset', async () => {
     .filter(Boolean)
   assert.deepEqual(matches, [target])
 })
+
+test('graph pages stop at the byte budget but always carry one revision', () => {
+  const rows = [{ description: 'a'.repeat(40) }, { description: 'b'.repeat(40) }, { description: 'c'.repeat(40) }]
+  const rowBytes = JSON.stringify(rows[0]).length
+  assert.deepEqual(GraphPage.withinByteBudget(rows, rowBytes * 2), rows.slice(0, 2))
+  assert.deepEqual(GraphPage.withinByteBudget(rows, rowBytes * 3), rows)
+  assert.deepEqual(GraphPage.withinByteBudget(rows, 1), rows.slice(0, 1))
+  assert.deepEqual(GraphPage.withinByteBudget([], 1), [])
+})

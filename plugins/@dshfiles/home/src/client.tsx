@@ -19,9 +19,19 @@ import { homeSettings, type HomeSettings } from './settings.js'
 const RECENT_THREADS = 3
 const defaults: HomeSettings = homeSettings.schema({})
 
+/** The slice of `@dshfiles/session-controller`'s `ctx.sessionDrafts` this plugin reads, without depending on it. */
+interface SessionDraftWorkspaces {
+  readonly list: {
+    getSnapshot(): Readonly<Record<string, { readonly workspaceId?: string } | undefined>>
+    subscribe(listener: () => void): () => void
+  }
+}
+
 interface Stores {
   readonly sessions: ISessions
   readonly workspaces: IWorkspaces
+  /** A New thread is a local draft until its first content; only this store knows its workspace until then. */
+  readonly drafts: () => SessionDraftWorkspaces | undefined
 }
 
 const useStores = <Value,>(stores: Stores, read: () => Value): Value => {
@@ -29,9 +39,11 @@ const useStores = <Value,>(stores: Stores, read: () => Value): Value => {
     (listener: () => void) => {
       const offSessions = stores.sessions.list.subscribe(listener)
       const offWorkspaces = stores.workspaces.list.subscribe(listener)
+      const offDrafts = stores.drafts()?.list.subscribe(listener)
       return () => {
         offSessions()
         offWorkspaces()
+        offDrafts?.()
       }
     },
     [stores],
@@ -42,7 +54,10 @@ const useStores = <Value,>(stores: Stores, read: () => Value): Value => {
 const workspaceOfSession = (stores: Stores, sessionId: string | undefined): WorkspaceView | undefined => {
   if (sessionId === undefined) return undefined
   const items = stores.workspaces.list.getSnapshot().items
-  const own = items.find(item => item.sessionIds.some(id => id === sessionId))
+  const draftWorkspaceId = stores.drafts()?.list.getSnapshot()[sessionId]?.workspaceId
+  const own =
+    (draftWorkspaceId === undefined ? undefined : items.find(item => item.workspaceId === draftWorkspaceId)) ??
+    items.find(item => item.sessionIds.some(id => id === sessionId))
   return own === undefined ? undefined : projectOf(own, items)
 }
 
@@ -153,7 +168,12 @@ export default defineClient({
   inject: ['slots', 'layout', 'sessions', 'workspaces', 'uiWorkspace'],
   setup(ctx, decorate) {
     const t = ctx.locale.bind(HOME_LOCALE_NAMESPACE)
-    const stores: Stores = { sessions: ctx.sessions, workspaces: ctx.workspaces }
+    const stores: Stores = {
+      sessions: ctx.sessions,
+      workspaces: ctx.workspaces,
+      // SAFETY: `sessionDrafts` is only ever provided by @dshfiles/session-controller, whose store has this list shape; absent, it reads undefined.
+      drafts: () => ctx.get('sessionDrafts') as SessionDraftWorkspaces | undefined,
+    }
     const threads = createApiClient(ctx, jjIntegrationApi)
     ctx.slots.inject('conversation.hero.brand.mark', () =>
       ctx.slots.register(

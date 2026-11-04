@@ -63,3 +63,19 @@ test('paging ends when a page adds nothing new, even if the Host still reports m
   assert.equal(GraphPagingModel.hasMoreAfterPage({ hasMore: true, addedRevisions: 3 }), true)
   assert.equal(GraphPagingModel.hasMoreAfterPage({ hasMore: false, addedRevisions: 3 }), false)
 })
+
+test('keeps loaded older pages across a refresh that read the same repository', async () => {
+  const { QueryClient } = await import('@dshfiles/plugin-ui/query')
+  const client = new QueryClient()
+  const read = () => ({ revisions: [{ commitId: 'a'.repeat(40) }], status: 'clean' })
+  const first = await client.fetchQuery({ queryKey: ['state'], queryFn: read })
+  const start = GraphPagingModel.snapshotGeneration({ state: undefined, generation: 0 }, first)
+  await client.refetchQueries({ queryKey: ['state'] })
+  const unchanged = GraphPagingModel.snapshotGeneration(start, client.getQueryData(['state']))
+  assert.equal(unchanged, start)
+
+  const changed = { revisions: [{ commitId: 'b'.repeat(40) }], status: 'clean' }
+  const next = GraphPagingModel.snapshotGeneration(unchanged, changed)
+  assert.equal(next.generation, start.generation + 1)
+  assert.equal(next.state, changed)
+})

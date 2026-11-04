@@ -16,7 +16,7 @@ import { TabMenuItems } from './tab-menu-items.js'
 import type { TabsEvent } from './tabs-machine.js'
 
 export type { TabView, TabStatus } from '@dshfiles/workbench/tabs'
-import type { TabView, TabStatus } from '@dshfiles/workbench/tabs'
+import { DEFAULT_CLOSE_BUTTON_POSITION, type CloseButtonPosition, type TabView, type TabStatus } from '@dshfiles/workbench/tabs'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 /** What one dragged tab can move into: a thread's aside, or a panel with both a main tab and a right-sidebar tab. */
@@ -32,6 +32,7 @@ interface TabStripProps {
   readonly newTabKeys: string
   /** Rename one thread's explicit title; rejects when the Host refuses it. */
   readonly renameThread: (sessionId: string, title: string) => Promise<void>
+  readonly closeButtonPosition?: CloseButtonPosition
 }
 
 /** One dot per thread tab, most urgent first: a question or approval waits, then work in progress, then an unseen finish. */
@@ -73,14 +74,9 @@ const DROP_CARET =
 const STRIP_BUTTON =
   'dshx:flex dshx:size-7 dshx:flex-none dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-(--dsw-radius-sm) dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring'
 
-/**
- * The tab row above the main view, styled after DSH's own dock-kit strip (the right panel's tabs): 28px pills on the
- * panel background, a hairline between inactive neighbours, the close cross over a faded title end, and "+" after the
- * last tab. Rendering only: the tabs machine owns order, pins, preview and the active tab; this keeps DOM-only state
- * (drop target, overflow measurement) and sends what the user did.
- */
 export const TabStrip = (props: TabStripProps): ReactElement => {
   const { tabs, send, t } = props
+  const closeButtonPosition = props.closeButtonPosition ?? DEFAULT_CLOSE_BUTTON_POSITION
   const scroller = useRef<HTMLDivElement>(null)
   const [overflowing, setOverflowing] = useState(false)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
@@ -232,6 +228,26 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
         {tabs.map((tab, index) => {
           const label = tab.status === null ? tab.title : `${tab.title}, ${t(statusLabel[tab.status])}`
           const previous = tabs[index - 1]
+          const closeButton = tab.pinned ? null : (
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label={t('close', { title: tab.title })}
+              className={cn(
+                'dshx:flex dshx:size-5 dshx:flex-none dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-(--dsw-radius-sm) dshx:text-(--dsw-alias-label-tertiary) dshx:hover:bg-accent dshx:hover:text-foreground',
+                closeButtonPosition === 'left' ? 'dshx:mr-1' : 'dshx:ml-1',
+                tab.active
+                  ? 'dshx:opacity-100'
+                  : 'dshx:pointer-events-none dshx:opacity-0 dshx:group-focus-within:pointer-events-auto dshx:group-focus-within:opacity-100 dshx:group-hover:pointer-events-auto dshx:group-hover:opacity-100',
+              )}
+              onClick={event => {
+                event.stopPropagation()
+                send({ type: 'tab.close', tabId: tab.id })
+              }}
+            >
+              <CloseGlyph />
+            </button>
+          )
           return (
             <ContextMenu key={tab.id}>
               {previous === undefined ? null : (
@@ -304,14 +320,8 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                           clearAsideTarget()
                         }}
                       >
-                        <span
-                          className={cn(
-                            'dshx:flex dshx:min-w-0 dshx:flex-auto dshx:items-center dshx:gap-[5px] dshx:overflow-hidden dshx:leading-[1.4]',
-                            !tab.pinned &&
-                              'dshx:group-hover:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))] dshx:group-focus-within:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))]',
-                            !tab.pinned && tab.active && 'dshx:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))]',
-                          )}
-                        >
+                        {closeButtonPosition === 'left' ? closeButton : null}
+                        <span className="dshx:flex dshx:min-w-0 dshx:flex-auto dshx:items-center dshx:gap-[5px] dshx:overflow-hidden dshx:leading-[1.4]">
                           {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
                           {tab.status === null ? null : <StatusDot size="sm" className={cn('dshx:flex-none', statusDotClass[tab.status])} />}
                           {tab.kind === 'thread' && renamingTabId === tab.id ? (
@@ -327,25 +337,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                           )}
                           {tab.pinned ? <PinIcon aria-label={t('pinned')} size={12} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
                         </span>
-                        {tab.pinned ? null : (
-                          <button
-                            type="button"
-                            tabIndex={-1}
-                            aria-label={t('close', { title: tab.title })}
-                            className={cn(
-                              'dshx:absolute dshx:top-1 dshx:right-1 dshx:flex dshx:size-5 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-(--dsw-radius-sm) dshx:text-(--dsw-alias-label-tertiary) dshx:hover:bg-accent dshx:hover:text-foreground',
-                              tab.active
-                                ? 'dshx:opacity-100'
-                                : 'dshx:pointer-events-none dshx:opacity-0 dshx:group-focus-within:pointer-events-auto dshx:group-focus-within:opacity-100 dshx:group-hover:pointer-events-auto dshx:group-hover:opacity-100',
-                            )}
-                            onClick={event => {
-                              event.stopPropagation()
-                              send({ type: 'tab.close', tabId: tab.id })
-                            }}
-                          >
-                            <CloseGlyph />
-                          </button>
-                        )}
+                        {closeButtonPosition === 'right' ? closeButton : null}
                       </div>
                     </ContextMenuTrigger>
                   </TooltipTrigger>

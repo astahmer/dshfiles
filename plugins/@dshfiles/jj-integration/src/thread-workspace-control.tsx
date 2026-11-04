@@ -21,6 +21,7 @@ import { threadQueryKeys, threadRebaseMutationKey } from './panel.js'
 import { RevisionGraphHoverCard, revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { SessionLogDownloadRow, type SessionLogDownloadPort } from './session-log-download.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
+import { threadStatusPollMs } from './thread-status-poll.js'
 import { useToast } from './toast.js'
 
 export interface ThreadWorkspaceControlProps {
@@ -76,12 +77,9 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       if (previous?.thread?.integrationQueuedAt !== current.thread?.integrationQueuedAt) announceRepositoryChange()
       return current
     },
-    // A queued land changes within seconds; otherwise this repeated an unchanged ~42 KiB answer every 5 s. Rebase/land
-    // here and a finished turn (the turn tail's read shares this key) invalidate it, so an idle view can wait.
     refetchInterval: query => {
       const current = query.state.data?.thread
-      if (current === null) return false
-      return current?.integrationQueuedAt === undefined ? 30_000 : 2_000
+      return threadStatusPollMs({ hasThread: current !== null, queued: current?.integrationQueuedAt !== undefined })
     },
   })
   const rebase = useMutation({

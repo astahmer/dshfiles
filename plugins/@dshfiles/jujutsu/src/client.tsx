@@ -461,7 +461,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     ...autoRefresh.queryOptions,
   })
   const state = stateQuery.data
-  const graphSnapshotGeneration = `${graphGeneration}:${stateQuery.dataUpdatedAt}`
+  const loadedState = useRef<{ readonly state: typeof state; readonly generation: number }>({ state: undefined, generation: 0 })
+  loadedState.current = GraphPagingModel.snapshotGeneration(loadedState.current, state)
+  const graphSnapshotGeneration = `${graphGeneration}:${loadedState.current.generation}`
   graphGenerationRef.current = graphSnapshotGeneration
   const graphOnScreen = autoRefresh.visible && view === 'graph' && !diffTabOpen
   useEffect(() => {

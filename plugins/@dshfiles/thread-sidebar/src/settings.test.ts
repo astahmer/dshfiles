@@ -20,6 +20,7 @@ test('Host settings reject malformed notification categories', () => {
   }
   const validate = threadSidebarSettings.schema['~standard'].validate
 
-  assert.doesNotThrow(() => validate(DEFAULT_PREFERENCES))
-  assert.throws(() => validate(invalid))
+  // Schemastery reports a rejected value as Standard Schema issues rather than throwing.
+  assert.equal('issues' in validate(DEFAULT_PREFERENCES), false)
+  assert.equal('issues' in validate(invalid), true)
 })

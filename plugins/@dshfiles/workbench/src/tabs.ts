@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { CLOSE_BUTTON_POSITIONS, DEFAULT_CLOSE_BUTTON_POSITION, type CloseButtonPosition } from './close-button-position.js'
 
 export type HostTarget =
   | { readonly kind: 'panel'; readonly panelId: string; readonly scope?: string | undefined }
@@ -8,6 +9,8 @@ export type HostTarget =
 export type TabTarget = HostTarget | { readonly kind: 'start' }
 
 export type TabStatus = 'running' | 'needsYou' | 'unread'
+
+export { CLOSE_BUTTON_POSITIONS, DEFAULT_CLOSE_BUTTON_POSITION, type CloseButtonPosition }
 
 interface TabViewBase {
   readonly id: string
@@ -29,6 +32,8 @@ export type WorkbenchTab = TabView & { readonly target: TabTarget }
 
 export interface WorkbenchTabsSnapshot {
   readonly enabled: boolean
+  /** Missing on older providers; Workbench treats it as left. */
+  readonly closeButtonPosition?: CloseButtonPosition
   /** The actor's current project/global set, not a second Dockview-owned tab set. */
   readonly scopeKey: string
   readonly activeTabId: string | null
@@ -66,7 +71,13 @@ export interface WorkbenchTabsProvider {
   readonly label?: (key: 'newTab' | 'pinned' | 'running' | 'needsYou' | 'unread' | 'renameThread' | 'renameFailed' | 'closeTab', title?: string) => string
 }
 
-const EMPTY_SNAPSHOT: WorkbenchTabsSnapshot = { enabled: false, scopeKey: 'project:none', activeTabId: null, tabs: [] }
+const EMPTY_SNAPSHOT: WorkbenchTabsSnapshot = {
+  enabled: false,
+  closeButtonPosition: DEFAULT_CLOSE_BUTTON_POSITION,
+  scopeKey: 'project:none',
+  activeTabId: null,
+  tabs: [],
+}
 
 /** @internal The page channel owns no actor, persistence, navigation or computed tab metadata. */
 const createWorkbenchTabsChannel = () => {

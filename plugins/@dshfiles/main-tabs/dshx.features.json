@@ -113,7 +113,7 @@
     {
       "id": "main-view-tabs",
       "title": "Browser-like tabs above the main view",
-      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with \u00d7 or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. A thread tab's menu opens that thread in the right side panel \u2014 through the cancelable `dshfiles:open-thread-aside` event `@dshfiles/thread-sidebar` answers, with the strip saying the panel is unavailable when no plugin takes it \u2014 and dragging a thread tab onto the open side panel moves it there instead: the right column highlights under the pointer, and dropping closes the main tab once the aside took the thread. The aside tab's own menu moves it back through `dshfiles:open-thread`. Thread tabs also copy their ID or a clean deep link, their menu's Edit title edits the title in place, and their menu can insert that thread into the active composer as a native @mention; Copy groups copy actions, and Change status groups status actions such as settling through thread-sidebar. A thread tab dragged onto a composer mentions it there instead of reordering: the tab drag carries the thread-mention type rather than plain text, so the editor never receives a stray title. Panel openings and standalone conversation tabs use a VS Code-style preview by default; Workbench conversations are kept in separate Session-bound tabs after normal sidebar clicks, independently of the legacy standalone-strip toggle. A panel plugin that shows different subjects can keep one tab per subject: it asks for a tab with `dshfiles:open-panel-tab` (`{ panelId, scope, title? }`), the strip announces `dshfiles:panel-scope` before navigating so the plugin swaps what it shows, and a live `dshfiles:panel-tab-title` renames the tab. Scope and title are saved with the tab, so a reload restores the same tab on the same subject.",
+      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills and hairline separators), and one profile setting places its close button to the left or right of the title on both the strip and Workbench headers. Tabs close with \u00d7 or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. A thread tab's menu opens that thread in the right side panel \u2014 through the cancelable `dshfiles:open-thread-aside` event `@dshfiles/thread-sidebar` answers, with the strip saying the panel is unavailable when no plugin takes it \u2014 and dragging a thread tab onto the open side panel moves it there instead: the right column highlights under the pointer, and dropping closes the main tab once the aside took the thread. The aside tab's own menu moves it back through `dshfiles:open-thread`. Thread tabs also copy their ID or a clean deep link, their menu's Edit title edits the title in place, and their menu can insert that thread into the active composer as a native @mention; Copy groups copy actions, and Change status groups status actions such as settling through thread-sidebar. A thread tab dragged onto a composer mentions it there instead of reordering: the tab drag carries the thread-mention type rather than plain text, so the editor never receives a stray title. Panel openings and standalone conversation tabs use a VS Code-style preview by default; Workbench conversations are kept in separate Session-bound tabs after normal sidebar clicks, independently of the legacy standalone-strip toggle. A panel plugin that shows different subjects can keep one tab per subject: it asks for a tab with `dshfiles:open-panel-tab` (`{ panelId, scope, title? }`), the strip announces `dshfiles:panel-scope` before navigating so the plugin swaps what it shows, and a live `dshfiles:panel-tab-title` renames the tab. Scope and title are saved with the tab, so a reload restores the same tab on the same subject.",
       "reach": [
         "seed tool-call-thread",
         "rightclick tab \"*\"",
@@ -131,7 +131,13 @@
         "click menuitem \"Edit title\"",
         "fill textbox \"Edit title\" \"Renamed thread\"",
         "press Enter",
-        "expect tab \"Renamed thread*\""
+        "expect tab \"Renamed thread*\"",
+        "click button \"Account menu\"",
+        "click menuitem \"Settings*\"",
+        "click button \"Main tabs\"",
+        "expect radio \"left\"",
+        "click radio \"right\"",
+        "expect radio \"right\""
       ],
       "surfaces": ["client", "integration", "storage", "settings"],
       "configuration": [
@@ -145,6 +151,13 @@
             "main-tabs.workbench-effective-preferences",
             "main-tabs.workbench-legacy-disabled-conversation-tabs"
           ]
+        },
+        {
+          "key": "closeButtonPosition",
+          "defaultValue": "left",
+          "constraints": "Places tab close buttons on the selected side of titles in the main strip and Workbench headers.",
+          "choices": ["left", "right"],
+          "coveredBy": ["main-tabs.close-button-position-strip", "main-tabs.close-button-position-workbench", "main-tabs.close-button-position-publication"]
         },
         {
           "key": "maxTabs",
@@ -180,6 +193,30 @@
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.close-button-position-strip",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "places the close button on either side of the title and preserves close behavior"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.close-button-position-workbench",
+          "file": "plugins/@dshfiles/workbench/src/workbench-tab.test.tsx",
+          "testName": "defaults missing close-button metadata to the left of the Workbench tab title"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.close-button-position-workbench-right",
+          "file": "plugins/@dshfiles/workbench/src/workbench-tab.test.tsx",
+          "testName": "places the Workbench close button after the title when configured right"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.close-button-position-publication",
+          "file": "plugins/@dshfiles/main-tabs/src/workbench-tabs.test.ts",
+          "testName": "publishes the close-button position as Workbench presentation metadata"
+        },
         { "kind": "gherkin", "id": "main-tabs.workbench-legacy-disabled-conversation-tabs", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
         {
           "kind": "unit-test",

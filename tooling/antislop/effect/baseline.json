@@ -15,8 +15,7 @@
     "plugins/@dshfiles/ai-accounts/src/claude-auth-status.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/claude-cli.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/codex-login-process.ts": 1,
-    "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
-    "plugins/@dshfiles/optmem-core/src/engine.ts": 6
+    "plugins/@dshfiles/hmr-gate/src/host.ts": 1
   },
   "effect-migration(no-host-module-state)": {
     "plugins/@dshfiles/ai-accounts/src/account-credential-home-work.ts": 1,

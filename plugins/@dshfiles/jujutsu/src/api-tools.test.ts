@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { graphPageOutputSchema, jujutsuApi, REVISION_PAGE_SIZE, revisionSchema } from './api.js'
+import { GRAPH_PAGE_BYTE_BUDGET, GRAPH_PAGE_SIZE, graphPageOutputSchema, jujutsuApi, REVISION_PAGE_SIZE, revisionSchema } from './api.js'
+import { GraphPage } from './graph-page.js'
 import { SchemaHelpers } from './schema-helpers.js'
 
 describe('revision graph API payload bounds', () => {
-  test('caps initial and subsequent graph page outputs to ten revisions', () => {
+  test('caps the first load at ten revisions and older pages at a hundred within the byte budget', () => {
     const revision = SchemaHelpers.decode(revisionSchema, {
       commitId: 'a'.repeat(40),
       changeId: 'b'.repeat(32),
@@ -26,12 +27,17 @@ describe('revision graph API payload bounds', () => {
     })
 
     expect(REVISION_PAGE_SIZE).toBe(10)
-    const page = { revisions: Array.from({ length: REVISION_PAGE_SIZE }, () => revision), hasMore: true }
+    expect(GRAPH_PAGE_SIZE).toBe(100)
+    const longPage = GraphPage.withinByteBudget(
+      Array.from({ length: GRAPH_PAGE_SIZE }, () => revision),
+      GRAPH_PAGE_BYTE_BUDGET,
+    )
+    const page = { revisions: longPage, hasMore: true }
+    expect(longPage.length).toBeLessThan(GRAPH_PAGE_SIZE)
     expect(SchemaHelpers.decodeSafe(graphPageOutputSchema, page).success).toBe(true)
     expect(Buffer.byteLength(JSON.stringify(page))).toBeLessThan(1_048_576)
-    const oversizedPage = { revisions: Array.from({ length: 100 }, () => revision), hasMore: true }
-    expect(Buffer.byteLength(JSON.stringify(oversizedPage))).toBeGreaterThan(1_048_576)
-    expect(SchemaHelpers.decodeSafe(graphPageOutputSchema, { ...page, revisions: [...page.revisions, revision] }).success).toBe(false)
+    const fullPage = { revisions: Array.from({ length: GRAPH_PAGE_SIZE }, () => revision), hasMore: true }
+    expect(SchemaHelpers.decodeSafe(graphPageOutputSchema, { ...fullPage, revisions: [...fullPage.revisions, revision] }).success).toBe(false)
   })
 })
 

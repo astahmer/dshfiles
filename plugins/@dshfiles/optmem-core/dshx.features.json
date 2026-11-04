@@ -106,15 +106,12 @@
     },
     {
       "id": "deterministic-view-and-summary",
-      "title": "Build deterministic bounded summaries and views",
-      "summary": "Merge the most due node pairs first, preserve recent detail, retry summaries under a tighter byte budget, and report compatibility capabilities accurately.",
+      "title": "Build deterministic views",
+      "summary": "Merge the most due node pairs first, preserve recent detail, and report compatibility capabilities accurately.",
       "surfaces": ["host", "storage", "integration"],
       "configuration": [],
-      "states": ["fine-grained", "coarsened", "summary-retry", "compatibility", "full-unavailable"],
-      "failureModes": [
-        "A summarizer answer that cannot fit is clipped deterministically or rejected if empty.",
-        "Full mode reports exactly which runtime hooks are missing."
-      ],
+      "states": ["fine-grained", "coarsened", "compatibility", "full-unavailable"],
+      "failureModes": ["Full mode reports exactly which runtime hooks are missing."],
       "externalDependencies": [],
       "verification": [
         {
@@ -122,12 +119,6 @@
           "id": "optmem-core.view-determinism",
           "file": "plugins/@dshfiles/optmem-core/src/view-math.test.ts",
           "testName": "is deterministic"
-        },
-        {
-          "kind": "unit-test",
-          "id": "optmem-core.summary-budget",
-          "file": "plugins/@dshfiles/optmem-core/src/bounded-summary.test.ts",
-          "testName": "retries a leaf with a stricter budget until the answer fits"
         },
         {
           "kind": "unit-test",

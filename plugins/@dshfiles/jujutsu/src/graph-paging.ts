@@ -9,6 +9,16 @@ export class GraphPagingModel {
   static readonly samePageSet = (left: GraphPageScope, right: GraphPageScope): boolean =>
     left.repoId === right.repoId && left.query === right.query && left.generation === right.generation
 
+  /**
+   * Older pages belong to one first-page snapshot. A refresh that reads the same repository keeps the same query data
+   * reference, so only a changed snapshot starts a new page set and scrolled history survives every unchanged poll.
+   */
+  static readonly snapshotGeneration = <State>(
+    previous: { readonly state: State | undefined; readonly generation: number },
+    state: State | undefined,
+  ): { readonly state: State | undefined; readonly generation: number } =>
+    previous.state === state ? previous : { state, generation: previous.generation + 1 }
+
   /** Revisions the graph loads before anything scrolls, so a first look is never a single page. */
   static readonly revisionFloor = 40
 
