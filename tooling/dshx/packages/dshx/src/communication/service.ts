@@ -153,6 +153,7 @@ export interface CommunicationInboxInput {
   readonly principal: CommunicationPrincipal
   readonly topic?: string | undefined
   readonly limit?: number | undefined
+  readonly includeSeen?: boolean | undefined
 }
 
 export interface CommunicationBrowseInput {
@@ -889,6 +890,10 @@ export class CommunicationService {
         .filter(message => message.recipients.some(recipient => principalKey(recipient.principal) === principalId))
         .filter(message => !acknowledgedMessageIds.has(message.id))
         .filter(message => topic === undefined || (topic === 'inbox' ? message.topic === null : message.topic === topic))
+        .filter(
+          message =>
+            input.includeSeen === true || message.recipients.some(recipient => principalKey(recipient.principal) === principalId && recipient.readAt === null),
+        )
         .slice(-limit)
       if (
         !matchingMessages.some(message => message.recipients.some(recipient => principalKey(recipient.principal) === principalId && recipient.readAt === null))

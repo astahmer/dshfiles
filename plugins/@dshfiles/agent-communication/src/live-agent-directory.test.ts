@@ -7,6 +7,51 @@ interface DirectoryAgent {
 }
 
 describe('live Agent directory', () => {
+  it('projects labels and caller relationships with useful peers first', () => {
+    const observed = LiveAgentDirectoryModel.projectAgents({
+      callerId: 'caller',
+      callerParentSessionId: 'parent',
+      callerCwd: '/work/project',
+      includeAll: false,
+      agents: [
+        { id: 'other', title: 'Other thread', status: 'running', createdAt: 30, cwd: '/elsewhere' },
+        { id: 'sibling', title: 'Sibling thread', status: 'idle', createdAt: 20, parentSessionId: 'parent', cwd: '/elsewhere' },
+        { id: 'child', title: 'Child thread', status: 'running', createdAt: 10, parentSessionId: 'caller', cwd: '/work/project' },
+        { id: 'archived', title: 'Archived thread', status: 'archived', createdAt: 40 },
+      ],
+    })
+
+    expect(observed).toEqual([
+      { id: 'child', title: 'Child thread', status: 'running', created_at: 10, parent_session_id: 'caller', relation: 'child' },
+      { id: 'sibling', title: 'Sibling thread', status: 'idle', created_at: 20, parent_session_id: 'parent', relation: 'sibling' },
+      { id: 'other', title: 'Other thread', status: 'running', created_at: 30, parent_session_id: null, relation: 'other' },
+    ])
+    expect(
+      LiveAgentDirectoryModel.projectAgents({
+        callerId: 'caller',
+        callerParentSessionId: 'parent',
+        agents: [
+          { id: 'parent', title: 'Parent', status: 'idle', createdAt: 1, cwd: '/work/project' },
+          { id: 'archived', title: 'Archived', status: 'archived', createdAt: 2 },
+        ],
+        includeAll: false,
+      }),
+    ).toMatchObject([{ id: 'parent', relation: 'parent', title: 'Parent' }])
+    expect(
+      LiveAgentDirectoryModel.projectAgents({
+        agents: [{ id: 'archived', title: 'Archived', status: 'archived', createdAt: 2 }],
+        includeAll: true,
+      }),
+    ).toMatchObject([{ id: 'archived', title: 'Archived' }])
+    expect(
+      LiveAgentDirectoryModel.projectAgents({
+        callerId: 'caller',
+        agents: [{ id: 'caller', title: 'Self', status: 'running', createdAt: 1 }],
+        includeAll: true,
+      }),
+    ).toMatchObject([{ id: 'caller', relation: 'self', parent_session_id: null }])
+  })
+
   it('returns bounded live metadata with a hashed workspace topic and no path or transcript fields', () => {
     const cwd = '/private/workspaces/project-a'
     const input = Object.freeze([

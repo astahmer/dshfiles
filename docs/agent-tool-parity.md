@@ -244,13 +244,14 @@ existing Host tools rather than a second workbench implementation.
 
 ### agent-communication
 
-Bound now (sibling revision `feat(activity-timeline,agent-communication): expose
-retained reads as agent tools`): read-only `dshx_comm_browse` (`browseMessages`),
-`dshx_comm_recipients` (`messageRecipients`) and `dshx_comm_diagnostics`
-(`diagnostics`). Everything else is already tool-served, including the message
-write verbs through the `dshx_comm_*` tools `host.ts` registers — binding
-`postMessage`/`setSubscription`/`unsubscribe`/`acknowledge` on the API would only
-duplicate them.
+The Agent surface intentionally keeps only `dshx_comm_agents`, `dshx_comm_send`,
+`dshx_comm_inbox` and `dshx_comm_ack`. Benchmark and 30-day activity data showed
+that 83% of real sends cross separate top-level threads, while within one
+parent/child tree native `send_message` and subagent results were faster and
+used fewer requests/tokens for the same success. The removed browsing,
+recipients, diagnostics, workspace, history, topic and subscription tools had
+fewer than 120 calls combined in 30 days; their underlying API and UI/CLI/MCP surfaces remain available. This measured overlap/use is the reason
+these user-facing API methods are not duplicated into the Agent tool list.
 
 ### activity-timeline
 

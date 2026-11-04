@@ -45,9 +45,6 @@ export const postMessageReceiptSchema = Schema.Struct({
   createdAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
 })
 
-/** Model-facing text for a structured tool result. */
-const compactJson = <Output>(output: Output): string => JSON.stringify(output)
-
 export const agentCommunicationApi = defineApi({
   id: 'agent-communication',
   version: 1,
@@ -55,23 +52,15 @@ export const agentCommunicationApi = defineApi({
     diagnostics: method({
       input: Schema.Struct({ limit: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100))) }),
       output: communicationDiagnosticsSchema,
-      description:
-        'Communication diagnostics: the live Agents, their workspace topic, whether a subscription is missing, and recent communication tool activity. Read-only.',
-      tool: { name: 'dshx_comm_diagnostics', readOnly: true, render: compactJson },
     }),
     browseMessages: method({
       input: browseMessagesInputSchema,
       output: communicationMessagePageSchema,
-      description:
-        'Browse one channel or direct conversation as a bounded page, newest or oldest first with a continuation cursor. Read-only; it never activates or messages an Agent.',
-      tool: { name: 'dshx_comm_browse', readOnly: true, render: compactJson },
     }),
     postMessage: method({ input: postMessageInputSchema, output: postMessageReceiptSchema }),
     messageRecipients: method({
       input: Schema.Struct({ messageId: messageIdSchema }),
       output: communicationMessageRecipientsSchema,
-      description: 'Per-recipient read and acknowledgement status of one stored message. Read-only.',
-      tool: { name: 'dshx_comm_recipients', readOnly: true, render: compactJson },
     }),
     revealMessageBody: method({
       input: Schema.Struct({ messageId: messageIdSchema }),
