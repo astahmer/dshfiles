@@ -59,6 +59,65 @@ pnpm dlx shadcn@4.21.4 add <name-or-registry-url>
 
 `components.json` sets the `dshx` prefix and self-referencing aliases. After adding, rewrite `@dshfiles/plugin-ui/...` and `cn` imports in the new file to relative `.js` paths (`../../lib/utils.js`, `./button.js`, so NodeNext consumers typecheck) — the CLI resolves them inconsistently — check it did not add stray dependencies, and use `React.forwardRef` on any part a Radix `asChild` trigger wraps (React 18 drops `ref` on function components).
 
+## Page kit
+
+Every plugin page (main panel, stage detail) is built from one template, so the product reads as one app
+([ADE plan §5](../../../plans/ade-ux/README.md#5-the-plugin-presentation-contract); tokens and anatomy in
+[DESIGN.md](../../../DESIGN.md)). Pilots: activity-timeline, background-jobs, mcp-servers.
+
+```tsx
+import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
+import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
+import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
+
+;<Page
+  heading="Hosts"
+  description="Machines threads can run on."
+  count={hosts.length}
+  primaryAction={{ id: 'add', label: 'Add host', icon: <PlusIcon />, onSelect: openAdd }}
+  actions={[{ id: 'refresh', label: 'Refresh', icon: <RefreshCwIcon />, onSelect: refetch, pending: isFetching }]}
+>
+  <PageSection heading="Registered" meta={`${online} online`}>
+    {hosts.length === 0 ? (
+      <EmptyState action={{ label: 'Add host', onSelect: openAdd }}>No hosts yet.</EmptyState>
+    ) : (
+      <EntityList>
+        {hosts.map(host => (
+          <EntityRow
+            key={host.id}
+            role="listitem"
+            status={toWorkStatus(host)}
+            heading={host.name}
+            meta={<span>{host.os}</span>}
+            trailing={
+              <Button size="sm" variant="outline">
+                Connect
+              </Button>
+            }
+          />
+        ))}
+      </EntityList>
+    )}
+  </PageSection>
+</Page>
+```
+
+| Part                       | Contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Page`                     | One `h1` `heading`, optional description (≤ 72ch), optional `count` and `meta` chips (two or three), **at most one** `primaryAction`, any number of `actions`, optional `tabs`, then the body. It is its own `@container` with `p-5` (`p-3` below 28rem). Below 42rem (measured with a `ResizeObserver`) inline `actions` fold into the `⋯` overflow menu; `placement: 'overflow'` keeps one there always. `scroll` makes the page own its scroll (`h-full overflow-y-auto`) where the host pane does not.               |
+| Page tabs                  | One style only: the segmented `TabsList` (`variant="default"`, grey track, white active pill), scrolling sideways when it does not fit. Use them for page views; a filter over one list stays a `ToggleGroup`. No underline tabs on pages.                                                                                                                                                                                                                                                                               |
+| `PageSection`              | A `section` named by its `h2` `heading` (`text-sm font-semibold`), optional muted `meta` ("3 enabled"), `actions` and description.                                                                                                                                                                                                                                                                                                                                                                                       |
+| `EmptyState`               | One sentence, centred and muted, plus at most one outline action. It draws no frame: the list or card around it does. Not for loading (use `Spinner`).                                                                                                                                                                                                                                                                                                                                                                   |
+| `WorkStatus`               | Exactly six states (`working`, `needs-you`, `failed`, `ready`, `idle`, `done`, ADE plan §4.7). Map plugin states onto them; add detail text, never a new colour. `WorkStatusModel` has the labels and the attention/emphasis predicates.                                                                                                                                                                                                                                                                                 |
+| `StatusGlyph`              | Fixed 16px box. Dark cockpit: working is a colourless spinner, needs-you the `info` diamond, failed the `destructive` cross, ready a solid foreground dot, idle nothing, done a muted check. Labelled by default; `decorative` when the row already states it in text.                                                                                                                                                                                                                                                   |
+| `EntityRow` / `EntityList` | `leading` (checkbox, chevron) · glyph · `heading` · muted `meta` chips · `description` line · `trailing` inline verb; `children` render full width below (an output pane). `onSelect` makes the middle one button; `leading`/`trailing` stay separate controls. Ready titles are bold, done titles muted, nothing else is coloured. In narrow panes meta wraps under the title and trailing verbs drop to their own line. `EntityList` is the one bordered list with hairline dividers; give its rows `role="listitem"`. |
+
+**Primary button: black.** The primary action is `Button` `variant="default"`, which is `bg-primary` = the Host
+`--dsw-alias-brand-primary` (`#0f1115` light, `#f9fafb` dark), the convention most plugins already use (MCP Add
+server, Memory, Backlog New, Hosts). Blue (`info`, `--dsw-alias-state-business-primary`) is never a button fill: it is
+reserved for focus rings, selection and the Needs-you glyph. One primary per page; everything else is `outline`
+(header) or `ghost`/`outline` `sm` (rows). The legacy `components/ui/page-header` stays for unmigrated pages only.
+
 ## Shared components
 
 Audit of UI rebuilt across owned plugins (native forks excluded), October 2026. Add a component here only when three or
