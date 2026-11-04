@@ -1,7 +1,7 @@
 # Backlog
 
-Resume here: the e2e journeys under "Remaining" below, then step 6b. Steps 1–6 and the redesign
-([redesign.md](redesign.md)) landed in `@dshfiles/backlog`; see its README.
+Resume here: the backlinks chip (step 6b, needs thread-sidebar), then steps 7 and 8. Steps 1–6, the FTS half of 6b,
+the redesign ([redesign.md](redesign.md)) and its journeys landed in `@dshfiles/backlog`; see its README.
 
 ## Why
 
@@ -46,8 +46,10 @@ adds the tracker ones: typed status, agents as actors, typed links with backlink
 | `lastActivityAt` | Any event bumps it; drives feed order and freshness.                                                          |
 
 Storage is a Host-owned storage-domain table (`backlog`), like prompt-stash: every browser and
-agent reads the same rows. Search is an in-memory token match over title, body and link targets; a
-FTS/embedding index is step 6 once the corpus outgrows it.
+agent reads the same rows. Search is a token scorer over title, tags, body, comments, capture, project
+and link targets, behind a trigram full-text index (`search-index.ts`) that only narrows which items are
+scored, so ranking stays the scorer's (parity tests in `search-index.test.ts`). An embedding index is not
+planned.
 
 ## Freshness
 
@@ -90,16 +92,24 @@ User corrections of an automatic move are kept as labelled examples for step 4's
 | 4   | Agent triage: Jev + cheap model proposals in `inbox`, threshold, corrections as examples    | done  |
 | 5   | Lifecycle signals from threads, jj revisions and PRs                                        | done  |
 | 6   | `@b:` scope in the composer's `@` menu (mentions, MCP and skill sources learn the scope)    | done  |
-| 6b  | Backlinks chip on threads and revisions; FTS index once the corpus outgrows the token match | open  |
+| 6b  | Backlinks chip on threads and revisions; FTS index once the corpus outgrows the token match | FTS done; chip open (needs thread-sidebar) |
 | 7   | Rich body editing (rich-composer) and quoting a thread message into an item                 | open  |
 | 8   | One-off import of the Discord TODO channel (also a labelled set for step 4)                 | open  |
 
 ## Remaining
 
-- [ ] e2e journeys, now that the UI is approved: Feed (paging, day separators), Inbox (filters, Acknowledge, thread
-      rows), Items (grouping, bulk move), Board (drag, card detail), Projects, search with operators, saved views,
-      composer (`#`/`@` autocomplete, optimistic send and Retry), inspector (pickers, links, proposal accept/dismiss).
-- [ ] Fix the `@b:` mentions journey (element not found, then `kill EPERM` on teardown); not investigated yet.
+- [x] e2e journeys for the approved UI: `backlog-views.feature` covers the feed day separator, Inbox filters with
+      read and resolve, Items grouping and collapse, Projects, search operators, saved views, `#`/`@` autocomplete,
+      Retry after a refused capture, inspector pickers and links, and triage suggestion accept/dismiss. Bulk move,
+      board drag and card detail were already covered (`backlog.multi-select`, `backlog.board-multi-drag`,
+      `backlog.start-thread`). The Retry journey found and fixed a lost-text bug in the composer.
+- [ ] Feed paging (150 entries a page) and Inbox thread rows (Acknowledge on a thread) have no journey: the first
+      needs a seeded store, the second thread-sidebar's settled threads in the composition.
+- [x] `@b:` mentions journey: the @ menu was empty in any composition without multi-host (its owner-missing
+      rejection dropped the thread rows too); fixed in `@dshfiles/mentions`, plus journey drift. `kill EPERM` on
+      teardown did not reproduce in five runs.
+- [x] Board column customization, lost in a reconcile, is restored; the Attention menu row is aligned again.
+- [x] An item's `secret:` link reveals inline through the Secret Catalog (`secret-link-reveal` contract).
 - [ ] Live model triage: Jev is checked live (about 200 ms a call, bug/tip/task and a duplicate read correctly);
       the model path still needs a provider that accepts calls outside OpenCode.
 - [ ] Load the landed plugin in the live DSH checkout (127.0.0.1:3080) at its next planned restart.

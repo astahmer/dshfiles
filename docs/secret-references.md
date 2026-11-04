@@ -24,6 +24,7 @@ body or an item link can carry it without becoming a secret.
 | Vault picker                | `@dshfiles/secret-catalog`  | `shell.overlay` on `[data-secret-input="reference"]`                           |
 | Missing-key setup offer     | `@dshfiles/secret-catalog`  | `@dshfiles/secret-catalog/setup` (`SecretSetupOffer`)                          |
 | Why a reference fails       | `@dshfiles/secret-catalog`  | `secret-catalog-setup.referenceStatus`, agent tool `secret_reference_status`   |
+| Inline reveal of an item link | `@dshfiles/secret-catalog` | provides `@dshfiles/backlog/secret-link-reveal`; reveals through its `reveal` verb |
 
 ## Consuming a reference on the Host
 

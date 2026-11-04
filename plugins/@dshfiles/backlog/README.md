@@ -93,7 +93,16 @@ an item fresh again. The list groups the feed like a chat history (Pinned, Today
 Earlier). The board shows the same items by status; each card names its project beside the item id,
 a click opens the item's detail beside the board, a drag moves the card to another column, and its
 status ring changes status in place. Dragging a selected card moves the whole selection; dragging an unselected
-card moves only that card. The drag preview names the count and dims every moving card.
+card moves only that card. The drag preview names the count and dims every moving card. The board's column
+menu reorders and hides status columns for this browser only; the last shown column stays.
+
+Search scores title, tags, description, comments, the original capture, project and links. A trigram
+full-text index picks which items can match before they are scored, so ranking is the scorer's either way.
+
+An item that names a credential as `secret:ALIAS` lists it under Relationships. With the Secret Catalog
+loaded, a Reveal button beside it shows the value through the Catalog's own reveal (explicit click, hidden
+after its configured seconds); the Backlog never stores or receives the value. The Catalog provides that
+control through the `@dshfiles/backlog/secret-link-reveal` contract.
 
 Feed, Inbox, Items, Board, search results and project item groups share Cmd/Ctrl-click toggles and inclusive
 Shift-click ranges. Plain clicks keep the existing open behavior and clear the batch. Right-click a selected

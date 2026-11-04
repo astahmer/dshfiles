@@ -1,6 +1,6 @@
 # Secret input binding
 
-Resume here: decide the open questions below, then phase 1.
+Resume here: adopt `data-secret-input` on MCP server env fields and AI Accounts refs (the last open item below).
 
 ## Why
 
@@ -82,9 +82,15 @@ the `hidden` attribute). The panel now places itself from its measured content h
 field near the bottom, caps its height to the room left and scrolls, and keeps the key button on screen;
 `secret-input-placement.test.ts` pins those three cases.
 
-Still open: reveal a bound reference inline from an item's `secret` link (the
-Catalog row's own reveal covers it today), and adopting the attribute on
-MCP server env fields and AI Accounts refs where a value is currently typed.
+Shipped since: an item's `secret` link reveals inline. The Backlog declares a
+`secret-link-reveal` contract module and renders it beside each secret link;
+the Catalog (which already depends on the Backlog) provides the control, finds
+the one row for the alias and environment, and reveals through its own `reveal`
+verb and reveal machine, so the value never enters Backlog state. A missing or
+ambiguous alias offers Open in Secrets. Journey: `backlog.secret-link-reveal`.
+
+Still open: adopting the attribute on MCP server env fields and AI Accounts refs
+where a value is currently typed.
 
 ## Limits
 
@@ -102,5 +108,5 @@ pnpm --dir plugins/@dshfiles/credential-port test
 pnpm --dir plugins/@dshfiles/secret-catalog test
 pnpm --dir plugins/@dshfiles/backlog test
 pnpm run check:e2e secret-catalog   # reveal/copy journeys still pass
-pnpm run check:e2e backlog          # secret-bound setting journey
+pnpm run check:e2e backlog          # secret-bound setting and inline secret-link reveal journeys
 ```
