@@ -4,6 +4,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import { InlineReferences } from '@dshfiles/chat/inline-references'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
@@ -11,7 +12,7 @@ import { useCallback, useSyncExternalStore } from 'react'
 
 import { MemoryPanel } from './memory-panel.tsx'
 import { MemoryFocusModel } from './memory-focus.ts'
-import { installMemoryReferenceLinks } from './memory-reference-links.ts'
+import { MemoryInlineReference } from './memory-reference-links.tsx'
 import { MemoryReferenceOverlay } from './memory-reference-overlay.tsx'
 import './client.css'
 
@@ -20,8 +21,8 @@ const PANEL_ID = 'dshfiles-memory-panel'
 export default defineClient({
   name: '@dshfiles/memory',
   inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'workspaces'],
-  setup(ctx, decorate) {
-    ctx.effect(() => installMemoryReferenceLinks(), 'memory reference links')
+  setup(ctx, decorate, metadata) {
+    metadata?.plugin?.add(InlineReferences, MemoryInlineReference.reference)
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
     const isMainPanelId = (panelId: string): panelId is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === panelId)
     const openThread = (sessionId: string): void => {
