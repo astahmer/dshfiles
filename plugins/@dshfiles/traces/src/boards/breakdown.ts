@@ -53,7 +53,8 @@ const breakdown = Effect.fn('traces board breakdown')(function* (query: Breakdow
     truncated,
     rows: [...groups]
       .map(([key, group]) => rowOf(key === NULL_GROUP ? null : key, group, query.measure?.divisor ?? null))
-      .sort(sorters[query.sortBy ?? 'count'])
+      // Equal rows keep one order whatever order the store returned their spans in.
+      .sort((left, right) => sorters[query.sortBy ?? 'count'](left, right) || String(left.key).localeCompare(String(right.key)))
       .slice(0, query.limit ?? 25),
   } satisfies Breakdown
 })

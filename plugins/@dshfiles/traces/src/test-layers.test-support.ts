@@ -10,3 +10,6 @@ export const TraceRepoTest = TraceRepo.layer.pipe(Layer.provide(TraceDb.layerAt(
 
 /** A fresh in-memory alert store, seeded with the built-in rules, per provide. */
 export const AlertRepoTest = AlertRepo.layer.pipe(Layer.provide(AlertDb.layerAt(':memory:')), Layer.provide(NodePlatform))
+
+/** A fresh, migrated in-memory span database per provide, for schema-level checks. */
+export const TraceDbTest = TraceDb.layerAt(':memory:').pipe(Layer.provide(NodePlatform))
