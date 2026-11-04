@@ -10,6 +10,8 @@ export default defineClientPlugin({
   inject: ['uiConversation'],
   setup(api) {
     api.lifecycle.onDispose(api.raw.ctx.uiConversation.events.register(turnActivityDefinition))
-    api.ui.register({ name: 'conversation.chat.turnTail', id: 'dshfiles-turn-summary', order: 50 }, props => <TurnSummaryLine turn={props.turn} />)
+    api.ui.register({ name: 'conversation.chat.turnTail', id: 'dshfiles-turn-summary', order: 50 }, props => (
+      <TurnSummaryLine openFile={props.openFile} turn={props.turn} />
+    ))
   },
 })

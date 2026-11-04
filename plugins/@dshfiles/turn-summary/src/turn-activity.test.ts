@@ -58,4 +58,37 @@ describe('TurnActivity.summarize', () => {
     expect(TurnActivity.parts(summary, { includeReads: true })).toEqual(['ran 1 command', 'edited 1 file', 'read 1 file', '1 search', '1 other tool call'])
     expect(TurnActivity.parts(summary, { includeReads: false })).toEqual(['ran 1 command', 'edited 1 file', '1 other tool call'])
   })
+
+  it('counts edited lines per file and reads the last test summary into the footer segments', () => {
+    const summary = TurnActivity.summarize({
+      calls: [
+        { callId: 'a', name: 'edit', arguments: JSON.stringify({ file_path: 'a.ts', old_string: 'one\ntwo\nthree', new_string: 'one\n2\n2b\nthree' }) },
+        { callId: 'b', name: 'write', arguments: JSON.stringify({ file_path: 'b.ts', content: 'x\ny\n' }) },
+        { callId: 'c', name: 'apply_patch', arguments: JSON.stringify({ path: 'a.ts', edits: [{ old: 'gone', new: '' }] }) },
+        call('d', 'bash', { command: 'pnpm test' }),
+        call('e', 'bash', { command: 'pnpm vitest run' }),
+      ],
+      results: [
+        { callId: 'a', isError: false, text: undefined },
+        { callId: 'b', isError: false, text: undefined },
+        { callId: 'c', isError: false, text: undefined },
+        { callId: 'd', isError: false, text: ' Tests  1 failed | 9 passed (10)\n[exit code: 1]' },
+        { callId: 'e', isError: false, text: ' Test Files  3 passed (3)\n      Tests  2 failed | 40 passed (42)\n[exit code: 1]' },
+      ],
+    })
+    expect(summary.editedFileStats).toEqual([
+      { path: 'a.ts', added: 2, removed: 2 },
+      { path: 'b.ts', added: 2, removed: 0 },
+    ])
+    expect(summary.tests).toEqual({ passed: 40, failed: 2, total: 42 })
+    expect(summary.commandRuns.map(run => run.outcome)).toEqual(['exit 1', 'exit 1'])
+    expect(TurnActivity.segments(summary, { includeReads: true, lineCounts: true, testResults: true }).map(segment => segment.text)).toEqual([
+      'edited 2 files +4 −2',
+      'ran 2 commands',
+      'tests 40/42',
+    ])
+    expect(TurnActivity.segments(summary, { includeReads: true, lineCounts: false, testResults: false }).map(segment => segment.text)).toEqual(['edited 2 files', 'ran 2 commands'])
+    expect(TurnActivity.testCounts('===== 3 failed, 12 passed in 1.20s =====')).toEqual({ passed: 12, failed: 3, total: 15 })
+    expect(TurnActivity.duration(72_000)).toBe('1m 12s')
+  })
 })
