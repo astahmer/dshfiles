@@ -122,16 +122,41 @@ command deadline expires.
 ## Rename, agent tools, and settings
 
 Edit can rename an alias inside its owning config with `secret mv`; it refuses
-a name that already exists. The Host registers two agent tools bound to the
+a name that already exists. The Host registers agent tools bound to the
 calling Session's workspace (`session.header.cwd`): `secret_list` returns
-metadata only, and `secret_get` returns one plaintext value, so it should be
-called only when the task needs it. Arrow keys, Home, and End move between
+metadata only, `secret_get` returns one plaintext value, so it should be
+called only when the task needs it, and `secret_remove_alias` removes one alias
+(keeping its vault item) only with `confirm: true`. Arrow keys, Home, and End move between
 table rows; the table header stays visible while rows scroll.
 
 The `secret-catalog` Settings namespace (DSH Settings page) sets the default
 scope filter, the environment prefilled for new secrets, how long a revealed
 value stays visible, whether blur/hidden pages hide it, and how long success
 notices stay.
+
+## Agents asking for a secret
+
+`request_secret` lets an Agent ask the user to store a value it needs: it passes
+an alias, a one-sentence purpose, and optionally an environment (`prod`), a
+scope (`global` by default; `project`/`local` use the thread's folder) and a
+timeout (10 s to 1 h, default 10 min). The call then waits. The thread's latest
+turn shows a **Secret request** card with the alias, environment, scope and the
+purpose as the Agent wrote it (untrusted text). **Enter value** opens the same
+masked create-and-bind form as reference fields, so the value goes from that
+form straight to the `secret` CLI on the Host, never into chat, settings or the
+request; a duplicate alias can bind the existing record instead. The card then
+answers the request with the `secret:ALIAS[@env]` reference, which the Host
+accepts only after a fresh config read shows that alias exists. The tool returns
+`{ status: 'stored', reference }`, or `declined`, `expired` or `cancelled` (the
+turn stopped or the Host shut down) with nothing stored.
+
+Requests live as long as the waiting tool call (in memory, at most 16 at once),
+and a `secret-catalog-requests` `changed` event keeps open cards current.
+`secret_requests_pending` lists what is waiting; `secret_list` shows the stored
+alias afterwards and `secret_remove_alias` (or the catalog's Remove action)
+takes it back. Answering and declining stay user-only by design: the Agent that
+asked is the one waiting, and letting a model answer its own request would
+defeat the point.
 
 ## AI Accounts credential import
 

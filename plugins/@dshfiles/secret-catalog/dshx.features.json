@@ -16,7 +16,12 @@
         "click menuitemradio \"Workspaces\"",
         "expect text \"JJ workspace\""
       ],
-      "surfaces": ["client", "host", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "left-nav: Secrets",
@@ -25,17 +30,32 @@
           "key": "defaultScope",
           "defaultValue": "all",
           "constraints": "One of all, project, global, or local.",
-          "choices": ["all", "project", "global", "local"],
-          "coveredBy": ["secret-catalog.scope-filter"]
+          "choices": [
+            "all",
+            "project",
+            "global",
+            "local"
+          ],
+          "coveredBy": [
+            "secret-catalog.scope-filter"
+          ]
         },
         {
           "key": "defaultEnvironment",
           "defaultValue": "prod",
           "constraints": "Must match ^[A-Za-z0-9_-]+$.",
-          "coveredBy": ["secret-catalog.scope-filter"]
+          "coveredBy": [
+            "secret-catalog.scope-filter"
+          ]
         }
       ],
-      "states": ["all-scopes", "project-scope", "global-scope", "local-scope", "ambiguous-alias"],
+      "states": [
+        "all-scopes",
+        "project-scope",
+        "global-scope",
+        "local-scope",
+        "ambiguous-alias"
+      ],
       "failureModes": [
         "Duplicate alias and environment across scopes makes value operations unavailable.",
         "A scope without a selected folder cannot claim project-specific results.",
@@ -106,7 +126,11 @@
       "id": "bounded-secret-reveal",
       "title": "Reveal on click and copy without revealing",
       "summary": "Hovering a masked value offers \"Click to reveal\"; a click reveals that one alias and environment through the Host, and it masks again after the configured timeout, on blur, Esc, scope change, refresh, or unmount. Copy goes through the Host CLI without revealing.",
-      "surfaces": ["client", "host", "settings"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "left-nav: Secrets › reveal",
@@ -115,23 +139,38 @@
           "key": "revealSeconds",
           "defaultValue": "15",
           "constraints": "Integer from 3 to 300 seconds.",
-          "coveredBy": ["secret-catalog.reveal-expiry"]
+          "coveredBy": [
+            "secret-catalog.reveal-expiry"
+          ]
         },
         {
           "key": "noticeSeconds",
           "defaultValue": "4",
           "constraints": "Integer from 0 to 60 seconds; zero keeps the notice persistent.",
-          "coveredBy": ["secret-catalog.reveal-expiry"]
+          "coveredBy": [
+            "secret-catalog.reveal-expiry"
+          ]
         },
         {
           "key": "hideOnBlur",
           "defaultValue": "true",
           "constraints": "Boolean; clear revealed values when focus leaves the view.",
-          "choices": ["true", "false"],
-          "coveredBy": ["secret-catalog.reveal-expiry"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "secret-catalog.reveal-expiry"
+          ]
         }
       ],
-      "states": ["masked", "revealing", "revealed", "expired", "cleared"],
+      "states": [
+        "masked",
+        "revealing",
+        "revealed",
+        "expired",
+        "cleared"
+      ],
       "failureModes": [
         "Secret values are never included in catalog metadata, argv, or notices.",
         "Blur or navigation clears client plaintext before another reveal."
@@ -174,7 +213,13 @@
           "testName": "records a secret <verb> span with flag names only, never the alias or the value"
         }
       ],
-      "reach": ["seed fake-secret-cli", "click tab \"Settings\"", "click button \"Secrets\"", "hover button \"Reveal GITHUB_TOKEN\"", "expect text \"Click to reveal\""]
+      "reach": [
+        "seed fake-secret-cli",
+        "click tab \"Settings\"",
+        "click button \"Secrets\"",
+        "hover button \"Reveal GITHUB_TOKEN\"",
+        "expect text \"Click to reveal\""
+      ]
     },
     {
       "id": "inline-quick-add",
@@ -190,7 +235,10 @@
         "click button \"Actions for STRIPE_API_KEY\"",
         "expect menuitem \"Generate on this Host\""
       ],
-      "surfaces": ["client", "host"],
+      "surfaces": [
+        "client",
+        "host"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "left-nav: Secrets › Add secret",
@@ -199,10 +247,19 @@
           "key": "defaultEnvironment",
           "defaultValue": "prod",
           "constraints": "Must match ^[A-Za-z0-9_-]+$.",
-          "coveredBy": ["secret-catalog.quick-add"]
+          "coveredBy": [
+            "secret-catalog.quick-add"
+          ]
         }
       ],
-      "states": ["draft", "invalid", "saving", "saved", "failed", "discarded"],
+      "states": [
+        "draft",
+        "invalid",
+        "saving",
+        "saved",
+        "failed",
+        "discarded"
+      ],
       "failureModes": [
         "A draft with no value is not saved: the Host refuses empty manual values, so the row asks for a value or Generate.",
         "A name that already exists in the environment is flagged before any write.",
@@ -267,12 +324,24 @@
         "click button \"Advanced*\"",
         "expect dialog \"Add secret\""
       ],
-      "surfaces": ["client", "host", "settings"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "left-nav: Secrets › Add with details",
       "configuration": [],
-      "states": ["editing", "invalid", "creating", "renaming", "removing-alias", "deleting-vault-item", "collision"],
+      "states": [
+        "editing",
+        "invalid",
+        "creating",
+        "renaming",
+        "removing-alias",
+        "deleting-vault-item",
+        "collision"
+      ],
       "failureModes": [
         "Duplicate alias/environment collisions are blocked before writes.",
         "Manual values travel through stdin and are not echoed in process output."
@@ -371,12 +440,26 @@
         "click button \"Add a new secret\"",
         "expect textbox \"Secret value\""
       ],
-      "surfaces": ["client", "host", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: secret-reference fields › Bind",
       "configuration": [],
-      "states": ["offered", "editing-masked", "duplicate-detected", "existing-bound", "cancelled", "stored", "bound", "bind-failed"],
+      "states": [
+        "offered",
+        "editing-masked",
+        "duplicate-detected",
+        "existing-bound",
+        "cancelled",
+        "stored",
+        "bound",
+        "bind-failed"
+      ],
       "failureModes": [
         "Invalid aliases, environments, and folderless project/local scopes are rejected before storage.",
         "A failed bind retains only the stored reference for retry; the value is cleared and never sent to the consumer.",
@@ -439,7 +522,13 @@
         "expect region \"Secret reference repair\"",
         "expect button \"Set value\""
       ],
-      "surfaces": ["client", "host", "settings", "tool", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "tool",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: secret-reference fields › repair",
@@ -527,14 +616,26 @@
     {
       "id": "metadata-only-agent-tools",
       "title": "Expose safe secret catalog tools to agents",
-      "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve without returning its value.",
-      "surfaces": ["tool", "host"],
+      "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve without returning its value. secret_remove_alias removes one alias (keeping its vault item) only with confirm: true.",
+      "surfaces": [
+        "tool",
+        "host"
+      ],
       "surface": "agentToolOnly",
       "destination": "none",
-      "currentSurface": "agent tool: secret_list / secret_get / secret_reference_status",
+      "currentSurface": "agent tool: secret_list / secret_get / secret_reference_status / secret_remove_alias",
       "configuration": [],
-      "states": ["metadata-listed", "exact-value-requested", "not-found", "ambiguous"],
-      "failureModes": ["List never contains secret values.", "Ambiguous aliases and missing scopes fail closed."],
+      "states": [
+        "metadata-listed",
+        "exact-value-requested",
+        "not-found",
+        "ambiguous",
+        "alias-removed"
+      ],
+      "failureModes": [
+        "List never contains secret values.",
+        "Ambiguous aliases and missing scopes fail closed."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -561,6 +662,89 @@
       ]
     },
     {
+      "id": "agent-secret-request",
+      "title": "Let an agent ask the user to store a secret",
+      "summary": "request_secret shows a card on the thread's latest turn with the alias, environment, scope and the agent's stated purpose. The user types the value into the Catalog's masked form (stored by the secret CLI on the Host) or declines; the waiting tool call receives only the secret:ALIAS reference, or a declined, expired or cancelled result. secret_requests_pending lists waiting requests; secret_list and secret_remove_alias see and remove the stored alias.",
+      "reach": [
+        "seed fake-secret-cli",
+        "click button \"New session\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"[[call request_secret {\\\"alias\\\":\\\"SYNTHETIC_REQUESTED_TOKEN\\\",\\\"purpose\\\":\\\"Call the synthetic API.\\\"}]]\"",
+        "press Enter",
+        "click button \"Enter value\"",
+        "expect button \"Create and bind\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "tool",
+        "integration"
+      ],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: turn tail › Secret request",
+      "configuration": [],
+      "states": [
+        "pending",
+        "editing-masked",
+        "stored",
+        "declined",
+        "expired",
+        "cancelled",
+        "duplicate-bound"
+      ],
+      "failureModes": [
+        "The value never enters the conversation, the tool result or the request list; only the reference does.",
+        "A reference is accepted only once its alias exists in the request's folder config, read fresh.",
+        "An answer after expiry or a stopped turn is refused with a message to ask again; a stored value stays in the Catalog.",
+        "At most 16 requests wait at once; project and local scopes need the thread's folder."
+      ],
+      "externalDependencies": [
+        {
+          "id": "secret-cli",
+          "boundary": "Secret value writes and metadata reads.",
+          "deterministicFake": "Use the fake secret CLI with synthetic values and a fake provider that calls request_secret."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.request-secret",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.request-secret-decline",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.request-secret-stored",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-requests.test.ts",
+          "testName": "settles a waiting request with the reference of a value the user stored, never the value"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.request-secret-outcomes",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-requests.test.ts",
+          "testName": "returns declined, expired and cancelled outcomes, and lists only the asking Session"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "secret"
+        }
+      ]
+    },
+    {
       "id": "backlog-jev-setup",
       "title": "Add a Jev key from the Backlog setting",
       "summary": "Open a masked setup popover on the Backlog Jev setting, store the key as a global Secret Catalog alias, and bind only its reference.",
@@ -573,12 +757,22 @@
         "click button \"Add secret\"",
         "expect button \"Add and bind\""
       ],
-      "surfaces": ["client", "host", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "plugins-page: View @dshfiles/backlog › Jev secret",
       "configuration": [],
-      "states": ["setup-open", "key-stored-global", "reference-bound", "existing-key-replaced"],
+      "states": [
+        "setup-open",
+        "key-stored-global",
+        "reference-bound",
+        "existing-key-replaced"
+      ],
       "failureModes": [
         "A project-scoped key cannot resolve from Backlog because triage has no project cwd, so setup writes a global alias.",
         "The key value stays out of the Agent conversation and settings; only the reference is written there.",
@@ -634,12 +828,25 @@
         "click button \"Set up missing secrets\"",
         "expect textbox \"Secret value\""
       ],
-      "surfaces": ["client", "host", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
       "surface": "transcriptCard",
       "destination": "transcript",
       "currentSurface": "transcript: turn tail › Set up missing secrets",
       "configuration": [],
-      "states": ["disabled-off", "key-needed-offer", "bound-reference-unresolved", "masked-form", "newest-turn-only", "key-stored-global", "reference-bound"],
+      "states": [
+        "disabled-off",
+        "key-needed-offer",
+        "bound-reference-unresolved",
+        "masked-form",
+        "newest-turn-only",
+        "key-stored-global",
+        "reference-bound"
+      ],
       "failureModes": [
         "The offer is absent when Jev is disabled or its key resolves.",
         "A configured but unresolvable reference shows the reference repair card, not another create form.",

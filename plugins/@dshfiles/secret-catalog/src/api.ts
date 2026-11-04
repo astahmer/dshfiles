@@ -1,4 +1,5 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
+import { defineApi, event, method } from '@dshfiles/dshx/api'
+import { secretAliasSchemaEffect, secretEnvironmentSchemaEffect, secretReferenceTextSchemaEffect, secretScopeSchemaEffect } from '@dshfiles/credential-port/effect'
 import { Schema } from 'effect'
 import {
   createInputSchema,
@@ -59,6 +60,63 @@ export const secretSetupApi = defineApi({
         readOnly: true,
         render: status => `${status.reference ?? '(no reference)'}: ${status.state}${status.scope === null ? '' : ` · ${status.scope}`}`,
       },
+    }),
+  },
+})
+
+const requestIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))
+
+export const secretRequestViewSchema = Schema.Struct({
+  requestId: requestIdSchema,
+  sessionId: Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))),
+  alias: secretAliasSchemaEffect,
+  environment: secretEnvironmentSchemaEffect,
+  scope: secretScopeSchemaEffect,
+  cwd: Schema.NullOr(Schema.String.check(Schema.isMaxLength(4096))),
+  purpose: Schema.String.check(Schema.isMaxLength(500)),
+  createdAt: Schema.Number,
+  expiresAt: Schema.Number,
+})
+
+/** Secrets an Agent asked the user to store with `request_secret`; the user answers with a reference, never a value. */
+export const secretRequestsApi = defineApi({
+  id: 'secret-catalog-requests',
+  version: 1,
+  owner: '@dshfiles/secret-catalog',
+  methods: {
+    pending: method({
+      input: Schema.Struct({
+        sessionId: Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))).annotate({
+          description: 'Only requests made in this Session; null lists every pending request.',
+        }),
+      }),
+      output: Schema.Struct({ requests: Schema.Array(secretRequestViewSchema).check(Schema.isMaxLength(64)) }),
+      description:
+        'List the secrets Agents are waiting for the user to store (alias, environment, scope and stated purpose). Never returns values. Read-only.',
+      tool: {
+        name: 'secret_requests_pending',
+        readOnly: true,
+        render: output =>
+          output.requests.length === 0
+            ? 'No secret requests are waiting.'
+            : output.requests.map(request => `${request.alias}@${request.environment} · ${request.scope} — ${request.purpose}`).join('\n'),
+      },
+    }),
+    complete: method({
+      input: Schema.Struct({ requestId: requestIdSchema, reference: secretReferenceTextSchemaEffect }),
+      output: Schema.Struct({ reference: secretReferenceTextSchemaEffect }),
+      description: 'Answer a pending request with the reference of a value the user just stored in the Secret Catalog form.',
+    }),
+    decline: method({
+      input: Schema.Struct({ requestId: requestIdSchema }),
+      output: Schema.Struct({ declined: Schema.Literal(true) }),
+      description: 'Decline a pending request; the waiting Agent receives a declined result and no value.',
+    }),
+  },
+  events: {
+    changed: event({
+      schema: Schema.Struct({}),
+      description: 'A secret request was added, answered, declined, expired or cancelled. Read the pending list again.',
     }),
   },
 })

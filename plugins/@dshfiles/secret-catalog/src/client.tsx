@@ -14,6 +14,7 @@ import { CatalogNavigation } from './catalog-navigation.js'
 import { SECRET_CATALOG_LOCALE_NAMESPACE, secretCatalogLocale } from './locales.js'
 import { SecretCatalogPanel } from './secret-catalog-panel.js'
 import { JevInlineSetup } from './jev-inline-setup.js'
+import { SecretRequestCards } from './secret-request-card.js'
 import { SecretInputOverlay } from './secret-input-overlay.js'
 import { SecretLinkRevealControl } from './secret-link-reveal.js'
 import { createWorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
@@ -87,6 +88,22 @@ export default defineClient({
         decorate((props: { readonly sessionId: string; readonly turn: TurnLocation }) => (
           <PluginQueryProvider>
             <JevInlineSetup {...props} probeFolders={workspaceFolders()} t={translate} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    ctx.slots.inject('conversation.chat.turnTail', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.chat.turnTail',
+          id: 'dshfiles-secret-catalog-requests',
+          order: 19,
+          locale: SECRET_CATALOG_LOCALE_NAMESPACE,
+          inject: sessionId => ({ sessionId }),
+        },
+        decorate((props: { readonly sessionId: string; readonly turn: TurnLocation }) => (
+          <PluginQueryProvider>
+            <SecretRequestCards {...props} t={translate} />
           </PluginQueryProvider>
         )),
       ),

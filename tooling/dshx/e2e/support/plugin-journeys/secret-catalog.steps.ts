@@ -21,6 +21,7 @@ interface SecretFixturePaths {
 }
 interface SecretFixture extends SecretFixturePaths {
   readonly previousPath: string | undefined
+  readonly previousSessionFile: string | undefined
   readonly previousJevKey: string | undefined
   readonly previousPrewarm: string | undefined
 }
@@ -81,8 +82,11 @@ Before({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
     vault: { 'item-github': 'gh-e2e-global-value', 'item-db-prod': 'db-e2e-prod-value', 'item-db-dev': 'db-e2e-dev-value', 'item-local': 'local-e2e-value' },
   }
   await writeFile(paths.storePath, JSON.stringify(store))
-  fixtures.set(page, { ...paths, previousPath: process.env.PATH, previousJevKey, previousPrewarm })
+  fixtures.set(page, { ...paths, previousPath: process.env.PATH, previousSessionFile: process.env.SECRET_SESSION_FILE, previousJevKey, previousPrewarm })
   process.env.PATH = `${paths.bin}${delimiter}${process.env.PATH ?? ''}`
+  // The fake keeps its whole store in store.json; naming it the session file puts it in the Catalog's metadata revision,
+  // so a step that edits the store directly is read again like an external CLI edit.
+  process.env.SECRET_SESSION_FILE = paths.storePath
 })
 
 After({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
@@ -91,6 +95,8 @@ After({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
   fixtures.delete(page)
   if (fixture.previousPath === undefined) delete process.env.PATH
   else process.env.PATH = fixture.previousPath
+  if (fixture.previousSessionFile === undefined) delete process.env.SECRET_SESSION_FILE
+  else process.env.SECRET_SESSION_FILE = fixture.previousSessionFile
   if (fixture.previousJevKey === undefined) delete process.env.TYPESAFE_API_KEY
   else process.env.TYPESAFE_API_KEY = fixture.previousJevKey
   if (fixture.previousPrewarm === undefined) delete process.env.DSHX_E2E_PREWARM
@@ -812,5 +818,81 @@ Then('the field stores only {string} while the fake CLI stores the synthetic val
 })
 
 Then('the secret setup journey is complete', async ({ page }: { page: Page }) => {
+  await finishJourneyAssertions(page)
+})
+
+const requestCard = (page: Page, alias: string) => page.getByRole('region', { name: `Secret request: ${alias}`, exact: true })
+
+const toolResults = (page: Page): readonly string[] =>
+  fakeCommandCodeFor(page)
+    .requests.filter(request => request.kind === 'turn')
+    .flatMap(request => request.messages.filter(message => message.role === 'tool').map(message => message.text))
+
+const allModelText = (page: Page): string => JSON.stringify(fakeCommandCodeFor(page).requests)
+
+When('a thread in the seeded project asks the agent to request the secret {string}', async ({ page }: { page: Page }, alias: string) => {
+  const project = fixtureFor(page).project
+  if ((await page.getByRole('treeitem', { name: 'secret-project', exact: true }).count()) === 0) await registerWorkspaceFolder(page, project)
+  if ((await page.getByRole('navigation', { name: 'Session hierarchy', exact: true }).count()) === 0) {
+    await startThreadWithModel(page, { project: 'secret-project', model: 'commandcode_work/gpt-6-luna' })
+  }
+  // The tool call waits for the user, so the turn stays open: send without waiting for it to settle.
+  const directive = `[[call request_secret ${JSON.stringify({ alias, purpose: `Call the synthetic API with ${alias}.` })}]]`
+  const composer = page
+    .getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+    .or(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true }))
+  await composer.fill(directive)
+  await composer.press('Enter')
+  await expect(requestCard(page, alias)).toBeVisible({ timeout: 60_000 })
+})
+
+Then('the secret request card for {string} shows its purpose and a masked value field', async ({ page }: { page: Page }, alias: string) => {
+  const card = requestCard(page, alias)
+  await recordAssertion(page, 'secret-catalog-request-card-shows-the-agent-purpose', async () => {
+    await expect(card.getByText(`Call the synthetic API with ${alias}.`, { exact: true })).toBeVisible()
+    await expect(card.getByText(alias, { exact: true })).toBeVisible()
+  })
+  await card.getByRole('button', { name: 'Enter value', exact: true }).click()
+  await recordAssertion(page, 'secret-catalog-request-value-is-masked', () =>
+    expect(card.getByLabel('Secret value')).toHaveAttribute('type', 'password'),
+  )
+})
+
+When('the value {string} is stored through the secret request', async ({ page }: { page: Page }, value: string) => {
+  const card = page.getByTestId('secret-request-card')
+  await card.getByLabel('Secret value').fill(value)
+  await card.getByRole('button', { name: 'Create and bind', exact: true }).click()
+})
+
+Then(
+  'the agent receives only {string} while the fake CLI stores {string}',
+  async ({ page }: { page: Page }, reference: string, value: string) => {
+    await recordAssertion(page, 'secret-catalog-request-stored-reference-only', async () => {
+      await expect(page.getByRole('status').filter({ hasText: `Stored. The agent received only ${reference}.` })).toBeVisible()
+      await expect.poll(() => toolResults(page).some(text => text.includes(`Use the reference ${reference} `)), { timeout: 30_000 }).toBe(true)
+      expect(allModelText(page)).not.toContain(value)
+      await expect(page.getByText(value)).toHaveCount(0)
+      const alias = reference.replace(/^secret:/u, '')
+      const store = await readStore(page)
+      const row = store.rows.find(candidate => candidate.alias === alias && candidate.environment === 'prod')
+      expect(row?.scope).toBe('global')
+      expect(store.vault[row?.item ?? '']).toBe(value)
+    })
+  },
+)
+
+When('the secret request for {string} is declined', async ({ page }: { page: Page }, alias: string) => {
+  await requestCard(page, alias).getByRole('button', { name: 'Decline', exact: true }).click()
+})
+
+Then('the agent receives a declined result and the fake CLI stores nothing for {string}', async ({ page }: { page: Page }, alias: string) => {
+  await recordAssertion(page, 'secret-catalog-request-declined', async () => {
+    await expect(page.getByRole('status').filter({ hasText: 'Declined. The agent was told that nothing was stored.' })).toBeVisible()
+    await expect.poll(() => toolResults(page).some(text => text.includes('The user declined to store this secret.')), { timeout: 30_000 }).toBe(true)
+    expect((await readStore(page)).rows.some(row => row.alias === alias)).toBe(false)
+  })
+})
+
+Then('the secret request journey is complete', async ({ page }: { page: Page }) => {
   await finishJourneyAssertions(page)
 })

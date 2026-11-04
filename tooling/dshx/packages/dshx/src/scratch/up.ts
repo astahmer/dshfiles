@@ -185,7 +185,11 @@ export const scratchUp = async (
     const project = await realpath(options.project === undefined ? await ScratchSeedRuntime.sampleProject(home) : resolve(options.project))
     const workspaceId = await registerScratchWorkspace(home, project)
     const fakeSecretCli = options.fakeSecretCli ? await ScratchSeedRuntime.installFakeSecretCli({ home, project }) : undefined
-    const hostSource = fakeSecretCli === undefined ? process.env : { ...process.env, PATH: `${fakeSecretCli}${delimiter}${process.env.PATH ?? ''}` }
+    // The fake keeps its whole store in store.json; naming it the session file puts it in the Catalog's metadata revision.
+    const hostSource =
+      fakeSecretCli === undefined
+        ? process.env
+        : { ...process.env, PATH: `${fakeSecretCli}${delimiter}${process.env.PATH ?? ''}`, SECRET_SESSION_FILE: join(fakeSecretCli, 'store.json') }
 
     await mkdir(options.stateDir, { recursive: true, mode: 0o700 })
     const hostLog = join(options.stateDir, 'host.log')

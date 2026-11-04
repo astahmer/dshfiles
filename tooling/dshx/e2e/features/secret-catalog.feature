@@ -183,3 +183,26 @@ Feature: Secret Catalog
     When a thread in the seeded project asks the fake model to "[[call secret_get {\"alias\":\"MISSING_ALIAS\"}]]"
     Then the tool result "contains" "No secret alias MISSING_ALIAS is configured for environment prod."
     And the secret tools journey is complete
+
+  @scenario:secret-catalog.request-secret
+  Scenario: An agent asks for a secret, the user stores it in the Catalog form, and the agent receives only its reference
+    Given the isolated plugin composition of "@dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread in the seeded project asks the agent to request the secret "SYNTHETIC_REQUESTED_TOKEN"
+    Then the secret request card for "SYNTHETIC_REQUESTED_TOKEN" shows its purpose and a masked value field
+    When the value "synthetic-requested-secret-value" is stored through the secret request
+    Then the agent receives only "secret:SYNTHETIC_REQUESTED_TOKEN" while the fake CLI stores "synthetic-requested-secret-value"
+    When a thread in the seeded project asks the fake model to "[[call secret_list {}]]"
+    Then the tool result "contains" "alias SYNTHETIC_REQUESTED_TOKEN · global · prod"
+    When a thread in the seeded project asks the fake model to "[[call secret_remove_alias {\"alias\":\"SYNTHETIC_REQUESTED_TOKEN\",\"scope\":\"global\",\"confirm\":true}]]"
+    Then the tool result "contains" "Removed alias SYNTHETIC_REQUESTED_TOKEN"
+    And the secret request journey is complete
+
+  @scenario:secret-catalog.request-secret-decline
+  Scenario: Declining a secret request tells the agent nothing was stored
+    Given the isolated plugin composition of "@dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread in the seeded project asks the agent to request the secret "DECLINED_TOKEN"
+    When the secret request for "DECLINED_TOKEN" is declined
+    Then the agent receives a declined result and the fake CLI stores nothing for "DECLINED_TOKEN"
+    And the secret request journey is complete

@@ -4,13 +4,14 @@ import type { SecretScope } from '@dshfiles/credential-port'
 import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { NodeFileSystem } from '@effect/platform-node'
-import { Effect, Layer } from 'effect'
-import { secretCatalogApi, secretSetupApi } from './api.js'
+import { Effect, Layer, Stream } from 'effect'
+import { secretCatalogApi, secretRequestsApi, secretSetupApi } from './api.js'
 import { CatalogPorts } from './catalog-ports-promise.js'
 import { DshCredentials } from './dsh-credentials-promise.js'
 import { SecretCatalog, SecretCatalogOperationError, type SecretCreateInput } from './secret-catalog.js'
 import { SecretCli } from './secret-cli.js'
 import { checkSecretReference } from './secret-reference-status.js'
+import { SecretRequests } from './secret-requests.js'
 import { secretTools } from './secret-tools.js'
 import { secretCatalogSettings } from './settings.js'
 
@@ -22,7 +23,27 @@ const cwdForScope = (scope: SecretScope, requestedCwd: string | null) => {
 
 const CatalogLive = SecretCatalog.layer.pipe(Layer.provide(SecretCli.layer), Layer.provide(DshChildProcessSpawner.layer))
 
-const SecretCatalogLive = CatalogPorts.pipe(Layer.provideMerge(Layer.mergeAll(CatalogLive, DshCredentials.layer)), Layer.provideMerge(NodeFileSystem.layer))
+/** Tell browsers to read the pending secret requests again whenever one is added or settled. */
+const RequestEvents = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const requests = yield* SecretRequests
+    yield* requests.changes.pipe(
+      Stream.runForEach(() =>
+        Api.publish({ contract: secretRequestsApi, event: 'changed', payload: {} }).pipe(
+          Effect.catchTag('PublishEventError', error => Effect.logWarning('secret-catalog: request change event refused', error.message)),
+        ),
+      ),
+      DshxPlugin.detached,
+      Effect.forkScoped,
+    )
+  }),
+)
+
+const SecretCatalogLive = Layer.mergeAll(CatalogPorts, RequestEvents).pipe(
+  Layer.provideMerge(SecretRequests.layer),
+  Layer.provideMerge(Layer.mergeAll(CatalogLive, DshCredentials.layer)),
+  Layer.provideMerge(NodeFileSystem.layer),
+)
 
 const list = (input: { readonly cwd: string | null }) => SecretCatalog.use(catalog => Effect.map(catalog.list(input.cwd), rows => [...rows]))
 
@@ -67,6 +88,11 @@ export default DshxPlugin.make({
       list,
       create,
       referenceStatus: input => checkSecretReference({ referenceText: input.reference, cwd: input.cwd, probeFolders: input.probeFolders }),
+    }),
+    Api.bind(secretRequestsApi, {
+      pending: input => SecretRequests.use(requests => Effect.map(requests.pending(input.sessionId), views => ({ requests: [...views] }))),
+      complete: input => SecretRequests.use(requests => requests.complete(input)),
+      decline: input => SecretRequests.use(requests => requests.decline(input.requestId)),
     }),
   ],
 })
