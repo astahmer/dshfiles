@@ -133,6 +133,21 @@ describe('usage history collection', () => {
     expect(meta.lastAttemptAt).toBe(meta.lastReadAt)
   })
 
+  it('records Claude extra usage with each reading and omits it for accounts without one', async () => {
+    const ctx = await openContext()
+    const resetsAt = Date.now() + 3_600_000
+    const extraUsage = { enabled: true, used: 12.34, monthlyLimit: 50, currency: 'USD', percentUsed: 24.68, resetsAt: null }
+    const answers = new Map<string, UsageCard>([
+      ['claude_a', { ...okCard(10, resetsAt), extraUsage }],
+      ['codex_a', okCard(42, resetsAt)],
+    ])
+    const service = createUsageHistoryService(ctx)
+    await service.collect([profile('claude_a', 'claude'), profile('codex_a', 'codex')], async account => answers.get(account.instanceId) ?? okCard(0, resetsAt))
+
+    expect((await service.read('claude_a', 0))[0]?.extraUsage).toEqual(extraUsage)
+    expect((await service.read('codex_a', 0))[0]).not.toHaveProperty('extraUsage')
+  })
+
   it('updates one row per account per interval bucket instead of accumulating', async () => {
     const ctx = await openContext()
     const resetsAt = Date.now() + 3_600_000

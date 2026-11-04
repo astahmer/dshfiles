@@ -648,7 +648,7 @@
     {
       "id": "quota-dashboard",
       "title": "Read provider quota and usage status",
-      "summary": "Keep enabled non-hidden accounts visible in canonical order, including accounts whose quota is unavailable. Show Sign in again or Quota unavailable with the provider reason instead of inventing a percentage. Real quota meters retain tags, reset tooltips, active-wire highlighting and last-good transient-error policy; only explicit user hiding collapses an account. A compact settings button beside Add opens the AI Accounts page and closes any open usage popover.",
+      "summary": "Keep enabled non-hidden accounts visible in canonical order, including accounts whose quota is unavailable. Show Sign in again or Quota unavailable with the provider reason instead of inventing a percentage. Real quota meters retain tags, reset tooltips, active-wire highlighting and last-good transient-error policy; only explicit user hiding collapses an account. Claude cards add an Extra usage meter (spent vs monthly cap, percent, currency, reset when reported, or Extra usage off), also in the quota agent tool and recorded history. A compact settings button beside Add opens the AI Accounts page and closes any open usage popover.",
       "reach": [
         "expect group \"AI accounts usage\"",
         "click button \"AI accounts usage\"",
@@ -814,6 +814,12 @@
           "id": "ai-accounts.usage-keeps-last-good",
           "file": "plugins/@dshfiles/ai-accounts/src/accounts-queries.test.ts",
           "testName": "keeps the last good quota of each account through a failed or unreadable poll"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.claude-extra-usage",
+          "file": "plugins/@dshfiles/ai-accounts/src/extra-usage.test.tsx",
+          "testName": "reads used credits and the monthly cap from cents, with the reported utilization"
         }
       ],
       "telemetry": [

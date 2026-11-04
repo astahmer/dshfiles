@@ -127,7 +127,7 @@ const collectUsageHistory = async (ctx: Context, accounts: readonly AccountProfi
         windows[window.label] = window.percentRemaining
         if (window.resetsAt !== null) resetsAt[window.label] = window.resetsAt
       }
-      const snapshot: QuotaSnapshot = {
+      const reading: QuotaSnapshot = {
         at,
         instanceId: account.instanceId,
         windows,
@@ -135,6 +135,7 @@ const collectUsageHistory = async (ctx: Context, accounts: readonly AccountProfi
         bankedResets: usage.bankedResets,
         bankedResetExpiries: usage.bankedResetExpiries,
       }
+      const snapshot: QuotaSnapshot = usage.extraUsage === undefined ? reading : { ...reading, extraUsage: usage.extraUsage }
       await quota.put(UsageHistoryModel.bucketKey(account.instanceId, at, settings.intervalMinutes), snapshot)
       return 1
     },
@@ -184,14 +185,15 @@ const readUsageHistories = async (
   for (const [key, value] of domain.table('quota').entries()) {
     const parsed = UsageHistoryModel.parseBucketKey(key)
     if (parsed === null || !rowsByInstance.has(parsed.instanceId) || value.at < sinceMs) continue
-    rowsByInstance.get(parsed.instanceId)?.push({
+    const point: QuotaSnapshot = {
       at: value.at,
       instanceId: value.instanceId,
       windows: value.windows,
       resetsAt: value.resetsAt,
       bankedResets: value.bankedResets,
       bankedResetExpiries: value.bankedResetExpiries ?? [],
-    })
+    }
+    rowsByInstance.get(parsed.instanceId)?.push(value.extraUsage === undefined ? point : { ...point, extraUsage: value.extraUsage })
   }
   return instanceIds.map(instanceId => {
     const rows = rowsByInstance.get(instanceId) ?? []

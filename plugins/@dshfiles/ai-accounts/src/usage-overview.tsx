@@ -12,6 +12,7 @@ import type { AccountsUsage } from './api.js'
 import { ProviderGlyph } from './provider-glyph.js'
 import { UsagePlanBadge } from './usage-plan-badge.js'
 import { AccountEnabledToggle } from './account-enabled-toggle.js'
+import { ExtraUsageMeter } from './extra-usage-view.js'
 import { useQuotaClock } from './quota-clock.js'
 import { usePreferences } from './use-preferences.js'
 import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
@@ -56,6 +57,7 @@ const AccountUsageCard = (props: {
   const usage = props.card.usage
   const limited = props.card.enabled && usage.status === 'ok' && UsageOverviewModel.isCardLimited(usage.windows)
   const onReserve = props.card.enabled && usage.status === 'ok' && UsageOverviewModel.reserveInUse(usage.windows) !== undefined
+  const extraUsage = usage.status === 'ok' ? usage.extraUsage : undefined
   return (
     <article
       className={cn(
@@ -92,7 +94,7 @@ const AccountUsageCard = (props: {
             <TooltipContent>{props.hostName}</TooltipContent>
           </Tooltip>
         </header>
-        {UsageOverviewModel.bindingWindow(props.card) === undefined ? (
+        {UsageOverviewModel.bindingWindow(props.card) === undefined && extraUsage?.enabled !== true ? (
           <div className="dshx:text-xs dshx:text-muted-foreground">
             <p className="dshx:font-semibold">{UsageOverviewModel.unavailableStatus(props.card).label}</p>
             <p>{UsageOverviewModel.unavailableStatus(props.card).reason}</p>
@@ -146,6 +148,7 @@ const AccountUsageCard = (props: {
             </div>
           )
         })}
+        {extraUsage === undefined ? null : <ExtraUsageMeter extra={extraUsage} muted={!props.card.enabled} now={props.now} />}
         {usage.bankedResets > 0 ? <BankedResets count={usage.bankedResets} expiries={usage.bankedResetExpiries} /> : null}
         {limited && usage.bankedResets > 0 && props.card.kind === 'codex' ? (
           <p className="dshx:text-[11px] dshx:text-muted-foreground">Spend a banked reset with “Reset usage” in the Codex app; it is not used automatically.</p>

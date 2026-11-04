@@ -7,6 +7,7 @@ import { routeQuoteSchema } from './cost-estimate.js'
 import { AiAccountsSchema } from './effect-schema.js'
 import { quotaContinuationSummarySchema } from './quota-continuation-model.js'
 import { fastModeUsageHistorySchema } from './fast-mode-usage-model.js'
+import { extraUsageSchema } from './extra-usage-schema.js'
 import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } from './usage-history-model.js'
 
 /**
@@ -281,6 +282,8 @@ export const usageCardSchema = Schema.Struct({
   bankedResets: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(20)),
   /** When each banked reset expires, when the provider reports it. */
   bankedResetExpiries: AiAccountsSchema.list(Schema.NullOr(Schema.Number.check(Schema.isFinite())), 20),
+  /** Missing from older Hosts and from providers without pay-as-you-go spend. */
+  extraUsage: Schema.optional(extraUsageSchema),
 })
 
 export const accountsUsageSchema = Schema.Struct({

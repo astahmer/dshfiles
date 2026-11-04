@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import * as Schema from 'effect/Schema'
 import type { UsageCard } from './api.js'
+import type { ExtraUsage } from './extra-usage-schema.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { AiAccountsSchema } from './effect-schema.js'
 import { readKeychainSecret } from './keychain.js'
@@ -116,7 +117,23 @@ const claudeWindowSchema = Schema.optional(
   ),
 )
 
+const nullableNumber = Schema.optional(Schema.NullOr(Schema.Number.check(Schema.isFinite())))
+
+/** Pay-as-you-go spend past the plan; amounts are in the currency's minor unit (cents). */
+const claudeExtraUsageSchema = Schema.Struct({
+  is_enabled: Schema.optional(Schema.NullOr(Schema.Boolean)),
+  monthly_limit: nullableNumber,
+  used_credits: nullableNumber,
+  utilization: nullableNumber,
+  currency: Schema.optional(Schema.NullOr(Schema.String)),
+  resets_at: Schema.optional(Schema.NullOr(Schema.String)),
+})
+
+type ClaudeExtraUsageBody = typeof claudeExtraUsageSchema.Type
+
 const claudeUsageSchema = Schema.Struct({
+  // A malformed extra_usage block must not cost the account its quota windows.
+  extra_usage: Schema.optional(Schema.Unknown),
   five_hour: claudeWindowSchema,
   seven_day: claudeWindowSchema,
   seven_day_opus: claudeWindowSchema,
@@ -129,6 +146,30 @@ const CLAUDE_WINDOWS = [
   ['seven_day_opus', 'Weekly Opus'],
   ['seven_day_sonnet', 'Weekly Sonnet'],
 ] as const
+
+/**
+ * Claude's `extra_usage`: whether pay-as-you-go spend is on, what it spent this month and the monthly cap, in cents.
+ * Anthropic reports no reset for it; `resets_at` is read only if a later response adds one. A block that says
+ * nothing (no flag, no amounts) yields nothing, as does a malformed one, so the card falls back to its windows.
+ */
+const toExtraUsage = (extra: ClaudeExtraUsageBody): ExtraUsage | undefined => {
+  const enabled = extra.is_enabled === true
+  const used = extra.used_credits === undefined || extra.used_credits === null ? null : Math.max(0, extra.used_credits) / 100
+  const monthlyLimit = extra.monthly_limit === undefined || extra.monthly_limit === null ? null : Math.max(0, extra.monthly_limit) / 100
+  if (typeof extra.is_enabled !== 'boolean' && used === null && monthlyLimit === null) return undefined
+  const reported = extra.utilization === undefined || extra.utilization === null ? null : extra.utilization
+  const derived = used !== null && monthlyLimit !== null && monthlyLimit > 0 ? (used / monthlyLimit) * 100 : null
+  const currency = extra.currency?.trim().toUpperCase() ?? ''
+  const resetsAt = extra.resets_at === undefined || extra.resets_at === null ? Number.NaN : Date.parse(extra.resets_at)
+  return {
+    enabled,
+    used,
+    monthlyLimit,
+    currency: /^[A-Z]{3}$/.test(currency) ? currency : 'USD',
+    percentUsed: reported ?? derived,
+    resetsAt: Number.isNaN(resetsAt) ? null : resetsAt,
+  }
+}
 
 export class ClaudeAccountModel {
   static resolveClaudeConfigDir = (homePath: string): string => {
@@ -176,7 +217,12 @@ export class ClaudeAccountModel {
       const resetsAt = window.resets_at === undefined || window.resets_at === null ? Number.NaN : Date.parse(window.resets_at)
       windows.push({ label, percentRemaining: ProviderUsageModel.remainingFromUsed(window.utilization), resetsAt: Number.isNaN(resetsAt) ? null : resetsAt })
     }
-    return { status: 'ok', message: null, identity: null, plan: plan ?? null, windows, bankedResets: 0, bankedResetExpiries: [] }
+    const card: UsageCard = { status: 'ok', message: null, identity: null, plan: plan ?? null, windows, bankedResets: 0, bankedResetExpiries: [] }
+    const block = parsed.success.extra_usage
+    if (block === undefined || block === null) return card
+    const extra = AiAccountsSchema.decodeResult(claudeExtraUsageSchema, block)
+    const extraUsage = extra._tag === 'Success' ? toExtraUsage(extra.success) : undefined
+    return extraUsage === undefined ? card : { ...card, extraUsage }
   }
 }
 
@@ -245,7 +291,7 @@ const fetchUsage = async (
     const parsed = AiAccountsSchema.decodeResult(claudeUsageSchema, raw)
     if (parsed._tag === 'Success' && !signal?.aborted) {
       const usage = parsed.success
-      if (CLAUDE_WINDOWS.some(([key]) => usage[key] !== undefined)) onAuthenticated?.()
+      if (CLAUDE_WINDOWS.some(([key]) => usage[key] !== undefined) || usage.extra_usage !== undefined) onAuthenticated?.()
     }
     return { card: ClaudeAccountModel.parseClaudeUsage(raw, credential.plan) }
   } catch (cause) {

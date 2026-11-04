@@ -1,6 +1,7 @@
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { AiAccountsSchema } from './effect-schema.js'
+import { extraUsageSchema } from './extra-usage-schema.js'
 
 export const MAX_USAGE_HISTORY_POINTS = 5_000
 
@@ -15,6 +16,8 @@ export const quotaSnapshotSchema = Schema.Struct({
   bankedResets: AiAccountsSchema.intBetween(0, 20),
   /** Missing on older persisted snapshots. */
   bankedResetExpiries: Schema.optional(AiAccountsSchema.list(Schema.NullOr(timestamp), 20)),
+  /** Claude pay-as-you-go spend at this reading; missing on older snapshots and other providers. */
+  extraUsage: Schema.optional(extraUsageSchema),
 })
 
 export const usageMetaSchema = Schema.Struct({
@@ -30,6 +33,7 @@ export const usageHistoryPointSchema = Schema.Struct({
   resetsAt: quotaSnapshotSchema.fields.resetsAt,
   bankedResets: quotaSnapshotSchema.fields.bankedResets,
   bankedResetExpiries: quotaSnapshotSchema.fields.bankedResetExpiries,
+  extraUsage: quotaSnapshotSchema.fields.extraUsage,
 })
 
 export type QuotaSnapshot = typeof quotaSnapshotSchema.Type

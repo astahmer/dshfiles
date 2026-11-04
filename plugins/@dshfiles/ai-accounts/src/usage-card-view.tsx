@@ -1,11 +1,12 @@
 import type { UsageCard } from './api.js'
+import { ExtraUsageMeter } from './extra-usage-view.js'
 import { QuotaMeter } from './panel-primitives.js'
 import { UsageOverviewModel } from './usage-overview-model.js'
 
 export const UsageCardView = (props: { readonly usage: UsageCard | undefined; readonly now: number }): JSX.Element | null => {
   const usage = props.usage
   if (usage === undefined) return null
-  if (usage.status !== 'ok' || usage.windows.length === 0) {
+  if (usage.status !== 'ok' || (usage.windows.length === 0 && usage.extraUsage === undefined)) {
     return (
       <p className="dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:text-xs dshx:text-muted-foreground">
         {usage.message ?? (usage.status === 'unauthenticated' ? "Sign in to read this account's quota." : 'This provider reported no quota windows.')}
@@ -19,6 +20,7 @@ export const UsageCardView = (props: { readonly usage: UsageCard | undefined; re
       {UsageOverviewModel.sortWindows(usage.windows).map(window => (
         <QuotaMeter detail={UsageOverviewModel.formatResetIn(window.resetsAt, now)} key={window.label} label={window.label} percent={window.percentRemaining} />
       ))}
+      {usage.extraUsage === undefined ? null : <ExtraUsageMeter className="dshx:md:col-span-2" extra={usage.extraUsage} now={now} />}
       {usage.bankedResets > 0 ? (
         <p className="dshx:text-xs dshx:text-info dshx:md:col-span-2">
           {String(usage.bankedResets)} banked reset{usage.bankedResets === 1 ? '' : 's'}
