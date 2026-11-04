@@ -212,7 +212,10 @@
           "file": "plugins/@dshfiles/multi-host/src/project-origins.test.ts",
           "testName": "records the project origins span without exposing input paths"
         }
-      ]
+      ],
+      "surface": "rowDecorator",
+      "destination": "threads",
+      "currentSurface": "thread-list: remote threads under their local project"
     },
     {
       "id": "fleet-update",
@@ -266,7 +269,10 @@
           "file": "plugins/@dshfiles/multi-host/tests/ssh-spans.test.ts",
           "testName": "records an ssh command span that fails on a refused target before ssh starts"
         }
-      ]
+      ],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Hosts › Update hosts"
     },
     {
       "id": "host-settings",
@@ -319,7 +325,10 @@
           "file": "plugins/@dshfiles/multi-host/tests/ssh-spans.test.ts",
           "testName": "records an ssh command span that fails on a refused target before ssh starts"
         }
-      ]
+      ],
+      "surface": "detail",
+      "destination": "observe",
+      "currentSurface": "left-nav: Hosts › Edit host"
     },
     {
       "id": "remote-delegation",
@@ -357,7 +366,10 @@
           "kind": "automatic",
           "source": "api-dispatch"
         }
-      ]
+      ],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: multi_host_delegate"
     },
     {
       "id": "ssh-runtime-connection",

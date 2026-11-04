@@ -262,7 +262,10 @@
           "kind": "not-applicable",
           "reason": "Client-only: Search projects and browse folder paths renders browser state and starts no Host work of its own."
         }
-      ]
+      ],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Choose workspace › search"
     },
     {
       "id": "keyboard-folder-selection",
@@ -291,7 +294,10 @@
           "kind": "not-applicable",
           "reason": "Client-only: Select project folders with keyboard navigation renders browser state and starts no Host work of its own."
         }
-      ]
+      ],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Choose workspace › keyboard rows"
     },
     {
       "id": "unregistered-recent-folders",
@@ -326,7 +332,10 @@
           "kind": "not-applicable",
           "reason": "Library rendering recent folders the host plugin reads through its own API; the Host read is that plugin catalog api-dispatch span."
         }
-      ]
+      ],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Choose workspace › Recent"
     },
     {
       "id": "directory-only-mode",
@@ -355,7 +364,10 @@
           "kind": "not-applicable",
           "reason": "Client-only: Start directly in the Host folder browser renders browser state and starts no Host work of its own."
         }
-      ]
+      ],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "Hosts › Add folder (directory-only picker)"
     }
   ]
 }

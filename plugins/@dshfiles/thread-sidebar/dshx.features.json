@@ -4,6 +4,9 @@
     {
       "id": "multi-model-fan-out",
       "title": "Send one prompt to several models",
+      "surface": "command",
+      "destination": "none",
+      "currentSurface": "palette: Send to several models…",
       "summary": "Create two to six independent threads for selected models, selecting each model before sending the same prompt and reporting per-model success or failure.",
       "reach": ["click button \"Open command palette\"", "click text \"Send to several models…\"", "expect dialog \"Send to several models\""],
       "surfaces": ["client", "host", "integration"],
