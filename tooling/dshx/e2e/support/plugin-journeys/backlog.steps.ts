@@ -167,6 +167,74 @@ Then('the Jev settings show a successful save', async ({ page }: { page: Page })
   await expect(page.getByRole('checkbox', { name: 'Enable Jev' })).toBeChecked()
 })
 
+When('a Linear sync backend for team {string} is saved with the key {string}', async ({ page }: { page: Page }, team: string, key: string) => {
+  const section = page.getByRole('region', { name: 'Remote sync' })
+  await section.getByRole('button', { name: 'Add backend', exact: true }).click()
+  const row = section.getByRole('group', { name: 'Sync backend 1' })
+  await row.getByRole('textbox', { name: 'Linear team key', exact: true }).fill(team)
+  const reference = row.getByRole('textbox', { name: 'Linear API key reference', exact: true })
+  await expect(reference).toHaveAttribute('data-secret-input', 'reference')
+  await reference.fill(key)
+  await section.getByRole('button', { name: 'Save sync backends', exact: true }).click()
+})
+
+Then('the remote sync settings show a successful save', async ({ page }: { page: Page }) => {
+  const section = page.getByRole('region', { name: 'Remote sync' })
+  await expect(section.getByRole('status').filter({ hasText: 'Remote sync backends saved.' })).toBeVisible()
+  await expect(section.getByRole('button', { name: 'Sync all now (0)', exact: true })).toBeDisabled()
+  await expect(section.getByRole('textbox', { name: 'Issue to import', exact: true })).toBeVisible()
+})
+
+When('the Backlog views are shown again', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Backlog views', exact: true }).click()
+  await expect(feed(page)).toBeVisible()
+})
+
+Then('item b:{int} offers Linear links in its sync chip', async ({ page }: { page: Page }, id: number) => {
+  await recordAssertion(page, `backlog-sync-chip-b${String(id)}`, async () => {
+    await peek(page).getByRole('button', { name: 'Remote sync: not linked', exact: true }).click()
+    const popover = page.getByRole('dialog').filter({ hasText: 'Mirror this item in a tracker' })
+    await expect(popover.getByRole('button', { name: 'Link to Linear issue…', exact: true })).toBeVisible()
+    await expect(popover.getByRole('button', { name: 'Create in Linear', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+  })
+})
+
+Then('backlog item b:{int} offers Linear links in its context menu', async ({ page }: { page: Page }, id: number) => {
+  const target = await contextTarget(page, id, 'feed')
+  await target.click({ button: 'right' })
+  await expect(contextMenu(page).getByRole('menuitem', { name: 'Link to Linear issue…', exact: true })).toBeVisible()
+  await expect(contextMenu(page).getByRole('menuitem', { name: 'Create in Linear', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+})
+
+When('backlog item b:{int} is linked to the Linear issue {string}', async ({ page }: { page: Page }, id: number, issue: string) => {
+  const target = await contextTarget(page, id, 'feed')
+  await target.click({ button: 'right' })
+  await contextMenu(page).getByRole('menuitem', { name: 'Link to Linear issue…', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: `Link b:${String(id)} to a Linear issue` })
+  await dialog.getByRole('textbox', { name: 'Linear issue', exact: true }).fill(issue)
+  await dialog.getByRole('button', { name: 'Link issue', exact: true }).click()
+})
+
+Then('the link dialog explains how to add a Linear backend', async ({ page }: { page: Page }) => {
+  const dialog = page.getByRole('dialog', { name: /^Link b:\d+ to a Linear issue$/ })
+  await expect(dialog.getByRole('alert')).toContainText('No enabled Linear backend is configured')
+  await expect(dialog.getByRole('alert')).toContainText('Backlog settings › Remote sync')
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await finishJourneyAssertions(page)
+})
+
+Then('the link dialog explains how to bind the Linear key', async ({ page }: { page: Page }) => {
+  const dialog = page.getByRole('dialog', { name: /^Link b:\d+ to a Linear issue$/ })
+  await expect(dialog.getByRole('alert')).toContainText('The Linear key does not resolve')
+  await expect(dialog.getByRole('alert')).toContainText('Backlog settings › Remote sync')
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await finishJourneyAssertions(page)
+})
+
 When('the image references are submitted with the capture', async ({ page }: { page: Page }) => {
   const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
   await capture.fill('Capture screenshots with the issue\n\n@Image 1 @Image 2')

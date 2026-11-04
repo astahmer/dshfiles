@@ -65,6 +65,7 @@ import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLin
 import { ItemGlyphs } from './item-glyphs.js'
 import { AttachmentMedia, ItemFiles } from './item-files.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
+import { BacklogSyncControls } from './sync-controls.js'
 import { BacklogText, ItemMarkdown } from './item-text.js'
 import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { submitReply } from './reply-submission.js'
@@ -1204,6 +1205,7 @@ const PeekBody = (props: {
                   attention={item.attention ?? 'none'}
                   onPick={attention => actions.update.mutate({ id: item.id, attention })}
                 />
+                <BacklogSyncControls.Chip itemId={item.id} />
                 <span className="dshx:ml-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
                   {item.actors.map(actor => (
                     <AgentThreadChip

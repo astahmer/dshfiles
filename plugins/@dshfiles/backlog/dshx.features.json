@@ -2208,6 +2208,281 @@
       ]
     },
     {
+      "id": "remote-sync",
+      "title": "Mirror backlog items in Linear or GitHub Issues",
+      "summary": "Link an item to an existing Linear or GitHub issue, create one from it, or unlink it again from its row menu or the sync chip in its detail. Title, description, status and tags sync both ways against the last synced base of each side; a field both sides changed goes to the side that changed last and leaves a conflict note on the item. New comments are carried over once in each direction. Agents read the same state with backlog_sync_status and act with backlog_sync_now and backlog_link_remote when the user asked.",
+      "reach": [
+        "click button \"Backlog: Items\"",
+        "fill textbox \"Capture\" \"Mirror this item in Linear\"",
+        "press Enter",
+        "rightclick article \"Item b:1\"",
+        "expect menuitem \"Link to Linear issue…\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "storage",
+        "tool",
+        "integration"
+      ],
+      "surface": "rowAction",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog: Items › row menu › Link to Linear issue… / item detail › sync chip",
+      "configuration": [],
+      "states": [
+        "not-linked",
+        "synced",
+        "pending",
+        "conflict",
+        "error",
+        "unlinked"
+      ],
+      "failureModes": [
+        "No enabled backend row for the item's project answers with the Backlog settings › Remote sync row to add, before any network call.",
+        "A key that does not resolve names the secret reference or environment variable to set; a refused key, rate limit or unreachable tracker is recorded on the item's sync state with its recovery, local edits are kept and the next Sync now retries.",
+        "A lossy mapping (GitHub has no in-progress state, Linear labels the team lacks) never reads as a change: each side is compared with its own last synced value.",
+        "Unlinking removes the mapping and the issue link only; neither the item nor the issue is deleted, and the item can be linked again."
+      ],
+      "externalDependencies": [
+        {
+          "id": "linear-graphql",
+          "boundary": "POST https://api.linear.app/graphql with the personal API key a backend row's secret:ALIAS (or LINEAR_API_KEY) resolves to on the Host; reads the team's workflow states and labels, reads, creates and updates issues and creates comments.",
+          "deterministicFake": "fakeLinear in src/sync-fakes.ts is an in-memory GraphQL endpoint for team ENG injected as the HttpClient; tests never reach the network."
+        },
+        {
+          "id": "github-rest",
+          "boundary": "GitHub REST v2022-11-28 issues and issue-comments endpoints of the configured owner/repo with the token a backend row's secret:ALIAS (or GITHUB_TOKEN) resolves to on the Host.",
+          "deterministicFake": "fakeGithub in src/sync-fakes.ts is an in-memory REST API for acme/app injected as the HttpClient; tests never reach the network."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.remote-sync-link",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-linear-create",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "creates a Linear issue from an item, maps status and labels, and records its spans"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-linear-two-way",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "links an existing issue, then syncs title, status and new comments both ways without echoes"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-conflict",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "settles a field both sides changed by last writer wins and leaves a conflict note"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-error-recovery",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "records a refused key on the item with a recovery path, and recovers on the next pass"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-unconfigured",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "names the setting to fix when no backend serves the project or no key resolves"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-unlink",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "unlinks without touching either side, and the item can be linked again"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-restart",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "keeps items and mappings across a Host restart"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-github",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "creates, closes and comments on a GitHub issue through the REST API and records its spans"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.remote-sync-policy-one-side",
+          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
+          "testName": "a field only one side changed flows to the other side"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.remote-sync-policy-lww",
+          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
+          "testName": "a field both sides changed goes to the side that changed last, with the other value kept as a conflict"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.remote-sync-policy-lossy",
+          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
+          "testName": "a lossy remote status never reads as a change against its own base"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.remote-sync-policy-first",
+          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
+          "testName": "the first sync adopts the issue and merges both sides’ tags"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "secret"
+        },
+        {
+          "kind": "custom",
+          "span": "backlog sync",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "creates a Linear issue from an item, maps status and labels, and records its spans"
+        },
+        {
+          "kind": "custom",
+          "span": "linear request",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "creates a Linear issue from an item, maps status and labels, and records its spans"
+        },
+        {
+          "kind": "custom",
+          "span": "github request",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "creates, closes and comments on a GitHub issue through the REST API and records its spans"
+        }
+      ]
+    },
+    {
+      "id": "remote-sync-settings",
+      "title": "Configure remote sync backends and import issues",
+      "summary": "Backlog settings › Remote sync holds one row per project and tracker (Linear team key or GitHub owner/repo, a secret:ALIAS key reference, an auto-sync interval, on/off), a Sync all now control, and Import an issue, which turns an existing Linear or GitHub issue into a linked item with its status, labels and comments. Agents import with backlog_import_remote when the user asked.",
+      "reach": [
+        "click button \"Backlog: Items\"",
+        "click button \"Backlog settings\"",
+        "expect textbox \"Issue to import\"",
+        "click button \"Add backend\"",
+        "expect textbox \"Linear team key\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "storage",
+        "tool",
+        "integration"
+      ],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: Backlog: Items › Backlog settings › Remote sync",
+      "configuration": [
+        {
+          "key": "dshfiles-backlog.syncBackends",
+          "defaultValue": "[]",
+          "constraints": "Rows of { project, backend: linear|github, enabled, target, secret (secret:ALIAS reference only, resolved on the Host), autoSyncMinutes 0–1440 }; a row with an empty project serves every project without a row of its own.",
+          "coveredBy": [
+            "backlog.remote-sync-settings"
+          ]
+        }
+      ],
+      "states": [
+        "no-backend",
+        "configured",
+        "auto-sync",
+        "imported",
+        "already-imported"
+      ],
+      "failureModes": [
+        "Settings stay read-only while the namespace is unavailable; the form says so instead of saving.",
+        "The form stores a Secret Catalog reference, never a key value; an empty reference falls back to LINEAR_API_KEY or GITHUB_TOKEN in the Host environment.",
+        "Importing an issue already linked returns its item instead of a duplicate; a reference outside the configured team or repository is refused with an example of what to paste.",
+        "A failing auto-sync tick is logged and retried on the next minute; each item's error stays visible on its sync chip."
+      ],
+      "externalDependencies": [
+        {
+          "id": "linear-graphql",
+          "boundary": "POST https://api.linear.app/graphql with the personal API key a backend row's secret:ALIAS (or LINEAR_API_KEY) resolves to on the Host; reads the team's workflow states and labels, reads, creates and updates issues and creates comments.",
+          "deterministicFake": "fakeLinear in src/sync-fakes.ts is an in-memory GraphQL endpoint for team ENG injected as the HttpClient; tests never reach the network."
+        },
+        {
+          "id": "github-rest",
+          "boundary": "GitHub REST v2022-11-28 issues and issue-comments endpoints of the configured owner/repo with the token a backend row's secret:ALIAS (or GITHUB_TOKEN) resolves to on the Host.",
+          "deterministicFake": "fakeGithub in src/sync-fakes.ts is an in-memory REST API for acme/app injected as the HttpClient; tests never reach the network."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.remote-sync-settings",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-import-linear",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "imports a Linear issue as a linked item with its status, labels and comments, once"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-import-github",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "imports an issue by URL and refuses one from another repository"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.remote-sync-references",
+          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
+          "testName": "reads Linear workflow-state types and identifiers"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.remote-sync-github-references",
+          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
+          "testName": "reads GitHub issue references only within the configured repository"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "secret"
+        },
+        {
+          "kind": "custom",
+          "span": "backlog sync",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "creates a Linear issue from an item, maps status and labels, and records its spans"
+        },
+        {
+          "kind": "custom",
+          "span": "linear request",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "creates a Linear issue from an item, maps status and labels, and records its spans"
+        }
+      ]
+    },
+    {
       "id": "secret-link-reveal",
       "title": "Reveal an item's secret link in place",
       "summary": "An item that names a credential as `secret:ALIAS[@env]` shows a Reveal button beside that link in its Relationships. The Secret Catalog provides the control through the backlog's secret-link-reveal contract and reveals through its own reveal verb and policy (explicit click, hidden on Hide, Esc or after the configured seconds); the backlog never stores or receives the value. An alias the Catalog does not hold, or holds in several scopes, offers Open in Secrets instead of guessing.",

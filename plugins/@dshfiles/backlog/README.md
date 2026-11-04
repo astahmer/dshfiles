@@ -1,5 +1,7 @@
 # @dshfiles/backlog
 
+![Configure remote sync backends and import issues](docs/screenshots/remote-sync-settings.png)
+
 ![Retrieve public tweet context into a backlog item](docs/screenshots/tweet-context-enrichment.png)
 
 ![Configure Jev triage from the Backlog panel](docs/screenshots/jev-settings.png)
@@ -317,6 +319,52 @@ dropping the rest of the draft.
 | `backlog_projects`         | read: per-project counts, who needs you, people                                       |
 | `backlog_accept_proposal`  | write                                                                                 |
 | `backlog_dismiss_proposal` | write                                                                                 |
+| `backlog_sync_status`      | read: remote sync backends and each linked item's issue, state, last sync and errors  |
+| `backlog_sync_now`         | write: sync one linked item, a project's, or every one now                            |
+| `backlog_link_remote`      | write: link an item to a Linear/GitHub issue, create one from it, or unlink it        |
+| `backlog_import_remote`    | write: import an existing Linear/GitHub issue as a linked item                        |
+
+## Remote sync (Linear, GitHub Issues)
+
+Items can mirror an issue in Linear or GitHub Issues, so the backlog lives somewhere shared without giving up
+the local feed. **Backlog settings › Remote sync** holds one row per project and tracker: a Linear team key or a
+GitHub `owner/repo`, a `secret:ALIAS` reference to a Linear personal API key or a GitHub token (empty falls back
+to `LINEAR_API_KEY` / `GITHUB_TOKEN` in the Host environment), an auto-sync interval in minutes (0 syncs only on
+**Sync now**) and an on/off switch. A row with an empty project serves every project that has no row of its own.
+The key is resolved on the Host through `@dshfiles/credential-port` and never reaches a browser.
+
+Linking is always your action: an item's row menu and the cloud chip in its detail offer **Link to Linear
+issue…** (paste `ENG-12` or its URL) and **Create in Linear**, the GitHub equivalents once a GitHub row exists,
+and **Sync now** / **Unlink** for a linked item. The settings section also has **Sync all now** and **Import an
+issue**, which turns an existing issue into a linked item (an issue already linked returns its item).
+
+What syncs, and how conflicts settle:
+
+| Item        | Linear                                                                    | GitHub                                                            |
+| ----------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| title, body | title, description                                                        | title, body                                                       |
+| status      | workflow state type (triage/backlog/unstarted/started/completed/canceled) | open → `todo`; closed completed → `done`, not planned → `dropped` |
+| tags        | the team's or workspace's labels of the same name                         | labels (GitHub creates missing ones)                              |
+| kind        | a label named after it on create/import (`Bug`, `Feature` for ideas)      | a label on create; `bug` / `idea` labels set the kind on import   |
+| comments    | new comments both ways, once each                                         | new comments both ways, once each                                 |
+
+Each mapping keeps both sides as the last sync left them, so a field only one side changed flows to the other and
+a lossy mapping (an in-progress item against an open GitHub issue) never reads as a change. A field both sides
+changed goes to the side that changed last (the item's field history against the issue's `updatedAt`) and the
+item gets a conflict note naming the value that lost; edit the field again to choose it, and the next sync carries
+it over. Linking an existing issue adopts its title, description and status on the first pass (the old values stay
+in the item's history) and merges both sides' tags; creating an issue starts both sides equal. Comments imported
+from the tracker are system comments that say where they came from; only your and agents' comments made after the
+link (or every one, for an issue created from the item) go out.
+
+A failing pass never touches the item: the mapping records the error with its recovery (bind the key, fix the
+team or repository, wait for a rate limit) and the chip shows it until the next pass succeeds. Unlinking removes
+the mapping and the issue link only. Host work leaves `backlog sync` (one per item pass), `linear request` and
+`github request` spans with identities and counts only.
+
+Deferred: a plain JSON snapshot export to an S3-compatible bucket or a git repository. The mapping store and the
+`RemoteBackend` port (`src/sync-backend.ts`) are where such a one-way backend would plug in; it was left out
+because it needs its own credential and conflict story (an export has no remote edits to merge).
 
 ## Search and saved views
 
@@ -390,6 +438,9 @@ rows. Search is an in-memory token match over title, body, tags, project and lin
 live in the separate `backlog_files` domain, keyed by item and attachment; `backlog_read_file` returns a
 data URL for the UI, and `save: true` writes a copy under `$TMPDIR/dsh-backlog-attachments/<item>-<attachment>.<ext>`
 and returns that absolute path so an agent can read an image instead of a base64 string.
+Remote sync keeps its mappings (remote id, the last synced value of each side, carried-over comment ids, state,
+recent conflicts and the last error) in a third domain, `backlog_sync` v1, keyed by item id, so the `items`
+rows stay at v1 and turning sync on or off never rewrites or loses an item.
 
 ## Secret references
 

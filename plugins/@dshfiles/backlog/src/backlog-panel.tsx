@@ -61,6 +61,7 @@ import { ProjectFilterPicker } from './project-picker.js'
 import { SearchResults } from './search-results.js'
 import { SearchScopes, type SearchScope } from './search-scope.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
+import { BacklogSyncControls } from './sync-controls.js'
 import { StartThreadDialog } from './start-thread-dialog.js'
 import type { StartThreadAgentChoice, StartThreadCatalog, StartThreadItem, StartThreadOutcome, StartThreadProject, StartThreadRequest } from './start-thread.js'
 import { FeedStatus } from './status-filter.js'
@@ -883,7 +884,12 @@ export const BacklogPanel = (props: {
           </p>
         ) : null}
         <div data-backlog-content-region className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1 dshx:@max-pane-compact:flex-col">
-          {showSettings ? <BacklogSettingsPanel /> : null}
+          {showSettings ? (
+            <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:overflow-y-auto">
+              <BacklogSettingsPanel />
+              <BacklogSyncControls.Settings projectPaths={projectPaths} />
+            </div>
+          ) : null}
           {!showSettings &&
             (showsResults ? (
               <>

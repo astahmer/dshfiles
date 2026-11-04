@@ -13,6 +13,30 @@ Feature: Backlog
     When Jev settings are saved with a secret reference
     Then the Jev settings show a successful save
 
+  @scenario:backlog.remote-sync-link
+  Scenario: Link an item to Linear from its menu before any backend exists
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Mirror this item in Linear" is captured
+    Then backlog item b:1 offers Linear links in its context menu
+    When backlog item b:1 is linked to the Linear issue "ENG-1"
+    Then the link dialog explains how to add a Linear backend
+
+  @scenario:backlog.remote-sync-settings
+  Scenario: Configure a Linear backend and link an item, with a recovery path when the key is missing
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And the Backlog settings are opened
+    And a Linear sync backend for team "ENG" is saved with the key "secret:DSH_TEST_LINEAR"
+    Then the remote sync settings show a successful save
+    When the Backlog views are shown again
+    And "Mirror this item in Linear" is captured
+    And backlog item b:1 is opened
+    Then item b:1 offers Linear links in its sync chip
+    And backlog item b:1 offers Linear links in its context menu
+    When backlog item b:1 is linked to the Linear issue "ENG-1"
+    Then the link dialog explains how to bind the Linear key
+
   @scenario:backlog.capture-triage
   Scenario: Capture free text and find it again
     Given the isolated plugin profile "@dshfiles/backlog" is booted

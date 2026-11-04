@@ -27,6 +27,8 @@ import { backlogItemMarkdown } from './item-markdown.js'
 import { useBacklogActions, type BacklogUpdateInput } from './use-backlog-actions.js'
 import { BacklogTweetContext } from './backlog-tweet-context.js'
 import { BacklogNotices } from './notices.js'
+import { BacklogSyncControls } from './sync-controls.js'
+import type { SyncBackendKind } from './sync-model.js'
 
 const NO_PROJECT = 'no-project'
 type BacklogMenuItem = Pick<
@@ -54,6 +56,7 @@ export const BacklogItemMenu = (props: {
 }): JSX.Element => {
   const item = props.item
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [linkBackend, setLinkBackend] = useState<SyncBackendKind | null>(null)
   const actions = useBacklogActions()
   const attention = item.attention ?? 'none'
   const selection = props.selection !== undefined && props.selection.length > 1 ? props.selection : [startThreadItemOf(item)]
@@ -131,6 +134,12 @@ export const BacklogItemMenu = (props: {
               <LinkIcon aria-hidden className="dshx:size-3.5" />
               Retrieve tweet content
             </ContextMenuItem>
+          )}
+          {many ? null : (
+            <>
+              <ContextMenuSeparator />
+              <BacklogSyncControls.MenuItems itemId={item.id} onLink={setLinkBackend} />
+            </>
           )}
           <ContextMenuSeparator />
           <ContextMenuSub>
@@ -266,6 +275,9 @@ export const BacklogItemMenu = (props: {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {linkBackend === null ? null : (
+        <BacklogSyncControls.LinkDialog itemId={item.id} backend={linkBackend} open onOpenChange={open => (open ? undefined : setLinkBackend(null))} />
+      )}
     </>
   )
 }
