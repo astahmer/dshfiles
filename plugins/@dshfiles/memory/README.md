@@ -69,7 +69,7 @@ Optional: TypeSafe's Jev (`jevEnabled`; key from `jevSecret`, a Secret Catalog r
 
 Out of scope: promoting facts into AGENTS.md or skills, reading `~/.agents`, mid-thread injection, thread handoff.
 
-Open the reusable **Memory: Browser** view from navigation or the Workbench chooser. Its Notes, Threads and Analytics tabs retain their own names.
+Open the reusable **Memory** view from navigation or the Workbench chooser. Its Notes, Threads and Analytics tabs retain their own names.
 
 ## Retrieval: BM25 by default, hybrid with your own embedder
 

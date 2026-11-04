@@ -1,4 +1,5 @@
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -132,7 +133,7 @@ export const AnalyticsTab = (props: {
 }): JSX.Element => {
   const [eventKind, setEventKind] = useState<'all' | MemoryEvent['kind']>('all')
   const usage = props.usage
-  if (usage === undefined) return <p className="dshx:p-6 dshx:text-sm dshx:text-muted-foreground">Loading analytics…</p>
+  if (usage === undefined) return <Spinner className="dshx:mx-auto dshx:my-6" aria-label="Loading analytics" />
   const tool = (name: string) => usage.tools.find(item => item.tool === name) ?? { calls: 0, withResults: 0, empty: 0, used: 0 }
   const search = tool('memory_search')
   const read = tool('memory_read')
@@ -164,7 +165,7 @@ export const AnalyticsTab = (props: {
   const topNotes = usage.topNotes.filter(note => props.project === undefined || note.project === props.project)
   const maxTop = Math.max(...topNotes.map(note => note.citations), 1)
   return (
-    <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-3 dshx:overflow-auto dshx:px-5 dshx:pb-5">
+    <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-3 dshx:overflow-auto">
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         <span className="dshx:text-xs dshx:text-muted-foreground">
           {usage.state === 'ready' ? 'Memory is active' : usage.state === 'off' ? 'Memory is off' : 'Memory failed to start'}

@@ -36,7 +36,7 @@ Given('memory holds the feedback note {string}', async ({ page }: { page: Page }
 })
 
 When('the Memory panel is opened', async ({ page }: { page: Page }) => {
-  await openGlobalPanel(page, 'Memory: Browser')
+  await openGlobalPanel(page, 'Memory')
   await expect(page.getByRole('tablist', { name: 'Memory views' })).toBeVisible()
 })
 

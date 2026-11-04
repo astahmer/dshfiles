@@ -1,5 +1,6 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { useApi } from '@dshfiles/dshx/client'
 import {
   AlertDialog,
@@ -30,7 +31,6 @@ import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
 import {
   ArrowUpRightIcon,
-  ChevronDownIcon,
   CopyIcon,
   LayoutGridIcon,
   ListIcon,
@@ -80,7 +80,6 @@ const filterSelect = (props: {
   <Select value={props.value} onValueChange={props.onChange}>
     <SelectTrigger aria-label={props.label} className={filterTrigger} size="sm">
       <SelectValue>{props.display}</SelectValue>
-      <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
     </SelectTrigger>
     <SelectContent align="start">{props.children}</SelectContent>
   </Select>
@@ -409,7 +408,7 @@ const NoteDetail = (props: {
                 <MessageSquareIcon className="dshx:size-4" />
               </span>
               <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-                <span className="dshx:text-[10px] dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">Thread</span>
+                <span className="dshx:text-xs dshx:text-muted-foreground">Thread</span>
                 <span className="dshx:truncate dshx:text-xs">{note.sourceThread}</span>
               </div>
               <Button size="xs" variant="outline" onClick={() => props.openThread(note.sourceThread ?? '')}>
@@ -481,7 +480,7 @@ const NoteDetail = (props: {
               </Button>
             </div>
           ) : null}
-          {archive.isError ? <p className="dshx:text-xs dshx:text-destructive">{errorMessage(archive.error, 'The archive action failed.')}</p> : null}
+          {archive.isError ? <p className="dshx:text-xs dshx:text-destructive">{errorMessage(archive.error, 'The archive action failed. Try it again.')}</p> : null}
         </section>
 
         {mode === 'view' ? null : <NoteEditorForm note={note} editor={{ snapshot, send }} key={`${note.id}:${note.updatedAt}`} />}
@@ -644,7 +643,7 @@ export const NotesTab = (props: {
       setConfirmingForget(false)
       setSelection(ListSelectionModel.empty())
     } catch (error) {
-      setForgetFailure(errorMessage(error, 'The selected notes could not be forgotten.'))
+      setForgetFailure(errorMessage(error, 'The selected notes could not be forgotten. Try Forget selected again.'))
     } finally {
       setForgetPending(false)
     }
@@ -652,7 +651,7 @@ export const NotesTab = (props: {
   const filtered = search.trim().length > 0 || type !== '' || status !== 'valid' || origin !== ''
   return (
     <TooltipProvider delayDuration={500}>
-      <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:gap-4 dshx:overflow-hidden dshx:px-5 dshx:pb-5 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:overflow-auto dshx:@max-[64rem]:flex-col dshx:@max-[64rem]:overflow-auto">
+      <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:gap-4 dshx:overflow-hidden dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:overflow-auto dshx:@max-[64rem]:flex-col dshx:@max-[64rem]:overflow-auto">
         <section className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card/40 dshx:@max-[64rem]:h-[28rem] dshx:@max-[64rem]:flex-none">
           <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:border-border dshx:p-3">
             <div className="dshx:flex dshx:items-center dshx:gap-2">
@@ -795,7 +794,7 @@ export const NotesTab = (props: {
           ) : null}
           {review.isError ? (
             <p className="dshx:border-b dshx:border-border dshx:p-3 dshx:text-xs dshx:text-destructive">
-              {errorMessage(review.error, 'Jev review is unavailable.')}
+              {errorMessage(review.error, 'Jev review is unavailable. Check that Jev is on in Settings, then review again.')}
             </p>
           ) : null}
           {review.data === undefined ? null : (
@@ -840,15 +839,15 @@ export const NotesTab = (props: {
                 </div>
               ))}
               {archiveSuggestion.isError ? (
-                <p className="dshx:text-xs dshx:text-destructive">{errorMessage(archiveSuggestion.error, 'The note could not be archived.')}</p>
+                <p className="dshx:text-xs dshx:text-destructive">{errorMessage(archiveSuggestion.error, 'The note could not be archived. Try Archive again.')}</p>
               ) : null}
             </section>
           )}
-          {notes.isError ? <p className="dshx:p-4 dshx:text-xs dshx:text-destructive">{errorMessage(notes.error, 'Notes are unavailable.')}</p> : null}
+          {notes.isError ? <p className="dshx:p-4 dshx:text-xs dshx:text-destructive">{errorMessage(notes.error, 'Notes are unavailable. Switch to another tab and back to reload them.')}</p> : null}
           {notes.isSuccess && visibleNotes.length === 0 ? (
-            <p className="dshx:p-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
+            <EmptyState>
               {filtered ? 'No notes match these filters.' : 'No notes yet. Agents add them with memory_note when you correct or decide something.'}
-            </p>
+            </EmptyState>
           ) : null}
           <div
             className={cn(

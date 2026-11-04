@@ -376,7 +376,7 @@
       "surfaces": ["client", "api"],
       "surface": "destinationSection",
       "destination": "knowledge",
-      "currentSurface": "left-nav: Memory: Browser",
+      "currentSurface": "left-nav: Memory",
       "configuration": [],
       "states": ["empty", "notes", "editing", "forgetting", "reviewing", "suggested", "archived", "restored", "history", "threads", "usage"],
       "failureModes": [
@@ -426,7 +426,7 @@
           "testName": "records a memory jev ask span per question without the key or the text"
         }
       ],
-      "reach": ["click button \"Memory: Browser\"", "expect tab \"Notes\""]
+      "reach": ["click button \"Memory\"", "expect tab \"Notes\""]
     },
     {
       "id": "memory-reference-preview",
@@ -492,7 +492,7 @@
       "surfaces": ["client", "storage"],
       "surface": "destinationSection",
       "destination": "knowledge",
-      "currentSurface": "left-nav: Memory: Browser › Analytics",
+      "currentSurface": "left-nav: Memory › Analytics",
       "configuration": [],
       "states": ["no-activity", "counted", "priced", "unpriced", "rated"],
       "failureModes": [
@@ -531,7 +531,7 @@
           "reason": "Client-only: Show what memory costs and whether it holds up renders browser state and starts no Host work of its own."
         }
       ],
-      "reach": ["click button \"Memory: Browser\"", "click tab \"Analytics\"", "expect text \"Recall\""]
+      "reach": ["click button \"Memory\"", "click tab \"Analytics\"", "expect text \"Recall\""]
     },
     {
       "id": "batch-forget-notes",
@@ -540,7 +540,7 @@
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "knowledge",
-      "currentSurface": "left-nav: Memory: Browser › Select notes",
+      "currentSurface": "left-nav: Memory › Select notes",
       "configuration": [],
       "states": ["unselected", "range-selected", "confirmed", "partially-forgotten"],
       "failureModes": [
@@ -567,7 +567,7 @@
           "reason": "Client-only: Forget a selection of notes renders browser state and starts no Host work of its own."
         }
       ],
-      "reach": ["click button \"Memory: Browser\"", "click button \"Select notes\"", "expect checkbox \"Select all visible notes\""]
+      "reach": ["click button \"Memory\"", "click button \"Select notes\"", "expect checkbox \"Select all visible notes\""]
     }
   ]
 }

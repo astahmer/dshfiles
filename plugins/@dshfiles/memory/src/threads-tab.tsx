@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import {
@@ -377,7 +378,7 @@ export const ThreadsTab = (props: {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
   return (
-    <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:gap-4 dshx:overflow-hidden dshx:px-5 dshx:pb-5 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:overflow-auto dshx:@max-[64rem]:flex-col dshx:@max-[64rem]:overflow-auto">
+    <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:gap-4 dshx:overflow-hidden dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:overflow-auto dshx:@max-[64rem]:flex-col dshx:@max-[64rem]:overflow-auto">
       <section className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card/40 dshx:@max-[64rem]:h-[28rem] dshx:@max-[64rem]:flex-none">
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:border-border dshx:p-3">
           <div className="dshx:flex dshx:h-9 dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:px-2.5">
@@ -436,13 +437,13 @@ export const ThreadsTab = (props: {
             </span>
           </div>
         </div>
-        {threads.isError ? <p className="dshx:p-4 dshx:text-xs dshx:text-destructive">{errorMessage(threads.error, 'Threads are unavailable.')}</p> : null}
+        {threads.isError ? <p className="dshx:p-4 dshx:text-xs dshx:text-destructive">{errorMessage(threads.error, 'Threads are unavailable. Switch to another tab and back to reload them.')}</p> : null}
         {threads.isSuccess && visible.length === 0 ? (
-          <p className="dshx:p-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
+          <EmptyState>
             {debounced.length > 0 || status !== 'all' || source !== ''
               ? 'No threads match these filters.'
               : 'No thread digests yet. A thread is digested once it has been idle for a minute.'}
-          </p>
+          </EmptyState>
         ) : null}
         <div className="dshx:min-h-0 dshx:flex-1 dshx:divide-y dshx:divide-border dshx:overflow-auto">
           {visible.map(thread => (
@@ -484,7 +485,7 @@ export const ThreadsTab = (props: {
                   <DropdownMenuLabel>{PanelFormat.threadRef(selected.id)}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => void writeClipboard(selected.id)}>
-                    <CopyIcon /> Copy Session id
+                    <CopyIcon /> Copy thread id
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => void writeClipboard(selected.digest)} disabled={!selected.digested}>
                     <CopyIcon /> Copy digest
@@ -537,7 +538,7 @@ export const ThreadsTab = (props: {
                   <Button size="sm" variant="outline" className="dshx:w-fit" onClick={() => redigest.mutate(selected.id)} disabled={redigest.isPending}>
                     <RefreshCwIcon className={redigest.isPending ? 'dshx:animate-spin' : undefined} /> Write digest now
                   </Button>
-                  {redigest.isError ? <p className="dshx:text-xs dshx:text-destructive">{errorMessage(redigest.error, 'The digest failed.')}</p> : null}
+                  {redigest.isError ? <p className="dshx:text-xs dshx:text-destructive">{errorMessage(redigest.error, 'The digest failed. Try it again.')}</p> : null}
                 </div>
               )}
             </div>

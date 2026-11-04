@@ -195,7 +195,7 @@ const NotePreview = (props: {
         {related.isPending ? <Skeleton className="dshx:h-3 dshx:w-2/3" /> : null}
         {related.isError ? (
           <p role="alert" className="dshx:text-xs dshx:text-destructive">
-            {errorMessage(related.error, 'Related memories are unavailable.')}
+            {errorMessage(related.error, 'Related memories are unavailable. Open the note in Memory to retry.')}
           </p>
         ) : null}
         {related.isSuccess && relatedNotes.length === 0 ? (
@@ -213,7 +213,7 @@ const NotePreview = (props: {
         {history.isPending ? <Skeleton className="dshx:h-3 dshx:w-2/3" /> : null}
         {history.isError ? (
           <p role="alert" className="dshx:text-xs dshx:text-destructive">
-            {errorMessage(history.error, 'The note history is unavailable.')}
+            {errorMessage(history.error, 'The note history is unavailable. Open the note in Memory to retry.')}
           </p>
         ) : null}
         {history.isSuccess && versions.length <= 1 ? <p className="dshx:text-xs dshx:text-muted-foreground">No earlier versions.</p> : null}
@@ -489,7 +489,7 @@ export const MemoryReferenceOverlay = (props: {
           ) : null}
           {preview.isError ? (
             <p role="alert" className="dshx:text-xs dshx:text-destructive">
-              {errorMessage(preview.error, 'Memory reference is unavailable.')}
+              {errorMessage(preview.error, 'This memory is unavailable; it may have been forgotten. Search Memory for it instead.')}
             </p>
           ) : null}
           {card?.kind === 'note' ? (
