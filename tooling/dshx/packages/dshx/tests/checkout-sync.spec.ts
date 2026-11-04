@@ -121,8 +121,8 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
       status: 'would-sync',
       changedFiles: [],
       rebuilt: { dshx: false, plugins: ['@dshfiles/attachment-gallery'] },
-      plugins: [{ name: '@dshfiles/attachment-gallery', host: true, client: true }],
-      restart: { needed: true, reasons: ['@dshfiles/attachment-gallery Host bundle changed'] },
+      plugins: [{ name: '@dshfiles/attachment-gallery', host: true, client: true, missing: true }],
+      restart: { needed: true, reasons: ['@dshfiles/attachment-gallery had no Host bundle yet (first build)'] },
     })
     expect(() => readFileSync(join(directory, 'dist/index.js'))).toThrow()
 
@@ -131,8 +131,8 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
       status: 'synced',
       changedFiles: [],
       rebuilt: { dshx: false, plugins: ['@dshfiles/attachment-gallery'] },
-      plugins: [{ name: '@dshfiles/attachment-gallery', host: true, client: true }],
-      restart: { needed: true, reasons: ['@dshfiles/attachment-gallery Host bundle changed'] },
+      plugins: [{ name: '@dshfiles/attachment-gallery', host: true, client: true, missing: true }],
+      restart: { needed: true, reasons: ['@dshfiles/attachment-gallery had no Host bundle yet (first build)'] },
     })
     expect(readFileSync(join(directory, 'dist/index.js'), 'utf8')).toBe('export {}\n')
     expect(readFileSync(join(directory, 'dist/client.js'), 'utf8')).toBe('export {}\n')
@@ -175,6 +175,36 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
     expect(result.hint).toContain('Rebase it onto main')
     expect(commitOf(checkout, 'default@')).toBe(before)
     expect(describeRevision(checkout, 'default@-')).toBe('feat: not landed')
+  })
+
+  it('gives every land refused by the same unlanded work one fingerprint', async () => {
+    writeFile(join(checkout, 'draft.txt'), 'draft\n')
+    jj(checkout, 'commit', '-m', 'feat: not landed')
+    land('one.txt', 'one\n', 'feat: first land')
+    const first = await sync()
+    land('two.txt', 'two\n', 'feat: second land')
+    const second = await sync()
+
+    expect(first.status).toBe('refused')
+    expect(first.to).not.toBe(second.to)
+    expect(first.fingerprint).toMatch(/^[0-9a-f]{16}$/u)
+    expect(second.fingerprint).toBe(first.fingerprint)
+    land('three.txt', 'three\n', 'feat: third land')
+    jj(checkout, 'describe', '-r', '@-', '-m', 'wip')
+    expect(await sync()).toMatchObject({ status: 'synced', fingerprint: null })
+  })
+
+  it('lists every changed file even when the jj output is far longer than a failure tail', async () => {
+    jj(lander, 'new', 'main')
+    const files = Array.from({ length: 300 }, (_, index) => `deeply/nested/directory/for/a/long/path/file-${String(index).padStart(3, '0')}.txt`)
+    for (const file of files) writeFile(join(lander, file), 'x\n')
+    jj(lander, 'commit', '-m', 'feat: many files')
+    jj(lander, 'bookmark', 'set', 'main', '-r', '@-')
+
+    const result = await sync(true)
+    expect(result.status).toBe('would-sync')
+    // The report keeps the first 200, intact and in order: the whole jj output was parsed, not its last 4 000 characters.
+    expect(result.changedFiles).toEqual(files.slice(0, 200))
   })
 
   it('refuses to rebase revisions another workspace builds on', async () => {
@@ -314,7 +344,7 @@ describe('checkout rebuild selection', () => {
   it('selects missing bundle outputs without rebuilding dependants', () => {
     rmSync(join(root, 'plugins/@dshfiles/panel/dist/client.js'))
     const plan = CheckoutRebuild.plan({ root, changedFiles: [] })
-    expect(plan.plugins).toEqual([{ name: '@dshfiles/panel', host: false, client: true }])
+    expect(plan.plugins).toEqual([{ name: '@dshfiles/panel', host: false, client: true, missing: true }])
   })
 
   it('picks changed plugins, their dependants and plugins bundling changed dshx runtime code', () => {

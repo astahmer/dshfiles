@@ -58,6 +58,7 @@ const humanReport = (result: CheckoutSyncResult): string => {
         .map(line => `    ${line}`)
         .join('\n')}`,
     )
+  if (result.fingerprint !== null) lines.push(`  cause      ${result.fingerprint} (same value for every sync this cause blocks)`)
   if (result.hint !== null) lines.push(`fix: ${result.hint}`)
   return `${lines.join('\n')}\n`
 }

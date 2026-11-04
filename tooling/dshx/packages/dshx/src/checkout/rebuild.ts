@@ -23,6 +23,8 @@ export interface PluginEffect {
   readonly host: boolean
   /** Its client bundle changed: DSH hot-reloads it. */
   readonly client: boolean
+  /** Its previous build left no bundle at all: this is a first build, not a change the move brought in. */
+  readonly missing?: true
 }
 
 export interface RebuildPlan {
@@ -173,7 +175,8 @@ const planRebuild = (input: { readonly root: string; readonly changedFiles: read
         comparesSources && [...sources()].some(source => changedSet.has(source) || dshxOutputs.has(source))
       // A source the last build never saw could land in either bundle; assume the Host so a restart is not missed.
       const host = pluginPackage.missingHostBundle || manifestChanged || unmapped || hits(pluginPackage.hostSources)
-      return { name: pluginPackage.name, host, client: pluginPackage.missingClientBundle || !host || hits(pluginPackage.clientSources) }
+      const effect = { name: pluginPackage.name, host, client: pluginPackage.missingClientBundle || !host || hits(pluginPackage.clientSources) }
+      return pluginPackage.missingHostBundle || pluginPackage.missingClientBundle ? { ...effect, missing: true as const } : effect
     })
 
   const installRoots = [...new Set(input.changedFiles.filter(path => /(^|\/)pnpm-lock\.yaml$/.test(path)).map(path => dirname(path)))].sort((left, right) =>
@@ -189,9 +192,14 @@ const planRebuild = (input: { readonly root: string; readonly changedFiles: read
 
 const fingerprint = (path: string): string | null => (existsSync(path) ? createHash('sha256').update(readFileSync(path)).digest('hex') : null)
 
+/**
+ * Runs one command. Build steps keep only the output tail for a failure report; `full` keeps everything, which a caller
+ * that parses the output (a jj file or revision list) needs: a tail cut mid-line silently drops and mangles entries.
+ */
 const runCommand = (input: {
   readonly argv: readonly [string, ...string[]]
   readonly cwd: string
+  readonly full?: boolean | undefined
   readonly onOutput?: ((chunk: string) => void) | undefined
 }): Promise<{ readonly exitCode: number; readonly output: string }> =>
   new Promise(resolvePromise => {
@@ -200,7 +208,7 @@ const runCommand = (input: {
     let output = ''
     const collect = (chunk: Buffer): void => {
       const text = chunk.toString('utf8')
-      output = (output + text).slice(-OUTPUT_TAIL)
+      output = input.full === true ? output + text : (output + text).slice(-OUTPUT_TAIL)
       input.onOutput?.(text)
     }
     child.stdout.on('data', collect)
@@ -256,7 +264,8 @@ const runRebuild = async (input: {
     const previous = before.get(plugin.name)
     const after = bundleFingerprints(plugin.name)
     const manifestChanged = changed.has(`${directory}/package.json`) || changed.has(`${directory}/cordis.patch.yml`)
-    return { name: plugin.name, host: manifestChanged || previous?.host !== after.host, client: previous?.client !== after.client }
+    const effect = { name: plugin.name, host: manifestChanged || previous?.host !== after.host, client: previous?.client !== after.client }
+    return plugin.missing === true ? { ...effect, missing: true as const } : effect
   })
   return { installed, dshx: input.plan.dshx, plugins, failure }
 }

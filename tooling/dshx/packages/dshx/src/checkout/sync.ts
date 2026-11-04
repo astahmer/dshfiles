@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { existsSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { CheckoutRebuild, CheckoutSyncError, type PluginEffect } from './rebuild.js'
@@ -33,6 +34,12 @@ export interface CheckoutSyncResult {
   readonly restart: { readonly needed: boolean; readonly reasons: readonly string[] }
   readonly hint: string | null
   readonly failure: { readonly step: string; readonly command: string; readonly output: string } | null
+  /**
+   * Stable id of a refusal, conflict or build failure, independent of the target commit: every land that hits the same
+   * unlanded revisions, conflicting files or failing step gets the same value, so a caller reports the cause once
+   * instead of once per land. `null` when the sync succeeded.
+   */
+  readonly fingerprint: string | null
 }
 
 interface Revision {
@@ -53,9 +60,9 @@ const isPlaceholder = (revision: Revision): boolean => PLACEHOLDER_DESCRIPTIONS.
 const shown = (revision: Revision): SyncRevision => ({ changeId: revision.changeId, description: revision.description })
 
 const jjAt = (cwd: string) => {
-  const run = (args: readonly string[]) => CheckoutRebuild.command({ argv: ['jj', '--color=never', '--no-pager', ...args], cwd })
+  const run = (args: readonly string[]) => CheckoutRebuild.command({ argv: ['jj', '--color=never', '--no-pager', ...args], cwd, full: true })
   const read = async (args: readonly string[]): Promise<string> => {
-    const result = await CheckoutRebuild.command({ argv: ['jj', '--color=never', '--no-pager', ...args], cwd })
+    const result = await run(args)
     if (result.exitCode !== 0)
       throw new CheckoutSyncError(
         'jj-failed',
@@ -92,10 +99,37 @@ const updateIfStale = async (jj: ReturnType<typeof jjAt>): Promise<boolean> => {
 
 const realPath = (path: string): string => (existsSync(path) ? realpathSync(path) : path)
 
-const restartReasons = (plugins: readonly PluginEffect[], profileReason: string | null): readonly string[] => [
-  ...plugins.filter(plugin => plugin.host).map(plugin => `${plugin.name} Host bundle changed`),
-  ...(profileReason === null ? [] : [profileReason]),
-]
+/** Changed Host bundles are named one by one; bundles a checkout never built collapse into one first-build line. */
+const restartReasons = (plugins: readonly PluginEffect[], profileReason: string | null): readonly string[] => {
+  const host = plugins.filter(plugin => plugin.host)
+  const firstBuilds = host.filter(plugin => plugin.missing === true)
+  return [
+    ...host.filter(plugin => plugin.missing !== true).map(plugin => `${plugin.name} Host bundle changed`),
+    ...(firstBuilds.length === 0
+      ? []
+      : firstBuilds.length === 1
+        ? [`${firstBuilds[0]?.name ?? ''} had no Host bundle yet (first build)`]
+        : [`${String(firstBuilds.length)} plugins had no Host bundle yet (first build in this checkout)`]),
+    ...(profileReason === null ? [] : [profileReason]),
+  ]
+}
+
+const failureFingerprint = (result: Omit<CheckoutSyncResult, 'fingerprint'>): string | null => {
+  if (result.status !== 'refused' && result.status !== 'conflicted' && result.status !== 'build-failed') return null
+  const cause = [
+    result.workspace,
+    result.bookmark,
+    result.status,
+    ...result.unlanded.map(revision => revision.changeId).sort(),
+    ...[...result.conflicts].sort(),
+    result.failure?.step ?? '',
+    // A refusal for another workspace's working copy names it only in the hint.
+    result.unlanded.length === 0 && result.conflicts.length === 0 && result.failure === null ? (result.hint ?? '') : '',
+  ]
+  return createHash('sha256').update(cause.join('\0')).digest('hex').slice(0, 16)
+}
+
+const finish = (result: Omit<CheckoutSyncResult, 'fingerprint'>): CheckoutSyncResult => ({ ...result, fingerprint: failureFingerprint(result) })
 
 /**
  * Reconciles the live web profile from the checkout's seed with the checkout's own `scripts/profile-sync.ts`, the
@@ -121,15 +155,7 @@ const syncWebProfile = async (input: {
   return `the profile seed changed but syncing the web profile failed (${reason}); the next "dsh web" start retries it`
 }
 
-/**
- * Brings the checkout of one jj workspace (the one running `dsh web`, `default` by default) onto a bookmark tip or
- * exact commit, keeping its local edits, then reinstalls and rebuilds what the move changed.
- *
- * Only undescribed (`wip`) revisions and described revisions the target already holds move; described work the target
- * lacks is refused, a conflict is undone, and a rebase that would rewrite another workspace's working copy is refused.
- * Every jj step runs in the workspace's own directory, so its files follow the rebase.
- */
-export const syncCheckout = async (options: {
+export interface SyncCheckoutOptions {
   readonly cwd: string
   readonly workspace: string
   readonly bookmark: string
@@ -137,7 +163,9 @@ export const syncCheckout = async (options: {
   readonly dryRun: boolean
   readonly onProgress?: ((message: string) => void) | undefined
   readonly onOutput?: ((chunk: string) => void) | undefined
-}): Promise<CheckoutSyncResult> => {
+}
+
+const syncOnce = async (options: SyncCheckoutOptions): Promise<Omit<CheckoutSyncResult, 'fingerprint'>> => {
   const { workspace, bookmark, dryRun } = options
   const names = /^[A-Za-z0-9._-]+$/u
   if (!names.test(workspace) || !names.test(bookmark)) {
@@ -183,7 +211,7 @@ export const syncCheckout = async (options: {
     )
   }
 
-  const base: Omit<CheckoutSyncResult, 'status'> = {
+  const base: Omit<CheckoutSyncResult, 'status' | 'fingerprint'> = {
     workspace,
     path,
     bookmark,
@@ -379,3 +407,13 @@ export const syncCheckout = async (options: {
     failure: outcome.failure,
   }
 }
+
+/**
+ * Brings the checkout of one jj workspace (the one running `dsh web`, `default` by default) onto a bookmark tip or
+ * exact commit, keeping its local edits, then reinstalls and rebuilds what the move changed.
+ *
+ * Only undescribed (`wip`) revisions and described revisions the target already holds move; described work the target
+ * lacks is refused, a conflict is undone, and a rebase that would rewrite another workspace's working copy is refused.
+ * Every jj step runs in the workspace's own directory, so its files follow the rebase.
+ */
+export const syncCheckout = async (options: SyncCheckoutOptions): Promise<CheckoutSyncResult> => finish(await syncOnce(options))
