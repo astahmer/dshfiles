@@ -166,6 +166,14 @@ describe('multi-host tool exposure', () => {
     })
   })
 
+  test('no-argument methods accept the undefined input the browser client sends', async () => {
+    const methods = [multiHostApi.methods.list, multiHostApi.methods.threadList, multiHostApi.methods.resourcePool]
+    for (const method of methods) {
+      if (method.input === undefined) throw new Error('A no-argument method still declares its Void input.')
+      expect('issues' in (await standard(method.input).validate(undefined))).toBe(false)
+    }
+  })
+
   test('session ID tools validate strictly and publish their input JSON Schema', async () => {
     const inputs: { readonly schema: ApiSchema | undefined; readonly valid: Readonly<Record<string, unknown>> }[] = [
       { schema: multiHostApi.methods.sessionJjRepositories.input, valid: { sessionId: 'session-1' } },
