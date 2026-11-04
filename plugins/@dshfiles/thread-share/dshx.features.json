@@ -1,0 +1,217 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "thread-share-link",
+      "title": "Share a thread as a read-only link",
+      "summary": "Settings › Thread sharing creates a read-only share link for one thread: live (re-read and redacted on every view) or a snapshot frozen at creation; anyone with the unguessable link, or link plus a passphrase kept only as a salted scrypt hash; expiring in 1 hour, 1 day, 7 days or never. The link is shown once (only its SHA-256 is stored). The list shows active shares with view counts and revokes one behind a confirmation; expired and revoked shares stay visible behind a switch. The page is served by a plugin-owned route, /thread-share/s/<token>, outside DSH's authenticated /api: it shows only that thread's user and assistant messages (no tools, attachments or other threads), redacts secret-shaped values and home or workspace paths, is rate-limited, and sends noindex, no-store, no-referrer and a script-free CSP. The agent can list (read-only), create and revoke (explicit confirm) shares.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Thread sharing\"", "expect button \"Create share link\""],
+      "surfaces": ["client", "host", "settings", "api", "tool", "storage", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Thread sharing",
+      "configuration": [],
+      "states": ["no-shares", "link-shown-once", "active", "expired", "revoked", "passphrase-required", "passphrase-locked", "rate-limited"],
+      "failureModes": [
+        "A wrong, expired or revoked link gets 404 with one message telling the viewer to ask for a new link; the page never says which.",
+        "A protected share without its grant cookie shows only the passphrase form; a wrong passphrase gets 401 and the form again, and five wrong ones in 15 minutes lock the share for the rest of that window with 429 and Retry-After.",
+        "More than 120 requests a minute from one client get 429 with Retry-After; behind a loopback tunnel the forwarded client address is the key.",
+        "A live share whose thread can no longer be read (deleted, or session-controller missing) gets 503 asking the viewer to check that DSH is running.",
+        "Creating a share for an unknown thread fails with a message naming the thread id and the session-controller requirement.",
+        "Revoking an unknown id fails with a message pointing at the share list; revoke without confirm: true is refused by the schema.",
+        "A Host restart forgets passphrase grants and rate-limit windows: viewers re-enter the passphrase."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/session-controller",
+          "boundary": "Every transcript read is one sessionsApi.messages call (user and assistant text only, at most 100 messages of 8,000 characters) plus a sessionsApi.list call for the title and working directory, made in process as @dshfiles/thread-share.",
+          "deterministicFake": "src/thread-share.test.ts mounts a sessionsApi owner with two sessions and records which ones were read."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "thread share request",
+          "file": "plugins/@dshfiles/thread-share/src/thread-share.test.ts",
+          "testName": "serves only the shared thread: another session and other paths are unreachable"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-share.share-link",
+          "featureFile": "tooling/dshx/e2e/features/thread-share.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "thread-share.isolation",
+          "file": "plugins/@dshfiles/thread-share/src/thread-share.test.ts",
+          "testName": "serves only the shared thread: another session and other paths are unreachable"
+        },
+        {
+          "kind": "host-test",
+          "id": "thread-share.redaction-route",
+          "file": "plugins/@dshfiles/thread-share/src/thread-share.test.ts",
+          "testName": "redacts secrets and host paths on the share page"
+        },
+        {
+          "kind": "host-test",
+          "id": "thread-share.passphrase",
+          "file": "plugins/@dshfiles/thread-share/src/thread-share.test.ts",
+          "testName": "asks for the passphrase of a protected share and locks it after repeated failures"
+        },
+        {
+          "kind": "host-test",
+          "id": "thread-share.revoke-expiry",
+          "file": "plugins/@dshfiles/thread-share/src/thread-share.test.ts",
+          "testName": "counts views, revokes only with confirm, and hides expired shares"
+        },
+        {
+          "kind": "host-test",
+          "id": "thread-share.rate-limit",
+          "file": "plugins/@dshfiles/thread-share/src/thread-share.test.ts",
+          "testName": "rate-limits one client across share pages"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-share.tokens",
+          "file": "plugins/@dshfiles/thread-share/src/share-policy.test.ts",
+          "testName": "generates unguessable link tokens and stores only their digest"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-share.passphrase-hash",
+          "file": "plugins/@dshfiles/thread-share/src/share-policy.test.ts",
+          "testName": "hashes a passphrase with a fresh salt and verifies only the same passphrase"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-share.expiry",
+          "file": "plugins/@dshfiles/thread-share/src/share-policy.test.ts",
+          "testName": "computes expiry from the preset and reports expired and revoked shares"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-share.redaction",
+          "file": "plugins/@dshfiles/thread-share/src/share-policy.test.ts",
+          "testName": "redacts secrets, the workspace path and home paths from transcript text"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-share.escaping",
+          "file": "plugins/@dshfiles/thread-share/src/share-policy.test.ts",
+          "testName": "escapes every transcript character before applying code and paragraph markup"
+        }
+      ]
+    },
+    {
+      "id": "thread-share-snapshot-export",
+      "title": "Freeze a snapshot or download a self-contained HTML export",
+      "summary": "A snapshot share stores the redacted transcript at creation (chunked under the 256 KiB storage value limit) and keeps showing it after the thread changes; revoking deletes it. Download HTML (and the thread_share_export tool) renders the same redacted page as one self-contained file with inline CSS, no script and no external resource, to host or upload anywhere when the Host route should not be reachable.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Thread sharing\"", "expect button \"Download HTML\""],
+      "surfaces": ["client", "host", "api", "tool", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Thread sharing",
+      "configuration": [],
+      "states": ["snapshot-frozen", "snapshot-deleted", "exported"],
+      "failureModes": [
+        "Exporting an unknown thread fails with a message naming the thread id and the session-controller requirement.",
+        "Only the latest 100 messages are captured; the page says when older ones were left out."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "thread-share.snapshot-export",
+          "file": "plugins/@dshfiles/thread-share/src/thread-share.test.ts",
+          "testName": "freezes a snapshot share and exports a self-contained HTML file"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-share.snapshot-chunks",
+          "file": "plugins/@dshfiles/thread-share/src/share-policy.test.ts",
+          "testName": "splits a large snapshot into chunks under the storage value limit"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-share.export-browser",
+          "reason": "Download HTML only hands the Host exportHtml answer to a browser Blob download; the Host test asserts the exported file and the share-link journey already walks the same Settings section."
+        }
+      ]
+    },
+    {
+      "id": "thread-share-publish",
+      "title": "Publish share pages through a time-bounded tunnel",
+      "summary": "Settings › Thread sharing detects tailscale and cloudflared and, only after the user confirms, runs one foreground `cloudflared tunnel --url` quick tunnel or `tailscale funnel --https=8443` for 15 minutes, 1 hour or 4 hours. The tunnel targets a separate loopback listener that answers only /thread-share/… and 404s everything else, so the DSH app and its API are never published; it stops on Stop, at its deadline, or with the plugin. New share links then include the public URL. Agents can read the status and stop the tunnel; starting it has no agent tool.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Thread sharing\"", "expect button \"Start publishing\""],
+      "surfaces": ["client", "host", "api", "tool", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Thread sharing",
+      "configuration": [],
+      "states": ["not-installed", "idle", "starting", "published", "failed", "stopped"],
+      "failureModes": [
+        "A missing CLI disables Start and names the install command.",
+        "A CLI that exits before printing a public URL (Funnel not enabled, not signed in) fails with its last output line and what to enable.",
+        "A CLI that prints no public URL within 45 seconds is stopped and reported as a timeout.",
+        "Starting while a tunnel runs stops the old one first; only one tunnel runs at a time."
+      ],
+      "externalDependencies": [
+        {
+          "id": "cloudflared / tailscale CLI",
+          "boundary": "One foreground child process through the DSH subprocess service, pointed at http://127.0.0.1:<listener port>; its stdout/stderr are read only for the public URL and the last line on failure.",
+          "deterministicFake": "src/thread-share.test.ts puts a shell script named cloudflared first on PATH that prints a trycloudflare.com URL and sleeps; nothing is published."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "thread share publish start",
+          "file": "plugins/@dshfiles/thread-share/src/thread-share.test.ts",
+          "testName": "publishes only share pages through a bounded tunnel process and stops it"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "thread-share.publish-tunnel",
+          "file": "plugins/@dshfiles/thread-share/src/thread-share.test.ts",
+          "testName": "publishes only share pages through a bounded tunnel process and stops it"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-share.publish-browser",
+          "reason": "A browser journey would have to run a real cloudflared or tailscale tunnel, which must never expose anything from a test; the Host test drives the same API with a fake CLI on PATH and checks the share-only listener."
+        }
+      ]
+    }
+  ]
+}

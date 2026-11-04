@@ -26,7 +26,8 @@ const readJson = async (path, schema) => Schema.decodeUnknownSync(schema)(JSON.p
 const isOwnedPackage = packageId => /^@dshfiles\/[^/]+$/.test(packageId)
 const packageIdFromExternal = external => /^@dshfiles\/[^/]+/.exec(external)?.[0]
 // Optional personal-project bundles require explicit selection, never activation by source synchronization.
-const optInWebBundles = new Set(['@dshfiles/tool-search', '@dshfiles/resource-packs'])
+// thread-share serves an unauthenticated read-only route and can start a public tunnel, so it is security-sensitive.
+const optInWebBundles = new Set(['@dshfiles/tool-search', '@dshfiles/resource-packs', '@dshfiles/thread-share'])
 
 /** A seeded profile reconciles only this region, so a stock-row override above it never reaches an existing profile. */
 const managedRegion = patch => {
