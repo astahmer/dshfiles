@@ -59,12 +59,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 449,
-  "apiToolBindings": 308,
-  "apiToolNameCount": 308,
-  "apiToolSchemas": 307,
+  "apiMethods": 461,
+  "apiToolBindings": 315,
+  "apiToolNameCount": 315,
+  "apiToolSchemas": 314,
   "definedTools": 28,
-  "tools": 335,
+  "tools": 342,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -1664,6 +1664,110 @@
           },
           "timeoutMs": {}
         },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "attention_done",
+      "description": "Mark one inbox item done, so it leaves Needs you and Other until its source publishes a changed state. Reversible with attention_reopen. Run only when the user asked.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Inbox item id from attention_list.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "attention_list",
+      "description": "List inbox items that need the user: one view at a time plus the count of every view and the muted sources. Needs you = blocking and failed items not done, snoozed, resolved or muted. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "view": {
+            "description": "needs-you (blocking and failed, the default), other (ready), snoozed, closed (done or resolved) or muted.",
+            "type": "string",
+            "enum": [
+              "needs-you",
+              "other",
+              "snoozed",
+              "closed",
+              "muted"
+            ]
+          },
+          "limit": {
+            "description": "Maximum items, 1 to 200; defaults to 100.",
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "attention_mute_source",
+      "description": "Mute (muted: true) or unmute (muted: false) every inbox item of one source. Muted items stay stored and listed in the muted view. Run only when the user asked.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "muted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source",
+          "muted"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "attention_reopen",
+      "description": "Undo Done or Snooze on one inbox item so it shows again. A resolved item cannot be reopened. Run only when the user asked.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Inbox item id from attention_list.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "attention_snooze",
+      "description": "Snooze one inbox item until a time or until its source changes it. Reversible with attention_reopen. Run only when the user asked.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Inbox item id from attention_list.",
+            "type": "string"
+          },
+          "until": {
+            "description": "Unix milliseconds to snooze until; omit when untilChange is true.",
+            "type": "integer"
+          },
+          "untilChange": {
+            "description": "Snooze until the source publishes a changed state.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
         "additionalProperties": false
       }
     },
@@ -7233,6 +7337,22 @@
           "path"
         ],
         "additionalProperties": false
+      }
+    },
+    {
+      "name": "shell_navigation_counts",
+      "description": "Read how often each rail destination and section was opened in the DSH GUI, and from which surface (rail, phone tab bar, list index, palette, moved-to help). Ids and counts only. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "shell_navigation_reset",
+      "description": "Clear the navigation counts and start counting again. Call only when the user asked to reset them; confirm must be true.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
       }
     },
     {
