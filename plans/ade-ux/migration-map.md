@@ -6,14 +6,14 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-345 features from 88 plugins.
+355 features from 88 plugins.
 
 ## Counts
 
 | Destination | agentToolOnly | attentionProvider | command | composerContribution | destinationSection | detail | entityProvider | infrastructure | rowAction | settingsSection | statusItem | threadFacet | transcriptCard | Total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Threads |  |  |  |  | 9 |  | 1 |  | 12 |  |  |  |  | 22 |
-| Inbox |  | 9 |  |  |  |  |  |  |  |  |  |  |  | 9 |
+| Inbox |  | 18 |  |  | 1 |  |  |  |  |  |  |  |  | 19 |
 | Land |  |  | 1 |  | 6 | 2 | 1 |  | 4 |  |  |  |  | 14 |
 | Work |  |  | 1 |  | 7 | 2 | 1 |  | 5 |  |  |  |  | 16 |
 | Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  | 5 |
@@ -32,23 +32,24 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | Left-nav entry today | Goes to | Features |
 | --- | --- | --- |
 | Activity Timeline: Activity | Inbox, Observe | activity-timeline/activity-condensation → Inbox (attentionProvider)<br>activity-timeline/activity-feed → Observe (destinationSection)<br>activity-timeline/verification-receipts → Observe (destinationSection) |
-| Agent Communication: Messages | Agents | agent-communication/agent-directory → Agents (destinationSection)<br>agent-communication/human-browser → Agents (destinationSection)<br>agent-communication/passive-messaging → Agents (destinationSection) |
 | Agent Toolkit: Capabilities | Thread panel | agent-toolkit/agent-toolkit-page → Thread panel (threadFacet) |
-| Agents: Directory | Agents | agents/agent-registry → Agents (destinationSection) |
+| Agents | Agents | agents/agent-registry → Agents (destinationSection) |
 | AI Accounts: Accounts | Settings | ai-accounts/account-lifecycle → Settings (settingsSection)<br>ai-accounts/model-routing → Settings (settingsSection)<br>ai-accounts/reference-dashboard → Settings (settingsSection) |
 | AI Accounts: Quota forecast | Observe | ai-accounts/quota-forecast → Observe (destinationSection) |
 | AI Accounts: Usage history | Observe | ai-accounts/usage-history-and-pricing → Observe (destinationSection) |
 | Background Jobs: Jobs | Observe | background-jobs/batch-stop-jobs → Observe (rowAction)<br>background-jobs/jobs-board → Observe (destinationSection) |
 | Backlog: Items | Work, Inbox, Settings | backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/project-scope → Work (destinationSection)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/tweet-context-enrichment → Work (rowAction) |
+| Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
 | JJ Integration: Thread integration | Land | jj-integration/thread-integration-attention-view → Land (destinationSection)<br>jj-integration/thread-integration-empty → Land (destinationSection)<br>jj-integration/thread-integration-row-details → Land (detail)<br>jj-integration/thread-workspaces-panel → Land (destinationSection) |
 | Jujutsu: Revision graph | Land, No place of its own | jujutsu/graph-navigation → Land (destinationSection)<br>jujutsu/panel-scopes → No place of its own (infrastructure)<br>jujutsu/previewed-revision-mutations → Land (rowAction)<br>jujutsu/revision-detail-and-diff → Land (detail)<br>jujutsu/revision-graph → Land (destinationSection)<br>jujutsu/workspace-at-revision → Land (rowAction)<br>jujutsu/workspace-cleanup → Land (command)<br>jujutsu/workspace-overflow → Land (rowAction)<br>jujutsu/workspace-removal → Land (rowAction) |
 | Jujutsu: Source Control | Land | jujutsu/source-control → Land (destinationSection) |
 | MCP Servers: Servers | Settings | mcp-servers/batch-server-actions → Settings (rowAction)<br>mcp-servers/oauth-authorization → Settings (settingsSection)<br>mcp-servers/registry-catalog → Settings (settingsSection)<br>mcp-servers/server-configuration → Settings (settingsSection) |
-| Memory: Browser | Knowledge | memory/batch-forget-notes → Knowledge (rowAction)<br>memory/memory-panel → Knowledge (destinationSection)<br>memory/usage-telemetry → Knowledge (destinationSection) |
+| Memory | Knowledge | memory/batch-forget-notes → Knowledge (rowAction)<br>memory/memory-panel → Knowledge (destinationSection)<br>memory/usage-telemetry → Knowledge (destinationSection) |
+| Messages | Agents | agent-communication/agent-directory → Agents (destinationSection)<br>agent-communication/human-browser → Agents (destinationSection)<br>agent-communication/passive-messaging → Agents (destinationSection) |
 | Multi-host: Hosts | Observe | multi-host/host-management → Observe (destinationSection)<br>multi-host/isolated-runtime-views → Observe (rowAction) |
 | pulls.review: Reviews | Thread panel | pulls-review/ai-scope-summaries → Thread panel (threadFacet)<br>pulls-review/batch-reviewed-marks → Thread panel (threadFacet)<br>pulls-review/thread-review-scopes → Thread panel (threadFacet) |
 | Resource Packs: Resources | Knowledge | resource-packs/local-properties → Knowledge (destinationSection) |
-| Secret Catalog: Secrets | Settings | secret-catalog/alias-mutations → Settings (settingsSection)<br>secret-catalog/bounded-secret-reveal → Settings (settingsSection)<br>secret-catalog/inline-quick-add → Settings (settingsSection)<br>secret-catalog/scoped-alias-catalog → Settings (settingsSection) |
+| Secrets | Settings | secret-catalog/alias-mutations → Settings (settingsSection)<br>secret-catalog/bounded-secret-reveal → Settings (settingsSection)<br>secret-catalog/inline-quick-add → Settings (settingsSection)<br>secret-catalog/scoped-alias-catalog → Settings (settingsSection) |
 | Thread Sidebar: Board | Threads | thread-sidebar/thread-classification → Threads (destinationSection) |
 | Traces: Explorer | Inbox, Observe | traces/alert-rules → Inbox (attentionProvider)<br>traces/boards-and-saved-views → Observe (destinationSection)<br>traces/log-explorer → Observe (destinationSection)<br>traces/metric-charts → Observe (destinationSection)<br>traces/service-map → Observe (destinationSection)<br>traces/trace-explorer → Observe (destinationSection)<br>traces/trace-insights → Observe (destinationSection) |
 | Usage: Analytics | Observe | usage/usage-activity-report → Observe (destinationSection)<br>usage/usage-charts → Observe (destinationSection)<br>usage/usage-jev-card → Observe (destinationSection)<br>usage/usage-request-log → Observe (destinationSection) |
@@ -70,8 +71,9 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | dialog | 5 | Settings 2, Agents 1, No place of its own 1, Thread panel 1 |
 | home | 1 | Threads 1 |
 | host | 42 | No place of its own 42 |
+| Host contract | 1 | Inbox 1 |
 | keyboard | 3 | No place of its own 3 |
-| left-nav | 76 | Observe 19, Work 15, Land 13, Settings 12, Agents 4, Knowledge 4, Thread panel 4, Inbox 3, No place of its own 1, Threads 1 |
+| left-nav | 85 | Observe 19, Work 15, Land 13, Inbox 12, Settings 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 11 | No place of its own 7, Settings 2, Thread panel 2 |
 | palette | 11 | No place of its own 11 |
 | plugins-page | 2 | No place of its own 1, Settings 1 |
@@ -120,19 +122,29 @@ rail destination (default); 22 features.
 
 ### Inbox
 
-rail destination; 9 features.
+rail destination; 19 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | activity-timeline/activity-condensation: Deterministic condensation and attention visibility | attentionProvider | left-nav: Activity Timeline: Activity › attention filter |
+| activity-timeline/attention-inbox: One attention inbox for everything that needs you | attentionProvider | Host contract: attention-api module and attention_* agent tools |
+| agent-questions/child-questions-inbox: Subagent questions in the Inbox, answerable in place | attentionProvider | left-nav: Inbox › Subagent question |
 | agent-questions/cross-thread-question-inbox: List and answer thread questions | attentionProvider | agent tool: list_thread_questions / answer_thread_question |
+| agent-questions/native-questions-inbox: Thread questions in the Inbox | attentionProvider | left-nav: Inbox › agent-questions.native-question |
 | agent-questions/parent-child-question: Ask and answer a child-agent question | attentionProvider | agent tool: ask_parent_question / answer_parent_question |
 | ai-accounts/quota-auto-retry: Retry exhausted quota when its reset arrives | attentionProvider | transcript: usage-limit turn tail › Resume |
-| backlog/attention-inbox: Attention Inbox across items and threads | attentionProvider | left-nav: Backlog: Items › Inbox |
+| ai-accounts/quota-inbox-items: Quota-blocked threads in the Inbox, resumable in place | attentionProvider | left-nav: Inbox › ai-accounts.quota-continuation |
+| backlog/attention-inbox: Attention Inbox across items and threads | attentionProvider | left-nav: Backlog: Items › Inbox filter (links to the Inbox) |
+| backlog/backlog-inbox-items: Backlog requests in the Inbox | attentionProvider | left-nav: Inbox › backlog.attention |
+| hmr-gate/deferred-update-inbox-item: Plugin updates waiting for a restart in the Inbox | attentionProvider | left-nav: Inbox › hmr-gate.deferred-update |
+| jj-integration/land-inbox-items: Blocked and ready-to-land workspaces in the Inbox | attentionProvider | left-nav: Inbox › jj-integration.land-blocked / jj-integration.ready-to-land |
 | thread-sidebar/finished-turn-attention: See finished turns on the Host until they are acknowledged | attentionProvider | thread-list: finished-turn unread marks |
+| thread-sidebar/finished-turn-inbox: Finished turns in the Inbox | attentionProvider | left-nav: Inbox › Turn finished |
 | thread-sidebar/interrupted-turn-threads: See threads a crash interrupted | attentionProvider | thread-list: interrupted threads |
 | thread-sidebar/usage-limit-group: Group provider-blocked threads under Usage limit | attentionProvider | thread-list: Usage limit group |
+| traces/alert-inbox-items: Firing alerts in the Inbox | attentionProvider | left-nav: Inbox › traces.alert-firing |
 | traces/alert-rules: Alert rules over stored telemetry | attentionProvider | left-nav: Traces: Explorer › Alerts |
+| activity-timeline/inbox-panel: Inbox page with one Needs you badge | destinationSection | left-nav: Inbox |
 
 ### Land
 
@@ -184,10 +196,10 @@ rail destination; 5 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| agent-communication/agent-directory: Discover Agents, history, and workspace channels | destinationSection | left-nav: Agent Communication: Messages |
-| agent-communication/human-browser: Post messages from the communication browser | destinationSection | left-nav: Agent Communication: Messages › post |
-| agent-communication/passive-messaging: Store and browse passive messages | destinationSection | left-nav: Agent Communication: Messages |
-| agents/agent-registry: Manage persistent agents | destinationSection | left-nav: Agents: Directory |
+| agent-communication/agent-directory: Discover Agents, history, and workspace channels | destinationSection | left-nav: Messages |
+| agent-communication/human-browser: Post messages from the communication browser | destinationSection | left-nav: Messages › post |
+| agent-communication/passive-messaging: Store and browse passive messages | destinationSection | left-nav: Messages |
+| agents/agent-registry: Manage persistent agents | destinationSection | left-nav: Agents |
 | agents/agent-mention-preview: Preview an agent from its mention | entityProvider | dialog: agent reference preview card |
 
 ### Observe
@@ -223,12 +235,12 @@ rail destination; 6 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| memory/memory-panel: Browse and clean up memory in the Memory panel | destinationSection | left-nav: Memory: Browser |
-| memory/usage-telemetry: Show what memory costs and whether it holds up | destinationSection | left-nav: Memory: Browser › Analytics |
+| memory/memory-panel: Browse and clean up memory in the Memory panel | destinationSection | left-nav: Memory |
+| memory/usage-telemetry: Show what memory costs and whether it holds up | destinationSection | left-nav: Memory › Analytics |
 | references/session-references: Attach named outside directories and git repositories to a thread | destinationSection | agent tool: reference_* and /reference (no UI) |
 | resource-packs/local-properties: Typed packs on referenced resources | destinationSection | left-nav: Resource Packs: Resources (not mounted) |
 | memory/memory-reference-preview: Preview cited memory inline | entityProvider | transcript: memory: <id> reference card |
-| memory/batch-forget-notes: Forget a selection of notes | rowAction | left-nav: Memory: Browser › Select notes |
+| memory/batch-forget-notes: Forget a selection of notes | rowAction | left-nav: Memory › Select notes |
 
 ### Settings
 
@@ -255,13 +267,13 @@ rail destination (bottom); 46 features.
 | plugin-marketplace/guarded-plugin-install: Install a selected plugin with explicit consent | settingsSection | settings: Built-in plugins › Framework Hub › Install |
 | policies/deny-policies: Deny tool calls outright, after permissions | settingsSection | agent tool: policies_list (no UI) |
 | privacy-controls/feedback-privacy-settings: Control feedback and session-data sharing | settingsSection | settings: Feedback & privacy |
-| secret-catalog/alias-mutations: Create, edit, rename, and remove aliases safely | settingsSection | left-nav: Secret Catalog: Secrets › Add with details |
+| secret-catalog/alias-mutations: Create, edit, rename, and remove aliases safely | settingsSection | left-nav: Secrets › Add with details |
 | secret-catalog/backlog-jev-setup: Add a Jev key from the Backlog setting | settingsSection | plugins-page: View @dshfiles/backlog › Jev secret |
-| secret-catalog/bounded-secret-reveal: Reveal on click and copy without revealing | settingsSection | left-nav: Secret Catalog: Secrets › reveal |
-| secret-catalog/inline-quick-add: Add a secret inline under the list | settingsSection | left-nav: Secret Catalog: Secrets › Add secret |
+| secret-catalog/bounded-secret-reveal: Reveal on click and copy without revealing | settingsSection | left-nav: Secrets › reveal |
+| secret-catalog/inline-quick-add: Add a secret inline under the list | settingsSection | left-nav: Secrets › Add secret |
 | secret-catalog/inline-reference-setup: Create and bind from a secret-reference field | settingsSection | settings: secret-reference fields › Bind |
 | secret-catalog/reference-repair: Repair a secret reference that does not resolve | settingsSection | settings: secret-reference fields › repair |
-| secret-catalog/scoped-alias-catalog: Browse aliases by scope and environment | settingsSection | left-nav: Secret Catalog: Secrets |
+| secret-catalog/scoped-alias-catalog: Browse aliases by scope and environment | settingsSection | left-nav: Secrets |
 | session-warming/prompt-cache-warming: Keep an idle thread's prompt cache warm, within a budget | settingsSection | settings: Session warming |
 | settings-shell/dsh-release-notice: DSH release notice and TL;DR | settingsSection | sidebar: Settings trigger release mark › General |
 | settings-shell/modified-settings: Modified settings and reset to default | settingsSection | settings: Reset to default |

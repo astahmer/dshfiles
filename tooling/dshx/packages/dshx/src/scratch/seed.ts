@@ -50,9 +50,29 @@ const seedBacklogJevEnabled = async (page: Page, timeoutMs: number): Promise<voi
   await page.keyboard.press('Escape')
 }
 
+/**
+ * Open a former left-nav page through the thread sidebar's fixed rail (plans/ade-ux Phase 3a): the destination tab,
+ * then its section in the list. Resolves false when the rail is absent (free docking, native sidebar), so the caller
+ * keeps its older path.
+ */
+const openThroughRail = async (page: Page, timeoutMs: number, target: { readonly destination: string; readonly section: string }): Promise<boolean> => {
+  const tab = page.getByRole('tablist', { name: 'Destinations', exact: true }).getByRole('tab', { name: target.destination, exact: true })
+  if (!(await tab.isVisible())) return false
+  await tab.click({ timeout: timeoutMs })
+  await page
+    .getByRole('navigation', { name: `${target.destination} pages`, exact: true })
+    .getByRole('button', { name: target.section, exact: true })
+    .click({ timeout: timeoutMs })
+  return true
+}
+
 const openAIAccountsPanel = async (page: Page, timeoutMs: number): Promise<void> => {
   const accounts = page.getByRole('complementary', { name: 'Provider accounts' })
   if (await accounts.isVisible()) return
+  if (await openThroughRail(page, timeoutMs, { destination: 'Settings', section: 'AI accounts' })) {
+    await accounts.waitFor({ state: 'visible', timeout: timeoutMs })
+    return
+  }
 
   const globalPanel = page
     .getByRole('navigation', { name: 'Global panels', exact: true })
@@ -691,10 +711,11 @@ const seedBacklogJevReadyForSetup = async (state: ScratchState, page: Page, time
   }
   const enabled = page.getByRole('switch', { name: 'Jev enabled', exact: true })
   if (!(await enabled.isVisible())) {
-    await page
-      .getByRole('navigation', { name: 'Global panels', exact: true })
-      .getByRole('button', { name: 'Plugins', exact: true })
-      .click({ timeout: timeoutMs })
+    if (!(await openThroughRail(page, timeoutMs, { destination: 'Settings', section: 'Plugins' })))
+      await page
+        .getByRole('navigation', { name: 'Global panels', exact: true })
+        .getByRole('button', { name: 'Plugins', exact: true })
+        .click({ timeout: timeoutMs })
     await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click({ timeout: timeoutMs })
     await enabled.waitFor({ state: 'visible', timeout: timeoutMs })
   }
@@ -1156,11 +1177,12 @@ const tracesReceiverEndpoint = async (input: {
       'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/traces ...".',
     )
   }
-  // The view is offered as `Traces: Explorer` (native sidebar, Workbench) or `Traces` in a shortened navigation.
-  await page
-    .getByRole('button', { name: /^Traces(?::|$)/u })
-    .first()
-    .click({ timeout: timeoutMs })
+  // The fixed rail first; otherwise the view is offered as `Traces: Explorer` (native sidebar, Workbench) or `Traces` in a shortened navigation.
+  if (!(await openThroughRail(page, timeoutMs, { destination: 'Observe', section: 'Traces' })))
+    await page
+      .getByRole('button', { name: /^Traces(?::|$)/u })
+      .first()
+      .click({ timeout: timeoutMs })
   const badge = page.getByTestId('traces-receiver-state')
   await badge.waitFor({ state: 'visible', timeout: timeoutMs })
   await page.waitForFunction(() => document.querySelector('[data-testid="traces-receiver-state"]')?.getAttribute('data-state') !== 'starting', undefined, {

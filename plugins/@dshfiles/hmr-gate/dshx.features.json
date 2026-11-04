@@ -7,6 +7,7 @@
       "title": "Plugin updates waiting for a Host restart",
       "summary": "A Plugins-page row names every plugin whose browser half rebuilt while its Host half still runs from before the rebuild, so the page keeps the last-good client code instead of running new client code against old Host code.",
       "reach": [
+        "click tab \"Settings\"",
         "click button \"Plugins\"",
         "click button \"View HMR updates\"",
         "expect text \"Nothing is waiting*\""
@@ -68,7 +69,7 @@
       "title": "Plugin updates waiting for a restart in the Inbox",
       "summary": "While any rebuilt plugin is held back because its new Host code is not loaded, the Inbox shows one Ready item about this DSH naming the waiting packages and how to apply them (restart when no agent is working). It offers no restart verb: restarting stays the user's decision. A changed set of packages shows again after Done; the item resolves once nothing waits.",
       "reach": [
-        "click button \"Inbox\"",
+        "click tab \"Inbox\"",
         "expect heading \"Inbox\""
       ],
       "surfaces": [

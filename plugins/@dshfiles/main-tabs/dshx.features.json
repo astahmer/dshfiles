@@ -636,10 +636,12 @@
         }
       ],
       "reach": [
+        "click tab \"Settings\"",
         "click button \"Plugins\"",
         "rightclick tab \"Plugins\"",
         "click menuitem \"Keep open\"",
-        "click button \"Jujutsu: Revision graph\"",
+        "click tab \"Land\"",
+        "click button \"History\"",
         "expect heading \"Jujutsu\"",
         "press ControlOrMeta+Alt+Digit1",
         "expect tab \"Plugins\""
@@ -711,7 +713,8 @@
         "seed tool-call-thread",
         "rightclick tab \"*\"",
         "click menuitem \"Keep open\"",
-        "click button \"Backlog: Items\"",
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
         "expect tab \"Backlog: Items*\"",
         "click textbox \"Capture\"",
         "press a",

@@ -6,7 +6,8 @@
       "title": "Ask and answer a child-agent question",
       "summary": "A child asks its direct parent with bounded context and a recommendation policy; only the parent can deliver the answer.",
       "reach": [
-        "click button \"Agent Toolkit: Capabilities\"",
+        "click tab \"Agents\"",
+        "click button \"Capabilities\"",
         "expect heading \"Agent toolkit\"",
         "expect region \"Tools (*\"",
         "expect text \"ask_parent_question\""
@@ -80,7 +81,8 @@
       "title": "Resolve question expiry safely",
       "summary": "Expiry either returns the recommended choice or writes a private deferred Markdown record without treating it as an answer.",
       "reach": [
-        "click button \"Agent Toolkit: Capabilities\"",
+        "click tab \"Agents\"",
+        "click button \"Capabilities\"",
         "expect heading \"Agent toolkit\"",
         "expect region \"Tools (*\"",
         "expect text \"ask_parent_question\""
@@ -148,7 +150,8 @@
       "title": "Submit and resolve anchored Markdown feedback",
       "summary": "Submit line-anchored feedback against the current document revision and deliver accepted, rejected, or deferred resolution receipts to the child.",
       "reach": [
-        "click button \"Agent Toolkit: Capabilities\"",
+        "click tab \"Agents\"",
+        "click button \"Capabilities\"",
         "expect heading \"Agent toolkit\"",
         "expect region \"Tools (*\"",
         "expect text \"submit_markdown_feedback\""
@@ -228,7 +231,8 @@
       "title": "Resolve feedback in bounded batches",
       "summary": "Accept at most twenty feedback resolutions atomically and reject oversized batches before writing any receipt.",
       "reach": [
-        "click button \"Agent Toolkit: Capabilities\"",
+        "click tab \"Agents\"",
+        "click button \"Capabilities\"",
         "expect heading \"Agent toolkit\"",
         "expect region \"Tools (*\"",
         "expect text \"resolve_parent_feedback\""
@@ -313,7 +317,8 @@
       "title": "List and answer thread questions",
       "summary": "Root Agents can list timed native questions across Sessions or by id, plus direct-child durable questions, with recommendation, timeout, and answerability metadata. Continued native forms and parent-scoped child questions use their authorized answer tools.",
       "reach": [
-        "click button \"Agent Toolkit: Capabilities\"",
+        "click tab \"Agents\"",
+        "click button \"Capabilities\"",
         "expect heading \"Agent toolkit\"",
         "expect region \"Tools (*\"",
         "expect text \"list_thread_questions\""
@@ -380,7 +385,7 @@
         "seed tool-call-thread",
         "fill textbox \"commands, @ files or s*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Deploy the release now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Deploy\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022wait\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Wait\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
         "press Enter",
-        "click button \"Inbox\"",
+        "click tab \"Inbox\"",
         "expect text \"A subagent asks: Deploy the release now?\"",
         "click button \"Deploy\"",
         "expect text \"Nothing needs you right now.\""
@@ -451,7 +456,7 @@
       "title": "Thread questions in the Inbox",
       "summary": "Every native ask_user_question form waiting in a live root thread is a blocking Inbox item about that thread. A continued form with one single-select question is answerable in place with its options, through the same native answer API as answer_thread_question; any other form says to answer it in the thread. The item resolves when the form settles or its thread stops.",
       "reach": [
-        "click button \"Inbox\"",
+        "click tab \"Inbox\"",
         "expect heading \"Inbox\""
       ],
       "surfaces": [

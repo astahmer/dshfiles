@@ -327,7 +327,8 @@
       "title": "Manage provider account drafts",
       "summary": "Edit and persist saved account settings; confirm removals, preserve an existing profile when removal is cancelled, and retry failed writes. New accounts use provisional setup and are saved only after connection succeeds.",
       "reach": [
-        "click button \"AI Accounts: Accounts\"",
+        "click tab \"Settings\"",
+        "click button \"AI accounts\"",
         "expect searchbox \"Search accounts and known models\"",
         "expect complementary \"Provider accounts\""
       ],
@@ -426,7 +427,8 @@
       "summary": "Reference-faithful account rail and tabbed detail with inline rename, observed connection state, model reasoning/visibility/inheritance, same-provider priority, confirmed scoped sign-out, and real exact-account request analytics.",
       "reach": [
         "seed tool-call-thread",
-        "click button \"AI Accounts: Accounts\"",
+        "click tab \"Settings\"",
+        "click button \"AI accounts\"",
         "expect tab \"Models\""
       ],
       "surfaces": [
@@ -475,7 +477,8 @@
       "summary": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
       "reach": [
         "seed tool-call-thread",
-        "click button \"AI Accounts: Accounts\"",
+        "click tab \"Settings\"",
+        "click button \"AI accounts\"",
         "expect tab \"Models\"",
         "expect searchbox \"Search models\""
       ],
@@ -1009,7 +1012,8 @@
       "title": "Forecast when each account runs out, whether a kind kept an account free, and the order to use them in",
       "summary": "The AI Accounts: Quota forecast view projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace. Hand-off plans the coming week per kind: each hour goes to the free account that resets soonest, showing when to hand off and when the kind runs dry. Pace overlays every account's current window on one start-to-reset axis against even pace, with past windows for the selected account.",
       "reach": [
-        "click button \"AI Accounts: Quota forecast\"",
+        "click tab \"Observe\"",
+        "click button \"Quota forecast\"",
         "expect tab \"Forecast\"",
         "click tab \"Hand-off\"",
         "expect text \"Enable an account with quota to see where it is heading.\""
@@ -1463,7 +1467,7 @@
       "title": "Quota-blocked threads in the Inbox, resumable in place",
       "summary": "Every waiting quota continuation (a turn stopped by an exhausted account limit) is a blocking Inbox item about its thread, with when the quota resets and whether it resumes by itself. Resume runs the same stored continuation as the Usage page's Resume, only when the user chooses it; Open goes to the thread to switch account or model first. The item resolves once the continuation is resumed, dismissed or superseded.",
       "reach": [
-        "click button \"Inbox\"",
+        "click tab \"Inbox\"",
         "expect heading \"Inbox\""
       ],
       "surfaces": [

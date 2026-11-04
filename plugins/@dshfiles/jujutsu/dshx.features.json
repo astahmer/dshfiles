@@ -6,7 +6,8 @@
       "title": "Locate landmarks and compare revision ancestry",
       "summary": "Jump to Current, main@origin, main or Default in one click; compare from toolbar or revision menu only when needed, then highlight the path, show changes since target, or open an ancestry view.",
       "reach": [
-        "click button \"Jujutsu: Revision graph\"",
+        "click tab \"Land\"",
+        "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -63,7 +64,8 @@
       "title": "Browse and filter the revision graph",
       "summary": "Browse one-height rows (the change ID with its unique prefix bold, coloured workspace, bookmark and tag labels, a muted (empty) / (no description), a trailing time column; stacked in the side panel) with authors and conflict/divergence markers, date headings, and a last-pushed boundary at the selected bookmark's remote-tracking revision; search descriptions, IDs and revision labels, and filter by author, mine, immutability, or date.",
       "reach": [
-        "click button \"Jujutsu: Revision graph\"",
+        "click tab \"Land\"",
+        "click button \"History\"",
         "click button \"Choose repository\"",
         "click button \"Filter by scope\"",
         "click menuitemradio \"Workspaces\"",
@@ -206,7 +208,8 @@
       "title": "Inspect revisions and changed files",
       "summary": "Open revision details, describe/full diff, browse files in flat or tree mode, and mark review status against the exact change; the Host stores review progress so every browser and CLI shares it.",
       "reach": [
-        "click button \"Jujutsu: Revision graph\"",
+        "click tab \"Land\"",
+        "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -355,7 +358,8 @@
       "title": "Preview and confirm repository mutations",
       "summary": "Create, squash, duplicate, revert, rebase, move workspaces and bookmarks, restore, split, and abandon changes only after a single-use preview bound to exact repository state. Open the overflow chip to drag or use actions on additional workspaces sharing a revision.",
       "reach": [
-        "click button \"Jujutsu: Revision graph\"",
+        "click tab \"Land\"",
+        "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -419,7 +423,8 @@
       "summary": "Open the overflow chip to see, drag, or use actions on additional workspaces that share a revision.",
       "reach": [
         "seed shared-workspaces",
-        "click button \"Jujutsu: Revision graph\"",
+        "click tab \"Land\"",
+        "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -449,7 +454,8 @@
       "title": "Create a workspace at a revision",
       "summary": "Right-click a revision and choose New workspace here\u2026 to name and place an isolated JJ workspace in that row, then preview the setup only after explicit confirmation. Forking a session moved to the native Branch action.",
       "reach": [
-        "click button \"Jujutsu: Revision graph\"",
+        "click tab \"Land\"",
+        "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -610,7 +616,8 @@
       "title": "Clean up idle JJ workspaces",
       "summary": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for all ages, or 1h, 6h, 24h, or 7d inactivity windows. A managed thread or secondary workspace whose checkout folder is missing is marked in the list and can be explicitly selected; the Host checks unlanded work and Session activity, forgets only a missing secondary's JJ registration, and never removes its path. Untracked folders remain protected for their first hour. Users can expand categories, select individual rows or all candidates, and start a background job that only removes the selected rows after rechecking eligibility. Unlanded work and uncommitted changes stay protected; empty undescribed revisions are also abandoned by the cleanup job. Other JJ workspaces remain manual-only and require explicit selection.",
       "reach": [
-        "click button \"Jujutsu: Revision graph\"",
+        "click tab \"Land\"",
+        "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -670,7 +677,8 @@
       "summary": "Right-click a workspace pill, or a revision that holds one, and choose Remove workspace\u2026: the confirmation expands in that row, so a managed thread workspace is discarded whole after it names its unlanded revisions, while any other workspace is only forgotten and keeps its folder, files and commits.",
       "reach": [
         "seed rebase-ready-thread",
-        "click button \"Jujutsu: Revision graph\"",
+        "click tab \"Land\"",
+        "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -729,7 +737,8 @@
       "title": "Describe and review the working copy in Source Control",
       "summary": "Jujutsu: Source Control is its own panel in navigation, the main view and the Workbench: a describe box for @, then the working copy and @-1 … @-N groups with their changed files, under the same repository, Fetch, Push, refresh, view settings and repository actions toolbar as the revision graph.",
       "reach": [
-        "click button \"Jujutsu: Source Control\"",
+        "click tab \"Land\"",
+        "click button \"Source control\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -780,7 +789,8 @@
       "title": "Keep one repository per Jujutsu tab, thread and dock",
       "summary": "Jujutsu: Revision graph and Jujutsu: Source Control are two separate panels in navigation, the main view and the Workbench; only the narrow per-thread side panel switches between both with tabs. Each Jujutsu surface keeps its own repository, view, filters, selection and expanded rows. The toolbar's copy-plus button opens the repository on screen in another main tab through @dshfiles/main-tabs, named after that repository and renamed after whichever one the tab shows later; picking another tab restores its own state. A thread's right-panel Jujutsu page opens on that thread's project instead of the last repository picked anywhere, and the global dock keeps its own.",
       "reach": [
-        "click button \"Jujutsu: Revision graph\"",
+        "click tab \"Land\"",
+        "click button \"History\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -789,7 +799,8 @@
         "click button \"Open this repository in a new tab\"",
         "expect tab \"Jujutsu \u00b7 sample*\"",
         "expect button \"Locate Current\"",
-        "click button \"Jujutsu: Source Control\"",
+        "click tab \"Land\"",
+        "click button \"Source control\"",
         "expect textbox \"Working copy description\"",
         "click tab \"Jujutsu \u00b7 sample*\"",
         "expect button \"Locate Current\""

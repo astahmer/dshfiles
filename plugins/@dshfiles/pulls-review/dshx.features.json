@@ -30,7 +30,8 @@
         "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/pulls\"",
         "press Enter",
         "expect text \"pulls.review \u00b7 main..@*\"",
-        "click button \"pulls.review: Reviews\"",
+        "click tab \"Land\"",
+        "click button \"Review\"",
         "expect heading \"pulls.review\"",
         "expect text \"main..@\"",
         "expect text \"1 file\"",
@@ -138,7 +139,8 @@
       ],
       "reach": [
         "seed rebase-ready-thread",
-        "click button \"pulls.review: Reviews\"",
+        "click tab \"Land\"",
+        "click button \"Review\"",
         "expect button \"Summarize\"",
         "click button \"Summarize\"",
         "expect text \"The model call failed*\""
@@ -225,7 +227,7 @@
           "source": "api-dispatch"
         }
       ],
-      "reach": ["click button \"pulls.review: Reviews\"", "expect checkbox \"Select all files in this review\""]
+      "reach": ["click tab \"Land\"", "click button \"Review\"", "expect checkbox \"Select all files in this review\""]
     }
   ]
 }

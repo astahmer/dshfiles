@@ -8,6 +8,7 @@
       "reach": [
         "seed fake-secret-cli",
         "seed rebase-ready-thread",
+        "click tab \"Settings\"",
         "click button \"Secrets\"",
         "click button \"Choose a project folder…\"",
         "expect dialog \"Choose a project folder\"",
@@ -173,7 +174,7 @@
           "testName": "records a secret <verb> span with flag names only, never the alias or the value"
         }
       ],
-      "reach": ["seed fake-secret-cli", "click button \"Secrets\"", "hover button \"Reveal GITHUB_TOKEN\"", "expect text \"Click to reveal\""]
+      "reach": ["seed fake-secret-cli", "click tab \"Settings\"", "click button \"Secrets\"", "hover button \"Reveal GITHUB_TOKEN\"", "expect text \"Click to reveal\""]
     },
     {
       "id": "inline-quick-add",
@@ -181,6 +182,7 @@
       "summary": "Add secret appends an editable row: an env-var style name and a masked value (or Generate on this Host from the row menu, which also offers Copy and Delete). Enter or leaving the row saves it to the viewed scope (the selected project under All) and the default environment; the split arrow opens the detailed dialog.",
       "reach": [
         "seed fake-secret-cli",
+        "click tab \"Settings\"",
         "click button \"Secrets\"",
         "click button \"Add secret\"",
         "fill textbox \"New secret name\" \"STRIPE_API_KEY\"",
@@ -257,6 +259,7 @@
       "summary": "Add through a required-first dialog (alias, scope defaulting to the selected project, environment prod, generated or masked value, Advanced fold for item metadata), edit metadata/value, rename aliases, remove one alias without deleting the vault item, or explicitly delete the vault entry.",
       "reach": [
         "seed fake-secret-cli",
+        "click tab \"Settings\"",
         "click button \"Secrets\"",
         "click button \"More ways to add a secret\"",
         "click menuitem \"Add with details…\"",
@@ -563,6 +566,7 @@
       "summary": "Open a masked setup popover on the Backlog Jev setting, store the key as a global Secret Catalog alias, and bind only its reference.",
       "reach": [
         "seed fake-secret-cli",
+        "click tab \"Settings\"",
         "click button \"Plugins\"",
         "click button \"View @dshfiles/backlog\"",
         "click textbox \"Jev secret\"",

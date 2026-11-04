@@ -776,7 +776,8 @@
         "click button \"View details\"",
         "click button \"Preview\"",
         "expect text \"You\"",
-        "click button \"JJ Integration: Thread integration\"",
+        "click tab \"Land\"",
+        "click button \"Workspaces\"",
         "expect heading \"Thread integration\""
       ],
       "configuration": [
@@ -925,7 +926,8 @@
       "title": "Thread integration prioritises what needs attention",
       "summary": "Opening the panel from the left sidebar lands on the Needs attention view: conflicts, ready work and blocked workspaces first, with completed or unchanged workspaces one click away. Integration-state tabs and the lifecycle filter stay separate, and switching to All keeps every count visible.",
       "reach": [
-        "click button \"JJ Integration: Thread integration\"",
+        "click tab \"Land\"",
+        "click button \"Workspaces\"",
         "expect heading \"Thread integration\"",
         "expect button \"Needs attention*\"",
         "click button \"Refresh\"",
@@ -1032,7 +1034,8 @@
       "title": "Thread integration with no thread workspaces",
       "summary": "A registered project with no thread workspace shows one plain sentence instead of empty groups, banners or filter tabs: the page never fabricates work, and the counts only appear once a workspace exists.",
       "reach": [
-        "click button \"JJ Integration: Thread integration\"",
+        "click tab \"Land\"",
+        "click button \"Workspaces\"",
         "expect heading \"Thread integration\"",
         "expect text \"No thread workspaces.\""
       ],
@@ -1125,7 +1128,7 @@
       "title": "Blocked and ready-to-land workspaces in the Inbox",
       "summary": "A thread workspace whose revisions conflict, or whose queued land stopped, is a Failed Inbox item (Land blocked) with Retry; an idle workspace with described revisions not on the bookmark is a Ready item with Land. Land and Retry run the same guarded land as the Land view, only when the user chooses them; items resolve when the workspace lands, the conflict goes away or nothing is left to land.",
       "reach": [
-        "click button \"Inbox\"",
+        "click tab \"Inbox\"",
         "expect heading \"Inbox\""
       ],
       "surfaces": [
