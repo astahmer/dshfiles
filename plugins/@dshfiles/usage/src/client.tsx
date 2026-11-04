@@ -2,7 +2,8 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { AccountUsageView, type AccountUsageViewProps } from '@dshfiles/ai-accounts/account-usage-view'
 import { UsageNavigation, type UsageQuotaTarget } from '@dshfiles/ai-accounts/quota-views'
@@ -13,10 +14,14 @@ import { AccountUsageDashboard } from './account-usage-dashboard.js'
 import type { OpenThread } from './format.js'
 import { UsagePanel, UsageTabs } from './panel.js'
 import { UsageQuota } from './quota-tab.js'
+import { ThreadCostFacet } from './thread-cost-facet.js'
 
 const PANEL_ID = 'dshfiles-usage'
+/** The thread panel's Cost facet (plans/ade-ux §4.4): a page tab type of the right pane. */
+const COST_FACET_ID = 'dshfiles-usage-cost'
+const TRACES_PANEL_ID = 'traces'
 
-const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
+const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
   <svg
     aria-hidden
     width={props.size ?? 18}
@@ -33,7 +38,7 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 
 export default defineClient({
   name: '@dshfiles/usage',
-  inject: ['slots', 'sessions', 'uiWorkspace', 'layout'],
+  inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'sidebarRightTabs'],
   setup(ctx, decorate, metadata) {
     const plugin = metadata?.plugin
     if (plugin !== undefined) {
@@ -90,6 +95,54 @@ export default defineClient({
       ctx.uiWorkspace.openSession(destination.id)
       return own === undefined ? 'parent' : 'opened'
     }
+    const openPanel = (id: string): void => {
+      // SAFETY: Only ids registered as main panels reach this (the Usage page here, Traces by @dshfiles/traces).
+      if (ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)) ctx.layout.selectPanel(id as MainPanelId)
+    }
+    const threadTitle = (sessionId: string): string => {
+      const summary = Object.values(ctx.sessions.list.getSnapshot().byId).find(entry => entry?.id === sessionId)
+      return summary?.displayTitle ?? 'This thread'
+    }
+    ctx.effect(
+      () =>
+        ctx.sidebarRightTabs.register({
+          id: COST_FACET_ID,
+          kind: COST_FACET_ID,
+          title: () => 'Cost',
+          guide: [
+            {
+              id: 'thread-cost',
+              order: 61,
+              title: () => 'Cost',
+              description: () => "This thread's route, cost per turn and requests.",
+              icon: PanelGlyph,
+            },
+          ],
+        }),
+      'usage: thread Cost facet type',
+    )
+    ctx.slots.inject('sidebar.right.pane.tab', () =>
+      ctx.slots.register(
+        { name: 'sidebar.right.pane.tab', key: COST_FACET_ID },
+        decorate((props: PropsRuntime<'sidebar.right.pane.tab'>) => (
+          <PluginQueryProvider>
+            <ThreadCostFacet
+              sessionId={props.sessionId}
+              onShowRequests={sessionId => {
+                UsageTabs.showRequestsFor({ sessionId, label: threadTitle(sessionId) })
+                openPanel(PANEL_ID)
+              }}
+              onOpenTraces={() => openPanel(TRACES_PANEL_ID)}
+              onOpenAccount={accountId => {
+                UsageQuota.go({ view: 'accounts', accountId })
+                UsageTabs.show('quota')
+                openPanel(PANEL_ID)
+              }}
+            />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label: 'Usage: Analytics' }, PanelGlyph),
     )

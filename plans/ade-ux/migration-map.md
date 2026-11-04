@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-369 features from 84 plugins.
+371 features from 84 plugins.
 
 ## Counts
 
@@ -20,7 +20,7 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Observe |  |  |  |  | 21 | 1 |  |  | 2 |  |  |  |  |  | 24 |
 | Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  |  | 6 |
 | Settings |  |  |  |  |  |  |  |  | 1 |  | 40 |  |  |  | 41 |
-| Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 21 |  | 21 |
+| Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 23 |  | 23 |
 | Composer |  |  |  | 51 |  |  |  |  |  |  |  |  |  |  | 51 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 17 | 17 |
 | No place of its own | 19 |  | 17 |  |  |  |  | 89 |  |  |  | 7 |  |  | 132 |
@@ -87,6 +87,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | status-strip | 6 | No place of its own 4, Composer 1, Observe 1 |
 | thread-header | 7 | Thread panel 3, Threads 3, No place of its own 1 |
 | thread-list | 22 | Threads 16, Inbox 3, No place of its own 2, Settings 1 |
+| thread-panel | 2 | Thread panel 2 |
 | toast | 1 | No place of its own 1 |
 | transcript | 22 | Transcript 17, Inbox 1, Knowledge 1, Land 1, Thread panel 1, Work 1 |
 | url | 1 | No place of its own 1 |
@@ -300,12 +301,13 @@ rail destination (bottom); 41 features.
 
 ### Thread panel
 
-facets of the active thread; 21 features.
+facets of the active thread; 23 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | agent-toolkit/agent-toolkit-page: Agent toolkit page | threadFacet | left-nav: Agent Toolkit: Capabilities |
 | annotations/preview-file: Annotate an HTML preview | threadFacet | dialog: annotate an HTML preview |
+| background-jobs/thread-jobs-facet: Thread panel Jobs facet | threadFacet | thread-panel: Jobs tab |
 | btw/btw-side-chat: /btw side chat | threadFacet | right-pane: btw tab |
 | diff-viewed/review-file-markers: Mark review files as viewed | threadFacet | right-pane: native review tab › Viewed |
 | editor/workspace-editor: Browse and edit workspace files | threadFacet | main-tabs: New tab › Editor: Files |
@@ -324,6 +326,7 @@ facets of the active thread; 21 features.
 | pulls-review/turn-card-opens-changes: A turn's Edited files card opens Changes on that turn | threadFacet | transcript: Edited N files card |
 | traces/span-cost: List-price cost on traces | threadFacet | conversation-view: Traces tab › cost |
 | traces/thread-traces-tab: Per-thread Traces tab | threadFacet | conversation-view: Traces / Requests tabs |
+| usage/thread-cost-facet: Thread panel Cost facet | threadFacet | thread-panel: Cost tab |
 | workbench/terminal-pages: Open native terminals from any pane's view chooser | threadFacet | main-tabs: New tab › Terminal: Terminal |
 
 ### Composer

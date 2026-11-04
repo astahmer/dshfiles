@@ -170,3 +170,17 @@ Then('its RAM tab shows the process memory that was its own page', async ({ page
   })
   await finishJourneyAssertions(page)
 })
+
+Then("the thread's Jobs facet lists only that thread's running job", async ({ page }: { page: Page }) => {
+  const entry = page.locator('[data-sidebar-right-guide-entry]').filter({ hasText: /^Jobs/ }).first()
+  if (!(await entry.isVisible())) await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+  await entry.click()
+  const facet = page.locator('[data-thread-facet="jobs"]')
+  await recordAssertion(page, 'background-jobs-thread-facet-lists-its-jobs', async () => {
+    // Each batch job runs in its own thread; the facet follows the thread on stage, the second one.
+    await expect.poll(() => facet.locator('[data-job-id]').count(), { timeout: 45_000 }).toBe(1)
+    await expect(facet.locator('[data-job-id]').first()).toContainText(BATCH_COMMANDS[1] ?? '')
+    await expect(facet.getByRole('button', { name: 'Stop', exact: true }).first()).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})

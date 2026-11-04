@@ -28,3 +28,8 @@ Feature: Usage analytics
   Scenario: Read tool and Jev activity
     When the Tools & Jev tab is opened
     Then the tool execution report and Jev call report are visible
+
+  @scenario:usage.thread-cost-facet
+  Scenario: A thread's Cost facet folds its requests per turn
+    When the thread of a failed request is opened from the log
+    Then its Cost facet lists the thread's turns and links to its requests

@@ -32,3 +32,10 @@ Feature: Background jobs board
     Given the isolated plugin composition of "@dshfiles/background-jobs, @dshfiles/worktree-memory" is booted
     When the Processes page is opened
     Then its RAM tab shows the process memory that was its own page
+
+  @scenario:background-jobs.thread-jobs-facet
+  Scenario: A thread's Jobs facet lists the job that thread runs
+    Given the isolated plugin composition of "@dshfiles/background-jobs, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread starts two running bash jobs
+    Then the thread's Jobs facet lists only that thread's running job

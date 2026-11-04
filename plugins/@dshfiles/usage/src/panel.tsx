@@ -12,7 +12,7 @@ import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Effect, Option } from 'effect'
 import type * as SchemaTypes from 'effect/Schema'
 import * as Schema from 'effect/Schema'
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { purposeSchema, usageApi } from './api.js'
 import { UsageCharts } from './charts.js'
 import { UsageFoldModel, type RequestPurpose } from './fold.js'
@@ -96,8 +96,30 @@ const showTab = (tab: UsageTab): void => {
   storedPreferences.set({ ...storedPreferences.get(), tab })
 }
 
+/** Requests narrowed to one thread, set by its Cost facet; a session detail, so not stored. */
+interface ThreadFilter {
+  readonly sessionId: string
+  readonly label: string
+}
+let threadFilter: ThreadFilter | null = null
+const threadFilterListeners = new Set<() => void>()
+const subscribeThreadFilter = (listener: () => void): (() => void) => {
+  threadFilterListeners.add(listener)
+  return () => threadFilterListeners.delete(listener)
+}
+const setThreadFilter = (next: ThreadFilter | null): void => {
+  threadFilter = next
+  for (const listener of threadFilterListeners) listener()
+}
+
 export class UsageTabs {
   static readonly show = showTab
+  /** Requests of one thread: the Requests tab with that thread's filter on. */
+  static readonly showRequestsFor = (filter: ThreadFilter): void => {
+    setThreadFilter(filter)
+    // A thread's requests can be older than the current preset; the year preset holds its whole history.
+    storedPreferences.set({ ...storedPreferences.get(), tab: 'log', preset: '365d', bucket: 'day' })
+  }
 }
 
 export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Element => {
@@ -108,6 +130,11 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
     storedPreferences.set({ ...storedPreferences.get(), ...patch })
   }
   const [logSearch, setLogSearch] = useState('')
+  const thread = useSyncExternalStore(
+    subscribeThreadFilter,
+    () => threadFilter,
+    () => threadFilter,
+  )
   const [mountedAt] = useState(() => Date.now())
 
   const statusQuery = useQuery({
@@ -276,7 +303,26 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
           </div>
 
           {preferences.tab === 'log' ? (
-            <RequestLog range={range} purposes={purposes} search={logSearch} onSearch={setLogSearch} openThread={props.openThread} />
+            <>
+              {thread === null ? null : (
+                <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs" role="status">
+                  <span className="dshx:min-w-0 dshx:truncate">
+                    Thread: <span className="dshx:font-medium">{thread.label}</span>
+                  </span>
+                  <Button size="xs" variant="ghost" onClick={() => setThreadFilter(null)}>
+                    Show every thread
+                  </Button>
+                </div>
+              )}
+              <RequestLog
+                range={range}
+                purposes={purposes}
+                search={logSearch}
+                onSearch={setLogSearch}
+                openThread={props.openThread}
+                {...(thread === null ? {} : { sessionId: thread.sessionId })}
+              />
+            </>
           ) : preferences.tab === 'charts' ? (
             <UsageCharts
               range={range}

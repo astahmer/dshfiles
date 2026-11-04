@@ -140,7 +140,7 @@ const OutputPane = (props: { readonly row: JobRow; readonly t: BackgroundJobsTra
   )
 }
 
-const JobLine = (props: {
+export const JobLine = (props: {
   readonly row: JobRow
   readonly now: number
   readonly t: BackgroundJobsTranslate
@@ -152,6 +152,8 @@ const JobLine = (props: {
   readonly sessionLabel: (sessionId: string) => string
   readonly onStop: (row: JobRow) => void
   readonly onArm: (row: JobRow) => void
+  /** False in the thread panel's Jobs facet, which has no batch stop. */
+  readonly selectable?: boolean
 }): JSX.Element => {
   const [open, setOpen] = useState(false)
   const modifiedCheckboxClick = useRef(false)
@@ -167,7 +169,7 @@ const JobLine = (props: {
       selected={props.selected}
       leading={
         <>
-          {running ? (
+          {running && props.selectable !== false ? (
             <input
               type="checkbox"
               aria-label={`${props.t('selectJob')} ${row.id}`}

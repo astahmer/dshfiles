@@ -247,6 +247,41 @@ Then('the tool execution report and Jev call report are visible', async ({ page 
   await finishJourneyAssertions(page)
 })
 
+/** Opens one thread panel tab type from the right sidebar's guide (plans/ade-ux §4.4 facets). */
+const openThreadFacet = async (page: Page, title: string): Promise<void> => {
+  const entry = page
+    .locator('[data-sidebar-right-guide-entry]')
+    .filter({ hasText: new RegExp(`^${title}`) })
+    .first()
+  if (!(await entry.isVisible())) await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+  await entry.click()
+}
+
+When('the thread of a failed request is opened from the log', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: /^Failed \d+$/ }).click()
+  await requestButton(page, /deepseek.*: open /).first().click()
+  await expect(page.getByText('activity timeline journey turn', { exact: true }).first()).toBeVisible()
+})
+
+Then("its Cost facet lists the thread's turns and links to its requests", async ({ page }: { page: Page }) => {
+  await openThreadFacet(page, 'Cost')
+  const facet = page.locator('[data-thread-facet="cost"]')
+  await recordAssertion(page, 'usage-cost-facet-folds-requests-per-turn', async () => {
+    await expect(facet.getByRole('heading', { name: 'Per turn', exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(facet.getByText(/^Turn \d+$/).first()).toBeVisible()
+    await expect(facet).toContainText('failed')
+    await expect(facet.getByRole('heading', { name: 'Route', exact: true })).toBeVisible()
+  })
+  await facet.getByRole('button', { name: 'Requests', exact: true }).click()
+  await recordAssertion(page, 'usage-cost-facet-opens-the-thread-requests', async () => {
+    await expect(page.getByRole('tab', { name: 'Requests', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('status').filter({ hasText: /^Thread: / })).toBeVisible()
+    await expect.poll(async () => logRows(page).count()).toBeGreaterThan(1)
+  })
+  await captureUsageEvidence(page, 'cost-facet')
+  await finishJourneyAssertions(page)
+})
+
 When('the Usage page is opened on its Quota tab', async ({ page }: { page: Page }) => {
   await openGlobalPanel(page, 'Usage: Analytics')
   await expect(page.getByRole('heading', { name: 'Usage', exact: true, level: 1 })).toBeVisible()

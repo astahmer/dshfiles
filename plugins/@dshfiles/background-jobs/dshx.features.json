@@ -199,6 +199,39 @@
           "reason": "Client-only: the page composes tabs; its reads are the jobs-board, dev-server and RAM features' API calls."
         }
       ]
+    },
+    {
+      "id": "thread-jobs-facet",
+      "title": "Thread panel Jobs facet",
+      "summary": "A Jobs tab in the thread panel (the right pane's tab chooser): this thread's background jobs with output and Stop, then each Processes view that can filter to one thread (its dev servers, the RAM its process trees use), and a link to Observe \u203a Processes. Registered as a right-pane page tab type, so it follows the thread on stage without changing sidebar-right.",
+      "reach": ["seed tool-call-thread", "click button \"Open right sidebar\"", "click text \"Jobs\"", "expect heading \"Jobs\""],
+      "surfaces": ["client"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "thread-panel: Jobs tab",
+      "configuration": [],
+      "states": ["loading", "empty", "running", "finished", "stop-armed"],
+      "failureModes": ["Stopping a job goes through the registry's owner fence, as on the board."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "background-jobs.thread-jobs-facet",
+          "featureFile": "tooling/dshx/e2e/features/background-jobs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.thread-facet-views",
+          "file": "plugins/@dshfiles/background-jobs/src/processes-page.test.ts",
+          "testName": "gives the Jobs facet only the views that can filter to one thread"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     }
   ]
 }

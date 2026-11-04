@@ -2,16 +2,21 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient, useRegistry } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { Processes } from './processes-page.js'
+import { ThreadJobsFacet } from './thread-jobs-facet.js'
+import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PROCESSES_JOBS_TAB, ProcessesNavigation, ProcessViews } from './process-views.js'
 import { BACKGROUND_JOBS_LOCALE_NAMESPACE, backgroundJobsLocale } from './locales.js'
 
 const PANEL_ID = 'dshfiles-background-jobs'
+/** The thread panel's Jobs facet (plans/ade-ux §4.4): a page tab type of the right pane. */
+const JOBS_FACET_ID = 'dshfiles-background-jobs-thread'
 
 const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
   <svg
@@ -33,7 +38,7 @@ const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element 
 export default defineClient({
   name: '@dshfiles/background-jobs',
   locales: [backgroundJobsLocale],
-  inject: ['slots', 'sessions', 'uiWorkspace', 'layout'],
+  inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'sidebarRightTabs'],
   setup(ctx, decorate, metadata) {
     const translate = ctx.locale.bind(BACKGROUND_JOBS_LOCALE_NAMESPACE)
     // The Processes glyph carries the marks its tabs contribute (RAM pressure and detached memory).
@@ -78,6 +83,30 @@ export default defineClient({
           run: () => openProcesses(row.tab),
         })
     }
+    ctx.effect(
+      () =>
+        ctx.sidebarRightTabs.register({
+          id: JOBS_FACET_ID,
+          kind: JOBS_FACET_ID,
+          title: () => translate('tabJobs'),
+          guide: [{ id: 'thread-jobs', order: 60, title: () => translate('tabJobs'), description: () => translate('jobsFacetGuide'), icon: PanelGlyph }],
+        }),
+      'background-jobs: thread Jobs facet type',
+    )
+    const JobsFacet = (props: PropsRuntime<'sidebar.right.pane.tab'>): JSX.Element => {
+      const sessionLabel = EntityLabels.useSessionLabel(ctx.sessions)
+      return <ThreadJobsFacet sessionId={props.sessionId} t={translate} sessionLabel={sessionLabel} onOpenProcesses={() => openProcesses()} />
+    }
+    ctx.slots.inject('sidebar.right.pane.tab', () =>
+      ctx.slots.register(
+        { name: 'sidebar.right.pane.tab', key: JOBS_FACET_ID, locale: BACKGROUND_JOBS_LOCALE_NAMESPACE },
+        decorate(props => (
+          <PluginQueryProvider>
+            <JobsFacet {...props} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
     ctx.slots.inject('main', () =>
       ctx.slots.register(
         { name: 'main', key: PANEL_ID, locale: BACKGROUND_JOBS_LOCALE_NAMESPACE },

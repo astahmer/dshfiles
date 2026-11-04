@@ -110,7 +110,7 @@
     {
       "id": "usage-request-log",
       "title": "Request log",
-      "summary": "The Requests tab of Observe \u203a Usage, with a sortable table of model requests (model and provider, when, project, input, cache read, output, cost, duration, TTFT, status with stop reason), status chips with counts, search by model, provider, project or thread title, a purpose filter and a date range. Each row opens the thread that made the request.",
+      "summary": "The Requests tab of Observe \u203a Usage, with a sortable table of model requests (model and provider, when, project, input, cache read, output, cost, duration, TTFT, status with stop reason), status chips with counts, search by model, provider, project or thread title, a purpose filter and a date range. Each row opens the thread that made the request. A thread's Cost facet opens it filtered to that thread (Show every thread clears the filter).",
       "reach": [
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a usage request\"",
@@ -452,6 +452,43 @@
         {
           "kind": "not-applicable",
           "reason": "Client-only: the tab composes ai-accounts' views, whose quota reads are the quota-dashboard feature's API calls."
+        }
+      ]
+    },
+    {
+      "id": "thread-cost-facet",
+      "title": "Thread panel Cost facet",
+      "summary": "A Cost tab in the thread panel (the right pane's tab chooser): the account route and model of the thread's last request, list-price cost per turn with tokens, models and failures, side requests apart, and links to this thread's requests (Usage \u203a Requests filtered to the thread), Usage \u203a Quota for that route, and Traces. Registered as a right-pane page tab type, so it follows the thread on stage without changing sidebar-right.",
+      "reach": ["seed tool-call-thread", "click button \"Open right sidebar\"", "click text \"Cost\"", "expect text \"Per turn\""],
+      "surfaces": ["client"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "thread-panel: Cost tab",
+      "configuration": [],
+      "states": ["loading", "empty", "per-turn", "unpriced", "read-failed"],
+      "failureModes": [
+        "An unpriced request leaves its turn's cost unknown rather than zero.",
+        "Only the thread's own requests are counted; subagents' requests stay in their own threads.",
+        "Traces opens the Traces page; selecting the thread's own Traces view needs a contract from the conversation header owner (rich-composer)."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "usage.thread-cost-facet",
+          "featureFile": "tooling/dshx/e2e/features/usage.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.thread-cost-per-turn",
+          "file": "plugins/@dshfiles/usage/src/thread-cost-facet.test.ts",
+          "testName": "folds a thread\u2019s requests per turn, newest turn first, side requests last"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     }
