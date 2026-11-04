@@ -16,6 +16,32 @@ import { AI_ACCOUNTS_WORKSPACE_SEED_KEY, seedAiAccountsWorkspace } from './ai-ac
 // Turbo result) depends only on the repository.
 const sourceProfileRoot = join(DSHFILES_ROOT, 'profiles/web')
 const URL_PATTERN = /http:\/\/127\.0\.0\.1:\d+\/\S*/
+const WELCOME_NOTICE_VERSION_PATTERN = /^\s+welcomeNoticeVersion:\s*(\S+)\s*$/mu
+
+/**
+ * The web seed acknowledges DSH's Preview Notice in its own `cordis.patch.yml`; a scratch boot copies only its package
+ * manifest, so without this every scratch page showed the notice. Native onboarding mounts it only once the Session list
+ * is ready and its settings scope has loaded, which under load lands after any fixed dismissal window and then covers
+ * the page mid-scenario. Seeding the same acknowledgement makes the notice never render, as on a real web profile.
+ * `@dshfiles/settings-shell` ports the step into its own namespace, so its row gets the same version when composed.
+ */
+let welcomeNoticeVersion: Promise<string> | undefined
+const readWelcomeNoticeVersion = (): Promise<string> =>
+  (welcomeNoticeVersion ??= readFile(join(sourceProfileRoot, 'cordis.patch.yml'), 'utf8').then(source => {
+    const version = WELCOME_NOTICE_VERSION_PATTERN.exec(source)?.[1]
+    if (version === undefined) throw new Error('profiles/web/cordis.patch.yml no longer acknowledges the welcome notice (welcomeNoticeVersion).')
+    return version
+  }))
+
+export const withStartupAcknowledgements = async (packageIds: readonly string[], cordisPatch?: string): Promise<string> => {
+  const version = await readWelcomeNoticeVersion()
+  const rows = [
+    `- id: ui-settings-general\n  name: '@deepseek-ai/dsh-client-ui-settings-general'\n  config:\n    welcomeNoticeVersion: ${version}\n`,
+    ...(packageIds.includes('@dshfiles/settings-shell') ? [`- id: dshfiles-settings-shell\n  config:\n    welcomeNoticeVersion: ${version}\n`] : []),
+  ]
+  const existing = cordisPatch === undefined || cordisPatch.trim() === '' ? '' : `${cordisPatch.replace(/\n*$/u, '')}\n`
+  return `${existing}${rows.join('')}`
+}
 
 /**
  * Phase timings for one scratch boot, printed when `DSHX_E2E_BOOT_TRACE=1`. A journey's dominant cost is its boot, so
@@ -208,7 +234,8 @@ export const bootProfile = async (profileLabel: string, timeoutMs = 90_000): Pro
   const bundles = requireNonEmptyBundles(await LocalBundleModel.listLocalBootBundles(), 'No owned plugin bundles were found for the composed scratch profile.')
   for (const bundle of bundles) await buildBundleOnce(bundle)
   const prepareStartedAt = Date.now()
-  const prepared = await prepareComposedBootProfile(bundles, { sourceProfileRoot })
+  const cordisPatch = await withStartupAcknowledgements(bundles.map(bundle => bundle.packageId))
+  const prepared = await prepareComposedBootProfile(bundles, { sourceProfileRoot, cordisPatch })
   traceBootPhase('prepare', prepareStartedAt, profileLabel)
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
@@ -314,12 +341,11 @@ const bootComposedProfile = async (request: ComposedBootRequest): Promise<Booted
   )
   for (const bundle of bundles) await buildBundleOnce(bundle)
   const prepareStartedAt = Date.now()
-  const prepared = await prepareComposedBootProfile(
-    bundles,
-    request.cordisPatch === undefined
-      ? { additionalBundleIds: request.additionalBundleIds, sourceProfileRoot }
-      : { additionalBundleIds: request.additionalBundleIds, sourceProfileRoot, cordisPatch: request.cordisPatch },
+  const cordisPatch = await withStartupAcknowledgements(
+    bundles.map(bundle => bundle.packageId),
+    request.cordisPatch,
   )
+  const prepared = await prepareComposedBootProfile(bundles, { additionalBundleIds: request.additionalBundleIds, sourceProfileRoot, cordisPatch })
   traceBootPhase('prepare', prepareStartedAt, request.profileLabel)
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {

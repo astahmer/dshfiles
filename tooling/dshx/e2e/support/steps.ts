@@ -257,7 +257,8 @@ export const visitIsolatedPluginProfile = async (page: Page, profile: BootedProf
     const boot = await readProfileOutcome(page, profile)
     assertClientBootReady(boot, profile, 'The isolated scratch profile did not boot cleanly.')
     expect(boot.slotFailures, 'The isolated scratch profile lost a Slot during boot.').toEqual([])
-    await StartupDialogs.dismissPreviewNotice(page)
+    // The boot seeds the Preview Notice acknowledgement (withStartupAcknowledgements), so only provider setup can open;
+    // a notice here means that seed broke, and the overlay assertion below names it instead of a timed dismissal hiding it.
     await StartupDialogs.dismissProviderSetupDuringStartup(page)
     await expect(page.getByRole('dialog').or(page.getByRole('alertdialog')), 'Startup left a modal overlay blocking the app.').toHaveCount(0)
     const interactive = await readProfileOutcome(page, profile)
