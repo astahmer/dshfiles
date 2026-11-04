@@ -205,6 +205,31 @@ try {
     parentNotified: true,
   })
   process.stdout.write('PASS: Pending question and feedback cold-resumed; the parent reattached, answered, and resolved the pending feedback after restart.\n')
+  // One line per catalog feature, so each E2E scenario asserts exactly the evidence its own feature owns.
+  const features = {
+    'agent-questions.parent-answer': prepared.parentQuestionToolPassed && result.parentQuestionToolPassed && result.unauthorizedQuestionAnswerRejected,
+    'agent-questions.restart-reattach':
+      result.questionReattachedAfterRestart && result.feedbackResolvedAfterRestart && result.childAbsentAtHostRestart && result.childResumedAfterResolution,
+    'agent-questions.expiry-defer':
+      prepared.expiryRecommendedPassed && prepared.expiryDeferredPassed && result.expiryRecommendedPassed && result.expiryDeferredPassed,
+    'agent-questions.feedback-resolution':
+      prepared.feedbackToolsPassed &&
+      prepared.feedbackResolutionToolPassed &&
+      result.feedbackSubmitReadCancelPassed &&
+      result.feedbackStatuses.current === 'resolved' &&
+      result.feedbackStatuses.cancelled === 'rejected',
+    'agent-questions.stale-anchor': result.staleAnchorRejected && result.feedbackStatuses.stale === 'stale',
+    'agent-questions.batch-boundary': prepared.oversizedBatchRejected && result.oversizedBatchRejected && result.feedbackStatuses.batch === 'resolved',
+    'agent-questions.cross-thread-inbox':
+      prepared.questionInboxPassed &&
+      prepared.questionInboxRootScopePassed &&
+      prepared.continuedNativeAnswerGuardPassed &&
+      prepared.nativeAnswerAuthorizationPassed,
+  }
+  for (const [feature, passed] of Object.entries(features)) {
+    assert.equal(passed, true, `${feature} evidence did not pass on the scratch Host.`)
+    process.stdout.write(`PASS[${feature}]\n`)
+  }
 } finally {
   await stopHost()
   await scratch.cleanup()

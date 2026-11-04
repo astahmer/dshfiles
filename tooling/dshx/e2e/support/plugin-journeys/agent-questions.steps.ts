@@ -9,6 +9,11 @@ import { redactHostOutput } from '../scratch-profile.js'
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../..')
 const pluginRoot = resolve(workspaceRoot, 'plugins/@dshfiles/agent-questions')
 const scratchRuns = new WeakMap<Page, { readonly output: string }>()
+/**
+ * The acceptance boots its own fresh scratch Host twice (cold resume) and proves every feature in one pass; each scenario
+ * asserts its own feature's line, so a worker runs it once instead of seven identical times.
+ */
+let workerScratchRun: Promise<string> | undefined
 
 const runScratchAcceptance = (): Promise<string> =>
   new Promise((resolveOutput, reject) => {
@@ -34,20 +39,21 @@ const runScratchAcceptance = (): Promise<string> =>
   })
 
 When('the Agent Questions scratch Host tool journey is run', async ({ page }: { page: Page }) => {
-  scratchRuns.set(page, { output: await runScratchAcceptance() })
+  workerScratchRun ??= runScratchAcceptance()
+  // A failed run is not remembered: the next scenario re-proves it and reports its own output.
+  workerScratchRun.catch(() => {
+    workerScratchRun = undefined
+  })
+  scratchRuns.set(page, { output: await workerScratchRun })
 })
 
-Then('the public question and feedback tools pass their real Host acceptance cases', async ({ page }: { page: Page }) => {
+Then('the scratch Host proves {string}', async ({ page }: { page: Page }, feature: string) => {
   const result = scratchRuns.get(page)
   if (result === undefined) throw new Error('The Agent Questions scratch Host journey did not run.')
 
-  await recordAssertion(page, 'agent-questions-tool-journey-and-boundaries', () => {
-    expect(result.output).toContain(
-      'PASS: Question inbox (all Sessions and one Session, root-only scope), child-question authorization, native root-only authorization and continued-answer guard, expiry/defer, feedback, and batch-boundary tools passed on a fresh DSH scratch Host.',
-    )
-    expect(result.output).toContain(
-      'PASS: Pending question and feedback cold-resumed; the parent reattached, answered, and resolved the pending feedback after restart.',
-    )
+  // Evidence ids are static kebab-case; the catalog id keeps its dot only in the PASS line.
+  await recordAssertion(page, `${feature.replaceAll('.', '-')}-scratch-acceptance`, () => {
+    expect(result.output, `The scratch Host acceptance did not report ${feature}.`).toContain(`PASS[${feature}]`)
   })
   await finishJourneyAssertions(page)
 })
