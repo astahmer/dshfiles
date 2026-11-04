@@ -1,5 +1,5 @@
 import type { DomainChanged, DomainSpec, KvTable, TableKeyOf, TableValueOf } from '@deepseek-ai/dsh-storage-domain'
-import { Context, Effect, Layer, Option, Queue, Schema, Scope, Semaphore, Stream } from 'effect'
+import { Context, Effect, Layer, Option, Queue, Schedule, Schema, Scope, Semaphore, Stream } from 'effect'
 import { HostContext, hostService } from './host-context.js'
 
 const domainErrorCode = Schema.Literals(['already-open', 'facet-unsupported', 'invalid-record', 'missing-key', 'closed'])
@@ -7,6 +7,88 @@ const domainErrorCode = Schema.Literals(['already-open', 'facet-unsupported', 'i
 const DomainErrorCause = Schema.Struct({ code: domainErrorCode })
 
 const codeOf = (cause: unknown) => Option.getOrUndefined(Schema.decodeUnknownOption(DomainErrorCause)(cause))?.code
+
+/**
+ * How long an open waits for a previous holder of the same domain to finish closing, when it cannot share that
+ * holder's handle (a different package, or a changed table set). A domain that is really held twice still fails, after
+ * this budget (about 5 s).
+ */
+const ALREADY_OPEN_RETRY = { schedule: Schedule.spaced('50 millis'), times: 100 } as const
+
+/** Retry `open` while the facility reports the domain is still open elsewhere, then surface the last failure. */
+export const openWaitingForClose = <A, R>(open: Effect.Effect<A, StorageDomainOpenFailed, R>): Effect.Effect<A, StorageDomainOpenFailed, R> =>
+  Effect.retry(open, { ...ALREADY_OPEN_RETRY, while: (error: StorageDomainOpenFailed) => error.code === 'already-open' })
+
+/** One native domain handle, shared by the instances of one package that hold it. */
+interface SharedHandle<Handle> {
+  readonly handle: Handle
+  readonly fingerprint: string
+  /** The activations holding it, each once: a second open within one activation still fails loud. */
+  readonly holders: Set<unknown>
+}
+
+/**
+ * Open domain handles by package and domain name, shared across bundle copies. A Host bundle reload starts the
+ * rebuilt instance of a plugin while the old one still holds its domains (the old Scope closes only after the new
+ * activation), and the facility refuses a second open of a name with `already-open` until the first is closed, which
+ * made thread-sidebar's reload fatal. The new instance of the same package therefore reuses the open handle and the
+ * last release closes it. The registry lives on `globalThis` because each bundle carries its own copy of this module.
+ */
+const SHARED_HANDLES = Symbol.for('@dshfiles/dshx/StorageDomain/shared-handles')
+const sharedHandles = (): Map<string, SharedHandle<unknown>> => {
+  const holder = globalThis as { [SHARED_HANDLES]?: Map<string, SharedHandle<unknown>> }
+  holder[SHARED_HANDLES] ??= new Map()
+  return holder[SHARED_HANDLES]
+}
+
+/** Shareable only while the table set and version match: a changed spec must open with its own schemas. */
+const fingerprintOf = (spec: DomainSpec): string =>
+  JSON.stringify([Object.keys(spec.tables).sort(), (spec as { readonly version?: unknown }).version ?? null, spec.global === undefined])
+
+/**
+ * Acquire a shared handle for `key`: reuse a live one with the same fingerprint, else open a new one. `isLive` lets the
+ * caller drop a handle its facility no longer knows (the facility itself was reloaded and closed it).
+ */
+export const acquireSharedHandle = <Handle, R>(input: {
+  readonly key: string
+  /** The activation opening it (its Cordis context): only another activation of the package may share the handle. */
+  readonly holder: unknown
+  readonly fingerprint: string
+  readonly isLive: (handle: Handle) => boolean
+  readonly open: Effect.Effect<Handle, StorageDomainOpenFailed, R>
+  readonly close: (handle: Handle) => Effect.Effect<void>
+}): Effect.Effect<Handle, StorageDomainOpenFailed, R | Scope.Scope> =>
+  Effect.acquireRelease(
+    Effect.suspend(() => {
+      const handles = sharedHandles()
+      // SAFETY: entries under one key are only ever written below with this key's Handle type.
+      const existing = handles.get(input.key) as SharedHandle<Handle> | undefined
+      if (
+        existing !== undefined &&
+        !existing.holders.has(input.holder) &&
+        existing.fingerprint === input.fingerprint &&
+        input.isLive(existing.handle)
+      ) {
+        existing.holders.add(input.holder)
+        return Effect.succeed(existing)
+      }
+      // A second open within one activation is a bug that waiting cannot fix: let the facility refuse it at once.
+      const sameHolder = existing?.holders.has(input.holder) === true
+      return Effect.map(sameHolder ? input.open : openWaitingForClose(input.open), handle => {
+        const entry: SharedHandle<Handle> = { handle, fingerprint: input.fingerprint, holders: new Set([input.holder]) }
+        handles.set(input.key, entry)
+        return entry
+      })
+    }),
+    entry =>
+      Effect.suspend(() => {
+        entry.holders.delete(input.holder)
+        if (entry.holders.size > 0) return Effect.void
+        const handles = sharedHandles()
+        if (handles.get(input.key) === entry) handles.delete(input.key)
+        return input.close(entry.handle)
+      }),
+  ).pipe(Effect.map(entry => entry.handle))
 
 /** Write locks the current fiber holds, so a write inside `withWriteLock` does not wait on its own permit. */
 const HeldWriteLocks = Context.Reference<ReadonlySet<Semaphore.Semaphore>>('@dshfiles/dshx/StorageDomain/HeldWriteLocks', {
@@ -111,13 +193,18 @@ export class StorageDomain extends Context.Service<
 
       const open = Effect.fn('storage-domain open')(function* <Spec extends DomainSpec>(spec: Spec) {
         yield* Effect.annotateCurrentSpan({ 'dshx.storage.domain': spec.name })
-        const domain = yield* Effect.acquireRelease(
-          Effect.tryPromise({
+        const domain = yield* acquireSharedHandle({
+          key: `${host.packageId}\u0000${spec.name}`,
+          holder: host.ctx,
+          fingerprint: fingerprintOf(spec),
+          // The facility's diagnostic lookup returns its own untyped runtime object for the same handle.
+          isLive: handle => (facility.get(spec.name) as unknown) === handle,
+          open: Effect.tryPromise({
             try: () => facility.open(spec),
             catch: cause => new StorageDomainOpenFailed({ domain: spec.name, code: codeOf(cause), cause }),
           }),
-          opened => Effect.tryPromise(() => opened.close()).pipe(Effect.ignore({ log: 'Warn', message: `storage domain ${spec.name} did not close cleanly` })),
-        )
+          close: opened => Effect.tryPromise(() => opened.close()).pipe(Effect.ignore({ log: 'Warn', message: `storage domain ${spec.name} did not close cleanly` })),
+        })
         const writeLock = yield* Semaphore.make(1)
         const changes = Stream.callback<DomainChanged>(queue =>
           Effect.acquireRelease(
