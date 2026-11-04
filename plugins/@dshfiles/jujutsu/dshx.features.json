@@ -24,7 +24,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "destinationSection",
       "destination": "land",
-      "currentSurface": "left-nav: Jujutsu: Revision graph › landmarks",
+      "currentSurface": "left-nav: Revision graph › landmarks",
       "configuration": [],
       "states": ["resolved", "missing", "ambiguous", "same", "ancestor", "descendant", "diverged", "filtered", "truncated"],
       "failureModes": [
@@ -86,7 +86,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "destinationSection",
       "destination": "land",
-      "currentSurface": "left-nav: Jujutsu: Revision graph",
+      "currentSurface": "left-nav: Revision graph",
       "configuration": [
         {
           "key": "defaultView",
@@ -221,7 +221,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "detail",
       "destination": "land",
-      "currentSurface": "left-nav: Jujutsu: Revision graph › revision detail",
+      "currentSurface": "left-nav: Revision graph › revision detail",
       "configuration": [
         {
           "key": "fileView",
@@ -372,7 +372,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "rowAction",
       "destination": "land",
-      "currentSurface": "left-nav: Jujutsu: Revision graph › revision menu",
+      "currentSurface": "left-nav: Revision graph › revision menu",
       "configuration": [],
       "states": ["previewed", "confirmed", "cancelled", "expired", "stale", "failed"],
       "failureModes": [
@@ -435,7 +435,7 @@
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "land",
-      "currentSurface": "left-nav: Jujutsu: Revision graph › workspace overflow chip",
+      "currentSurface": "left-nav: Revision graph › workspace overflow chip",
       "configuration": [],
       "states": ["collapsed", "expanded"],
       "failureModes": ["A failed workspace move is reported by the existing preview flow."],
@@ -468,7 +468,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "land",
-      "currentSurface": "left-nav: Jujutsu: Revision graph › New workspace here",
+      "currentSurface": "left-nav: Revision graph › New workspace here",
       "configuration": [
         {
           "key": "headerToggle",
@@ -632,7 +632,7 @@
       "surfaces": ["client", "host"],
       "surface": "command",
       "destination": "land",
-      "currentSurface": "left-nav: Jujutsu: Revision graph › Clean up workspaces",
+      "currentSurface": "left-nav: Revision graph › Clean up workspaces",
       "configuration": [],
       "states": ["preset-threshold", "preview", "row-selection", "category-selection", "queued", "running", "done", "failed"],
       "failureModes": [
@@ -691,7 +691,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "land",
-      "currentSurface": "left-nav: Jujutsu: Revision graph › Remove workspace",
+      "currentSurface": "left-nav: Revision graph › Remove workspace",
       "configuration": [],
       "states": ["thread-workspace", "plain-workspace", "removed", "refused"],
       "failureModes": [
@@ -735,7 +735,7 @@
     {
       "id": "source-control",
       "title": "Describe and review the working copy in Source Control",
-      "summary": "Jujutsu: Source Control is its own panel in navigation, the main view and the Workbench: a describe box for @, then the working copy and @-1 … @-N groups with their changed files, under the same repository, Fetch, Push, refresh, view settings and repository actions toolbar as the revision graph.",
+      "summary": "Source control is its own panel in navigation, the main view and the Workbench: a describe box for @, then the working copy and @-1 … @-N groups with their changed files, under the same repository, Fetch, Push, refresh, view settings and repository actions toolbar as the revision graph.",
       "reach": [
         "click tab \"Land\"",
         "click button \"Source control\"",
@@ -750,7 +750,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "destinationSection",
       "destination": "land",
-      "currentSurface": "left-nav: Jujutsu: Source Control",
+      "currentSurface": "left-nav: Source control",
       "configuration": [],
       "states": ["working-copy", "ancestors", "no-repository"],
       "failureModes": [
@@ -787,7 +787,7 @@
     {
       "id": "panel-scopes",
       "title": "Keep one repository per Jujutsu tab, thread and dock",
-      "summary": "Jujutsu: Revision graph and Jujutsu: Source Control are two separate panels in navigation, the main view and the Workbench; only the narrow per-thread side panel switches between both with tabs. Each Jujutsu surface keeps its own repository, view, filters, selection and expanded rows. The toolbar's copy-plus button opens the repository on screen in another main tab through @dshfiles/main-tabs, named after that repository and renamed after whichever one the tab shows later; picking another tab restores its own state. A thread's right-panel Jujutsu page opens on that thread's project instead of the last repository picked anywhere, and the global dock keeps its own.",
+      "summary": "Revision graph and Source control are two separate panels in navigation, the main view and the Workbench; only the narrow per-thread side panel switches between both with tabs. Each Jujutsu surface keeps its own repository, view, filters, selection and expanded rows. The toolbar's copy-plus button opens the repository on screen in another main tab through @dshfiles/main-tabs, named after that repository and renamed after whichever one the tab shows later; picking another tab restores its own state. A thread's right-panel Jujutsu page opens on that thread's project instead of the last repository picked anywhere, and the global dock keeps its own.",
       "reach": [
         "click tab \"Land\"",
         "click button \"History\"",
@@ -808,7 +808,7 @@
       "surfaces": ["client", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",
-      "currentSurface": "left-nav: Jujutsu: Revision graph › per-tab repository",
+      "currentSurface": "left-nav: Revision graph › per-tab repository",
       "configuration": [],
       "states": ["default-panel", "main-tab", "thread-side-panel", "dock", "restored"],
       "failureModes": [

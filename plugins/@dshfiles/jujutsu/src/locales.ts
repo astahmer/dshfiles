@@ -23,7 +23,7 @@ const en = {
   evolutionScanLimited: 'Evolution scan limited; some evolved markers may be missing.',
   views: 'Jujutsu views',
   revisionGraph: 'Revision graph',
-  sourceControl: 'Source Control',
+  sourceControl: 'Source control',
   working: 'Working…',
   filterAuthor: 'Filter author',
   authorPlaceholder: 'Author',

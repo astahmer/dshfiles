@@ -24,8 +24,8 @@ const removalDescription = (thread: ThreadView | null): string =>
   thread === null
     ? 'Forgets the workspace registration in this repository. Its folder, its files and every commit stay on disk.'
     : thread.unlanded.length > 0
-      ? 'Forgets the jj workspace, removes any DSH project entry, deletes its folder and abandons the revisions listed below. Conversations remain in DSH and are not archived.'
-      : 'Forgets the jj workspace, removes any DSH project entry and deletes its folder. Conversations remain in DSH and are not archived.'
+      ? 'Forgets the jj workspace, removes any DSH project entry, deletes its folder and abandons the revisions listed below. Its threads stay in DSH and are not archived.'
+      : 'Forgets the jj workspace, removes any DSH project entry and deletes its folder. Its threads stay in DSH and are not archived.'
 
 const confirmLabel = (thread: ThreadView | null): string =>
   thread === null ? 'Remove workspace' : thread.unlanded.length > 0 ? 'Abandon work and remove workspace' : 'Remove workspace and folder'

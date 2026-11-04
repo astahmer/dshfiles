@@ -22,7 +22,7 @@ const AGE_CHOICES = [
 
 const KIND_CHOICES: readonly { readonly kind: CleanupKindView; readonly label: string }[] = [
   { kind: 'empty', label: 'Empty' },
-  { kind: 'integrated', label: 'Already integrated' },
+  { kind: 'integrated', label: 'Already landed' },
   { kind: 'untracked', label: 'Untracked folders' },
   { kind: 'secondary', label: 'Other JJ workspaces' },
 ]
@@ -144,7 +144,7 @@ export const WorkspaceCleanupDialog = (props: {
         <DialogHeader className="dshx:px-5 dshx:pb-4 dshx:pt-5">
           <DialogTitle>Clean up workspaces</DialogTitle>
           <DialogDescription className="dshx:sr-only">
-            Select idle workspaces and untracked folders to remove. Unlanded work, uncommitted changes, and active sessions are always kept.
+            Select idle workspaces and untracked folders to remove. Unlanded work, uncommitted changes, and active threads are always kept.
           </DialogDescription>
         </DialogHeader>
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-5 dshx:pb-4 dshx:text-xs">

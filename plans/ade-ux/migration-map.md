@@ -41,15 +41,15 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | Backlog | Work, Inbox, Settings | backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/project-scope → Work (destinationSection)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/tweet-context-enrichment → Work (rowAction) |
 | Hosts | Observe | multi-host/host-management → Observe (destinationSection)<br>multi-host/isolated-runtime-views → Observe (rowAction) |
 | Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
-| Jujutsu: Revision graph | Land, No place of its own | jujutsu/graph-navigation → Land (destinationSection)<br>jujutsu/panel-scopes → No place of its own (infrastructure)<br>jujutsu/previewed-revision-mutations → Land (rowAction)<br>jujutsu/revision-detail-and-diff → Land (detail)<br>jujutsu/revision-graph → Land (destinationSection)<br>jujutsu/workspace-at-revision → Land (rowAction)<br>jujutsu/workspace-cleanup → Land (command)<br>jujutsu/workspace-overflow → Land (rowAction)<br>jujutsu/workspace-removal → Land (rowAction) |
-| Jujutsu: Source Control | Land | jujutsu/source-control → Land (destinationSection) |
 | Land | Land | jj-integration/thread-integration-attention-view → Land (destinationSection)<br>jj-integration/thread-integration-empty → Land (destinationSection)<br>jj-integration/thread-integration-row-details → Land (detail)<br>jj-integration/thread-workspaces-panel → Land (destinationSection) |
 | MCP Servers: Servers | Settings | mcp-servers/batch-server-actions → Settings (rowAction)<br>mcp-servers/oauth-authorization → Settings (settingsSection)<br>mcp-servers/registry-catalog → Settings (settingsSection)<br>mcp-servers/server-configuration → Settings (settingsSection) |
 | Memory | Knowledge | memory/batch-forget-notes → Knowledge (rowAction)<br>memory/memory-panel → Knowledge (destinationSection)<br>memory/usage-telemetry → Knowledge (destinationSection) |
 | Messages | Agents | agent-communication/agent-directory → Agents (destinationSection)<br>agent-communication/human-browser → Agents (destinationSection)<br>agent-communication/passive-messaging → Agents (destinationSection) |
 | Resource Packs: Resources | Knowledge | resource-packs/local-properties → Knowledge (destinationSection) |
 | Review | Thread panel | pulls-review/ai-scope-summaries → Thread panel (threadFacet)<br>pulls-review/batch-reviewed-marks → Thread panel (threadFacet)<br>pulls-review/thread-review-scopes → Thread panel (threadFacet) |
+| Revision graph | Land, No place of its own | jujutsu/graph-navigation → Land (destinationSection)<br>jujutsu/panel-scopes → No place of its own (infrastructure)<br>jujutsu/previewed-revision-mutations → Land (rowAction)<br>jujutsu/revision-detail-and-diff → Land (detail)<br>jujutsu/revision-graph → Land (destinationSection)<br>jujutsu/workspace-at-revision → Land (rowAction)<br>jujutsu/workspace-cleanup → Land (command)<br>jujutsu/workspace-overflow → Land (rowAction)<br>jujutsu/workspace-removal → Land (rowAction) |
 | Secrets | Settings | secret-catalog/alias-mutations → Settings (settingsSection)<br>secret-catalog/bounded-secret-reveal → Settings (settingsSection)<br>secret-catalog/inline-quick-add → Settings (settingsSection)<br>secret-catalog/scoped-alias-catalog → Settings (settingsSection) |
+| Source control | Land | jujutsu/source-control → Land (destinationSection) |
 | Thread Sidebar: Board | Threads | thread-sidebar/thread-classification → Threads (destinationSection) |
 | Traces: Explorer | Inbox, Observe | traces/alert-rules → Inbox (attentionProvider)<br>traces/boards-and-saved-views → Observe (destinationSection)<br>traces/log-explorer → Observe (destinationSection)<br>traces/metric-charts → Observe (destinationSection)<br>traces/service-map → Observe (destinationSection)<br>traces/trace-explorer → Observe (destinationSection)<br>traces/trace-insights → Observe (destinationSection) |
 | Usage: Analytics | Observe | usage/usage-activity-report → Observe (destinationSection)<br>usage/usage-charts → Observe (destinationSection)<br>usage/usage-jev-card → Observe (destinationSection)<br>usage/usage-request-log → Observe (destinationSection) |
@@ -154,20 +154,20 @@ rail destination; 14 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| jujutsu/workspace-cleanup: Clean up idle JJ workspaces | command | left-nav: Jujutsu: Revision graph › Clean up workspaces |
+| jujutsu/workspace-cleanup: Clean up idle JJ workspaces | command | left-nav: Revision graph › Clean up workspaces |
 | jj-integration/thread-integration-attention-view: Thread integration prioritises what needs attention | destinationSection | left-nav: Land › Needs you |
 | jj-integration/thread-integration-empty: Thread integration with no thread workspaces | destinationSection | left-nav: Land › empty state |
 | jj-integration/thread-workspaces-panel: Thread integration control center | destinationSection | left-nav: Land |
-| jujutsu/graph-navigation: Locate landmarks and compare revision ancestry | destinationSection | left-nav: Jujutsu: Revision graph › landmarks |
-| jujutsu/revision-graph: Browse and filter the revision graph | destinationSection | left-nav: Jujutsu: Revision graph |
-| jujutsu/source-control: Describe and review the working copy in Source Control | destinationSection | left-nav: Jujutsu: Source Control |
+| jujutsu/graph-navigation: Locate landmarks and compare revision ancestry | destinationSection | left-nav: Revision graph › landmarks |
+| jujutsu/revision-graph: Browse and filter the revision graph | destinationSection | left-nav: Revision graph |
+| jujutsu/source-control: Describe and review the working copy in Source Control | destinationSection | left-nav: Source control |
 | jj-integration/thread-integration-row-details: Thread integration row details | detail | left-nav: Land › row details |
-| jujutsu/revision-detail-and-diff: Inspect revisions and changed files | detail | left-nav: Jujutsu: Revision graph › revision detail |
+| jujutsu/revision-detail-and-diff: Inspect revisions and changed files | detail | left-nav: Revision graph › revision detail |
 | jujutsu/chat-references: Open Jujutsu references from a chat message | entityProvider | transcript: jj: reference links |
-| jujutsu/previewed-revision-mutations: Preview and confirm repository mutations | rowAction | left-nav: Jujutsu: Revision graph › revision menu |
-| jujutsu/workspace-at-revision: Create a workspace at a revision | rowAction | left-nav: Jujutsu: Revision graph › New workspace here |
-| jujutsu/workspace-overflow: Move a workspace from a shared revision | rowAction | left-nav: Jujutsu: Revision graph › workspace overflow chip |
-| jujutsu/workspace-removal: Remove a workspace from the graph | rowAction | left-nav: Jujutsu: Revision graph › Remove workspace |
+| jujutsu/previewed-revision-mutations: Preview and confirm repository mutations | rowAction | left-nav: Revision graph › revision menu |
+| jujutsu/workspace-at-revision: Create a workspace at a revision | rowAction | left-nav: Revision graph › New workspace here |
+| jujutsu/workspace-overflow: Move a workspace from a shared revision | rowAction | left-nav: Revision graph › workspace overflow chip |
+| jujutsu/workspace-removal: Remove a workspace from the graph | rowAction | left-nav: Revision graph › Remove workspace |
 
 ### Work
 
@@ -467,7 +467,7 @@ palette commands, status items, agent tools, infrastructure; 130 features.
 | jev/jev-ask: Ask Jev one Noul question and record its usage | infrastructure | host: library |
 | jj-cli/jj-cli-run: One Effect service that runs the Jujutsu CLI | infrastructure | host: library |
 | jj-cli/jj-cli-view-reads: Operation-head cache for jj view reads | infrastructure | host: library |
-| jujutsu/panel-scopes: Keep one repository per Jujutsu tab, thread and dock | infrastructure | left-nav: Jujutsu: Revision graph › per-tab repository |
+| jujutsu/panel-scopes: Keep one repository per Jujutsu tab, thread and dock | infrastructure | left-nav: Revision graph › per-tab repository |
 | loopback-access/localhost-with-lan: Keep localhost available when LAN access is enabled | infrastructure | host: loopback listeners |
 | main-tabs/backlog-capture-with-thread-tab: Typing in Backlog with a kept thread tab | infrastructure | main-tabs: kept thread tab focus |
 | main-tabs/main-view-tabs: Browser-like tabs above the main view | infrastructure | main-tabs: tab strip |

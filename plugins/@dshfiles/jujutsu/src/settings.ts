@@ -4,7 +4,7 @@ import { defineSettings } from '@dshfiles/dshx/settings'
 export const jujutsuSettings = defineSettings({
   namespace: 'dshfiles-jujutsu',
   schema: Schema.object({
-    defaultView: Schema.union([Schema.const('graph').description('Revision graph'), Schema.const('source').description('Source Control')])
+    defaultView: Schema.union([Schema.const('graph').description('Revision graph'), Schema.const('source').description('Source control')])
       .default('graph')
       .description('Tab shown when the Jujutsu panel opens.'),
     ancestorCount: Schema.natural().min(1).max(20).default(5).description('Ancestor groups (@-1 … @-N) shown in Source Control.'),

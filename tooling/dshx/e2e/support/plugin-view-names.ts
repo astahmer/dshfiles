@@ -102,6 +102,8 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   ['Review', { destination: 'Land', section: 'Review' }],
   ['Backlog', { destination: 'Work', section: 'Backlog' }],
   ['Land', { destination: 'Land', section: 'Workspaces' }],
+  ['Revision graph', { destination: 'Land', section: 'History' }],
+  ['Source control', { destination: 'Land', section: 'Source control' }],
 ])
 
 const destinationTabs = (page: Page): Locator => page.getByRole('tablist', { name: 'Destinations', exact: true })

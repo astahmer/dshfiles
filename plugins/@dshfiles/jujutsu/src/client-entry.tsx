@@ -128,11 +128,9 @@ export default defineClient({
       panel({ surface: 'main', scope: props.scope, visible: props.visible, view: 'graph' }),
     )
     ctx.effect(() => PanelScopes.listen(), 'dshfiles-jujutsu: the scope each main tab shows')
+    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Revision graph' }, PanelGlyph))
     ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Jujutsu: Revision graph' }, PanelGlyph),
-    )
-    ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: SOURCE_CONTROL_PANEL_ID, order: 3, label: 'Jujutsu: Source Control' }, SourceControlGlyph),
+      ctx.slots.register({ name: 'sidebar.panellist', id: SOURCE_CONTROL_PANEL_ID, order: 3, label: 'Source control' }, SourceControlGlyph),
     )
     ctx.effect(
       () =>
@@ -323,7 +321,7 @@ export default defineClient({
       () =>
         workbenchPanels().register({
           id: DOCK_PANEL_ID,
-          title: 'Jujutsu: Revision graph',
+          title: 'Revision graph',
           dockDefault: true,
           // The same feature's full main-view page, so the workbench offers "Move to main view" for the panel.
           mainPanelId: PANEL_ID,
@@ -336,7 +334,7 @@ export default defineClient({
       () =>
         workbenchPanels().register({
           id: SOURCE_CONTROL_DOCK_PANEL_ID,
-          title: 'Jujutsu: Source Control',
+          title: 'Source control',
           mainPanelId: SOURCE_CONTROL_PANEL_ID,
           component: DockSourceControlPanel,
         }),

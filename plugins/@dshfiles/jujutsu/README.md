@@ -20,7 +20,7 @@ A DSH sidebar plugin for browsing and changing a Jujutsu repository. It is built
 with this repository's local `@dshfiles/dshx` fork and DSH 0.2 client/host
 contracts.
 
-Two panels in navigation, the main view and the Workbench chooser: **Jujutsu: Revision graph** and **Jujutsu: Source Control**. Each opens straight on its toolbar (repository, Fetch, Push, refresh, view settings, repository actions); only the narrow per-thread side panel switches between both views with tabs. Repository-scoped tabs keep their repository titles. Saved Workbench layouts keep `dshfiles-jujutsu.dock` for the graph; Source Control is `dshfiles-jujutsu.source-control`.
+Two panels in navigation, the main view and the Workbench chooser: **Revision graph** and **Source control**. Each opens straight on its toolbar (repository, Fetch, Push, refresh, view settings, repository actions); only the narrow per-thread side panel switches between both views with tabs. Repository-scoped tabs keep their repository titles. Saved Workbench layouts keep `dshfiles-jujutsu.dock` for the graph; Source Control is `dshfiles-jujutsu.source-control`.
 
 ## What it provides
 

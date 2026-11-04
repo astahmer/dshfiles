@@ -89,7 +89,7 @@ When('a disposable Jujutsu repository with two authors is opened in the Jujutsu 
   jj(repository, ['new'])
   await page.evaluate(path => localStorage.setItem('dshfiles.jujutsu.selected', JSON.stringify(path)), repository.path)
   await page.reload()
-  await openGlobalPanel(page, 'Jujutsu: Revision graph')
+  await openGlobalPanel(page, 'Revision graph')
   await expect(revisionRow(page, 'Feature work by Ada')).toBeVisible({ timeout: 30_000 })
 })
 
@@ -313,7 +313,7 @@ Then('the workspace {string} exists and a session opens in it only when asked', 
     expect(jj(repository, ['--ignore-working-copy', 'log', '--no-graph', '-r', `${name}@-`, '-T', 'description.first_line()'])).toBe('Feature work by Ada')
     await expect(page.getByRole('treeitem', { name, exact: true })).toHaveCount(0)
   })
-  await provision.getByRole('button', { name: 'Open a DSH Session here', exact: true }).click()
+  await provision.getByRole('button', { name: 'Open a thread here', exact: true }).click()
   await recordAssertion(page, 'jujutsu-session-opens-in-the-new-workspace', async () => {
     await expect(page.getByRole('treeitem', { name, exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText(name)

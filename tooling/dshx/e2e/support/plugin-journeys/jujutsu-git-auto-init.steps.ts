@@ -126,7 +126,7 @@ When('a disposable dirty Git-only checkout is opened through the Jujutsu reposit
     await rm(root, { recursive: true, force: true })
     throw error
   }
-  await openGlobalPanel(page, 'Jujutsu: Revision graph')
+  await openGlobalPanel(page, 'Revision graph')
   await chooseGitCheckout(page, fixtureFor(page))
 })
 
@@ -152,7 +152,7 @@ Then('reselecting and reopening the Git checkout does not initialize JJ again', 
     expect(await snapshotGit(fixture)).toEqual(fixture.before)
   })
   await reloadPastProviderSetup(page)
-  await openGlobalPanel(page, 'Jujutsu: Revision graph')
+  await openGlobalPanel(page, 'Revision graph')
   await expect(importedCommitRow(page)).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled()
   await recordAssertion(page, 'jujutsu-git-auto-init-reopen-is-idempotent', async () => {

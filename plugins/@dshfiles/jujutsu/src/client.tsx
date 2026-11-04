@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Empty, EmptyHeader, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
@@ -145,7 +146,7 @@ const REPO_HISTORY_LIMIT = 12
 const CODE_BLOCK =
   'dshx:max-h-80 dshx:overflow-auto dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:p-2 dshx:font-mono dshx:text-[11px] dshx:leading-snug dshx:whitespace-pre'
 const DISCLOSURE_TRIGGER =
-  'dshx:group/disclosure dshx:flex dshx:items-center dshx:gap-1 dshx:py-1 dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground dshx:hover:text-foreground'
+  'dshx:group/disclosure dshx:flex dshx:items-center dshx:gap-1 dshx:py-1 dshx:text-[11px] dshx:font-semibold dshx:text-muted-foreground dshx:hover:text-foreground'
 
 const COMPACT_BADGE = 'dshx:h-4 dshx:max-w-40 dshx:rounded-sm dshx:px-1.5 dshx:py-0 dshx:font-mono dshx:text-[10px] dshx:leading-none'
 
@@ -940,7 +941,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     graphPageMutation.error && errorMessage(graphPageMutation.error, 'Could not load revision results.'),
     registerMutation.error && errorMessage(registerMutation.error, 'Could not register this repository.'),
     actionSnapshot.context.error,
-    launchMutation.error && errorMessage(launchMutation.error, 'Workspace Session could not be opened.'),
+    launchMutation.error && errorMessage(launchMutation.error, 'A thread could not be opened in this workspace. Try again.'),
   ].filter((message): message is string => Boolean(message))
 
   const askForConfirmation = (action: Mutation, presentation: DropPresentation | null = null): void => {
@@ -1433,7 +1434,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         ) : (
           <>
             <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-[11px] dshx:text-muted-foreground">
-              <span className="dshx:font-semibold dshx:uppercase dshx:tracking-wide">Changed files</span>
+              <span className="dshx:font-semibold">Changed files</span>
               <span className="dshx:font-mono">{details.files.length}</span>
               <FileViewToggle onChange={value => setPreference('fileView', value)} value={preferences.fileView} />
               <Tooltip>
@@ -1738,7 +1739,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   {item.kind === 'day' ? (
                     <button
                       aria-expanded={!collapsedDays.has(item.day)}
-                      className="dshx:flex dshx:h-[18px] dshx:w-full dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-left dshx:text-[10px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                      className="dshx:flex dshx:h-[18px] dshx:w-full dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-left dshx:text-[11px] dshx:font-semibold dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
                       data-row-focus=""
                       onClick={() =>
                         setCollapsedDays(current => {
@@ -1762,7 +1763,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   ) : item.kind === 'push' ? (
                     <div
                       aria-label={`Last pushed revision: ${item.bookmark}@${item.remote}`}
-                      className="dshx:flex dshx:h-[18px] dshx:w-full dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-[10px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground"
+                      className="dshx:flex dshx:h-[18px] dshx:w-full dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-[11px] dshx:font-semibold dshx:text-muted-foreground"
                       data-push-boundary=""
                     >
                       <span className="dshx:relative dshx:h-full dshx:flex-none" style={{ width: graphWidth }}>
@@ -1835,11 +1836,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           )}
           {visibleRevisions.length === 0 && !graphPagePending && (
-            <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
-              <EmptyHeader>
-                <EmptyTitle className="dshx:text-sm">No revisions match these filters.</EmptyTitle>
-              </EmptyHeader>
-            </Empty>
+            <EmptyState className="dshx:py-6">No revisions match these filters. Change the search or the filters above to see more.</EmptyState>
           )}
         </div>
       </>
@@ -1859,15 +1856,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       </EmptyHeader>
     </Empty>
   ) : repositoryStatus.showEmptyPrompt ? (
-    <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
-      <EmptyHeader>
-        <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">Choose a repository to open its revision graph.</EmptyTitle>
-        <Button className="dshx:mt-2" onClick={() => setPickerOpen(true)} size="sm" type="button" variant="outline">
-          <FolderGit2Icon />
-          Choose repository…
-        </Button>
-      </EmptyHeader>
-    </Empty>
+    <EmptyState action={{ label: 'Choose repository…', icon: <FolderGit2Icon />, onSelect: () => setPickerOpen(true) }}>
+      Choose a repository to open its revision graph.
+    </EmptyState>
   ) : null
 
   const tabsContent = (
@@ -1922,29 +1913,20 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         >
           <header className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-2 dshx:border-b dshx:px-3 dshx:pt-2 dshx:pb-2.5">
             {showViewTabs && (
-              <TabsList aria-label="Jujutsu views" className="dshx:h-9 dshx:gap-4 dshx:rounded-none dshx:border-b dshx:p-0" variant="line">
+              <TabsList aria-label="Repository views" className="dshx:self-start">
                 {props.view !== 'source' && (
-                  <TabsTrigger
-                    className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0.5 dshx:after:bottom-[-1px] dshx:after:bg-primary dshx:data-[state=active]:font-semibold"
-                    value="graph"
-                  >
+                  <TabsTrigger className="dshx:flex-none" value="graph">
                     Revision graph
                   </TabsTrigger>
                 )}
                 {fullDiff !== null && (
-                  <TabsTrigger
-                    className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0.5 dshx:after:bottom-[-1px] dshx:after:bg-primary dshx:data-[state=active]:font-semibold"
-                    value="diff"
-                  >
+                  <TabsTrigger className="dshx:flex-none" value="diff">
                     Diff
                   </TabsTrigger>
                 )}
                 {props.view !== 'graph' && (
-                  <TabsTrigger
-                    className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0.5 dshx:after:bottom-[-1px] dshx:after:bg-primary dshx:data-[state=active]:font-semibold"
-                    value="source"
-                  >
-                    Source Control
+                  <TabsTrigger className="dshx:flex-none" value="source">
+                    Source control
                   </TabsTrigger>
                 )}
               </TabsList>
@@ -1962,11 +1944,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                     <FolderGit2Icon className="dshx:text-muted-foreground" />
                     {state !== undefined || path.length > 0 ? (
                       <>
-                        <span className="dshx:flex-none dshx:font-medium">{repositoryName(state?.root ?? path)}</span>
-                        <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{state?.root ?? path}</span>
+                        <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">{repositoryName(state?.root ?? path)}</span>
                       </>
                     ) : (
-                      <span className="dshx:text-muted-foreground">Choose repository…</span>
+                      <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">Choose repository…</span>
                     )}
                     <ChevronDownIcon className="dshx:ml-auto dshx:text-muted-foreground" />
                   </Button>
@@ -2160,7 +2141,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       type="button"
                       variant="outline"
                     >
-                      {launchMutation.isPending ? 'Opening…' : 'Open a DSH Session here'}
+                      {launchMutation.isPending ? 'Opening…' : 'Open a thread here'}
                     </Button>
                   </AlertDescription>
                 </Alert>
@@ -2266,7 +2247,7 @@ const PreferencesMenu = (): JSX.Element => {
                 Revision graph
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem className="dshx:text-xs" value="source">
-                Source Control
+                Source control
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </DropdownMenuSubContent>

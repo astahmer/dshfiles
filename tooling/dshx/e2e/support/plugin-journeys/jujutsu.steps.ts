@@ -239,7 +239,7 @@ const dispatchDrop = async (
 const selectRepository = async (page: Page, fixture: JujutsuFixture, waitForFixtureRows = true): Promise<void> => {
   await page.evaluate(({ key, path }) => localStorage.setItem(key, JSON.stringify(path)), { key: 'dshfiles.jujutsu.selected', path: fixture.repositoryPath })
   await page.reload()
-  await openGlobalPanel(page, 'Jujutsu: Revision graph')
+  await openGlobalPanel(page, 'Revision graph')
   if (!waitForFixtureRows) return
   await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible({ timeout: 30_000 })
   await expect(revisionRow(page, fixture.targetDescription)).toBeVisible({ timeout: 30_000 })

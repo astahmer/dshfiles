@@ -114,7 +114,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
       <div className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:px-3 dshx:py-2">
         <div className="dshx:flex dshx:items-center dshx:gap-1">
-          <span className="dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">Changes</span>
+          <span className="dshx:text-[11px] dshx:font-semibold dshx:text-muted-foreground">Changes</span>
           <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
             <FileViewToggle onChange={props.onFileViewChange} value={props.fileView} />
             {workingCopy !== undefined && (
@@ -206,7 +206,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
           const editable = !revision.immutable
           const parent = group.parent
           const child = group.child
-          const label = group.depth === 0 ? 'Working Copy' : `@-${group.depth}`
+          const label = group.depth === 0 ? 'Working copy' : `@-${group.depth}`
           const describeText = describing?.commitId === revision.commitId ? describing.text : null
           const splitMessage = splitMessages[revision.commitId] ?? ''
           return (
