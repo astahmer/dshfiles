@@ -18,7 +18,21 @@ export type PatchViewProps = PatchSource & {
   readonly renderHeaderPrefix?: (file: FileDiffMetadata) => ReactNode
   /** Trailing slot of each sticky file header, e.g. per-file actions. */
   readonly renderHeaderMetadata?: (file: FileDiffMetadata) => ReactNode
+  /**
+   * Lets the user drag or click across line numbers to select lines, and reports the finished range: `side` says
+   * whether the numbers are the new file's (`additions`) or the old file's (`deletions`). Without it lines are not
+   * selectable.
+   */
+  readonly onLineSelection?: (input: PatchLineSelection) => void
   readonly className?: string
+}
+
+/** A finished line selection in one file of a patch, in that side's line numbers. */
+export interface PatchLineSelection {
+  readonly file: FileDiffMetadata
+  readonly start: number
+  readonly end: number
+  readonly side: 'additions' | 'deletions'
 }
 
 const subscribeToDarkTheme = (onChange: () => void): (() => void) => {
@@ -80,6 +94,17 @@ export const PatchView = (props: PatchViewProps): JSX.Element => {
                 stickyHeader: true,
                 hunkSeparators: 'line-info',
                 overflow: 'scroll',
+                ...(props.onLineSelection === undefined
+                  ? {}
+                  : {
+                      enableLineSelection: true,
+                      onLineSelectionEnd: range => {
+                        if (range === null) return
+                        const start = Math.min(range.start, range.end)
+                        const end = Math.max(range.start, range.end)
+                        props.onLineSelection?.({ file, start, end, side: (range.endSide ?? range.side) === 'deletions' ? 'deletions' : 'additions' })
+                      },
+                    }),
               }}
               renderHeaderMetadata={file => props.renderHeaderMetadata?.(file)}
               renderHeaderPrefix={file => props.renderHeaderPrefix?.(file)}
