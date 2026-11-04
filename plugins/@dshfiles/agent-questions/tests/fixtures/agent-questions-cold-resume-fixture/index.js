@@ -1,7 +1,6 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { Effect } from 'effect'
 
 const packageName = '@dshfiles/agent-questions-cold-resume-fixture'
 const parentProvider = 'agent-questions-scratch-parent'
@@ -57,6 +56,23 @@ const requireToolSuccess = (result, label) => {
   return String(result.value)
 }
 
+/**
+ * A child question is created by the child's own ask_parent_question call, which then waits for the answer; the parent
+ * finds it the way an Agent does, through list_thread_questions.
+ */
+const listedChildQuestion = async (context, { parent, child, question }) => {
+  const deadline = Date.now() + 15_000
+  while (Date.now() < deadline) {
+    const listed = await executeTool(context, { agent: parent, name: 'list_thread_questions', args: { sessionId: child.id, limit: 50 } })
+    const found = JSON.parse(requireToolSuccess(listed, 'Question inbox while waiting for a child question')).questions.find(
+      candidate => candidate.kind === 'child' && candidate.question === question,
+    )
+    if (found !== undefined) return found
+    await new Promise(resolveDelay => setTimeout(resolveDelay, 50))
+  }
+  throw new Error('The child question "' + question + '" never reached its parent inbox.')
+}
+
 const feedbackIdFrom = (result, label) => {
   const text = requireToolSuccess(result, label)
   const match = text.match(/^Feedback ([^\s]+) was sent to the direct parent/)
@@ -65,7 +81,7 @@ const feedbackIdFrom = (result, label) => {
 }
 
 export const name = packageName
-export const inject = ['agents', 'llm', 'parentFeedback', 'parentQuestions', 'subagents', 'tools']
+export const inject = ['agents', 'llm', 'subagents', 'tools']
 export const apply = async context => {
   const home = process.env.DSH_HOME
   if (home === undefined) throw new Error('The scratch DSH_HOME is unavailable.')
@@ -168,14 +184,13 @@ export const apply = async context => {
         expiryBehavior: 'recommended',
         timeoutMs: 10_000,
       }
-      const questionReceipt = await Effect.runPromise(
-        context.parentQuestions.request({
-          agent: child,
-          operationId: questionOperationId,
-          ...questionInput,
-          signal: new AbortController().signal,
-        }),
-      )
+      const childQuestionWait = executeTool(context, {
+        agent: child,
+        name: 'ask_parent_question',
+        args: questionInput,
+        callId: questionOperationId,
+      })
+      const questionReceipt = await listedChildQuestion(context, { parent, child, question: questionInput.question })
       const allThreadQuestionResult = await executeTool(context, {
         agent: parent,
         name: 'list_thread_questions',
@@ -241,12 +256,6 @@ export const apply = async context => {
         args: { questionId: questionReceipt.questionId, answer: 'The child cannot answer itself.' },
       })
       if (!unauthorizedAnswer.isError) throw new Error('A child incorrectly answered its own parent question.')
-      const childQuestionWait = executeTool(context, {
-        agent: child,
-        name: 'ask_parent_question',
-        args: questionInput,
-        callId: questionOperationId,
-      })
       const parentQuestionAnswer = await executeTool(context, {
         agent: parent,
         name: 'answer_parent_question',
@@ -257,11 +266,13 @@ export const apply = async context => {
         throw new Error('The Agent Questions Host tools did not complete a child question and parent answer.')
       }
 
-      const reattachQuestion = await Effect.runPromise(
-        context.parentQuestions.request({
-          agent: child,
-          operationId: 'cold-resume-question',
-          question: 'What should happen after the Host restarts?',
+      // Left waiting on purpose: stopping the Host interrupts this wait, and the durable question must survive it.
+      const reattachQuestionText = 'What should happen after the Host restarts?'
+      void executeTool(context, {
+        agent: child,
+        name: 'ask_parent_question',
+        args: {
+          question: reattachQuestionText,
           context: 'Reattach to this question using its durable id.',
           options: [
             { id: 'resume', label: 'Resume the pending decision' },
@@ -270,9 +281,10 @@ export const apply = async context => {
           recommendedOptionId: 'resume',
           expiryBehavior: 'recommended',
           timeoutMs: 120_000,
-          signal: new AbortController().signal,
-        }),
-      )
+        },
+        callId: 'cold-resume-question',
+      }).catch(() => undefined)
+      const reattachQuestion = await listedChildQuestion(context, { parent, child, question: reattachQuestionText })
       const toolChildStarted = await context.subagents.startActivation({
         provider: continuationProvider,
         label: 'Agent Questions public Host tool acceptance',
@@ -406,24 +418,19 @@ export const apply = async context => {
       const document = await readFile(resolve(projectPath, 'review.md'), 'utf8')
       const excerpt = document.split(/\r\n|\n|\r/, 1)[0]
       if (excerpt === undefined || excerpt.length === 0) throw new Error('The cold-resume Markdown anchor is empty.')
-      const coldResumeRecord = await Effect.runPromise(
-        context.parentFeedback.submit({
+      const coldResumeFeedbackId = feedbackIdFrom(
+        await executeTool(context, {
           agent: child,
-          operationId: 'cold-resume-feedback',
-          anchor: {
-            kind: 'markdown',
-            path: 'review.md',
-            revision: createHash('sha256').update(document).digest('hex'),
-            startLine: 1,
-            endLine: 1,
-            excerpt,
-          },
-          comment: 'Resolve this after Host restart.',
-          signal: new AbortController().signal,
+          name: 'submit_markdown_feedback',
+          args: { path: 'review.md', startLine: 1, endLine: 1, selectedText: excerpt, comment: 'Resolve this after Host restart.' },
+          callId: 'cold-resume-feedback',
         }),
+        'Cold-resume feedback submission',
       )
-      if (coldResumeRecord.status !== 'pending') throw new Error('The cold-resume feedback did not remain pending.')
-      const coldResumeFeedbackId = coldResumeRecord.feedbackId
+      const coldResumeRead = await executeTool(context, { agent: child, name: 'get_parent_feedback', args: { feedbackId: coldResumeFeedbackId } })
+      if (!requireToolSuccess(coldResumeRead, 'Cold-resume feedback retrieval').includes('is still pending')) {
+        throw new Error('The cold-resume feedback did not remain pending.')
+      }
       const batchFeedbackId = feedbackIdFrom(
         await executeTool(context, {
           agent: toolChild,
@@ -537,13 +544,17 @@ export const apply = async context => {
       agentOptions: { provider: parentProvider, model: 'fixture' },
     })
     const parent = parentHandle.agent
-    const [resolution] = await Effect.runPromise(
-      context.parentFeedback.answerMany({
+    const resolutionText = requireToolSuccess(
+      await executeTool(context, {
         agent: parent,
-        responses: [{ feedbackId: state.feedbackId, disposition: 'accepted', note: 'Accepted after cold resume.' }],
-        signal: new AbortController().signal,
+        name: 'resolve_parent_feedback',
+        args: { responses: [{ feedbackId: state.feedbackId, disposition: 'accepted', note: 'Accepted after cold resume.' }] },
       }),
+      'Cold-resumed parent feedback resolution',
     )
+    const resolutionLine = resolutionText.split('\n').find(line => line.startsWith(state.feedbackId + ': '))
+    const resolution =
+      resolutionLine === undefined ? undefined : { status: /^[^:]+: ([a-z-]+);/.exec(resolutionLine)?.[1], notified: resolutionLine.includes('child notified') }
     const child = context.agents.get(state.childSessionId)
     if (child === undefined) throw new Error('Parent resolution did not cold-resume the child.')
     const reattachedQuestion = executeTool(context, {
