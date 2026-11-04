@@ -186,7 +186,7 @@ Feature: Secret Catalog
 
   @scenario:secret-catalog.request-secret
   Scenario: An agent asks for a secret, the user stores it in the Catalog form, and the agent receives only its reference
-    Given the isolated plugin composition of "@dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    Given the isolated plugin composition of "@dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker, @dshfiles/chat, @dshfiles/session-controller" is booted
     When a Command Code account backed by a local fake provider is added
     And a thread in the seeded project asks the agent to request the secret "SYNTHETIC_REQUESTED_TOKEN"
     Then the secret request card for "SYNTHETIC_REQUESTED_TOKEN" shows its purpose and a masked value field
@@ -200,7 +200,7 @@ Feature: Secret Catalog
 
   @scenario:secret-catalog.request-secret-decline
   Scenario: Declining a secret request tells the agent nothing was stored
-    Given the isolated plugin composition of "@dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    Given the isolated plugin composition of "@dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker, @dshfiles/chat, @dshfiles/session-controller" is booted
     When a Command Code account backed by a local fake provider is added
     And a thread in the seeded project asks the agent to request the secret "DECLINED_TOKEN"
     When the secret request for "DECLINED_TOKEN" is declined

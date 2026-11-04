@@ -572,6 +572,7 @@
       "summary": "request_secret shows a card on the thread's latest turn with the alias, environment, scope and the agent's stated purpose. The user types the value into the Catalog's masked form (stored by the secret CLI on the Host) or declines; the waiting tool call receives only the secret:ALIAS reference, or a declined, expired or cancelled result. secret_requests_pending lists waiting requests; secret_list and secret_remove_alias see and remove the stored alias.",
       "reach": [
         "seed fake-secret-cli",
+        "seed tool-call-thread",
         "click button \"New session\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"[[call request_secret {\\\"alias\\\":\\\"SYNTHETIC_REQUESTED_TOKEN\\\",\\\"purpose\\\":\\\"Call the synthetic API.\\\"}]]\"",
         "press Enter",

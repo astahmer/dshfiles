@@ -136,6 +136,8 @@ notices stay.
 
 ## Agents asking for a secret
 
+![Let an agent ask the user to store a secret](docs/screenshots/agent-secret-request.png)
+
 `request_secret` lets an Agent ask the user to store a value it needs: it passes
 an alias, a one-sentence purpose, and optionally an environment (`prod`), a
 scope (`global` by default; `project`/`local` use the thread's folder) and a
@@ -149,6 +151,11 @@ answers the request with the `secret:ALIAS[@env]` reference, which the Host
 accepts only after a fresh config read shows that alias exists. The tool returns
 `{ status: 'stored', reference }`, or `declined`, `expired` or `cancelled` (the
 turn stopped or the Host shut down) with nothing stored.
+
+The card is a `conversation.chat.turnTail` entry on a turn that is still
+running, so it needs the owned `@dshfiles/chat` fork (in the web profile): the
+native Chat renders turn tails only once a turn ends. Without the fork,
+`secret_requests_pending` still lists the request.
 
 Requests live as long as the waiting tool call (in memory, at most 16 at once),
 and a `secret-catalog-requests` `changed` event keeps open cards current.
