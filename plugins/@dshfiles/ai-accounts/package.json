@@ -44,6 +44,10 @@
       "types": "./src/usage-overview-model.ts",
       "default": "./dist/usage-overview-model.js"
     },
+    "./codex-credential": {
+      "types": "./src/codex-credential.ts",
+      "default": "./dist/codex-credential.js"
+    },
     "./locale/en.json": "./locale/en.json",
     "./pricing-catalog": {
       "types": "./src/pricing-catalog.ts",
