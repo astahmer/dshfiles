@@ -250,13 +250,24 @@ export const DestinationBar = (props: {
   const current = destination.data ?? (toggle.busy ? lastDestination.current : undefined)
   const rootSelectionHandledFor = useRef<string | null>(null)
   const rootSelectionVisitId = composerWorkspace?.visitId ?? mountId
+  // A thread that was just sent is no longer blank, yet its empty-thread screen (and this bar) stays mounted until its
+  // first turn renders. Redirecting then would open a fresh New thread in the project root on every visit to the
+  // running thread, each one a new tab; only a composer with no sent thread may be moved to the project root.
+  const showsSentThread = composerWorkspace !== null && composerWorkspace.sessionId === undefined
   useEffect(() => {
     if (rootSelectionHandledFor.current === rootSelectionVisitId || workspaceId === null || current === undefined || toggle.busy) return
     rootSelectionHandledFor.current = rootSelectionVisitId
-    if (newThreadId !== null || current.vcs !== 'jj' || !current.isolated || current.projectWorkspaceId === null || current.projectWorkspaceId === workspaceId)
+    if (
+      showsSentThread ||
+      newThreadId !== null ||
+      current.vcs !== 'jj' ||
+      !current.isolated ||
+      current.projectWorkspaceId === null ||
+      current.projectWorkspaceId === workspaceId
+    )
       return
     services.pickWorkspace(current.projectWorkspaceId)
-  }, [current, newThreadId, rootSelectionVisitId, services, toggle.busy, workspaceId])
+  }, [current, newThreadId, rootSelectionVisitId, services, showsSentThread, toggle.busy, workspaceId])
   const projectId = current?.projectWorkspaceId ?? workspaceId ?? ''
   const localProjectPath = services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === projectId)?.path
   const isJj = current?.vcs === 'jj'
