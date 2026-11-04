@@ -1284,6 +1284,7 @@ const pluginLayer = (config: Schema.Schema.Type<typeof configSchema>) =>
 
 export default DshxPlugin.make({
   name: '@dshfiles/multi-host',
+  inject: ['subprocess'],
   Config: configSchema,
   layer: pluginLayer,
   apis: [Api.bind(multiHostApi, handlers)],

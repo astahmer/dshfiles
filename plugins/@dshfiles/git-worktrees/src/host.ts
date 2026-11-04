@@ -84,6 +84,7 @@ const platform = Layer.mergeAll(DshChildProcessSpawner.layer, nodeFileSystemLaye
 
 export default DshxPlugin.make({
   name: '@dshfiles/git-worktrees',
+  inject: ['subprocess'],
   settings: [gitWorktreesSettings],
   layer: Layer.mergeAll(GitWorktrees.layer, WorkspaceRegistry.layer).pipe(Layer.provideMerge(platform)),
   apis: [

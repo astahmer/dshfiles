@@ -69,7 +69,7 @@ const AnnotationsLive = ExtensionRoutes.layer.pipe(
 
 export default DshxPlugin.make({
   name: '@dshfiles/annotations',
-  inject: ['storageDomain'],
+  inject: ['storageDomain', 'subprocess'],
   settings: [annotationsSettings],
   layer: AnnotationsLive,
   apis: [
