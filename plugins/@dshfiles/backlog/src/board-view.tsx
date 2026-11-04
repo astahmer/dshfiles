@@ -1,6 +1,17 @@
-import { LinkIcon, LoaderCircleIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftIcon, ArrowRightIcon, Columns3Icon, LinkIcon, LoaderCircleIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { Schema } from 'effect'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
@@ -18,6 +29,17 @@ import { itemTransitionName } from './view-transition.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']
+const boardStatusSchema = Schema.Literals(['inbox', 'todo', 'doing', 'done', 'dropped'])
+/** The board's own column order and hidden columns, kept in this browser and apart from every other view's settings. */
+const boardColumns = createStoredValue({
+  key: 'dshfiles.backlog.board-columns.v1',
+  schema: Schema.Struct({ order: Schema.Array(boardStatusSchema), hidden: Schema.Array(boardStatusSchema) }),
+  fallback: { order: [...boardStatuses], hidden: [] as readonly BacklogStatus[] },
+})
+const rankIn = (order: readonly BacklogStatus[], status: BacklogStatus): number => {
+  const index = order.indexOf(status)
+  return index === -1 ? order.length : index
+}
 /** Cards mounted per column before scrolling near the end reveals another batch. */
 const COLUMN_PAGE = 30
 
@@ -191,6 +213,28 @@ export const BoardView = (props: {
   readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
+  const columnPreferences = boardColumns.useValue()
+  const orderedStatuses = useMemo(
+    // A status missing from a stored order (an older value) sorts last instead of first.
+    () => [...boardStatuses].sort((left, right) => rankIn(columnPreferences.order, left) - rankIn(columnPreferences.order, right)),
+    [columnPreferences.order],
+  )
+  const visibleStatuses = useMemo(
+    () => orderedStatuses.filter(status => !columnPreferences.hidden.includes(status)),
+    [orderedStatuses, columnPreferences.hidden],
+  )
+  const updateColumns = (patch: { readonly order?: readonly BacklogStatus[]; readonly hidden?: readonly BacklogStatus[] }): void => {
+    boardColumns.set({ ...columnPreferences, ...patch })
+  }
+  const moveColumn = (status: BacklogStatus, direction: -1 | 1): void => {
+    const order = [...orderedStatuses]
+    const index = order.indexOf(status)
+    const nextIndex = index + direction
+    if (index < 0 || nextIndex < 0 || nextIndex >= order.length) return
+    order.splice(index, 1)
+    order.splice(nextIndex, 0, status)
+    updateColumns({ order })
+  }
   const [drag, setDrag] = useState<Drag | null>(null)
   const [over, setOver] = useState<BacklogStatus | null>(null)
   const dragCleanup = useRef<(() => void) | null>(null)
@@ -208,13 +252,13 @@ export const BoardView = (props: {
   }, [props.items])
   const orderedItems = useMemo(
     () =>
-      boardStatuses.flatMap(status =>
+      visibleStatuses.flatMap(status =>
         props.items
           .filter(item => item.status === status)
           .sort((left, right) => right.lastActivityAt - left.lastActivityAt)
           .slice(0, (pages[status] ?? 1) * COLUMN_PAGE),
       ),
-    [props.items, pages],
+    [props.items, pages, visibleStatuses],
   )
   const orderedIds = useMemo(() => orderedItems.map(item => item.id), [orderedItems])
   const selectedItems = useMemo(() => orderedItems.filter(item => selected.has(item.id)).map(startThreadItemOf), [orderedItems, selected])
@@ -312,75 +356,134 @@ export const BoardView = (props: {
     <div
       ref={boardRoot}
       data-backlog-board
-      className={cn('dshx:flex dshx:h-full dshx:min-h-0 dshx:gap-3 dshx:overflow-x-hidden dshx:px-4 dshx:py-4', drag !== null && 'dshx:cursor-grabbing')}
+      className={cn(
+        'dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-2 dshx:overflow-x-hidden dshx:px-4 dshx:py-3',
+        drag !== null && 'dshx:cursor-grabbing',
+      )}
     >
-      {boardStatuses.map(status => {
-        const column = props.items.filter(item => item.status === status).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
-        const target = over === status && drag !== null && props.items.some(item => drag.ids.includes(item.id) && item.status !== status)
-        return (
-          <section
-            key={status}
-            data-backlog-column={status}
-            aria-label={`${ItemGlyphs.statusLabels[status]} column`}
-            className={cn(
-              'dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:rounded-2xl dshx:p-1.5 dshx:transition-[background-color,box-shadow] dshx:duration-150',
-              target ? 'dshx:bg-info/10 dshx:ring-1 dshx:ring-info/40' : 'dshx:bg-muted/45',
-            )}
-          >
-            <header className="dshx:flex dshx:h-8 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-2">
-              <ItemGlyphs.StatusIcon status={status} />
-              <h3 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{ItemGlyphs.statusLabels[status]}</h3>
-              <span className="dshx:rounded-md dshx:bg-background/70 dshx:px-1.5 dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
-                {column.length}
-              </span>
-              <button
-                type="button"
-                aria-label={`Add to ${ItemGlyphs.statusLabels[status]}`}
-                onClick={() => props.captureInto(status)}
-                className="dshx:ml-auto dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
-              >
-                <PlusIcon className="dshx:size-3.5" />
-              </button>
-            </header>
-            <div
-              data-backlog-column-scroll
-              className="dshx:flex dshx:min-h-16 dshx:flex-1 dshx:flex-col dshx:gap-1.5 dshx:overflow-y-auto dshx:p-0.5"
-              onScroll={event => {
-                const element = event.currentTarget
-                const root = boardRoot.current
-                if (root !== null) scrollAnchors.current = BoardScrollAnchors.capture(root)
-                if (element.scrollHeight - element.scrollTop - element.clientHeight > 240) return
-                setPages(current => {
-                  const page = current[status] ?? 1
-                  if (column.length <= page * COLUMN_PAGE) return current
-                  return { ...current, [status]: page + 1 }
-                })
-              }}
+      <div className="dshx:flex dshx:shrink-0 dshx:justify-end">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="ghost" size="icon-xs" aria-label="Configure board columns" className="dshx:text-muted-foreground">
+              <Columns3Icon aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="dshx:w-64">
+            <DropdownMenuLabel>Board columns</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {orderedStatuses.map((columnStatus, index) => {
+              const shown = !columnPreferences.hidden.includes(columnStatus)
+              return (
+                <div key={columnStatus} className="dshx:flex dshx:items-center dshx:gap-1 dshx:pr-1">
+                  <DropdownMenuCheckboxItem
+                    checked={shown}
+                    // The last shown column stays: a board with no columns has nowhere to drop a card.
+                    disabled={shown && visibleStatuses.length === 1}
+                    onSelect={event => event.preventDefault()}
+                    onCheckedChange={checked =>
+                      updateColumns({
+                        hidden: checked ? columnPreferences.hidden.filter(hidden => hidden !== columnStatus) : [...columnPreferences.hidden, columnStatus],
+                      })
+                    }
+                    className="dshx:min-w-0 dshx:flex-1"
+                  >
+                    {ItemGlyphs.statusLabels[columnStatus]}
+                  </DropdownMenuCheckboxItem>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Move ${ItemGlyphs.statusLabels[columnStatus]} left`}
+                    disabled={index === 0}
+                    onClick={() => moveColumn(columnStatus, -1)}
+                  >
+                    <ArrowLeftIcon aria-hidden />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Move ${ItemGlyphs.statusLabels[columnStatus]} right`}
+                    disabled={index === orderedStatuses.length - 1}
+                    onClick={() => moveColumn(columnStatus, 1)}
+                  >
+                    <ArrowRightIcon aria-hidden />
+                  </Button>
+                </div>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:gap-3 dshx:overflow-x-hidden">
+        {visibleStatuses.map(status => {
+          const column = props.items.filter(item => item.status === status).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
+          const target = over === status && drag !== null && props.items.some(item => drag.ids.includes(item.id) && item.status !== status)
+          return (
+            <section
+              key={status}
+              data-backlog-column={status}
+              aria-label={`${ItemGlyphs.statusLabels[status]} column`}
+              className={cn(
+                'dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:rounded-2xl dshx:p-1.5 dshx:transition-[background-color,box-shadow] dshx:duration-150',
+                target ? 'dshx:bg-info/10 dshx:ring-1 dshx:ring-info/40' : 'dshx:bg-muted/45',
+              )}
             >
-              {column.length === 0 ? <EmptyState className="dshx:py-6">Nothing here.</EmptyState> : null}
-              {column.slice(0, (pages[status] ?? 1) * COLUMN_PAGE).map(item => (
-                <BoardCard
-                  key={item.id}
-                  item={item}
-                  openId={props.openId}
-                  cursor={item.id === props.cursorId}
-                  open={props.open}
-                  startDrag={startDrag}
-                  pickStatus={move}
-                  startThread={props.startThread}
-                  projectPaths={props.projectPaths}
-                  dragging={drag?.ids.includes(item.id) ?? false}
-                  triageOff={props.triageOff}
-                  selected={selected.has(item.id)}
-                  selectWithModifiers={selectWithModifiers}
-                  selection={selected.has(item.id) ? selectedItems : undefined}
-                  clearSelection={clearSelection}
-                />
-              ))}
-            </div>
-          </section>
-        )
-      })}
+              <header className="dshx:flex dshx:h-8 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-2">
+                <ItemGlyphs.StatusIcon status={status} />
+                <h3 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{ItemGlyphs.statusLabels[status]}</h3>
+                <span className="dshx:rounded-md dshx:bg-background/70 dshx:px-1.5 dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
+                  {column.length}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Add to ${ItemGlyphs.statusLabels[status]}`}
+                  onClick={() => props.captureInto(status)}
+                  className="dshx:ml-auto dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
+                >
+                  <PlusIcon className="dshx:size-3.5" />
+                </button>
+              </header>
+              <div
+                data-backlog-column-scroll
+                className="dshx:flex dshx:min-h-16 dshx:flex-1 dshx:flex-col dshx:gap-1.5 dshx:overflow-y-auto dshx:p-0.5"
+                onScroll={event => {
+                  const element = event.currentTarget
+                  const root = boardRoot.current
+                  if (root !== null) scrollAnchors.current = BoardScrollAnchors.capture(root)
+                  if (element.scrollHeight - element.scrollTop - element.clientHeight > 240) return
+                  setPages(current => {
+                    const page = current[status] ?? 1
+                    if (column.length <= page * COLUMN_PAGE) return current
+                    return { ...current, [status]: page + 1 }
+                  })
+                }}
+              >
+                {column.length === 0 ? <EmptyState className="dshx:py-6">Nothing here.</EmptyState> : null}
+                {column.slice(0, (pages[status] ?? 1) * COLUMN_PAGE).map(item => (
+                  <BoardCard
+                    key={item.id}
+                    item={item}
+                    openId={props.openId}
+                    cursor={item.id === props.cursorId}
+                    open={props.open}
+                    startDrag={startDrag}
+                    pickStatus={move}
+                    startThread={props.startThread}
+                    projectPaths={props.projectPaths}
+                    dragging={drag?.ids.includes(item.id) ?? false}
+                    triageOff={props.triageOff}
+                    selected={selected.has(item.id)}
+                    selectWithModifiers={selectWithModifiers}
+                    selection={selected.has(item.id) ? selectedItems : undefined}
+                    clearSelection={clearSelection}
+                  />
+                ))}
+              </div>
+            </section>
+          )
+        })}
+      </div>
       {drag === null || dragged === undefined ? null : (
         <article
           aria-hidden
