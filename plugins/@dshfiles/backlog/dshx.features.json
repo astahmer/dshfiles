@@ -37,7 +37,8 @@
       ],
       "failureModes": [
         "An unknown prefix stays in the title and the item becomes a task.",
-        "A storage write failure is logged and the in-memory item stays readable."
+        "A storage write failure is logged and the in-memory item stays readable.",
+        "A capture the Host refuses puts its text back in the box with Retry; a box holding only blank lines after a send counts as empty."
       ],
       "externalDependencies": [],
       "verification": [
@@ -69,6 +70,16 @@
           "id": "backlog.capture-and-triage-host-ids",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "continues ids after a Host restart"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.composer-autocomplete",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.composer-retry",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
         }
       ],
       "telemetry": [
@@ -237,6 +248,11 @@
           "id": "backlog.feed-host-revive",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "hides dormant items from the feed until something touches them"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.feed-day-separators",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
         }
       ],
       "telemetry": [
@@ -351,6 +367,11 @@
           "id": "backlog.board-host-backlinks",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "answers backlinks for items and for any linked target"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.inspector-pickers",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
         }
       ],
       "telemetry": [
@@ -679,6 +700,11 @@
           "id": "backlog.auto-triage-host-dismiss",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "dismisses a proposal without changing the item"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.proposal-accept-dismiss",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
         }
       ],
       "telemetry": [
@@ -1211,6 +1237,21 @@
           "id": "backlog.search-index-store",
           "file": "plugins/@dshfiles/backlog/src/search-index.test.ts",
           "testName": "finds an item by its edited text and no longer by the text it lost"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.items-grouping",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.search-operators",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.saved-views",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
         }
       ],
       "telemetry": [
@@ -1302,6 +1343,11 @@
           "id": "backlog.inbox-host-snooze",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "hides a snoozed item until its time, then lets it resurface"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.inbox-filters",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
         }
       ],
       "telemetry": [
@@ -1695,6 +1741,11 @@
           "id": "backlog.project-scope-remember",
           "file": "plugins/@dshfiles/backlog/src/capture-project.test.ts",
           "testName": "keeps the project it just used, and forgets it when remembering is off"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.projects-overview",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
         }
       ],
       "telemetry": [
