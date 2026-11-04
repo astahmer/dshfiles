@@ -63,6 +63,8 @@ Leftovers of finished plans. The plan files were deleted; each line links to the
 
 Written plans for ideas that were scoped but not started:
 
+- [One Agent Development Environment](ade-ux/README.md): unified UI/UX redesign: thread as the primary object, one
+  inbox, seven destinations, a plugin presentation contract, phone layout; research in `ade-ux/research/`.
 - [Agent Calendar](agent-calendar.md): a turn-time Calendar tab inside Usage.
 - [Capabilities hub](capabilities-hub.md): one launchpad for Skills, MCP and DSH plugin managers.
 - [External usage history](external-usage-history.md): opt-in cross-harness token usage in Usage.
