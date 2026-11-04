@@ -63,17 +63,23 @@ const runtimesWithStartedThreads = <Runtime extends { readonly id: string }>(
   return runtimes.filter(runtime => runtimeIds.has(runtime.id))
 }
 
-/** Project started-here remote threads, enriching their rows with live runtime details when available. */
+/**
+ * Project started-here remote threads, enriching their rows with live runtime details when available. Threads of a
+ * hidden host stay stored but leave the sidebar, like the host leaves the destination picker.
+ */
 const buildRemoteSidebarThreads = (input: {
   readonly startedHere: readonly RemoteThreadSummary[]
   readonly statuses: readonly RemoteRuntimeStatusEntry[]
+  readonly hiddenRuntimeIds?: ReadonlySet<string>
 }): readonly RemoteSidebarThread[] => {
-  const startedHere = new Map(input.startedHere.map(thread => [threadKey(thread.runtimeId, thread.sessionId), thread]))
+  const hidden = input.hiddenRuntimeIds ?? new Set<string>()
+  const visibleStarted = input.startedHere.filter(thread => !hidden.has(thread.runtimeId))
+  const startedHere = new Map(visibleStarted.map(thread => [threadKey(thread.runtimeId, thread.sessionId), thread]))
   const rows = new Map<string, RemoteSidebarThread>()
   const blank = new Set<string>()
 
   for (const entry of input.statuses) {
-    if (!entry.status.ok) continue
+    if (!entry.status.ok || hidden.has(entry.runtimeId)) continue
     for (const session of entry.status.sessions) {
       const key = threadKey(session.runtimeId, session.sessionId)
       if (session.blank) {
@@ -101,7 +107,7 @@ const buildRemoteSidebarThreads = (input: {
     }
   }
 
-  for (const thread of input.startedHere) {
+  for (const thread of visibleStarted) {
     const key = threadKey(thread.runtimeId, thread.sessionId)
     if (rows.has(key) || blank.has(key)) continue
     const workspaceTitle = folderName(thread.cwd)
@@ -157,8 +163,13 @@ export const useRemoteSidebarThreads = (enabled: boolean): readonly RemoteSideba
     })
   }, [directory.data?.hosts, enabled, runtimes, statusQueries])
 
+  const hiddenRuntimeIds = useMemo(() => {
+    const hiddenHosts = new Set((directory.data?.hosts ?? []).filter(host => host.hidden).map(host => host.id))
+    return new Set((directory.data?.runtimes ?? []).filter(runtime => hiddenHosts.has(runtime.hostId)).map(runtime => runtime.id))
+  }, [directory.data?.hosts, directory.data?.runtimes])
+
   return useMemo(
-    () => (enabled ? buildRemoteSidebarThreads({ startedHere: startedHere.data?.threads ?? [], statuses }) : []),
-    [enabled, startedHere.data?.threads, statuses],
+    () => (enabled ? buildRemoteSidebarThreads({ startedHere: startedHere.data?.threads ?? [], statuses, hiddenRuntimeIds }) : []),
+    [enabled, hiddenRuntimeIds, startedHere.data?.threads, statuses],
   )
 }

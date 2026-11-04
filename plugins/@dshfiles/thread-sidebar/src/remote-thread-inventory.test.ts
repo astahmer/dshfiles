@@ -81,6 +81,22 @@ test('remote inventory enriches started-here threads without adding host-only se
   expect(rows.some(row => row.sessionId === 'host-thread' || row.sessionId === 'blank-thread')).toBe(false)
 })
 
+test('threads of a hidden host leave the sidebar', () => {
+  const stored = {
+    runtimeId: 'runtime-a',
+    sessionId: 'live-thread',
+    cwd: '/work/Atlas',
+    title: 'Stored title',
+    mention: formatSessionReferenceMention({ sessionId: SessionId('live-thread'), label: 'Stored title' }),
+    createdAt: '2025-01-01T00:00:00.000Z',
+    hostName: 'Build host',
+    connected: false,
+  }
+  const statuses = [{ runtimeId: 'runtime-a', hostName: 'Build host', status }]
+  expect(RemoteThreadInventoryModel.build({ startedHere: [stored], statuses, hiddenRuntimeIds: new Set(['runtime-a']) })).toEqual([])
+  expect(RemoteThreadInventoryModel.build({ startedHere: [stored], statuses, hiddenRuntimeIds: new Set(['runtime-b']) })).toHaveLength(1)
+})
+
 test('remote rows respect settled status and source filters', () => {
   const threads = [
     {
