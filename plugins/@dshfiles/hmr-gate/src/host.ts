@@ -8,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-modules'
 import type {} from '@deepseek-ai/dsh-hmr'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { hmrGateApi, type DeferredPackage, type HmrGateStatus } from './api.js'
+import { DeferredUpdateAttention } from './host/attention.js'
 import { HmrGateModel, digestOf, hostArtifactOf } from './host/gate.js'
 
 /**
@@ -76,6 +77,16 @@ const registerGate = (ctx: Context): GateRuntime => {
   const connections = new Set<ServerResponse>()
 
   const deferredPackages = (): readonly DeferredPackage[] => gate.deferred().map(id => ({ id, reason: DEFERRED_REASON }))
+  let announce = (): void => undefined
+
+  ctx.effect(() => {
+    const attention = DeferredUpdateAttention.install(ctx, deferredPackages)
+    announce = attention.changed
+    return () => {
+      announce = () => undefined
+      attention.dispose()
+    }
+  }, 'hmr-gate: inbox provider')
 
   const broadcast = (value: ServerFrame): void => {
     const line = frame(value)
@@ -84,6 +95,7 @@ const registerGate = (ctx: Context): GateRuntime => {
 
   const publishDeferred = (): void => {
     broadcast({ type: 'deferred', packages: deferredPackages() })
+    announce()
   }
 
   const applyRebuild = (id: string): void => {

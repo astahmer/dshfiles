@@ -2716,6 +2716,9 @@ importers:
 
   plugins/@dshfiles/hmr-gate:
     dependencies:
+      '@dshfiles/activity-timeline':
+        specifier: workspace:*
+        version: link:../activity-timeline
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime

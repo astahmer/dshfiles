@@ -6,13 +6,25 @@
       "id": "plugins-row",
       "title": "Plugin updates waiting for a Host restart",
       "summary": "A Plugins-page row names every plugin whose browser half rebuilt while its Host half still runs from before the rebuild, so the page keeps the last-good client code instead of running new client code against old Host code.",
-      "reach": ["click button \"Plugins\"", "click button \"View HMR updates\"", "expect text \"Nothing is waiting*\""],
-      "surfaces": ["client", "host", "settings"],
+      "reach": [
+        "click button \"Plugins\"",
+        "click button \"View HMR updates\"",
+        "expect text \"Nothing is waiting*\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
       "surface": "statusItem",
       "destination": "none",
       "currentSurface": "plugins-page: View HMR updates",
       "configuration": [],
-      "states": ["in-step", "deferred", "released"],
+      "states": [
+        "in-step",
+        "deferred",
+        "released"
+      ],
       "failureModes": [
         "A rebuilt client bundle whose Host half did not change applies immediately, as before.",
         "A rebuilt client bundle whose Host half changed is announced as deferred; the browser keeps the last-good code and the row names the package until a Host restart.",
@@ -42,6 +54,65 @@
           "kind": "not-applicable",
           "id": "hmr-gate.plugins-row-no-gherkin-journey",
           "reason": "A deferral needs a plugin whose Host half is rebuilt on disk while the Host keeps the old one loaded; no Gherkin scenario sets that up yet. The feature's reach steps open the empty row on a scratch DSH with dshx dev open, and the defer and release decisions are unit-tested in src/host/gate.test.ts."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "deferred-update-inbox-item",
+      "title": "Plugin updates waiting for a restart in the Inbox",
+      "summary": "While any rebuilt plugin is held back because its new Host code is not loaded, the Inbox shows one Ready item about this DSH naming the waiting packages and how to apply them (restart when no agent is working). It offers no restart verb: restarting stays the user's decision. A changed set of packages shows again after Done; the item resolves once nothing waits.",
+      "reach": [
+        "click button \"Inbox\"",
+        "expect heading \"Inbox\""
+      ],
+      "surfaces": [
+        "host",
+        "integration"
+      ],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "left-nav: Inbox › hmr-gate.deferred-update",
+      "configuration": [],
+      "states": [
+        "deferred",
+        "changed-set",
+        "applied",
+        "inbox-absent"
+      ],
+      "failureModes": [
+        "Without the inbox (activity-timeline) loaded, the gate works exactly as before; the provider reconciles when the inbox announces it is ready.",
+        "The item never restarts or reloads anything; it only says what waits and how to apply it."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/activity-timeline",
+          "boundary": "attention-api module: reconcile through the dshx Host API client.",
+          "deterministicFake": "src/host/attention.test.ts serves the attention contract from a fake inbox Host on a real Cordis test Host."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.inbox-draft",
+          "file": "plugins/@dshfiles/hmr-gate/src/host/attention.test.ts",
+          "testName": "states held-back rebuilds as one Ready item with recovery text and no restart verb"
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.inbox-round-trip",
+          "file": "plugins/@dshfiles/hmr-gate/src/host/attention.test.ts",
+          "testName": "states the deferred set to the inbox after a burst, again when the inbox is ready, and nothing once it applied"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "hmr-gate.inbox-browser-journey",
+          "reason": "A deferred update needs a plugin's Host bundle rebuilt under a running scratch DSH while its client is served; the provider round trip is proven on a real Cordis Host in src/host/attention.test.ts."
         }
       ],
       "telemetry": [
