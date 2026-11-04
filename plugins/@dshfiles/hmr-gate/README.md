@@ -37,8 +37,10 @@ The Host tracks, per client row:
 2. the digest of that file as the running Host loaded it;
 3. the digest currently on disk.
 
-A client rebuild applies only while (2) and (3) agree. On each poll the client
-bundle's stat change is the trigger; the Host half's bytes are the verdict. If the
+A client rebuild applies only while (2) and (3) agree. The client bundle's stat
+change is the trigger: the Host watches bundle directories (`fs.watch`, async
+`stat` of the named bundles only, a 10 s safety re-read, and polling only for a
+directory that cannot be watched) instead of the stock 500 ms `statSync` poll; the Host half's bytes are the verdict. If the
 Host later reloads the package in-process (`hmr/reload`), the deferral is released
 and the frame is announced.
 

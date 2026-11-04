@@ -1,4 +1,3 @@
-import { statSync } from 'node:fs'
 import type { ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { defineHost } from '@dshfiles/dshx/host'
@@ -9,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-hmr'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { hmrGateApi, type DeferredPackage, type HmrGateStatus } from './api.js'
 import { DeferredUpdateAttention } from './host/attention.js'
+import { BundleWatch, type BundleRead, type BundleStat, type BundleWatcher } from './host/bundle-watcher.js'
 import { HmrGateModel, digestOf, hostArtifactOf } from './host/gate.js'
 
 /**
@@ -27,16 +27,9 @@ import { HmrGateModel, digestOf, hostArtifactOf } from './host/gate.js'
  */
 
 const EVENTS_ENDPOINT = '/plugins/events'
-const POLL_INTERVAL_MS = 500
 const DEFERRED_REASON = 'host-artifact-changed' as const
 
-/** The bundle metadata the poll compares, plus the path it came from. */
-interface BundleStat {
-  readonly mtimeMs: number
-  readonly ctimeMs: number
-  readonly size: number
-}
-
+/** The bundle metadata the watch compares, plus the path it came from. */
 interface BundledRow extends BundleStat {
   readonly path: string
 }
@@ -114,6 +107,35 @@ const registerGate = (ctx: Context): GateRuntime => {
     watched.set(id, { path, mtimeMs: baseline.mtimeMs, ctimeMs: baseline.ctimeMs, size: baseline.size, dirty: false })
   }
 
+  const observe = (id: string, read: BundleRead): void => {
+    const row = watched.get(id)
+    if (row === undefined) return
+    if (read.kind === 'error') {
+      row.dirty = true
+      if (!isEnoent(read.error)) ctx.logger.warn(read.error)
+      return
+    }
+    const current = read.stat
+    if (!row.dirty && current.mtimeMs === row.mtimeMs && current.ctimeMs === row.ctimeMs && current.size === row.size) return
+    row.mtimeMs = current.mtimeMs
+    row.ctimeMs = current.ctimeMs
+    row.size = current.size
+    row.dirty = false
+    const facts = gate.facts(id)
+    const verdict = gate.observe(id, facts?.hostPath === undefined ? undefined : digestOf(facts.hostPath))
+    if (verdict.action === 'apply') {
+      applyRebuild(id)
+      // A failed apply leaves the row dirty; read it again soon instead of waiting for the next event.
+      if (row.dirty) bundles?.retry([id])
+      publishDeferred()
+      return
+    }
+    ctx.logger.info('HMR deferred (%s): the running Host has not loaded %s', id, facts?.hostPath ?? 'its Host half')
+    publishDeferred()
+  }
+
+  let bundles: BundleWatcher | undefined
+
   const syncWatches = (): void => {
     const rows = new Map<string, BundledRow>()
     for (const row of ctx.clientModules.graph().entries) {
@@ -126,44 +148,18 @@ const registerGate = (ctx: Context): GateRuntime => {
       if (existing !== undefined && existing.path === baseline.path) continue
       trackRow(id, baseline.path, baseline)
     }
-  }
-
-  const poll = (): void => {
-    for (const [id, row] of watched) {
-      let current: BundleStat
-      try {
-        const stat = statSync(row.path)
-        current = { mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs, size: stat.size }
-      } catch (error) {
-        row.dirty = true
-        if (!isEnoent(error)) ctx.logger.warn(error)
-        continue
-      }
-      if (!row.dirty && current.mtimeMs === row.mtimeMs && current.ctimeMs === row.ctimeMs && current.size === row.size) continue
-      row.mtimeMs = current.mtimeMs
-      row.ctimeMs = current.ctimeMs
-      row.size = current.size
-      row.dirty = false
-      const facts = gate.facts(id)
-      const verdict = gate.observe(id, facts?.hostPath === undefined ? undefined : digestOf(facts.hostPath))
-      if (verdict.action === 'apply') {
-        applyRebuild(id)
-        publishDeferred()
-        continue
-      }
-      ctx.logger.info('HMR deferred (%s): the running Host has not loaded %s', id, facts?.hostPath ?? 'its Host half')
-      publishDeferred()
-    }
+    bundles?.sync(new Map([...watched].map(([id, row]) => [id, row.path])))
   }
 
   ctx.effect(() => {
+    const watcher = BundleWatch.create({ onRead: observe, onWatchError: error => ctx.logger.warn(error) })
+    bundles = watcher
     syncWatches()
     const unsubscribe = ctx.clientModules.onGraphChanged(syncWatches)
-    const timer = setInterval(poll, POLL_INTERVAL_MS)
-    timer.unref()
     return () => {
       unsubscribe()
-      clearInterval(timer)
+      watcher.dispose()
+      bundles = undefined
       watched.clear()
     }
   }, 'hmr-gate: bundle watches')

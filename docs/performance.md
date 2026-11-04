@@ -141,6 +141,29 @@ Each page load now sends one `bundleLabels` and no `listBundles`. Whole page loa
 `dynamicCordisRunner/*`), so the per-call comparison is the evidence. The scratch trace store was migrated with
 `spans_end` on boot.
 
+### Steady Host costs from the same profile
+
+**hmr-gate bundle watch.** The profile showed hmr-gate `statSync`-ing every client bundle every 500 ms (232 ms per
+20 s). It now watches bundle directories and their package directories with `fs.watch` and reads only the bundles an
+event names with async `stat`, plus a 10 s safety re-read ([bundle-watcher.ts](../plugins/@dshfiles/hmr-gate/src/host/bundle-watcher.ts)).
+Scratch benchmark, not the live Host (Node 22.23.3, 170 bundle files in temp directories, 20 s idle after a 1 s
+settle, two runs each):
+
+| Mode                     | Bundle reads | Sync main-thread `stat` | Process CPU |
+| ------------------------ | ------------ | ----------------------- | ----------- |
+| No watcher (baseline)    | 0            | 0 ms                    | 37–51 ms    |
+| Old: 500 ms `statSync`   | 6,800        | 53–56 ms                | 121–123 ms  |
+| New: `fs.watch` + 10 s   | 340 (async)  | 0 ms                    | 67–95 ms    |
+
+A live 20 s Host profile after deployment is still pending; the Host half changes, so it needs a user-approved restart.
+
+**Telemetry export attributed to shared-streams.** shared-streams' Host code only registers a worker route and an
+index tap. Every owned Host bundle embeds the dshx runtime, and the process-wide tracer
+(`Symbol.for('@dshfiles/dshx.tracing.v3')`) is installed by whichever bundle loads first, so the profile names that
+bundle's file. The ~260 ms per 20 s is the dshx OTLP batch exporter
+([otlp-exporter.ts](../tooling/dshx/packages/dshx/src/tracing/otlp-exporter.ts)) JSON-encoding spans and POSTing them,
+by default to this process's own traces receiver. Still open; the owner is dshx tracing, not shared-streams.
+
 ## Thread-content search (palette `#…`)
 
 One search took 21 s to 1.4 min and stalled every other request (`modelCatalog`, `credentials/describe`, `state`,

@@ -6,30 +6,18 @@
       "id": "plugins-row",
       "title": "Plugin updates waiting for a Host restart",
       "summary": "A Plugins-page row names every plugin whose browser half rebuilt while its Host half still runs from before the rebuild, so the page keeps the last-good client code instead of running new client code against old Host code.",
-      "reach": [
-        "click tab \"Settings\"",
-        "click button \"Plugins\"",
-        "click button \"View HMR updates\"",
-        "expect text \"Nothing is waiting*\""
-      ],
-      "surfaces": [
-        "client",
-        "host",
-        "settings"
-      ],
+      "reach": ["click tab \"Settings\"", "click button \"Plugins\"", "click button \"View HMR updates\"", "expect text \"Nothing is waiting*\""],
+      "surfaces": ["client", "host", "settings"],
       "surface": "statusItem",
       "destination": "none",
       "currentSurface": "plugins-page: View HMR updates",
       "configuration": [],
-      "states": [
-        "in-step",
-        "deferred",
-        "released"
-      ],
+      "states": ["in-step", "deferred", "released"],
       "failureModes": [
         "A rebuilt client bundle whose Host half did not change applies immediately, as before.",
         "A rebuilt client bundle whose Host half changed is announced as deferred; the browser keeps the last-good code and the row names the package until a Host restart.",
-        "A Host that reloads the package in-process releases the deferral and announces the rebuild."
+        "A Host that reloads the package in-process releases the deferral and announces the rebuild.",
+        "A bundle directory removed by a clean build, or one that cannot be watched, is polled until a watch reopens; a 10 s re-read covers dropped watch events."
       ],
       "externalDependencies": [],
       "verification": [
@@ -52,6 +40,18 @@
           "testName": "reads an owned bundle entry from exports"
         },
         {
+          "kind": "unit-test",
+          "id": "hmr-gate.plugins-row-unit-watches-rewritten-bundle",
+          "file": "plugins/@dshfiles/hmr-gate/src/host/bundle-watcher.test.ts",
+          "testName": "reads only the rewritten bundle after a directory event, without polling idle bundles"
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.plugins-row-unit-watch-survives-clean-build",
+          "file": "plugins/@dshfiles/hmr-gate/src/host/bundle-watcher.test.ts",
+          "testName": "falls back to polling a removed bundle directory and resumes when a clean build recreates it"
+        },
+        {
           "kind": "not-applicable",
           "id": "hmr-gate.plugins-row-no-gherkin-journey",
           "reason": "A deferral needs a plugin whose Host half is rebuilt on disk while the Host keeps the old one loaded; no Gherkin scenario sets that up yet. The feature's reach steps open the empty row on a scratch DSH with dshx dev open, and the defer and release decisions are unit-tested in src/host/gate.test.ts."
@@ -68,24 +68,13 @@
       "id": "deferred-update-inbox-item",
       "title": "Plugin updates waiting for a restart in the Inbox",
       "summary": "While any rebuilt plugin is held back because its new Host code is not loaded, the Inbox shows one Ready item about this DSH naming the waiting packages and how to apply them (restart when no agent is working). It offers no restart verb: restarting stays the user's decision. A changed set of packages shows again after Done; the item resolves once nothing waits.",
-      "reach": [
-        "click tab \"Inbox\"",
-        "expect heading \"Inbox\""
-      ],
-      "surfaces": [
-        "host",
-        "integration"
-      ],
+      "reach": ["click tab \"Inbox\"", "expect heading \"Inbox\""],
+      "surfaces": ["host", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › hmr-gate.deferred-update",
       "configuration": [],
-      "states": [
-        "deferred",
-        "changed-set",
-        "applied",
-        "inbox-absent"
-      ],
+      "states": ["deferred", "changed-set", "applied", "inbox-absent"],
       "failureModes": [
         "Without the inbox (activity-timeline) loaded, the gate works exactly as before; the provider reconciles when the inbox announces it is ready.",
         "The item never restarts or reloads anything; it only says what waits and how to apply it."
@@ -127,24 +116,14 @@
       "id": "restart-status-item",
       "title": "See a pending Host restart in the status strip",
       "summary": "While a rebuilt plugin waits for a Host restart, the status strip shows \"Restart pending\" (with the plugin count when several wait). It offers no restart verb: restarting stays the user's decision, and the Plugins page row explains what would apply.",
-      "reach": [
-        "expect region \"Threads\""
-      ],
-      "surfaces": [
-        "client"
-      ],
+      "reach": ["expect region \"Threads\""],
+      "surfaces": ["client"],
       "surface": "statusItem",
       "destination": "none",
       "currentSurface": "status-strip: Restart pending",
       "configuration": [],
-      "states": [
-        "hidden",
-        "pending-one",
-        "pending-many"
-      ],
-      "failureModes": [
-        "Without frame-layout the item is registered but not shown; the Plugins page row and the Inbox item still report the pending restart."
-      ],
+      "states": ["hidden", "pending-one", "pending-many"],
+      "failureModes": ["Without frame-layout the item is registered but not shown; the Plugins page row and the Inbox item still report the pending restart."],
       "externalDependencies": [],
       "verification": [
         {
