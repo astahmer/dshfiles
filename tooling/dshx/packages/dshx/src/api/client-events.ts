@@ -4,6 +4,7 @@ import type { AnyApiEventDefinition, AnyApiMethodDefinition, ApiClient, ApiEvent
 import { ApiProtocolModel } from './common.js'
 import { ApiRuntimeModel } from './runtime.js'
 import { ApiChannelModel } from './channel.js'
+import { decodeJson, jsonValueSchema } from '../json.js'
 
 interface EventSourceLike {
   readonly readyState: number
@@ -60,7 +61,7 @@ const notifyStatus = (hub: EventHub): void => {
 const receive = (hub: EventHub, raw: unknown): void => {
   let parsed: unknown
   try {
-    parsed = typeof raw === 'string' ? JSON.parse(raw) : undefined
+    parsed = typeof raw === 'string' ? decodeJson(jsonValueSchema, raw) : undefined
   } catch {
     return
   }

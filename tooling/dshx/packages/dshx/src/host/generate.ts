@@ -3,6 +3,7 @@ import type { BlockAssembler, GenerateOptions, TokenUsage } from '@deepseek-ai/d
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { PluginApiError } from '../api/common.js'
 import { publishedJsonSchema } from '../api/json-schema.js'
+import { decodeJson, jsonValueSchema } from '../json.js'
 
 export interface GenerateModel {
   readonly provider: string
@@ -75,7 +76,7 @@ const decode = async <Output>(
 ): Promise<{ readonly ok: true; readonly value: Output } | { readonly ok: false; readonly issues: string }> => {
   let parsed: unknown
   try {
-    parsed = JSON.parse(stripFence(text))
+    parsed = decodeJson(jsonValueSchema, stripFence(text))
   } catch (cause) {
     return { ok: false, issues: `The reply is not JSON: ${cause instanceof Error ? cause.message : String(cause)}` }
   }

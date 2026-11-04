@@ -3,7 +3,7 @@ import * as Schema from 'effect/Schema'
 import { dirname, relative, resolve } from 'node:path'
 import type { ArrayExpression, Expression, ObjectExpression, Program } from 'oxc-parser'
 import { SourceSyntax } from '../project/syntax.js'
-import { jsonObjectSchema } from '../json.js'
+import { decodeJson, jsonObjectSchema } from '../json.js'
 import { CLIENT_CAPABILITIES, DSH_PROTOCOL_2, HOST_CAPABILITIES } from 'create-dshx/capabilities'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
@@ -80,7 +80,7 @@ const record = (value: unknown): Record<string, unknown> | undefined =>
 
 const parseManifest = (source: string): Record<string, unknown> | undefined => {
   try {
-    return record(JSON.parse(source))
+    return { ...decodeJson(jsonObjectSchema, source) }
   } catch {
     return undefined
   }

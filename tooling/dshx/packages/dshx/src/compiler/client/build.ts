@@ -1,3 +1,4 @@
+import * as Schema from 'effect/Schema'
 import { readdir, readFile, realpath } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { isAbsolute, relative, resolve } from 'node:path'
@@ -17,6 +18,14 @@ import { LocaleNamespaceOwnershipModel } from './locale-ownership.js'
 import { profilePackages } from './profile-scan.js'
 import { ClientCompilerGuards } from './guards.js'
 import { clientSlotRegistrations, slotOccupancyConflicts } from './slot-occupancy.js'
+import { decodeJson } from '../../json.js'
+
+/** The dependency maps whose names are typo candidates for dsh.client.inject; only the names are read. */
+const dependencyMapsSchema = Schema.Struct({
+  dependencies: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  devDependencies: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  peerDependencies: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+})
 
 const VIRTUAL_CLIENT_ENTRY = '\0virtual:dshx-client-entry'
 const VIRTUAL_CLIENT_PUBLIC = '\0virtual:dshx-client-public'
@@ -384,10 +393,7 @@ async function validateInjectPackages(paths: Awaited<ReturnType<typeof resolveOp
     })
   const missing = inject.filter(name => !installed(name))
   if (missing.length === 0) return
-  const manifest = JSON.parse(await readFile(resolve(paths.root, 'package.json'), 'utf8').catch(() => '{}')) as Record<
-    string,
-    Record<string, string> | undefined
-  >
+  const manifest = decodeJson(dependencyMapsSchema, await readFile(resolve(paths.root, 'package.json'), 'utf8').catch(() => '{}'))
   const scoped = await readdir(resolve(paths.root, 'node_modules/@deepseek-ai')).catch(() => [] as string[])
   const candidates = [
     ...new Set([

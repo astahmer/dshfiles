@@ -3,6 +3,7 @@ import { isAbsolute, resolve } from 'node:path'
 import type { Plugin } from 'vite'
 import { DshxError } from '../../diagnostics.js'
 import { containsPrivateDshxImport } from '../private-imports.js'
+import { decodeJson, jsonValueSchema } from '../../json.js'
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
@@ -29,7 +30,7 @@ function hostPeerDependencyPlugin(root: string): Plugin {
     async buildStart() {
       let manifest: unknown
       try {
-        manifest = JSON.parse(await readFile(packageFile, 'utf8'))
+        manifest = decodeJson(jsonValueSchema, await readFile(packageFile, 'utf8'))
       } catch (cause) {
         throw new DshxError('DSHX4005', 'Cannot inspect Host package peerDependencies.', {
           cause,

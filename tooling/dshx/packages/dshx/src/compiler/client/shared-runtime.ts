@@ -1,3 +1,4 @@
+import * as Schema from 'effect/Schema'
 import { execFile } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
@@ -5,6 +6,10 @@ import { dirname, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { Plugin } from 'vite'
 import { DshxError } from '../../diagnostics.js'
+import { decodeJson } from '../../json.js'
+
+/** What the export-name probe prints: each provided specifier's sorted export names. */
+const exportNamesSchema = Schema.Record(Schema.String, Schema.Array(Schema.String))
 
 /**
  * Opt-in shared runtime: one supplier package's Client chunk carries third-party modules and the shared plugin sheet
@@ -55,7 +60,7 @@ export class SharedRuntime {
     const script = `const specifiers = ${JSON.stringify(provide)}; const names = {}; for (const specifier of specifiers) names[specifier] = Object.keys(await import(specifier)).filter(name => name !== '__esModule').sort(); process.stdout.write(JSON.stringify(names))`
     try {
       const { stdout } = await promisify(execFile)(process.execPath, ['--input-type=module', '--eval', script], { cwd: root, maxBuffer: 16 * 1024 * 1024 })
-      return JSON.parse(stdout) as Record<string, readonly string[]>
+      return decodeJson(exportNamesSchema, stdout)
     } catch (cause) {
       throw new DshxError('DSHX1208', 'Cannot read the export names of every client.sharedRuntime.provide module.', {
         cause,

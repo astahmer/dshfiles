@@ -1,3 +1,4 @@
+import * as Schema from 'effect/Schema'
 import { mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { delimiter, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -10,6 +11,13 @@ import { registerScratchWorkspace } from '../project/scratch-workspace.js'
 import { ScratchReaperRuntime, type ReapedScratch, type WarnedScratch } from './reaper.js'
 import { ScratchSeedRuntime } from './seed.js'
 import { LIVE_DSH_HOME, LIVE_DSH_PORT, ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
+import { decodeJson } from '../json.js'
+
+/** The profile seed's dependency maps; only their package names matter here. */
+const seedManifestSchema = Schema.Struct({
+  dependencies: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  devDependencies: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+})
 
 export interface ScratchUpOptions {
   readonly name: string
@@ -81,22 +89,15 @@ const scratchCordisPatch = (packageIds: readonly string[]): { readonly cordisPat
  * global tool behind `tool_search`, which made catalog reaches calling `bash` or `ask_user_question` fail with
  * `UNKNOWN_TOOL`) load only through an explicit `--plugin`. An unreadable seed falls back to every owned bundle.
  */
-export const defaultScratchPlugins = (
-  available: readonly { readonly packageId: string }[],
-  seedDependencies: ReadonlySet<string> | undefined,
-): string[] =>
+export const defaultScratchPlugins = (available: readonly { readonly packageId: string }[], seedDependencies: ReadonlySet<string> | undefined): string[] =>
   available.map(bundle => bundle.packageId).filter(packageId => seedDependencies === undefined || seedDependencies.has(packageId))
 
 const readWebSeedDependencies = async (): Promise<ReadonlySet<string> | undefined> => {
   const source = await readFile(join(DSHFILES_ROOT, 'profiles', 'web', 'package.json'), 'utf8').catch(() => undefined)
   if (source === undefined) return undefined
   try {
-    const manifest: unknown = JSON.parse(source)
-    if (typeof manifest !== 'object' || manifest === null) return undefined
-    const record = manifest as { readonly dependencies?: unknown; readonly devDependencies?: unknown }
-    const names = [record.dependencies, record.devDependencies].flatMap(deps =>
-      typeof deps === 'object' && deps !== null ? Object.keys(deps) : [],
-    )
+    const manifest = decodeJson(seedManifestSchema, source)
+    const names = [manifest.dependencies, manifest.devDependencies].flatMap(deps => (deps === undefined ? [] : Object.keys(deps)))
     return names.length === 0 ? undefined : new Set(names)
   } catch {
     return undefined

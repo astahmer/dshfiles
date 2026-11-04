@@ -6,6 +6,7 @@ import { withUnknownProperties } from '../schema.js'
 import type { JsonValue } from './client.js'
 import { DshPlatformError, DshPlatformLaunchUrl } from './client.js'
 import { ApiChannelModel } from '../api/channel.js'
+import { decodeJson, jsonValueSchema } from '../json.js'
 
 const responseSchema = withUnknownProperties({
   type: Schema.Literal('server-response'),
@@ -68,7 +69,7 @@ export const createDshxApiCaller = ({ origin, cookie, packageId, apiId, version,
     if (!response.ok) throw new DshPlatformError('api-http-error', 'DSH API returned HTTP ' + response.status + ' for ' + apiId + '/' + method + '.')
     let body: unknown
     try {
-      body = JSON.parse(await response.text())
+      body = decodeJson(jsonValueSchema, await response.text())
     } catch {
       throw new DshPlatformError('invalid-response', 'DSH API ' + apiId + '/' + method + ' returned invalid JSON.')
     }

@@ -7,6 +7,8 @@ import { join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { JsonLineTransport } from '../bridge/json-line.js'
 import type { RuntimePluginStatus } from './runtime-plugins.js'
+import * as Result from 'effect/Result'
+import { decodeJson, decodeJsonSafe, jsonObjectSchema, jsonValueSchema } from '../json.js'
 
 const PROTOCOL_VERSION = 1
 const MAX_MESSAGE_BYTES = 64 * 1024
@@ -95,7 +97,7 @@ function paths(packageId: string) {
 async function removeStaleEndpoint(location: { socketPath: string; metadataPath: string }): Promise<void> {
   let value: Record<string, unknown> | undefined
   try {
-    value = JSON.parse(await readFile(location.metadataPath, 'utf8')) as Record<string, unknown>
+    value = decodeJson(jsonObjectSchema, await readFile(location.metadataPath, 'utf8'))
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') value = undefined
   }
@@ -129,7 +131,7 @@ interface ParsedInspectRequest {
 function parseRequest(text: string, token: string): ParsedInspectRequest {
   let value: unknown
   try {
-    value = JSON.parse(text)
+    value = decodeJson(jsonValueSchema, text)
   } catch {
     throw new BridgeFailure('DSHX3203', 'Inspect bridge received invalid JSON.')
   }
@@ -367,9 +369,9 @@ const inspectBridgeEnabled = (): boolean => {
 }
 
 const readBridgeMetadata = async (path: string): Promise<Record<string, unknown>> => {
-  const value = JSON.parse(await readFile(path, 'utf8')) as unknown
-  if (!isRecord(value)) throw new Error('Inspect bridge metadata must be an object.')
-  return value
+  const value = decodeJsonSafe(jsonObjectSchema, await readFile(path, 'utf8'))
+  if (Result.isFailure(value)) throw new Error('Inspect bridge metadata must be an object.')
+  return value.success
 }
 
 export class HostInspectBridge {

@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
+import { decodeJson, jsonObjectSchema } from '../json.js'
 
 interface PackageTarget {
   readonly field: string
@@ -39,9 +40,7 @@ function diagnostic(config: ResolvedDshxConfig, target: PackageTarget, message: 
 export async function checkPackageTargets(config: ResolvedDshxConfig): Promise<DshxDiagnostic[]> {
   let manifest: Record<string, unknown>
   try {
-    const parsed: unknown = JSON.parse(await readFile(config.packageFile, 'utf8'))
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new TypeError('package.json must contain an object')
-    manifest = parsed as Record<string, unknown>
+    manifest = decodeJson(jsonObjectSchema, await readFile(config.packageFile, 'utf8'))
   } catch (error) {
     return [
       {

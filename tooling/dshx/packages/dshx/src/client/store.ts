@@ -1,5 +1,6 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { Subscribable } from './broker.js'
+import { decodeJson, jsonValueSchema } from '../json.js'
 
 /** `global` keeps one value; `session` and `project` keep one per session or project id. */
 export type StoreScope = 'global' | 'session' | 'project'
@@ -69,7 +70,7 @@ const decode = <T>(schema: StandardSchemaV1<unknown, T>, raw: string | null): { 
   if (raw === null) return { ok: false }
   let parsed: unknown
   try {
-    parsed = JSON.parse(raw)
+    parsed = decodeJson(jsonValueSchema, raw)
   } catch {
     return { ok: false }
   }

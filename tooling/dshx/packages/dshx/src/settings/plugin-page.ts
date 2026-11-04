@@ -12,6 +12,7 @@
  */
 import type { ReactNode } from 'react'
 import { SettingsPageRendererModel } from './page-renderer.js'
+import { decodeJson, jsonValueSchema } from '../json.js'
 
 type ReactRuntime = typeof import('react')
 declare const require: ((name: string) => unknown) | undefined
@@ -203,7 +204,7 @@ const draftValue = (type: FieldKind, text: string): { readonly value: unknown } 
     return Number.isFinite(parsed) ? { value: parsed } : undefined
   }
   try {
-    return { value: JSON.parse(text) }
+    return { value: decodeJson(jsonValueSchema, text) }
   } catch {
     return undefined
   }
@@ -291,7 +292,7 @@ const createPluginPage = (react: ReactRuntime, primitives: Primitives): ((props:
   }): ReactNode => {
     const fields = react.useMemo(() => {
       try {
-        return pageFields(props.schemaService.rehydrate(JSON.parse(props.schemaJson)), props.secrets)
+        return pageFields(props.schemaService.rehydrate(decodeJson(jsonValueSchema, props.schemaJson)), props.secrets)
       } catch {
         return []
       }

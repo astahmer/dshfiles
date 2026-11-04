@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
+import * as Result from 'effect/Result'
+import * as Schema from 'effect/Schema'
+import { decodeJson, decodeJsonSafe, jsonValueSchema } from '../../json.js'
+
+const namedManifestSchema = Schema.Struct({ name: Schema.String })
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
@@ -11,8 +16,8 @@ function nearestPackageManifest(from: string): string | undefined {
   for (;;) {
     const candidate = join(directory, 'package.json')
     try {
-      const parsed: unknown = JSON.parse(readFileSync(candidate, 'utf8'))
-      if (isObject(parsed) && typeof parsed.name === 'string' && parsed.name.length > 0) return candidate
+      const parsed = decodeJsonSafe(namedManifestSchema, readFileSync(candidate, 'utf8'))
+      if (Result.isSuccess(parsed) && parsed.success.name.length > 0) return candidate
     } catch {
       // Keep walking up.
     }
@@ -48,7 +53,7 @@ export async function installedLocaleNamespaces(packageId: string): Promise<read
   if (manifestPath === undefined) return undefined
   let manifest: unknown
   try {
-    manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    manifest = decodeJson(jsonValueSchema, await readFile(manifestPath, 'utf8'))
   } catch {
     return undefined
   }

@@ -9,6 +9,7 @@ import type { Context, Fiber, Inject } from '@deepseek-ai/cordis'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { HostRuntimeModel, type HostPluginMetadata } from './runtime.js'
 import { hostGenerationManifestSchema, HOST_GENERATION_DIRECTORY } from './generation-contract.js'
+import { decodeJson, jsonValueSchema } from '../json.js'
 
 /** The Loader and lifecycle surface one generation must provide. */
 export interface HostGenerationImplementation {
@@ -192,7 +193,7 @@ export const createHostGenerationPlugin = (options: HostGenerationPluginOptions)
         fail(options.generation, error)
         return
       }
-      const decodedManifest = Schema.decodeUnknownOption(hostGenerationManifestSchema, { onExcessProperty: 'error' })(JSON.parse(rawManifest))
+      const decodedManifest = Schema.decodeUnknownOption(hostGenerationManifestSchema, { onExcessProperty: 'error' })(decodeJson(jsonValueSchema, rawManifest))
       if (Option.isNone(decodedManifest)) {
         logger.error('Invalid Host generation manifest (plugin=%s)', options.metadata.packageId)
         return

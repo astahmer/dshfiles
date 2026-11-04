@@ -4,7 +4,7 @@ import { access, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/prom
 import { dirname, relative, resolve, sep } from 'node:path'
 import type { Program } from 'oxc-parser'
 import { SourceSyntax } from '../project/syntax.js'
-import { jsonObjectSchema } from '../json.js'
+import { decodeJson, jsonObjectSchema } from '../json.js'
 import { withUnknownProperties } from '../schema.js'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import type { DshCompatibility } from '../compat/types.js'
@@ -350,7 +350,8 @@ function newClientSource(clientFile: string, contributionFile: string, slotName:
 }
 
 function updateManifest(source: string, provider: string, slotName: string, compatibility: DshCompatibility) {
-  const value = JSON.parse(source) as Record<string, unknown>
+  // SAFETY: a decoded JSON object is a string-keyed record; this copy is rewritten field by field below.
+  const value = { ...decodeJson(jsonObjectSchema, source) } as Record<string, unknown>
   const exports = value.exports
   if (exports !== undefined && (typeof exports !== 'object' || exports === null || Array.isArray(exports)))
     throw new Error('package.json exports must be an object when adding a Client entry.')

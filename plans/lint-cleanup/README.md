@@ -25,10 +25,17 @@ Per rule (oxlint, finding count / cap): `no-native-title` 89 / 309,
 
 ast-grep: `no-direct-json-parse` 181 / 247, `no-direct-json-parse-tsx` 2 / 4.
 
+2026-11-04: dshx `src` is down to two deliberate sites: `config/resolve.ts` parses
+raw so it can see an own `__proto__` key, which a schema decode drops, and
+`repository/bundle-freshness.ts` is imported as TypeScript source by
+`scripts/profile-sync.ts`, where `../json.js` does not resolve. Every
+other site goes through `src/json.ts` with its owning schema or `jsonValueSchema`.
+`no-direct-json-parse` measured 171 → 151; cap lowered 184 → 151.
+
 ## Remaining work, in order
 
-1. **dshx** — `no-direct-json-parse` in `src/project/*`,
-   `src/communication/bridge.ts`, `src/platform/*` and the dshx tests, then the
+1. **dshx** — `src` done (2026-11-04). Remaining: about 76
+   `no-direct-json-parse` sites in `tooling/dshx/packages/dshx/tests`, then the
    antislop tail.
 2. **ai-accounts** — `api-key-setup-dialog.tsx` plus the antislop tail.
 3. **multi-host, thread-sidebar, traces, annotations** — mostly

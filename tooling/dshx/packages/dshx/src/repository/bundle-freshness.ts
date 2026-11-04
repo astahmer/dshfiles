@@ -30,6 +30,8 @@ export type BundleFreshnessReport =
  * fails on imports. A source newer than its bundle counts only when its content differs from the hash the build
  * recorded, since a jj checkout rewrites files it leaves unchanged.
  */
+// scripts/profile-sync.ts imports this file as TypeScript source under Node type stripping, where `../json.js` does not
+// resolve; this module keeps its own schema-checked JSON boundary instead of importing src/json.ts.
 const decodeJson = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: string): S['Type'] => {
   const value: unknown = JSON.parse(text)
   return Schema.decodeUnknownSync(schema)(value)
