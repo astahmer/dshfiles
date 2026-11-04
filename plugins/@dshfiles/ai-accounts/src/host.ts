@@ -49,6 +49,7 @@ import { fetchCommandCodeCatalog, createCommandCodeProvider } from './commandcod
 import { CredentialModel, resolveKeyFromContext } from './credentials.js'
 import { fetchOpenCodeGoCatalog } from './opencode-go-catalog.js'
 import { DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { AccountsPlatformLive } from './platform-layer.js'
 import { AccountLocks } from './account-locks.js'
 import type { Context } from '@deepseek-ai/cordis'
@@ -77,6 +78,7 @@ import { randomUUID } from 'node:crypto'
 import { materializeCodexShadowHome } from './codex-home.js'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
 import { createQuotaContinuationService } from './quota-continuation.js'
+import { QuotaAttention } from './quota-attention.js'
 import { ProviderProfileModel, EffortPinnedAdapter } from './provider-profile.js'
 import { DeclaredRetryAfter } from './provider-retry-after.js'
 import { AccountModelSettingsModel } from './account-model-settings.js'
@@ -824,7 +826,7 @@ export default DshxPlugin.make({
   name: 'llm-ai-accounts',
   inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'workspaceRegistry', 'credentials', 'agents', 'sessionProjections'],
   settings: [aiAccountsSettings],
-  layer: AccountsHostLive.pipe(
+  layer: Layer.merge(AccountsHostLive, QuotaAttention.layer.pipe(Layer.provide(HostApis.layer))).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         RequestRouting.layer,

@@ -5,21 +5,39 @@
       "id": "disabled-account-preview",
       "title": "Keep disabled accounts visible and toggle routing from the usage popover",
       "summary": "Disabled saved accounts keep their measured quota percentage and reset time in muted grey, with a compact OFF label beneath the name, without increasing the preview row height. Clicking still opens the usage popover, where each account has an Enable account toggle using the same Switch component as Settings and sharing the existing saved-account operation. Explicit Hide is separate. Disabled accounts cannot be selected for thread routing or counted as the most critical enabled account. Missing measurements remain unavailable rather than invented; pending and failed saves stay visible without optimistic routing changes.",
-      "surfaces": ["client", "host", "storage"],
+      "surfaces": [
+        "client",
+        "host",
+        "storage"
+      ],
       "surface": "statusItem",
       "destination": "none",
       "currentSurface": "sidebar-footer: usage strip popover",
       "configuration": [],
-      "states": ["enabled", "disabled", "saving", "failed", "explicitly-hidden"],
+      "states": [
+        "enabled",
+        "disabled",
+        "saving",
+        "failed",
+        "explicitly-hidden"
+      ],
       "failureModes": [
         "Failed saves leave the committed toggle state unchanged and permit retry.",
         "Missing account settings disable the toggle rather than saving an incomplete profile.",
         "A disabled account remains clickable for management, not selectable for new thread routing."
       ],
       "externalDependencies": [],
-      "reach": ["seed tool-call-thread", "click button \"Command Code 1:*\"", "expect switch \"Enable Command Code 1\""],
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"Command Code 1:*\"",
+        "expect switch \"Enable Command Code 1\""
+      ],
       "verification": [
-        { "kind": "gherkin", "id": "ai-accounts.disabled-account-preview", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.disabled-account-preview",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
         {
           "kind": "unit-test",
           "id": "ai-accounts.disabled-preview-visible",
@@ -52,20 +70,39 @@
         }
       ],
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" }
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
       "id": "thread-account-switch",
       "title": "Use a sidebar account for this thread without reselecting its model",
       "summary": "Right-click a sidebar account to preview a thread-only selection. Keep the exact model when offered, otherwise use the deployment default if offered or the target's preferred available model, shown explicitly. Preserve compatible reasoning effort, the active request and the global default. A durable provider preference takes precedence over distribution without changing global order; normal failure recovery remains available. Suggest optional compaction only from a measured context estimate, with cost/detail-loss/cache caveats; never compact or send a message automatically.",
-      "surfaces": ["client", "host", "storage"],
+      "surfaces": [
+        "client",
+        "host",
+        "storage"
+      ],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "sidebar-footer: usage strip › Use this account for this thread",
       "configuration": [],
-      "states": ["preview", "same-model", "default-model", "preferred-model", "confirmed", "stale", "unavailable", "compaction-suggested"],
+      "states": [
+        "preview",
+        "same-model",
+        "default-model",
+        "preferred-model",
+        "confirmed",
+        "stale",
+        "unavailable",
+        "compaction-suggested"
+      ],
       "failureModes": [
         "A failed or cached-stale preview cannot be confirmed.",
         "Changing threads discards the dialog; a stale model revision is rejected by the Host.",
@@ -81,7 +118,11 @@
         "expect dialog \"Use account for this thread\""
       ],
       "verification": [
-        { "kind": "gherkin", "id": "ai-accounts.thread-account-switch", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.thread-account-switch",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
         {
           "kind": "unit-test",
           "id": "ai-accounts.thread-model-retained",
@@ -102,16 +143,31 @@
         }
       ],
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" }
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
       "id": "quick-account-setup",
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" },
-        { "kind": "automatic", "source": "secret" },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "secret"
+        },
         {
           "kind": "custom",
           "span": "ai-accounts provider request",
@@ -133,13 +189,31 @@
       ],
       "title": "Connect an account without leaving the chat",
       "summary": "Minimal provider dialogs show common sign-in choices, with named credentials and custom CLI homes under More options. A pencil edits the provisional new-account name without changing route identity or restarting authentication. New profiles remain outside saved accounts and model routes until verification. Claude subscriptions use official CLI configuration status, not remote token validation.",
-      "reach": ["click button \"Add AI account\"", "expect dialog \"Add account\""],
-      "surfaces": ["client", "host", "storage"],
+      "reach": [
+        "click button \"Add AI account\"",
+        "expect dialog \"Add account\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "storage"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "dialog: Add AI account",
       "configuration": [],
-      "states": ["choosing", "preparing", "connecting", "waiting-for-provider", "staging-key", "verifying", "cancelled", "expired", "error", "connected"],
+      "states": [
+        "choosing",
+        "preparing",
+        "connecting",
+        "waiting-for-provider",
+        "staging-key",
+        "verifying",
+        "cancelled",
+        "expired",
+        "error",
+        "connected"
+      ],
       "failureModes": [
         "Old Hosts without provisional connection APIs fail closed and never fall back to eager account creation.",
         "Cancellation, expiry and failed verification discard the provisional connection without adding an account; existing accounts are preserved.",
@@ -157,9 +231,21 @@
         }
       ],
       "verification": [
-        { "kind": "gherkin", "id": "ai-accounts.sidebar-add", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
-        { "kind": "gherkin", "id": "ai-accounts.login-methods", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
-        { "kind": "gherkin", "id": "ai-accounts.existing-login-sources", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.sidebar-add",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.login-methods",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.existing-login-sources",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
         {
           "kind": "unit-test",
           "id": "ai-accounts.setup-lifecycle",
@@ -177,27 +263,57 @@
     {
       "id": "active-chat-account",
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" },
-        { "kind": "automatic", "source": "model-stream" }
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
       ],
       "title": "See which account serves the active chat",
       "summary": "Sidebar meters highlight actual wire-account metadata for the foreground chat, following distribution and failover. Idle chats show the last successful account; unknown sources are never inferred from model selection.",
-      "reach": ["seed tool-call-thread", "expect group \"AI accounts usage*\""],
-      "surfaces": ["client", "host", "storage"],
+      "reach": [
+        "seed tool-call-thread",
+        "expect group \"AI accounts usage*\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "storage"
+      ],
       "surface": "statusItem",
       "destination": "none",
       "currentSurface": "sidebar-footer: usage strip meters",
       "configuration": [],
-      "states": ["unknown", "attempting", "succeeded", "failed", "last-successful"],
+      "states": [
+        "unknown",
+        "attempting",
+        "succeeded",
+        "failed",
+        "last-successful"
+      ],
       "failureModes": [
         "Old Hosts and native/non-account routes show no false current-account highlight.",
         "Side requests and delayed previous-chat results cannot overwrite foreground attribution."
       ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "ai-accounts.active-chat-account", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
-        { "kind": "gherkin", "id": "ai-accounts.active-chat-switch", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.active-chat-account",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.active-chat-switch",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
         {
           "kind": "unit-test",
           "id": "ai-accounts.serving-account",
@@ -215,7 +331,12 @@
         "expect searchbox \"Search accounts and known models\"",
         "expect complementary \"Provider accounts\""
       ],
-      "surfaces": ["client", "host", "settings", "storage"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "storage"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "left-nav: AI Accounts: Accounts",
@@ -224,17 +345,35 @@
           "key": "saveMode",
           "defaultValue": "auto",
           "constraints": "One of auto or manual.",
-          "choices": ["auto", "manual"],
-          "coveredBy": ["ai-accounts.save-policy"]
+          "choices": [
+            "auto",
+            "manual"
+          ],
+          "coveredBy": [
+            "ai-accounts.save-policy"
+          ]
         },
         {
           "key": "autoSaveDelayMs",
           "defaultValue": "800",
           "constraints": "Integer from 200 to 10000 milliseconds; used only by auto save.",
-          "coveredBy": ["ai-accounts.save-policy"]
+          "coveredBy": [
+            "ai-accounts.save-policy"
+          ]
         }
       ],
-      "states": ["clean", "dirty", "saving", "saved", "validation-error", "save-error", "confirming-removal", "removing", "remove-error", "removed"],
+      "states": [
+        "clean",
+        "dirty",
+        "saving",
+        "saved",
+        "validation-error",
+        "save-error",
+        "confirming-removal",
+        "removing",
+        "remove-error",
+        "removed"
+      ],
       "failureModes": [
         "Invalid account path or environment alias is rejected.",
         "A failed write preserves the draft and supports retry or revert.",
@@ -268,8 +407,14 @@
     {
       "id": "reference-dashboard",
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
         {
           "kind": "custom",
           "span": "account sign out",
@@ -279,13 +424,30 @@
       ],
       "title": "Manage account Models, Settings and Usage",
       "summary": "Reference-faithful account rail and tabbed detail with inline rename, observed connection state, model reasoning/visibility/inheritance, same-provider priority, confirmed scoped sign-out, and real exact-account request analytics.",
-      "reach": ["seed tool-call-thread", "click button \"AI Accounts: Accounts\"", "expect tab \"Models\""],
-      "surfaces": ["client", "host", "storage"],
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"AI Accounts: Accounts\"",
+        "expect tab \"Models\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "storage"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "left-nav: AI Accounts: Accounts › Models / Settings / Usage tabs",
       "configuration": [],
-      "states": ["models", "settings", "usage", "inherited", "customized", "empty", "unavailable", "sign-out-confirmation"],
+      "states": [
+        "models",
+        "settings",
+        "usage",
+        "inherited",
+        "customized",
+        "empty",
+        "unavailable",
+        "sign-out-confirmation"
+      ],
       "failureModes": [
         "Stored credentials never imply provider-verified token validity; unknown identity, checks and usage remain explicit.",
         "Exact provider attribution is enforced before aggregation and confirmed in API responses; older Hosts cannot display unscoped analytics as account data.",
@@ -299,14 +461,30 @@
           "deterministicFake": "Synthetic session records ingested through the real ledger; no provider traffic."
         }
       ],
-      "verification": [{ "kind": "gherkin", "id": "ai-accounts.dashboard-reference", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" }]
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.dashboard-reference",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        }
+      ]
     },
     {
       "id": "model-routing",
       "title": "Curate models and choose account routes",
       "summary": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
-      "reach": ["seed tool-call-thread", "click button \"AI Accounts: Accounts\"", "expect tab \"Models\"", "expect searchbox \"Search models\""],
-      "surfaces": ["client", "host", "settings", "storage"],
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"AI Accounts: Accounts\"",
+        "expect tab \"Models\"",
+        "expect searchbox \"Search models\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "storage"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "left-nav: AI Accounts: Accounts › Models",
@@ -315,31 +493,58 @@
           "key": "distribution",
           "defaultValue": "sticky",
           "constraints": "One of sticky, priority, round-robin, or balanced; non-sticky modes distribute within compatible accounts of the same provider kind and model.",
-          "choices": ["sticky", "priority", "round-robin", "balanced"],
-          "coveredBy": ["ai-accounts.pool-failover"]
+          "choices": [
+            "sticky",
+            "priority",
+            "round-robin",
+            "balanced"
+          ],
+          "coveredBy": [
+            "ai-accounts.pool-failover"
+          ]
         },
         {
           "key": "cooldownMs",
           "defaultValue": "300000",
           "constraints": "Integer from 0 to 86400000 milliseconds.",
-          "coveredBy": ["ai-accounts.pool-failover"]
+          "coveredBy": [
+            "ai-accounts.pool-failover"
+          ]
         },
         {
           "key": "modelsPageAccounts",
           "defaultValue": "true",
           "constraints": "Boolean; show account routing controls on the models page.",
-          "choices": ["true", "false"],
-          "coveredBy": ["ai-accounts.model-curation"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.model-curation"
+          ]
         },
         {
           "key": "fastModeDefault",
           "defaultValue": "false",
           "constraints": "Boolean; enable Fast mode for supported Codex models unless the thread overrides that model route.",
-          "choices": ["true", "false"],
-          "coveredBy": ["ai-accounts.fast-mode-default"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.fast-mode-default"
+          ]
         }
       ],
-      "states": ["available", "cooling-down", "rebound", "no-eligible-account", "priority-order", "fallback-serving", "fallback-returned"],
+      "states": [
+        "available",
+        "cooling-down",
+        "rebound",
+        "no-eligible-account",
+        "priority-order",
+        "fallback-serving",
+        "fallback-returned"
+      ],
       "failureModes": [
         "A provider rate limit cools the account that served the request and may rebind its retry.",
         "All eligible accounts are cooling down and no route can be selected.",
@@ -441,8 +646,16 @@
       "id": "quota-dashboard",
       "title": "Read provider quota and usage status",
       "summary": "Keep enabled non-hidden accounts visible in canonical order, including accounts whose quota is unavailable. Show Sign in again or Quota unavailable with the provider reason instead of inventing a percentage. Real quota meters retain tags, reset tooltips, active-wire highlighting and last-good transient-error policy; only explicit user hiding collapses an account. A compact settings button beside Add opens the AI Accounts page and closes any open usage popover.",
-      "reach": ["expect group \"AI accounts usage\"", "click button \"AI accounts usage\"", "expect region \"AI account usage\""],
-      "surfaces": ["client", "host", "settings"],
+      "reach": [
+        "expect group \"AI accounts usage\"",
+        "click button \"AI accounts usage\"",
+        "expect region \"AI account usage\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "sidebar-footer: AI accounts usage",
@@ -451,62 +664,101 @@
           "key": "usageRefreshSeconds",
           "defaultValue": "60",
           "constraints": "Integer from 15 to 3600 seconds.",
-          "coveredBy": ["ai-accounts.quota-display"]
+          "coveredBy": [
+            "ai-accounts.quota-display"
+          ]
         },
         {
           "key": "footerButton",
           "defaultValue": "true",
           "constraints": "Boolean; show the footer quota control.",
-          "choices": ["true", "false"],
-          "coveredBy": ["ai-accounts.quota-display"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.quota-display"
+          ]
         },
         {
           "key": "meterLabel",
           "defaultValue": "both",
           "constraints": "One of both, percent, or reset.",
-          "choices": ["both", "percent", "reset"],
-          "coveredBy": ["ai-accounts.quota-display"]
+          "choices": [
+            "both",
+            "percent",
+            "reset"
+          ],
+          "coveredBy": [
+            "ai-accounts.quota-display"
+          ]
         },
         {
           "key": "usageWindowLayout",
           "defaultValue": "binding",
           "constraints": "One of binding, horizontal, or vertical; multi-window layouts show every quota window for the account.",
-          "choices": ["binding", "horizontal", "vertical"],
-          "coveredBy": ["ai-accounts.usage-window-layout"]
+          "choices": [
+            "binding",
+            "horizontal",
+            "vertical"
+          ],
+          "coveredBy": [
+            "ai-accounts.usage-window-layout"
+          ]
         },
         {
           "key": "usageOrder",
           "defaultValue": "[]",
           "constraints": "Ordered account ID list; unknown IDs are ignored.",
-          "coveredBy": ["ai-accounts.quota-display"]
+          "coveredBy": [
+            "ai-accounts.quota-display"
+          ]
         },
         {
           "key": "hiddenUsageAccounts",
           "defaultValue": "[]",
           "constraints": "Account ID list hidden from usage meters.",
-          "coveredBy": ["ai-accounts.quota-display"]
+          "coveredBy": [
+            "ai-accounts.quota-display"
+          ]
         },
         {
           "key": "usagePopoverWidth",
           "defaultValue": "0",
           "constraints": "Integer px from the popover's resize grip; 0 fits the default width. A wide popover lays account cards out as a grid.",
-          "coveredBy": ["ai-accounts.usage-popover-resize"]
+          "coveredBy": [
+            "ai-accounts.usage-popover-resize"
+          ]
         },
         {
           "key": "usagePopoverHeight",
           "defaultValue": "0",
           "constraints": "Integer px from the popover's resize grip; 0 fits the content.",
-          "coveredBy": ["ai-accounts.usage-popover-resize"]
+          "coveredBy": [
+            "ai-accounts.usage-popover-resize"
+          ]
         },
         {
           "key": "edgeWidget",
           "defaultValue": "false",
           "constraints": "Boolean; enable the edge quota overlay (hidden while no account is set up).",
-          "choices": ["true", "false"],
-          "coveredBy": ["ai-accounts.quota-display"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.quota-display"
+          ]
         }
       ],
-      "states": ["loading", "available", "limited", "reset-known", "failed", "hidden"],
+      "states": [
+        "loading",
+        "available",
+        "limited",
+        "reset-known",
+        "failed",
+        "hidden"
+      ],
       "failureModes": [
         "A quota provider failure is displayed without persisting a fake success.",
         "Missing or stale accounts do not crash the quota strip.",
@@ -578,8 +830,15 @@
       "id": "strip-short-names",
       "title": "Short names in the sidebar usage strip",
       "summary": "Show or hide the tag beside each meter in the wide usage strip (Settings switch or the strip's context menu), and set each account's strip short name in AI Accounts settings; an account without one uses its picker tag, then its initials.",
-      "reach": ["click button \"Settings\"", "click text \"AI Accounts\"", "expect switch \"Short names in the strip\""],
-      "surfaces": ["client", "settings"],
+      "reach": [
+        "click button \"Settings\"",
+        "click text \"AI Accounts\"",
+        "expect switch \"Short names in the strip\""
+      ],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: AI Accounts › strip short names",
@@ -588,18 +847,33 @@
           "key": "usageShortNames",
           "defaultValue": "true",
           "constraints": "Boolean; show each account's short name in the wide strip.",
-          "choices": ["true", "false"],
-          "coveredBy": ["ai-accounts.strip-short-names"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.strip-short-names"
+          ]
         },
         {
           "key": "usageShortNameOverrides",
           "defaultValue": "{}",
           "constraints": "Account id → strip short name, at most 6 characters; empty falls back to the picker tag, then the initials.",
-          "coveredBy": ["ai-accounts.strip-short-names"]
+          "coveredBy": [
+            "ai-accounts.strip-short-names"
+          ]
         }
       ],
-      "states": ["shown", "hidden", "overridden", "fallback-tag", "fallback-initials"],
-      "failureModes": ["A spent account's binding meter still names the account in its 'limit reached' text when short names are hidden."],
+      "states": [
+        "shown",
+        "hidden",
+        "overridden",
+        "fallback-tag",
+        "fallback-initials"
+      ],
+      "failureModes": [
+        "A spent account's binding meter still names the account in its 'limit reached' text when short names are hidden."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -631,7 +905,12 @@
       "id": "usage-history-and-pricing",
       "title": "Review usage history and cost forecasts",
       "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, apply explicit price overrides, and estimate composer and completed-turn costs without persisting provider response payloads.",
-      "surfaces": ["client", "host", "storage", "settings"],
+      "surfaces": [
+        "client",
+        "host",
+        "storage",
+        "settings"
+      ],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: AI Accounts: Usage history",
@@ -640,24 +919,41 @@
           "key": "pricingRefreshHours",
           "defaultValue": "24",
           "constraints": "Integer from 1 to 720 hours.",
-          "coveredBy": ["ai-accounts.pricing-cost"]
+          "coveredBy": [
+            "ai-accounts.pricing-cost"
+          ]
         },
         {
           "key": "pricingOverrides",
           "defaultValue": "{}",
           "constraints": "Model ID to synthetic price override map; malformed entries are ignored safely.",
-          "coveredBy": ["ai-accounts.pricing-cost"]
+          "coveredBy": [
+            "ai-accounts.pricing-cost"
+          ]
         },
         {
           "key": "currency",
           "defaultValue": "USD",
           "constraints": "The only supported currency is USD.",
-          "choices": ["USD"],
-          "coveredBy": ["ai-accounts.pricing-cost"]
+          "choices": [
+            "USD"
+          ],
+          "coveredBy": [
+            "ai-accounts.pricing-cost"
+          ]
         }
       ],
-      "states": ["snapshot-written", "same-bucket-updated", "provider-failure", "history-trimmed", "price-missing"],
-      "failureModes": ["Failed quota reads write no history row.", "Missing model price yields an unavailable estimate rather than an invented cost."],
+      "states": [
+        "snapshot-written",
+        "same-bucket-updated",
+        "provider-failure",
+        "history-trimmed",
+        "price-missing"
+      ],
+      "failureModes": [
+        "Failed quota reads write no history row.",
+        "Missing model price yields an unavailable estimate rather than an invented cost."
+      ],
       "externalDependencies": [
         {
           "id": "models-dev-pricing",
@@ -718,7 +1014,12 @@
         "click tab \"Hand-off\"",
         "expect text \"Enable an account with quota to see where it is heading.\""
       ],
-      "surfaces": ["client", "host", "storage", "settings"],
+      "surfaces": [
+        "client",
+        "host",
+        "storage",
+        "settings"
+      ],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: AI Accounts: Quota forecast",
@@ -727,10 +1028,21 @@
           "key": "workHours",
           "defaultValue": "{\"days\":[1,2,3,4,5],\"startHour\":9,\"endHour\":18}",
           "constraints": "Days are Date.getDay() values (0 = Sunday); startHour 0–23, endHour 1–24 and after startHour.",
-          "coveredBy": ["ai-accounts.coverage-none-free", "ai-accounts.handoff-plan"]
+          "coveredBy": [
+            "ai-accounts.coverage-none-free",
+            "ai-accounts.handoff-plan"
+          ]
         }
       ],
-      "states": ["insufficient-history", "runs-out-before-reset", "reset-before-depletion", "unavailable", "pool-covered", "pool-none-free", "handoff-gap"],
+      "states": [
+        "insufficient-history",
+        "runs-out-before-reset",
+        "reset-before-depletion",
+        "unavailable",
+        "pool-covered",
+        "pool-none-free",
+        "handoff-gap"
+      ],
       "failureModes": [
         "An account without a quota reading shows \"Reconnect to forecast\" or \"Quota not reported\" instead of an invented projection.",
         "An older Host ignores the history bucket and returns its bounded series; the forecast still draws."
@@ -814,7 +1126,11 @@
       "id": "luna-reserve-routing",
       "title": "Route exhausted Luna accounts through Reserve",
       "summary": "Use the separate Reserve quota window and route to the Reserve model only after the weekly Luna window is spent.",
-      "surfaces": ["client", "host", "settings"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: AI Accounts › failure recovery",
@@ -823,19 +1139,38 @@
           "key": "codexLunaReserve",
           "defaultValue": "true",
           "constraints": "Boolean; enable separate Luna Reserve routing and metering.",
-          "choices": ["true", "false"],
-          "coveredBy": ["ai-accounts.luna-reserve"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.luna-reserve"
+          ]
         },
         {
           "key": "costEstimates",
           "defaultValue": "true",
           "constraints": "Boolean; enable composer and completed-turn cost estimates.",
-          "choices": ["true", "false"],
-          "coveredBy": ["ai-accounts.luna-reserve"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.luna-reserve"
+          ]
         }
       ],
-      "states": ["weekly-available", "weekly-spent", "reserve-available", "reserve-spent", "route-default"],
-      "failureModes": ["Reserve exhaustion does not masquerade as weekly quota.", "Disabled Reserve leaves the default route unchanged."],
+      "states": [
+        "weekly-available",
+        "weekly-spent",
+        "reserve-available",
+        "reserve-spent",
+        "route-default"
+      ],
+      "failureModes": [
+        "Reserve exhaustion does not masquerade as weekly quota.",
+        "Disabled Reserve leaves the default route unchanged."
+      ],
       "externalDependencies": [
         {
           "id": "codex-quota-api",
@@ -879,7 +1214,11 @@
       "id": "failure-recovery",
       "title": "Recover failed account requests per failure kind",
       "summary": "Retry, Luna Reserve, fail over to a compatible account, wait, shrink re-sent images, then fail or hand to DSH, configured per failure kind.",
-      "surfaces": ["client", "host", "settings"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: AI Accounts › failure recovery",
@@ -888,10 +1227,20 @@
           "key": "failureRecovery",
           "defaultValue": "transport: retry 2x then fail over; rateLimit: fail over then wait 60 s; exhausted: Luna Reserve then fail over; auth and oversized: hand to DSH",
           "constraints": "Per kind (transport, rateLimit, exhausted, auth, oversized): retries 0-10, backoffMs 100-60000, lunaReserve, failover, waitSeconds 0-3600, shrink, then fail|dsh; malformed fields fall back to defaults.",
-          "coveredBy": ["ai-accounts.failure-policy-ladder", "ai-accounts.failure-recovery-pool"]
+          "coveredBy": [
+            "ai-accounts.failure-policy-ladder",
+            "ai-accounts.failure-recovery-pool"
+          ]
         }
       ],
-      "states": ["retrying", "luna-reserve", "failed-over", "waiting", "shrunk", "given-up"],
+      "states": [
+        "retrying",
+        "luna-reserve",
+        "failed-over",
+        "waiting",
+        "shrunk",
+        "given-up"
+      ],
       "failureModes": [
         "A fail-over never crosses provider kinds, skips hidden accounts and accounts without the model.",
         "A recovered account takes its conversations back after its cooldown.",
@@ -944,7 +1293,12 @@
       "id": "quota-auto-retry",
       "title": "Retry exhausted quota when its reset arrives",
       "summary": "Explain exhausted provider limits inline, let the user resume with another available provider/account/model/reasoning effort (defaulting to the same model on another provider), and auto-resume one minute after a known reset from a checkbox beside Resume, on by default and overridable per thread.",
-      "surfaces": ["client", "host", "settings", "storage"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "storage"
+      ],
       "surface": "attentionProvider",
       "destination": "inbox",
       "currentSurface": "transcript: usage-limit turn tail › Resume",
@@ -953,18 +1307,34 @@
           "key": "autoRetryQuotaDefault",
           "defaultValue": "true",
           "constraints": "Boolean; pre-check the per-thread auto-resume checkbox for a new recovery.",
-          "choices": ["true", "false"],
-          "coveredBy": ["ai-accounts.quota-retry-settings"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.quota-retry-settings"
+          ]
         },
         {
           "key": "showQuotaRetryChoice",
           "defaultValue": "true",
           "constraints": "Boolean; show the per-thread checkbox beside Resume and the inline quota notice.",
-          "choices": ["true", "false"],
-          "coveredBy": ["ai-accounts.quota-retry-settings"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.quota-retry-settings"
+          ]
         }
       ],
-      "states": ["quota-exhausted", "route-selection", "waiting-for-reset", "resume-queued", "reset-unknown"],
+      "states": [
+        "quota-exhausted",
+        "route-selection",
+        "waiting-for-reset",
+        "resume-queued",
+        "reset-unknown"
+      ],
       "failureModes": [
         "Automatic resume is on by default for a known reset and cannot be enabled without one; it queues one minute after reset.",
         "A thread keeps the choice made for its earlier recovery, so the global default cannot silently undo it.",
@@ -1050,12 +1420,19 @@
         "expect complementary \"Provider accounts\"",
         "expect button \"Add account\""
       ],
-      "surfaces": ["client", "settings"],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
       "surface": "transcriptCard",
       "destination": "transcript",
       "currentSurface": "transcript: failed turn › Open AI Accounts",
       "configuration": [],
-      "states": ["hidden-for-other-failures", "available-for-credential-failure", "accounts-panel-open"],
+      "states": [
+        "hidden-for-other-failures",
+        "available-for-credential-failure",
+        "accounts-panel-open"
+      ],
       "failureModes": [
         "A failed turn with missing credentials does not need to be retried before setup is reachable.",
         "Unrelated failures do not show an irrelevant credential action."
@@ -1078,6 +1455,68 @@
         {
           "kind": "not-applicable",
           "reason": "Client-only: Open credential setup from failed turns renders browser state and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "quota-inbox-items",
+      "title": "Quota-blocked threads in the Inbox, resumable in place",
+      "summary": "Every waiting quota continuation (a turn stopped by an exhausted account limit) is a blocking Inbox item about its thread, with when the quota resets and whether it resumes by itself. Resume runs the same stored continuation as the Usage page's Resume, only when the user chooses it; Open goes to the thread to switch account or model first. The item resolves once the continuation is resumed, dismissed or superseded.",
+      "reach": [
+        "click button \"Inbox\"",
+        "expect heading \"Inbox\""
+      ],
+      "surfaces": [
+        "host",
+        "integration"
+      ],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "left-nav: Inbox › ai-accounts.quota-continuation",
+      "configuration": [],
+      "states": [
+        "waiting",
+        "resumed-from-inbox",
+        "resumed-elsewhere",
+        "dismissed",
+        "newer-work",
+        "inbox-absent"
+      ],
+      "failureModes": [
+        "Without the inbox (activity-timeline) loaded, quota recovery works exactly as before; the provider reconciles when the inbox announces it is ready.",
+        "Resume on a continuation that has newer work, was dismissed or whose Session is unavailable is refused with how to continue the thread instead.",
+        "Before the accounts Host has started its recovery service, the provider states nothing and Resume asks to try again in a moment."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/activity-timeline",
+          "boundary": "attention-api module: reconcile through the dshx Host API client and the dshfiles/attention/act serial event.",
+          "deterministicFake": "src/quota-attention.test.ts mounts the real activity-timeline Host and a real quota continuation service on JSON storage with a fake Session controller."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.inbox-quota-drafts",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-attention.test.ts",
+          "testName": "states each waiting continuation as a blocking, resumable item about its thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.inbox-quota-round-trip",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-attention.test.ts",
+          "testName": "lists a quota-blocked thread in the inbox, resumes it on Resume, and resolves a dismissed one"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "ai-accounts.inbox-quota-browser-journey",
+          "reason": "A browser journey needs a provider that reports an exhausted quota inside the scratch DSH; the round trip (listed, Resume through the Inbox act, resolved, dismissed elsewhere resolves) is proven against the real activity-timeline Host and the real continuation service in quota-attention.test.ts instead."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     }

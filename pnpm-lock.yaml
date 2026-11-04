@@ -1116,6 +1116,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: 'catalog:'
         version: 3.18.4
+      '@dshfiles/activity-timeline':
+        specifier: workspace:*
+        version: link:../activity-timeline
       '@dshfiles/credential-port':
         specifier: workspace:*
         version: link:../credential-port
