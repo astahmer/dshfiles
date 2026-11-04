@@ -81,13 +81,14 @@ Resume here: pick an item from "Suggested order".
 
 Ordered by leverage: how much daily loop it closes against how much it costs. Most items fit owned Host plugins.
 
-1. **C1 + C2 + B4: forge plugin with GitHub first.** Create a PR from a thread, link it to the thread, and watch it to wake the agent. This closes the "agent ships, CI fails, agent fixes" loop that today needs a human watching. Reuse the `gh` login and secret references. Keep PR links in plugin storage, and wake the agent through the sessions API `message({ wake })`.
+1. ~~**C2 + B4 + C3**~~ Done in part: `@dshfiles/pull-requests` links PRs to threads, watches them with `gh` and wakes or settles the thread. Open: **C1** creating the PR with a generated title and body.
+   Original note — **C1 + C2 + B4: forge plugin with GitHub first.** Create a PR from a thread, link it to the thread, and watch it to wake the agent. This closes the "agent ships, CI fails, agent fixes" loop that today needs a human watching. Reuse the `gh` login and secret references. Keep PR links in plugin storage, and wake the agent through the sessions API `message({ wake })`.
 2. **C3: PR-aware auto-settle.** The Host-owned scan and the `requestSettle` trigger API have shipped; once C2 exists, its PR watcher calls `requestSettle` with "PR merged" or "PR closed" as the reason.
 3. **B5: project-scheduled tasks and webhooks.** Each run starts a new thread through the sessions API `create`. Use a Host route with an HMAC check, plus tools that mirror t3code's. Unlocks CI-failure and new-PR automation.
 4. **B3: rewind N turns with file restore.** Extend session-undo to any turn, using jj-operation snapshots for each turn, and add a guard for shared directories. Users already expect "edit from here".
 5. ~~**A2 + A3: visual replies and preview tools.**~~ Done: `@dshfiles/html-render` and `@dshfiles/preview`. An `html_render` tool shown as a sandboxed iframe card in chat. First-party agent browser tools over the Host browser page. Dev-server port detection in a thread card.
 6. ~~**A4 + A5: composer quick wins.**~~ Done: prompt recall with ArrowUp, large-paste-to-file, editing a queued message (UI and `thread_queue_edit`), prompt links (`?prompt=`).
 7. ~~**B6: MCP endpoint for outside agents.**~~ Done: `@dshfiles/mcp-endpoint`.
-8. **A6: multi-model fan-out.** One prompt, N threads, each isolated with jj. Cheap on top of the sessions API `create`.
+8. ~~**A6: multi-model fan-out.**~~ Done: thread-sidebar `thread_fan_out` and Send to several models…. One prompt, N threads, each isolated with jj. Cheap on top of the sessions API `create`.
 9. ~~**C7 + C6: worktree policies, auto-fetch, local clone and new project.**~~ Done: jj-integration `autoCleanup.onSettle` and `autoFetch`; workspace-folder-picker Clone repository and New project.
 10. Defer: A1/D2/D3 (mobile, relay, guests), B1 (ACP client), A9/A10/D4. Each costs a lot or depends on a new client or a relay.
