@@ -126,7 +126,7 @@ export default defineClient({
     })
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register(
-        { name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => `JJ Integration: ${translate('title')}`, locale: JJ_INTEGRATION_LOCALE_NAMESPACE },
+        { name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => translate('title'), locale: JJ_INTEGRATION_LOCALE_NAMESPACE },
         PanelGlyph,
       ),
     )
@@ -264,7 +264,7 @@ export default defineClient({
             let unsubscribe = (): void => undefined
             const timeout = setTimeout(() => {
               unsubscribe()
-              reject(new Error('The remote thread did not appear in the Session list after refresh.'))
+              reject(new Error('The remote thread did not appear in the thread list after refresh. Refresh the page and open it again.'))
             }, 5_000)
             const finish = (): void => {
               clearTimeout(timeout)
@@ -793,7 +793,7 @@ export default defineClient({
       await held.ready
       releaseOnceSent(sessionId, () => held.release())
       const scoped = ctx.sessions.scope(sessionId)
-      if (scoped === undefined) throw new Error('The thread workspace Session is not available.')
+      if (scoped === undefined) throw new Error('This thread is not available. Refresh the thread list and try again.')
       return { sessionId, workspaceId, blank: true, input: ctx.conversation.input.for(scoped) }
     }
     const warmups = new ThreadWarmup<Awaited<ReturnType<typeof threadComposerIn>>>()
@@ -1133,13 +1133,13 @@ export default defineClient({
               <SessionLogDownloadFeedback sessionId={props.sessionId} controller={props.controller} t={translate} />
             ),
           ),
-        'jj-integration: session log export feedback replaces the native header cell',
+        'jj-integration: thread log export feedback replaces the native header cell',
       )
       scoped.effect(
         () => () => {
           sessionLog.current = undefined
         },
-        'jj-integration: session log download port',
+        'jj-integration: thread log download port',
       )
     })
     ctx.slots.inject('conversation.session.header.utilities', () =>

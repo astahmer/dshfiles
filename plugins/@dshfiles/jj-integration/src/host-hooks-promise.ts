@@ -65,8 +65,8 @@ export const rebaseCommand = defineCommand({
     const { thread } = await api.threadAt({ path }, { signal: invocation.signal })
     if (thread === null) return { kind: 'error', text: 'This Session is not in a managed thread workspace. Use an isolated thread workspace to run /rebase.' }
     const result = await api.land({ path: thread.path, sessionId: String(invocation.agent.id) }, { signal: invocation.signal })
-    if (result.status === 'landed') return { kind: 'success', text: `Integrated ${String(result.revisions.length)} revision(s) into ${result.bookmark}.` }
-    if (result.status === 'nothing-to-land') return { kind: 'success', text: `Nothing to integrate; the workspace now sits on ${result.bookmark}.` }
+    if (result.status === 'landed') return { kind: 'success', text: `Landed ${String(result.revisions.length)} revision(s) on ${result.bookmark}.` }
+    if (result.status === 'nothing-to-land') return { kind: 'success', text: `Nothing to land; the workspace now sits on ${result.bookmark}.` }
     if (result.status === 'needs-description')
       return {
         kind: 'error',

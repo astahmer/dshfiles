@@ -36,11 +36,11 @@ const landingMessage = (outcome: LandResult): string | undefined => {
  * blaming the thread the user is looking at.
  */
 const busyWorkspaceMessage = (blockers: readonly ThreadActivityBlocker[]): string => {
-  if (blockers.length === 0) return 'This workspace is still in use. Integrate once every thread in it is idle.'
+  if (blockers.length === 0) return 'This workspace is still in use. Land once every thread in it is idle.'
   const named = blockers.map(
     blocker => `“${blocker.title ?? blocker.sessionId}” ${blocker.reason === 'working' ? 'is still working' : 'is waiting for an answer'}`,
   )
-  return `This workspace is still in use: ${named.join('; ')}. Integrate once every thread in it is idle.`
+  return `This workspace is still in use: ${named.join('; ')}. Land once every thread in it is idle.`
 }
 
 export class LandingMessages {

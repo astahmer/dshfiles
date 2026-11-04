@@ -461,10 +461,10 @@
         "seed rebase-ready-thread",
         "expect button \"Current thread workspace: thread-*\"",
         "click button \"Current thread workspace: thread-*\"",
-        "expect text \"Integrate into main\"",
-        "expect button \"Integrate this thread into main\"",
+        "expect text \"Land on main\"",
+        "expect button \"Land this thread on main\"",
         "expect button \"Open thread workspaces in side panel\"",
-        "expect button \"Download session log\""
+        "expect button \"Download thread log\""
       ],
       "surfaces": [
         "client"
@@ -521,13 +521,13 @@
         "expect heading \"Revision graph\"",
         "press Escape",
         "click button \"Current thread workspace: thread-*\"",
-        "expect button \"Integrate this thread into main\"",
-        "expect text \"1 pending integration\"",
+        "expect button \"Land this thread on main\"",
+        "expect text \"1 to land\"",
         "press Escape",
         "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/rebase\"",
         "press Enter",
-        "expect text \"Integrated 1 revision(s) into main.\"",
-        "expect button \"Settle this integrated thread\""
+        "expect text \"Landed 1 revision(s) on main.\"",
+        "expect button \"Mark this landed thread done\""
       ],
       "surfaces": [
         "host",
@@ -710,17 +710,17 @@
       "summary": "The newest completed turn of an isolated thread workspace offers the same integration one click from the answer: a row beside the answer names the pending revisions and its button lands them. It appears only while the workspace is ready — described, conflict-free revisions with no Session writing and no question waiting — and disappears once the work lands, a queue waits, or a Session works again. The header control stays the permanent entry point.",
       "reach": [
         "seed rebase-ready-thread",
-        "expect button \"Integrate into main\"",
-        "click button \"Integrate into main\"",
+        "expect button \"Land on main\"",
+        "click button \"Land on main\"",
         "click button \"Current thread workspace: thread-*\"",
-        "expect text \"Nothing to integrate\""
+        "expect text \"Nothing to land\""
       ],
       "surfaces": [
         "client"
       ],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: turn tail › Integrate into main",
+      "currentSurface": "transcript: turn tail › Land on main",
       "configuration": [],
       "states": [
         "offer-shown",
@@ -770,15 +770,15 @@
         "click button \"Current thread workspace: thread-*\"",
         "expect button \"Open thread workspaces in side panel\"",
         "click button \"Open thread workspaces in side panel\"",
-        "expect heading \"Thread integration\"",
-        "expect button \"Integrate\"",
-        "expect button \"Integrate all*\"",
+        "expect heading \"Land\"",
+        "expect button \"Land\"",
+        "expect button \"Land all*\"",
         "click button \"View details\"",
         "click button \"Preview\"",
         "expect text \"You\"",
         "click tab \"Land\"",
         "click button \"Workspaces\"",
-        "expect heading \"Thread integration\""
+        "expect heading \"Land\""
       ],
       "configuration": [
         {
@@ -797,7 +797,7 @@
       ],
       "surface": "destinationSection",
       "destination": "land",
-      "currentSurface": "left-nav: JJ Integration: Thread integration",
+      "currentSurface": "left-nav: Land",
       "states": [
         "loading",
         "no-repositories",
@@ -924,16 +924,16 @@
     {
       "id": "thread-integration-attention-view",
       "title": "Thread integration prioritises what needs attention",
-      "summary": "Opening the panel from the left sidebar lands on the Needs attention view: conflicts, ready work and blocked workspaces first, with completed or unchanged workspaces one click away. Integration-state tabs and the lifecycle filter stay separate, and switching to All keeps every count visible.",
+      "summary": "Opening the panel from the left sidebar lands on the Needs you view: conflicts, ready work and blocked workspaces first, with completed or unchanged workspaces one click away. Integration-state tabs and the lifecycle filter stay separate, and switching to All keeps every count visible.",
       "reach": [
         "click tab \"Land\"",
         "click button \"Workspaces\"",
-        "expect heading \"Thread integration\"",
-        "expect button \"Needs attention*\"",
+        "expect heading \"Land\"",
+        "expect button \"Needs you*\"",
         "click button \"Refresh\"",
         "click button \"All*\"",
         "expect button \"Completed*\"",
-        "click button \"Needs attention*\"",
+        "click button \"Needs you*\"",
         "click button \"All*\"",
         "expect button \"Conflicts*\""
       ],
@@ -942,7 +942,7 @@
       ],
       "surface": "destinationSection",
       "destination": "land",
-      "currentSurface": "left-nav: JJ Integration: Thread integration › Needs attention",
+      "currentSurface": "left-nav: Land › Needs you",
       "configuration": [],
       "states": [
         "attention-default",
@@ -985,7 +985,7 @@
         "click button \"Current thread workspace: thread-*\"",
         "expect button \"Open thread workspaces in side panel\"",
         "click button \"Open thread workspaces in side panel\"",
-        "expect heading \"Thread integration\"",
+        "expect heading \"Land\"",
         "click button \"View details\"",
         "expect button \"Preview\""
       ],
@@ -994,7 +994,7 @@
       ],
       "surface": "detail",
       "destination": "land",
-      "currentSurface": "left-nav: JJ Integration: Thread integration › row details",
+      "currentSurface": "left-nav: Land › row details",
       "configuration": [],
       "states": [
         "details-collapsed",
@@ -1036,7 +1036,7 @@
       "reach": [
         "click tab \"Land\"",
         "click button \"Workspaces\"",
-        "expect heading \"Thread integration\"",
+        "expect heading \"Land\"",
         "expect text \"No thread workspaces.\""
       ],
       "surfaces": [
@@ -1044,7 +1044,7 @@
       ],
       "surface": "destinationSection",
       "destination": "land",
-      "currentSurface": "left-nav: JJ Integration: Thread integration › empty state",
+      "currentSurface": "left-nav: Land › empty state",
       "configuration": [],
       "states": [
         "no-threads",

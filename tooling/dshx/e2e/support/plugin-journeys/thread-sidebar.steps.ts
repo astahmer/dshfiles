@@ -1518,7 +1518,7 @@ Then('the header More menu still offers Settings and opens a destination the row
   const navigation = sidebarNavigation(page)
   const toolbar = navigation.getByRole('toolbar', { name: 'Sidebar navigation', exact: true })
   const menu = page.getByRole('dialog').filter({ has: page.getByPlaceholder('Filter destinations…') })
-  const movedDestination = 'JJ Integration: Thread integration'
+  const movedDestination = 'Land'
   await recordAssertion(page, 'thread-sidebar-menu-overflow-offers-settings', async () => {
     await navigation.getByRole('button', { name: 'More sidebar destinations', exact: true }).click()
     await expect(menu.getByRole('option', { name: movedDestination, exact: true })).toBeVisible()
@@ -1530,7 +1530,7 @@ Then('the header More menu still offers Settings and opens a destination the row
   await recordAssertion(page, 'thread-sidebar-menu-overflow-opens-a-moved-destination', async () => {
     await expect(toolbar.getByRole('button', { name: movedDestination, exact: true })).toHaveCount(0)
     await openGlobalPanel(page, movedDestination)
-    await expect(page.getByRole('heading', { name: 'Thread integration', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Land', exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

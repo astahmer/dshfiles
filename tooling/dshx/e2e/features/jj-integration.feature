@@ -312,7 +312,7 @@ Feature: jj thread workspaces
     When the conversation is opened from its workspace row
     And the Thread workspaces side panel is opened
     Then its Preview shows the latest message
-    When "Remove workspace and work to rebase…" is chosen from the thread row's More menu
+    When "Remove workspace and unlanded work…" is chosen from the thread row's More menu
     Then the confirmation names the thread and its 1 revision to rebase
     When the removal is confirmed
     Then the thread workspace is gone from jj and from the panel

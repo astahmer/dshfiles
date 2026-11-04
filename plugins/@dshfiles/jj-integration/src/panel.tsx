@@ -3,6 +3,9 @@ import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-session-turn-outline/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PaletteActions, type PaletteActionContext } from '@dshfiles/command-palette/palette-contract'
+import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
+import { EntityList } from '@dshfiles/plugin-ui/components/entity-row'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import {
   AlertDialog,
@@ -446,7 +449,12 @@ const ThreadRow = (props: {
       <dl className="dshx:grid dshx:grid-cols-[auto_minmax(0,1fr)] dshx:gap-x-3 dshx:gap-y-1 dshx:text-xs">
         <dt className="dshx:text-muted-foreground">{t('workspaceColumn')}</dt>
         <dd className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
-          <span className="dshx:truncate dshx:font-mono">{thread.path}</span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="dshx:truncate dshx:font-mono">{thread.name}</span>
+            </TooltipTrigger>
+            <TooltipContent>{thread.path}</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -615,7 +623,7 @@ const ThreadRow = (props: {
                 value={integrationBookmark}
                 onValueChange={setIntegrationBookmark}
               />
-              <Button size="sm" disabled={props.busy || props.job !== undefined} onClick={() => props.onIntegrate(integrationBookmark)}>
+              <Button size="sm" variant="outline" disabled={props.busy || props.job !== undefined} onClick={() => props.onIntegrate(integrationBookmark)}>
                 {t('integrate')}
               </Button>
             </>
@@ -1092,44 +1100,33 @@ export const ThreadWorkspacesPanel = (props: {
 
   return (
     <TooltipProvider>
-      <div className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-6 dshx:@max-pane-narrow:p-3">
-        <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:gap-4">
-          <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-3">
-            <span
-              aria-hidden="true"
-              className="dshx:mt-0.5 dshx:flex dshx:size-9 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-xl dshx:bg-muted dshx:text-muted-foreground"
-            >
-              <GitForkIcon className="dshx:size-5" />
-            </span>
-            <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-              <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
-              <p className="dshx:text-sm dshx:text-muted-foreground">{t('subtitle', { bookmark: props.bookmark })}</p>
-            </div>
-          </div>
-          {threads.length > 0 ? (
-            <div className="dshx:ml-auto dshx:flex dshx:min-w-64 dshx:flex-1 dshx:items-center dshx:gap-3 dshx:@max-pane-compact:w-full dshx:@max-pane-compact:flex-auto">
-              <label className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:bg-background dshx:px-3 dshx:py-2 dshx:text-sm dshx:text-muted-foreground">
-                <SearchIcon aria-hidden="true" className="dshx:size-4" />
-                <input
-                  aria-label={t('searchThreads')}
-                  className="dshx:min-w-0 dshx:flex-1 dshx:bg-transparent dshx:outline-hidden dshx:text-sm"
-                  placeholder={t('searchThreads')}
-                  value={search}
-                  onChange={event => setSearch(event.currentTarget.value)}
-                />
-              </label>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void refreshRepositoryViews()}
-                disabled={repositories.isFetching || repositories.data?.refreshing === true}
-              >
-                {repositories.isFetching || repositories.data?.refreshing === true ? <Spinner /> : <RefreshCwIcon />}
-                {t('refresh')}
-              </Button>
-            </div>
-          ) : null}
-        </header>
+      <Page
+        scroll
+        heading={t('title')}
+        description={t('subtitle', { bookmark: props.bookmark })}
+        {...(threads.length > 0 ? { count: threads.length } : {})}
+        actions={[
+          {
+            id: 'refresh',
+            label: t('refresh'),
+            icon: <RefreshCwIcon />,
+            onSelect: () => void refreshRepositoryViews(),
+            pending: repositories.isFetching || repositories.data?.refreshing === true,
+          },
+        ]}
+      >
+        {threads.length > 0 ? (
+          <label className="dshx:flex dshx:min-w-0 dshx:max-w-md dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2.5 dshx:py-1.5 dshx:text-sm dshx:text-muted-foreground">
+            <SearchIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0" />
+            <input
+              aria-label={t('searchThreads')}
+              className="dshx:min-w-0 dshx:flex-1 dshx:bg-transparent dshx:text-sm dshx:text-foreground dshx:outline-hidden"
+              placeholder={t('searchThreads')}
+              value={search}
+              onChange={event => setSearch(event.currentTarget.value)}
+            />
+          </label>
+        ) : null}
         {toast.element}
         <WorkspaceSyncLine t={t} />
         {notice === null ? null : (
@@ -1139,43 +1136,60 @@ export const ThreadWorkspacesPanel = (props: {
         )}
         {repositories.isError ? (
           <Alert variant="destructive">
-            <AlertDescription>{errorMessage(repositories.error, t('loadFailed'))}</AlertDescription>
+            <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
+              <span className="dshx:min-w-0">{errorMessage(repositories.error, t('loadFailed'))}</span>
+              <Button size="xs" variant="outline" onClick={() => void refreshRepositoryViews()}>
+                {t('refresh')}
+              </Button>
+            </AlertDescription>
           </Alert>
         ) : null}
         {repositories.isPending || (repositories.data?.refreshing === true && repositories.data.repositories.length === 0) ? <PanelSkeleton /> : null}
         {repositories.data?.refreshFailed === true ? (
           <Alert variant="default">
-            <AlertDescription>{t('loadFailed')}</AlertDescription>
+            <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
+              <span className="dshx:min-w-0">{t('loadFailed')}</span>
+              <Button size="xs" variant="outline" onClick={() => void refreshRepositoryViews()}>
+                {t('refresh')}
+              </Button>
+            </AlertDescription>
           </Alert>
         ) : null}
         {repositories.data?.refreshing !== true && repositories.data?.refreshFailed !== true && repositories.data?.repositories.length === 0 ? (
-          <p className="dshx:text-sm dshx:text-muted-foreground">{t('noRepositories')}</p>
+          <EntityList>
+            <EmptyState>{t('noRepositories')}</EmptyState>
+          </EntityList>
         ) : null}
         {repositories.data !== undefined && repositories.data.repositories.length > 0 && threads.length === 0 ? (
-          <p className="dshx:text-sm dshx:text-muted-foreground">{t('noThreads')}</p>
+          <EntityList>
+            <EmptyState>{t('noThreads')}</EmptyState>
+          </EntityList>
         ) : null}
         {threads.length > 0 ? (
           <>
             <nav
               aria-label={t('workspaceFilters')}
-              className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1 dshx:self-start dshx:rounded-xl dshx:border dshx:bg-muted/30 dshx:p-1"
+              className="dshx:flex dshx:max-w-full dshx:flex-wrap dshx:items-center dshx:gap-0.5 dshx:self-start dshx:rounded-lg dshx:bg-muted dshx:p-0.5 dshx:@max-pane-compact:flex-nowrap dshx:@max-pane-compact:overflow-x-auto"
             >
               {tabs.map(tab => (
                 <Button
                   key={tab.id}
                   size="sm"
-                  variant={filter === tab.id ? 'default' : 'ghost'}
-                  className="dshx:gap-2"
+                  variant="ghost"
+                  className={cn(
+                    'dshx:h-7 dshx:gap-2 dshx:px-2.5 dshx:text-xs',
+                    filter === tab.id ? 'dshx:bg-background dshx:text-foreground dshx:shadow-xs dshx:hover:bg-background' : 'dshx:text-muted-foreground',
+                  )}
                   aria-pressed={filter === tab.id}
                   onClick={() => setFilter(tab.id)}
                 >
                   {tab.dot === undefined ? null : <StatusDot size="sm" className={tab.dot} />}
                   {tab.label}
-                  <span className={cn('dshx:tabular-nums', filter === tab.id ? 'dshx:opacity-80' : 'dshx:text-muted-foreground')}>{counts[tab.id]}</span>
+                  <span className="dshx:text-muted-foreground dshx:tabular-nums">{counts[tab.id]}</span>
                 </Button>
               ))}
               <Separator orientation="vertical" className="dshx:mx-1 dshx:h-5!" />
-              <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:text-muted-foreground">
+              <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:text-muted-foreground">
                 {t('lifecycleFilter')}
                 <Combobox
                   label={t('lifecycleFilter')}
@@ -1191,7 +1205,7 @@ export const ThreadWorkspacesPanel = (props: {
               </span>
             </nav>
             {queueVisible ? (
-              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:rounded-xl dshx:border dshx:bg-muted/30 dshx:px-4 dshx:py-2 dshx:text-xs">
+              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2 dshx:text-xs">
                 <span className="dshx:font-medium">{t('queueHeading')}</span>
                 {activeLabel === undefined ? null : (
                   <span className="dshx:flex dshx:items-center dshx:gap-1.5">
@@ -1204,13 +1218,8 @@ export const ThreadWorkspacesPanel = (props: {
               </div>
             ) : null}
             {counts.ready > 0 && (filter === 'attention' || filter === 'all' || filter === 'ready') ? (
-              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-4 dshx:rounded-xl dshx:border dshx:border-success/30 dshx:bg-success/5 dshx:px-4 dshx:py-3">
-                <span
-                  aria-hidden="true"
-                  className="dshx:flex dshx:size-8 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-success dshx:text-white"
-                >
-                  <CheckIcon className="dshx:size-5" />
-                </span>
+              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2.5">
+                <StatusGlyph status="ready" decorative />
                 <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
                   <p className="dshx:text-sm dshx:font-semibold">{t('readyBannerTitle', { count: counts.ready })}</p>
                   <p className="dshx:text-xs dshx:text-muted-foreground">{t('readyBannerBody', { bookmark: props.bookmark })}</p>
@@ -1243,13 +1252,13 @@ export const ThreadWorkspacesPanel = (props: {
                   <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-3">
                     {groupGlyph(group.tone)}
                     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
-                      <h2 className="dshx:text-base dshx:font-semibold">
+                      <h2 className="dshx:text-sm dshx:font-semibold">
                         {group.title} <span className="dshx:text-muted-foreground">({entriesInGroup.length})</span>
                       </h2>
-                      <p className="dshx:text-sm dshx:text-muted-foreground">{group.description}</p>
+                      <p className="dshx:text-xs dshx:text-muted-foreground">{group.description}</p>
                     </div>
                   </div>
-                  <div className="dshx:overflow-hidden dshx:rounded-xl dshx:border">
+                  <div className="dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card">
                     {repositoriesWithThreads?.map(repository => {
                       const repoEntries = shownEntries.filter(entry => entry.repositoryRoot === repository.repoRoot)
                       if (repoEntries.length === 0) return null
@@ -1259,7 +1268,6 @@ export const ThreadWorkspacesPanel = (props: {
                           {showRepositoryHeader ? (
                             <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:bg-muted/30 dshx:px-3 dshx:py-1.5 dshx:text-xs">
                               <span className="dshx:font-medium">{repository.title}</span>
-                              <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-muted-foreground">{repository.repoRoot}</span>
                               <div className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2">
                                 {repositoryExcluded ? (
                                   <Tooltip>
@@ -1338,14 +1346,28 @@ export const ThreadWorkspacesPanel = (props: {
               )
             })}
             {visibleEntries.length === 0 ? (
-              <p className="dshx:text-sm dshx:text-muted-foreground">
-                {search.trim() !== '' ? t('noMatchingThreads') : filter === 'attention' ? t('nothingNeedsAttention') : t('noThreadsInFilter')}
-              </p>
+              <EntityList>
+                <EmptyState
+                  {...(search.trim() !== '' || filter !== 'all'
+                    ? {
+                        action: {
+                          label: t('allThreads'),
+                          onSelect: () => {
+                            setSearch('')
+                            setFilter('all')
+                          },
+                        },
+                      }
+                    : {})}
+                >
+                  {search.trim() !== '' ? t('noMatchingThreads') : filter === 'attention' ? t('nothingNeedsAttention') : t('noThreadsInFilter')}
+                </EmptyState>
+              </EntityList>
             ) : null}
           </>
         ) : null}
         <DiscardDialog t={t} confirmation={discard} />
-      </div>
+      </Page>
     </TooltipProvider>
   )
 }

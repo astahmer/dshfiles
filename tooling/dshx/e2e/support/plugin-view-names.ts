@@ -101,6 +101,7 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   // Plain labels the page-kit migration (plans/ade-ux Phase 1b) gave these pages.
   ['Review', { destination: 'Land', section: 'Review' }],
   ['Backlog', { destination: 'Work', section: 'Backlog' }],
+  ['Land', { destination: 'Land', section: 'Workspaces' }],
 ])
 
 const destinationTabs = (page: Page): Locator => page.getByRole('tablist', { name: 'Destinations', exact: true })

@@ -13,43 +13,41 @@ export const jjIntegrationSettings = defineSettings({
       Schema.const('none').description('Keep integration manual.'),
       Schema.const('isolated').description('Automatically integrate verified, isolated thread workspaces; new-thread isolation stays opt-in.'),
       Schema.const('all').description(
-        'Automatically isolate each new thread and integrate only its verified, uniquely owned thread workspace; existing shared checkouts stay manual.',
+        'Automatically isolate each new thread and land only its verified, uniquely owned thread workspace; existing shared checkouts stay manual.',
       ),
     ])
       .default('none')
       .description(
-        'Automatically rebase finished thread work after Project Checks pass. All scope also isolates new threads by default; existing shared checkouts stay manual.',
+        'Automatically land finished thread work after Project Checks pass. All scope also isolates new threads by default; existing shared checkouts stay manual.',
       ),
     autoIntegrationExcludedRepositories: Schema.array(Schema.string())
       .default([])
       .description(
-        'Repositories whose finished thread work is never integrated automatically, such as a checkout whose main only accepts pull requests. Manual Integrate still works. Each value is the absolute repository path shown beside the project in Thread integration.',
+        'Repositories whose finished thread work never lands automatically, such as a checkout whose main only accepts pull requests. Manual Land still works. Each value is the absolute repository path; switch Auto off beside the project in Land to add it.',
       ),
     integratedThreadActions: Schema.union([
-      Schema.const('settle').description('Settle: offer only Settle in the “Integrated into …” notice.'),
+      Schema.const('settle').description('Done: offer only Done in the “Landed on …” notice.'),
       Schema.const('archive').description('Archive: offer only Archive, the notice’s original action.'),
-      Schema.const('both').description('Both: offer Settle and Archive.'),
+      Schema.const('both').description('Both: offer Done and Archive.'),
       Schema.const('none').description('None: offer no button; act on the thread row instead.'),
     ])
       .default('settle')
-      .description(
-        'Buttons the “Integrated into …” notice offers. “Settle integrated threads” and “Archive settled threads” in Thread sidebar settings do it automatically instead.',
-      ),
-    bookmark: Schema.string().default('main').description('Exact local bookmark new threads start from and Rebase advances.'),
+      .description('Buttons the “Landed on …” notice offers. The thread list’s automatic done and archive settings do it without a click.'),
+    bookmark: Schema.string().default('main').description('Exact local bookmark new threads start from and Land advances.'),
     threadsDirectory: Schema.string()
       .default('')
       .description('Parent directory for thread workspaces. Empty uses `<repository>-threads` beside the repository.'),
     askAgentToFixLanding: Schema.boolean()
       .default(true)
-      .description('When Rebase finds conflicts or undescribed revisions, queue a message asking the thread’s agent to fix them and rebase again.'),
+      .description('When Land finds conflicts or undescribed revisions, queue a message asking the thread’s agent to fix them and land again.'),
     syncWorkspaceAfterLand: Schema.string()
       .default('default')
       .description(
-        'After Rebase advances the bookmark, bring this jj workspace (the checkout running DSH) onto it in the background with `dshx checkout sync`, keeping its local edits and rebuilding what changed. Empty disables it.',
+        'After Land advances the bookmark, bring this jj workspace (the checkout running DSH) onto it in the background with `dshx checkout sync`, keeping its local edits and rebuilding what changed. Empty disables it.',
       ),
     removeFinishedThreads: Schema.boolean()
       .default(true)
-      .description('Automatically remove rebased thread workspaces once all their threads are archived and they hold no revisions to rebase.'),
+      .description('Automatically remove landed thread workspaces once all their threads are archived and they hold no unlanded revisions.'),
     removeFinishedThreadsAfterMinutes: Schema.natural()
       .min(1)
       .max(24 * 60)
@@ -115,7 +113,7 @@ export const defaultJjIntegrationSettings: JjIntegrationSettings = jjIntegration
 
 export type IntegratedNoticeAction = 'settle' | 'archive'
 
-/** The actions the “Integrated into …” notice offers; settling and archiving automatically are sidebar settings. */
+/** The actions the “Landed on …” notice offers; marking done and archiving automatically are sidebar settings. */
 export class IntegratedNoticeActions {
   static readonly forSettings = (settings: JjIntegrationSettings): readonly IntegratedNoticeAction[] => {
     if (settings.integratedThreadActions === 'both') return ['settle', 'archive']

@@ -118,7 +118,7 @@ describe.skipIf(!jjAvailable)('jj-integration wire error codes', () => {
         },
         "land: busy sessions": {
           "code": "thread-active",
-          "message": "This workspace is still in use: “Busy thread” is still working; “Asking thread” is waiting for an answer. Integrate once every thread in it is idle.",
+          "message": "This workspace is still in use: “Busy thread” is still working; “Asking thread” is waiting for an answer. Land once every thread in it is idle.",
         },
         "land: folder outside jj": {
           "code": "not-a-repository",
@@ -223,7 +223,7 @@ describe.skipIf(!jjAvailable)('jj-integration wire error codes', () => {
           "error": "Workspace isolation requires a Session inside a local jj repository.",
         },
         "jj_thread_rebase: busy sibling session": {
-          "error": "This workspace is still in use: “Busy thread” is still working; “Asking thread” is waiting for an answer. Integrate once every thread in it is idle.",
+          "error": "This workspace is still in use: “Busy thread” is still working; “Asking thread” is waiting for an answer. Land once every thread in it is idle.",
         },
         "jj_thread_rebase: owner session exempt from its own guard": {
           "status": "landed",

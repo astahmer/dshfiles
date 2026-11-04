@@ -15,7 +15,7 @@ stays intact.
 Works on stock DSH 0.2.0-rc.2; no core patch. Needs **jj 0.46 or newer**: reporting a workspace whose folder was deleted relies on
 `jj workspace list` still naming that workspace's recorded root, which 0.45 reports as `null`.
 
-Open the reusable **JJ Integration: Thread integration** view from navigation or the Workbench chooser.
+Open the reusable **Land** view from navigation or the Workbench chooser.
 
 ## Starting a thread
 
