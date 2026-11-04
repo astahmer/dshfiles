@@ -33,6 +33,17 @@ export class JjFailed extends Schema.TaggedError<JjFailed>()(
   }
 }
 
+/** A git command exited non-zero, timed out, overflowed its output limit or printed something this plugin cannot trust. */
+export class GitFailed extends Schema.TaggedError<GitFailed>()(
+  'GitFailed',
+  { detail: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'git-failed' },
+) {
+  override get message(): string {
+    return this.detail
+  }
+}
+
 /** A workspace name would escape the threads directory, or now belongs to another jj workspace. */
 export class UnsafePath extends Schema.TaggedError<UnsafePath>()(
   'UnsafePath',
@@ -139,4 +150,4 @@ export class HostCallFailed extends Schema.TaggedError<HostCallFailed>()(
   }
 }
 
-export type ThreadWorkspaceError = NotARepository | NotAThread | JjFailed | UnsafePath | WorkspaceFilesFailed
+export type ThreadWorkspaceError = NotARepository | NotAThread | JjFailed | GitFailed | UnsafePath | WorkspaceFilesFailed

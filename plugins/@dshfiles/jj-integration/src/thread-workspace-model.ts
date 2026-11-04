@@ -1,11 +1,16 @@
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 
+/** The version-control system a thread workspace backend drives; jj wins when a checkout has both `.jj` and `.git`. */
+export type VcsKind = 'jj' | 'git'
+
 export interface ThreadLocation {
-  /** Root of the checkout that owns the jj store; thread workspaces sit in its `-threads` sibling. */
+  /** Root of the checkout that owns the jj store or the main git worktree; thread workspaces sit in its `-threads` sibling. */
   readonly repoRoot: string
   readonly workspaceRoot: string
   readonly threadName: string | undefined
+  /** Which backend located it; absent means jj (locations built before git support). */
+  readonly vcs?: VcsKind | undefined
 }
 
 const isSecondaryWorkspace = (location: ThreadLocation): boolean => location.workspaceRoot !== location.repoRoot

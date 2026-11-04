@@ -2,7 +2,7 @@ import { execFileSync, spawn } from 'node:child_process'
 import { Jj, JjViewReads } from '@dshfiles/jj-cli'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Duration, Effect, Layer, ManagedRuntime, Schema, Sink, Stream } from 'effect'
-import { ChildProcessSpawner } from 'effect/process'
+import { type ChildProcess, ChildProcessSpawner } from 'effect/process'
 import { Executables } from './executables-promise.js'
 import { jjSettingsTest } from './jj-settings.js'
 import { RepoLocks } from './repo-locks.js'
@@ -12,7 +12,8 @@ import { ThreadWorkspaces } from './thread-workspaces.js'
 
 /**
  * The real `ThreadWorkspaces` layer for tests, over a process spawner whose jj runs go through `executor`, so a test can
- * observe, delay or rewrite one jj command while everything else runs for real. Other executables (git) are spawned.
+ * observe, delay or rewrite one jj command while everything else runs for real. Other executables (git) are spawned
+ * with the command's own environment variables.
  */
 
 export interface JjResult {
@@ -36,9 +37,16 @@ const jjExecutable = (() => {
   }
 })()
 
-const runProcess = (input: { readonly executable: string; readonly args: readonly string[]; readonly cwd: string }): Promise<JjResult> =>
+const runProcess = (input: {
+  readonly executable: string
+  readonly args: readonly string[]
+  readonly cwd: string
+  readonly env?: ChildProcess.CommandOptions['env']
+}): Promise<JjResult> =>
   new Promise(resolvePromise => {
-    const child = spawn(input.executable, input.args, { cwd: input.cwd, env })
+    // A command's own variables (git's scratch `GIT_INDEX_FILE`) apply over the test environment, as on the Host.
+    const extra = Object.fromEntries(Object.entries(input.env ?? {}).flatMap(([key, value]) => (typeof value === 'string' ? [[key, value]] : [])))
+    const child = spawn(input.executable, input.args, { cwd: input.cwd, env: { ...env, ...extra } })
     let stdout = ''
     let stderr = ''
     child.stdout.on('data', chunk => (stdout += String(chunk)))
@@ -61,7 +69,9 @@ const spawnerFrom = (executor: JjExecutor) =>
       const args = command.args.map(String)
       const cwd = command.options.cwd ?? process.cwd()
       const result = yield* Effect.promise(() =>
-        command.command === jjExecutable ? executor({ args: args.slice(2), cwd }) : runProcess({ executable: command.command, args, cwd }),
+        command.command === jjExecutable
+          ? executor({ args: args.slice(2), cwd })
+          : runProcess({ executable: command.command, args, cwd, env: command.options.env }),
       )
       const stdout = result.stdoutLossy === true ? `${result.stdout}${' '.repeat(MAX_STDOUT_BYTES)}` : result.stdout
       const stdoutStream = Stream.make(encoder.encode(stdout))
