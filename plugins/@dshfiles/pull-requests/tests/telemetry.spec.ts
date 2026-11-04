@@ -34,3 +34,20 @@ describe('pull-requests telemetry', () => {
     })
   })
 })
+
+describe('pull-request creation telemetry', () => {
+  it('records one span each for gh sign-in check, branch lookup and pull-request creation', async () => {
+    using recorder = recordSpans()
+    const work = Effect.all(
+      (['pull request gh auth', 'pull request gh list', 'pull request gh create'] as const).map(name =>
+        withGitHubCommandSpan({ name, attributes: { 'dshx.plugin.package': pluginPackage, 'github.repository': 'acme/widget' }, effect: Effect.void }),
+      ),
+    ).pipe(Effect.provide(DshxEffect.tracerLayer))
+
+    await Effect.runPromise(work)
+
+    for (const name of ['pull request gh auth', 'pull request gh list', 'pull request gh create']) {
+      expect(recorder.span(name).attributes).toMatchObject({ 'dshx.plugin.package': pluginPackage })
+    }
+  })
+})

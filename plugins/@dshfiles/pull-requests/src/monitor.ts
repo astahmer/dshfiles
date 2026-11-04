@@ -70,13 +70,13 @@ export type PullRequestMonitorError =
 const linkId = (input: { readonly sessionId: string; readonly repo: string; readonly number: number }): string =>
   `${encodeURIComponent(input.sessionId)}::${input.repo.toLowerCase()}#${String(input.number)}`
 
-const sessionFor = (provided: string | undefined, caller: ApiCaller): Effect.Effect<string, PullRequestSessionRequired> => {
+export const sessionFor = (provided: string | undefined, caller: ApiCaller): Effect.Effect<string, PullRequestSessionRequired> => {
   if (provided !== undefined) return Effect.succeed(provided)
   if (caller.kind === 'agent' && caller.sessionId !== undefined) return Effect.succeed(caller.sessionId)
   return Effect.fail(new PullRequestSessionRequired({ reason: 'Pass a session id when the call is not made from a thread.' }))
 }
 
-const cwdForCaller = (caller: ApiCaller): string => (caller.kind === 'agent' ? (caller.cwd ?? '') : '')
+export const cwdForCaller = (caller: ApiCaller): string => (caller.kind === 'agent' ? (caller.cwd ?? '') : '')
 
 const parsePullRequestUrl = (url: string): { readonly repo: string; readonly number: number; readonly url: string } | undefined => {
   const match = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/([1-9]\d*)\/?$/u.exec(url)

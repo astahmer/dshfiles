@@ -3,11 +3,15 @@ import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
+import { Jj } from '@dshfiles/jj-cli'
+import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Duration, Effect, Layer, Schedule } from 'effect'
 import { pullRequestApi } from './api.js'
+import { PullRequestCreator } from './create.js'
 import { GitHubCli } from './github-cli.js'
 import { PullRequestMonitor } from './monitor.js'
 import { PullRequestStore } from './store.js'
+import { ThreadContext } from './thread-context.js'
 import type { PullRequestLinkView, PullRequestRecord } from './pull-request-model.js'
 
 const pullRequestLinkViewOf = (record: PullRequestRecord): PullRequestLinkView => ({
@@ -24,6 +28,10 @@ const pullRequestLinkViewOf = (record: PullRequestRecord): PullRequestLinkView =
 const hostServices = Layer.mergeAll(StorageDomain.layer, DshChildProcessSpawner.layer, HostApis.layer)
 const storeAndGitHub = Layer.mergeAll(PullRequestStore.layer, GitHubCli.layer).pipe(Layer.provideMerge(hostServices))
 const monitor = PullRequestMonitor.layer.pipe(Layer.provideMerge(storeAndGitHub))
+const jjAndThread = Layer.mergeAll(Jj.layer, ThreadContext.layer).pipe(
+  Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, DshChildProcessSpawner.layer)),
+)
+const creator = PullRequestCreator.layer.pipe(Layer.provideMerge(Layer.mergeAll(monitor, jjAndThread)))
 
 const pollWorker = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -35,7 +43,7 @@ const pollWorker = Layer.effectDiscard(
       ),
     )
   }),
-).pipe(Layer.provideMerge(monitor))
+).pipe(Layer.provideMerge(creator))
 
 export default DshxPlugin.make({
   name: '@dshfiles/pull-requests',
@@ -54,6 +62,8 @@ export default DshxPlugin.make({
         ),
       watch: (input, call) =>
         PullRequestMonitor.use(monitor => monitor.watch(input, call.caller).pipe(Effect.map(link => ({ link: pullRequestLinkViewOf(link) })))),
+      createPreview: (input, call) => PullRequestCreator.use(creator => creator.preview(input, call.caller)),
+      create: (input, call) => PullRequestCreator.use(creator => creator.create(input, call.caller)),
       unwatch: (input, call) =>
         PullRequestMonitor.use(monitor => monitor.unwatch(input, call.caller).pipe(Effect.map(link => ({ link: pullRequestLinkViewOf(link) })))),
     }),

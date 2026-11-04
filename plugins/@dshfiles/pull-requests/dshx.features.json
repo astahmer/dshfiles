@@ -50,8 +50,14 @@
         }
       ],
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
         {
           "kind": "custom",
           "span": "pull request gh repo",
@@ -61,6 +67,140 @@
         {
           "kind": "custom",
           "span": "pull request gh view",
+          "file": "plugins/@dshfiles/pull-requests/tests/telemetry.spec.ts",
+          "testName": "records one span for repository discovery and pull-request polling"
+        }
+      ]
+    },
+    {
+      "id": "github-pull-request-create",
+      "title": "Create a GitHub pull request from a thread",
+      "summary": "Previews the thread's jj workspace (repository, base, bookmark, commits above the base, an open pull request for the bookmark) with a title and body drafted from the thread by its model, then on explicit confirm sets the bookmark, pushes it with jj git push, runs gh pr create and links and watches the pull request on the thread.",
+      "surfaces": ["host", "tool", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: agent tools pull_request_create_preview/pull_request_create",
+      "configuration": [],
+      "states": ["ready", "blocked", "created", "linked-existing", "failed"],
+      "failureModes": [
+        "gh missing, not signed in, or no GitHub repository for the workspace blocks the preview with an install, `gh auth login` or remote recovery.",
+        "jj missing, not a jj workspace, no remote, an unknown base branch, no commits, undescribed or conflicted commits block the preview with the exact jj command to fix it.",
+        "A workspace whose head moved since the preview is refused before anything is written; the user previews again.",
+        "A rejected push explains fetch-and-rebase or credential recovery; a gh pr create failure after the push says the branch is pushed and how to link the PR by hand.",
+        "No model route or no model answer falls back to a title and body drafted from the commit messages and says why."
+      ],
+      "externalDependencies": [
+        {
+          "id": "github-cli",
+          "boundary": "Runs gh auth status --hostname github.com, gh repo view --json nameWithOwner,defaultBranchRef, gh pr list --head, and gh pr create --repo --head --base --title --body [--draft] with the CLI's configured login; never reads or stores a token.",
+          "deterministicFake": "tests/create.spec.ts replaces the GitHubCli service with scripted results; tests/create-host.spec.ts puts a shell-script gh on PATH that answers the same calls and logs every argv."
+        },
+        {
+          "id": "jj",
+          "boundary": "Fixed-argv jj through @dshfiles/jj-cli: git remote list, log over <base>@<remote>..head, bookmark set on the previewed commit, git push --remote --bookmark.",
+          "deterministicFake": "tests/create.spec.ts replaces the Jj service with a scripted runner; tests/create-host.spec.ts uses real jj against a temporary bare Git remote."
+        },
+        {
+          "id": "model",
+          "boundary": "One dshx Llm completion on the thread's last request route (or a passed provider/model) with the thread title, a bounded transcript and the commit list.",
+          "deterministicFake": "tests/create.spec.ts replaces ThreadContext with a fixed answer; the Host test has no model and asserts the commit-message fallback."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "pull-requests.create-preview",
+          "file": "plugins/@dshfiles/pull-requests/tests/create.spec.ts",
+          "testName": "previews the commits, bookmark and a model-drafted title and body without writing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pull-requests.create-confirm",
+          "file": "plugins/@dshfiles/pull-requests/tests/create.spec.ts",
+          "testName": "creates on confirm: sets the bookmark, pushes it with jj, runs gh pr create and watches the link"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pull-requests.create-recovery-gh",
+          "file": "plugins/@dshfiles/pull-requests/tests/create.spec.ts",
+          "testName": "blocks with a recovery when gh is missing, unauthenticated, or the repository is unknown"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pull-requests.create-recovery-jj",
+          "file": "plugins/@dshfiles/pull-requests/tests/create.spec.ts",
+          "testName": "blocks with a recovery when jj is missing, there is no remote, the base is unknown, or commits are conflicted or undescribed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pull-requests.create-stale",
+          "file": "plugins/@dshfiles/pull-requests/tests/create.spec.ts",
+          "testName": "refuses to create when the workspace moved since the preview, and when preflight is blocked"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pull-requests.create-push-failure",
+          "file": "plugins/@dshfiles/pull-requests/tests/create.spec.ts",
+          "testName": "explains how to recover when the push is rejected or gh pr create fails after pushing"
+        },
+        {
+          "kind": "host-test",
+          "id": "pull-requests.create-served",
+          "file": "plugins/@dshfiles/pull-requests/tests/create-host.spec.ts",
+          "testName": "pushes the thread bookmark with jj, opens the PR with gh, and links and watches it on the thread"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "pull-requests.create-no-browser-journey",
+          "reason": "This change adds the Host API and agent tools only; the served API, a real jj push and a stubbed gh are exercised through a real test Host in tests/create-host.spec.ts."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        },
+        {
+          "kind": "custom",
+          "span": "pull-requests create preview",
+          "file": "plugins/@dshfiles/pull-requests/tests/create.spec.ts",
+          "testName": "records one span around the preview and one around the confirmed create, with jj runs beneath them"
+        },
+        {
+          "kind": "custom",
+          "span": "pull-requests create",
+          "file": "plugins/@dshfiles/pull-requests/tests/create.spec.ts",
+          "testName": "records one span around the preview and one around the confirmed create, with jj runs beneath them"
+        },
+        {
+          "kind": "custom",
+          "span": "pull request gh auth",
+          "file": "plugins/@dshfiles/pull-requests/tests/telemetry.spec.ts",
+          "testName": "records one span each for gh sign-in check, branch lookup and pull-request creation"
+        },
+        {
+          "kind": "custom",
+          "span": "pull request gh list",
+          "file": "plugins/@dshfiles/pull-requests/tests/telemetry.spec.ts",
+          "testName": "records one span each for gh sign-in check, branch lookup and pull-request creation"
+        },
+        {
+          "kind": "custom",
+          "span": "pull request gh create",
+          "file": "plugins/@dshfiles/pull-requests/tests/telemetry.spec.ts",
+          "testName": "records one span each for gh sign-in check, branch lookup and pull-request creation"
+        },
+        {
+          "kind": "custom",
+          "span": "pull request gh repo",
           "file": "plugins/@dshfiles/pull-requests/tests/telemetry.spec.ts",
           "testName": "records one span for repository discovery and pull-request polling"
         }
