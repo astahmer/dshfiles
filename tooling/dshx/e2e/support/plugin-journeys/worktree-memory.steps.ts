@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { globalPanelEntry, openGlobalPanel } from '../plugin-view-names.js'
 import { join } from 'node:path'
 import { mkdir, rm } from 'node:fs/promises'
 import { expect, type Page } from '@playwright/test'
@@ -32,7 +32,7 @@ const requireDecoy = (page: Page): Decoy => {
   return decoy
 }
 
-const ramEntry = (page: Page) => globalPanelLink(page, 'Worktree Memory: RAM')
+const ramEntry = (page: Page) => globalPanelEntry(page, 'Worktree Memory: RAM')
 
 When('a detached decoy process runs inside a registered workspace', async ({ page }: { page: Page }) => {
   const root = await createScratchDirectory('dshx-worktree-memory-e2e-')
@@ -56,7 +56,7 @@ When('a detached decoy process runs inside a registered workspace', async ({ pag
 })
 
 When('the RAM panel is opened', async ({ page }: { page: Page }) => {
-  await ramEntry(page).click()
+  await openGlobalPanel(page, 'Worktree Memory: RAM')
   await expect(page.getByRole('heading', { name: 'RAM', exact: true, level: 1 })).toBeVisible()
 })
 

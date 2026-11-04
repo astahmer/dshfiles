@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from '@playwright/test'
-import { globalPanelLink, openGlobalPanel } from '../plugin-view-names.js'
+import { canOpenGlobalPanel, openGlobalPanel } from '../plugin-view-names.js'
 import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { isAbsolute, join, relative } from 'node:path'
@@ -164,9 +164,8 @@ const addCommandCodeAccount = async (page: Page, input: { readonly name: string;
 const openAccountsPanel = async (page: Page): Promise<void> => {
   if (await providerAccounts(page).isVisible()) return
 
-  const globalPanel = globalPanelLink(page, 'AI Accounts: Accounts')
-  if (await globalPanel.isVisible()) {
-    await globalPanel.click()
+  if (await canOpenGlobalPanel(page, 'AI Accounts: Accounts')) {
+    await openGlobalPanel(page, 'AI Accounts: Accounts')
   } else {
     await openSettingsDialog(page)
     await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()

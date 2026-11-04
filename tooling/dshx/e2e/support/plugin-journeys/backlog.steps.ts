@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test'
-import { globalPanelLink, openGlobalPanel } from '../plugin-view-names.js'
+import { globalPanelEntryPoint, openGlobalPanel } from '../plugin-view-names.js'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Then, When } from '../bdd.js'
@@ -467,7 +467,7 @@ When('the customized Board view is opened', async ({ page }: { page: Page }) => 
 
 When('the scratch Host is restarted in the browser', async ({ page }: { page: Page }) => {
   await restartScratchProfileInBrowser(page)
-  await expect(globalPanelLink(page, 'Backlog: Items')).toBeVisible()
+  await expect(globalPanelEntryPoint(page, 'Backlog: Items')).toBeVisible()
 })
 
 Then('the Items view lists both {string} and {string}', async ({ page }: { page: Page }, first: string, second: string) => {

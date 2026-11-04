@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { globalPanelLink, openGlobalPanel } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
 import * as Schema from 'effect/Schema'
 import { accountDraftSchema } from '../../../../../plugins/@dshfiles/ai-accounts/src/api.js'
@@ -280,8 +280,7 @@ Then('Fast mode works for supported Codex models and stays hidden for Spark', as
 
 When('two Command Code accounts offer the same model in a new thread', async ({ page }: { page: Page }) => {
   await startFakeCommandCode(page)
-  const accounts = globalPanelLink(page, 'AI Accounts: Accounts')
-  await accounts.click()
+  await openGlobalPanel(page, 'AI Accounts: Accounts')
   const panel = page.getByRole('complementary', { name: 'Provider accounts', exact: true })
   await expect(panel).toBeVisible()
   for (const [name, key] of [

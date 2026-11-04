@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 import { dirname, join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
@@ -12,10 +12,8 @@ const THREAD_CHANGES = [
   { path: 'src/app.ts', content: 'export const reviewFixture = true\n' },
 ]
 
-const panelButton = (page: Page) => globalPanelLink(page, 'pulls.review: Reviews')
-
 When('the pulls.review panel is opened from the sidebar', async ({ page }: { page: Page }) => {
-  await panelButton(page).click()
+  await openGlobalPanel(page, 'pulls.review: Reviews')
   await expect(page.getByRole('heading', { name: 'pulls.review', exact: true })).toBeVisible()
 })
 

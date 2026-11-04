@@ -1,13 +1,11 @@
 import { expect, type Page } from '@playwright/test'
-import { globalPanelLink } from '../plugin-view-names.js'
+import { globalPanelEntryPoint, openGlobalPanel } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
-const communicationPanelButton = (page: Page) => globalPanelLink(page, 'Messages')
-
 When('the Agent communication panel is opened', async ({ page }: { page: Page }) => {
-  await expect(communicationPanelButton(page)).toBeVisible()
-  await communicationPanelButton(page).click()
+  await expect(globalPanelEntryPoint(page, 'Messages')).toBeVisible()
+  await openGlobalPanel(page, 'Messages')
   await expect(page.getByRole('heading', { name: 'Messages', exact: true, level: 1 })).toBeVisible()
 })
 
