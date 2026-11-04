@@ -76,7 +76,7 @@ Options:
   --warn-minutes <min> Warning grace before the automatic down (default ${DEFAULT_WARN_MINUTES}; 0 = stop at once, no warning).
 
 Example:
-  dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/home --json
+  dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/workspace-nav --json
 
 ${COMMON_HELP}`,
   ],

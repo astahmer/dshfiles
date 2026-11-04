@@ -124,7 +124,7 @@ Feature: Jujutsu revision interactions
 
   @scenario:jujutsu.workspace-cleanup
   Scenario: Cleanup removes an older-page workspace and refreshes its graph label
-    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration, @dshfiles/home, @dshfiles/multi-host, @dshfiles/workspace-folder-picker" is booted
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration, @dshfiles/multi-host, @dshfiles/workspace-folder-picker" is booted
     When a disposable Jujutsu cleanup repository with an empty older-page workspace is selected
     Then the empty workspace label appears on its older main ancestor
     And two stale untracked folders exist beside the repository

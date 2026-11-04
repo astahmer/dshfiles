@@ -21,7 +21,7 @@ If your `dsh` command is a personal launcher that rewrites HOME, set `DSHX_DSH_E
 If bundled Chromium is unavailable (for example on NixOS), set `DSHX_CHROMIUM_EXECUTABLE` to an absolute installed Chrome/Chromium executable; scratch, Chromium boot checks and E2E keep their isolated profiles and headless options, while actual browser compatibility still requires a successful live pass.
 
 ```sh
-dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/home --json
+dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/workspace-nav --json
 ```
 
 Builds the named bundles (plus the client bundles they load), installs a scratch
@@ -55,7 +55,7 @@ later and are reported as such.
 dshx dev open jj-integration/thread-destination
 dshx dev open jj-integration/rebase
 dshx dev open jj-integration/thread-workspaces-panel
-dshx dev open home-screen
+dshx dev open workspace-nav/new-thread-composer
 ```
 
 Goes to the app root, dismisses Preview Notice and the provider-setup dialog
@@ -180,7 +180,7 @@ A red journey is drift or a regression: triage it with `maintain-verify-dsh`.
   `/var -> /private/var`; a non-canonical path fails Session attach
   ("its cwd resolves to …").
 - Sessions created with `dshx sessions create --cwd` stay "Unassigned" (not in
-  the project's workspace); seed threads through the composer, as `home-screen`
+  the project's workspace); seed threads through the composer, as `workspace-nav/new-thread-composer`
   does. After clicking `New thread`, wait for its tab to become selected before
   sending text: a visible composer can still belong to the previously selected
   thread, so setup prompts may be queued there.

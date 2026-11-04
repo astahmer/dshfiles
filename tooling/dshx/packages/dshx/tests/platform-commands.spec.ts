@@ -112,7 +112,7 @@ const liveInstance = (): LiveInstanceFacts => ({
   currentRevision: { changeId: 'vrmuluomuulx', commitId: '0f946ce835e4', bookmarks: [], description: 'test(e2e): follow the shell settings menu' },
   staleBundles: [
     { name: '@dshfiles/ai-accounts', builtAt: 1_700_000_000_000, sourcesAt: 1_700_000_001_000, reason: 'sources-newer' },
-    { name: '@dshfiles/home', builtAt: 1_700_000_002_000, sourcesAt: 1_700_000_000_000, reason: 'built-after-start' },
+    { name: '@dshfiles/workspace-nav', builtAt: 1_700_000_002_000, sourcesAt: 1_700_000_000_000, reason: 'built-after-start' },
     { name: '@dshfiles/editor', builtAt: 1_700_000_003_000, sourcesAt: 1_700_000_000_000, reason: 'built-after-start' },
   ],
 })

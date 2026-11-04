@@ -675,7 +675,7 @@ To reproduce, start a scratch DSH and seed it:
 
 ```sh
 node tooling/dshx/packages/dshx/dist/cli/bin.js dev up \
-  --plugin @dshfiles/jj-integration --plugin @dshfiles/home \
+  --plugin @dshfiles/jj-integration --plugin @dshfiles/workspace-nav \
   --plugin @dshfiles/thread-sidebar --plugin @dshfiles/ui-styles \
   --name sidebar-scale --skip-build --json
 node tooling/dshx/scripts/sidebar-scale-bench.mjs "$TMPDIR/dshx-dev/sidebar-scale/state.json" --seed 305 --rounds 5
