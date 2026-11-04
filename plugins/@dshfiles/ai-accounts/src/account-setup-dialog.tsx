@@ -336,7 +336,11 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
               {step === 'cli' && (
                 <>
                   <p className="dshx:text-sm dshx:text-muted-foreground">
-                    {account.kind === 'claude' ? 'Use your Claude subscription. No API key needed.' : 'Use an existing CLI login on this Host.'}
+                    {account.kind === 'claude'
+                      ? 'Use your Claude subscription. No API key needed.'
+                      : account.kind === 'mistral'
+                        ? 'Use the Le Chat or Vibe plan key that `vibe --setup` (Launch browser) saved in ~/.vibe/.env on this Host. DSH reads it in place.'
+                        : 'Use an existing CLI login on this Host.'}
                   </p>
                   <details className="dshx:text-xs">
                     <summary className="dshx:cursor-pointer dshx:text-muted-foreground">Sign-in command</summary>

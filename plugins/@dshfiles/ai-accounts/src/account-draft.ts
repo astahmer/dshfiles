@@ -32,6 +32,7 @@ export class AccountDraftModel {
     commandcode: '',
     'github-copilot': '',
     cursor: '',
+    mistral: '',
   } satisfies Record<AccountKind, string>
 
   /** The authored half of a profile; identity and health are observed, never sent back. */

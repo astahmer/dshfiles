@@ -168,7 +168,7 @@ export const createAccountSetupService = (input: {
   const draftForMethod = (draft: AccountDraft, method: AccountConnectionMethod, id: string): AccountDraft => ({
     ...draft,
     apiKeyEnv: method === 'key' ? privateReference(id) : method === 'reference' ? draft.apiKeyEnv : '',
-    ...((draft.kind === 'commandcode' || draft.kind === 'cursor' || draft.kind === 'opencode-go') && {
+    ...((draft.kind === 'commandcode' || draft.kind === 'cursor' || draft.kind === 'opencode-go' || draft.kind === 'mistral') && {
       authSource: method === 'cli' ? ('cli' as const) : ('reference' as const),
     }),
   })

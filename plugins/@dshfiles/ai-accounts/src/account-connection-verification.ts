@@ -61,7 +61,8 @@ export const verifyAccountConnection = async (
     }
     // An explicitly chosen CLI login must never be replaced by a default environment key.
     let resolveCredential = explicitCli ? async (): Promise<string> => '' : input.resolveCredential
-    const keyed = account.kind === 'claude' || account.kind === 'opencode-go' || account.kind === 'commandcode' || account.kind === 'cursor'
+    const keyed =
+      account.kind === 'claude' || account.kind === 'opencode-go' || account.kind === 'commandcode' || account.kind === 'cursor' || account.kind === 'mistral'
     let resolvedKey: string | undefined
     if (keyed && account.apiKeyEnv !== '') {
       const name = account.apiKeyEnv

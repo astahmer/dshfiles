@@ -52,7 +52,7 @@ const renderReport = (value: typeof accountsReport.Type): string =>
 export const aiAccountsTool = Tool.make({
   name: 'ai_accounts',
   description:
-    'List the configured Codex and OpenCode Go accounts: their model routes, whether each holds a login, and how the pool currently spreads requests.',
+    'List the configured AI accounts (Codex, Claude, Copilot, Mistral, OpenCode Go, Command Code, Cursor): their model routes, whether each holds a login, and how the pool currently spreads requests.',
   input: Schema.Struct({}),
   output: accountsReport,
   readOnly: true,

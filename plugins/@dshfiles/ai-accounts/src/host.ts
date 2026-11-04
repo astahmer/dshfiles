@@ -47,6 +47,7 @@ import { CommandCodeCapabilities } from './commandcode-capabilities.js'
 import { fetchCommandCodeCatalog, createCommandCodeProvider } from './commandcode-provider.js'
 import { CredentialModel, resolveKeyFromContext } from './credentials.js'
 import { fetchOpenCodeGoCatalog } from './opencode-go-catalog.js'
+import { MistralAccountModel } from './mistral-account.js'
 import { DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { AccountsPlatformLive } from './platform-layer.js'
 import { AccountLocks } from './account-locks.js'
@@ -54,6 +55,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { Effect, Layer, Stream, SubscriptionRef } from 'effect'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
+import { createMistralProvider } from './mistral-provider.js'
 import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
 import { createProvider } from '@earendil-works/pi-ai'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
@@ -78,7 +80,7 @@ import { createQuotaContinuationService } from './quota-continuation.js'
 import { ProviderProfileModel, EffortPinnedAdapter } from './provider-profile.js'
 import { DeclaredRetryAfter } from './provider-retry-after.js'
 import { AccountModelSettingsModel } from './account-model-settings.js'
-import { CLAUDE_KIND, COMMANDCODE_KIND, CODEX_KIND, OPENCODE_KIND, ProviderRoutes, type KeyedRoute, type Route } from './provider-routes.js'
+import { CLAUDE_KIND, COMMANDCODE_KIND, CODEX_KIND, MISTRAL_KIND, OPENCODE_KIND, ProviderRoutes, type KeyedRoute, type Route } from './provider-routes.js'
 
 /**
  * Per-account Codex and OpenCode Go provider instances for DeepSeek Harness.
@@ -280,6 +282,8 @@ const startAccountsHost = (input: {
   const codexUpstream = openaiCodexProvider()
   const codexFastUpstream = withCodexFastMode({ upstream: codexUpstream, fastMode })
   const opencodeUpstream = opencodeGoProvider()
+  // Mistral plan and pay-as-you-go keys share one transport: `api.mistral.ai/v1/chat/completions` with x-affinity.
+  const mistralUpstream = createMistralProvider()
   const claudeUpstream = anthropicProvider()
   const claudeCli = new ClaudeCliSessions({
     configDir: provider => {
@@ -316,7 +320,8 @@ const startAccountsHost = (input: {
       )
     }
     return (
-      candidate.kind === OPENCODE_KIND &&
+      (candidate.kind === OPENCODE_KIND || candidate.kind === MISTRAL_KIND) &&
+      candidate.kind === expected.kind &&
       candidate.apiBaseUrl === expected.apiBaseUrl &&
       candidate.apiKeyEnv === expected.apiKeyEnv &&
       candidate.authSource === expected.authSource
@@ -333,7 +338,9 @@ const startAccountsHost = (input: {
           resolveCredential,
           readFallbackKey: () => readCommandCodeKey(route.apiKeyEnv, resolveCredential, route.authSource),
         })
-      : opencodeUpstream
+      : route.kind === MISTRAL_KIND
+        ? mistralUpstream
+        : opencodeUpstream
   // Per-account, per-model default efforts, read from the same file as the
   // routes so a pin can never outlive the account that declared it.
   //
@@ -517,6 +524,13 @@ const startAccountsHost = (input: {
         // Keyed providers read the variable their own account names, so several
         // subscriptions live in the vault without any value in the accounts file.
         const named = ProviderRoutes.keyEnvFor(route)
+        if (route.kind === MISTRAL_KIND) {
+          const mistralKey = await MistralAccountModel.readKey(route.apiKeyEnv, resolveCredential, route.authSource)
+          if (mistralKey.length === 0) {
+            throw new LlmError(`No Mistral key for '${provider}'. Run \`vibe --setup\` on the Host, or store ${named} for this account.`, 'MISSING_CREDENTIAL')
+          }
+          return mistralKey
+        }
         const namedKey = route.kind === COMMANDCODE_KIND ? await readCommandCodeKey(named, resolveCredential, route.authSource) : await resolveCredential(named)
         const key = route.authSource === undefined ? namedKey || config.opencodeApiKey.trim() : namedKey
         if (key.length === 0) {
@@ -605,6 +619,7 @@ const startAccountsHost = (input: {
     )
   }
 
+  const discoversModels = (route: Route): route is KeyedRoute => route.kind === COMMANDCODE_KIND || route.kind === OPENCODE_KIND || route.kind === MISTRAL_KIND
   let adapterRegistration: AdapterRegistrationHandle | undefined
   let directoryRegistration: DirectoryRegistrationHandle | undefined
   const modelDiscoveries = new Map<string, { readonly route: KeyedRoute; readonly dispose: () => void }>()
@@ -625,6 +640,15 @@ const startAccountsHost = (input: {
           contextWindow: entry.contextWindow ?? 128_000,
           maxTokens: CommandCodeCapabilities.maxOutputTokens(entry.id),
           inputModalities: CommandCodeCapabilities.readsImages(entry.id) ? ['text', 'image'] : ['text'],
+        }))
+      }
+      if (route.kind === MISTRAL_KIND) {
+        const key = request.apiKey?.trim() || (await MistralAccountModel.readKey(route.apiKeyEnv, resolveCredential, route.authSource))
+        const entries = await MistralAccountModel.fetchCatalog(key, signal)
+        return entries.map(entry => ({
+          id: entry.id,
+          ...(entry.contextWindow !== undefined && { contextWindow: entry.contextWindow }),
+          inputModalities: entry.vision ? ['text', 'image'] : ['text'],
         }))
       }
       const modelIds = await fetchOpenCodeGoCatalog(signal)
@@ -676,7 +700,7 @@ const startAccountsHost = (input: {
     }
     catalogState.retain(({ instanceId, route }) => sameKeyedRoute(nextRoutes.get(instanceId), route))
     for (const [id, route] of enabled) {
-      if ((route.kind !== COMMANDCODE_KIND && route.kind !== OPENCODE_KIND) || modelDiscoveries.has(id)) continue
+      if (!discoversModels(route) || modelDiscoveries.has(id)) continue
       registerKeyedDiscovery(id, route)
     }
 
@@ -702,7 +726,7 @@ const startAccountsHost = (input: {
   runtime.refreshRoutes = refreshRoutes
   const refreshModelCatalog = async (instanceId: string): Promise<void> => {
     const route = routes.get(instanceId)
-    if (route === undefined || !route.enabled || (route.kind !== COMMANDCODE_KIND && route.kind !== OPENCODE_KIND)) return
+    if (route === undefined || !route.enabled || !discoversModels(route)) return
     const settingsNs = `ai-accounts.${route.kind}.${instanceId}`
     const discoveryRequest = route.kind === COMMANDCODE_KIND ? { provider: route.kind, baseURL: route.apiBaseUrl } : { provider: route.kind }
     const modelIds = await catalogState.refresh(instanceId, async signal =>
@@ -717,7 +741,7 @@ const startAccountsHost = (input: {
   // Discovered catalogs live in memory only, so without this every restart left
   // keyed accounts on their floor catalog until their model list was opened.
   for (const [instanceId, route] of routes) {
-    if (!route.enabled || (route.kind !== COMMANDCODE_KIND && route.kind !== OPENCODE_KIND)) continue
+    if (!route.enabled || !discoversModels(route)) continue
     void refreshModelCatalog(instanceId).catch(() => ctx.logger.warn(`ai-accounts: startup catalog refresh failed for ${instanceId}`))
   }
 

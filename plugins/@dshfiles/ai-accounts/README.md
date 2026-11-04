@@ -7,8 +7,8 @@
 ![Unavailable quota stays visible in the sidebar](docs/screenshots/sidebar-unavailable-accounts.png)
 
 AI Accounts runs several subscription accounts side by side. Codex, Claude,
-OpenCode Go and Command Code accounts each become their own route in the model
-picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
+Mistral, OpenCode Go and Command Code accounts each become their own route in the
+model picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
 accounts only track identity and quota: DSH has no Cursor agent runtime, so
 Cursor sessions run outside DSH.
 
@@ -79,6 +79,7 @@ The dialog presents only the common sign-in choices. Claude uses **Claude accoun
 - **Claude setup token or API key:** choose **API key**, import a Catalog entry, or select **More options → Use existing credential**. The token path does not require installing Claude Code. Verification sends a fixed synthetic request to Anthropic's official free, nongenerative token-count endpoint—never a paid inference request or another provider origin. Actual setup-token permission for that endpoint remains unverified; denial is not bypassed by switching identities. API keys retain separate API billing.
 - **Codex:** keep official browser/device sign-in or select **Existing login**. **Existing or custom CLI home** restores the shared-home and distinct authentication-overlay fields before saving. Linking verifies the selected existing overlay without copying/deleting user auth. Device sign-in explicitly stages a new login and adopts it only after accepted completion, with replacement consent. Custom equal shared/overlay paths remain rejected; the generated private pair retains its managed policy. DSH does not install the CLI.
 - **Command Code and Cursor:** choose a new key/token, an existing credential reference, or the existing `cmd login` / `cursor-agent login`. An explicit CLI choice remains pinned after saving and ordinary settings edits; it does not become a default environment-key fallback. Command Code base settings remain available in every mode. **Cursor** is still quota-only, never a DSH model route.
+- **Mistral (Le Chat / Vibe plan):** choose **Mistral Vibe login** to reuse the key `vibe --setup` (Launch browser) minted for your plan, or paste/import a key from chat.mistral.ai/code/extensions or console.mistral.ai. See [Mistral subscriptions](#mistral-subscriptions).
 - **OpenCode Go:** paste/import a key or reuse an existing named credential, including `OPENCODE_API_KEY`. OpenCode CLI OAuth is not a supported path in this integration.
 - **GitHub Copilot:** device OAuth remains provisional in Host memory until checked completion. Unlimited or nondisplayable quota no longer causes a valid authenticated connection to be rejected.
 
@@ -120,6 +121,7 @@ Automated verification uses fake CLI/device responses and a loopback provider. I
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Codex          | **Continue with Codex** in quick setup (official CLI device approval); existing CLI login remains supported                                              | yes         | 5-hour and weekly windows, banked resets                                                                                    |
 | Claude         | `claude auth login` under the account's `CLAUDE_CONFIG_DIR`; an optional `claude setup-token` in DSH credentials or the Host environment serves requests | yes         | 5-hour, weekly, weekly Opus/Sonnet (`/api/oauth/usage`)                                                                     |
+| Mistral        | Mistral Vibe login (`~/.vibe/.env`, macOS Keychain), or a key in DSH credentials or the Host environment                                                 | yes         | monthly Vibe allowance from `/v1/billing/budget` (what Mistral Vibe's footer reads; best effort)                            |
 | OpenCode Go    | key in DSH credentials or the Host environment                                                                                                           | yes         | rolling, weekly and monthly windows                                                                                         |
 | Command Code   | key in DSH credentials or the Host environment, or `cmd login`                                                                                           | yes         | 5-hour and weekly window limits (`/alpha/billing/credits`)                                                                  |
 | GitHub Copilot | GitHub device-code OAuth; grant and refresh token stay in DSH credentials                                                                                | yes         | premium requests and chat, from GitHub's internal `copilot_internal/user` (what GitHub's Copilot clients read; best effort) |
@@ -135,6 +137,27 @@ expires, run Claude Code once on the account. Quota needs the interactive
 login, because a setup token cannot read usage. Cursor publishes no usage API,
 so the plugin reads the dashboard's own endpoint. If Cursor changes that
 endpoint, the card reports "unsupported" instead of a guessed number.
+
+## Mistral subscriptions
+
+A Mistral subscription (Le Chat Pro, Team or Enterprise, or a Vibe plan) is not a separate credential: it is an
+ordinary Mistral API key, and the organization's plan decides whether a request draws the plan's included monthly
+allowance or pay-as-you-go credits. This follows Mistral Vibe itself and the community
+[opencode-mistral-vibe](https://github.com/thorstenkramm/opencode-mistral-vibe) plugin; opencode, pi and t3code have no
+other Mistral subscription path (t3code and Zed run Vibe over ACP instead).
+
+- **Login.** **Mistral Vibe login** reads, read-only, the key `vibe --setup` → **Launch browser** stored: `MISTRAL_API_KEY`
+  in `$VIBE_HOME/.env` (default `~/.vibe/.env`), then the macOS Keychain (`ai.mistral.vibe`, legacy `vibe`). Linux and
+  Windows keyrings are not read; use `.env` or a key reference there. A named key reference never falls back to the
+  Vibe login. DSH does not implement Vibe's undocumented browser sign-in or its OIDC client.
+- **Requests.** pi-ai's Mistral transport: `https://api.mistral.ai/v1/chat/completions` with the account's bearer key and
+  `x-affinity` set to the conversation for prompt caching.
+- **Models.** The Vibe plan catalog (`/v1/model-catalog?surface=vibe-code`, e.g. `mistral-vibe-cli-latest`), falling back
+  to the documented `/v1/models`; only tool-capable chat models are offered.
+- **Quota.** The monthly Vibe allowance and plan name from `/v1/billing/budget` and `/v1/billing/subscription`, the reads
+  Mistral Vibe's footer uses. They are not in Mistral's public API reference: a key without a plan allowance, or a member
+  without the usage permission, shows **Quota unavailable**, never a guessed percentage.
+- **Sign out.** Not offered: the key belongs to Mistral Vibe or your credential store. Revoke it in console.mistral.ai.
 
 ## Claude through the Claude Code CLI
 

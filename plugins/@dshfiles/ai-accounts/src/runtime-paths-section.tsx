@@ -51,6 +51,11 @@ const KEY_FIELD = {
   },
   commandcode: { label: 'API KEY', hint: 'Name the key reference; empty falls back to `cmd login`.', placeholder: 'COMMANDCODE_API_KEY' },
   cursor: { label: 'ACCESS TOKEN', hint: 'Optional token reference. Empty uses the `cursor-agent login`.', placeholder: 'CURSOR_WORK_API_KEY' },
+  mistral: {
+    label: 'API KEY',
+    hint: 'Optional key reference. Empty uses the Mistral Vibe login in ~/.vibe/.env (`vibe --setup`).',
+    placeholder: 'MISTRAL_WORK_API_KEY',
+  },
 } satisfies Record<AccountDraft['kind'], { readonly label: string; readonly hint: string; readonly placeholder: string } | null>
 
 const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`

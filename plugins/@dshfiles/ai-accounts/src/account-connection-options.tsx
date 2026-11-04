@@ -23,7 +23,7 @@ interface ConnectionOptionsProps {
 const methodLabel = (method: AccountConnectionMethod, account: AccountProfile): string => {
   if (method === 'subscription') return 'Claude account'
   if (method === 'device') return 'Browser sign-in'
-  if (method === 'cli') return account.kind === 'codex' ? 'Existing login' : 'CLI login'
+  if (method === 'cli') return account.kind === 'codex' ? 'Existing login' : account.kind === 'mistral' ? 'Mistral Vibe login' : 'CLI login'
   return account.kind === 'cursor' ? 'Access token' : 'API key'
 }
 
@@ -143,7 +143,13 @@ export const ExistingConnectionReference = (props: ConnectionOptionsProps): JSX.
     onSubmit: ({ value }) => props.configure(value),
   })
   const example =
-    props.account.kind === 'commandcode' ? 'COMMANDCODE_API_KEY' : props.account.kind === 'opencode-go' ? 'OPENCODE_API_KEY' : 'CLAUDE_WORK_API_KEY'
+    props.account.kind === 'commandcode'
+      ? 'COMMANDCODE_API_KEY'
+      : props.account.kind === 'opencode-go'
+        ? 'OPENCODE_API_KEY'
+        : props.account.kind === 'mistral'
+          ? 'MISTRAL_API_KEY'
+          : 'CLAUDE_WORK_API_KEY'
   return (
     <form
       className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3"

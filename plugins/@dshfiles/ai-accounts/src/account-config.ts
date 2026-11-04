@@ -14,11 +14,11 @@ export interface CodexAccountConfig {
 export interface KeyedAccountConfig {
   readonly instanceId: string
   readonly displayName: string
-  readonly kind: 'opencode-go' | 'commandcode'
+  readonly kind: 'opencode-go' | 'commandcode' | 'mistral'
   /** Environment variable holding this account's key. */
   readonly apiKeyEnv: string
   readonly authSource?: 'cli' | 'reference' | undefined
-  /** Alternate API base, for a self-hosted or staging Command Code. */
+  /** Alternate API base, for a self-hosted or staging Command Code; unused by Mistral. */
   readonly apiBaseUrl: string
   readonly enabled: boolean
 }

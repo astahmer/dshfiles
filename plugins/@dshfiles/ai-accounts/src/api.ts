@@ -20,7 +20,7 @@ import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } fr
  * whether it holds a login, the identity it presents, and the command that creates one.
  */
 
-export const accountKindSchema = Schema.Literals(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor'])
+export const accountKindSchema = Schema.Literals(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor', 'mistral'])
 
 export const createSetupAccountInputSchema = Schema.Struct({ kind: accountKindSchema, requestId: Schema.String.check(Schema.isUUID()) })
 export type CreateSetupAccountInput = typeof createSetupAccountInputSchema.Type
@@ -727,7 +727,7 @@ export const aiAccountsApi = defineApi({
       input: Schema.Void,
       output: accountsUsageSchema,
       description:
-        'Live subscription quota of every configured AI account (Codex, Copilot, OpenCode Go…): used and remaining windows and when each resets. Read-only; cached for a short while.',
+        'Live subscription quota of every configured AI account (Codex, Copilot, Mistral, OpenCode Go…): used and remaining windows and when each resets. Read-only; cached for a short while.',
       tool: { name: 'ai_accounts_quota', readOnly: true },
     }),
     /** Native DSH provider rows (DeepSeek, Command Code, …) and whether each is switched on. */

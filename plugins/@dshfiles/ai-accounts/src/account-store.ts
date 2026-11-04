@@ -11,6 +11,7 @@ import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
 import { DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
 import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
+import { MISTRAL_LOGIN_HINT, MistralAccountModel } from './mistral-account.js'
 import { AccountOrderModel } from './account-order-model.js'
 import { type AccountReorder, type CreateSetupAccountInput } from './api.js'
 import { AccountConflict, AccountOrderRejected, AccountStoreWriteFailed } from './errors.js'
@@ -114,6 +115,17 @@ const observe = async (
       detail: null,
     })
   }
+  if (draft.kind === 'mistral') {
+    const hasKey = (await MistralAccountModel.readKey(draft.apiKeyEnv, resolveCredential, draft.authSource)).length > 0
+    return observed(draft, {
+      cooling,
+      signedIn: hasKey,
+      identity: null,
+      plan: null,
+      loginHint: MISTRAL_LOGIN_HINT,
+      detail: null,
+    })
+  }
   if (draft.kind === 'claude') {
     const configDir = ClaudeAccountModel.resolveClaudeConfigDir(draft.homePath)
     const auth = await claudeAccountService.describeAuth({ configDir, keyEnv: draft.apiKeyEnv, now: Date.now(), resolveCredential })
@@ -209,7 +221,10 @@ const connectionMetadata = (draft: AccountDraft, shadowRoot: string): Pick<Accou
   }
   if (draft.kind === 'claude')
     return { mode: 'direct', loginHint: ClaudeAccountModel.claudeLoginHint(ClaudeAccountModel.resolveClaudeConfigDir(draft.homePath)) }
-  return { mode: 'direct', loginHint: draft.kind === 'commandcode' ? 'cmd login' : draft.kind === 'cursor' ? CURSOR_LOGIN_HINT : '' }
+  return {
+    mode: 'direct',
+    loginHint: draft.kind === 'commandcode' ? 'cmd login' : draft.kind === 'cursor' ? CURSOR_LOGIN_HINT : draft.kind === 'mistral' ? MISTRAL_LOGIN_HINT : '',
+  }
 }
 
 /**

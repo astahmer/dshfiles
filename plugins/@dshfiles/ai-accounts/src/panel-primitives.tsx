@@ -40,7 +40,11 @@ export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; re
       props.large ? 'dshx:size-16' : 'dshx:size-11',
       props.kind === 'opencode-go' && 'dshx:bg-violet dshx:text-primary-foreground',
     )}
-    style={props.kind === 'claude' || props.kind === 'commandcode' ? { backgroundColor: KIND_ACCENT[props.kind], color: 'white' } : undefined}
+    style={
+      props.kind === 'claude' || props.kind === 'commandcode' || props.kind === 'mistral'
+        ? { backgroundColor: KIND_ACCENT[props.kind], color: 'white' }
+        : undefined
+    }
   >
     <ProviderLogo kind={props.kind} monochrome className={props.large ? 'dshx:size-10' : 'dshx:size-7'} />
   </span>
