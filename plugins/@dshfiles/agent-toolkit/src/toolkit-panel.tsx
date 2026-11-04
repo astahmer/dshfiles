@@ -2,6 +2,7 @@ import { dshxRegistryApi, isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import { mcpServersApi, decodeSnapshot } from '@dshfiles/mcp-servers/api'
 import { memoryApi } from '@dshfiles/memory/api'
+import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -65,13 +66,13 @@ const INVOCATION_LABEL = { both: 'invokeBoth', user: 'invokeUser', model: 'invok
 const QUERY_ROOT = ['agent-toolkit'] as const
 
 const Section = (props: { readonly id: string; readonly title: string; readonly children: ReactNode }): ReactNode => (
-  <section aria-labelledby={props.id} className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2">
-    <h2 id={props.id} className="dshx:text-sm dshx:font-semibold">
-      {props.title}
-    </h2>
+  <PageSection id={props.id} heading={props.title}>
     {props.children}
-  </section>
+  </PageSection>
 )
+
+/** A project is filed by its folder; show its name and keep the path in a tooltip. */
+const projectName = (project: string): string => project.replace(/\/+$/u, '').split('/').at(-1) || project
 
 const Muted = (props: { readonly children: ReactNode }): ReactNode => <p className="dshx:text-sm dshx:text-muted-foreground">{props.children}</p>
 
@@ -146,29 +147,27 @@ export const AgentToolkitPanel = (props: {
   )
   const methods = listing.data === undefined ? [] : AgentToolkit.apiMethods({ listing: listing.data, filter, query })
   const skills = (listing.data?.skills ?? []).filter(skill => AgentToolkit.matches(query, skill.name, skill.description, skill.provider))
-  const noMatch = <Muted>{t('noMatch')}</Muted>
+  const noMatch = <EmptyState className="dshx:py-4">{t('noMatch')}</EmptyState>
 
   return (
     <TooltipProvider>
-      <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto" data-testid="agent-toolkit">
-        <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:border-b dshx:border-border dshx:px-6 dshx:py-4 dshx:@max-pane-narrow:px-3">
-          <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3">
-            <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-              <h1 className="dshx:text-base dshx:font-semibold">{t('title')}</h1>
-              <p className="dshx:text-sm dshx:text-muted-foreground dshx:@max-pane-narrow:sr-only">{t('subtitle')}</p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="dshx:shrink"
-              aria-label={t('refresh')}
-              onClick={() => void queryClient.invalidateQueries({ queryKey: QUERY_ROOT })}
-              disabled={listing.isFetching}
-            >
-              <RefreshCwIcon className={cn(listing.isFetching && 'dshx:animate-spin')} />
-              <span className="dshx:@max-pane-compact:sr-only">{t('refresh')}</span>
-            </Button>
-          </div>
+      <Page
+        heading={t('title')}
+        description={t('subtitle')}
+        actions={[
+          {
+            id: 'refresh',
+            label: t('refresh'),
+            icon: <RefreshCwIcon className={cn(listing.isFetching && 'dshx:animate-spin')} />,
+            onSelect: () => void queryClient.invalidateQueries({ queryKey: QUERY_ROOT }),
+            disabled: listing.isFetching,
+          },
+        ]}
+        scroll
+        data-testid="agent-toolkit"
+        bodyClassName="dshx:gap-6"
+      >
+        <div className="dshx:flex dshx:flex-col dshx:gap-3">
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
             {thread === undefined ? (
               <Muted>{t('noThread')}</Muted>
@@ -198,7 +197,7 @@ export const AgentToolkitPanel = (props: {
           </div>
           <ToggleGroup
             aria-label={t('filterLabel')}
-            className="dshx:flex-wrap"
+            className="dshx:max-w-full dshx:justify-start dshx:overflow-x-auto"
             size="sm"
             type="single"
             value={filter}
@@ -215,7 +214,6 @@ export const AgentToolkitPanel = (props: {
           </ToggleGroup>
         </div>
 
-        <div className="dshx:flex dshx:flex-col dshx:gap-6 dshx:px-6 dshx:py-4 dshx:@max-pane-narrow:px-3">
           {listing.isError ? (
             <Alert variant="destructive">
               <AlertDescription>{t('unavailable')}</AlertDescription>
@@ -286,7 +284,7 @@ export const AgentToolkitPanel = (props: {
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <span className="dshx:inline-flex">
-                                      <Badge variant="destructive">{t('restricted')}</Badge>
+                                      <Badge variant="outline">{t('restricted')}</Badge>
                                     </span>
                                   </TooltipTrigger>
                                   <TooltipContent>{t('restrictedHint')}</TooltipContent>
@@ -407,13 +405,13 @@ export const AgentToolkitPanel = (props: {
             <Section id="agent-toolkit-mcp" title={t('mcp', { count: mcpRows.length })}>
               {servers.isPending ? <Loading label={t('loading')} /> : null}
               {servers.isError ? <Muted>{isApiOwnerMissing(servers.error) ? t('mcpUnavailable') : t('unavailable')}</Muted> : null}
-              {servers.data !== undefined && servers.data.servers.length === 0 ? <Muted>{t('mcpEmpty')}</Muted> : null}
+              {servers.data !== undefined && servers.data.servers.length === 0 ? <EmptyState className="dshx:py-4">{t('mcpEmpty')}</EmptyState> : null}
               <ul className="dshx:flex dshx:flex-col dshx:gap-2">
                 {mcpRows.map(row => (
                   <li key={row.id} className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:p-3">
                     <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
                       <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{row.name}</span>
-                      <Badge variant={row.lifecycle === 'loaded' ? 'success' : row.lifecycle === 'start-failed' ? 'destructive' : 'muted'}>
+                      <Badge variant={row.lifecycle === 'start-failed' ? 'destructive' : row.lifecycle === 'loaded' ? 'secondary' : 'muted'}>
                         {row.enabled ? row.lifecycle : t('mcpOff')}
                       </Badge>
                       <span className="dshx:text-xs dshx:text-muted-foreground">{t('mcpToolCount', { count: row.tools.length })}</span>
@@ -476,9 +474,16 @@ export const AgentToolkitPanel = (props: {
                       {t('openMemory')}
                     </Button>
                   </div>
-                  <p className="dshx:text-xs dshx:text-muted-foreground dshx:break-all">{t('memoryBlock', { project: startBlock.data.project })}</p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="dshx:w-fit dshx:text-xs dshx:text-muted-foreground dshx:break-all">
+                        {t('memoryBlock', { project: projectName(startBlock.data.project) })}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent>{startBlock.data.project}</TooltipContent>
+                  </Tooltip>
                   {startBlock.data.text === '' ? (
-                    <Muted>{t('memoryBlockEmpty')}</Muted>
+                    <EmptyState className="dshx:py-4">{t('memoryBlockEmpty')}</EmptyState>
                   ) : (
                     <pre className="dshx:max-h-72 dshx:overflow-auto dshx:rounded-md dshx:bg-muted dshx:p-3 dshx:font-mono dshx:text-xs dshx:whitespace-pre-wrap">
                       {startBlock.data.text}
@@ -488,8 +493,7 @@ export const AgentToolkitPanel = (props: {
               )}
             </Section>
           ) : null}
-        </div>
-      </main>
+      </Page>
     </TooltipProvider>
   )
 }

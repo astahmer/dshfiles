@@ -148,7 +148,7 @@ describe('Agent toolkit page', () => {
     expect(screen.queryByTitle('/repo/.agents/skills/verify-dsh/SKILL.md')).toBeNull()
     expect(screen.queryByTitle('/home/me/.agents/skills/caveman/SKILL.md')).toBeNull()
     expect(await screen.findByText('feedback · 2')).toBeTruthy()
-    expect(screen.getByText('Start block for /repo')).toBeTruthy()
+    expect(screen.getByText('Start block for repo')).toBeTruthy()
   })
 
   it('narrows to one source and its section', async () => {
