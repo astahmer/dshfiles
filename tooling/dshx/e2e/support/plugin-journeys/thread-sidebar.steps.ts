@@ -83,6 +83,18 @@ const openThreadRow = async (row: Locator): Promise<void> => {
 const openThreadRowMenu = async (row: Locator): Promise<void> => {
   await row.click({ button: 'right', position: { x: 24, y: 16 } })
 }
+/**
+ * Status grouping moves a row between groups as its turn starts and ends (Working → Idle/Needs you), which remounts the
+ * row and closes a menu opened in between. Reopen until the menu shows the item the journey needs.
+ */
+const openSettledThreadRowMenu = async (page: Page, row: Locator, item: string): Promise<Locator> => {
+  const menuItem = page.getByRole('menuitem', { name: item, exact: true })
+  await expect(async () => {
+    if (!(await menuItem.isVisible())) await openThreadRowMenu(row)
+    await expect(menuItem).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
+  return menuItem
+}
 // Pin, Park, Settle and Archive sit under the row menu's Change status submenu.
 const chooseRowStatusAction = async (page: Page, action: string): Promise<void> => {
   await page.getByRole('menuitem', { name: 'Change status', exact: true }).click()
@@ -132,7 +144,7 @@ const startBlankThread = async (page: Page): Promise<string> => {
   }
   page.on('response', recordCreatedThread)
   try {
-    await sidebarNavigation(page).getByRole('button', { name: 'New thread', exact: true }).click()
+    await ThreadSidebarJourney.newThreadButton(page).click()
     await expect
       .poll(
         () => {
@@ -155,7 +167,7 @@ const selectBlankThreadAwayFrom = async (page: Page, excludedThreadId: string): 
   const blankComposer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
   const existingThreadId = currentThreadId(page)
   if (existingThreadId !== null && existingThreadId !== excludedThreadId && (await blankComposer.isVisible())) return existingThreadId
-  await sidebarNavigation(page).getByRole('button', { name: 'New thread', exact: true }).click()
+  await ThreadSidebarJourney.newThreadButton(page).click()
   await expect
     .poll(
       async () => {
@@ -169,6 +181,13 @@ const selectBlankThreadAwayFrom = async (page: Page, excludedThreadId: string): 
   if (selectedThreadId === null || selectedThreadId === excludedThreadId) throw new Error('The page did not leave the archived session.')
   return selectedThreadId
 }
+
+/**
+ * Settings as a profile shows it: settings-shell's page in the stage, or — in a composition without settings-shell —
+ * the native Settings dialog, whose accessible name is not "Settings". Both list the built-in plugins.
+ */
+const settingsSurface = (page: Page): Locator =>
+  settingsPage(page).or(page.getByRole('dialog')).filter({ hasText: 'Built-in plugins' }).first()
 
 const openSidebarSettings = async (page: Page): Promise<void> => {
   await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
@@ -1194,7 +1213,8 @@ When('a thread finishes its turn and the browser hands its unfinished marker to 
 Then('every open tab shows the finished turn until one tab opens it', async ({ page }: { page: Page }) => {
   const journey = finishedTurnJourneys.get(page)
   if (journey === undefined) throw new Error('No finished-turn journey was recorded for this browser page.')
-  const finishedLabel = (target: Page) => threadRow(target, journey.targetThreadId).getByText('Turn finished', { exact: true })
+  // Status grouping shows an unacknowledged finished turn as the Ready glyph; opening the thread makes it Idle.
+  const finishedLabel = (target: Page) => threadRow(target, journey.targetThreadId).getByRole('img', { name: 'Ready', exact: true })
   await recordAssertion(page, 'thread-sidebar-turn-finished-outlives-its-client', async () => {
     await page.reload()
     await expect(finishedLabel(page)).toBeVisible({ timeout: 60_000 })
@@ -1401,6 +1421,8 @@ Then('the notification settings survive a browser reload', async ({ page }: { pa
 })
 
 When('the header is expanded, reordered, and one destination is hidden', async ({ page }: { page: Page }) => {
+  // Header destinations belong to the free-docking sidebar; the fixed layout's rail is not reorderable.
+  await ThreadSidebarJourney.useFreeDocking(page)
   await page.getByRole('button', { name: 'Sidebar settings', exact: true }).first().click()
   const customize = customizeSidebar(page)
   await expect(customize).toBeVisible()
@@ -1431,6 +1453,8 @@ Then('the custom layout survives a browser reload', async ({ page }: { page: Pag
 })
 
 When('the sidebar footer More menu is opened', async ({ page }: { page: Page }) => {
+  // The footer and header More menus belong to the free-docking sidebar; the fixed layout lists every page on the rail.
+  await ThreadSidebarJourney.useFreeDocking(page)
   await page.getByRole('button', { name: 'More', exact: true }).click()
 })
 
@@ -1462,7 +1486,7 @@ Then('the header menu offers Settings and Customize sidebar', async ({ page }: {
   })
   await settings.click()
   await recordAssertion(page, 'thread-sidebar-header-more-opens-settings', async () => {
-    await expect(settingsPage(page).filter({ hasText: 'Built-in plugins' })).toBeVisible()
+    await expect(settingsSurface(page)).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
@@ -1497,13 +1521,14 @@ Then('the Workbench Navigation More menu offers Settings', async ({ page }: { pa
   })
   await menu.getByRole('option', { name: 'Settings', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-workbench-navigation-more-opens-settings', async () => {
-    await expect(settingsPage(page).filter({ hasText: 'Built-in plugins' })).toBeVisible()
+    await expect(settingsSurface(page)).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
 
 // The overflow mode has no Customize control; a browser copy is what the sidebar hands to Host settings on load.
 When('the sidebar header moves overflowing destinations into its More menu only', async ({ page }: { page: Page }) => {
+  await ThreadSidebarJourney.useFreeDocking(page)
   await expect(sidebarNavigation(page).getByRole('button', { name: 'More sidebar destinations', exact: true })).toBeVisible()
   await page.evaluate(
     ([key, preferences]) => localStorage.setItem(key ?? '', preferences ?? ''),
@@ -1536,7 +1561,8 @@ Then('the header More menu still offers Settings and opens a destination the row
 })
 
 When('the sidebar thread-search destination is opened with a nonmatching query', async ({ page }: { page: Page }) => {
-  await sidebarNavigation(page).getByRole('button', { name: 'Search threads', exact: true }).click()
+  // Fixed layout seats Search threads above the list; free docking keeps it in the Sidebar navigation header.
+  await page.getByRole('button', { name: 'Search threads', exact: true }).filter({ visible: true }).first().click()
   await expect(paletteDialog(page)).toBeVisible()
   await paletteInput(page).fill('e2e-no-thread-match-in-fresh-host')
 })
@@ -2137,8 +2163,7 @@ When('a thread title is renamed from its row menu and a second edit is cancelled
   const row = threadRow(page, threadId)
   await expect(row).toHaveCount(1)
 
-  await openThreadRowMenu(row)
-  await page.getByRole('menuitem', { name: 'Edit title', exact: true }).click()
+  await (await openSettledThreadRowMenu(page, row, 'Edit title')).click()
   const titleEditor = threadSidebar(page).getByRole('textbox', { name: 'Edit title', exact: true })
   await expect(titleEditor).toBeVisible()
   // The row's hover action strip sits over the editor's right half; click the free left side for the caret.
@@ -2148,8 +2173,7 @@ When('a thread title is renamed from its row menu and a second edit is cancelled
   await expect(titleEditor).toHaveCount(0)
   await expect(row).toContainText('Sidebar rename e2e')
 
-  await openThreadRowMenu(row)
-  await page.getByRole('menuitem', { name: 'Edit title', exact: true }).click()
+  await (await openSettledThreadRowMenu(page, row, 'Edit title')).click()
   const cancelledEditor = threadSidebar(page).getByRole('textbox', { name: 'Edit title', exact: true })
   await cancelledEditor.fill('Cancelled draft')
   await cancelledEditor.press('Escape')

@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { Then, When } from '../bdd.js'
 import { recordAssertion, finishJourneyAssertions } from '../steps.js'
+import { ThreadSidebarJourney } from '../thread-list-grouping.js'
 
 const THREADS = 'Thread Sidebar: Threads'
 const ID = 'dshfiles-thread-sidebar.workbench-threads'
@@ -17,6 +18,8 @@ const openSettings = async (page: Page): Promise<void> => {
 }
 
 Then('the sidebar settings gear belongs to the Threads panel instead of fixed chrome', async ({ page }: { page: Page }) => {
+  // A movable Workbench Threads panel exists only in Settings › Layout › Free docking; the fixed layout seats the list.
+  await ThreadSidebarJourney.useFreeDocking(page)
   await recordAssertion(page, 'thread-sidebar-panel-gear-authority', async () => {
     await expect(gear(page)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Sidebar settings', exact: true })).toHaveCount(1)

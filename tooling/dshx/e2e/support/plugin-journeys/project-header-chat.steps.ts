@@ -6,6 +6,7 @@ import * as Schema from 'effect/Schema'
 import { Then, When } from '../bdd.js'
 import { browserDiagnosticsFor, finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
 import { connectDshxApi, type DshxApiCall } from '../../../packages/dshx/src/platform/dshx-api.js'
+import { ThreadSidebarJourney } from '../thread-list-grouping.js'
 
 const projectSchema = Schema.Struct({ projectId: Schema.String })
 const createdSchema = Schema.Struct({ sessionId: Schema.String })
@@ -220,10 +221,7 @@ Then('sending one draft leaves other unsent chats intact and New chat stays fres
     await expect(composer(page)).toHaveText('Second unfinished Alpha prompt')
     await openRow(page, betaDraft)
     await expect(composer(page)).toHaveText('Unfinished Beta prompt')
-    const globalDraft = await createFromHeader(
-      page,
-      page.getByRole('navigation', { name: 'Sidebar navigation' }).getByRole('button', { name: 'New thread', exact: true }),
-    )
+    const globalDraft = await createFromHeader(page, ThreadSidebarJourney.newThreadButton(page))
     await composer(page).fill('Global New thread is saved while typing too')
     await expect(row(page, globalDraft)).toContainText('Draft: Global New thread is saved while typing too')
     await expect
