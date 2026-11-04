@@ -683,7 +683,7 @@
                     ],
                     "additionalProperties": false
                   },
-                  "maxItems": 10
+                  "maxItems": 100
                 },
                 "hasMore": {
                   "type": "boolean"

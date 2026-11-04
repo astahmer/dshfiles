@@ -3,6 +3,10 @@ import * as Schema from 'effect/Schema'
 import { SchemaHelpers } from './schema-helpers.js'
 
 export const REVISION_PAGE_SIZE = 10
+/** Older-history pages: a jj read costs the same for 10 or 100 revisions, so scrolling pays one round trip per 100 rows. */
+export const GRAPH_PAGE_SIZE = 100
+/** Encoded bytes one older-history page may carry, below the 1 MiB response cap; long descriptions end a page early. */
+export const GRAPH_PAGE_BYTE_BUDGET = 768 * 1024
 // One revision can be the working copy of every thread workspace; the Host's bounded jj output still caps the row.
 const MAX_REVISION_WORKSPACES = 1024
 
@@ -192,7 +196,7 @@ const revisionRelationshipSchema = Schema.Struct({
 })
 
 export const graphPageOutputSchema = Schema.Struct({
-  revisions: Schema.Array(revisionSchema).check(Schema.isMaxLength(REVISION_PAGE_SIZE)),
+  revisions: Schema.Array(revisionSchema).check(Schema.isMaxLength(GRAPH_PAGE_SIZE)),
   hasMore: Schema.Boolean,
 })
 

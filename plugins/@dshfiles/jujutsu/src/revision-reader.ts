@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { Context, Effect, Layer, Schema } from 'effect'
-import { REVISION_PAGE_SIZE, revisionSchema, type JujutsuState, type Revision } from './api.js'
+import { GRAPH_PAGE_BYTE_BUDGET, GRAPH_PAGE_SIZE, REVISION_PAGE_SIZE, revisionSchema, type JujutsuState, type Revision } from './api.js'
 import { JujutsuOutputModel } from './core.js'
 import { OutputLimitExceeded } from './errors.js'
 import { GraphNavigationReads } from './graph-navigation-reads.js'
@@ -173,7 +173,7 @@ const make = Effect.gen(function* () {
     readonly excludeCommitIds: readonly string[]
   }) {
     const repo = yield* repositories.resolve(input.repoId)
-    const candidateCount = REVISION_PAGE_SIZE + MAX_WORKSPACE_HEAD_CANDIDATES + 1
+    const candidateCount = GRAPH_PAGE_SIZE + MAX_WORKSPACE_HEAD_CANDIDATES + 1
     const scanLimit = input.excludeCommitIds.length + candidateCount
     const listing = yield* repositories.run(repo)(
       [ignoreWorkingCopy, 'log', '--no-graph', '--limit', String(scanLimit), '--revisions', GraphPage.revset(input.query), '--template', 'commit_id ++ "\\n"'],
@@ -187,14 +187,17 @@ const make = Effect.gen(function* () {
       scanLimit,
     })
     if (candidates.commitIds.length === 0) return { revisions: [], hasMore: false }
-    const revisions = (yield* revisionsByIds(repo, candidates.commitIds).pipe(
+    // Very long descriptions can overflow one jj read of every candidate; a short read still returns a page.
+    const read = yield* revisionsByIds(repo, candidates.commitIds).pipe(
+      Effect.catchTag('OutputLimitExceeded', () => revisionsByIds(repo, candidates.commitIds.slice(0, REVISION_PAGE_SIZE + MAX_WORKSPACE_HEAD_CANDIDATES + 1))),
       Effect.catchTag('OutputLimitExceeded', () => Effect.fail(new OutputLimitExceeded({ subject: 'revision-graph' }))),
-    )).filter(revision => matchesRevisionSearch(revision, input.query))
-    const page = revisions.slice(0, REVISION_PAGE_SIZE)
+    )
+    const revisions = read.filter(revision => matchesRevisionSearch(revision, input.query))
+    const page = GraphPage.withinByteBudget(revisions.slice(0, GRAPH_PAGE_SIZE), GRAPH_PAGE_BYTE_BUDGET)
     const evolution = yield* evolvedCommitIds(repo, page)
     return {
       revisions: withEvolved(page, evolution.commitIds),
-      hasMore: page.length > 0 && (revisions.length > REVISION_PAGE_SIZE || candidates.listingTruncated),
+      hasMore: page.length > 0 && (revisions.length > page.length || read.length < candidates.commitIds.length || candidates.listingTruncated),
     }
   })
 

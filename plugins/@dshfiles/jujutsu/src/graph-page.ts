@@ -1,5 +1,7 @@
 import { reverseHexChangeId } from './graph.js'
 
+const utf8 = new TextEncoder()
+
 const quoteRevsetString = (value: string): string =>
   `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\n', '\\n').replaceAll('\r', '\\r')}"`
 
@@ -41,5 +43,17 @@ export class GraphPage {
       commitIds: input.listedCommitIds.filter(commitId => !excluded.has(commitId)).slice(0, input.size),
       listingTruncated: input.listedCommitIds.length >= input.scanLimit,
     }
+  }
+
+  /** The leading revisions whose encoded size fits `budget`; the first always fits so a page never comes back empty. */
+  static withinByteBudget<Row>(rows: readonly Row[], budget: number): readonly Row[] {
+    let used = 0
+    let count = 0
+    for (const row of rows) {
+      used += utf8.encode(JSON.stringify(row)).byteLength
+      if (count > 0 && used > budget) break
+      count += 1
+    }
+    return rows.slice(0, count)
   }
 }
