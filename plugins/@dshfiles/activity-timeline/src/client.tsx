@@ -8,9 +8,14 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ActivityTimelinePanel } from './panel.js'
+import { InboxGlyph } from './inbox-glyph.js'
+import { INBOX_LOCALE_NAMESPACE, inboxLocale } from './inbox-locales.js'
+import { InboxPanel, openThread } from './inbox-panel.js'
 import { ACTIVITY_TIMELINE_LOCALE_NAMESPACE, activityTimelineLocale } from './locales.js'
 
 const PANEL_ID = 'activity-timeline'
+/** Temporary left-nav placement until the Phase 3 rail (plans/ade-ux §4.2). */
+const INBOX_PANEL_ID = 'attention-inbox'
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
   <svg aria-hidden width={props.size ?? 18} height={props.size ?? 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -21,11 +26,38 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 
 export default defineClient({
   name: '@dshfiles/activity-timeline',
-  locales: [activityTimelineLocale],
+  locales: [activityTimelineLocale, inboxLocale],
   inject: ['slots', 'sessions', 'uiWorkspace', 'workspaces'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(ACTIVITY_TIMELINE_LOCALE_NAMESPACE)
     const label = (): string => `Activity Timeline: ${translate('title')}`
+    const inboxTranslate = ctx.locale.bind(INBOX_LOCALE_NAMESPACE)
+    const navigation = { sessions: ctx.sessions, uiWorkspace: ctx.uiWorkspace, workspaces: ctx.workspaces }
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register(
+        { name: 'sidebar.panellist', id: INBOX_PANEL_ID, order: 2, label: () => inboxTranslate('title'), locale: INBOX_LOCALE_NAMESPACE },
+        decorate(props => (
+          <PluginQueryProvider>
+            <InboxGlyph
+              size={props.size}
+              onOpenItem={item => {
+                if (item.subject.kind === 'session') openThread(navigation, item.subject.id)
+              }}
+            />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    ctx.slots.inject('main', () =>
+      ctx.slots.register(
+        { name: 'main', key: INBOX_PANEL_ID, locale: INBOX_LOCALE_NAMESPACE },
+        decorate(props => (
+          <PluginQueryProvider>
+            <InboxPanel {...navigation} t={props.t} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 3, label, locale: ACTIVITY_TIMELINE_LOCALE_NAMESPACE }, PanelGlyph),
     )

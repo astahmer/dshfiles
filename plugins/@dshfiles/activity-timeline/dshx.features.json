@@ -391,6 +391,66 @@
           "source": "agent-tool"
         }
       ]
+    },
+    {
+      "id": "inbox-panel",
+      "title": "Inbox page with one Needs you badge",
+      "summary": "An Inbox entry in the left navigation opens one page with Needs you and Other tabs (plus Snoozed, Done and Muted when they hold items). Each row shows a severity glyph, the reason, the source, a link to the thread and its verbs inline: answer choices, Open, Done, Snooze and Mute source, with Reopen and Unmute on the history tabs. The nav glyph carries the only badge, the Needs you count, and can raise opt-in browser alerts for blocking items.",
+      "surface": "destinationSection",
+      "destination": "inbox",
+      "currentSurface": "left-nav: Inbox",
+      "reach": [
+        "click button \"Inbox\"",
+        "expect tab \"Needs you\""
+      ],
+      "surfaces": [
+        "client"
+      ],
+      "configuration": [],
+      "states": [
+        "empty",
+        "needs-you",
+        "other",
+        "snoozed",
+        "closed",
+        "muted",
+        "answered-in-place",
+        "action-refused",
+        "alerts-opt-in",
+        "compact"
+      ],
+      "failureModes": [
+        "An archived or missing thread is reported unavailable with a recovery hint instead of being reopened.",
+        "A refused action (resolved item, no provider loaded) shows the provider message with what to do instead.",
+        "A disconnected event stream falls back to polling, so the badge still converges.",
+        "Browser alerts stay off until the user opts in and grants permission; a denied permission says how to allow it."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.inbox-reopen-path",
+          "file": "plugins/@dshfiles/activity-timeline/src/inbox-view.test.ts",
+          "testName": "offers the reopen path for done and snoozed items, unmute for muted ones, and nothing for resolved ones"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.inbox-snooze-targets",
+          "file": "plugins/@dshfiles/activity-timeline/src/inbox-view.test.ts",
+          "testName": "turns snooze choices into a time or an until-it-changes target"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "activity-timeline.inbox-panel-model-question",
+          "reason": "Walked in a scratch DSH through thread-sidebar/finished-turn-inbox (failed turn, Needs you row and badge, Open, Resolved under Done) at 1440x900 Chromium and 390x844 WebKit; screenshots in docs/screenshots. No Gherkin scenario yet."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: renders inbox state and calls the attention API, whose Host work carries the automatic api-dispatch span."
+        }
+      ]
     }
   ]
 }

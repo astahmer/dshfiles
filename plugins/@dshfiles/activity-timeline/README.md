@@ -8,6 +8,42 @@ only: it never activates, messages, or steers an Agent.
 
 Open the reusable **Activity Timeline: Activity** view from navigation or the Workbench chooser.
 
+## Inbox: one place for everything that needs you
+
+![Inbox page with one Needs you badge](docs/screenshots/inbox-panel.png)
+
+<img alt="Inbox at 390×844 in WebKit" src="docs/screenshots/inbox-panel-phone.png" width="195">
+
+The plugin also owns the attention inbox of [the ADE plan](../../../plans/ade-ux/README.md#48-the-attention-model)
+(Phase 2a). The **Inbox** entry in the left navigation (a temporary home until the Phase 3 rail) carries the only
+badge, the Needs you count. The page has **Needs you** (blocking and failed items) and **Other** (ready items) tabs,
+plus **Snoozed**, **Done** and **Muted** when they hold items. Each row shows a severity glyph, the reason, the source,
+a link to the thread and its verbs inline: answer choices, Open, Done, Snooze (1 h, 4 h, tomorrow, until it changes)
+and Mute source. The history tabs offer Reopen, Unsnooze and Unmute, so every user transition can be undone. Browser
+alerts for new blocking items are opt-in, per browser, below the list.
+
+### The attention contract
+
+Providers import the `@dshfiles/activity-timeline/attention-api` dshx module (one-way dependency; the inbox never
+imports a provider) and call it from their Host half with `HostApis.client(attentionApi)`:
+
+| Method | Who | What |
+| --- | --- | --- |
+| `publish({ source, dedupeKey, subject, reason, detail?, severity, verbs, choices? })` | provider | Add or merge one item. Same source + key merges; an unchanged repeat writes nothing; a changed one lifts a Done or a snooze-until-change; a publish after resolve reopens it as a new occurrence. `info` goes to the Activity log only. |
+| `resolve({ source, dedupeKey })` | provider | The underlying state changed (answered elsewhere, retry passed). |
+| `reconcile({ source, items })` | provider | State every open item of one source; unlisted open items resolve. Providers call it on start, on `dshfiles/attention/ready` and on every change of their own state. |
+| `list({ view?, limit? })` | anyone · tool `attention_list` | One view plus every view's count and the muted sources. |
+| `done` / `snooze` / `reopen` / `muteSource` | user · tools `attention_done`, `attention_snooze`, `attention_reopen`, `attention_mute_source` | User transitions; each is reversible. A resolved item cannot be reopened by hand. |
+| `act({ id, verb, choiceId? })` | user | Answer, Approve, Land, Retry or Resume, handed to the owning provider through the `dshfiles/attention/act` serial Cordis event. |
+
+Severities follow plan §4.7: `blocking` and `failed` are Needs you, `ready` is Other, `info` never reaches the inbox.
+Items live in the `dshfiles_attention` storage domain (bounded at 2000; closed items kept seven days). Browsers follow
+the `changed` event, which carries the new Needs you count, and fall back to polling while the event stream is down.
+
+First providers: `@dshfiles/agent-questions` (pending child-to-parent questions are blocking items about the parent
+thread, answerable in place with the question's options) and `@dshfiles/thread-sidebar` (unacknowledged finished turns
+are Ready, or Failed for an error or the token limit; opening the thread resolves the item).
+
 ## Data flow
 
 ```
