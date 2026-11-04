@@ -98,6 +98,8 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   ['Messages', { destination: 'Agents', section: 'Messages' }],
   ['Memory', { destination: 'Knowledge', section: 'Memory' }],
   ['Secrets', { destination: 'Settings', section: 'Secrets' }],
+  // Plain labels the page-kit migration (plans/ade-ux Phase 1b) gave these pages.
+  ['Review', { destination: 'Land', section: 'Review' }],
 ])
 
 const destinationTabs = (page: Page): Locator => page.getByRole('tablist', { name: 'Destinations', exact: true })

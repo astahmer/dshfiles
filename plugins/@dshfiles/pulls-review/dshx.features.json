@@ -9,7 +9,7 @@
       "surfaces": ["client", "host"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "left-nav: pulls.review: Reviews",
+      "currentSurface": "left-nav: Review",
       "configuration": [],
       "states": ["choose-project", "choose-workspace", "workspace-missing-recovery", "loading", "empty-diff", "scoped", "reviewed", "truncated", "failed"],
       "failureModes": [
@@ -32,7 +32,7 @@
         "expect text \"pulls.review \u00b7 main..@*\"",
         "click tab \"Land\"",
         "click button \"Review\"",
-        "expect heading \"pulls.review\"",
+        "expect heading \"Review\"",
         "expect text \"main..@\"",
         "expect text \"1 file\"",
         "expect text \"seeded-work.md*\"",
@@ -121,7 +121,7 @@
       "surfaces": ["client", "host"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "left-nav: pulls.review: Reviews › Summarize",
+      "currentSurface": "left-nav: Review › Summarize",
       "configuration": [],
       "states": ["idle", "summarizing", "summarized", "no-route", "unparsed", "failed"],
       "failureModes": [
@@ -200,7 +200,7 @@
       "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "left-nav: pulls.review: Reviews › reviewed marks",
+      "currentSurface": "left-nav: Review › reviewed marks",
       "configuration": [],
       "states": ["unselected", "range-selected", "marked", "cleared"],
       "failureModes": [

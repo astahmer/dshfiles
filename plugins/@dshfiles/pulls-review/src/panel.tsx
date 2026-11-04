@@ -1,5 +1,6 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import { useApi, useSubscribable, type HostStore } from '@dshfiles/dshx/client'
+import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
@@ -85,8 +86,8 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
     selectedProject === undefined
       ? reviewPath === ''
         ? 'Choose project or workspace'
-        : `Other folder · ${reviewPath}`
-      : `${selectedProject.title} · ${selectedProject.canonicalPath}`
+        : `Other folder · ${reviewPath.split('/').filter(Boolean).at(-1) ?? reviewPath}`
+      : selectedProject.title
 
   const query = useQuery({
     queryKey: ['pulls-review', reviewPath, baseRef],
@@ -188,13 +189,21 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
     setSelection(ListSelectionModel.empty())
   }
 
+  const failure = (message: string, retry: () => void): ReactNode => (
+    <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">
+      <span className="dshx:min-w-0">{message}</span>
+      <Button size="xs" variant="outline" onClick={retry}>
+        Try again
+      </Button>
+    </p>
+  )
   const footer = ((): ReactNode => {
-    if (reviewPath.length === 0) return <p className={HINT}>Choose a project or workspace to review.</p>
+    if (reviewPath.length === 0) return null
     if (query.isPending) return <p className={HINT}>Reading the workspace diff…</p>
-    if (query.isError) return <p className="dshx:text-xs dshx:text-destructive">{errorMessage(query.error, 'The workspace diff could not be read.')}</p>
+    if (query.isError) return failure(errorMessage(query.error, 'The workspace diff could not be read.'), () => void query.refetch())
     if (result === undefined) return null
-    if (result.status === 'failed') return <p className="dshx:text-xs dshx:text-destructive">{result.message}</p>
-    if (summarize.isError) return <p className="dshx:text-xs dshx:text-destructive">{errorMessage(summarize.error, 'Summarizing failed.')}</p>
+    if (result.status === 'failed') return failure(result.message, () => void query.refetch())
+    if (summarize.isError) return failure(errorMessage(summarize.error, 'Summarizing failed.'), () => summarize.mutate())
     if (summarized?.status === 'failed') return <p className={HINT}>{summarized.message}</p>
     if (summarize.isPending)
       return (
@@ -211,13 +220,38 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
     return null
   })()
 
+  const canSummarize = result?.status === 'ok' && result.fileCount > 0 && scopes.length > 0
+
   return (
-    <section className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:p-4">
-      <header className="dshx:flex dshx:flex-col dshx:gap-2">
+    <div className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto">
+      <Page
+        heading="Review"
+        description="Changed files of a project or workspace against its base, grouped by scope. Marks are kept across browsers."
+        meta={
+          result?.status === 'ok' ? (
+            <Badge variant="secondary" className="dshx:font-mono dshx:text-[11px]">
+              {result.range}
+            </Badge>
+          ) : undefined
+        }
+        {...(canSummarize
+          ? {
+              primaryAction: {
+                id: 'summarize',
+                label: aiSummaries === undefined ? 'Summarize' : 'Re-summarize',
+                icon: <Sparkles aria-hidden className="dshx:size-3.5" />,
+                onSelect: () => summarize.mutate(),
+                pending: summarize.isPending,
+              },
+            }
+          : {})}
+        actions={[{ id: 'refresh', label: 'Refresh', icon: <RefreshCw aria-hidden />, onSelect: () => void query.refetch(), pending: query.isFetching }]}
+        className="dshx:shrink-0"
+      >
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
           <Button
             aria-label="Choose project or workspace"
-            className="dshx:min-w-48 dshx:max-w-full dshx:justify-between dshx:font-normal"
+            className="dshx:min-w-48 dshx:max-w-full dshx:shrink dshx:justify-between dshx:font-normal"
             onClick={() => setPickerOpen(true)}
             size="sm"
             type="button"
@@ -247,26 +281,8 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
             placeholder="Base branch (default)"
             value={baseRef}
             onChange={event => setBaseRef(event.target.value)}
-            className="dshx:w-48 dshx:font-mono!"
+            className="dshx:w-48 dshx:max-w-full dshx:font-mono!"
           />
-        </div>
-        <div className="dshx:flex dshx:items-center dshx:gap-2">
-          <h2 className="dshx:text-sm dshx:font-semibold">pulls.review</h2>
-          {result?.status === 'ok' ? (
-            <Badge variant="secondary" className="dshx:font-mono dshx:text-[11px]">
-              {result.range}
-            </Badge>
-          ) : null}
-          <span className="dshx:ml-auto" />
-          {result?.status === 'ok' && result.fileCount > 0 && scopes.length > 0 ? (
-            <Button variant="outline" size="sm" disabled={summarize.isPending} onClick={() => summarize.mutate()} className="dshx:gap-1.5 dshx:shrink">
-              <Sparkles aria-hidden className={cn('dshx:size-3.5', summarize.isPending && 'dshx:animate-pulse')} />
-              {aiSummaries === undefined ? 'Summarize' : 'Re-summarize'}
-            </Button>
-          ) : null}
-          <Button variant="ghost" size="icon" aria-label="Refresh" disabled={query.isFetching} onClick={() => void query.refetch()}>
-            <RefreshCw aria-hidden className={cn(query.isFetching && 'dshx:animate-spin')} />
-          </Button>
         </div>
         {result?.status === 'ok' ? (
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
@@ -278,45 +294,62 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
           </div>
         ) : null}
         {result?.status === 'ok' && result.truncated ? (
-          <p className={HINT}>The diff was too large for one read and is truncated; refresh after the workspace settles.</p>
+          <p className={HINT}>The diff was too large for one read and is truncated; refresh once the thread stops writing to the workspace.</p>
         ) : null}
-      </header>
 
-      {footer}
+        {footer}
 
-      {result?.status === 'ok' && result.fileCount === 0 ? <p className={HINT}>This thread has no changes since {result.base} yet.</p> : null}
+        {reviewPath.length === 0 ? (
+          <div className={SURFACE}>
+            <EmptyState action={{ label: 'Choose project or workspace', onSelect: () => setPickerOpen(true) }}>
+              Choose a project or workspace to review its changes.
+            </EmptyState>
+          </div>
+        ) : null}
+        {result?.status === 'ok' && result.fileCount === 0 ? (
+          <div className={SURFACE}>
+            <EmptyState>This thread has no changes since {result.base} yet.</EmptyState>
+          </div>
+        ) : null}
 
-      {allPaths.length > 0 ? (
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-[11px]">
-          <label className="dshx:flex dshx:items-center dshx:gap-1">
-            <input
-              type="checkbox"
-              aria-label="Select all files in this review"
-              checked={ListSelectionModel.isComplete({ state: selection, orderedIds: allPaths })}
-              onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds: allPaths }))}
-              className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
-            />
-            Select all files
-          </label>
-          {selection.ids.length === 0 ? null : (
-            <span className="dshx:ml-auto dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
-              <span className="dshx:mr-1 dshx:tabular-nums">{selection.ids.length} selected</span>
-              <Button size="xs" variant="secondary" onClick={() => applyReviewed(true)}>
-                Mark selected reviewed
-              </Button>
-              <Button size="xs" variant="ghost" onClick={() => applyReviewed(false)}>
-                Mark selected unreviewed
-              </Button>
-              <Button size="xs" variant="ghost" onClick={() => setSelection(ListSelectionModel.empty())}>
-                Clear
-              </Button>
-            </span>
-          )}
-        </div>
-      ) : null}
+        {allPaths.length > 0 ? (
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs">
+            <label className="dshx:flex dshx:items-center dshx:gap-1">
+              <input
+                type="checkbox"
+                aria-label="Select all files in this review"
+                checked={ListSelectionModel.isComplete({ state: selection, orderedIds: allPaths })}
+                onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds: allPaths }))}
+                className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
+              />
+              Select all files
+            </label>
+            {selection.ids.length === 0 ? null : (
+              <span className="dshx:ml-auto dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
+                <span className="dshx:mr-1 dshx:tabular-nums">{selection.ids.length} selected</span>
+                <Button size="xs" variant="outline" onClick={() => applyReviewed(true)}>
+                  Mark selected reviewed
+                </Button>
+                <Button size="xs" variant="ghost" onClick={() => applyReviewed(false)}>
+                  Mark selected unreviewed
+                </Button>
+                <Button size="xs" variant="ghost" onClick={() => setSelection(ListSelectionModel.empty())}>
+                  Clear
+                </Button>
+              </span>
+            )}
+          </div>
+        ) : null}
+      </Page>
 
       {scopes.length > 0 ? (
-        <div data-testid="pulls-review-diffs" className={cn(SURFACE, 'dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-hidden')}>
+        <div
+          data-testid="pulls-review-diffs"
+          className={cn(
+            SURFACE,
+            'dshx:mx-5 dshx:mb-5 dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:@max-pane-narrow:mx-3 dshx:@max-pane-narrow:mb-3',
+          )}
+        >
           <PatchView
             files={reviewFiles}
             className="dshx:flex-1"
@@ -367,6 +400,6 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
           />
         </div>
       ) : null}
-    </section>
+    </div>
   )
 }

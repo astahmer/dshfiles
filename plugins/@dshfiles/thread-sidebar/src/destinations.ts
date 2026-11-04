@@ -67,7 +67,7 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
   { panelId: 'dshfiles-thread-board', destination: 'threads', label: 'Board', description: 'The same threads as columns.', formerLabels: ['Thread Sidebar: Board'] },
   { panelId: 'attention-inbox', destination: 'inbox', label: 'Needs you', description: 'Questions, approvals and failures waiting on you.', formerLabels: ['Inbox'] },
   { panelId: 'jj-integration', destination: 'land', label: 'Workspaces', description: 'Thread workspaces ready, blocked or behind.', order: 1, formerLabels: ['JJ Integration: Thread integration'] },
-  { panelId: 'pulls-review', destination: 'land', label: 'Review', description: 'Review a workspace before landing it.', order: 2, formerLabels: ['pulls.review: Reviews'] },
+  { panelId: 'pulls-review', destination: 'land', label: 'Review', description: 'Review a workspace before landing it.', order: 2, formerLabels: ['pulls.review: Reviews', 'Review'] },
   { panelId: 'dshfiles-jujutsu', destination: 'land', label: 'History', description: 'The revision graph of a project.', order: 3, formerLabels: ['Jujutsu: Revision graph'] },
   { panelId: 'dshfiles-jujutsu-source-control', destination: 'land', label: 'Source control', description: 'Working-copy changes and commits.', order: 4, formerLabels: ['Jujutsu: Source Control'] },
   { panelId: 'dshfiles-backlog-panel', destination: 'work', label: 'Backlog', description: 'Tasks, bugs, ideas and notes.', order: 1, formerLabels: ['Backlog: Items'] },

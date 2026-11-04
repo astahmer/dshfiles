@@ -35,7 +35,7 @@ export default defineClientPlugin({
         if (legacy.success && Object.keys(reviewed.get()).length === 0) reviewed.set(legacy.data)
       })
       .catch((error: unknown) => console.warn('pulls.review: reviewed marks stay unsaved until the Host storage answers.', error))
-    api.ui.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 40, label: 'pulls.review: Reviews' }, () => <GitPullRequest aria-hidden />)
+    api.ui.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 40, label: 'Review' }, () => <GitPullRequest aria-hidden />)
     api.provide(Changes, {
       review: input => {
         PageReviewContextModel.set({ workspacePath: input.workspacePath, sessionId: input.sessionId })

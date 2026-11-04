@@ -10,7 +10,7 @@ The searchable project picker keeps existing thread workspaces in their own scop
 
 ![Project and workspace picker](docs/screenshots/project-workspace-picker.png)
 
-Open the reusable **pulls.review: Reviews** view from navigation or the Workbench chooser.
+Open the reusable **Review** view from navigation or the Workbench chooser.
 
 ## What it does
 

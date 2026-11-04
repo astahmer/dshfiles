@@ -13,15 +13,17 @@ const THREAD_CHANGES = [
 ]
 
 When('the pulls.review panel is opened from the sidebar', async ({ page }: { page: Page }) => {
-  await openGlobalPanel(page, 'pulls.review: Reviews')
-  await expect(page.getByRole('heading', { name: 'pulls.review', exact: true })).toBeVisible()
+  await openGlobalPanel(page, 'Review')
+  await expect(page.getByRole('heading', { name: 'Review', exact: true })).toBeVisible()
 })
 
 Then('the pulls.review panel reads the thread workspace against {string}', async ({ page }: { page: Page }, base: string) => {
   await recordAssertion(page, 'pulls-review-reads-thread-workspace', async () => {
     const projectPicker = page.getByRole('button', { name: 'Choose project or workspace', exact: true })
     await expect(projectPicker).toBeVisible()
-    await expect(projectPicker).toContainText(threadWorkspacePathFor(page))
+    // The picker names the project or workspace; the absolute path stays out of the label.
+    await expect(projectPicker).toContainText(threadWorkspacePathFor(page).split('/').filter(Boolean).at(-1) ?? '')
+    await expect(projectPicker).not.toContainText(threadWorkspacePathFor(page))
     const baseSelector = page.getByRole('textbox', { name: 'Base branch or bookmark', exact: true })
     await expect(baseSelector).toBeVisible()
     await baseSelector.fill(base)
