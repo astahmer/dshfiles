@@ -1,6 +1,7 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { Effect, Schema, SchemaGetter } from 'effect'
 import { BacklogItems } from './item.js'
+import { BacklogSyncModel } from './sync-model.js'
 
 const idSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))
 const freshnessSchema = Schema.Literals(BacklogItems.freshnessStates)
@@ -177,6 +178,57 @@ const backfillOutputSchema = Schema.Struct({
   failed: nonNegativeCountSchema,
   remaining: nonNegativeCountSchema,
 })
+
+const syncStateSchema = Schema.Literals(BacklogSyncModel.syncStates)
+const syncErrorViewSchema = Schema.Struct({ code: Schema.String, message: Schema.String })
+const syncItemSchema = Schema.Struct({
+  itemId: idSchema,
+  backend: BacklogSyncModel.backendSchema,
+  remoteKey: Schema.String,
+  url: Schema.String,
+  state: syncStateSchema,
+  lastSyncedAt: Schema.NullOr(Schema.Number.check(Schema.isFinite())),
+  lastError: Schema.NullOr(BacklogSyncModel.syncErrorSchema),
+  conflicts: Schema.Array(BacklogSyncModel.conflictSchema),
+})
+const syncResultSchema = Schema.Struct({
+  itemId: idSchema,
+  remoteKey: Schema.NullOr(Schema.String),
+  state: syncStateSchema,
+  pulled: Schema.Array(Schema.Literals(BacklogSyncModel.syncedFields)),
+  pushed: Schema.Array(Schema.Literals(BacklogSyncModel.syncedFields)),
+  conflicts: Schema.Array(BacklogSyncModel.conflictSchema),
+  commentsPulled: nonNegativeCountSchema,
+  commentsPushed: nonNegativeCountSchema,
+  error: Schema.NullOr(syncErrorViewSchema),
+})
+const syncStatusSchema = Schema.Struct({
+  backends: Schema.Array(
+    Schema.Struct({
+      project: Schema.NullOr(Schema.String),
+      backend: BacklogSyncModel.backendSchema,
+      target: Schema.String,
+      enabled: Schema.Boolean,
+      autoSyncMinutes: nonNegativeCountSchema,
+      credential: Schema.Literals(['reference', 'environment', 'missing']),
+    }),
+  ),
+  items: Schema.Array(syncItemSchema),
+})
+const remoteReferenceSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTargetChars)).annotate({
+  description: 'The issue: a URL, a Linear identifier such as ENG-12, or a GitHub issue number such as 42.',
+})
+
+const renderSyncResults = (output: { readonly results: readonly (typeof syncResultSchema.Type)[] }): string =>
+  output.results.length === 0
+    ? 'No linked items to sync.'
+    : output.results
+        .map(result =>
+          result.error === null
+            ? `b:${String(result.itemId)} ↔ ${result.remoteKey ?? '?'}: ${result.state}${result.pulled.length > 0 ? ` · pulled ${result.pulled.join(', ')}` : ''}${result.pushed.length > 0 ? ` · pushed ${result.pushed.join(', ')}` : ''}`
+            : `b:${String(result.itemId)}: ${result.error.message}`,
+        )
+        .join('\n')
 
 const writeNote = 'Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.'
 
@@ -418,6 +470,61 @@ export const backlogApi = defineApi({
       description: `Start one thread for these items: it runs in its own jj workspace of their project, is named after the first item, receives every selected item's full description, all current replies in order, and every item- and reply-level attachment, and links to every item. Missing or unreadable items/files and upload or prompt failures reject the start instead of silently omitting context. ${writeNote}`,
       tool: { name: 'backlog_start_thread', readOnly: false },
     }),
+    syncStatus: method({
+      input: Schema.Struct({
+        ids: Schema.Array(idSchema)
+          .check(Schema.isMaxLength(500))
+          .pipe(Schema.optional)
+          .annotate({ description: 'Only these items; omit for every linked item.' }),
+      }),
+      output: syncStatusSchema,
+      description:
+        'Remote sync of backlog items: the configured backends (Linear teams, GitHub repositories) with whether a key is bound, and each linked item with its issue, sync state (synced, pending, conflict, error), last sync time, last error and recent conflicts. Read-only.',
+      tool: { name: 'backlog_sync_status', readOnly: true },
+    }),
+    syncNow: method({
+      input: Schema.Struct({
+        id: idSchema.pipe(Schema.optional).annotate({ description: 'One linked item; omit to sync every linked item (of `project`, when given).' }),
+        project: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))
+          .pipe(Schema.optional)
+          .annotate({ description: 'Only linked items of this project; null selects items without a project.' }),
+      }),
+      output: Schema.Struct({ results: Schema.Array(syncResultSchema) }),
+      description: `Sync linked backlog items with their Linear or GitHub issues now: title, description, status and tags flow both ways (a field both sides changed goes to the side that changed last, with a conflict note on the item), and new comments are carried over once. Run only when the user asked. ${writeNote}`,
+      tool: { name: 'backlog_sync_now', readOnly: false, render: renderSyncResults },
+    }),
+    linkRemote: method({
+      input: Schema.Struct({
+        id: idSchema,
+        backend: BacklogSyncModel.backendSchema,
+        reference: remoteReferenceSchema.pipe(Schema.optional),
+        create: Schema.Boolean.pipe(Schema.optional).annotate({
+          description: 'Create a new issue from the item in the configured team or repository instead of linking `reference`.',
+        }),
+        remove: Schema.Boolean.pipe(Schema.optional).annotate({
+          description: 'Unlink the item from its issue and stop syncing it; neither side is deleted. Link it again to resume.',
+        }),
+      }).check(
+        Schema.makeFilter(input =>
+          input.remove === true || input.create === true || (input.reference ?? '') !== '' ? undefined : 'Pass `reference`, `create: true` or `remove: true`.',
+        ),
+      ),
+      output: Schema.Struct({ item: Schema.NullOr(syncItemSchema), result: Schema.NullOr(syncResultSchema) }),
+      description: `Link one backlog item to a Linear or GitHub issue (adopting the issue's fields on the first sync, tags merged), create a new issue from it, or unlink it with \`remove: true\`. The issue URL is added to the item's links. Run only when the user asked; it writes to the remote tracker. ${writeNote}`,
+      tool: { name: 'backlog_link_remote', readOnly: false },
+    }),
+    importRemote: method({
+      input: Schema.Struct({
+        backend: BacklogSyncModel.backendSchema,
+        reference: remoteReferenceSchema,
+        project: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))
+          .pipe(Schema.optional)
+          .annotate({ description: 'Project the new item belongs to; defaults to the project of the first enabled row for that backend.' }),
+      }),
+      output: Schema.Struct({ detail: detailSchema, created: Schema.Boolean }),
+      description: `Import an existing Linear or GitHub issue as a new backlog item linked to it, with its title, description, status, labels and comments; an issue already linked returns its item. Run only when the user asked. ${writeNote}`,
+      tool: { name: 'backlog_import_remote', readOnly: false, render: output => renderItemPreview(output.detail.item) },
+    }),
     acknowledge: method({
       input: Schema.Struct({ ids: Schema.Array(idSchema).check(Schema.isMaxLength(500)) }),
       output: Schema.Void,
@@ -493,6 +600,9 @@ export type BacklogDetailView = typeof detailSchema.Type
 export type BacklogListView = typeof listOutputSchema.Type
 export type BacklogDetailResult = typeof detailResultSchema.Type
 export type BacklogBackfillResult = typeof backfillOutputSchema.Type
+export type BacklogSyncStatusView = typeof syncStatusSchema.Type
+export type BacklogSyncItemView = typeof syncItemSchema.Type
+export type BacklogSyncResultView = typeof syncResultSchema.Type
 
 export type BacklogSummaryInput = typeof summarySchema.Encoded
 export type BacklogListInput = typeof listOutputSchema.Encoded

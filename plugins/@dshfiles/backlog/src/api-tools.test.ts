@@ -54,13 +54,17 @@ describe('backlog tool exposure', () => {
       'backlog_enrich_tweet',
       'backlog_get',
       'backlog_get_many',
+      'backlog_import_remote',
       'backlog_link',
+      'backlog_link_remote',
       'backlog_list',
       'backlog_projects',
       'backlog_read_file',
       'backlog_referencing',
       'backlog_remove_file',
       'backlog_start_thread',
+      'backlog_sync_now',
+      'backlog_sync_status',
       'backlog_triage',
       'backlog_triage_backfill',
       'backlog_triage_backfill_status',
@@ -80,6 +84,7 @@ describe('backlog tool exposure', () => {
       'backlog_projects',
       'backlog_read_file',
       'backlog_referencing',
+      'backlog_sync_status',
       'backlog_triage_backfill_status',
     ])
   })
@@ -146,6 +151,9 @@ describe('backlog tool exposure', () => {
       'dismissProposal',
       'backfillTriage',
       'startThread',
+      'syncNow',
+      'linkRemote',
+      'importRemote',
     ] as const) {
       expect(backlogApi.methods[name].description ?? '').toMatch(/Use it when the user asked/u)
     }

@@ -108,6 +108,28 @@ export const backlogSettings = defineSettings({
     publishActivity: Schema.boolean()
       .default(true)
       .description('Report item moves, links and requests for input to the Activity timeline, so the shared activity room shows backlog work.'),
+    syncBackends: Schema.array(
+      Schema.object({
+        project: Schema.string().default('').description('Absolute project path this backend serves. Empty serves every project that has no row of its own.'),
+        backend: Schema.union([Schema.const('linear').description('Linear'), Schema.const('github').description('GitHub Issues')]).default('linear'),
+        enabled: Schema.boolean().default(true),
+        target: Schema.string().default('').description('Linear team key (for example ENG) or GitHub owner/repo.'),
+        secret: Schema.string()
+          .role('secret-ref')
+          .default('')
+          .description(
+            'Secret Catalog reference to a Linear personal API key or a GitHub token, as secret:ALIAS. Empty uses LINEAR_API_KEY or GITHUB_TOKEN from the Host environment.',
+          ),
+        autoSyncMinutes: Schema.natural()
+          .max(1_440)
+          .default(0)
+          .description('Sync every linked item of this project on this interval. 0 syncs only when you press Sync now.'),
+      }),
+    )
+      .default([])
+      .description(
+        'Remote trackers backlog items mirror, one row per project and tracker. Linking, creating and importing issues is always your explicit action.',
+      ),
     savedViews: Schema.array(
       Schema.object({
         name: Schema.string().required(),

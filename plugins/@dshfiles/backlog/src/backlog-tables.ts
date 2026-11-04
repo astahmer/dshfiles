@@ -55,6 +55,9 @@ export class BacklogTables extends Context.Service<
   /** Tables over plain maps, standing in for the Host storage domain; pass the same maps again to model a restart. */
   static readonly layerMemory = (rows: { readonly items: Map<string, BacklogItem>; readonly files: Map<string, BacklogFileRecord> }) =>
     Layer.succeed(BacklogTables, BacklogTables.of({ items: memoryTable(rows.items), files: memoryTable(rows.files) }))
+
+  /** One table over a plain map, for any backlog domain a test stands in for. */
+  static readonly memoryTable = <Value>(rows: Map<string, Value>): StorageTable<string, Value> => memoryTable(rows)
 }
 
 const memoryTable = <Value>(rows: Map<string, Value>): StorageTable<string, Value> => ({

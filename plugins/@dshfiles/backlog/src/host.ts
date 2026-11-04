@@ -23,6 +23,8 @@ import { LifecycleSignals } from './lifecycle-signals.js'
 import { CaptureProjects } from './project-target.js'
 import { ReplyGenerator } from './reply-generator.js'
 import { backlogSettings } from './settings.js'
+import { BacklogSync, RemoteBackends, RemoteSyncLoop } from './sync-service.js'
+import { BacklogSyncTables } from './sync-tables.js'
 import { BacklogStore } from './store.js'
 import { actorOf, ThreadStart } from './thread-start.js'
 import { TriageBackfill } from './triage-backfill.js'
@@ -45,15 +47,15 @@ const hostEdges = Layer.mergeAll(
   platform,
 )
 
-const backlogServices = Layer.mergeAll(ThreadStart.layer, TriageBackfill.layer, TweetImport.layer, ReplyGenerator.layer).pipe(
+const backlogServices = Layer.mergeAll(ThreadStart.layer, TriageBackfill.layer, TweetImport.layer, ReplyGenerator.layer, BacklogSync.layer).pipe(
   Layer.provideMerge(Triage.layer),
   Layer.provideMerge(Layer.mergeAll(BacklogStore.layer, AiActivity.layer, CaptureProjects.layer, AttachmentExport.layer)),
-  Layer.provideMerge(BacklogTables.layer),
+  Layer.provideMerge(Layer.mergeAll(BacklogTables.layer, BacklogSyncTables.layer, RemoteBackends.layer)),
   Layer.provideMerge(Layer.mergeAll(Jev.layer, Jj.layer, VcsProviderService.layer)),
 )
 
 /** Every backlog service and background loop of one activation. */
-const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, BacklogAttention.layer).pipe(
+const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, BacklogAttention.layer, RemoteSyncLoop).pipe(
   Layer.provideMerge(backlogServices),
   Layer.provideMerge(hostEdges),
 )
@@ -117,6 +119,10 @@ const backlogHandlers = Api.handlers(backlogApi, {
   continueAgentThread: input => ThreadStart.use(threads => threads.continueThread(input)),
   startThread: (input, call) => ThreadStart.use(threads => threads.start(input, call.caller)),
   comment: (input, call) => BacklogStore.use(store => store.comment({ ...input, actor: actorOf(call.caller) })),
+  syncStatus: input => BacklogSync.use(sync => sync.status(input)),
+  syncNow: input => BacklogSync.use(sync => sync.syncNow(input)),
+  linkRemote: (input, call) => BacklogSync.use(sync => sync.link({ ...input, actor: actorOf(call.caller) })),
+  importRemote: (input, call) => BacklogSync.use(sync => sync.importRemote({ ...input, actor: actorOf(call.caller) })),
   editComment: (input, call) => BacklogStore.use(store => store.editComment({ ...input, actor: actorOf(call.caller) })),
   deleteComment: (input, call) => BacklogStore.use(store => store.deleteComment({ ...input, actor: actorOf(call.caller) })),
 })
