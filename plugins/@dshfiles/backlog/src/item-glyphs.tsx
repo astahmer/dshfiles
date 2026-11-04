@@ -87,6 +87,22 @@ const attentionTone = {
   waiting: 'dshx:bg-muted dshx:text-muted-foreground',
 } satisfies Record<Exclude<BacklogAttention, 'none'>, string>
 
+const attentionIconTone = {
+  'needs-input': 'dshx:text-warning',
+  blocked: 'dshx:text-destructive',
+  waiting: 'dshx:text-muted-foreground',
+} satisfies Record<Exclude<BacklogAttention, 'none'>, string>
+
+/**
+ * The attention glyph alone, the width of a Status or Kind icon, for icon columns such as menu rows: the pill below is
+ * 24px wide and pushes the row's label 10px past its neighbours.
+ */
+const AttentionIcon = (props: { readonly attention: BacklogAttention; readonly className?: string }): JSX.Element => {
+  if (props.attention === 'none') return <span aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0', props.className)} />
+  const Icon = attentionIcons[props.attention]
+  return <Icon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0', attentionIconTone[props.attention], props.className)} />
+}
+
 /** A small pill only when the item asks for something; nothing for the normal case. */
 const AttentionBadge = (props: { readonly attention: BacklogAttention; readonly compact?: boolean }): JSX.Element | null => {
   if (props.attention === 'none') return null
@@ -199,6 +215,7 @@ export class ItemGlyphs {
   static readonly StatusIcon = StatusIcon
   static readonly KindIcon = KindIcon
   static readonly AttentionBadge = AttentionBadge
+  static readonly AttentionIcon = AttentionIcon
   static readonly ProjectDot = ProjectDot
   static readonly ProjectLabel = ProjectLabel
   static readonly ActorAvatar = ActorAvatar

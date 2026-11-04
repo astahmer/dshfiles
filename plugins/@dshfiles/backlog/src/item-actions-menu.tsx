@@ -181,11 +181,7 @@ export const BacklogItemMenu = (props: {
           </ContextMenuSub>
           <ContextMenuSub>
             <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
-              {attention === 'none' ? (
-                <span aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
-              ) : (
-                <ItemGlyphs.AttentionBadge attention={attention} compact />
-              )}
+              <ItemGlyphs.AttentionIcon attention={attention} />
               Attention
               {countSuffix}
             </ContextMenuSubTrigger>
@@ -199,7 +195,7 @@ export const BacklogItemMenu = (props: {
               >
                 {BacklogItems.attentions.map(attention => (
                   <ContextMenuRadioItem key={attention} value={attention} className="dshx:text-[13px]">
-                    {attention === 'none' ? <span className="dshx:w-3.5" /> : <ItemGlyphs.AttentionBadge attention={attention} compact />}
+                    <ItemGlyphs.AttentionIcon attention={attention} />
                     {ItemGlyphs.attentionLabels[attention]}
                   </ContextMenuRadioItem>
                 ))}

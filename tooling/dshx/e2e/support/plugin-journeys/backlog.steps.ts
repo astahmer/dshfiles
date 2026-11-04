@@ -105,10 +105,9 @@ const menuItemTextPosition = async (item: Locator, label: string): Promise<numbe
   }, label)
 
 const expectContextMenuLabelsAligned = async (menu: Locator, includeOpenItem: boolean): Promise<void> => {
-  const labels = ['Start thread…', 'Copy item ID', 'Copy item link', 'Copy item as Markdown', 'Status', 'Kind', 'Project', 'Pin item']
+  // Attention included: its glyph is an icon-column icon like Status and Kind, whether or not the item asks for something.
+  const labels = ['Start thread…', 'Copy item ID', 'Copy item link', 'Copy item as Markdown', 'Status', 'Kind', 'Attention', 'Project', 'Pin item']
   if (includeOpenItem) labels.push('Open item')
-  const attention = menu.getByRole('menuitem', { name: 'Attention', exact: true })
-  if ((await attention.locator('span[title]').count()) === 0) labels.push('Attention')
 
   const referencePosition = await menuItemTextPosition(menu.getByRole('menuitem', { name: 'Start thread…', exact: true }), 'Start thread…')
   for (const label of labels) {
