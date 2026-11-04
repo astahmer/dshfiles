@@ -81,6 +81,7 @@
     "@dshfiles/user-questions": "link:../../plugins/@dshfiles/user-questions",
     "@dshfiles/web-search-brave": "link:../../plugins/@dshfiles/web-search-brave",
     "@dshfiles/web-fetch-readable": "link:../../plugins/@dshfiles/web-fetch-readable",
+    "@dshfiles/whiteboard": "link:../../plugins/@dshfiles/whiteboard",
     "@dshfiles/workbench": "link:../../plugins/@dshfiles/workbench",
     "@dshfiles/workspace-folder-picker": "link:../../plugins/@dshfiles/workspace-folder-picker",
     "@dshfiles/workspace-nav": "link:../../plugins/@dshfiles/workspace-nav",
@@ -177,7 +178,8 @@
         "@dshfiles/plugin-guide",
         "@dshfiles/web-fetch-readable",
         "@dshfiles/component-gallery",
-        "@dshfiles/thread-transfer"
+        "@dshfiles/thread-transfer",
+        "@dshfiles/whiteboard"
       ]
     }
   }
