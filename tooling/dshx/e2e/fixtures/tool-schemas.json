@@ -6055,7 +6055,7 @@
     },
     {
       "name": "project_checks_receipts",
-      "description": "Recent project-check receipts for a thread: what ran, its outcome, exit status, duration and whether it is still fresh against the working copy. Defaults to the calling thread. Read-only.",
+      "description": "Recent project-check receipts for a thread: what ran, its outcome, exit status, duration, verification stage (manual, completion, rebase, or not-recorded for older receipts) and whether it is still fresh against the working copy. Defaults to the calling thread. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
