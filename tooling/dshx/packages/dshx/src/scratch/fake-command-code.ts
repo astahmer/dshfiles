@@ -17,6 +17,7 @@ import { decodeJson } from '../json.js'
  * `[[call TOOL {json}]]` calls any tool; `[[once call TOOL {json}]]` calls it only on its first match; `[[read PATH]]`
  * and `[[memory_search QUERY]]` call tools; `[[empty]]` settles with reasoning but no answer; `[[hold]]` keeps the
  * turn running until `releaseHeldTurns`; `[[title NAME]]` sets the thread name; `[[answer TEXT]]` returns markdown;
+ * `[[fail TEXT]]` rejects the request with a non-retryable 400 carrying TEXT, so the turn ends in an error;
  * the turn after a tool result answers `Tool finished.`.
  *
  * E2E journeys start it per page; `dshx dev`'s `tool-call-thread` seed runs it as its own process.
@@ -157,7 +158,7 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
   // DSH can append project and runtime context after the user's tool directive.
   const last = messages.filter(message => !isRuntimeContextMessage(message.text)).at(-1)
   const lastAssistantIndex = messages.findLastIndex(message => message.role === 'assistant' || message.role === 'tool')
-  const hasDirective = /\[\[(?:stream|empty|hold|answer|(?:once )?call|read|memory_search)\b/
+  const hasDirective = /\[\[(?:stream|empty|hold|answer|fail|(?:once )?call|read|memory_search)\b/
   const directiveMessage = messages
     .slice(lastAssistantIndex + 1)
     .findLast(message => message.role === 'user' && !isRuntimeContextMessage(message.text) && hasDirective.test(message.text))
@@ -170,6 +171,8 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
   if (last?.role === 'tool') return streamAnswer({ content: 'Tool finished.' })
   if (directiveText.includes('[[empty]]')) return streamAnswer({ reasoning_content: 'Thinking without an answer.' })
   if (directiveText.includes('[[hold]]')) return { kind: 'held' }
+  const failure = /\[\[fail ([^\]]+)\]\]/.exec(directiveText)
+  if (failure?.[1] !== undefined) return responseAnswer({ error: { message: failure[1], type: 'invalid_request_error', code: 'FAKE_FAILURE' } }, 400)
 
   const answer = /\[\[answer ([\s\S]+?)\]\]/.exec(directiveText)
   if (answer?.[1] !== undefined) return streamAnswer({ content: answer[1] }, streamDelayMs)
