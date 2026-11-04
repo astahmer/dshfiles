@@ -26,6 +26,11 @@
           "id": "tool-ask-user.markdown-guidance",
           "file": "plugins/@dshfiles/tool-ask-user/src/schema.test.ts",
           "testName": "tells the model that questions are markdown with sandboxed html previews"
+        },
+        {
+          "kind": "gherkin",
+          "id": "tool-ask-user.preset-child",
+          "featureFile": "tooling/dshx/e2e/features/user-questions-markdown.feature"
         }
       ],
       "telemetry": [

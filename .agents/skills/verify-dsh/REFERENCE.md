@@ -76,6 +76,9 @@ or when a binary outside the repository changed.
   and fail with "AI Accounts never saved …" when the store disagrees with the panel.
 - AI Accounts E2E profiles (alone, owned Chat, model-effort picker) seed their own canonical workspace folder before Host boot; without a selected workspace the native composer shows “Choose workspace”, not a prompt field.
 - AI Accounts setup is provisional: Cancel/X/Escape leaves no new account. Fake Command Code routes set the loopback URL in the pending key dialog's Connection settings, then Verify and add account; rename the saved route in Settings → Advanced only after success, preserving its verified native credential reference. Existing inert Codex catalog fixtures are not new-connection proof.
+- A bundle the seed composes as a preset child (`@dshfiles/tool-ask-user` as `preset-standard`'s
+  `tool-ask-user`) has no row of its own: the scratch copies the seed's whole preset row
+  (`seed-nested-rows.ts`), so `--plugin` it like any bundle.
 - Reaches share one browser and project selection persists. A reach that needs
   the project picker should run before another selects `sample` or use a separate
   `--name` instance. A reach that changes a sidebar view leaves it for the next

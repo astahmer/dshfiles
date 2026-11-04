@@ -2,9 +2,40 @@
 
 ![An answered question form stays closed while its reply waits for admission](docs/screenshots/answered-question-stays-closed.png)
 
+![Markdown questions with sandboxed HTML previews](docs/screenshots/markdown-question.png)
+
 Owned fork of DSH's native question form (`ask_user_question` and plan review). It keeps the native composer takeover,
-answer panels and late-reply node, and stops an answered `continued` form from flashing back while its reply waits for
-admission (b:270).
+answer panels and late-reply node, stops an answered `continued` form from flashing back while its reply waits for
+admission (b:270), and renders questions as markdown with sandboxed HTML previews (b:6).
+
+## Markdown questions
+
+An agent can show what it is asking about instead of describing it: a screenshot, a link, a table, a code sample or a
+chart. The `question` text and each option's `description` are markdown; they are the only rich fields that survive
+both the live answerer request and the Host `userQuestions` projection, which strips any other field, so nothing new
+is added to the tool schema. [`@dshfiles/tool-ask-user`](../tool-ask-user) tells the model about it.
+
+- **Heading**: the first paragraph (a leading `#` heading loses its markers). Plain prose keeps the native `h2`; inline
+  markdown (a link, `code`, emphasis) renders in an ARIA heading. A question that opens with an image or a fence gets a
+  visually hidden heading from its `header`, else from its prose.
+- **Body**: everything after the heading, through the native `MarkdownText` the chat transcript uses (GFM tables,
+  links, fenced code with highlighting, KaTeX math). Images follow the transcript's policy: an absolute local path
+  resolves through the file API, an https image loads directly, anything else renders as its alt text.
+- **HTML preview**: a fence whose info string is `html preview`, optionally followed by a title
+  (` ```html preview Revenue by month `), goes to the `QuestionHtmlPreview` registry this package declares as the
+  dshx module `@dshfiles/user-questions/html-preview`. [`@dshfiles/html-render`](../html-render) provides it with its
+  sandboxed card: `sandbox="allow-scripts"` without same-origin, a no-network Content-Security-Policy first in the
+  head, Copy / Open in new tab / Expand. Without a provider the fence renders as an `html` code block, and a plain
+  ` ```html ` fence or an unclosed preview fence is always code, so markup never runs outside a sandbox.
+- **Options**: a markdown description renders under its option button instead of inside it, so a link stays a link
+  (clicking it does not pick the option) and the button keeps its short accessible name (`aria-describedby` points at
+  the description). The whole row carries hover and selection. Plain descriptions render inline as before.
+- **Size**: a question with a body may take up to `min(72vh, 720px)` before its seat scrolls; the header and footer
+  stay pinned. Images and tables are clamped to the pane, checked at iPhone 15 width in WebKit.
+
+Parsing lives in [`src/rich/question-markdown.ts`](src/rich/question-markdown.ts) (unit-tested in
+[`tests/question-markdown.spec.ts`](tests/question-markdown.spec.ts)); rendering in
+[`src/rich/QuestionMarkdown.tsx`](src/rich/QuestionMarkdown.tsx).
 
 ## Upstream and license
 
@@ -25,11 +56,14 @@ package replaces the `ui-user-questions` Loader row: its `cordis.patch.yml` disa
 
 ### Local delta
 
-Every other vendored file is byte-identical to the pinned revision.
+Every other vendored file is byte-identical to the pinned revision. Owned files outside `src/native` (`src/rich/`,
+`src/html-preview.ts`) are not vendored.
 
-| File                  | Change                                                                                                                                                                                                                                                                                                                                 |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/native/index.ts` | upstream revision `69f2241e` (`fix(ui-user-questions): keep an answered question from flashing back`), not yet released: the Remote answer path records each call this Client answered until the Host stops listing it, and the reconcile creates that card without taking the composer seat, so the tool call row can still reveal it |
+| File                                     | Change                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/native/index.ts`                    | upstream revision `69f2241e` (`fix(ui-user-questions): keep an answered question from flashing back`), not yet released: the Remote answer path records each call this Client answered until the Host stops listing it, and the reconcile creates that card without taking the composer seat, so the tool call row can still reveal it |
+| `src/native/QuestionComposer.tsx`        | the question is markdown: heading split, rich body and html previews from `src/rich/`, markdown option descriptions under their button (b:6)                                                                                                                                                                                           |
+| `src/native/QuestionComposer.module.css` | `.optionItem` row highlight, `.srOnly` heading, `.cardRich` height for those (b:6)                                                                                                                                                                                                                                                     |
 
 Answering a `continued` form queues a `user-question-reply` in the Inbox. The step boundary's `claim()` empties the
 Inbox several awaits before the admitted `user/message` settles the `userQuestions` projection; for that gap the

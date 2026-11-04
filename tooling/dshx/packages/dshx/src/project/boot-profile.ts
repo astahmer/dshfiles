@@ -11,6 +11,7 @@ import { withUnknownProperties } from '../schema.js'
 import { parse } from 'yaml'
 import { CORDIS_IDENTITY_DEPENDENCIES } from 'create-dshx/capabilities'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
+import { seedRowsComposingNestedBundles } from './seed-nested-rows.js'
 
 const WORKSPACE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../../')
 const PROFILE_NAME = 'dshx-boot'
@@ -224,7 +225,11 @@ const prepareBootProfiles = async (
     }
     await writeFile(join(profileRoot, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)
     await writeFile(join(profileRoot, 'pnpm-workspace.yaml'), pnpmWorkspace)
-    if (options.cordisPatch !== undefined) await writeFile(join(profileRoot, 'cordis.patch.yml'), options.cordisPatch)
+    // A bundle composed as a preset child has no row of its own; the seed's row that composes it comes along.
+    const seedPatchPath = join(WORKSPACE_ROOT, 'profiles/web/cordis.patch.yml')
+    const seedRows = existsSync(seedPatchPath) ? seedRowsComposingNestedBundles(await readFile(seedPatchPath, 'utf8'), packageIds) : ''
+    const cordisPatch = [options.cordisPatch, seedRows].filter(part => part !== undefined && part.trim() !== '').join('\n')
+    if (cordisPatch !== '') await writeFile(join(profileRoot, 'cordis.patch.yml'), `${cordisPatch}\n`)
     await installProfile(profileRoot, homeRoot, workspaceManifest.packageManager)
     return {
       homeRoot,
