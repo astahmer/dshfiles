@@ -29,7 +29,7 @@
       ],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items",
+      "currentSurface": "left-nav: Backlog",
       "configuration": [],
       "states": [
         "inbox",
@@ -102,7 +102,7 @@
       ],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "left-nav: Backlog: Items › Backlog settings",
+      "currentSurface": "left-nav: Backlog › Backlog settings",
       "configuration": [
         {
           "key": "dshfiles-backlog.jevEnabled",
@@ -184,7 +184,7 @@
       ],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › Feed",
+      "currentSurface": "left-nav: Backlog › Feed",
       "configuration": [],
       "states": [
         "fresh",
@@ -255,7 +255,7 @@
       ],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › rows",
+      "currentSurface": "left-nav: Backlog › rows",
       "configuration": [],
       "states": [
         "reading",
@@ -316,7 +316,7 @@
       ],
       "surface": "detail",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › Board / item detail",
+      "currentSurface": "left-nav: Backlog › Board / item detail",
       "configuration": [],
       "states": [
         "inbox",
@@ -380,7 +380,7 @@
       ],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › Board › Configure board columns",
+      "currentSurface": "left-nav: Backlog › Board › Configure board columns",
       "configuration": [],
       "states": [
         "default-order",
@@ -439,7 +439,7 @@
       ],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › rows",
+      "currentSurface": "left-nav: Backlog › rows",
       "configuration": [],
       "states": [
         "unselected",
@@ -557,7 +557,7 @@
       ],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › row menu",
+      "currentSurface": "left-nav: Backlog › row menu",
       "configuration": [],
       "states": [
         "single",
@@ -600,7 +600,7 @@
       ],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › capture",
+      "currentSurface": "left-nav: Backlog › capture",
       "configuration": [],
       "states": [
         "off",
@@ -729,7 +729,7 @@
       ],
       "surface": "command",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › Backfill triage",
+      "currentSurface": "left-nav: Backlog › Backfill triage",
       "configuration": [],
       "states": [
         "untriaged",
@@ -1148,7 +1148,7 @@
       ],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › search",
+      "currentSurface": "left-nav: Backlog › search",
       "configuration": [],
       "states": [
         "browsing",
@@ -1224,7 +1224,7 @@
       ],
       "surface": "attentionProvider",
       "destination": "inbox",
-      "currentSurface": "left-nav: Backlog: Items › Inbox filter (links to the Inbox)",
+      "currentSurface": "left-nav: Backlog › Inbox filter (links to the Inbox)",
       "configuration": [],
       "states": [
         "unread",
@@ -1394,7 +1394,7 @@
       ],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › capture box",
+      "currentSurface": "left-nav: Backlog › capture box",
       "configuration": [],
       "states": [
         "empty",
@@ -1482,7 +1482,7 @@
       ],
       "surface": "detail",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › item detail",
+      "currentSurface": "left-nav: Backlog › item detail",
       "states": [
         "reading",
         "editing",
@@ -1641,7 +1641,7 @@
       ],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › project filter",
+      "currentSurface": "left-nav: Backlog › project filter",
       "configuration": [],
       "states": [
         "all-projects",
@@ -1802,7 +1802,7 @@
       ],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › Start thread",
+      "currentSurface": "left-nav: Backlog › Start thread",
       "configuration": [],
       "states": [
         "item-without-project",
@@ -2003,7 +2003,7 @@
       ],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › row menu › tweet context",
+      "currentSurface": "left-nav: Backlog › row menu › tweet context",
       "configuration": [],
       "states": [
         "unmatched",

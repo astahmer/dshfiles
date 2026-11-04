@@ -38,7 +38,7 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | AI Accounts: Quota forecast | Observe | ai-accounts/quota-forecast → Observe (destinationSection) |
 | AI Accounts: Usage history | Observe | ai-accounts/usage-history-and-pricing → Observe (destinationSection) |
 | Background Jobs: Jobs | Observe | background-jobs/batch-stop-jobs → Observe (rowAction)<br>background-jobs/jobs-board → Observe (destinationSection) |
-| Backlog: Items | Work, Inbox, Settings | backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/project-scope → Work (destinationSection)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/tweet-context-enrichment → Work (rowAction) |
+| Backlog | Work, Inbox, Settings | backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/project-scope → Work (destinationSection)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/tweet-context-enrichment → Work (rowAction) |
 | Hosts | Observe | multi-host/host-management → Observe (destinationSection)<br>multi-host/isolated-runtime-views → Observe (rowAction) |
 | Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
 | JJ Integration: Thread integration | Land | jj-integration/thread-integration-attention-view → Land (destinationSection)<br>jj-integration/thread-integration-empty → Land (destinationSection)<br>jj-integration/thread-integration-row-details → Land (detail)<br>jj-integration/thread-workspaces-panel → Land (destinationSection) |
@@ -136,7 +136,7 @@ rail destination; 19 features.
 | agent-questions/parent-child-question: Ask and answer a child-agent question | attentionProvider | agent tool: ask_parent_question / answer_parent_question |
 | ai-accounts/quota-auto-retry: Retry exhausted quota when its reset arrives | attentionProvider | transcript: usage-limit turn tail › Resume |
 | ai-accounts/quota-inbox-items: Quota-blocked threads in the Inbox, resumable in place | attentionProvider | left-nav: Inbox › ai-accounts.quota-continuation |
-| backlog/attention-inbox: Attention Inbox across items and threads | attentionProvider | left-nav: Backlog: Items › Inbox filter (links to the Inbox) |
+| backlog/attention-inbox: Attention Inbox across items and threads | attentionProvider | left-nav: Backlog › Inbox filter (links to the Inbox) |
 | backlog/backlog-inbox-items: Backlog requests in the Inbox | attentionProvider | left-nav: Inbox › backlog.attention |
 | hmr-gate/deferred-update-inbox-item: Plugin updates waiting for a restart in the Inbox | attentionProvider | left-nav: Inbox › hmr-gate.deferred-update |
 | jj-integration/land-inbox-items: Blocked and ready-to-land workspaces in the Inbox | attentionProvider | left-nav: Inbox › jj-integration.land-blocked / jj-integration.ready-to-land |
@@ -175,22 +175,22 @@ rail destination; 16 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| backlog/backfill-triage: Backfill triage on items captured before it was set up | command | left-nav: Backlog: Items › Backfill triage |
-| backlog/activity-feed-and-freshness: Feed ordered by activity, with idle items sinking | destinationSection | left-nav: Backlog: Items › Feed |
-| backlog/auto-triage: Triage new items automatically | destinationSection | left-nav: Backlog: Items › capture |
-| backlog/board-column-preferences: Customize Backlog board columns | destinationSection | left-nav: Backlog: Items › Board › Configure board columns |
-| backlog/capture-and-triage: Capture anything and let it sort itself | destinationSection | left-nav: Backlog: Items |
-| backlog/project-scope: File and scope items by project | destinationSection | left-nav: Backlog: Items › project filter |
-| backlog/rich-capture: A chat-sized capture box with files, properties and references | destinationSection | left-nav: Backlog: Items › capture box |
-| backlog/search-and-views: Search with reasons and saved views | destinationSection | left-nav: Backlog: Items › search |
-| backlog/board-links-and-history: Board, links, backlinks and history | detail | left-nav: Backlog: Items › Board / item detail |
-| backlog/rich-item-text: Write descriptions and replies like a capture | detail | left-nav: Backlog: Items › item detail |
+| backlog/backfill-triage: Backfill triage on items captured before it was set up | command | left-nav: Backlog › Backfill triage |
+| backlog/activity-feed-and-freshness: Feed ordered by activity, with idle items sinking | destinationSection | left-nav: Backlog › Feed |
+| backlog/auto-triage: Triage new items automatically | destinationSection | left-nav: Backlog › capture |
+| backlog/board-column-preferences: Customize Backlog board columns | destinationSection | left-nav: Backlog › Board › Configure board columns |
+| backlog/capture-and-triage: Capture anything and let it sort itself | destinationSection | left-nav: Backlog |
+| backlog/project-scope: File and scope items by project | destinationSection | left-nav: Backlog › project filter |
+| backlog/rich-capture: A chat-sized capture box with files, properties and references | destinationSection | left-nav: Backlog › capture box |
+| backlog/search-and-views: Search with reasons and saved views | destinationSection | left-nav: Backlog › search |
+| backlog/board-links-and-history: Board, links, backlinks and history | detail | left-nav: Backlog › Board / item detail |
+| backlog/rich-item-text: Write descriptions and replies like a capture | detail | left-nav: Backlog › item detail |
 | backlog/reference-preview: Preview a referenced item from a conversation | entityProvider | transcript: b:<id> reference card |
-| backlog/inline-title-edit: Rename an item in place | rowAction | left-nav: Backlog: Items › rows |
-| backlog/multi-select-items: Select items in ranges and batch-edit them | rowAction | left-nav: Backlog: Items › rows |
-| backlog/selection-context-menu: Apply every context-menu action to the selection | rowAction | left-nav: Backlog: Items › row menu |
-| backlog/start-thread-from-item: Start a thread from an item | rowAction | left-nav: Backlog: Items › Start thread |
-| backlog/tweet-context-enrichment: Retrieve public tweet context into a backlog item | rowAction | left-nav: Backlog: Items › row menu › tweet context |
+| backlog/inline-title-edit: Rename an item in place | rowAction | left-nav: Backlog › rows |
+| backlog/multi-select-items: Select items in ranges and batch-edit them | rowAction | left-nav: Backlog › rows |
+| backlog/selection-context-menu: Apply every context-menu action to the selection | rowAction | left-nav: Backlog › row menu |
+| backlog/start-thread-from-item: Start a thread from an item | rowAction | left-nav: Backlog › Start thread |
+| backlog/tweet-context-enrichment: Retrieve public tweet context into a backlog item | rowAction | left-nav: Backlog › row menu › tweet context |
 
 ### Agents
 
@@ -258,7 +258,7 @@ rail destination (bottom); 45 features.
 | ai-accounts/quick-account-setup: Connect an account without leaving the chat | settingsSection | dialog: Add AI account |
 | ai-accounts/reference-dashboard: Manage account Models, Settings and Usage | settingsSection | left-nav: AI Accounts: Accounts › Models / Settings / Usage tabs |
 | ai-accounts/strip-short-names: Short names in the sidebar usage strip | settingsSection | settings: AI Accounts › strip short names |
-| backlog/jev-settings: Configure Jev from the Backlog panel | settingsSection | left-nav: Backlog: Items › Backlog settings |
+| backlog/jev-settings: Configure Jev from the Backlog panel | settingsSection | left-nav: Backlog › Backlog settings |
 | loopback-access/network-access-settings: Choose how DSH is reachable | settingsSection | settings: Network access |
 | mcp-endpoint/mcp-endpoint-settings: Issue the MCP token and copy the Claude Code command | settingsSection | settings: MCP endpoint |
 | mcp-servers/oauth-authorization: Authorize remote OAuth servers | settingsSection | left-nav: MCP Servers: Servers › OAuth |

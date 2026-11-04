@@ -331,13 +331,13 @@ When('a kept thread tab is present while text is typed into Backlog', async ({ p
   backlogDropSessions.set(page, sessionId)
   await threadTab(page, sessionId).dblclick()
   const navigation = page.getByRole('navigation', { name: 'Sidebar navigation', exact: true })
-  const destination = navigation.getByRole('button', { name: 'Backlog: Items', exact: true })
+  const destination = navigation.getByRole('button', { name: 'Backlog', exact: true })
   if (await destination.isVisible()) await destination.click()
   else {
     // Backlog contributes sidebar.panellist, which the owned sidebar hosts in
     // its footer overflow, not the separate sidebar.header destination menu.
     await page.getByRole('button', { name: 'More', exact: true }).click()
-    await page.getByRole('button', { name: 'Backlog: Items', exact: true }).click()
+    await page.getByRole('button', { name: 'Backlog', exact: true }).click()
   }
   await expect(tab(page, 'Backlog')).toHaveAttribute('aria-selected', 'true')
   const capture = page.getByRole('textbox', { name: 'Capture', exact: true })

@@ -140,7 +140,7 @@ const expectItemActions = async (page: Page, includeOpenItem: boolean): Promise<
 When('the Backlog panel is opened', async ({ page }: { page: Page }) => {
   // A loaded machine can raise the provider-setup modal after the boot step stopped waiting; it hides the panel from role queries.
   await StartupDialogs.registerProviderSetupDismissal(page)
-  await openGlobalPanel(page, 'Backlog: Items')
+  await openGlobalPanel(page, 'Backlog')
   await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
 })
 
@@ -467,7 +467,7 @@ When('the customized Board view is opened', async ({ page }: { page: Page }) => 
 
 When('the scratch Host is restarted in the browser', async ({ page }: { page: Page }) => {
   await restartScratchProfileInBrowser(page)
-  await expect(globalPanelEntryPoint(page, 'Backlog: Items')).toBeVisible()
+  await expect(globalPanelEntryPoint(page, 'Backlog')).toBeVisible()
 })
 
 Then('the Items view lists both {string} and {string}', async ({ page }: { page: Page }, first: string, second: string) => {
@@ -718,7 +718,7 @@ Then('the thread composer is open for it', async ({ page }: { page: Page }) => {
 })
 
 When('the Backlog panel is opened again', async ({ page }: { page: Page }) => {
-  await openGlobalPanel(page, 'Backlog: Items')
+  await openGlobalPanel(page, 'Backlog')
   await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
 })
 

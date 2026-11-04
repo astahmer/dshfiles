@@ -715,14 +715,14 @@
         "click menuitem \"Keep open\"",
         "click tab \"Work\"",
         "click button \"Backlog\"",
-        "expect tab \"Backlog: Items*\"",
+        "expect tab \"Backlog*\"",
         "click textbox \"Capture\"",
         "press a",
         "press b",
         "press c",
-        "expect tab \"Backlog: Items*\"",
+        "expect tab \"Backlog*\"",
         "press Enter",
-        "expect tab \"Backlog: Items*\""
+        "expect tab \"Backlog*\""
       ],
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",

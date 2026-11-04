@@ -1,4 +1,5 @@
 import { useBacklogSelection } from './use-backlog-selection.js'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
@@ -80,10 +81,8 @@ export const SearchResults = (props: {
       </div>
       <ul aria-label="Search results" className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">
         {props.loaded && props.items.length === 0 ? (
-          <li className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:py-20 dshx:text-center">
-            <SearchIcon aria-hidden className="dshx:size-7 dshx:text-muted-foreground" />
-            <p className="dshx:text-sm dshx:font-medium">No match</p>
-            <p className="dshx:text-xs dshx:text-muted-foreground">Search covers titles, descriptions, comments, tags, links and archived items.</p>
+          <li>
+            <EmptyState className="dshx:py-20">No match. Search covers titles, descriptions, comments, tags, links and archived items.</EmptyState>
           </li>
         ) : null}
         {props.items.map(item => (

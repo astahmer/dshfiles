@@ -135,7 +135,7 @@ const eventIcons = {
 const Section = (props: { readonly title: string; readonly action?: ReactNode; readonly children: ReactNode }): JSX.Element => (
   <section className="dshx:flex dshx:flex-col dshx:gap-2">
     <div className="dshx:flex dshx:h-6 dshx:items-center dshx:justify-between">
-      <h4 className="dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground">{props.title}</h4>
+      <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.title}</h4>
       {props.action}
     </div>
     {props.children}
@@ -189,7 +189,7 @@ const AddLink = (props: { readonly id: number }): JSX.Element => {
           <input
             aria-label="Link target"
             autoFocus
-            placeholder="URL, session id, jj revision, branch, item number…"
+            placeholder="URL, thread id, jj revision, branch, item number…"
             className="dshx:h-8 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-xs dshx:outline-none dshx:focus-visible:border-ring"
             value={target}
             onChange={event => setTarget(event.currentTarget.value)}

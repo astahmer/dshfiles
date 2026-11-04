@@ -312,7 +312,7 @@ export default defineClient({
       () =>
         workbenchPanels().register({
           id: PANEL_ID,
-          title: 'Backlog: Items',
+          title: 'Backlog',
           component: decorate(PanelView),
           mainPanelId: PANEL_ID,
           showInContextMenu: true,
@@ -320,7 +320,7 @@ export default defineClient({
         }),
       'backlog: workbench side panel',
     )
-    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 3, label: 'Backlog: Items' }, PanelGlyph))
+    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 3, label: 'Backlog' }, PanelGlyph))
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))
     ctx.slots.inject('shell.overlay', () =>
       ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-backlog-reference-preview', order: 121 }, decorate(ReferenceOverlay)),

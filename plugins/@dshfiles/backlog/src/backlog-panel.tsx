@@ -136,7 +136,7 @@ const ProjectFilter = (props: {
       trigger={
         <>
           {singleProject !== null ? <ItemGlyphs.ProjectDot project={singleProject} /> : <FolderIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />}
-          <span className="dshx:min-w-0 dshx:truncate dshx:@max-[72rem]:sr-only">
+          <span className="dshx:min-w-0 dshx:truncate dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">
             <Tooltip>
               <TooltipTrigger asChild>
                 <span>{label}</span>
@@ -167,7 +167,7 @@ const FilterMenu = (props: {
         )}
       >
         <ListFilterIcon className="dshx:size-3.5" />
-        <span className="dshx:@max-[72rem]:sr-only">Filter</span>
+        <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">Filter</span>
         {active > 0 ? <span className="dshx:rounded-full dshx:bg-info/15 dshx:px-1.5 dshx:text-[10px] dshx:text-info">{active}</span> : null}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="dshx-root dshx:w-56">
@@ -213,7 +213,7 @@ const SavedViews = (props: {
         className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
       >
         <BookmarkIcon className="dshx:size-3.5" />
-        <span className="dshx:@max-[72rem]:sr-only">Views</span>
+        <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">Views</span>
         {props.views.length === 0 ? null : <span className="dshx:text-[10px] dshx:tabular-nums">{props.views.length}</span>}
       </PopoverTrigger>
       <PopoverContent align="end" className="dshx-root dshx:w-72 dshx:p-1">
@@ -714,8 +714,9 @@ export const BacklogPanel = (props: {
         onKeyDown={onKeyDown}
         className="dshx-root dshx:@container dshx:relative dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground dshx:outline-none"
       >
-        <header className="dshx:flex dshx:h-12 dshx:shrink-0 dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:px-4">
-          <nav aria-label="Backlog views" className="dshx:flex dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:bg-muted/60 dshx:p-0.5">
+        <header className="dshx:flex dshx:h-12 dshx:shrink-0 dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:px-4 dshx:@max-pane-narrow:gap-2 dshx:@max-pane-narrow:px-3 dshx:@max-pane-compact:overflow-x-auto">
+          <h1 className="dshx:shrink-0 dshx:text-base dshx:font-semibold dshx:tracking-[-0.01em] dshx:@max-pane-compact:sr-only">Backlog</h1>
+          <nav aria-label="Backlog views" className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:bg-muted/60 dshx:p-0.5">
             {views.map((entry, index) => {
               const Icon = viewIcons[entry]
               return (
@@ -739,7 +740,7 @@ export const BacklogPanel = (props: {
               )
             })}
           </nav>
-          <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
+          <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:@max-pane-compact:shrink-0">
             <Tooltip>
               <TooltipTrigger asChild>
                 <label className="dshx:flex dshx:h-7 dshx:min-w-28 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-input">
@@ -802,7 +803,7 @@ export const BacklogPanel = (props: {
                       className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground"
                     >
                       <ArrowDownWideNarrowIcon className="dshx:size-3.5" />
-                      <span className="dshx:@max-[72rem]:sr-only">{sort === 'updated' ? 'Last update' : 'Created'}</span>
+                      <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">{sort === 'updated' ? 'Last update' : 'Created'}</span>
                     </DropdownMenuTrigger>
                   </TooltipTrigger>
                   <TooltipContent>{`Sort by ${sort === 'updated' ? 'last update' : 'creation date'}`}</TooltipContent>
@@ -840,7 +841,7 @@ export const BacklogPanel = (props: {
                   )}
                 >
                   <Settings2Icon aria-hidden className="dshx:size-3.5" />
-                  <span className="dshx:@max-[72rem]:sr-only">{showSettings ? 'Backlog' : 'Settings'}</span>
+                  <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">{showSettings ? 'Backlog' : 'Settings'}</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent>{showSettings ? 'Back to backlog' : 'Backlog settings'}</TooltipContent>
@@ -867,25 +868,26 @@ export const BacklogPanel = (props: {
                       className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
                     >
                       <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
-                      <span className="dshx:@max-[72rem]:sr-only">Backfill</span>
+                      <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">Backfill</span>
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>Triage items captured before triage was set up</TooltipContent>
                 </Tooltip>
-                <button
-                  type="button"
-                  onClick={() => startCapture(null)}
-                  className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:bg-primary dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:text-primary-foreground dshx:transition-[opacity,transform] dshx:hover:opacity-90 dshx:active:scale-[0.98]"
-                >
+                <Button type="button" size="sm" onClick={() => startCapture(null)}>
                   <PlusIcon className="dshx:size-3.5" />
                   <span className="dshx:@max-pane-narrow:sr-only">New</span>
-                </button>
+                </Button>
               </>
             )}
           </div>
         </header>
         {list.isError ? (
-          <p className="dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-destructive">{errorMessage(list.error, 'The backlog is unavailable.')}</p>
+          <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-destructive">
+            <span className="dshx:min-w-0">{errorMessage(list.error, 'The backlog is unavailable.')}</span>
+            <Button size="xs" variant="outline" onClick={() => void list.refetch()}>
+              Try again
+            </Button>
+          </p>
         ) : null}
         <div data-backlog-content-region className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1 dshx:@max-pane-compact:flex-col">
           {showSettings ? <BacklogSettingsPanel /> : null}

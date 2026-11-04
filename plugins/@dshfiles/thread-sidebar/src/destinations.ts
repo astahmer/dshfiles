@@ -70,7 +70,7 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
   { panelId: 'pulls-review', destination: 'land', label: 'Review', description: 'Review a workspace before landing it.', order: 2, formerLabels: ['pulls.review: Reviews', 'Review'] },
   { panelId: 'dshfiles-jujutsu', destination: 'land', label: 'History', description: 'The revision graph of a project.', order: 3, formerLabels: ['Jujutsu: Revision graph'] },
   { panelId: 'dshfiles-jujutsu-source-control', destination: 'land', label: 'Source control', description: 'Working-copy changes and commits.', order: 4, formerLabels: ['Jujutsu: Source Control'] },
-  { panelId: 'dshfiles-backlog-panel', destination: 'work', label: 'Backlog', description: 'Tasks, bugs, ideas and notes.', order: 1, formerLabels: ['Backlog: Items'] },
+  { panelId: 'dshfiles-backlog-panel', destination: 'work', label: 'Backlog', description: 'Tasks, bugs, ideas and notes.', order: 1, formerLabels: ['Backlog: Items', 'Backlog'] },
   { panelId: 'schedules', destination: 'work', label: 'Schedules', description: 'Reminders and recurring prompts.', order: 2, formerLabels: ['Schedules'] },
   { panelId: 'dshfiles-agents', destination: 'agents', label: 'Directory', description: 'Configured agents and their threads.', order: 1, formerLabels: ['Agents: Directory', 'Agents'] },
   { panelId: 'agent-communication', destination: 'agents', label: 'Messages', description: 'What agents sent each other.', order: 2, formerLabels: ['Agent Communication: Messages', 'Messages'] },

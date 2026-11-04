@@ -1,4 +1,5 @@
 import { LinkIcon, LoaderCircleIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 
@@ -328,9 +329,7 @@ export const BoardView = (props: {
           >
             <header className="dshx:flex dshx:h-8 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-2">
               <ItemGlyphs.StatusIcon status={status} />
-              <h3 className="dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground">
-                {ItemGlyphs.statusLabels[status]}
-              </h3>
+              <h3 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{ItemGlyphs.statusLabels[status]}</h3>
               <span className="dshx:rounded-md dshx:bg-background/70 dshx:px-1.5 dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
                 {column.length}
               </span>
@@ -358,7 +357,7 @@ export const BoardView = (props: {
                 })
               }}
             >
-              {column.length === 0 ? <p className="dshx:py-6 dshx:text-center dshx:text-xs dshx:text-muted-foreground/70">Nothing here</p> : null}
+              {column.length === 0 ? <EmptyState className="dshx:py-6">Nothing here.</EmptyState> : null}
               {column.slice(0, (pages[status] ?? 1) * COLUMN_PAGE).map(item => (
                 <BoardCard
                   key={item.id}

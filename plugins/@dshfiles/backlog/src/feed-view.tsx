@@ -1,4 +1,5 @@
 import { useBacklogSelection } from './use-backlog-selection.js'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { LinkIcon, MessageSquareIcon, PaperclipIcon, PinIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
@@ -356,26 +357,13 @@ export const FeedView = (props: {
         <div className="dshx:mx-auto dshx:flex dshx:min-h-full dshx:max-w-4xl dshx:flex-col dshx:justify-end dshx:px-3 dshx:pt-6 dshx:pb-3">
           {props.loaded && props.items.length === 0 ? (
             props.statuses.length === 0 ? (
-              <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:py-20 dshx:text-center">
-                <span className="dshx:text-3xl">✦</span>
-                <p className="dshx:text-sm dshx:font-medium">Your backlog starts here</p>
-                <p className="dshx:max-w-80 dshx:text-xs dshx:text-muted-foreground">
-                  Type anything below like a message. Kinds, tags and links are picked up for you; idle things sink on their own.
-                </p>
-              </div>
+              <EmptyState className="dshx:py-20">
+                Your backlog starts here. Type anything below like a message; kinds, tags and links are picked up for you.
+              </EmptyState>
             ) : (
-              <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:py-20 dshx:text-center">
-                <span className="dshx:text-3xl">◌</span>
-                <p className="dshx:text-sm dshx:font-medium">No {selectionLabel(props.statuses)} items</p>
-                <p className="dshx:max-w-80 dshx:text-xs dshx:text-muted-foreground">Pick another status above, or clear the filter to see everything.</p>
-                <button
-                  type="button"
-                  onClick={props.clearStatuses}
-                  className="dshx:mt-1 dshx:rounded-full dshx:border dshx:border-border dshx:px-3 dshx:py-1 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
-                >
-                  Show all statuses
-                </button>
-              </div>
+              <EmptyState className="dshx:py-20" action={{ label: 'Show all statuses', onSelect: props.clearStatuses }}>
+                No {selectionLabel(props.statuses)} items. Pick another status above, or clear the filter to see everything.
+              </EmptyState>
             )
           ) : null}
           <div key="older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />

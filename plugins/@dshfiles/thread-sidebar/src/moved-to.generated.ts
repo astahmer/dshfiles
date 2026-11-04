@@ -14,7 +14,7 @@ export const FORMER_NAVIGATION: readonly FormerNavigationEntry[] = [
   { entry: 'AI Accounts: Quota forecast', destinations: ['observe'] },
   { entry: 'AI Accounts: Usage history', destinations: ['observe'] },
   { entry: 'Background Jobs: Jobs', destinations: ['observe'] },
-  { entry: 'Backlog: Items', destinations: ['inbox', 'work', 'settings'] },
+  { entry: 'Backlog', destinations: ['inbox', 'work', 'settings'] },
   { entry: 'Hosts', destinations: ['observe'] },
   { entry: 'Inbox', destinations: ['inbox'] },
   { entry: 'JJ Integration: Thread integration', destinations: ['land'] },

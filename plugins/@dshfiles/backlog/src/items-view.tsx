@@ -1,3 +1,4 @@
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -411,18 +412,9 @@ export const ItemsView = (props: {
           <span className="dshx:text-right">{props.sort === 'created' ? 'Created' : 'Updated'}</span>
         </div>
         {entries.length === 0 && filtering ? (
-          <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:px-4 dshx:py-20 dshx:text-center">
-            <span className="dshx:text-3xl">◌</span>
-            <p className="dshx:text-sm dshx:font-medium">No items match this status filter</p>
-            <p className="dshx:max-w-80 dshx:text-xs dshx:text-muted-foreground">Pick another status above, or clear the filter to see everything.</p>
-            <button
-              type="button"
-              onClick={props.clearStatuses}
-              className="dshx:mt-1 dshx:rounded-full dshx:border dshx:border-border dshx:px-3 dshx:py-1 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
-            >
-              Show all statuses
-            </button>
-          </div>
+          <EmptyState className="dshx:py-20" action={{ label: 'Show all statuses', onSelect: props.clearStatuses }}>
+            No items match this status filter. Pick another status above, or clear the filter to see everything.
+          </EmptyState>
         ) : null}
         <div style={{ height: virtualizer.getTotalSize() }} className="dshx:relative">
           {virtualizer.getVirtualItems().map(virtual => {

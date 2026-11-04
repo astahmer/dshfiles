@@ -1,4 +1,5 @@
 import { useBacklogSelection } from './use-backlog-selection.js'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { CheckIcon, CircleAlertIcon, CircleCheckIcon, CircleStopIcon, InboxIcon, MessagesSquareIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -110,10 +111,8 @@ export const InboxView = (props: {
         )}
         <ul className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">
           {props.loaded && rows.length === 0 ? (
-            <li className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:px-6 dshx:py-20 dshx:text-center">
-              <InboxIcon aria-hidden className="dshx:size-7 dshx:text-muted-foreground" />
-              <p className="dshx:text-sm dshx:font-medium">Nothing needs you</p>
-              <p className="dshx:text-xs dshx:text-muted-foreground">Agents asking for a decision, blocked work and triage suggestions land here.</p>
+            <li>
+              <EmptyState className="dshx:py-20">Nothing needs you. Agents asking for a decision, blocked work and triage suggestions land here.</EmptyState>
             </li>
           ) : null}
           {rows.map(({ item, threads, hasItemReason }) => (

@@ -8,9 +8,9 @@ const reusableViewNames = new Map([
   ['Sidebar status', 'AI Accounts: Preview'],
   // Shared Workbench fixtures include native/unlabeled footer actions, so this aggregate has mixed owners.
   ['Sidebar actions', 'Thread Sidebar: Plugin controls'],
-  ['Backlog', 'Backlog: Items'],
+  ['Backlog', 'Backlog'],
   ['Editor', 'Editor: Files'],
-  ['Jujutsu', 'Jujutsu: Revision graph'],
+  ['Jujutsu', 'Revision graph'],
   ['Scratchpad', 'Workbench: Scratchpad'],
   ['Ticker', 'Workbench: Ticker'],
   ['Plugins', 'Plugin Manager: Plugins'],
@@ -100,6 +100,7 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   ['Secrets', { destination: 'Settings', section: 'Secrets' }],
   // Plain labels the page-kit migration (plans/ade-ux Phase 1b) gave these pages.
   ['Review', { destination: 'Land', section: 'Review' }],
+  ['Backlog', { destination: 'Work', section: 'Backlog' }],
 ])
 
 const destinationTabs = (page: Page): Locator => page.getByRole('tablist', { name: 'Destinations', exact: true })

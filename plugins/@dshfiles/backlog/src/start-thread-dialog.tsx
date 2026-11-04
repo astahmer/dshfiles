@@ -16,7 +16,7 @@ import {
 import { continueMarkdownList } from './list-continuation.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
-const labelClass = 'dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground'
+const labelClass = 'dshx:text-xs dshx:font-medium dshx:text-muted-foreground'
 
 /**
  * Chooses the project, account/model and opening message, then hands the request to the panel and closes. Creating the
