@@ -110,6 +110,19 @@ of the live Host during that load (20 s, 5.8 s busy) names the owners below.
 | Thread open failed with "All fibers interrupted"         | concurrent `owns` joined the fiber `FiberMap.run(onlyIfMissing)` interrupts                                             | join the running discovery                                                                | multi-host         |
 | Session log lookups                                      | core `findLog` scans all 726 project directories per lookup; one tail read spent 4.4 s in `stat`, 18 ms reading         | open                                                                                      | core (Host gap)    |
 
+After, on a scratch DSH with every owned bundle (`dshx dev up`, 79 bundles, 342 Loader rows; machine load ~24 on 10
+cores), ten alternating calls of each on the same Host, with a cheap RPC pinging alongside:
+
+| Call                                | p50 / max        | Ping stall while it runs (p50) | Bytes  |
+| ----------------------------------- | ---------------- | ------------------------------ | ------ |
+| `pluginManager/listBundles` (old)   | 1,019 / 3,073 ms | 1,012 ms                       | 182 KB |
+| `settings-shell/bundleLabels` (new) | 38 / 609 ms      | 27 ms                          | 153 KB |
+
+Each page load now sends one `bundleLabels` and no `listBundles`. Whole page loads on that machine stayed noisy
+(slowest early request 0.6–2.0 s, led by core `settings/describe`, `credentials/describe` and
+`dynamicCordisRunner/*`), so the per-call comparison is the evidence. The scratch trace store was migrated with
+`spans_end` on boot.
+
 ## Thread-content search (palette `#…`)
 
 One search took 21 s to 1.4 min and stalled every other request (`modelCatalog`, `credentials/describe`, `state`,
