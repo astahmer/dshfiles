@@ -1,9 +1,8 @@
 import { homedir } from 'node:os'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
-import { commandAttributes } from '@dshfiles/dshx/tracing'
-import { Context, Duration, Effect, FileSystem, Layer, Option, Path, Random, Schema, Stream } from 'effect'
-import { ChildProcess, ChildProcessSpawner } from 'effect/process'
+import { Git } from '@dshfiles/git-cli'
+import { Context, Effect, FileSystem, Layer, Option, Path, Random, Schema } from 'effect'
 import { gitWorktreesSettings } from './settings.js'
 
 export interface GitLocation {
@@ -67,15 +66,6 @@ const SNAPSHOT_AUTHOR = { GIT_AUTHOR_NAME: 'dsh', GIT_AUTHOR_EMAIL: 'dsh@localho
 
 const GitWorktreesSettings = Settings.Tag<SettingsValue<typeof gitWorktreesSettings.schema>>(gitWorktreesSettings.namespace)
 
-const collectText = <E>(stream: Stream.Stream<Uint8Array, E>) =>
-  stream.pipe(
-    Stream.decodeText(),
-    Stream.runFold(
-      () => '',
-      (text, chunk) => text + chunk,
-    ),
-  )
-
 /**
  * Plain git repositories: thread worktrees beside the repository and file snapshots as unreferenced-but-kept commits.
  * A snapshot is a commit of every tracked and untracked, non-ignored file under `refs/dsh/snapshots/`, built in a
@@ -97,7 +87,7 @@ export class GitWorktrees extends Context.Service<
   static readonly layer = Layer.effect(
     GitWorktrees,
     Effect.gen(function* () {
-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const cli = yield* Git
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const settings = yield* GitWorktreesSettings
@@ -108,30 +98,18 @@ export class GitWorktrees extends Context.Service<
         return path.join(configured.startsWith('~/') ? path.join(homedir(), configured.slice(2)) : configured, path.basename(repoRoot))
       })
 
-      /** One git process; a non-zero exit fails inside its span, so the span carries the error status. */
+      /** One git run through `@dshfiles/git-cli`: its span, bounds and redacted stderr; failures keep this plugin's `GitFailed`. */
       const git = (args: readonly string[], cwd: string, env?: Readonly<Record<string, string>>) => {
         const subcommand = args[0] ?? ''
-        const attributes = commandAttributes({ executable: 'git', args, valueFlags: ['-c', '-C', '-b', '-m'] })
-        return Effect.gen(function* () {
-          const handle = yield* spawner.spawn(
-            ChildProcess.make('git', ['-c', 'core.quotePath=false', ...args], {
-              cwd,
-              stdin: 'ignore',
-              forceKillAfter: Duration.seconds(1),
-              ...(env !== undefined && { env }),
-            }),
+        return cli
+          .exec({ args, cwd, env })
+          .pipe(
+            Effect.mapError(cause =>
+              cause._tag === 'GitCommandFailed'
+                ? new GitFailed({ subcommand, exitCode: cause.exitCode, detail: cause.detail.slice(0, MAX_STDERR_CHARACTERS), cause })
+                : new GitFailed({ subcommand, detail: cause.message, cause }),
+            ),
           )
-          const [stdout, stderr, exitCode] = yield* Effect.all([collectText(handle.stdout), collectText(handle.stderr), handle.exitCode], {
-            concurrency: 'unbounded',
-          })
-          yield* Effect.annotateCurrentSpan({ 'process.exit.code': exitCode })
-          if (exitCode !== 0) return yield* new GitFailed({ subcommand, exitCode, detail: stderr.trim().slice(0, MAX_STDERR_CHARACTERS) })
-          return stdout
-        }).pipe(
-          Effect.scoped,
-          Effect.catchTag('PlatformError', cause => Effect.fail(new GitFailed({ subcommand, detail: 'git could not be started.', cause }))),
-          Effect.withSpan(`git ${String(attributes['process.command.verb'])}`.trim(), { kind: 'client', attributes }),
-        )
       }
 
       const locate = Effect.fn('git locate')(function* (target: string) {
@@ -241,5 +219,5 @@ export class GitWorktrees extends Context.Service<
         restore,
       })
     }),
-  )
+  ).pipe(Layer.provide(Git.layer))
 }

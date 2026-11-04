@@ -198,7 +198,7 @@
         {
           "kind": "unit-test",
           "id": "jj-integration.vcs-detector",
-          "file": "plugins/@dshfiles/jj-integration/src/vcs-detector.test.ts",
+          "file": "plugins/@dshfiles/vcs-provider-port/src/detect.test.ts",
           "testName": "prefers jj in a colocated checkout, picks git for a git-only one, and reads the nearest marker"
         },
         {
@@ -256,7 +256,7 @@
         {
           "kind": "custom",
           "span": "git <verb>",
-          "file": "plugins/@dshfiles/jj-integration/src/git-cli.test.ts",
+          "file": "plugins/@dshfiles/git-cli/src/git.test.ts",
           "testName": "records one git <verb> client span with value-free attributes and the exit code"
         }
       ]

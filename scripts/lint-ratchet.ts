@@ -24,6 +24,7 @@ const astGrepBoundaries = [
   'tooling/dshx/packages/dshx/src/effect/index.ts',
   'plugins/@dshfiles/credential-port/src/effect.ts',
   'plugins/@dshfiles/jj-cli/src/index.ts',
+  'plugins/@dshfiles/git-cli/src/index.ts',
   'plugins/@dshfiles/session-source-port/src/index.ts',
   'tooling/dshx/packages/dshx/src/effect/api.ts',
   'tooling/dshx/packages/dshx/src/effect/plugin.ts',

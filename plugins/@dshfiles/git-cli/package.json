@@ -1,0 +1,40 @@
+{
+  "name": "@dshfiles/git-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Effect service that runs the git CLI for Host plugins: bounded output, a timeout, non-interactive environment, credential-redacted stderr and one `git <verb>` span per run.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "dshx.features.json"
+  ],
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "node --run build && vitest run && node --test tests/runtime-distribution.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}

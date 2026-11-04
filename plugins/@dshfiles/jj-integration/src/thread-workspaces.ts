@@ -1,5 +1,6 @@
 import { Context, Effect, Layer } from 'effect'
-import { GitCli } from './git-cli.js'
+import { Git } from '@dshfiles/git-cli'
+import { VcsDetector } from '@dshfiles/vcs-provider-port/detect'
 import { GitThreadWorkspaces } from './git-thread-workspaces.js'
 import { JjThreadWorkspaces } from './jj-thread-workspaces.js'
 import { ThreadMetadata } from './thread-metadata.js'
@@ -23,7 +24,6 @@ import type {
 } from './thread-workspace-types.js'
 import type { IntegrationRecord } from './thread-metadata.js'
 import type { VcsKind } from './thread-workspace-model.js'
-import { VcsDetector } from './vcs-detector.js'
 
 export type {
   DiscardOutcome,
@@ -176,6 +176,6 @@ export class ThreadWorkspaces extends Context.Service<ThreadWorkspaces, ThreadWo
   /** The router over the jj and git adapters; needs jj view reads, a process spawner, the filesystem and settings. */
   static readonly layer = ThreadWorkspaces.routerLayer.pipe(
     Layer.provide(Layer.mergeAll(JjThreadWorkspaces.layer, GitThreadWorkspaces.layer, VcsDetector.layer)),
-    Layer.provide(Layer.mergeAll(ThreadMetadata.layer, GitCli.layer)),
+    Layer.provide(Layer.mergeAll(ThreadMetadata.layer, Git.layer)),
   )
 }

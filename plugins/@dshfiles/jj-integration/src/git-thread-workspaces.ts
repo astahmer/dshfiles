@@ -1,6 +1,6 @@
 import { Context, Effect, FileSystem, Layer, Option, Path, type PlatformError } from 'effect'
 import { GitFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed } from './errors.js'
-import { GitCli } from './git-cli.js'
+import { Git, type GitCommandFailed, type GitRunFailed } from '@dshfiles/git-cli'
 import { JjSettings } from './jj-settings.js'
 import { RepoLocks } from './repo-locks.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
@@ -84,7 +84,7 @@ const withRebaseMetadata = (status: ThreadStatus, entry: RebaseMetadataEntry | u
 }
 
 const make = Effect.gen(function* () {
-  const cli = yield* GitCli
+  const cli = yield* Git
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const locks = yield* RepoLocks
@@ -97,8 +97,10 @@ const make = Effect.gen(function* () {
   const filesFailed = (detail: string) => (cause: PlatformError.PlatformError) => new WorkspaceFilesFailed({ detail, cause })
   const gitFailed = (detail: string) => new GitFailed({ detail })
 
-  const git = (args: readonly string[], cwd: string, env?: Readonly<Record<string, string>>) => cli.exec({ args, cwd, env })
-  const run = (args: readonly string[], cwd: string, env?: Readonly<Record<string, string>>) => cli.run({ args, cwd, env })
+  /** The library's failures become this plugin's `git-failed` wire code, with the redacted detail as the message. */
+  const asGitFailed = (cause: GitRunFailed | GitCommandFailed) => new GitFailed({ detail: cause.message, cause })
+  const git = (args: readonly string[], cwd: string, env?: Readonly<Record<string, string>>) => cli.exec({ args, cwd, env }).pipe(Effect.mapError(asGitFailed))
+  const run = (args: readonly string[], cwd: string, env?: Readonly<Record<string, string>>) => cli.run({ args, cwd, env }).pipe(Effect.mapError(asGitFailed))
   const lines = (stdout: string): readonly string[] => stdout.split('\n').filter(line => line.length > 0)
 
   const revisions = (range: string, cwd: string, maxCount?: number) =>

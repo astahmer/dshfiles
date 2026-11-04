@@ -1,5 +1,6 @@
 import { Context, Effect, FileSystem, Layer, Option, Path } from 'effect'
-import type { VcsKind } from './thread-workspace-model.js'
+/** The version-control systems a path can belong to; jj wins when a checkout has both `.jj` and `.git`. */
+export type VcsKind = 'jj' | 'git'
 
 /**
  * Which backend owns a path: the nearest ancestor holding `.jj` or `.git`, jj first when one folder holds both (a
@@ -13,7 +14,7 @@ export class VcsDetector extends Context.Service<
     /** Undefined outside any repository; `kindOf` reads this as jj. */
     readonly detect: (target: string) => Effect.Effect<VcsKind | undefined>
   }
->()('@dshfiles/jj-integration/VcsDetector') {
+>()('@dshfiles/vcs-provider-port/VcsDetector') {
   static readonly layer = Layer.effect(
     VcsDetector,
     Effect.gen(function* () {

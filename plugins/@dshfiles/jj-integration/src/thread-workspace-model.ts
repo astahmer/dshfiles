@@ -1,8 +1,10 @@
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 
+import type { VcsKind } from '@dshfiles/vcs-provider-port/detect'
+
 /** The version-control system a thread workspace backend drives; jj wins when a checkout has both `.jj` and `.git`. */
-export type VcsKind = 'jj' | 'git'
+export type { VcsKind }
 
 export interface ThreadLocation {
   /** Root of the checkout that owns the jj store or the main git worktree; thread workspaces sit in its `-threads` sibling. */

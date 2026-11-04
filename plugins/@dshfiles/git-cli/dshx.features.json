@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "git-cli-run",
+      "title": "One Effect service that runs the git CLI",
+      "summary": "Run git non-interactively with bounded stdout and stderr, a timeout that kills the process and one git <verb> span; return a non-zero exit as a value or fail with redacted arguments and stderr.",
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["succeeded", "exited-non-zero", "timed-out", "truncated"],
+      "failureModes": [
+        "git that cannot start fails with GitRunFailed spawn-failed and a hint to install it.",
+        "A run over its timeout is stopped and its process killed.",
+        "A non-zero exit through exec carries flag-value-redacted arguments and credential-redacted stderr."
+      ],
+      "externalDependencies": [
+        {
+          "id": "git",
+          "boundary": "Fixed-argv git CLI through the Effect ChildProcessSpawner with stdin ignored, a non-interactive environment, bounded output and a timeout.",
+          "deterministicFake": "Real temporary git repositories per test, and a sleeping stand-in executable for the timeout; no git mock is used."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "git-cli.span",
+          "file": "plugins/@dshfiles/git-cli/src/git.test.ts",
+          "testName": "records one git <verb> client span with value-free attributes and the exit code"
+        },
+        {
+          "kind": "unit-test",
+          "id": "git-cli.timeout",
+          "file": "plugins/@dshfiles/git-cli/src/git.test.ts",
+          "testName": "stops a run that exceeds its timeout"
+        },
+        {
+          "kind": "unit-test",
+          "id": "git-cli.redaction",
+          "file": "plugins/@dshfiles/git-cli/src/git.test.ts",
+          "testName": "keeps flag values and credentials out of errors"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "git <verb>",
+          "file": "plugins/@dshfiles/git-cli/src/git.test.ts",
+          "testName": "records one git <verb> client span with value-free attributes and the exit code"
+        }
+      ]
+    }
+  ]
+}

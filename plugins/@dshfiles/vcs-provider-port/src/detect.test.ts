@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer } from 'effect'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { VcsDetector } from './vcs-detector.js'
+import { VcsDetector } from './detect.ts'
 
 const detect = (target: string) =>
   Effect.runPromise(

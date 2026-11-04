@@ -450,7 +450,7 @@ an Effect service whose two adapters are layers of their own:
 `VcsDetector` picks the adapter from the nearest `.jj` or `.git` above the path (filesystem only, no process), jj first
 when one folder holds both; the router (`ThreadWorkspaces.layer`) forwards each call. Shared state, the threads
 directory and the land records behind review ranges, lives in `ThreadMetadata`, so both backends read the same files.
-Git runs through `GitCli`: the executable DSH resolves, non-interactive (`GIT_TERMINAL_PROMPT=0`, no editor), bounded
+Git runs through the shared [`@dshfiles/git-cli`](../git-cli/README.md) (also used by git-worktrees): non-interactive (`GIT_TERMINAL_PROMPT=0`, no editor), bounded
 output, a two-minute timeout and one `git <verb>` span per run.
 
 In a git repository the tools, API and UI keep their jj names and behave as follows:
@@ -474,8 +474,15 @@ In a git repository the tools, API and UI keep their jj names and behave as foll
 ## VCS provider
 
 This plugin serves [`@dshfiles/vcs-provider-port`](../vcs-provider-port/README.md) for jj repositories (priority 100,
-so a jj repository colocated with git is jj's) and for git-only repositories (priority 50, above
-`@dshfiles/git-worktrees`' 10, because these thread workspaces can integrate). For jj: `provision` is the same verb as `jj-threads.provision`, and
+so a jj repository colocated with git is jj's) and for git-only repositories (priority 50).
+
+**Behaviour change for git repositories.** Priority 50 is above [`@dshfiles/git-worktrees`](../git-worktrees/README.md)'
+10, so with both plugins loaded this plugin now owns plain git repositories for every port caller: a backlog item's
+thread isolates according to this plugin's `isolateByDefault` (not git-worktrees' `isolate`), starts from the configured
+`bookmark` instead of `HEAD`, and can be integrated; session-undo snapshots are the same `refs/dsh/snapshots/` commits
+as before. git-worktrees answers only when this plugin is not loaded.
+
+For jj: `provision` is the same verb as `jj-threads.provision`, and
 `snapshot`/`restore` record a workspace's files as the jj operation that snapshotted them and put them back with
 `jj restore --from 'at_operation(<op>, @)' --into @`. A restore touches only that workspace's working-copy files:
 history, bookmarks and other workspaces stay where they are.

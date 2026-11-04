@@ -2808,8 +2808,33 @@ importers:
         specifier: 4.4.7
         version: 4.4.7(@types/react@18.3.31)(immer@10.1.1)(react@18.3.1)
 
+  plugins/@dshfiles/git-cli:
+    dependencies:
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.0
+    devDependencies:
+      '@effect/platform-node':
+        specifier: 'catalog:'
+        version: 4.1.0(effect@4.1.0)(redis@6.3.1(@opentelemetry/api@1.9.1))
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.1.0(effect@4.1.0)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.19.20)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.19.20)(yaml@2.9.0)))
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.20
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.19.20)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.19.20)(yaml@2.9.0))
+
   plugins/@dshfiles/git-worktrees:
     dependencies:
+      '@dshfiles/git-cli':
+        specifier: workspace:*
+        version: link:../git-cli
       '@dshfiles/vcs-provider-port':
         specifier: workspace:*
         version: link:../vcs-provider-port
@@ -3259,6 +3284,9 @@ importers:
       '@dshfiles/command-palette':
         specifier: workspace:*
         version: link:../command-palette
+      '@dshfiles/git-cli':
+        specifier: workspace:*
+        version: link:../git-cli
       '@dshfiles/jj-cli':
         specifier: workspace:*
         version: link:../jj-cli
@@ -7661,6 +7689,9 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
+      '@effect/platform-node':
+        specifier: 'catalog:'
+        version: 4.1.0(effect@4.1.0)(redis@6.3.1(@opentelemetry/api@1.9.1))
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.20

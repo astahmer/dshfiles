@@ -43,6 +43,39 @@
           "source": "api-dispatch"
         }
       ]
+    },
+    {
+      "id": "vcs-detection",
+      "title": "Which VCS owns a path",
+      "summary": "VcsDetector (subpath ./detect) names jj or git for a path from the nearest .jj or .git above it, jj first when both exist, reading only the filesystem; jj-integration and pulls-review pick their jj or git adapter with it.",
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["jj", "git", "none"],
+      "failureModes": ["A path outside any repository, or one deleted meanwhile, detects nothing and kindOf reads it as jj so callers keep their jj errors."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "vcs-provider-port.detect-nearest",
+          "file": "plugins/@dshfiles/vcs-provider-port/src/detect.test.ts",
+          "testName": "prefers jj in a colocated checkout, picks git for a git-only one, and reads the nearest marker"
+        },
+        {
+          "kind": "unit-test",
+          "id": "vcs-provider-port.detect-outside",
+          "file": "plugins/@dshfiles/vcs-provider-port/src/detect.test.ts",
+          "testName": "reads a folder outside any repository, or one deleted meanwhile, as jj so its errors stay unchanged"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Pure filesystem existence checks with no process, socket or network; the caller's span covers them."
+        }
+      ]
     }
   ]
 }

@@ -45,6 +45,10 @@ runtime bundle. The root `VcsProviders` Promise API remains unchanged.
 jj-integration claims a git-only repository through its git backend, so with both loaded a git repository's threads
 are jj-integration's (they can integrate); git-worktrees answers when jj-integration is not loaded.
 
+`VcsDetector` from `@dshfiles/vcs-provider-port/detect` answers which VCS owns a path (`jj`, `git` or none) from the
+nearest `.jj` or `.git`, jj first when both exist, without starting a process. jj-integration and pulls-review use it
+to pick their jj or git adapter.
+
 Callers: `@dshfiles/backlog` (an item's thread starts isolated) and `@dshfiles/session-undo` (turn snapshots).
 Bundle the port in the Host entry (`host.bundleDependencies`).
 
