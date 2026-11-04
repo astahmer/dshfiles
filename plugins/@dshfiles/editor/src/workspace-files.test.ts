@@ -205,6 +205,51 @@ describe('createWorkspaceFileIndex with Host changes', () => {
   })
 })
 
+describe('createWorkspaceFileIndex relist bursts', () => {
+  it('answers a build burst across 30 directories with one pass, one flatten and one publish', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const tree: Tree = Object.fromEntries(Array.from({ length: 30 }, (_, directory) => [`d${directory}`, { 'a.ts': 'file' as const }]))
+      const { list, listed } = lister(tree)
+      const { watch, watched, emit } = watcher()
+      const index = createWorkspaceFileIndex({ list: (_sessionId, path) => list(path), watch, now: () => 0 })
+      const replies: WorkspaceFilesState[] = []
+      const stop = index.request('ses_1', reply => replies.push(reply))
+      await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ status: 'ready' }))
+      expect(watched()).toHaveLength(31)
+
+      const publishedBefore = replies.length
+      const listedBefore = listed.length
+      for (let directory = 0; directory < 30; directory += 1) {
+        const node = tree[`d${directory}`]
+        if (node === undefined || node === 'file') throw new Error('fixture')
+        node['b.ts'] = 'file'
+        emit(`d${directory}`)
+        // Frames arrive spread over the window, as a build writes them.
+        await vi.advanceTimersByTimeAsync(3)
+      }
+      await vi.advanceTimersByTimeAsync(200)
+      await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ files: expect.arrayContaining(['d0/b.ts', 'd29/b.ts']) as unknown }))
+      expect(replies.at(-1)).toMatchObject({ status: 'ready', truncated: false })
+
+      expect(replies.length - publishedBefore).toBe(1)
+      expect(listed.length - listedBefore).toBe(30)
+
+      // A change that lands while nothing is pending still gets its own pass.
+      const d0 = tree.d0
+      if (d0 === undefined || d0 === 'file') throw new Error('fixture')
+      d0['c.ts'] = 'file'
+      emit('d0')
+      await vi.advanceTimersByTimeAsync(200)
+      await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ files: expect.arrayContaining(['d0/c.ts']) as unknown }))
+      stop()
+      index.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('walkWorkspaceFiles with .gitignore', () => {
   it('drops paths the root and nested .gitignore files ignore, re-including negated ones', async () => {
     const tree: Tree = {

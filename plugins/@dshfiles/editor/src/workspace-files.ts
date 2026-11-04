@@ -32,6 +32,8 @@ interface DirectoryListing {
 }
 type Directories = Map<string, DirectoryListing>
 
+const depthOf = (path: string): number => (path === '' ? 0 : path.split('/').length)
+
 const joinPath = (parent: string, name: string): string => (parent === '' ? name : `${parent}/${name}`)
 
 const ancestorsOf = (path: string): string[] => {
@@ -148,7 +150,12 @@ interface SessionIndex {
   generation: number
   readonly listeners: Set<(reply: WorkspaceFilesState) => void>
   readonly watches: Map<string, AbortController>
-  readonly relists: Map<string, ReturnType<typeof setTimeout>>
+  /** Directories a watch reported changed since the last relist pass. */
+  readonly dirty: Set<string>
+  /** One pending relist pass for the whole index, however many directories changed. */
+  relistTimer: ReturnType<typeof setTimeout> | null
+  /** A relist pass is reading; changes that arrive meanwhile wait for one trailing pass. */
+  relisting: boolean
   idleTimer: ReturnType<typeof setTimeout> | null
   releaseTimer: ReturnType<typeof setTimeout> | null
 }
@@ -192,8 +199,9 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
     if (index.fullyWatched && index.indexedAt !== null) index.indexedAt = now()
     for (const controller of index.watches.values()) controller.abort()
     index.watches.clear()
-    for (const timer of index.relists.values()) clearTimeout(timer)
-    index.relists.clear()
+    if (index.relistTimer !== null) clearTimeout(index.relistTimer)
+    index.relistTimer = null
+    index.dirty.clear()
     index.fullyWatched = false
   }
 
@@ -229,36 +237,75 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
     }
   }
 
-  const relist = async (sessionId: SessionId, index: SessionIndex, path: string): Promise<void> => {
-    const next = await readDirectory({ ...walkSource(sessionId), directories: index.directories, path, signal: disposed.signal })
-    if (disposed.signal.aborted || index.walking) return
-    const previous = index.directories.get(path)
-    if (next === null) {
-      removeSubtree(index.directories, path)
-    } else {
-      for (const child of previous?.directories ?? []) if (!next.directories.includes(child)) removeSubtree(index.directories, child)
-      index.directories.set(path, next)
-      const added = next.directories.filter(child => !index.directories.has(child))
-      if (added.length > 0) {
-        await walkInto({ ...walkSource(sessionId), signal: disposed.signal, directories: index.directories, roots: added }).catch(() => undefined)
-      }
+  /**
+   * One pass over every directory that changed in the window: read them (at most `PARALLEL_LISTS` at once), apply
+   * the results shallow-first, walk only added directories, then flatten, re-watch and publish once. A build that
+   * touches fifty directories costs one flatten and one publish, not fifty.
+   */
+  const relistDirty = async (sessionId: SessionId, index: SessionIndex): Promise<void> => {
+    index.relistTimer = null
+    const signal = AbortSignal.any([disposed.signal, index.controller.signal])
+    if (signal.aborted) return
+    // A full walk in flight answers for every directory; its result replaces these listings anyway.
+    if (index.walking) {
+      index.dirty.clear()
+      return
     }
-    const result = flatten(index.directories)
-    index.files = result.files
-    index.truncated = result.truncated
-    syncWatches(sessionId, index)
-    publish(sessionId, index)
+    const paths = [...index.dirty].sort((left, right) => depthOf(left) - depthOf(right))
+    index.dirty.clear()
+    if (paths.length === 0) return
+    index.relisting = true
+    try {
+      const listings = new Map<string, DirectoryListing | null>()
+      let next = 0
+      const worker = async (): Promise<void> => {
+        while (next < paths.length && !signal.aborted) {
+          const path = paths[next++]
+          if (path === undefined) return
+          listings.set(path, await readDirectory({ ...walkSource(sessionId), directories: index.directories, path, signal }))
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(PARALLEL_LISTS, paths.length) }, worker))
+      if (signal.aborted || index.walking) return
+      const added: string[] = []
+      for (const path of paths) {
+        // A shallower result of this pass may have removed this directory; do not bring it back.
+        if (path !== '' && !index.directories.has(path)) continue
+        const listing = listings.get(path) ?? null
+        const previous = index.directories.get(path)
+        if (listing === null) {
+          removeSubtree(index.directories, path)
+          continue
+        }
+        for (const child of previous?.directories ?? []) if (!listing.directories.includes(child)) removeSubtree(index.directories, child)
+        index.directories.set(path, listing)
+        for (const child of listing.directories) if (!index.directories.has(child)) added.push(child)
+      }
+      if (added.length > 0) {
+        await walkInto({ ...walkSource(sessionId), signal, directories: index.directories, roots: added }).catch(() => undefined)
+      }
+      if (signal.aborted || index.walking) return
+      const result = flatten(index.directories)
+      index.files = result.files
+      index.truncated = result.truncated
+      syncWatches(sessionId, index)
+      publish(sessionId, index)
+    } finally {
+      index.relisting = false
+      if (index.dirty.size > 0 && !signal.aborted) armRelist(sessionId, index)
+    }
+  }
+
+  const armRelist = (sessionId: SessionId, index: SessionIndex): void => {
+    if (index.relistTimer !== null || index.relisting) return
+    index.relistTimer = setTimeout(() => {
+      void relistDirty(sessionId, index)
+    }, RELIST_DELAY_MS)
   }
 
   const scheduleRelist = (sessionId: SessionId, index: SessionIndex, path: string): void => {
-    clearTimeout(index.relists.get(path))
-    index.relists.set(
-      path,
-      setTimeout(() => {
-        index.relists.delete(path)
-        void relist(sessionId, index, path)
-      }, RELIST_DELAY_MS),
-    )
+    index.dirty.add(path)
+    armRelist(sessionId, index)
   }
 
   const syncWatches = (sessionId: SessionId, index: SessionIndex): void => {
@@ -346,7 +393,9 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
       generation: 0,
       listeners: new Set(),
       watches: new Map(),
-      relists: new Map(),
+      dirty: new Set(),
+      relistTimer: null,
+      relisting: false,
       idleTimer: null,
       releaseTimer: null,
     }
