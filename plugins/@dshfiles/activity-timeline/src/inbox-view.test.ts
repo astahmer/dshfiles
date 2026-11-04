@@ -43,6 +43,8 @@ describe('inbox view', () => {
 
   it('names known sources in words and keeps unknown ids', () => {
     expect(InboxView.sourceLabel('agent-questions.child-question')).toBe('Subagent question')
+    expect(InboxView.sourceLabel('jj-integration.ready-to-land')).toBe('Ready to land')
+    expect(InboxView.sourceLabel('hmr-gate.deferred-update')).toBe('Restart needed')
     expect(InboxView.sourceLabel('custom.source')).toBe('custom.source')
   })
 })

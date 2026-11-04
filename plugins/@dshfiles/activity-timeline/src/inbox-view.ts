@@ -4,6 +4,13 @@ import type { AttentionItem, AttentionSeverity, AttentionView } from './attentio
 const SOURCE_LABELS = new Map([
   ['agent-questions.child-question', 'Subagent question'],
   ['thread-sidebar.finished-turn', 'Thread turns'],
+  ['agent-questions.native-question', 'Thread question'],
+  ['jj-integration.land-blocked', 'Land blocked'],
+  ['jj-integration.ready-to-land', 'Ready to land'],
+  ['ai-accounts.quota-continuation', 'Usage limit'],
+  ['traces.alert-firing', 'Alert'],
+  ['backlog.attention', 'Backlog'],
+  ['hmr-gate.deferred-update', 'Restart needed'],
 ])
 
 const sourceLabel = (source: string): string => SOURCE_LABELS.get(source) ?? source
