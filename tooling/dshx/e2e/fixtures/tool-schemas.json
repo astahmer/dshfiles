@@ -33,7 +33,6 @@
     "@dshfiles/plugin-marketplace",
     "@dshfiles/policies",
     "@dshfiles/preview",
-    "@dshfiles/privacy-controls",
     "@dshfiles/project-checks",
     "@dshfiles/prompt-stash",
     "@dshfiles/pulls-review",
