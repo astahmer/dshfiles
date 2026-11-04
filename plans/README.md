@@ -45,6 +45,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [~/dev cleanup](dev-cleanup-audit.md)                          | 23 workspaces and repositories awaiting a keep/archive/remove decision.                                                                                                                                     |
 | [Performance optimization](performance-optimization/README.md) | Remaining client, Host and tooling work packages from the repository-wide audit, then full representative before/after acceptance.                                                                          |
 | [Lint cleanup](lint-cleanup/README.md)                         | Remove the ratcheted lint baseline with real fixes and lower each cap as a rule empties.                                                                                                                    |
+| [Effect-native follow-ups](effect-native-follow-ups/README.md) | Leftovers of the Effect migration branch: fff-search on Linux, session-search index store, memory bench, core-owned HAR requests, batched `jj:` lookups, a fresh HAR.                                       |
 
 ## Open follow-ups
 
