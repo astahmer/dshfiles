@@ -70,12 +70,10 @@ const resolveChatReference = <
 
 /**
  * Hovering a reference asks the overlay for a graph; leaving it takes the request back. Both travel as window events
- * because the reference is a native `<code>` node this plugin decorated, not a React element it owns.
+ * because Chat renders the chip inside its own message tree and one overlay serves every message.
  */
 export const chatReferencePreviewEvent = 'dshfiles:jujutsu-reference-preview'
 export const chatReferencePreviewDismissEvent = 'dshfiles:jujutsu-reference-preview-dismiss'
-export const chatReferenceTitleRequestEvent = 'dshfiles:jujutsu-reference-title-request'
-export const chatReferenceTitleResolvedEvent = 'dshfiles:jujutsu-reference-title-resolved'
 
 const sessionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
 const referenceIdentitySchema = Schema.Struct({
@@ -96,21 +94,7 @@ export const chatReferencePreviewRequestSchema = Schema.Struct({
   }),
 })
 
-export const chatReferenceTitleRequestSchema = Schema.Struct({
-  sessionId: sessionIdSchema,
-  cwd: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
-  reference: referenceIdentitySchema,
-})
-
-export const chatReferenceTitleResolvedSchema = Schema.Struct({
-  ...chatReferenceTitleRequestSchema.fields,
-  title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
-  targetPath: Schema.optionalKey(Schema.NullOr(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)))),
-})
-
 export type ChatReferencePreviewRequest = Schema.Schema.Type<typeof chatReferencePreviewRequestSchema>
-export type ChatReferenceTitleRequest = Schema.Schema.Type<typeof chatReferenceTitleRequestSchema>
-export type ChatReferenceTitleResolved = Schema.Schema.Type<typeof chatReferenceTitleResolvedSchema>
 
 const CHAT_REFERENCE_TITLE_LIMIT = 52
 

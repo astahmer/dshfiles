@@ -9,7 +9,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { Changes, defineClient, useApi } from '@dshfiles/dshx/client'
+import { InlineReferences } from '@dshfiles/chat/inline-references'
+import { Changes, createApiClient, defineClient, useApi } from '@dshfiles/dshx/client'
 // Type-only: `ctx.rightPanel`, the frame's right-column seat.
 import type {} from '@dshfiles/frame-layout/regions'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
@@ -18,7 +19,10 @@ import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/workspace
 import { workbenchPanels, NativeAsideOwners, type WorkbenchPanelProps } from '@dshfiles/workbench/registry'
 import * as Schema from 'effect/Schema'
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
+import { jujutsuApi } from './api.js'
+import { ChatReferenceLinks } from './chat-reference-links.js'
 import { ChatReferenceOverlay } from './chat-reference-overlay.js'
+import { ChatReferenceTitleStore } from './chat-reference-titles.js'
 import { sessionProjectPath } from './session-project-path.js'
 import { JujutsuPanel } from './client.js'
 import { ComposerChangesBar, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
@@ -46,6 +50,14 @@ export default defineClient({
   // The panel calls useApi, so the entry must be decorated: a raw component
   // renders outside the API context and its useApi throws while rendering.
   setup(ctx, decorate, metadata) {
+    const jujutsu = createApiClient(ctx, jujutsuApi)
+    ChatReferenceLinks.setTitles(
+      new ChatReferenceTitleStore({
+        load: input => jujutsu.referenceTitles({ paths: input.paths, references: input.references }),
+        projectPathForSession: sessionId => sessionProjectPath(sessionId, ctx.sessions.list.getSnapshot().byId, ctx.workspaces.list.getSnapshot().items),
+      }),
+    )
+    metadata?.plugin?.add(InlineReferences, ChatReferenceLinks.reference)
     const directoryPicker: DirectoryPickerPort = {
       pick: () => ctx.uiWorkspace.pickDirectory(),
       list: (path, signal) => ctx.uiWorkspace.listDirectory(path, signal),
@@ -255,7 +267,7 @@ export default defineClient({
       )
       return <ChatReferenceOverlay projectPathForSession={sessionId => sessionProjectPath(sessionId, sessionsById, workspaces)} />
     }
-    // One overlay serves every message: a chat reference is a native `<code>` node, so the request arrives as an event.
+    // One overlay serves every message: a chat reference is a chip Chat renders, so the request arrives as an event.
     ctx.slots.inject('shell.overlay', () =>
       ctx.slots.register(
         { name: 'shell.overlay', id: 'dshfiles-jujutsu-reference-preview', order: 60 },

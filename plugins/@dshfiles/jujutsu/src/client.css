@@ -1,7 +1,8 @@
 @source './';
 @source '../../workspace-folder-picker/src/picker';
 
-code[data-dshfiles-jj-reference-owner] {
+/* Chat renders a reference chip as the whole content of its inline code; the code box itself steps back. */
+code:has(> [data-dshfiles-jj-reference]) {
   background-color: transparent;
   border-radius: 0;
   color: inherit;
@@ -21,15 +22,6 @@ code[data-dshfiles-jj-reference-owner] {
   overflow-wrap: anywhere;
   text-align: inherit;
   white-space: inherit;
-}
-
-[data-dshfiles-jj-reference-label] {
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: bottom;
-  white-space: nowrap;
 }
 
 [data-dshfiles-jj-reference]:focus-visible {

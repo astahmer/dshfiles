@@ -232,6 +232,41 @@ const make = Effect.gen(function* () {
     return yield* ReferenceGraphModel.read({ run: repositories.run(repo), reference: input.reference })
   })
 
+  /**
+   * Titles for every chat reference one render pass shows, in one Host request. Each repository path is tried in order
+   * (the thread's project, then its working directory); a reference resolved in one path is not read again.
+   */
+  const referenceTitles = Effect.fn('jujutsu reference titles')(function* (input: {
+    readonly paths: readonly string[]
+    readonly references: readonly { readonly value: string; readonly kind: 'revision' | 'bookmark' }[]
+  }) {
+    const keyOf = (reference: { readonly value: string; readonly kind: string }): string => `${reference.kind}\u0000${reference.value}`
+    const pending = new Map(input.references.map(reference => [keyOf(reference), reference]))
+    const found = new Map<string, { readonly title: string; readonly root: string }>()
+    for (const path of new Set(input.paths)) {
+      if (pending.size === 0) break
+      const repo = yield* repositories.register(path).pipe(Effect.option)
+      if (repo._tag === 'None') continue
+      const run = repositories.run(repo.value)
+      const reads = yield* Effect.forEach(
+        [...pending.values()],
+        reference => ReferenceGraphModel.readTitle({ run, reference: reference.value }).pipe(Effect.map(title => ({ reference, title }))),
+        { concurrency: 4 },
+      )
+      for (const { reference, title } of reads) {
+        if (title === undefined) continue
+        found.set(keyOf(reference), { title: title.description.length === 0 ? reference.value : title.description, root: repo.value.root })
+        pending.delete(keyOf(reference))
+      }
+    }
+    return {
+      titles: input.references.map(reference => {
+        const match = found.get(keyOf(reference))
+        return { value: reference.value, kind: reference.kind, title: match?.title ?? null, root: match?.root ?? null }
+      }),
+    }
+  })
+
   const details = Effect.fn('jujutsu revision details')(function* (input: { readonly repoId: string; readonly commitId: string }) {
     return yield* RevisionReads.details(repositories.run(yield* repositories.resolve(input.repoId)), input.commitId)
   })
@@ -260,6 +295,7 @@ const make = Effect.gen(function* () {
     relationship,
     slice,
     referenceGraph,
+    referenceTitles,
     details,
     fileStats,
     editTimes,

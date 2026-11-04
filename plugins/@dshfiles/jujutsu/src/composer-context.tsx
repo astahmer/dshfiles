@@ -26,7 +26,7 @@ import { composerContextApi, type ComposerBase, type ComposerRepository } from '
 import type { FileStatus } from './api.js'
 import { ComposerContextModel, composerBaseFromSetting, composerBaseSetting } from './composer-context-core.js'
 import { composerSessionCwd } from './composer-context-session.js'
-import { installChatReferenceLinks } from './chat-reference-links.js'
+import { ChatReferenceLinks } from './chat-reference-links.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { decodePreferences } from './preferences.js'
 import { jujutsuSettings } from './settings.js'
@@ -459,11 +459,10 @@ export const ConversationHeaderToggle = (props: ComposerSlotProps & { readonly i
     if (!preferences.chatReferenceLinks || context.cwd === null) return
     const cwd = context.cwd
     const behavior = preferences.chatReferenceClickBehavior
-    return installChatReferenceLinks({
-      sessionId: props.sessionId,
+    return ChatReferenceLinks.attach(props.sessionId, {
       cwd,
       bookmarks,
-      onOpen: (reference, targetPath) => props.jujutsu.openJujutsuReference(targetPath ?? cwd, { ...reference, behavior }),
+      onOpen: (reference, targetPath) => props.jujutsu.openJujutsuReference(targetPath, { ...reference, behavior }),
     })
   }, [bookmarks, context.cwd, preferences.chatReferenceClickBehavior, preferences.chatReferenceLinks, props.jujutsu, props.sessionId])
   if (repository === null) return null

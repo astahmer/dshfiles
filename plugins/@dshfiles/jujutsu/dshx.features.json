@@ -513,7 +513,7 @@
     {
       "id": "chat-references",
       "title": "Open Jujutsu references from a chat message",
-      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity \u2014 a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name \u2014 hovering it previews a bounded revision graph around it \u2014 its neighbourhood plus the working copy, main, main@origin and the default workspace, with separate Commit ID and Change ID labels \u2014 and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the referenced revision's first-line description in the native session-reference chip style with its icon, truncated when long; the accessible label and hover tooltip retain the full title and reference. Visible links resolve titles lazily and fall back to the bare reference if a title is unavailable.",
+      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity \u2014 a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name \u2014 hovering it previews a bounded revision graph around it \u2014 its neighbourhood plus the working copy, main, main@origin and the default workspace, with separate Commit ID and Change ID labels \u2014 and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the referenced revision's first-line description in the native session-reference chip style with its icon, truncated when long; the accessible label and hover tooltip retain the full title and reference. Chat renders the links through its inline-reference registry; the titles of every chip a render pass mounts arrive in one batched Host request (`referenceTitles`, also the `jj_reference_titles` tool), and a link falls back to the bare reference if a title is unavailable.",
       "reach": [
         "seed chat-reference-thread",
         "hover link \"Jujutsu bookmark: Sample project (main)\"",
@@ -535,7 +535,7 @@
         "expect text \"Commit ID:*\"",
         "expect text \"Change ID:*\""
       ],
-      "surfaces": ["client", "settings"],
+      "surfaces": ["client", "settings", "tool"],
       "surface": "entityProvider",
       "destination": "land",
       "currentSurface": "transcript: jj: reference links",
@@ -588,27 +588,38 @@
         {
           "kind": "unit-test",
           "id": "jujutsu.chat-reference-links",
-          "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.ts",
+          "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.tsx",
           "testName": "navigates with the reference on click and on Enter, and ignores other clicks"
         },
         {
           "kind": "unit-test",
           "id": "jujutsu.chat-reference-title",
-          "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.ts",
+          "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.tsx",
           "testName": "uses the native reference chip and keeps the full accessible title"
         },
         {
           "kind": "unit-test",
           "id": "jujutsu.chat-reference-display",
-          "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.ts",
-          "testName": "re-strips a prefix React rewrites and stops linking a token that changed"
+          "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.tsx",
+          "testName": "links only explicit revision and bookmark tokens while the title is pending"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.chat-reference-title-batch",
+          "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.tsx",
+          "testName": "asks for every visible title in one Host request per render pass"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.chat-reference-title-read",
+          "file": "plugins/@dshfiles/jujutsu/src/reference-graph.test.ts",
+          "testName": "reads a chat title with one quoted jj log, and answers nothing for a reference it cannot resolve"
         }
       ],
       "telemetry": [
-        {
-          "kind": "not-applicable",
-          "reason": "Client-only: Open Jujutsu references from a chat message renders browser state and starts no Host work of its own."
-        }
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        { "kind": "automatic", "source": "jj" }
       ]
     },
     {

@@ -208,9 +208,36 @@ const readReferenceGraph = Effect.fnUntraced(function* (input: { readonly run: J
   return graphAround
 })
 
+/**
+ * The first-line description a chat chip shows for one reference, or undefined when this repository cannot resolve it
+ * (unknown, ambiguous or not a symbol). One `jj log` per reference: a single combined revset would fail as a whole on
+ * the first ambiguous prefix.
+ */
+const readReferenceTitle = (input: { readonly run: JjRun; readonly reference: string }) =>
+  Effect.gen(function* () {
+    const reference = Schema.decodeUnknownOption(referenceSchema)(input.reference)
+    if (reference._tag === 'None') return undefined
+    const result = yield* input.run([
+      '--ignore-working-copy',
+      '--no-pager',
+      '--color=never',
+      'log',
+      '--no-graph',
+      '--limit',
+      '1',
+      '-r',
+      JSON.stringify(reference.value),
+      '-T',
+      'separate("\\n", commit_id, description.first_line().substr(0, 255))',
+    ])
+    const [commitId, ...description] = result.stdout.trimEnd().split('\n')
+    return commitId !== undefined && isCommitId(commitId) ? { description: description.join('\n').trim() } : undefined
+  }).pipe(Effect.catch(() => Effect.succeed(undefined)))
+
 export class ReferenceGraphModel {
   static readonly collapseHidden = collapseHidden
   static readonly revset = revset
   static readonly template = template
   static readonly read = readReferenceGraph
+  static readonly readTitle = readReferenceTitle
 }

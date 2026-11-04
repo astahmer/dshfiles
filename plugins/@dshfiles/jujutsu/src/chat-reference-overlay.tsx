@@ -1,47 +1,28 @@
-import { ReferenceChip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { Popover, PopoverAnchor, PopoverContent, PopoverHeader, PopoverTitle } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { jujutsuApi } from './api.js'
 import { ChatReferenceModel, chatReferenceQueryKeys } from './chat-reference.js'
+import { ChatReferenceLinks } from './chat-reference-links.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { ReferenceGraphView } from './reference-graph-view.js'
-import {
-  chatReferencePreviewDismissEvent,
-  chatReferencePreviewEvent,
-  chatReferencePreviewRequestSchema,
-  chatReferenceTitleRequestEvent,
-  chatReferenceTitleRequestSchema,
-  chatReferenceTitleResolvedEvent,
-  type ChatReferencePreviewRequest,
-  type ChatReferenceTitleRequest,
-} from './chat-reference.js'
+import { chatReferencePreviewDismissEvent, chatReferencePreviewEvent, chatReferencePreviewRequestSchema, type ChatReferencePreviewRequest } from './chat-reference.js'
 
 /** Moving the pointer from a reference into the card must not close it, so leaving waits out a short grace. */
 const CLOSE_GRACE_MS = 140
 
-const titleRequestKey = (request: ChatReferenceTitleRequest): string =>
-  `${request.sessionId}\u0000${request.cwd}\u0000${request.reference.kind}\u0000${request.reference.value}`
-
 /**
- * The hidden template chip keeps the native chip's markup; the native component names its label through `title`, so it
- * travels as typed props rather than a native title attribute.
- */
-const referenceTemplateProps: ComponentProps<typeof ReferenceChip> = { appearance: 'session', label: 'Jujutsu reference', title: 'Jujutsu reference' }
-
-/**
- * The revision-graph preview for a `jj:` reference in chat. A native session-reference chip lives inside its code node;
- * the request arrives as a window event carrying the chip's anchor, so one overlay serves every message.
+ * The revision-graph preview for a `jj:` reference in chat. Chat renders the chips through its inline-reference
+ * registry; a hover arrives as a window event carrying the chip's anchor, so one overlay serves every message.
  */
 export const ChatReferenceOverlay = (props: { readonly projectPathForSession: (sessionId: string) => string | undefined }): JSX.Element => {
   const api = useApi(jujutsuApi)
   const jjIntegration = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
   const [request, setRequest] = useState<ChatReferencePreviewRequest | null>(null)
-  const [titleRequests, setTitleRequests] = useState<ChatReferenceTitleRequest[]>([])
   const closeTimer = useRef<number | undefined>(undefined)
   const cancelClose = useCallback((): void => {
     if (closeTimer.current === undefined) return
@@ -64,36 +45,26 @@ export const ChatReferenceOverlay = (props: { readonly projectPathForSession: (s
       cancelClose()
       setRequest(parsed.data)
     }
-    const queueTitle = (event: Event): void => {
-      if (!(event instanceof CustomEvent)) return
-      const parsed = SchemaHelpers.decodeSafe(chatReferenceTitleRequestSchema, event.detail)
-      if (!parsed.success) return
-      setTitleRequests(current => (current.some(request => titleRequestKey(request) === titleRequestKey(parsed.data)) ? current : [...current, parsed.data]))
-    }
     const closeOnScroll = (event: Event): void => {
       if (event.target instanceof Element && event.target.closest('[data-dshfiles-jj-preview]') !== null) return
       setRequest(null)
     }
     const close = (): void => setRequest(null)
     window.addEventListener(chatReferencePreviewEvent, open)
-    window.addEventListener(chatReferenceTitleRequestEvent, queueTitle)
     window.addEventListener(chatReferencePreviewDismissEvent, dismiss)
     window.addEventListener('scroll', closeOnScroll, true)
     window.addEventListener('resize', close)
     return () => {
       if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current)
       window.removeEventListener(chatReferencePreviewEvent, open)
-      window.removeEventListener(chatReferenceTitleRequestEvent, queueTitle)
       window.removeEventListener(chatReferencePreviewDismissEvent, dismiss)
       window.removeEventListener('scroll', closeOnScroll, true)
       window.removeEventListener('resize', close)
     }
   }, [cancelClose, dismiss])
 
-  const titleRequest = titleRequests.at(0) ?? null
   const referenced = request?.reference.value
   const projectPath = request === null ? undefined : props.projectPathForSession(request.sessionId)
-  const titleProjectPath = titleRequest === null ? undefined : props.projectPathForSession(titleRequest.sessionId)
   const readLocalReference = async (cwd: string, reference: string, signal: AbortSignal) => {
     try {
       const repository = await queryClient.fetchQuery({
@@ -162,53 +133,15 @@ export const ChatReferenceOverlay = (props: { readonly projectPathForSession: (s
     staleTime: 30_000,
     queryFn: ({ signal }) => resolveReference(request?.cwd ?? '', projectPath, referenced ?? '', signal),
   })
-  const titleGraph = useQuery({
-    queryKey: chatReferenceQueryKeys.localTitle(titleRequest?.cwd ?? '', titleRequest?.reference.value ?? '', titleProjectPath),
-    enabled: titleRequest !== null,
-    retry: false,
-    staleTime: 30_000,
-    queryFn: async ({ signal }) => {
-      if (titleRequest === null) return null
-      const projectPath = props.projectPathForSession(titleRequest.sessionId)
-      if (projectPath !== undefined) {
-        const preferred = await readLocalReference(projectPath, titleRequest.reference.value, signal)
-        if (preferred !== null) return preferred
-      }
-      return readLocalReference(titleRequest.cwd, titleRequest.reference.value, signal)
-    },
-  })
-
-  useEffect(() => {
-    if (titleRequest === null || titleGraph.isFetching || (!titleGraph.isSuccess && !titleGraph.isError)) return
-    const match = titleGraph.data ?? null
-    window.dispatchEvent(
-      new CustomEvent(chatReferenceTitleResolvedEvent, {
-        detail: {
-          ...titleRequest,
-          title: match?.graph.description?.trim() || titleRequest.reference.value,
-          targetPath: match?.repository.root ?? null,
-        },
-      }),
-    )
-    const completedKey = titleRequestKey(titleRequest)
-    setTitleRequests(current => (current[0] !== undefined && titleRequestKey(current[0]) === completedKey ? current.slice(1) : current))
-  }, [titleGraph.data, titleGraph.isError, titleGraph.isFetching, titleGraph.isSuccess, titleRequest])
-
   useEffect(() => {
     if (request === null || graph.isFetching || !graph.isSuccess) return
     const match = ChatReferenceModel.uniqueMatch(graph.data ?? [])
     if (match === undefined) return
-    window.dispatchEvent(
-      new CustomEvent(chatReferenceTitleResolvedEvent, {
-        detail: {
-          sessionId: request.sessionId,
-          cwd: request.cwd,
-          reference: request.reference,
-          title: match.graph.description?.trim() || request.reference.value,
-          targetPath: match.repository.root,
-        },
-      }),
-    )
+    // The preview searched every registered repository, so it can settle a chip the thread's own repository could not.
+    ChatReferenceLinks.titles()?.record(request.sessionId, request.cwd, request.reference, {
+      title: match.graph.description?.trim() || request.reference.value,
+      targetPath: match.repository.root,
+    })
   }, [graph.data, graph.isFetching, graph.isSuccess, request])
 
   const matches = graph.data ?? []
@@ -217,9 +150,6 @@ export const ChatReferenceOverlay = (props: { readonly projectPathForSession: (s
   const rendered = referenceGraph?.graph
   return (
     <TooltipProvider delayDuration={0}>
-      <span aria-hidden="true" data-composer-card data-dshfiles-jj-reference-template hidden>
-        <ReferenceChip {...referenceTemplateProps} />
-      </span>
       {request === null ? null : (
         <Popover open onOpenChange={open => !open && setRequest(null)}>
           <PopoverAnchor asChild>

@@ -118,4 +118,23 @@ describe('reference graph', () => {
       expect(error.message).toMatch(/bounded output limit/u)
     }),
   )
+
+  it.effect('reads a chat title with one quoted jj log, and answers nothing for a reference it cannot resolve', () =>
+    Effect.gen(function* () {
+      const calls: (readonly string[])[] = []
+      const run: JjRun = args =>
+        Effect.suspend(() => {
+          calls.push(args)
+          if (args.includes('"missing"')) return Effect.fail(new Error('Revision "missing" doesn\'t exist') as never)
+          return Effect.succeed({ stdout: `${COMMIT}\nBase fixture\n`, truncated: false })
+        })
+      expect(yield* ReferenceGraphModel.readTitle({ run, reference: 'main' })).toEqual({ description: 'Base fixture' })
+      expect(calls[0]).toContain('"main"')
+      expect(calls[0]).toContain('--ignore-working-copy')
+      expect(yield* ReferenceGraphModel.readTitle({ run, reference: 'missing' })).toBeUndefined()
+      // Revset syntax is not a symbol: refused before any jj read.
+      expect(yield* ReferenceGraphModel.readTitle({ run, reference: 'main | all()' })).toBeUndefined()
+      expect(calls).toHaveLength(2)
+    }),
+  )
 })

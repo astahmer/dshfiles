@@ -1861,6 +1861,201 @@
         "toolOutput": {}
       },
       {
+        "name": "referenceTitles",
+        "description": "Titles for up to 100 chat references (revisions or bookmarks) in one call: each path is tried in order and the first repository that resolves a reference names its first-line description and root. Read-only.",
+        "tool": {
+          "name": "jj_reference_titles",
+          "readOnly": true
+        },
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "minItems": 1,
+              "maxItems": 3
+            },
+            "references": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "revision",
+                      "bookmark"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "kind"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 100
+            }
+          },
+          "required": [
+            "paths",
+            "references"
+          ],
+          "additionalProperties": false
+        },
+        "output": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "titles": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "revision",
+                      "bookmark"
+                    ]
+                  },
+                  "title": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 255
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "root": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "kind",
+                  "title",
+                  "root"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 100
+            }
+          },
+          "required": [
+            "titles"
+          ],
+          "additionalProperties": false
+        },
+        "toolInput": {
+          "type": "object",
+          "properties": {
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "references": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "revision",
+                      "bookmark"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "kind"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "paths",
+            "references"
+          ],
+          "additionalProperties": false
+        },
+        "toolOutput": {
+          "type": "object",
+          "properties": {
+            "titles": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "revision",
+                      "bookmark"
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "root": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "value",
+                  "kind",
+                  "title",
+                  "root"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "titles"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
         "name": "details",
         "description": "One revision: its description, files, patch and evolution log. Read-only.",
         "tool": {

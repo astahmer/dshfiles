@@ -3284,7 +3284,7 @@ importers:
         version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
-        version: 0.2.1-rc.2(c37fa28e03c2b0c560c091c51f7f1895)
+        version: 0.2.1-rc.2(ec9f2e253bae51acb4a788c4c3c4bea0)
       '@deepseek-ai/dsh-api-session-controller':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(7bf81b8172900f64a30ef0a9a087b68b)
@@ -3339,12 +3339,18 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 18.3.7(@types/react@18.3.31)
       jsdom:
         specifier: 'catalog:'
         version: 26.1.0
       react:
         specifier: 'catalog:'
         version: 18.3.1
+      react-dom:
+        specifier: 'catalog:'
+        version: 18.3.1(react@18.3.1)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

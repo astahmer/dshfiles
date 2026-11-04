@@ -200,6 +200,11 @@ export const graphPageOutputSchema = Schema.Struct({
   hasMore: Schema.Boolean,
 })
 
+const chatReferenceIdentitySchema = Schema.Struct({
+  value: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
+  kind: Schema.Literals(['revision', 'bookmark']),
+})
+
 const referenceGraphSchema = Schema.Struct({
   label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
   commitId: Schema.NullOr(commitIdSchema),
@@ -341,6 +346,26 @@ export const jujutsuApi = defineApi({
         readOnly: true,
         render: output => ('graph' in output ? `${output.label}\n${output.graph}` : readFailureText(output)),
       },
+    }),
+    referenceTitles: method({
+      input: Schema.Struct({
+        paths: Schema.Array(repoPathSchema).check(Schema.isMinLength(1), Schema.isMaxLength(3)),
+        references: Schema.Array(chatReferenceIdentitySchema).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+      }),
+      output: Schema.Struct({
+        titles: Schema.Array(
+          Schema.Struct({
+            ...chatReferenceIdentitySchema.fields,
+            /** First-line description, or the reference itself for an undescribed revision; null when no path resolves it. */
+            title: Schema.NullOr(Schema.String.check(Schema.isMaxLength(255))),
+            /** Root of the first repository that resolved it. */
+            root: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2048))),
+          }),
+        ).check(Schema.isMaxLength(100)),
+      }),
+      description:
+        'Titles for up to 100 chat references (revisions or bookmarks) in one call: each path is tried in order and the first repository that resolves a reference names its first-line description and root. Read-only.',
+      tool: { name: 'jj_reference_titles', readOnly: true, render: compactJson },
     }),
     details: method({
       input: Schema.Struct({ repoId: repoIdSchema, commitId: revisionRefSchema }),
