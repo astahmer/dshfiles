@@ -40,6 +40,33 @@ export class ThreadUrlModel {
     return url.toString()
   }
 }
+/**
+ * The `?thread=` route the page was loaded with, offered until one thread list resolves it. The thread list unmounts
+ * while the rail shows another destination and the URL then keeps the thread it last wrote, so a remount must not read
+ * that stale URL as a request to navigate: it would pull the stage away from a thread opened meanwhile (New thread on
+ * the Settings destination). Back and Forward still route through `popstate`.
+ */
+export class PageLoadThreadRoute {
+  private settled = false
+
+  /** The page-load route while unresolved; null once a list resolved it or the page had none. */
+  readonly pending = (currentUrl: string): string | null => {
+    if (this.settled) return null
+    const sessionId = ThreadUrlModel.readThreadUrl(currentUrl)?.sessionId ?? null
+    // A page loaded without a route has nothing to resolve: a URL written later by the list is never a request.
+    if (sessionId === null) this.settled = true
+    return sessionId
+  }
+
+  /** Called once the route was opened, found already selected, reported missing or overtaken by a user selection. */
+  readonly settle = (): void => {
+    this.settled = true
+  }
+}
+
+/** One per page: each plugin bundle loads this module once. */
+export const pageLoadThreadRoute = new PageLoadThreadRoute()
+
 export const buildThreadUrl = ThreadUrlModel.buildThreadUrl
 export const clearThreadUrl = ThreadUrlModel.clearThreadUrl
 export const readThreadUrl = ThreadUrlModel.readThreadUrl

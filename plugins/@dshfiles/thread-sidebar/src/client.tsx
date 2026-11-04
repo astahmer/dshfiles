@@ -156,7 +156,7 @@ import { UsageLimitRowsModel, type QuotaContinuation, type UsageLimitRow } from 
 import { usageLimitRefetchInterval } from './usage-limit-poll.js'
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
-import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
+import { buildThreadUrl, clearThreadUrl, pageLoadThreadRoute, readThreadUrl } from './thread-url.js'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import {
   EMPTY_THREAD_SELECTION,
@@ -1657,8 +1657,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (notice === null) return
     return scheduleSuccessNoticeDismissal(notice, updateNotice)
   }, [notice, updateNotice])
+  // Only the page-load route: a list remounted by the rail must not treat the URL it last wrote as a navigation.
   const [routeRequest, setRouteRequest] = useState<string | null>(() =>
-    typeof window === 'undefined' ? null : (readThreadUrl(window.location.href)?.sessionId ?? null),
+    typeof window === 'undefined' || !isPrimarySurface ? null : pageLoadThreadRoute.pending(window.location.href),
   )
   const previousStatus = useRef<Readonly<Record<string, ThreadInteractionStatus>> | null>(null)
   const openedRouteId = useRef<string | null>(null)
@@ -2151,6 +2152,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const opened = attention.records.get(sessionId)
     if (opened !== undefined) attention.clearUnread(sessionId, opened.version)
     setRouteRequest(null)
+    if (isPrimarySurface) pageLoadThreadRoute.settle()
     openedRouteId.current = sessionId
     suppressUrlForSession.current = null
     const session = sessionState.byId[sessionId]
@@ -2196,6 +2198,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   useEffect(() => {
     if (!isPrimarySurface || routeRequest === null || sessionState.phase !== 'ready') return
+    pageLoadThreadRoute.settle()
     const target = sessions.find(session => session.id === routeRequest)
     if (target === undefined) {
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarLinkNotFound') })
