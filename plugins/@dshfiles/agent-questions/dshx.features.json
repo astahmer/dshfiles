@@ -445,6 +445,70 @@
           "source": "api-dispatch"
         }
       ]
+    },
+    {
+      "id": "native-questions-inbox",
+      "title": "Thread questions in the Inbox",
+      "summary": "Every native ask_user_question form waiting in a live root thread is a blocking Inbox item about that thread. A continued form with one single-select question is answerable in place with its options, through the same native answer API as answer_thread_question; any other form says to answer it in the thread. The item resolves when the form settles or its thread stops.",
+      "reach": [
+        "click button \"Inbox\"",
+        "expect heading \"Inbox\""
+      ],
+      "surfaces": [
+        "host",
+        "integration"
+      ],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "left-nav: Inbox › agent-questions.native-question",
+      "configuration": [],
+      "states": [
+        "open",
+        "continued-answerable",
+        "continued-in-thread",
+        "answered-from-inbox",
+        "answered-elsewhere",
+        "thread-stopped",
+        "inbox-absent"
+      ],
+      "failureModes": [
+        "Only forms the native question projection tracks are listed: it records forms whose tool schema is the timed one, so a legacy-schema form stays out of the inbox (the same coverage as list_thread_questions).",
+        "A form still open on the native answerer waterfall is refused in place and answered in its thread; the native answer API takes continued forms only.",
+        "Without the inbox (activity-timeline) loaded, questions work exactly as before; the provider reconciles when the inbox announces it is ready.",
+        "The native question fork (@dshfiles/user-questions) keeps its upstream no-op Host half; agent-questions already reads the forms Host-side, so it owns this provider."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/activity-timeline",
+          "boundary": "attention-api module: reconcile through the dshx Host API client and the dshfiles/attention/act serial event.",
+          "deterministicFake": "src/native-question-attention.test.ts serves the attention contract from a fake inbox Host on a real Cordis test Host, with fake native question facts and answer API."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agent-questions.native-inbox-drafts",
+          "file": "plugins/@dshfiles/agent-questions/src/native-question-attention.test.ts",
+          "testName": "states a continued single-select form as answerable in place, and other forms as answer-in-thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-questions.native-inbox-answer",
+          "file": "plugins/@dshfiles/agent-questions/src/native-question-attention.test.ts",
+          "testName": "states pending forms of live threads, answers one in place through the native answer API, and resolves it"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agent-questions.native-inbox-browser-journey",
+          "reason": "The reach needs a model tool call to ask_user_question from the fake provider; in the 2026-11-04 scratch DSH tool calls failed inside the core tool scheduler, so the provider round trip is proven on a real Cordis Host in native-question-attention.test.ts instead."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     }
   ],
   "kind": "bundle"

@@ -7,6 +7,7 @@ import { AgentDirectory, NativeQuestions, QuestionFactsLive } from './agent-host
 import { ChildQuestionAttention } from './attention-provider.js'
 import { DeferredQuestionFiles } from './deferred-question-files.js'
 import { MarkdownDocuments } from './markdown-documents.js'
+import { NativeQuestionAttention } from './native-question-attention.js'
 import { ParentFeedback } from './parent-feedback.js'
 import { ParentQuestions } from './parent-questions.js'
 import { QuestionScan } from './question-scan.js'
@@ -24,7 +25,7 @@ const HostEdgeLive = Layer.mergeAll(
   QuestionStore.layer.pipe(Layer.provide(StorageDomain.layer)),
 )
 
-const AgentQuestionsLive = ChildQuestionAttention.layer.pipe(
+const AgentQuestionsLive = Layer.merge(ChildQuestionAttention.layer, NativeQuestionAttention.layer).pipe(
   Layer.provideMerge(Layer.mergeAll(ParentQuestions.layer, ParentFeedback.layer, QuestionScan.layer)),
   Layer.provideMerge(Layer.mergeAll(WorkspaceFilesLive, HostEdgeLive, HostApis.layer)),
 )
