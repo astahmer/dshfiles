@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-358 features from 88 plugins.
+364 features from 88 plugins.
 
 ## Counts
 
@@ -20,10 +20,10 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Observe |  |  |  |  | 18 |  |  |  | 2 |  |  |  |  | 20 |
 | Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  | 6 |
 | Settings |  |  |  |  |  |  |  |  | 1 | 44 |  |  |  | 45 |
-| Thread panel |  |  |  |  |  |  |  |  |  |  |  | 17 |  | 17 |
+| Thread panel |  |  |  |  |  |  |  |  |  |  |  | 21 |  | 21 |
 | Composer |  |  |  | 46 |  |  |  |  |  |  |  |  |  | 46 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  | 17 | 17 |
-| No place of its own | 17 |  | 15 |  |  |  |  | 91 |  |  | 7 |  |  | 130 |
+| No place of its own | 17 |  | 15 |  |  |  |  | 93 |  |  | 7 |  |  | 132 |
 
 ## By current left-nav entry
 
@@ -70,14 +70,14 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | conversation-view | 2 | Thread panel 2 |
 | dialog | 4 | Agents 1, No place of its own 1, Settings 1, Thread panel 1 |
 | home | 1 | Threads 1 |
-| host | 42 | No place of its own 42 |
+| host | 44 | No place of its own 44 |
 | Host contract | 1 | Inbox 1 |
 | keyboard | 3 | No place of its own 3 |
 | left-nav | 85 | Observe 19, Work 15, Land 13, Inbox 12, Settings 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 10 | No place of its own 7, Thread panel 2, Settings 1 |
 | palette | 11 | No place of its own 11 |
 | plugins-page | 2 | No place of its own 1, Settings 1 |
-| right-pane | 4 | No place of its own 2, Thread panel 2 |
+| right-pane | 7 | Thread panel 5, No place of its own 2 |
 | settings | 26 | Settings 24, No place of its own 2 |
 | shell | 7 | No place of its own 5, Threads 2 |
 | sidebar | 2 | Settings 2 |
@@ -86,7 +86,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | thread-header | 7 | Thread panel 3, Threads 3, No place of its own 1 |
 | thread-list | 21 | Threads 15, Inbox 3, No place of its own 2, Settings 1 |
 | toast | 1 | No place of its own 1 |
-| transcript | 21 | Transcript 17, Inbox 1, Knowledge 1, Land 1, Work 1 |
+| transcript | 22 | Transcript 17, Inbox 1, Knowledge 1, Land 1, Thread panel 1, Work 1 |
 | url | 1 | No place of its own 1 |
 | workbench | 13 | No place of its own 12, Settings 1 |
 
@@ -298,7 +298,7 @@ rail destination (bottom); 45 features.
 
 ### Thread panel
 
-facets of the active thread; 17 features.
+facets of the active thread; 21 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -315,7 +315,11 @@ facets of the active thread; 17 features.
 | project-checks/native-hook-receipts: Show native hook invocation records | threadFacet | composer: Project checks › hook events |
 | pulls-review/ai-scope-summaries: Summarize review scopes with the thread's own model | threadFacet | left-nav: Review › Summarize |
 | pulls-review/batch-reviewed-marks: Mark a selection of changed files reviewed | threadFacet | left-nav: Review › reviewed marks |
+| pulls-review/changes-facet: Review a thread's changes in its Changes facet | threadFacet | right-pane: Changes |
+| pulls-review/diff-line-comments: Comment on diff lines as chips in the next message | threadFacet | right-pane: Changes › diff line selection |
+| pulls-review/land-card: Land a thread from the top of its Changes facet | threadFacet | right-pane: Changes › Land |
 | pulls-review/thread-review-scopes: Review project and workspace changes by scope | threadFacet | left-nav: Review |
+| pulls-review/turn-card-opens-changes: A turn's Edited files card opens Changes on that turn | threadFacet | transcript: Edited N files card |
 | traces/span-cost: List-price cost on traces | threadFacet | conversation-view: Traces tab › cost |
 | traces/thread-traces-tab: Per-thread Traces tab | threadFacet | conversation-view: Traces / Requests tabs |
 | workbench/terminal-pages: Open native terminals from any pane's view chooser | threadFacet | main-tabs: New tab › Terminal: Terminal |
@@ -399,7 +403,7 @@ cards inline in the active thread; 17 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 130 features.
+palette commands, status items, agent tools, infrastructure; 132 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -453,6 +457,7 @@ palette commands, status items, agent tools, infrastructure; 130 features.
 | dialogs/app-dialogs: App dialogs for every plugin | infrastructure | dialog: app confirm, alert and toast primitives |
 | dialogs/app-toasts: App toasts for every plugin | infrastructure | toast: app toast stack |
 | diff-viewed/host-owned-view-state: Retain viewed marks on the Host | infrastructure | host: diff_viewed storage |
+| diff-viewed/revision-range-marks: One viewed-marks store for turns and revision ranges | infrastructure | host: diff_viewed storage |
 | editor/session-screen-contract: Session screen and workspace files for other plugins | infrastructure | client: SessionScreen contract |
 | editor/workspace-file-index: Index workspace files with bounded traversal | infrastructure | host: workspace file index |
 | frame-layout/collapsed-state-persistence: Persist the collapsed sidebar | infrastructure | shell: collapsed sidebar |
@@ -491,6 +496,7 @@ palette commands, status items, agent tools, infrastructure; 130 features.
 | project-folder-picker/keyboard-folder-selection: Select project folders with keyboard navigation | infrastructure | client: library (project picker) |
 | project-folder-picker/registered-project-search: Search projects and browse folder paths | infrastructure | client: library (project picker) |
 | project-folder-picker/unregistered-recent-folders: Offer recent folders not yet registered as projects | infrastructure | client: library (project picker) |
+| pulls-review/review-marks-migration: Move the Review page's marks into the one viewed-marks store | infrastructure | host: pulls-review reviewed record |
 | request-messages/dispatch-request-messages: Dispatch agent/request-messages on stock DSH | infrastructure | host: no UI |
 | rich-composer/composer-contract: Composer contract for other plugins | infrastructure | client: Composer contract |
 | rich-composer/workbench-conversation-views: Dock an independently bound Conversation view | infrastructure | workbench: docked Conversation views |
