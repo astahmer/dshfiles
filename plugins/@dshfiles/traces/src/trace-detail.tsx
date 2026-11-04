@@ -4,7 +4,8 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, ChevronRightIcon, CopyIcon, MessageSquareIcon, ScrollTextIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useMemo, useState } from 'react'
+import { animate, motionSafe, springs } from '@dshfiles/plugin-ui/motion'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { TraceFormat } from './format.js'
 import type { TracesTranslate } from './locales.js'
 import type { OpenThread } from './open-thread.js'
@@ -178,6 +179,21 @@ export const TraceDetailView = (props: {
   const rows = useMemo(() => TraceFormat.visibleRows(trace.spans, collapsed), [trace.spans, collapsed])
   const selected = trace.spans.find(span => span.spanId === selectedId) ?? trace.spans[0]
   const total = Math.max(trace.durationMs, 0.001)
+  // When a trace opens, each bar grows from its start offset in time order, so the waterfall replays the run once.
+  const treeRef = useRef<HTMLOListElement>(null)
+  useLayoutEffect(() => {
+    const bars = Array.from(treeRef.current?.querySelectorAll<HTMLElement>('[data-testid="span-bar"]') ?? [])
+    if (bars.length === 0) return
+    const offsets = bars.map(bar => Number(bar.dataset.offsetFraction ?? 0))
+    const controls = animate(
+      bars,
+      { transform: ['scaleX(0)', 'scaleX(1)'] },
+      motionSafe({ ...springs.smooth, delay: (index: number) => Math.min(0.6, (offsets[index] ?? 0) * 0.6) }),
+    )
+    return () => controls.complete()
+    // Replays per trace, not on collapse or selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trace.traceId])
   const toggle = (spanId: string): void =>
     setCollapsed(current => {
       const next = new Set(current)
@@ -208,7 +224,7 @@ export const TraceDetailView = (props: {
             ))}
           </div>
         </div>
-        <ol className="dshx:flex dshx:flex-col" role="tree" aria-label={props.t('waterfall')}>
+        <ol className="dshx:flex dshx:flex-col" role="tree" aria-label={props.t('waterfall')} ref={treeRef}>
           {rows.map(span => {
             const isCollapsed = collapsed.has(span.spanId)
             const left = (span.offsetMs / total) * 100
@@ -261,8 +277,9 @@ export const TraceDetailView = (props: {
                 <div className="dshx:relative dshx:h-4 dshx:rounded-sm dshx:bg-muted/30">
                   <div
                     data-testid="span-bar"
+                    data-offset-fraction={span.offsetMs / total}
                     className={cn(
-                      'dshx:absolute dshx:top-0.5 dshx:h-3 dshx:min-w-[2px] dshx:rounded-sm',
+                      'dshx:absolute dshx:top-0.5 dshx:h-3 dshx:min-w-[2px] dshx:origin-left dshx:rounded-sm',
                       span.status === 'error' ? 'dshx:bg-destructive' : TraceFormat.serviceTone(span.service),
                     )}
                     style={{ left: `${String(Math.min(left, 99.6))}%`, width: `${String(Math.min(width, 100 - Math.min(left, 99.6)))}%` }}

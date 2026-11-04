@@ -9,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
+import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { EmptyState, Page, PageSection, type PageTabs } from '@dshfiles/plugin-ui/components/page'
@@ -401,10 +402,10 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
       meta={
         <>
           <Badge variant="muted">
-            {value?.runningCount ?? 0} {t('running')}
+            <RollingNumber value={value?.runningCount ?? 0} /> {t('running')}
           </Badge>
           <Badge variant="muted">
-            {value?.finishedCount ?? 0} {t('finished')}
+            <RollingNumber value={value?.finishedCount ?? 0} /> {t('finished')}
           </Badge>
           <Badge variant="muted">
             {value?.indexing.historyRows ?? 0} {t('historyRows')}

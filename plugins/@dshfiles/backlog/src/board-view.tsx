@@ -1,4 +1,5 @@
 import { ArrowLeftIcon, ArrowRightIcon, Columns3Icon, LinkIcon, LoaderCircleIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
+import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
@@ -30,11 +31,12 @@ import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']
 const boardStatusSchema = Schema.Literals(['inbox', 'todo', 'doing', 'done', 'dropped'])
+const noHiddenColumns: readonly BacklogStatus[] = []
 /** The board's own column order and hidden columns, kept in this browser and apart from every other view's settings. */
 const boardColumns = createStoredValue({
   key: 'dshfiles.backlog.board-columns.v1',
   schema: Schema.Struct({ order: Schema.Array(boardStatusSchema), hidden: Schema.Array(boardStatusSchema) }),
-  fallback: { order: [...boardStatuses], hidden: [] as readonly BacklogStatus[] },
+  fallback: { order: [...boardStatuses], hidden: noHiddenColumns },
 })
 const rankIn = (order: readonly BacklogStatus[], status: BacklogStatus): number => {
   const index = order.indexOf(status)
@@ -432,9 +434,10 @@ export const BoardView = (props: {
               <header className="dshx:flex dshx:h-8 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-2">
                 <ItemGlyphs.StatusIcon status={status} />
                 <h3 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{ItemGlyphs.statusLabels[status]}</h3>
-                <span className="dshx:rounded-md dshx:bg-background/70 dshx:px-1.5 dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
-                  {column.length}
-                </span>
+                <RollingNumber
+                  value={column.length}
+                  className="dshx:rounded-md dshx:bg-background/70 dshx:px-1.5 dshx:text-[11px] dshx:text-muted-foreground"
+                />
                 <button
                   type="button"
                   aria-label={`Add to ${ItemGlyphs.statusLabels[status]}`}

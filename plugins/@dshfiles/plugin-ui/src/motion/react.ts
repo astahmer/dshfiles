@@ -144,6 +144,75 @@ export function useElapsed(active: boolean): number {
   return elapsed
 }
 
+/**
+ * A highlight that slides between the items of a tab list or segmented control. Put `ref` on the list (it must be
+ * `position: relative`), render `indicatorRef` as an absolutely positioned element inside it, and mark each item
+ * with `data-indicator-key`. The indicator jumps to the active item on first paint and springs to it afterwards, so
+ * the list keeps its own roles (`tablist`/`tab`) and keyboard behaviour.
+ */
+const activeItem = (list: HTMLElement, key: string): HTMLElement | undefined =>
+  Array.from(list.querySelectorAll<HTMLElement>('[data-indicator-key]')).find(candidate => candidate.dataset.indicatorKey === key)
+
+const placeIndicator = (indicator: HTMLElement, item: HTMLElement): void => {
+  Object.assign(indicator.style, {
+    opacity: '1',
+    left: `${item.offsetLeft}px`,
+    top: `${item.offsetTop}px`,
+    width: `${item.offsetWidth}px`,
+    height: `${item.offsetHeight}px`,
+  })
+}
+
+export interface SlidingIndicator<L extends HTMLElement, I extends HTMLElement> {
+  readonly ref: React.RefObject<L>
+  readonly indicatorRef: React.RefObject<I>
+}
+
+export function useSlidingIndicator<L extends HTMLElement = HTMLDivElement, I extends HTMLElement = HTMLSpanElement>(
+  activeKey: string,
+): SlidingIndicator<L, I> {
+  const ref = React.useRef<L>(null)
+  const indicatorRef = React.useRef<I>(null)
+  const placed = React.useRef(false)
+  const activeRef = React.useRef(activeKey)
+  activeRef.current = activeKey
+  // A resize (pane drag, wrap, font load) moves the items without a key change: re-place without animating.
+  React.useEffect(() => {
+    const list = ref.current
+    if (list == null || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      const indicator = indicatorRef.current
+      const item = activeItem(list, activeRef.current)
+      if (indicator != null && item !== undefined) placeIndicator(indicator, item)
+    })
+    observer.observe(list)
+    return () => observer.disconnect()
+  }, [])
+  React.useLayoutEffect(() => {
+    const list = ref.current
+    const indicator = indicatorRef.current
+    if (list == null || indicator == null) return
+    const item = activeItem(list, activeKey)
+    if (item === undefined) {
+      indicator.style.opacity = '0'
+      return
+    }
+    const box = { left: item.offsetLeft, top: item.offsetTop, width: item.offsetWidth, height: item.offsetHeight }
+    if (!placed.current) {
+      placed.current = true
+      placeIndicator(indicator, item)
+      return
+    }
+    const controls = animate(
+      indicator,
+      { opacity: 1, left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` },
+      motionSafe({ type: 'spring', stiffness: 520, damping: 38, mass: 0.8 }),
+    )
+    return () => controls.stop()
+  }, [activeKey])
+  return { ref, indicatorRef }
+}
+
 interface LayoutPoint {
   readonly x: number
   readonly y: number

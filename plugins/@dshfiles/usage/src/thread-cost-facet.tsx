@@ -1,4 +1,5 @@
 import { useApi } from '@dshfiles/dshx/client'
+import { CostWaterfall } from '@dshfiles/plugin-ui/components/motion/cost-waterfall'
 import { EmptyState, PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -7,6 +8,7 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useMemo, useState } from 'react'
 import { usageApi, type RequestView } from './api.js'
+import { ThreadCostWaterfall, WATERFALL_TURN_LIMIT } from './cost-waterfall-steps.js'
 import { UsageFormattingModel } from './format.js'
 
 const DAY_MS = 86_400_000
@@ -79,8 +81,9 @@ export const ThreadCostFacet = (props: {
     refetchInterval: 30_000,
     retry: 1,
   })
-  const rows = page.data?.rows ?? []
+  const rows = useMemo(() => page.data?.rows ?? [], [page.data])
   const turns = useMemo(() => turnsOf(rows), [rows])
+  const waterfall = useMemo(() => ThreadCostWaterfall.stepsOf(rows), [rows])
   const total = rows.reduce<number | null>((sum, row) => (row.cost === null ? sum : (sum ?? 0) + row.cost), null)
   const last = rows[0]
 
@@ -135,6 +138,16 @@ export const ThreadCostFacet = (props: {
               Quota
             </Button>
           </div>
+        </PageSection>
+      )}
+      {waterfall.steps.length === 0 ? null : (
+        <PageSection heading="Cost waterfall" description="Where this thread's spend went, turn by turn.">
+          <CostWaterfall steps={waterfall.steps} live={false} />
+          {waterfall.hiddenTurns > 0 ? (
+            <p className="dshx:text-xs dshx:text-muted-foreground">
+              Showing the latest {WATERFALL_TURN_LIMIT} turns; {waterfall.hiddenTurns} older turns are in Per turn below.
+            </p>
+          ) : null}
         </PageSection>
       )}
       {turns.length === 0 ? null : (

@@ -5,6 +5,7 @@ import { Button } from './ui/button.js'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu.js'
 import { Spinner } from './ui/spinner.js'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.js'
+import { useSlidingIndicator } from '../motion/react.js'
 
 /** One header action. The page shows at most one `primaryAction`; everything else is an overflow-capable action. */
 export interface PageAction {
@@ -240,14 +241,7 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
             className={cn('dshx:min-w-0 dshx:gap-3', fill && 'dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col')}
           >
             <div className="dshx:min-w-0 dshx:overflow-x-auto dshx:pb-0.5">
-              <TabsList aria-label={tabs.label}>
-                {tabs.items.map(tab => (
-                  <TabsTrigger key={tab.value} value={tab.value} className="dshx:flex-none">
-                    {tab.label}
-                    {tab.count === undefined ? null : <span className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">{tab.count}</span>}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+              <PageTabList tabs={tabs} />
             </div>
             <TabsContent value={tabs.value} className={cn('dshx:min-w-0', fill && 'dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col')}>
               {body}
@@ -258,6 +252,37 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
     </div>
   )
 })
+
+/**
+ * The page's segmented tabs. The white pill is one element that springs to the selected tab instead of each tab
+ * painting its own background, so switching views reads as one motion. It sits in a positioned wrapper before the
+ * list: the list's grey track paints under it and the (positioned) triggers over it.
+ */
+function PageTabList({ tabs }: { readonly tabs: PageTabs }) {
+  const { ref, indicatorRef } = useSlidingIndicator<HTMLDivElement, HTMLSpanElement>(tabs.value)
+  return (
+    <div ref={ref} className="dshx:relative dshx:w-fit">
+      <span
+        aria-hidden
+        ref={indicatorRef}
+        className="dshx:pointer-events-none dshx:absolute dshx:rounded-md dshx:border dshx:border-transparent dshx:bg-background dshx:opacity-0 dshx:shadow-sm dshx:dark:border-input dshx:dark:bg-input/30"
+      />
+      <TabsList aria-label={tabs.label}>
+        {tabs.items.map(tab => (
+          <TabsTrigger
+            key={tab.value}
+            value={tab.value}
+            data-indicator-key={tab.value}
+            className="dshx:flex-none dshx:data-[state=active]:bg-transparent! dshx:data-[state=active]:shadow-none! dshx:dark:data-[state=active]:border-transparent!"
+          >
+            {tab.label}
+            {tab.count === undefined ? null : <span className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">{tab.count}</span>}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </div>
+  )
+}
 
 export interface PageSectionProps extends Omit<React.ComponentPropsWithoutRef<'section'>, 'title'> {
   readonly heading: React.ReactNode

@@ -1,6 +1,7 @@
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useApi } from '@dshfiles/dshx/client'
+import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
@@ -218,7 +219,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
         className={cn('dshx:h-4 dshx:px-1.5 dshx:text-[10px]', conflicted && 'dshx:bg-warning/20 dshx:text-warning')}
         variant={conflicted ? 'ghost' : 'secondary'}
       >
-        {unlanded}
+        <RollingNumber value={unlanded} />
       </Badge>
     ) : null
 

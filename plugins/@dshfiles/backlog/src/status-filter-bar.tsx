@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
 import { BacklogItems, type BacklogStatus } from './item.js'
@@ -50,7 +51,7 @@ export const StatusFilterBar = (props: {
             >
               <ItemGlyphs.StatusIcon status={status} />
               <span className="dshx:@max-pane-compact:sr-only">{ItemGlyphs.statusLabels[status]}</span>
-              <span className={cn('dshx:tabular-nums', active ? 'dshx:text-foreground' : 'dshx:text-muted-foreground/80')}>{count}</span>
+              <RollingNumber value={count} className={cn(active ? 'dshx:text-foreground' : 'dshx:text-muted-foreground/80')} />
             </button>
           )
         })}

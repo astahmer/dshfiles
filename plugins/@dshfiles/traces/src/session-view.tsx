@@ -1,5 +1,6 @@
 import type { ConvViewOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
 import { ChatFocusModel } from '@dshfiles/chat/chat-focus'
 import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription, AlertTitle } from '@dshfiles/plugin-ui/components/ui/alert'
@@ -9,7 +10,7 @@ import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowLeftIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useInfiniteQuery, useQuery } from '@dshfiles/plugin-ui/query'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { Types } from 'effect'
 import { tracesApi, type LogsInput } from './api.js'
 import type { OpenThread } from './open-thread.js'
@@ -30,7 +31,7 @@ const TURN_TRACE_WAIT_MS = 20_000
 const pair = (left: number | null, right: number | null): string =>
   `${left === null ? '–' : TraceFormat.duration(left)} · ${right === null ? '–' : TraceFormat.duration(right)}`
 
-const Stat = (props: { readonly label: TracesLocaleKey; readonly value: string; readonly tone?: 'error'; readonly t: TracesTranslate }): JSX.Element => (
+const Stat = (props: { readonly label: TracesLocaleKey; readonly value: ReactNode; readonly tone?: 'error'; readonly t: TracesTranslate }): JSX.Element => (
   <div
     className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:rounded-md dshx:border dshx:border-border dshx:px-2.5 dshx:py-1.5"
     data-stat={props.label}
@@ -39,6 +40,9 @@ const Stat = (props: { readonly label: TracesLocaleKey; readonly value: string; 
     <span className={cn('dshx:truncate dshx:font-mono dshx:text-sm', props.tone === 'error' ? 'dshx:text-destructive' : '')}>{props.value}</span>
   </div>
 )
+
+/** An integer stat whose changed digits roll; String keeps the text the summary always showed (no grouping). */
+const count = (value: number): JSX.Element => <RollingNumber value={value} format={String} />
 
 const SummaryGrid = (props: { readonly summary: SessionSummary; readonly t: TracesTranslate }): JSX.Element => {
   const summary = props.summary
@@ -49,12 +53,12 @@ const SummaryGrid = (props: { readonly summary: SessionSummary; readonly t: Trac
       data-testid="traces-session-summary"
       className="dshx:grid dshx:grid-cols-4 dshx:gap-2 dshx:@max-pane-compact:grid-cols-3 dshx:@max-pane-narrow:grid-cols-2"
     >
-      <Stat label="statTraces" value={String(summary.traces)} t={props.t} />
-      <Stat label="statSpans" value={String(summary.spans)} t={props.t} />
-      <Stat label="statErrors" value={String(summary.errorSpans)} {...(summary.errorSpans > 0 ? { tone: 'error' } : {})} t={props.t} />
+      <Stat label="statTraces" value={count(summary.traces)} t={props.t} />
+      <Stat label="statSpans" value={count(summary.spans)} t={props.t} />
+      <Stat label="statErrors" value={count(summary.errorSpans)} {...(summary.errorSpans > 0 ? { tone: 'error' } : {})} t={props.t} />
       <Stat label="statTotalTime" value={TraceFormat.duration(summary.totalTraceMs)} t={props.t} />
-      <Stat label="statModelCalls" value={String(summary.modelCalls)} t={props.t} />
-      <Stat label="statToolCalls" value={String(summary.toolCalls)} t={props.t} />
+      <Stat label="statModelCalls" value={count(summary.modelCalls)} t={props.t} />
+      <Stat label="statToolCalls" value={count(summary.toolCalls)} t={props.t} />
       <Stat label="statTraceLatency" value={pair(summary.traceLatency.p50Ms, summary.traceLatency.p95Ms)} t={props.t} />
       {summary.modelCalls === 0 ? null : <Stat label="statModelLatency" value={pair(summary.modelLatency.p50Ms, summary.modelLatency.p95Ms)} t={props.t} />}
       {tokens === null ? null : (

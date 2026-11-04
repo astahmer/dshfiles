@@ -1,5 +1,6 @@
 import { useApi, useApiEvent, useRegistry } from '@dshfiles/dshx/client'
 import { EntityList } from '@dshfiles/plugin-ui/components/entity-row'
+import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
 import { PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -59,7 +60,13 @@ export const ThreadJobsFacet = (props: {
     >
       <PageSection
         heading={t('tabJobs')}
-        meta={board.data === undefined ? undefined : `${String(running)} ${t('running')} · ${String(rows.length - running)} ${t('finished')}`}
+        meta={
+          board.data === undefined ? undefined : (
+            <>
+              <RollingNumber value={running} /> {t('running')} · <RollingNumber value={rows.length - running} /> {t('finished')}
+            </>
+          )
+        }
         actions={
           <Button size="xs" variant="ghost" onClick={props.onOpenProcesses}>
             {t('processesTitle')}

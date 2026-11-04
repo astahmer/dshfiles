@@ -1,15 +1,8 @@
-import { CircleCheckIcon, CircleDashedIcon, LoaderCircleIcon } from '@dshfiles/plugin-ui/icons'
+import { StepGlyph, type StepGlyphStatus } from '@dshfiles/plugin-ui/components/motion/step-glyph'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { PlanProgress, type PlanStep } from './plan-progress.js'
 
-const StepIcon = (props: { readonly step: PlanStep }): JSX.Element =>
-  props.step.status === 'completed' ? (
-    <CircleCheckIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-success" />
-  ) : props.step.status === 'in_progress' ? (
-    <LoaderCircleIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:animate-spin dshx:text-foreground" />
-  ) : (
-    <CircleDashedIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-  )
+const GLYPH_STATUS = { completed: 'done', in_progress: 'running', pending: 'pending' } as const satisfies Record<PlanStep['status'], StepGlyphStatus>
 
 const STATUS_LABEL = { completed: 'done', in_progress: 'in progress', pending: 'pending' } as const
 
@@ -25,7 +18,7 @@ export const PlanSteps = (props: { readonly steps: readonly PlanStep[]; readonly
           data-status={step.status}
           key={step.content}
         >
-          <StepIcon step={step} />
+          <StepGlyph aria-hidden size="sm" status={GLYPH_STATUS[step.status]} tone="success" />
           <span
             className={cn(
               'dshx:min-w-0 dshx:flex-1 dshx:truncate',
@@ -35,7 +28,9 @@ export const PlanSteps = (props: { readonly steps: readonly PlanStep[]; readonly
           >
             {step.content}
           </span>
-          {elapsed !== undefined && <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{PlanProgress.formatDuration(elapsed)}</span>}
+          {elapsed !== undefined && (
+            <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{PlanProgress.formatDuration(elapsed)}</span>
+          )}
         </li>
       )
     })}

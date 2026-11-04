@@ -11,6 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
+import { CheckpointGraph } from '@dshfiles/plugin-ui/components/motion/checkpoint-graph'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -18,6 +19,7 @@ import { History, Redo2, Undo2 } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import { sessionUndoApi } from './api.js'
+import { rewindPreview } from './rewind-preview.js'
 
 type Key =
   | 'undo'
@@ -35,6 +37,7 @@ type Key =
   | 'confirmLost'
   | 'confirmFiles'
   | 'confirmNoFiles'
+  | 'checkpointFiles'
   | 'confirmRedo'
   | 'confirmAction'
   | 'cancel'
@@ -118,6 +121,8 @@ export const UndoControl = (props: UndoControlProps): JSX.Element | null => {
   const confirmIndex = dialog?.kind === 'confirm' ? lastIndexOf(checkpoints, dialog.turn) : -1
   const rewound = confirmIndex === -1 ? [] : checkpoints.slice(confirmIndex)
   const target = rewound[0]
+  const preview =
+    target === undefined ? [] : rewindPreview(checkpoints, confirmIndex, { untitled: props.t('untitledPrompt'), files: props.t('checkpointFiles') })
   return (
     <TooltipProvider>
       <span className="dshx-root dshx:inline-flex dshx:items-center" data-session-undo="control">
@@ -224,6 +229,12 @@ export const UndoControl = (props: UndoControlProps): JSX.Element | null => {
                   </li>
                 ))}
               </ul>
+              <div
+                className="dshx:max-h-48 dshx:min-w-0 dshx:overflow-y-auto dshx:overscroll-contain dshx:rounded-md dshx:border dshx:border-border dshx:px-2 dshx:pb-1 dshx:text-left"
+                data-session-undo="rewind-preview"
+              >
+                <CheckpointGraph checkpoints={preview} selectedId={preview[confirmIndex - 1]?.id} />
+              </div>
               <p className="dshx:text-left dshx:text-sm">{props.t(target.files ? 'confirmFiles' : 'confirmNoFiles', { turn: target.turn })}</p>
               <p className="dshx:text-left dshx:text-sm dshx:text-muted-foreground">{props.t('confirmRedo')}</p>
             </AlertDialogHeader>

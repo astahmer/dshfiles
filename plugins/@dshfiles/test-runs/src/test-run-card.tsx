@@ -1,10 +1,14 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { FilePath, StackTrace } from '@dshfiles/plugin-ui/components/stack-trace'
 import { StatusIcon, ToolCard } from '@dshfiles/plugin-ui/components/tool-card'
+import { HeightReveal } from '@dshfiles/plugin-ui/components/motion/height-reveal'
+import { ShimmerText } from '@dshfiles/plugin-ui/components/motion/text'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ChevronDownIcon, ChevronUpIcon, CircleCheckIcon, CopyIcon, RotateCwIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useState } from 'react'
+import { animate, motionSafe, springs, staggers } from '@dshfiles/plugin-ui/motion'
+import { useSlidingIndicator } from '@dshfiles/plugin-ui/motion/react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { VitestReport, type TestCase, type TestFailure, type TestFile, type TestRun } from './vitest-report.js'
 
 type Filter = 'all' | 'failed' | 'skipped' | 'slow'
@@ -136,8 +140,10 @@ const TestRow = (props: {
         <span className="dshx:text-xs dshx:text-muted-foreground">{formatDuration(props.test.durationMs)}</span>
         {expandable && (open ? <ChevronUpIcon className="dshx:size-3.5" /> : <ChevronDownIcon className="dshx:size-3.5" />)}
       </button>
-      {open && props.test.failure !== undefined && (
-        <FailureDetail actions={props.actions} failure={props.test.failure} file={props.file} openFile={props.openFile} test={props.test} />
+      {props.test.failure !== undefined && (
+        <HeightReveal open={open}>
+          <FailureDetail actions={props.actions} failure={props.test.failure} file={props.file} openFile={props.openFile} test={props.test} />
+        </HeightReveal>
       )}
     </li>
   )
@@ -177,7 +183,7 @@ const FileRow = (props: {
         <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{formatDuration(props.file.durationMs)}</span>
         {open ? <ChevronUpIcon className="dshx:size-3.5 dshx:shrink-0" /> : <ChevronDownIcon className="dshx:size-3.5 dshx:shrink-0" />}
       </button>
-      {open && (
+      <HeightReveal open={open}>
         <div className="dshx:ml-2 dshx:flex dshx:flex-col dshx:gap-1 dshx:border-l dshx:border-border dshx:pl-4">
           {props.file.error !== undefined && (
             <FailureDetail
@@ -212,8 +218,61 @@ const FileRow = (props: {
             </span>
           )}
         </div>
-      )}
+      </HeightReveal>
     </li>
+  )
+}
+
+/** Passed, failed and skipped shares of the run; the segments grow in one after another when the card opens. */
+const TallyBar = (props: { readonly tally: TestRun['testTally'] }) => {
+  const ref = useRef<HTMLDivElement>(null)
+  const { passed, failed, skipped, total } = props.tally
+  const percent = (value: number): string => `${total === 0 ? 0 : (value / total) * 100}%`
+  useLayoutEffect(() => {
+    const segments = Array.from(ref.current?.children ?? [])
+    if (segments.length === 0) return
+    const controls = animate(
+      segments,
+      { transform: ['scaleX(0)', 'scaleX(1)'] },
+      motionSafe({ ...springs.smooth, delay: (index: number) => index * staggers.loose }),
+    )
+    return () => controls.complete()
+  }, [passed, failed, skipped])
+  return (
+    <div aria-hidden className="dshx:flex dshx:h-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted" ref={ref}>
+      <span className="dshx:origin-left dshx:bg-success" style={{ width: percent(passed) }} />
+      <span className="dshx:origin-left dshx:bg-destructive" style={{ width: percent(failed) }} />
+      <span className="dshx:origin-left dshx:bg-muted-foreground/30" style={{ width: percent(skipped) }} />
+    </div>
+  )
+}
+
+const FILTERS = ['all', 'failed', 'skipped', 'slow'] as const satisfies readonly Filter[]
+
+/** Filter tabs whose highlight slides to the selected one; they stay real tabs for assistive tech and tests. */
+const FilterTabs = (props: { readonly value: Filter; readonly counts: Readonly<Record<Filter, number>>; readonly onChange: (filter: Filter) => void }) => {
+  const { ref, indicatorRef } = useSlidingIndicator<HTMLDivElement, HTMLSpanElement>(props.value)
+  return (
+    <div className="dshx:relative dshx:flex dshx:flex-wrap dshx:gap-1" ref={ref} role="tablist">
+      <span aria-hidden className="dshx:pointer-events-none dshx:absolute dshx:rounded-md dshx:bg-muted dshx:opacity-0" ref={indicatorRef} />
+      {FILTERS.map(candidate => (
+        <button
+          aria-selected={props.value === candidate}
+          className={cn(
+            'dshx:relative dshx:rounded-md dshx:px-2 dshx:py-0.5 dshx:text-sm dshx:capitalize dshx:transition-colors dshx:motion-reduce:transition-none',
+            props.value === candidate ? 'dshx:font-medium' : 'dshx:text-muted-foreground dshx:hover:text-foreground',
+            props.counts[candidate] === 0 && candidate !== 'all' && 'dshx:opacity-50',
+          )}
+          data-indicator-key={candidate}
+          key={candidate}
+          onClick={() => props.onChange(candidate)}
+          role="tab"
+          type="button"
+        >
+          {candidate} <span className="dshx:tabular-nums">{props.counts[candidate]}</span>
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -238,7 +297,6 @@ export const TestRunCard = (props: {
   const files = props.run.files.filter(
     file => filter === 'all' || (filter === 'failed' && file.error !== undefined) || file.tests.some(test => matchesFilter(test, filter)),
   )
-  const percent = (value: number): string => `${tally.total === 0 ? 0 : (value / tally.total) * 100}%`
   const headline = VitestReport.summaryLabel(props.run)
   return (
     <ToolCard
@@ -251,29 +309,8 @@ export const TestRunCard = (props: {
       summary={headline}
     >
       <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-1" data-test-runs-card="">
-        <div aria-hidden className="dshx:flex dshx:h-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
-          <span className="dshx:bg-success" style={{ width: percent(tally.passed) }} />
-          <span className="dshx:bg-destructive" style={{ width: percent(tally.failed) }} />
-          <span className="dshx:bg-muted-foreground/30" style={{ width: percent(tally.skipped) }} />
-        </div>
-        <div className="dshx:flex dshx:flex-wrap dshx:gap-1" role="tablist">
-          {(['all', 'failed', 'skipped', 'slow'] as const).map(candidate => (
-            <button
-              aria-selected={filter === candidate}
-              className={cn(
-                'dshx:rounded-md dshx:px-2 dshx:py-0.5 dshx:text-sm dshx:capitalize',
-                filter === candidate ? 'dshx:bg-muted dshx:font-medium' : 'dshx:text-muted-foreground',
-                counts[candidate] === 0 && candidate !== 'all' && 'dshx:opacity-50',
-              )}
-              key={candidate}
-              onClick={() => setFilter(candidate)}
-              role="tab"
-              type="button"
-            >
-              {candidate} <span className="dshx:tabular-nums">{counts[candidate]}</span>
-            </button>
-          ))}
-        </div>
+        <TallyBar tally={tally} />
+        <FilterTabs counts={counts} onChange={setFilter} value={filter} />
         <ul className="dshx:flex dshx:flex-col">
           {files.map(file => (
             <FileRow actions={props.actions} file={file} filter={filter} key={file.path} openFailures={props.openFailures} openFile={props.openFile} />
@@ -299,7 +336,7 @@ export const TestRunPending = (props: { readonly command: string }) => (
       onToggle={() => undefined}
       open={false}
       status="running"
-      summary={<span className="dshx:font-mono dshx:text-xs">{props.command}</span>}
+      summary={<ShimmerText className="dshx:font-mono dshx:text-xs">{props.command}</ShimmerText>}
     />
   </span>
 )
