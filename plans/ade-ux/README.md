@@ -10,7 +10,7 @@ Resume here: see the progress table in §11.
 | Phase | State | Revision / notes |
 | --- | --- | --- |
 | 0. Ground truth | done | Catalog `surface`/`destination`/`currentSurface` on all 339 features, checked by `features:check`; [migration map](migration-map.md) via `pnpm ade:migration-map`. [Baseline](baseline/README.md): 41 WebKit shots (desktop, 390×844 phone, 3 dark) with 30 defects. Usage data records agent tools only, not navigation, so it cannot pick the rail: keep the seven destinations and add a client navigation counter in Phase 3. Follow-ups: journey 3 (question card) did not render in scratch (reach drift?); scratch `dev up` in a fresh workspace needs a plugin build first and `DSHX_DSH_EXECUTABLE` |
-| 1. Language and kit | in progress | 1a page kit, DESIGN.md, copy ratchet, 3 pilot pages (`ade-kit`); 1b remaining pages pending |
+| 1. Language and kit | in progress | 1a done: page kit in plugin-ui (`Page`, `PageSection`, `EmptyState`, `StatusGlyph`, `EntityRow`), [DESIGN.md](../../DESIGN.md), `node --run check:copy` ratchet (286 hits), Activity/Jobs/MCP migrated. 1b running in three batches (observe, agents, land plugins). Follow-up: verification-evidence e2e fails at a native-sidebar step after its Activity checks (not yet re-run on main) |
 | 2. One inbox | in progress | 2a attention contract + store in activity-timeline, Inbox UI, 2 providers (`ade-inbox`); 2b other providers pending |
 | 3. Shell and navigation | not started | |
 | 4. Thread loop | not started | |
