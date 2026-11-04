@@ -217,9 +217,11 @@ checkout sync` (`--dry-run` to preview). It rebases the `default` workspace
 - Always pass `-m` to `jj describe` and `jj squash` (or
   `--use-destination-message`); a bare command opens an editor and hangs.
 - Check `jj log -r 'conflicts()'` after a rebase.
-- For `jj_details`, pass the full 40- or 64-character hexadecimal commit hash;
-  short prefixes used in chat or accepted by the jj CLI fail its API schema.
-  Resolve the full hash from `jj log` or `jj_load` before calling it.
+- The jujutsu read tools (`jj_details`, `jj_revision_files`, `jj_edit_times`,
+  `jj_graph_slice`, `jj_revision_relationship`) accept a full commit id or a
+  short commit or change id prefix and resolve it on the Host; an ambiguous or
+  divergent prefix gets its own error. Mutating actions still take full ids
+  from `jj_load` or a preview.
 - Long runs: keep a `plans/<topic>/README.md` progress table with a "Resume
   here" line and commit after each milestone. When a plan's last task is done
   and verified, run the `complete-plan` skill: its durable content moves into
