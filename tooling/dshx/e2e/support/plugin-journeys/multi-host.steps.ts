@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createServer } from 'node:https'
-import { chmod, mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import * as Schema from 'effect/Schema'
@@ -21,6 +21,7 @@ import { RuntimeLaunchFile } from '../../../../../plugins/@dshfiles/multi-host/s
 const { launchFilePaths, parseRuntimeLaunch } = RuntimeLaunchFile
 import { mergeInventory } from '../../../../../plugins/@dshfiles/multi-host/src/inventory.js'
 import { startFakeCommandCode } from '../fake-command-code.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 
 const multiHostPackageId = '@dshfiles/multi-host'
 const multiHostApiId = 'multi-host'
@@ -215,6 +216,13 @@ const readTunnelProcessRecords = async (path: string) => {
     }),
   )
 }
+
+/**
+ * Effect's ChildProcessSpawner starts each child as its own process-group leader, so the SSH forward multi-host spawns
+ * leads its own group; an older spawner left it in the manager's. Ownership is the parent pid either way.
+ */
+const ownsProcessGroup = (processGroupId: number, input: { readonly processId: number; readonly managerProcessId: number }): boolean =>
+  processGroupId === input.managerProcessId || processGroupId === input.processId
 
 const readProcessDetails = (processId: number) => {
   const result = spawnSync('ps', ['-o', 'ppid=', '-o', 'pgid=', '-o', 'comm=', '-p', String(processId)], { encoding: 'utf8', timeout: 5_000 })
@@ -431,7 +439,8 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
 
 When('the scratch remote is added from the host UI', async ({ page }: { readonly page: Page }) => {
   const pair = pairFor(page)
-  await page.getByRole('button', { name: 'Hosts', exact: true }).click()
+  // Hosts is a section of the Observe rail destination now, not a top-level sidebar button.
+  await openGlobalPanel(page, 'Multi-host: Hosts')
   await expect(page.getByTestId('dshfiles-hosts-page')).toBeVisible()
   await page.getByRole('button', { name: 'Add host', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Add host', exact: true })
@@ -523,12 +532,53 @@ When('the remote model picker selects its model', async ({ page }: { readonly pa
   const picker = page.getByRole('button', { name: /deepseek-flash, reasoning Default/u })
   await expect(picker).toBeVisible()
   await picker.click()
-  const models = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
+  // The picker lists one row per model and account; its Use button names both.
+  const models = page.getByRole('list', { name: 'Models and accounts', exact: true })
   await expect(models).toBeVisible()
-  const model = models.getByRole('button', { name: /GPT-6 Luna/u })
+  const model = models.getByRole('button', { name: /^Use GPT-6 Luna \(/u })
   await expect(model).toBeVisible()
   await model.click()
   await expect(page.locator('[data-model-picker-text]')).toHaveText('GPT-6 Luna')
+})
+
+const pickedAttachments = new WeakMap<Page, { readonly name: string; readonly content: string }>()
+
+/** Paths under a scratch DSH home whose bytes equal `content`; installed packages are skipped. */
+const filesWithContent = async (root: string, content: string): Promise<string[]> => {
+  const matches: string[] = []
+  const walk = async (directory: string): Promise<void> => {
+    for (const entry of await readdir(directory, { withFileTypes: true }).catch(() => [])) {
+      if (entry.name === 'node_modules') continue
+      const path = join(directory, entry.name)
+      if (entry.isDirectory()) await walk(path)
+      else if (entry.isFile() && (await stat(path)).size === Buffer.byteLength(content) && (await readFile(path, 'utf8')) === content) matches.push(path)
+    }
+  }
+  await walk(root)
+  return matches
+}
+
+When('the native composer attaches a file through its picker', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const name = `remote-picker-${randomUUID()}.txt`
+  const content = `Picked in the browser for the remote Session: ${randomUUID()}\n`
+  const localPath = join(pair.sshd.scratchRoot, name)
+  await writeFile(localPath, content)
+  // The composer's own file input, as its attach button opens it; the upload must reach the runtime that owns the Session.
+  await page.locator('[data-composer-card] input[type="file"]').setInputFiles(localPath)
+  await expect(page.locator('[data-composer-card]').getByText(name)).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('[data-composer-card]').getByText('Uploading…')).toHaveCount(0, { timeout: 30_000 })
+  pickedAttachments.set(page, { name, content })
+})
+
+Then('the picked file is stored by the owning remote host only', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const picked = pickedAttachments.get(page)
+  if (picked === undefined) throw new Error('No file was attached through the composer picker.')
+  await recordAssertion(page, 'multi-host-picker-upload-stays-on-owning-host', async () => {
+    await expect.poll(async () => (await filesWithContent(pair.remote.homeRoot, picked.content)).length, { timeout: 30_000 }).toBeGreaterThan(0)
+    expect(await filesWithContent(pair.manager.homeRoot, picked.content)).toEqual([])
+  })
 })
 
 When('the native composer sends a prompt to the remote Session', async ({ page }: { readonly page: Page }) => {
@@ -544,7 +594,8 @@ When('the native composer sends a prompt to the remote Session', async ({ page }
 })
 
 When('the Hosts page is opened', async ({ page }: { readonly page: Page }) => {
-  await page.getByRole('button', { name: 'Hosts', exact: true }).click()
+  // Hosts is a section of the Observe rail destination now, not a top-level sidebar button.
+  await openGlobalPanel(page, 'Multi-host: Hosts')
   await expect(page.getByTestId('dshfiles-hosts-page')).toBeVisible()
 })
 
@@ -567,13 +618,17 @@ When('the manager composer selects the recorded remote thread mention', async ({
   await page.getByRole('button', { name: 'New thread', exact: true }).first().click()
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
   await expect(composer).toBeVisible({ timeout: 30_000 })
-  await composer.click()
-  await composer.pressSequentially(`@t:${observation.sessionId}`)
   const option = page.getByRole('listbox').getByRole('option').filter({ hasText: observation.sessionId }).first()
-  await expect(option).toBeVisible({ timeout: 30_000 })
-  await option.click()
-
   const chip = page.locator('[data-composer-card] [data-composer-chip="reference"]')
+  // The New thread composer can remount once its destination settles, dropping keys or the open menu of the first instance.
+  await expect(async () => {
+    await composer.fill('')
+    await composer.click()
+    await composer.pressSequentially(`@t:${observation.sessionId}`)
+    await option.click({ timeout: 5_000 })
+    await expect(chip).toHaveCount(1, { timeout: 5_000 })
+  }).toPass({ timeout: 45_000 })
+
   await expect(chip).toHaveCount(1)
   await expect(chip).toContainText(observation.sessionId)
 })
@@ -708,6 +763,9 @@ When('the mirrored thread opens its owning host UI', async ({ page }: { readonly
   const observation = autoDestinationObservations.get(page)
   if (observation === undefined) throw new Error('The remote thread composer journey did not produce an observation.')
 
+  // Opening the Hosts page left the rail on Observe; the mirrored thread row lives in the Threads destination.
+  const destinations = page.getByRole('tablist', { name: 'Destinations', exact: true })
+  if (await destinations.isVisible()) await destinations.getByRole('tab', { name: 'Threads', exact: true }).click()
   const remoteThread = page.locator('[data-remote-thread-id]').filter({ hasText: scratchRemoteName })
   await expect(remoteThread).toHaveAttribute('data-remote-thread-id', `${observation.runtimeId}:${observation.sessionId}`, { timeout: 30_000 })
   await remoteThread.click()
@@ -788,10 +846,12 @@ When('the SSH tunnel drops and reconnects', async ({ page }: { readonly page: Pa
     tunnelProcessRecord.marker !== 'persistent-forward' ||
     tunnelProcessDetails.commandName !== 'ssh' ||
     tunnelProcessDetails.parentProcessId !== managerProcessId ||
-    tunnelProcessDetails.processGroupId !== managerProcessId ||
+    !ownsProcessGroup(tunnelProcessDetails.processGroupId, { processId: tunnelProcessId, managerProcessId }) ||
     !isProcessRunning(tunnelProcessId)
   ) {
-    throw new Error('Refusing to signal a process not owned by the manager DSH tunnel fixture.')
+    throw new Error(
+      `Refusing to signal a process not owned by the manager DSH tunnel fixture: recorded ${tunnelProcessRecord.marker} pid ${String(tunnelProcessId)} is ${tunnelProcessDetails.commandName} (parent ${String(tunnelProcessDetails.parentProcessId)}, group ${String(tunnelProcessDetails.processGroupId)}); the manager DSH is pid ${String(managerProcessId)}.`,
+    )
   }
   process.kill(tunnelProcessId, 'SIGKILL')
   for (let attempt = 0; attempt < 100 && isProcessRunning(tunnelProcessId); attempt += 1) await delay(25)
@@ -810,7 +870,7 @@ When('the SSH tunnel drops and reconnects', async ({ page }: { readonly page: Pa
     recoveredTunnelProcessRecord.marker !== 'persistent-forward' ||
     recoveredTunnelProcessDetails.commandName !== 'ssh' ||
     recoveredTunnelProcessDetails.parentProcessId !== managerProcessId ||
-    recoveredTunnelProcessDetails.processGroupId !== managerProcessId ||
+    !ownsProcessGroup(recoveredTunnelProcessDetails.processGroupId, { processId: recoveredTunnelProcessRecord.processId, managerProcessId }) ||
     !isProcessRunning(recoveredTunnelProcessRecord.processId)
   ) {
     throw new Error('The restarted SSH tunnel process was not owned by the manager DSH.')

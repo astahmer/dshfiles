@@ -34,8 +34,10 @@ Feature: Multi-host loopback SSH lifecycle
     When the scratch remote is added from the host UI
     And Auto creates a thread through the remote folder picker
     And the remote model picker selects its model
+    And the native composer attaches a file through its picker
     And the native composer sends a prompt to the remote Session
     Then the new thread is owned by the automatically selected remote runtime
+    And the picked file is stored by the owning remote host only
 
   @scenario:multi-host.host-resources
   Scenario: The Hosts page shows live SSH resource pressure
