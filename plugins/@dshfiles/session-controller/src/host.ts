@@ -22,7 +22,9 @@ export default defineHost({
   apis: [interruptionHost, continuationHost, threadModelHost, sessionsHost],
   prompts: [sessionInstructionsSection],
   setup: async (ctx, config: unknown) => {
-    ctx.plugin(SessionController, SessionController.Config(Schema.decodeUnknownSync(configSchema)(config)))
+    // Wait for the forked native controller to finish activating: the root layer below reads `sessionController`
+    // once, and an unfinished activation left every sessions call answering `controller-unavailable` on a slow start.
+    await ctx.plugin(SessionController, SessionController.Config(Schema.decodeUnknownSync(configSchema)(config)))
     loadSessionInstructions(ctx)
     return sessionControllerEffectPlugin.setup(ctx, config)
   },
