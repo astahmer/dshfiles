@@ -481,3 +481,50 @@
     transition: none;
   }
 }
+
+/* Owned delta: an option whose description is markdown keeps it under its button, in the same row. */
+.optionItem {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--dsw-radius-md);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+/* The row, not the button alone, carries hover and selection, so the description reads as part of its option. */
+.optionItem:hover:not(:has(> .option:disabled)),
+.optionItem:has(> .optionSelected) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.optionItem:has(> .optionSelected) {
+  border-color: var(--dsw-alias-border-l2);
+}
+
+.optionItem > .option,
+.optionItem > .option:hover:not(:disabled),
+.optionItem > .optionSelected {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* Owned delta: the accessible heading of a question that opens with an image or fence. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Owned delta: a question with a markdown body (images, tables, an html preview) gets more of the viewport before its
+   seat scrolls; the header and footer stay pinned either way. */
+.cardRich:not(.cardMinimized) {
+  max-height: min(72vh, 720px);
+}

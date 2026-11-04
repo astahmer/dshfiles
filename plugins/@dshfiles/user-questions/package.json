@@ -2,7 +2,7 @@
   "name": "@dshfiles/user-questions",
   "version": "0.1.0",
   "private": true,
-  "description": "Owned fork of DSH's native question form: an answered question stays closed while its reply waits for admission.",
+  "description": "Owned fork of DSH's native question form: markdown questions with sandboxed HTML previews, and an answered question stays closed while its reply waits for admission.",
   "license": "MIT",
   "files": [
     "dist",
@@ -16,6 +16,10 @@
   "exports": {
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
+    "./html-preview": {
+      "types": "./src/html-preview.ts",
+      "default": "./dist/html-preview.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
@@ -45,6 +49,7 @@
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-typert-protocol": "0.2.1-rc.2",
     "@deepseek-ai/dsh-user-questions": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-util-workspace-path": "0.2.1-rc.2",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

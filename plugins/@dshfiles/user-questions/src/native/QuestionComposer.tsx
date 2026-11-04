@@ -12,6 +12,8 @@ import { planReviewOf, type QuestionAnswer, type QuestionCardSnapshot, type Ques
 import type { PendingQuestion } from './contract/slots.ts'
 import type { QuestionDraftAnswer, QuestionDraftProgress } from './draft-store.ts'
 import { PlanReviewPanel } from './PlanReviewPanel.tsx'
+import { QuestionMarkdownText } from '../rich/question-markdown.ts'
+import { OptionDescription, QuestionMarkdown, QuestionTitle } from '../rich/QuestionMarkdown.tsx'
 import css from './QuestionComposer.module.css'
 
 /**
@@ -241,6 +243,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   // oxlint-disable-next-line typescript/no-non-null-assertion
   const draft = drafts[index]!
   const hasOptions = (question.options?.length ?? 0) > 0
+  const { title: questionTitle, body: questionBody } = useMemo(() => QuestionMarkdownText.parts(question.question), [question.question])
 
   const replaceProgress = (nextIndex: number, nextDrafts: QuestionDraftAnswer[]): void => {
     actions.replace(pending.key, {
@@ -432,15 +435,17 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   return (
     <div className={css.frame} data-question-key={pending.key}>
       <section
-        className={clsx(css.card, minimized && css.cardMinimized)}
+        className={clsx(css.card, minimized && css.cardMinimized, questionBody !== '' && css.cardRich)}
         aria-labelledby={`question-${pending.key}-${String(index)}`}
       >
         <header className={css.header}>
           <div className={css.headingBlock}>
             {question.header !== undefined && <div className={css.eyebrow}>{question.header}</div>}
-            <h2 className={css.title} id={`question-${pending.key}-${String(index)}`}>
-              {question.question}
-            </h2>
+            {/* Owned delta: the question is markdown. Its first paragraph is the heading; an untitled question (it
+                opens with an image or a fence) keeps an accessible heading from its header. */}
+            {questionTitle === undefined
+              ? <h2 className={css.srOnly} id={`question-${pending.key}-${String(index)}`}>{question.header ?? QuestionMarkdownText.plainText(question.question)}</h2>
+              : <QuestionTitle className={css.title} id={`question-${pending.key}-${String(index)}`} text={questionTitle} labels={markdownLabels} />}
           </div>
           <div className={css.headerActions}>
             {countdown !== undefined && card.waitState !== 'waiting' && card.waitState !== 'editing' && card.waitState !== 'continued' && (
@@ -492,6 +497,9 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
               onFocusCapture={focusAnswerSurface}
               onBlurCapture={blurAnswerSurface}
             >
+              {questionBody !== '' && (
+                <QuestionMarkdown text={questionBody} labels={markdownLabels} previewTitle={question.header ?? questionTitle ?? 'HTML preview'} />
+              )}
               {question.detail !== undefined && (
                 <div className={css.detail}><MarkdownText text={question.detail} labels={markdownLabels} /></div>
               )}
@@ -499,13 +507,19 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                 {(question.options ?? []).map((option, optionIndex) => {
                   const selected = draft.selected.includes(option.label)
                   const display = parseRecommendedLabel(option.label)
-                  return (
+                  // Owned delta: a markdown description renders under the button, so its links stay links.
+                  const richDescription = option.description !== undefined && QuestionMarkdownText.hasSyntax(option.description)
+                    ? option.description
+                    : undefined
+                  const descriptionId = `question-${pending.key}-${String(index)}-option-${String(optionIndex)}-description`
+                  const row = (
                     <button
                       type="button" key={`${option.label}-${String(optionIndex)}`}
                       className={clsx(css.option, selected && question.multiSelect !== true && css.optionSelected)}
                       role={question.multiSelect === true ? 'checkbox' : 'radio'}
                       aria-checked={selected}
                       aria-label={display.label}
+                      aria-describedby={richDescription === undefined ? undefined : descriptionId}
                       disabled={locked}
                       onClick={() => { choose(option.label) }}
                       onKeyDown={(event) => {
@@ -527,12 +541,24 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                           {display.recommended && (
                             <span className={css.badge}>{t('option.recommended')}</span>
                           )}
-                          {option.description !== undefined && (
+                          {option.description !== undefined && richDescription === undefined && (
                             <span className={css.description}>{option.description}</span>
                           )}
                         </span>
                       </span>
                     </button>
+                  )
+                  if (richDescription === undefined) return row
+                  return (
+                    <div key={`${option.label}-${String(optionIndex)}`} className={css.optionItem}>
+                      {row}
+                      <OptionDescription
+                        id={descriptionId}
+                        text={richDescription}
+                        labels={markdownLabels}
+                        onSelect={locked ? undefined : () => { choose(option.label) }}
+                      />
+                    </div>
                   )
                 })}
 

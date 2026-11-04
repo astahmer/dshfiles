@@ -1,0 +1,77 @@
+/* The question's rich body sits in the card's scroll seat above the options, inset like the native detail block. */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin: 4px 24px 0;
+  overflow-wrap: anywhere;
+}
+
+/* Images and tables are agent-sized: keep them inside the pane at every width (iPhone 375 px included). */
+.body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--dsw-radius-md);
+}
+
+.body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.preview {
+  min-width: 0;
+}
+
+/* Inline markdown in the heading keeps the heading's own type instead of the compact renderer's secondary sizing;
+   the doubled class outranks the renderer's single-class rules whatever the sheet order. */
+.title.title > *,
+.title.title p {
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: inherit;
+}
+
+.title.title a {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+/* Under the option label, aligned with it: 8px row inset + 20px indicator + 8px gap + 1px border. */
+.optionDescription {
+  min-width: 0;
+  margin: -8px 0 4px;
+  padding: 0 12px 6px 37px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 14px;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.optionDescription.optionDescription > *,
+.optionDescription.optionDescription p {
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.optionDescription img {
+  max-width: 100%;
+  height: auto;
+}
+
+@media (max-width: 720px) {
+  .body {
+    margin: 4px 18px 0;
+  }
+
+  .optionDescription {
+    padding-left: 35px;
+    padding-right: 6px;
+  }
+}
