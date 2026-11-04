@@ -116,7 +116,7 @@
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a usage request\"",
         "press Enter",
         "click button \"Usage: Analytics\"",
-        "click button \"Re-index session logs\"",
+        "click button \"Re-index thread logs\"",
         "click tab \"Request log\"",
         "expect heading \"Request log\""
       ],

@@ -1,4 +1,6 @@
 import { Chart, barX, barY, colorLegend, defineChart, scaleBand, scaleLinear, tooltip } from '@dshfiles/plugin-ui/chart'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
@@ -176,7 +178,15 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
   )
 
   if (query.isPending) return <p className="dshx:text-sm dshx:text-muted-foreground">Loading tool activity…</p>
-  if (query.isError) return <p className="dshx:text-sm dshx:text-destructive">{errorMessage(query.error, 'Could not load tool activity.')}</p>
+  if (query.isError)
+    return (
+      <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-destructive">
+        {errorMessage(query.error, 'Could not load tool activity.')}
+        <Button variant="outline" size="xs" disabled={query.isFetching} onClick={() => void query.refetch()}>
+          Try again
+        </Button>
+      </p>
+    )
   if (report === undefined) return <p className="dshx:text-sm dshx:text-muted-foreground">Loading tool activity…</p>
   const totals = report.totals
   const callsForCategory = (category: ToolCategory): number =>
@@ -190,7 +200,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
   return (
     <div className="dshx-root dshx:@container dshx:flex dshx:flex-col dshx:gap-4">
       {totals === undefined ? null : (
-        <dl className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:md:grid-cols-3 dshx:xl:grid-cols-6">
+        <dl className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@min-[48rem]:grid-cols-3 dshx:@min-[80rem]:grid-cols-6">
           <Tile label="Tool calls" value={UsageFormattingModel.formatCount(totals.calls)} detail={`${report.tools.length.toLocaleString()} distinct tools`} />
           <Tile label="Success rate" value={UsageFormattingModel.formatPercent(totals.successRate)} detail={`${totals.errors.toLocaleString()} errors`} />
           <Tile
@@ -226,10 +236,10 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
         </dl>
       )}
 
-      <div className="dshx:grid dshx:items-start dshx:gap-3 dshx:lg:grid-cols-2">
+      <div className="dshx:grid dshx:items-start dshx:gap-3 dshx:@min-[64rem]:grid-cols-2">
         <Panel title="Tool calls over time" description={`${report.timelineBucket === 'hour' ? 'Hourly' : 'Daily'} calls stacked by category.`}>
           {timelineRows.length === 0 ? (
-            <p className="dshx:text-xs dshx:text-muted-foreground">No tool executions in this range.</p>
+            <EmptyState>No tool executions in this range.</EmptyState>
           ) : (
             <Chart
               ariaLabel="Tool calls over time"
@@ -258,7 +268,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
             ))}
           </ToggleGroup>
           {rankedRows.length === 0 ? (
-            <p className="dshx:text-xs dshx:text-muted-foreground">No tool executions in this range.</p>
+            <EmptyState>No tool executions in this range.</EmptyState>
           ) : (
             <Chart
               ariaLabel="Most-used tools"
@@ -272,7 +282,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
 
       <Panel title="Output by category" description="Estimated tokens each source returned, against the busiest source.">
         {report.categoryOutcomes.length === 0 ? (
-          <p className="dshx:text-xs dshx:text-muted-foreground">No measured tool output in this range.</p>
+          <EmptyState>No measured tool output in this range.</EmptyState>
         ) : (
           <ol className="dshx:flex dshx:flex-col dshx:gap-2">
             {[...report.categoryOutcomes]
@@ -293,10 +303,10 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
         </p>
       </Panel>
 
-      <div className="dshx:grid dshx:gap-3 dshx:lg:grid-cols-2">
+      <div className="dshx:grid dshx:gap-3 dshx:@min-[64rem]:grid-cols-2">
         <Panel title="Time by command" description="Normalized executable and subcommand.">
           {commandDistribution.length === 0 ? (
-            <p className="dshx:text-xs dshx:text-muted-foreground">No safely identifiable command timings in this range.</p>
+            <EmptyState>No safely identifiable command timings in this range.</EmptyState>
           ) : (
             <ol className="dshx:flex dshx:flex-col dshx:gap-2">
               {commandDistribution.map(row => (
@@ -313,7 +323,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
         </Panel>
         <Panel title="Time by test runner" description="Recognized runners; outcomes are shell-call status, not parsed test output.">
           {testRunDistribution.length === 0 ? (
-            <p className="dshx:text-xs dshx:text-muted-foreground">No recognized test-run timings in this range.</p>
+            <EmptyState>No recognized test-run timings in this range.</EmptyState>
           ) : (
             <ol className="dshx:flex dshx:flex-col dshx:gap-2">
               {testRunDistribution.map(row => (
@@ -332,7 +342,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
 
       <Panel title="Every tool" description="Calls, outcomes, returned tokens and recorded latency.">
         {report.tools.length === 0 ? (
-          <p className="dshx:text-xs dshx:text-muted-foreground">No tool executions in this range.</p>
+          <EmptyState>No tool executions in this range.</EmptyState>
         ) : (
           <div className="dshx:overflow-x-auto">
             <table className="dshx:w-full dshx:text-left dshx:text-sm">

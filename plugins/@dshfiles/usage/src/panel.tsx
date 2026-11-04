@@ -1,6 +1,7 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
+import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { Page } from '@dshfiles/plugin-ui/components/page'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
@@ -120,34 +121,60 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
     update({ purposes: UsageFoldModel.REQUEST_PURPOSES.filter(item => current.has(item)) })
   }
 
+  const indexState =
+    status === undefined
+      ? 'Connecting…'
+      : status.indexing
+        ? 'Indexing thread logs…'
+        : `${status.indexedFiles.toLocaleString()} logs indexed${status.lastIndexedAt === null ? '' : ` · ${UsageFormattingModel.formatAgo(status.lastIndexedAt, now, relativeTime)}`}`
+  const indexError = status?.lastError == null ? null : `Indexing failed: ${status.lastError}`
+  const refreshError = refresh.isError ? errorMessage(refresh.error, 'Re-indexing failed.') : null
+
   return (
-    <section className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-auto dshx:bg-background dshx:p-4 dshx:text-foreground dshx:sm:p-6">
-      <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-3">
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-          <h1 className="dshx:text-lg dshx:font-semibold">Usage analytics</h1>
-          <p className="dshx:text-xs dshx:text-muted-foreground">
-            Every model request from the session logs, side calls included. Costs are list-price estimates from the models.dev catalog AI Accounts keeps
-            {status?.pricingFetchedAt == null
-              ? ' (no catalog cached yet)'
-              : ` (updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, now, relativeTime)})`}
-            ; subscription traffic is priced as if it were metered.
-          </p>
-        </div>
-        <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
-          <span aria-live="polite">
-            {status === undefined
-              ? 'Connecting…'
-              : status.indexing
-                ? 'Indexing session logs…'
-                : `${status.indexedFiles.toLocaleString()} logs indexed${status.lastIndexedAt === null ? '' : ` · ${UsageFormattingModel.formatAgo(status.lastIndexedAt, now, relativeTime)}`}`}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => refresh.mutate()} disabled={refresh.isPending} aria-label="Re-index session logs">
-            <RefreshCwIcon className={refresh.isPending ? 'dshx:animate-spin' : undefined} /> Refresh
-          </Button>
-        </div>
-      </header>
-      {status?.lastError == null ? null : <p className="dshx:text-xs dshx:text-destructive">Indexing failed: {status.lastError}</p>}
-      {refresh.isError ? <p className="dshx:text-xs dshx:text-destructive">{errorMessage(refresh.error, 'Re-indexing failed.')}</p> : null}
+    <Page
+      scroll
+      className="dshx:bg-background dshx:text-foreground"
+      heading="Usage"
+      description={
+        <>
+          Every model request from thread logs, side calls included. Costs are list-price estimates from the models.dev price catalog
+          {status?.pricingFetchedAt == null
+            ? ' (no catalog cached yet)'
+            : ` (updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, now, relativeTime)})`}
+          ; subscription traffic is priced as if it were metered.
+        </>
+      }
+      meta={
+        <span aria-live="polite" className="dshx:text-xs dshx:text-muted-foreground">
+          {indexState}
+        </span>
+      }
+      actions={[
+        { id: 'reindex', label: 'Re-index thread logs', icon: <RefreshCwIcon aria-hidden />, pending: refresh.isPending, onSelect: () => refresh.mutate() },
+      ]}
+      tabs={{
+        label: 'Usage views',
+        value: preferences.tab,
+        onValueChange: value => update({ tab: value === 'charts' || value === 'activity' ? value : 'log' }),
+        items: [
+          { value: 'log', label: 'Request log' },
+          { value: 'charts', label: 'Charts' },
+          { value: 'activity', label: 'Tools & Jev' },
+        ],
+      }}
+    >
+      {[indexError, refreshError].map(message =>
+        message === null ? null : (
+          <Alert key={message} variant="destructive">
+            <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+              <span className="dshx:min-w-0 dshx:flex-1">{message}</span>
+              <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
+                Try again
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ),
+      )}
 
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2" role="group" aria-label="Date range">
         <ToggleGroup
@@ -229,44 +256,31 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
         ))}
       </div>
 
-      <Tabs
-        value={preferences.tab}
-        onValueChange={value => update({ tab: value === 'charts' || value === 'activity' ? value : 'log' })}
-        className="dshx:min-h-0 dshx:flex-1"
-      >
-        <TabsList>
-          <TabsTrigger value="log">Request log</TabsTrigger>
-          <TabsTrigger value="charts">Charts</TabsTrigger>
-          <TabsTrigger value="activity">Tools & Jev</TabsTrigger>
-        </TabsList>
-        <TabsContent value="log" className="dshx:min-h-0">
-          <RequestLog range={range} purposes={purposes} search={logSearch} onSearch={setLogSearch} openThread={props.openThread} />
-        </TabsContent>
-        <TabsContent value="charts">
-          <UsageCharts
-            range={range}
-            purposes={purposes}
-            bucket={preferences.bucket}
-            groupBy={preferences.groupBy}
-            onGroupBy={groupBy => update({ groupBy })}
-            onShowRequests={(search, groupBy) => {
-              if (groupBy === 'purpose') {
-                const purpose = Schema.decodeUnknownOption(purposeSchema)(search)
-                if (Option.isNone(purpose)) return
-                setLogSearch('')
-                update({ tab: 'log', purposes: [purpose.value] })
-                return
-              }
-              setLogSearch(search)
-              update({ tab: 'log' })
-            }}
-            openThread={props.openThread}
-          />
-        </TabsContent>
-        <TabsContent value="activity">
-          <UsageToolsTab range={range} bucket={preferences.bucket} />
-        </TabsContent>
-      </Tabs>
-    </section>
+      {preferences.tab === 'log' ? (
+        <RequestLog range={range} purposes={purposes} search={logSearch} onSearch={setLogSearch} openThread={props.openThread} />
+      ) : preferences.tab === 'charts' ? (
+        <UsageCharts
+          range={range}
+          purposes={purposes}
+          bucket={preferences.bucket}
+          groupBy={preferences.groupBy}
+          onGroupBy={groupBy => update({ groupBy })}
+          onShowRequests={(search, groupBy) => {
+            if (groupBy === 'purpose') {
+              const purpose = Schema.decodeUnknownOption(purposeSchema)(search)
+              if (Option.isNone(purpose)) return
+              setLogSearch('')
+              update({ tab: 'log', purposes: [purpose.value] })
+              return
+            }
+            setLogSearch(search)
+            update({ tab: 'log' })
+          }}
+          openThread={props.openThread}
+        />
+      ) : (
+        <UsageToolsTab range={range} bucket={preferences.bucket} />
+      )}
+    </Page>
   )
 }

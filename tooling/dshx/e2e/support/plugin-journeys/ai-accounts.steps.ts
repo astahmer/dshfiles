@@ -260,7 +260,7 @@ When('two synthetic work accounts and recorded account usage populate the dashbo
     }),
   )
   await openGlobalPanel(page, 'Usage: Analytics')
-  await page.getByRole('button', { name: 'Re-index session logs', exact: true }).click()
+  await page.getByRole('button', { name: 'Re-index thread logs', exact: true }).click()
   await expect.poll(() => page.getByRole('table').getByRole('row').count()).toBeGreaterThan(20)
   await page.reload()
   await openAccountsPanel(page)

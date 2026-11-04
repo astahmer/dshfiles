@@ -90,10 +90,10 @@ When('recorded session logs and a price catalog are seeded', async ({ page }: { 
 
 When('the Usage analytics panel is opened on the range since {string}', async ({ page }: { page: Page }, from: string) => {
   await openGlobalPanel(page, 'Usage: Analytics')
-  await expect(page.getByRole('heading', { name: 'Usage analytics', exact: true, level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Usage', exact: true, level: 1 })).toBeVisible()
   await page.getByRole('radio', { name: 'Custom', exact: true }).click()
   await page.getByLabel('From date', { exact: true }).fill(from)
-  await page.getByRole('button', { name: 'Re-index session logs', exact: true }).click()
+  await page.getByRole('button', { name: 'Re-index thread logs', exact: true }).click()
   await expect(page.getByText(/ of the latest \d+ requests$/)).toBeVisible()
   await expect.poll(async () => logRows(page).count(), { timeout: 30_000 }).toBeGreaterThan(200)
 })

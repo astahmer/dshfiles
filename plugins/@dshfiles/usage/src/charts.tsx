@@ -1,4 +1,6 @@
 import { Chart, ChartFrame, barY, colorLegend, defineChart, lineY, scaleBand, scaleLinear, scalePoint, tooltip } from '@dshfiles/plugin-ui/chart'
+import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -27,7 +29,7 @@ const Panel = (props: { readonly title: string; readonly description?: string; r
 
 const Tile = (props: { readonly label: string; readonly value: string; readonly detail?: ReactNode }): JSX.Element => (
   <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:rounded-lg dshx:border dshx:px-3 dshx:py-2">
-    <span className="dshx:text-[11px] dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">{props.label}</span>
+    <span className="dshx:text-xs dshx:text-muted-foreground">{props.label}</span>
     <span className="dshx:text-base dshx:font-semibold dshx:tabular-nums">{props.value}</span>
     {props.detail === undefined ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{props.detail}</span>}
   </div>
@@ -292,7 +294,15 @@ export const UsageCharts = (props: {
     [series.latency, pointAxis, props.bucket, props.range.from, props.range.to],
   )
 
-  if (charts.isError) return <p className="dshx:text-xs dshx:text-destructive">{errorMessage(charts.error, 'Charts could not be loaded.')}</p>
+  if (charts.isError)
+    return (
+      <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">
+        {errorMessage(charts.error, 'Charts could not be loaded.')}
+        <Button variant="outline" size="xs" disabled={charts.isFetching} onClick={() => void charts.refetch()}>
+          Try again
+        </Button>
+      </p>
+    )
   if (view === undefined) return <p className="dshx:text-xs dshx:text-muted-foreground">Loading…</p>
 
   const summary = view.summary
@@ -302,7 +312,7 @@ export const UsageCharts = (props: {
 
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-3">
-      <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:md:grid-cols-3 dshx:xl:grid-cols-4">
+      <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@min-[48rem]:grid-cols-3 dshx:@min-[80rem]:grid-cols-4">
         <Tile
           label="Cost (estimate)"
           value={UsageFormattingModel.formatCost(summary.cost)}
@@ -392,7 +402,7 @@ export const UsageCharts = (props: {
       <UsageBreakdownTable view={view} groupBy={props.groupBy} onShowRequests={props.onShowRequests} />
       <UsageCalendar view={view} range={props.range} />
 
-      <div className="dshx:grid dshx:gap-3 dshx:lg:grid-cols-2">
+      <div className="dshx:grid dshx:gap-3 dshx:@min-[64rem]:grid-cols-2">
         <Panel title="Tokens" description="Uncached input, cache reads, cache writes and output.">
           <Chart ariaLabel="Tokens over time" ariaDescription="Token counts per bucket split by kind." definition={tokenChart} height={CHART_HEIGHT} />
         </Panel>
@@ -424,7 +434,7 @@ export const UsageCharts = (props: {
 
       <Panel title="Top threads by cost">
         {view.topThreads.length === 0 ? (
-          <p className="dshx:text-xs">No requests.</p>
+          <EmptyState>No requests in this range.</EmptyState>
         ) : (
           <ol className="dshx:flex dshx:flex-col dshx:gap-0.5">
             {view.topThreads.map(thread => (
@@ -435,7 +445,7 @@ export const UsageCharts = (props: {
                   onClick={() => props.openThread({ sessionId: thread.sessionId, parentSessionId: null })}
                 >
                   <span className="dshx:min-w-0 dshx:truncate">
-                    {thread.title ?? thread.sessionId}
+                    {thread.title ?? 'Untitled thread'}
                     {thread.project === null ? null : <span className="dshx:text-muted-foreground"> · {thread.project}</span>}
                   </span>
                   <span className="dshx:shrink-0 dshx:tabular-nums">

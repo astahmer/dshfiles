@@ -1,3 +1,4 @@
+import { EmptyState, PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@dshfiles/plugin-ui/components/ui/table'
@@ -42,11 +43,7 @@ const SortableHead = (props: {
   const active = props.sort.column === props.column
   return (
     <TableHead className={cn('dshx:text-right', props.className)} aria-sort={active ? (props.sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
-      <button
-        type="button"
-        className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:uppercase dshx:hover:text-foreground"
-        onClick={() => props.onSort(props.column)}
-      >
+      <button type="button" className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:hover:text-foreground" onClick={() => props.onSort(props.column)}>
         {props.label}
         {active ? props.sort.direction === 'asc' ? <ArrowUpIcon className="dshx:size-3" /> : <ArrowDownIcon className="dshx:size-3" /> : null}
       </button>
@@ -56,7 +53,7 @@ const SortableHead = (props: {
 
 const threadLabel = (row: RequestView): string => {
   const where = row.turn === null ? (row.purpose === 'title' ? 'title generation' : row.purpose) : `turn ${String(row.turn)}, step ${String(row.step ?? 0)}`
-  return `${row.sessionTitle ?? row.sessionId} · ${where}`
+  return `${row.sessionTitle ?? 'Untitled thread'} · ${where}`
 }
 
 export const RequestLog = (props: {
@@ -98,7 +95,7 @@ export const RequestLog = (props: {
     const outcome = props.openThread({ sessionId: row.sessionId, parentSessionId: row.parentSessionId })
     setNotice(
       outcome === 'missing'
-        ? `${row.sessionTitle ?? row.sessionId} is no longer in the thread list (archived or deleted).`
+        ? `${row.sessionTitle ?? 'Untitled thread'} is no longer in the thread list (archived or deleted).`
         : outcome === 'parent'
           ? 'Opened the parent thread: this subagent has no thread of its own.'
           : null,
@@ -109,24 +106,19 @@ export const RequestLog = (props: {
   const matching = data === undefined ? 0 : status === 'all' ? data.total : (data.statusCounts[status] ?? 0)
 
   return (
-    <section className="dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-lg dshx:border dshx:p-3" aria-labelledby="dshfiles-usage-log-title">
-      <div className="dshx:flex dshx:flex-wrap dshx:items-end dshx:justify-between dshx:gap-3">
-        <div className="dshx:flex dshx:flex-col dshx:gap-0.5">
-          <h2 id="dshfiles-usage-log-title" className="dshx:text-base dshx:font-semibold">
-            Request log
-          </h2>
-          <p className="dshx:text-xs dshx:text-muted-foreground">
-            {data === undefined ? 'Loading…' : `${shown.toLocaleString()} of the latest ${matching.toLocaleString()} requests`}
-          </p>
-        </div>
+    <PageSection
+      heading="Request log"
+      meta={data === undefined ? 'Loading…' : `${shown.toLocaleString()} of the latest ${matching.toLocaleString()} requests`}
+      actions={
         <SearchInput
-          className="dshx:w-full dshx:sm:w-72"
+          className="dshx:w-72 dshx:max-w-full"
           aria-label="Search requests"
           value={props.search}
           onChange={event => props.onSearch(event.target.value)}
           placeholder="Model, provider or project"
         />
-      </div>
+      }
+    >
       <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5" role="group" aria-label="Status">
         {STATUS_CHIPS.map(chip => (
           <Button
@@ -146,28 +138,35 @@ export const RequestLog = (props: {
           {notice}
         </p>
       )}
-      {page.isError ? <p className="dshx:text-xs dshx:text-destructive">{errorMessage(page.error, 'Requests could not be loaded.')}</p> : null}
+      {page.isError ? (
+        <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">
+          {errorMessage(page.error, 'Requests could not be loaded.')}
+          <Button variant="outline" size="xs" disabled={page.isFetching} onClick={() => void page.refetch()}>
+            Try again
+          </Button>
+        </p>
+      ) : null}
       <div className="dshx:overflow-x-auto">
         <Table className="dshx:min-w-[880px] dshx:text-xs">
           <TableHeader>
             <TableRow>
-              <TableHead className="dshx:uppercase">Model</TableHead>
+              <TableHead>Model</TableHead>
               <SortableHead column="startedAt" label="When" sort={sort} onSort={onSort} className="dshx:text-left" />
-              <TableHead className="dshx:uppercase">Project</TableHead>
+              <TableHead>Project</TableHead>
               <SortableHead column="input" label="Input" sort={sort} onSort={onSort} />
               <SortableHead column="cacheRead" label="Cache read" sort={sort} onSort={onSort} />
               <SortableHead column="output" label="Output" sort={sort} onSort={onSort} />
               <SortableHead column="cost" label="Cost" sort={sort} onSort={onSort} />
               <SortableHead column="durationMs" label="Duration" sort={sort} onSort={onSort} />
               <SortableHead column="ttftMs" label="TTFT" sort={sort} onSort={onSort} />
-              <TableHead className="dshx:uppercase">Status</TableHead>
+              <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data !== undefined && data.rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="dshx:py-6 dshx:text-center dshx:text-muted-foreground">
-                  No requests in this range.
+                <TableCell colSpan={10}>
+                  <EmptyState>No requests in this range.</EmptyState>
                 </TableCell>
               </TableRow>
             ) : null}
@@ -222,6 +221,6 @@ export const RequestLog = (props: {
           </TableBody>
         </Table>
       </div>
-    </section>
+    </PageSection>
   )
 }

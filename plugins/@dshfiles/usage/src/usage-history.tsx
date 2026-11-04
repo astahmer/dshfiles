@@ -11,7 +11,7 @@ type CalendarMetric = 'tokens' | 'cost' | 'requests'
 
 const columnLabels = {
   requests: 'Requests',
-  sessions: 'Sessions',
+  sessions: 'Threads',
   averageTokens: 'Avg tokens / req',
   input: 'Input',
   cacheRead: 'Cache read',
