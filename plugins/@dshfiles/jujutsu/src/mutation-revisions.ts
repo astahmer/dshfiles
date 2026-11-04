@@ -1,6 +1,6 @@
 import type { Mutation, Revision } from './api.js'
 
-const revisionIdsFor = (action: Mutation): readonly string[] => {
+export const revisionIdsFor = (action: Mutation): readonly string[] => {
   switch (action.kind) {
     case 'squash':
     case 'rebase':

@@ -29,6 +29,15 @@ export const OPERATION_ID_TEMPLATE =
   '\',"attributes":\' ++ self.attributes().escape_json() ++ ' +
   '\',"time":\' ++ self.time().end().format("%+").escape_json() ++ \'}\' ++ "\\n"'
 
+/**
+ * What a prepared action is bound to for one revision it names: visibility, mutability, working-copy role, parents,
+ * local bookmarks and first line. Any change here between preview and confirmation refuses the action.
+ */
+export const TARGET_TEMPLATE =
+  'commit_id ++ "\\t" ++ if(hidden, "hidden", "visible") ++ "\\t" ++ if(immutable, "immutable", "mutable") ++ "\\t" ++ ' +
+  'if(current_working_copy, "working-copy", "-") ++ "\\t" ++ working_copies ++ "\\t" ++ parents.map(|c| c.commit_id()).join(",") ++ "\\t" ++ ' +
+  'local_bookmarks.map(|b| b.name()).join(",") ++ "\\t" ++ description.first_line() ++ "\\n"'
+
 export const EVOLUTION_TEMPLATE =
   '\'{"commitId":\' ++ self.commit().commit_id().short(64).escape_json() ++ ' +
   '\',"predecessors":[\' ++ self.predecessors().map(|c| c.commit_id().short(64).escape_json()).join(",") ++ \']}\' ++ "\\n"'

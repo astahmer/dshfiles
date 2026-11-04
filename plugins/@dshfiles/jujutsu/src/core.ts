@@ -11,10 +11,19 @@ export interface FileChange {
   readonly contentDigest: string | null
 }
 
+/** Digests of what one action names: its revisions, its bookmark's targets, the remote configuration and workspace. */
+export interface TargetState {
+  readonly revisions: string
+  readonly bookmark: string
+  readonly remote: string
+  readonly workspace: string
+}
+
 export interface PreparedMutation {
   readonly root: string
   readonly identity: string
-  readonly fingerprint: string
+  /** The state of what the action names when it was previewed; confirmation compares a fresh read of the same. */
+  readonly targets: TargetState
   readonly action: Mutation
   /** The folder `workspace-forget` resolves at preview time, snapshotted before the workspace is unregistered. */
   readonly workspaceRoot?: string

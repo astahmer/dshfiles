@@ -107,6 +107,10 @@ When('a revision {string} is committed outside DSH', async ({ page }: { page: Pa
   jj(repository, ['new'])
 })
 
+When('a bookmark {string} is set on the Feature revision outside DSH', async ({ page }: { page: Page }, bookmark: string) => {
+  jj(repositoryFor(page), ['bookmark', 'create', bookmark, '-r', 'description(substring:"Feature work by Ada")'])
+})
+
 When('a revision {string} created in 2020 is edited outside DSH today', async ({ page }: { page: Page }, description: string) => {
   const repository = repositoryFor(page)
   jj(repository, ['new', 'main', '-m', description], { name: 'Ada Author', email: 'ada@example.invalid', timestamp: '2020-01-01T00:00:00Z' })
@@ -289,7 +293,10 @@ Then('its changed files keep literal paths and track review progress', async ({ 
 Then('the stale preview is refused without changing the repository', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
   await recordAssertion(page, 'jujutsu-stale-preview-is-refused', async () => {
-    await expect(page.getByRole('alert').filter({ hasText: 'Preview expired or repository state changed. Refresh and preview again.' })).toBeVisible()
+    // A preview is bound to what it names: the unrelated outside commit alone would not refuse it, the bookmark on Feature does.
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'A revision or bookmark this action names changed after the preview. Refresh and prepare the action again.' }),
+    ).toBeVisible()
     expect(descriptions(repository)).toContain('Feature work by Ada')
   })
 })

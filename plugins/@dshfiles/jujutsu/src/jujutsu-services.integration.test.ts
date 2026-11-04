@@ -206,6 +206,23 @@ describe.skipIf(!jjAvailable)('jujutsu services', () => {
     }).pipe(Effect.scoped),
   )
 
+  it.effect('refuses a fetch preview with its own cause once the remote configuration changed', () =>
+    Effect.gen(function* () {
+      const repo = yield* temporaryRepository
+      yield* withRemoteMain(repo)
+      yield* Effect.gen(function* () {
+        const { id: repoId } = yield* Repositories.use(repositories => repositories.register(repo))
+        const preview = yield* Mutations.use(mutations => mutations.prepare({ repoId, action: { kind: 'fetch', remote: 'origin' } }))
+        jj(repo, 'git', 'remote', 'set-url', 'origin', repo + '-elsewhere.git')
+        const error = yield* Effect.flip(Mutations.use(mutations => mutations.confirm({ repoId, previewId: preview.id })))
+        expect({ tag: error._tag, message: error.message }).toEqual({
+          tag: 'PreviewExpired',
+          message: 'The remote configuration changed after the preview. Refresh and prepare the action again.',
+        })
+      }).pipe(Effect.provide(servicesWith(NodeServices.layer)))
+    }).pipe(Effect.scoped),
+  )
+
   it.effect('refuses a preview once it is five minutes old', () =>
     Effect.gen(function* () {
       const repo = yield* temporaryRepository
@@ -221,7 +238,7 @@ describe.skipIf(!jjAvailable)('jujutsu services', () => {
         const error = yield* Effect.flip(Mutations.use(mutations => mutations.confirm({ repoId, previewId: stale.id })))
         expect({ tag: error._tag, message: error.message }).toEqual({
           tag: 'PreviewExpired',
-          message: 'Preview expired or repository state changed. Refresh and preview again.',
+          message: 'Preview expired or was already used. Prepare the action again.',
         })
 
         const fresh = yield* Mutations.use(mutations => mutations.prepare({ repoId, action }))

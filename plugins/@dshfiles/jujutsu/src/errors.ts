@@ -93,14 +93,28 @@ export class RepositoryInitFailed extends Schema.TaggedError<RepositoryInitFaile
   }
 }
 
-/** A prepared action is one-use, expires after five minutes and is bound to the repository state it previewed. */
+const previewExpiredMessages = {
+  expired: 'Preview expired or was already used. Prepare the action again.',
+  repository: 'The repository at this path changed after the preview. Select it again, then prepare the action again.',
+  'target-changed': 'A revision or bookmark this action names changed after the preview. Refresh and prepare the action again.',
+  'remote-changed': 'The remote configuration changed after the preview. Refresh and prepare the action again.',
+} as const
+
+/**
+ * A prepared action is one-use, expires after five minutes and is bound to the revisions, bookmark, remote and
+ * workspace it names. Each refusal names its own cause; changes elsewhere in the repository do not refuse it.
+ */
 export class PreviewExpired extends Schema.TaggedError<PreviewExpired>()(
   'PreviewExpired',
-  { previewId: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  {
+    previewId: Schema.String,
+    reason: Schema.Literals(['expired', 'repository', 'target-changed', 'remote-changed']),
+    cause: Schema.optional(Schema.Defect()),
+  },
   { dshxWireCode: 'preview-expired' },
 ) {
   override get message(): string {
-    return 'Preview expired or repository state changed. Refresh and preview again.'
+    return previewExpiredMessages[this.reason]
   }
 }
 

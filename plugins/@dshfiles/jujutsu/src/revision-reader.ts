@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto'
 import { Cache, Context, Duration, Effect, Layer, Schema } from 'effect'
 import { GRAPH_PAGE_BYTE_BUDGET, GRAPH_PAGE_SIZE, REVISION_PAGE_SIZE, revisionSchema, type JujutsuState, type Revision } from './api.js'
-import { JujutsuOutputModel } from './core.js'
+import { JujutsuOutputModel, type TargetState } from './core.js'
 import { OutputLimitExceeded } from './errors.js'
 import { GraphNavigationReads } from './graph-navigation-reads.js'
 import { GraphPage } from './graph-page.js'
 import { matchesRevisionSearch } from './graph.js'
-import { EVOLUTION_TEMPLATE, OPERATION_ID_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
+import { EVOLUTION_TEMPLATE, OPERATION_ID_TEMPLATE, REVISION_TEMPLATE, TARGET_TEMPLATE } from './jj-templates.js'
 import { ReferenceGraphModel } from './reference-graph.js'
 import { Repositories } from './repositories.js'
 import { RepositoryIdentity, type RegisteredRepo } from './repository-identity.js'
@@ -45,12 +45,21 @@ const remoteNamePattern = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/
 
 const ignoreWorkingCopy = RevisionReads.ignoreWorkingCopy
 
-/** The panel's view of a repository plus what a prepared action is bound to: its identity and a state fingerprint. */
+/** The panel's view of a repository and the identity it was read under. */
 export interface Snapshot {
   readonly state: JujutsuState
   readonly identity: string
-  readonly fingerprint: string
 }
+
+/** What one prepared action names; `targetState` reads exactly this, at preview and again at confirmation. */
+export interface MutationTarget {
+  readonly commitIds: readonly string[]
+  readonly bookmark?: string | undefined
+  readonly remote?: boolean | undefined
+  readonly workspace?: string | undefined
+}
+
+const digest = (value: string): string => createHash('sha256').update(value).digest('hex')
 
 const withEvolved = (revisions: readonly Revision[], evolved: ReadonlySet<string>): Revision[] =>
   revisions.map(revision => ({ ...revision, evolved: evolved.has(revision.commitId) }))
@@ -216,11 +225,56 @@ const make = Effect.gen(function* () {
       lastPushHistoryTruncated: lastPush.historyTruncated,
       evolutionHistoryTruncated: evolution.truncated,
     }
-    const fingerprint = createHash('sha256')
-      .update(JSON.stringify({ revisions: graphRevisions, changedPaths, status: state.status, remoteConfig: remotes.configFingerprint }))
-      .digest('hex')
-    const current: Snapshot = { state, identity: repo.identity, fingerprint }
+    const current: Snapshot = { state, identity: repo.identity }
     return current
+  })
+
+  /**
+   * The state of exactly what an action names, never the whole repository: each named revision's visibility,
+   * mutability, working-copy role, parents, bookmarks and first line; the commits its bookmark points at; the remote
+   * configuration; the workspace's folder. Reads ignore the working copy, so the caller snapshots `@` first.
+   */
+  const targetState = Effect.fn('jujutsu mutation target state')(function* (repo: RegisteredRepo, target: MutationTarget) {
+    const run = repositories.run(repo)
+    const lines = (result: { readonly stdout: string; readonly truncated: boolean }) =>
+      result.truncated
+        ? 'truncated'
+        : result.stdout
+            .split('\n')
+            .filter(line => line.length > 0)
+            .sort()
+            .join('\n')
+    const commitIds = [...new Set(target.commitIds)].sort()
+    const [revisions, bookmark, remote, workspace] = yield* Effect.all(
+      [
+        commitIds.length === 0
+          ? Effect.succeed('')
+          : run([ignoreWorkingCopy, 'log', '--no-graph', '--revisions', GraphPage.commitIdsRevset(commitIds), '--template', TARGET_TEMPLATE], {
+              outputLimit: 256_000,
+            }).pipe(
+              Effect.map(lines),
+              Effect.catchTag('JujutsuCommandFailed', () => Effect.succeed('unavailable')),
+            ),
+        target.bookmark === undefined
+          ? Effect.succeed('')
+          : run([ignoreWorkingCopy, 'log', '--no-graph', '--revisions', `bookmarks(exact:"${target.bookmark}")`, '--template', 'commit_id ++ "\\n"'], {
+              outputLimit: 64_000,
+            }).pipe(
+              Effect.map(lines),
+              Effect.catchTag('JujutsuCommandFailed', () => Effect.succeed('unavailable')),
+            ),
+        target.remote === true ? readRemotes(repo).pipe(Effect.map(remotes => remotes.configFingerprint)) : Effect.succeed(''),
+        target.workspace === undefined
+          ? Effect.succeed('')
+          : repositories.workspaces(repo).pipe(
+              Effect.map(workspaces => JSON.stringify(workspaces.find(workspace => workspace.name === target.workspace) ?? null)),
+              Effect.catchTag('JujutsuCommandFailed', () => Effect.succeed('unavailable')),
+            ),
+      ],
+      { concurrency: 'unbounded' },
+    )
+    const state: TargetState = { revisions: digest(revisions), bookmark: digest(bookmark), remote: digest(remote), workspace: digest(workspace) }
+    return state
   })
 
   /** `revisions` plus the evolution flags of the ones looked up by id, for revisions an action names off the first page. */
@@ -378,6 +432,7 @@ const make = Effect.gen(function* () {
 
   return {
     snapshot,
+    targetState,
     withRevisions,
     paths: (repo: RegisteredRepo, revision: string) => RevisionReads.paths(repositories.run(repo), revision),
     load,

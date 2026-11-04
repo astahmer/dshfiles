@@ -263,7 +263,7 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
       expect(first).toMatchObject({ output: { message: `${preview.title} completed.` } })
       expect(await host.wire('confirm', { repoId, previewId: preview.id })).toEqual({
         code: 'preview-expired',
-        message: 'Preview expired or repository state changed. Refresh and preview again.',
+        message: 'Preview expired or was already used. Prepare the action again.',
       })
     })
 
@@ -273,9 +273,16 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
       jj(repo, 'describe', '-m', 'changed by someone else')
       expect(await host.wire('confirm', { repoId, previewId: preview.id })).toEqual({
         code: 'preview-expired',
-        message: 'Preview expired or repository state changed. Refresh and preview again.',
+        message: 'A revision or bookmark this action names changed after the preview. Refresh and prepare the action again.',
       })
       expect(jj(repo, 'log', '--no-graph', '-r', '@', '-T', 'description')).toBe('changed by someone else\n')
+    })
+
+    it('keeps a preview when only revisions it does not name changed', async () => {
+      const { repoId } = await host.api.registerRepository({ path: repo })
+      const preview = await host.api.prepare({ repoId, action: await describeAction(repoId) })
+      jj(repo, '--ignore-working-copy', 'new', 'root()', '--no-edit', '-m', 'unrelated work elsewhere')
+      expect(await host.wire('confirm', { repoId, previewId: preview.id })).toMatchObject({ output: { message: `${preview.title} completed.` } })
     })
   })
 
@@ -329,7 +336,7 @@ describe.skipIf(!jjAvailable)('jujutsu Host boundary', { timeout: 60_000 }, () =
         },
         "confirm: unknown preview": {
           "code": "preview-expired",
-          "message": "Preview expired or repository state changed. Refresh and preview again.",
+          "message": "Preview expired or was already used. Prepare the action again.",
         },
         "details: unknown revision": {
           "output": {

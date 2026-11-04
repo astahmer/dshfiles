@@ -4,10 +4,10 @@ import type { Mutation, Revision } from './api.js'
 import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel, type PreparedMutation } from './core.js'
 import { MutationRefused, PreviewExpired, WorkspaceChanged } from './errors.js'
 import { JujutsuCommands } from './jujutsu-commands.js'
-import { missingMutationRevisionIds } from './mutation-revisions.js'
+import { missingMutationRevisionIds, revisionIdsFor } from './mutation-revisions.js'
 import { Repositories } from './repositories.js'
 import { RepositoryIdentity, type RegisteredRepo } from './repository-identity.js'
-import { RevisionReader, type Snapshot } from './revision-reader.js'
+import { RevisionReader, type MutationTarget, type Snapshot } from './revision-reader.js'
 import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
 
 const PREVIEW_TTL = Duration.minutes(5)
@@ -254,6 +254,17 @@ const mutationPreview = Effect.fnUntraced(function* (input: {
   }
 })
 
+/** Everything one action names, which is all its preview is bound to. */
+const targetOf = (action: Mutation): MutationTarget => ({
+  commitIds: revisionIdsFor(action),
+  bookmark:
+    action.kind === 'bookmark-move' || action.kind === 'bookmark-set' || action.kind === 'bookmark-delete' || action.kind === 'push'
+      ? action.bookmark
+      : undefined,
+  remote: action.kind === 'fetch' || action.kind === 'push',
+  workspace: action.kind === 'workspace-add' || action.kind === 'workspace-forget' || action.kind === 'workspace-edit' ? action.name : undefined,
+})
+
 const pathsRevisionOf = (action: Mutation): string | undefined => {
   if (action.kind === 'split' || action.kind === 'restore') return action.commitId
   if (action.kind === 'squash' && action.paths !== undefined) return action.sourceId
@@ -268,7 +279,7 @@ const make = Effect.gen(function* () {
   const commands = yield* JujutsuCommands
 
   const previews = yield* Cache.make({
-    lookup: (previewId: string): Effect.Effect<PreparedMutation, PreviewExpired> => Effect.fail(new PreviewExpired({ previewId })),
+    lookup: (previewId: string): Effect.Effect<PreparedMutation, PreviewExpired> => Effect.fail(new PreviewExpired({ previewId, reason: 'expired' })),
     capacity: MAX_PREVIEWS,
     timeToLive: PREVIEW_TTL,
   })
@@ -322,7 +333,7 @@ const make = Effect.gen(function* () {
     const prepared: PreparedMutation = {
       root: repo.root,
       identity: current.identity,
-      fingerprint: current.fingerprint,
+      targets: yield* reader.targetState(repo, targetOf(preparedAction)),
       action: preparedAction,
       argv,
       title: preview.title,
@@ -335,14 +346,24 @@ const make = Effect.gen(function* () {
     return prepared
   })
 
-  /** Take a preview once: it is gone after this read whether or not it still matches the repository. */
-  const take = Effect.fnUntraced(function* (previewId: string, repo: RegisteredRepo, current: Snapshot) {
+  /**
+   * Take a preview once: it is gone after this read whether or not it still matches. It still applies only while
+   * everything it names reads the same as at preview time; other revisions, workspaces and edits do not matter.
+   */
+  const take = Effect.fnUntraced(function* (previewId: string, repo: RegisteredRepo) {
     const prepared = yield* Cache.getOption(previews, previewId)
     yield* Cache.invalidate(previews, previewId)
-    if (Option.isNone(prepared)) return yield* new PreviewExpired({ previewId })
+    if (Option.isNone(prepared)) return yield* new PreviewExpired({ previewId, reason: 'expired' })
     const entry = prepared.value
-    if (entry.root !== repo.root || entry.identity !== repo.identity || entry.fingerprint !== current.fingerprint)
-      return yield* new PreviewExpired({ previewId })
+    if (entry.root !== repo.root || entry.identity !== repo.identity) return yield* new PreviewExpired({ previewId, reason: 'repository' })
+    // Snapshot this workspace's `@` first, so an edit made since the preview shows up as a rewritten target.
+    yield* repositories.run(repo)(['status'], { outputLimit: 8_000 })
+    const now = yield* reader.targetState(repo, targetOf(entry.action))
+    if (now.remote !== entry.targets.remote) return yield* new PreviewExpired({ previewId, reason: 'remote-changed' })
+    if (now.revisions !== entry.targets.revisions || now.bookmark !== entry.targets.bookmark) {
+      return yield* new PreviewExpired({ previewId, reason: 'target-changed' })
+    }
+    if (now.workspace !== entry.targets.workspace) return yield* new WorkspaceChanged({ reason: 'moved' })
     return entry
   })
 
@@ -361,8 +382,7 @@ const make = Effect.gen(function* () {
 
   const confirm = Effect.fn('jujutsu mutation confirm')(function* (input: { readonly repoId: string; readonly previewId: string }) {
     const repo = yield* repositories.resolve(input.repoId)
-    const current = yield* reader.snapshot(repo, MAX_REVISIONS)
-    const prepared = yield* take(input.previewId, repo, current)
+    const prepared = yield* take(input.previewId, repo)
     yield* identity.verify(repo)
     const action = prepared.action
     const workspacePath =

@@ -226,13 +226,26 @@ The browser supplies an absolute path only when registering a repository. The
 Host canonicalizes it, verifies it with `jj root`, and stores an opaque,
 process-local repository id. Later API calls accept only that id. Before and
 after commands, the Host checks the canonical directory and its device/inode;
-before confirmation it recomputes the revision/status/path and remote-config
-fingerprint. Remote configuration is hashed in memory and never sent to the
-client. Remote preview and command output is redacted before it crosses the
+before confirmation it snapshots the working copy and re-reads exactly what the
+action names: each named revision's visibility, mutability, working-copy role,
+parents, bookmarks and first line; the commits its bookmark points at; the
+remote configuration; the named workspace's folder. Remote configuration is
+hashed in memory and never sent to the client. Remote preview and command output is redacted before it crosses the
 API.
 
 Confirmation tokens are one-use, expire after five minutes, and bind the
-action to the repository identity and current state. Fetch cannot provide an
+action to the repository identity and to the state of what it names, so other
+agents' edits to unrelated revisions or workspaces do not refuse it. A refusal
+names its cause: expired or used, repository replaced, a named revision or
+bookmark changed, or the remote configuration changed.
+
+Read tools (`jj_details`, `jj_revision_files`, `jj_edit_times`,
+`jj_graph_slice`, `jj_revision_relationship`) accept a full commit id, a unique
+1–64 hex commit id prefix or a 1–32 letter change id prefix, as `jj log`
+prints them, and resolve it on the Host through `commit_id()` / `change_id()`.
+An ambiguous prefix, divergent copies of one change and an unknown id each get
+their own message; outputs always carry full ids, and mutations still take
+full ids only. Fetch cannot provide an
 exact incoming-change preview through the supported JJ command used here, so
 its preview explains that remote changes depend on the fetch response. Push
 uses `jj git push --dry-run` when available; a failed dry run is disclosed in

@@ -78,6 +78,7 @@ Feature: Jujutsu revision interactions
     And the Feature revision is opened
     And the Feature revision is previewed for squashing into its parent
     And a revision "Moved the repository on" is committed outside DSH
+    And a bookmark "outside-mark" is set on the Feature revision outside DSH
     And the squash preview is confirmed
     Then the stale preview is refused without changing the repository
     When the Feature revision is opened

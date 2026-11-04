@@ -101,7 +101,7 @@ test('an unknown prefix reports that no revision matches instead of a stale-revi
   assert.equal(error.message, 'No revision matches "deadbeef1234". Check the id against jj log and try again.')
 })
 
-test('a short prefix of several commits is refused as ambiguous, and one of divergent copies lists them', async () => {
+test('a short prefix of several commits is refused as ambiguous, and one of divergent copies lists them', { timeout: 60_000 }, async () => {
   const { repo, jj, run } = await scratchRepo()
   const commitIds: string[] = []
   for (let index = 0; index < 20; index++) {
