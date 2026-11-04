@@ -179,4 +179,43 @@ test('edit times keep the last content change through rebases and describes, and
 
   jj(['new', '--message', 'empty', 'root()'])
   assert.equal(await editedAt('@'), null)
+
+  const commitIds = [feature, side, base, '@'].map(commitIdOf)
+  const evologs: string[][] = []
+  const counted: JjRun = (args, options) => {
+    if (args.includes('evolog')) evologs.push([...args])
+    return run(args, options)
+  }
+  const batched = await Effect.runPromise(RevisionReads.editTimes(counted, { repositoryRoot: repo, commitIds, cache: makeEditTimeCache() }))
+  assert.equal(evologs.length, 1)
+  const separate = await Promise.all(
+    commitIds.map(
+      async commitId => (await Effect.runPromise(RevisionReads.editTimes(run, { repositoryRoot: repo, commitIds: [commitId], cache: makeEditTimeCache() })))[0],
+    ),
+  )
+  assert.deepEqual(batched, separate)
+  assert.equal(batched[0]?.editedAt, squashedAt)
+})
+
+test('edit times read in one batch keep divergent copies of one change apart', { timeout: 60_000 }, async () => {
+  const { repo, jj, run } = await scratchRepo()
+  const commitIdsOf = (revision: string): string[] =>
+    jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', revision, '--template', 'commit_id ++ "\\n"']).trim().split('\n')
+  await writeFile(join(repo, 'shared.txt'), 'one\n')
+  jj(['describe', '--message', 'shared'])
+  const change = jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@', '--template', 'change_id']).trim()
+  const before = jj(['op', 'log', '--no-graph', '--limit', '1', '--template', 'self.id()']).trim()
+  await writeFile(join(repo, 'shared.txt'), 'two\n')
+  jj(['status'])
+  jj(['--at-op', before, 'describe', change, '--message', 'shared, renamed concurrently'])
+  const copies = commitIdsOf(`change_id(${change})`)
+  assert.equal(copies.length, 2)
+  const batched = await Effect.runPromise(RevisionReads.editTimes(run, { repositoryRoot: repo, commitIds: copies, cache: makeEditTimeCache() }))
+  const separate = await Promise.all(
+    copies.map(
+      async commitId => (await Effect.runPromise(RevisionReads.editTimes(run, { repositoryRoot: repo, commitIds: [commitId], cache: makeEditTimeCache() })))[0],
+    ),
+  )
+  assert.deepEqual(batched, separate)
+  assert.notEqual(batched[0]?.editedAt, batched[1]?.editedAt)
 })

@@ -24,6 +24,7 @@ const editTimeRowSchema = Schema.Struct({
   commitId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{40,64}$/)),
   changeId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{20,64}$/)),
   edited: Schema.Boolean,
+  predecessors: Schema.Array(Schema.String.check(Schema.isPattern(/^[a-f0-9]{40,64}$/))),
   time: Schema.String.check(Schema.isMaxLength(64)),
 })
 
@@ -31,6 +32,7 @@ const EDIT_TIME_CACHE_LIMIT = 50_000
 /** A just-rewritten commit usually resolves from its newest entries or a cached predecessor; the full log is the last resort. */
 const EDIT_TIME_EVOLOG_LIMITS = [2, 32, undefined] as const
 const EDIT_TIME_CONCURRENCY = 4
+const EDIT_TIME_OUTPUT_LIMIT = 2_000_000
 
 const ignoreWorkingCopy = '--ignore-working-copy'
 
@@ -143,6 +145,60 @@ const editTimes = Effect.fnUntraced(function* (
     for (const commitId of commitIds) input.cache.set(cacheKey(commitId), editedAt)
     return editedAt
   }
+  type EditTimeRow = typeof editTimeRowSchema.Type
+  /** Walk one change's versions newest first: the first edit wins, and a cached version answers for the rest. */
+  type Walked = { readonly decided: true; readonly editedAt: string | null } | { readonly decided: false; readonly visited: readonly string[] }
+  const walk = (versions: readonly EditTimeRow[]): Walked => {
+    const visited: string[] = []
+    for (const version of versions) {
+      const known = input.cache.get(cacheKey(version.commitId))
+      if (Option.isSome(known)) return { decided: true, editedAt: remember(visited, known.value) }
+      visited.push(version.commitId)
+      if (version.edited) return { decided: true, editedAt: remember(visited, version.time) }
+    }
+    return { decided: false, visited }
+  }
+  /**
+   * Every uncached commit from one `jj evolog` over their revset: a jj process costs about as much as the walk itself,
+   * so one process per commit made a 100-revision page take seconds. Nothing is decided when the read fails or is
+   * truncated, and each commit then takes the per-commit path.
+   */
+  const batched = Effect.fnUntraced(function* (commitIds: readonly string[]) {
+    if (commitIds.length < 2) return
+    const result = yield* run([ignoreWorkingCopy, 'evolog', '--no-graph', '--revisions', commitIds.join('|'), '--template', EDIT_TIME_TEMPLATE], {
+      outputLimit: EDIT_TIME_OUTPUT_LIMIT,
+    }).pipe(Effect.option)
+    if (Option.isNone(result) || result.value.truncated) return
+    const entries = JujutsuOutputModel.parseJsonLines(JujutsuOutputModel.completeLines(result.value), editTimeRowSchema)
+    if (entries._tag === 'Failure') return
+    const byCommit = new Map(entries.success.map(entry => [entry.commitId, entry]))
+    /**
+     * The versions of one commit, newest first, by its own predecessor links: one log interleaves every requested
+     * commit, and divergent copies share a change id. `complete` when the chain reaches the change's first version;
+     * any other end (a predecessor from another change, a missing row) leaves the commit to the per-commit read.
+     */
+    const chainOf = (commitId: string) => {
+      const versions: EditTimeRow[] = []
+      let current = byCommit.get(commitId)
+      while (current !== undefined) {
+        versions.push(current)
+        // A version with several predecessors is a squash, which `edited` already reports.
+        if (current.edited) return { versions, complete: true }
+        const [only, ...others] = current.predecessors
+        if (only === undefined) return { versions, complete: true }
+        const previous = byCommit.get(only)
+        if (others.length > 0 || previous?.changeId !== current.changeId) return { versions, complete: false }
+        current = previous
+      }
+      return { versions, complete: false }
+    }
+    for (const commitId of commitIds) {
+      if (Option.isSome(input.cache.get(cacheKey(commitId)))) continue
+      const chain = chainOf(commitId)
+      const walked = walk(chain.versions)
+      if (!walked.decided && chain.complete) remember(walked.visited, null)
+    }
+  })
   const resolve = Effect.fnUntraced(function* (commitId: string) {
     const cached = input.cache.get(cacheKey(commitId))
     if (Option.isSome(cached)) return cached.value
@@ -158,24 +214,20 @@ const editTimes = Effect.fnUntraced(function* (
           '--template',
           EDIT_TIME_TEMPLATE,
         ],
-        { outputLimit: 2_000_000 },
+        { outputLimit: EDIT_TIME_OUTPUT_LIMIT },
       )
       const entries = yield* Effect.fromResult(JujutsuOutputModel.parseJsonLines(JujutsuOutputModel.completeLines(result), editTimeRowSchema))
       const changeId = entries[0]?.changeId
       // Squashed-in revisions bring their own history into the log; only this change's versions count.
-      const versions = entries.filter(entry => entry.changeId === changeId)
-      const visited: string[] = []
-      for (const version of versions) {
-        const known = input.cache.get(cacheKey(version.commitId))
-        if (Option.isSome(known)) return remember(visited, known.value)
-        visited.push(version.commitId)
-        if (version.edited) return remember(visited, version.time)
-      }
-      if (!result.truncated && (limit === undefined || entries.length < limit)) return remember(visited, null)
+      const walked = walk(entries.filter(entry => entry.changeId === changeId))
+      if (walked.decided) return walked.editedAt
+      if (!result.truncated && (limit === undefined || entries.length < limit)) return remember(walked.visited, null)
     }
     return null
   })
-  return yield* Effect.forEach([...new Set(input.commitIds)], commitId => Effect.map(resolve(commitId), editedAt => ({ commitId, editedAt })), {
+  const commitIds = [...new Set(input.commitIds)]
+  yield* batched(commitIds.filter(commitId => Option.isNone(input.cache.get(cacheKey(commitId)))))
+  return yield* Effect.forEach(commitIds, commitId => Effect.map(resolve(commitId), editedAt => ({ commitId, editedAt })), {
     concurrency: EDIT_TIME_CONCURRENCY,
   })
 })
