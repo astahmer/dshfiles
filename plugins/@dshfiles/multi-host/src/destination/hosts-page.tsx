@@ -16,6 +16,7 @@ import {
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
+  SearchIcon,
   ServerIcon,
   Trash2Icon,
 } from '@dshfiles/plugin-ui/icons'
@@ -27,7 +28,8 @@ import { remoteDirectoryPicker } from './remote-folders.js'
 import { HostDialog, hostState, StatusDot, type HostDraft } from './hosts-dialog.js'
 import { moveHostId, shiftHostId } from './host-order.js'
 import { CloneProjectDialog } from './clone-project-dialog.js'
-import { versionMismatch } from './connection-diagnostics.js'
+import { ConnectionDiagnostics } from './connection-diagnostics.js'
+import { ConnectionTestSteps } from './connection-test-steps.js'
 import { FleetUpdateDialog } from './fleet-update-dialog.js'
 import { DisconnectGrace } from './disconnect-grace.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
@@ -105,7 +107,7 @@ const HostRow = (props: {
   const { api, host, runtime } = props
   const queryClient = useQueryClient()
   const state = DisconnectGrace.use(hostState(runtime))
-  const outdatedVersion = versionMismatch({ localVersion: props.localVersion, remoteVersion: runtime?.identity?.dshVersion })
+  const outdatedVersion = ConnectionDiagnostics.versionMismatch({ localVersion: props.localVersion, remoteVersion: runtime?.identity?.dshVersion })
   const [confirming, setConfirming] = useState(false)
   const [popupBlocked, setPopupBlocked] = useState(false)
   const reconnect = useMutation({
@@ -131,6 +133,33 @@ const HostRow = (props: {
       return 'copied'
     },
     onError: (_error, variables) => variables.tab?.close(),
+  })
+  const diagnose = useMutation({
+    mutationFn: async () => {
+      if (host.connector.kind !== 'ssh') throw new Error('Only SSH hosts can be diagnosed.')
+      return api.testConnection({ name: host.name, sshTarget: host.connector.sshTarget, remoteHome: runtime?.remoteHome ?? '' })
+    },
+  })
+  const diagnosisFailure = diagnose.data?.ok === false ? failure(diagnose.data) : undefined
+  const failedStep = diagnose.data?.steps?.find(step => !step.ok)
+  const copyDiagnostics = useMutation({
+    mutationFn: async () => {
+      const outcome =
+        diagnose.data?.ok === true
+          ? { kind: 'passed' as const, steps: diagnose.data.steps, dshVersion: diagnose.data.identity.dshVersion, profile: diagnose.data.identity.profile }
+          : {
+              kind: 'failed' as const,
+              steps: diagnose.data?.steps ?? [],
+              message: diagnosisFailure?.message ?? errorMessage(diagnose.error, 'The connection test failed.'),
+            }
+      const report = ConnectionDiagnostics.createReport({
+        sshTarget: host.connector.kind === 'ssh' ? host.connector.sshTarget : '',
+        remoteHome: runtime?.remoteHome ?? '',
+        localVersion: props.localVersion,
+        outcome,
+      })
+      if (!(await writeClipboard(report))) throw new Error('Could not copy the diagnostics. Allow clipboard access and try again.')
+    },
   })
   return (
     <li
@@ -202,6 +231,39 @@ const HostRow = (props: {
         {reconnect.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(reconnect.error, 'Reconnect failed.')}</span> : null}
         {remoteView.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(remoteView.error, 'Remote host link failed.')}</span> : null}
         {popupBlocked ? <span className="dshx:text-xs dshx:text-destructive">Allow pop-ups to open the remote host.</span> : null}
+        {diagnose.data === undefined ? null : (
+          <ConnectionTestSteps steps={diagnose.data.steps ?? []} {...(diagnose.data.ok ? { identity: diagnose.data.identity } : {})} />
+        )}
+        {diagnosisFailure === undefined && !diagnose.isError ? null : (
+          <Alert variant="destructive">
+            <AlertDescription>
+              {diagnosisFailure?.message ?? errorMessage(diagnose.error, 'The connection test failed.')} {ConnectionDiagnostics.recovery(failedStep?.step)}
+            </AlertDescription>
+          </Alert>
+        )}
+        {diagnose.data !== undefined || diagnose.isError ? (
+          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="dshx:h-7 dshx:px-2"
+              disabled={copyDiagnostics.isPending}
+              onClick={() => copyDiagnostics.mutate()}
+            >
+              <CopyIcon className="dshx:size-3.5" />
+              Copy diagnostics
+            </Button>
+            {copyDiagnostics.isSuccess ? (
+              <span role="status" className="dshx:text-success">
+                Copied.
+              </span>
+            ) : null}
+            {copyDiagnostics.isError ? (
+              <span className="dshx:text-destructive">{errorMessage(copyDiagnostics.error, 'Allow clipboard access, then try again.')}</span>
+            ) : null}
+          </div>
+        ) : null}
         {remoteView.data === 'copied' ? (
           <span role="status" className="dshx:text-xs dshx:text-success">
             Remote host link copied.
@@ -271,6 +333,22 @@ const HostRow = (props: {
             >
               <CopyIcon className="dshx:size-3.5" />
             </Button>
+            {runtime?.lastError === undefined ? null : (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="dshx:h-7 dshx:px-2"
+                aria-label={`Diagnose ${host.name}`}
+                disabled={diagnose.isPending}
+                onClick={() => {
+                  copyDiagnostics.reset()
+                  diagnose.mutate()
+                }}
+              >
+                {diagnose.isPending ? <Spinner className="dshx:size-3.5" /> : <SearchIcon className="dshx:size-3.5" />}
+                Diagnose
+              </Button>
+            )}
             <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onAddProject}>
               <PlusIcon className="dshx:size-3.5" />
               Add folder

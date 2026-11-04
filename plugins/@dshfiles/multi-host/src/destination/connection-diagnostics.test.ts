@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import { connectionDiagnostics, versionMismatch } from './connection-diagnostics.js'
+import { ConnectionDiagnostics } from './connection-diagnostics.js'
 
 describe('connection diagnostics', () => {
   test('a passed test lists every step with its timing and the remote identity', () => {
-    const report = connectionDiagnostics({
+    const report = ConnectionDiagnostics.createReport({
       sshTarget: 'm1-perso',
       remoteHome: '/Users/me/.dsh',
       localVersion: '0.2.1',
@@ -25,7 +25,7 @@ describe('connection diagnostics', () => {
   })
 
   test('a failed test keeps the error the Host reported and the hops that ran', () => {
-    const report = connectionDiagnostics({
+    const report = ConnectionDiagnostics.createReport({
       sshTarget: 'vps',
       remoteHome: '/home/deploy/.dsh',
       localVersion: undefined,
@@ -45,11 +45,20 @@ describe('connection diagnostics', () => {
   })
 })
 
+describe('connection test recovery', () => {
+  test('provides a recovery path for each failed hop and a general request failure', () => {
+    expect(ConnectionDiagnostics.recovery('ssh')).toContain('SSH target')
+    expect(ConnectionDiagnostics.recovery('runtime')).toContain('Start DSH')
+    expect(ConnectionDiagnostics.recovery('identity')).toContain('remote profile')
+    expect(ConnectionDiagnostics.recovery(undefined)).toContain('Edit the SSH target')
+  })
+})
+
 describe('version mismatch', () => {
   test('reports the remote version only when both are known and differ', () => {
-    expect(versionMismatch({ localVersion: '0.2.1', remoteVersion: '0.2.0' })).toBe('0.2.0')
-    expect(versionMismatch({ localVersion: '0.2.1', remoteVersion: '0.2.1' })).toBeUndefined()
-    expect(versionMismatch({ localVersion: undefined, remoteVersion: '0.2.0' })).toBeUndefined()
-    expect(versionMismatch({ localVersion: '0.2.1', remoteVersion: undefined })).toBeUndefined()
+    expect(ConnectionDiagnostics.versionMismatch({ localVersion: '0.2.1', remoteVersion: '0.2.0' })).toBe('0.2.0')
+    expect(ConnectionDiagnostics.versionMismatch({ localVersion: '0.2.1', remoteVersion: '0.2.1' })).toBeUndefined()
+    expect(ConnectionDiagnostics.versionMismatch({ localVersion: undefined, remoteVersion: '0.2.0' })).toBeUndefined()
+    expect(ConnectionDiagnostics.versionMismatch({ localVersion: '0.2.1', remoteVersion: undefined })).toBeUndefined()
   })
 })

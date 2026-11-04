@@ -7,7 +7,7 @@ import { ExternalLinkIcon, EyeOffIcon, TriangleAlertIcon } from '@dshfiles/plugi
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { multiHostApi } from './api.js'
 import { openRemoteView } from './open-remote-view.js'
-import { versionMismatch } from './destination/connection-diagnostics.js'
+import { ConnectionDiagnostics } from './destination/connection-diagnostics.js'
 import { multiHostKeys, multiHostQueries } from './destination/queries.js'
 
 export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => {
@@ -52,7 +52,7 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
   const hostVersion = directory.data?.runtimes.find(runtime => runtime.id === runtimeId)?.identity?.dshVersion
   const ownerRuntime = directory.data?.runtimes.find(runtime => runtime.id === runtimeId)
   const unreachable = ownerRuntime !== undefined && !ownerRuntime.connected && ownerRuntime.lastError !== undefined
-  const outdatedVersion = versionMismatch({ localVersion: localIdentity.data?.dshVersion, remoteVersion: hostVersion })
+  const outdatedVersion = ConnectionDiagnostics.versionMismatch({ localVersion: localIdentity.data?.dshVersion, remoteVersion: hostVersion })
   const open = (): void => {
     setPopupBlocked(false)
     const tab = window.open('about:blank', '_blank')

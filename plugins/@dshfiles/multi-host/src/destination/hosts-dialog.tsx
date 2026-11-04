@@ -8,11 +8,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { CheckIcon, ChevronDownIcon, CopyIcon, PlusIcon, SearchIcon, ServerIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, ChevronDownIcon, CopyIcon, PlusIcon, SearchIcon, ServerIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
-import type { ConnectionTestStep, RuntimeSummary } from '../api.js'
-import { connectionDiagnostics } from './connection-diagnostics.js'
+import type { RuntimeSummary } from '../api.js'
+import { ConnectionDiagnostics } from './connection-diagnostics.js'
+import { ConnectionTestSteps } from './connection-test-steps.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 import { setHostDestination } from './state.js'
 
@@ -26,8 +27,6 @@ export type HostDraft = {
 }
 
 const WEIGHTS = [1, 2, 4] as const
-
-const stepLabels: Record<ConnectionTestStep['step'], string> = { ssh: 'SSH login', runtime: 'DSH runtime', identity: 'multi-host identity' }
 
 const failure = (result: { readonly ok: boolean; readonly code?: string; readonly message?: string }): Error =>
   new Error(result.message === undefined ? 'The host request failed.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
@@ -121,7 +120,7 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
               steps: test.data?.steps ?? [],
               message: testFailure?.message ?? errorMessage(test.error, 'The connection test failed.'),
             }
-      const report = connectionDiagnostics({
+      const report = ConnectionDiagnostics.createReport({
         sshTarget: draft.sshTarget.trim(),
         remoteHome: draft.remoteHome.trim(),
         localVersion: localIdentity.data?.dshVersion,
@@ -292,25 +291,12 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
         <span className="dshx:font-medium">Fetch jj before new threads</span>
         <Switch checked={draft.fetchBeforeThread ?? false} onCheckedChange={checked => setDraft({ ...draft, fetchBeforeThread: checked })} />
       </label>
-      {test.data !== undefined ? (
-        <ul className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs" aria-label="Connection test">
-          {test.data.steps.map(step => (
-            <li key={step.step} className="dshx:flex dshx:items-center dshx:gap-2">
-              {step.ok ? <CheckIcon className="dshx:size-3.5 dshx:text-emerald-500" /> : <XIcon className="dshx:size-3.5 dshx:text-destructive" />}
-              {stepLabels[step.step]} <span className="dshx:text-muted-foreground">{step.ms} ms</span>
-              {step.ok || step.message === undefined ? null : <span className="dshx:min-w-0 dshx:truncate dshx:text-destructive">{step.message}</span>}
-            </li>
-          ))}
-          {test.data.ok ? (
-            <li className="dshx:text-muted-foreground">
-              DSH {test.data.identity.dshVersion} · profile {test.data.identity.profile}
-            </li>
-          ) : null}
-        </ul>
-      ) : null}
+      {test.data === undefined ? null : <ConnectionTestSteps steps={test.data.steps} {...(test.data.ok ? { identity: test.data.identity } : {})} />}
       {testFailure === undefined ? null : (
         <Alert variant="destructive">
-          <AlertDescription>{testFailure.message}</AlertDescription>
+          <AlertDescription>
+            {testFailure.message} {ConnectionDiagnostics.recovery(test.data?.steps?.find(step => !step.ok)?.step)}
+          </AlertDescription>
         </Alert>
       )}
       {test.data !== undefined || test.isError ? (
@@ -326,13 +312,20 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
           ) : null}
         </div>
       ) : null}
-      {[discover, test, save, copyDiagnostics].map((mutation, index) =>
+      {[discover, save, copyDiagnostics].map((mutation, index) =>
         mutation.isError ? (
           <Alert key={index} variant="destructive">
             <AlertDescription>{errorMessage(mutation.error, 'The host request failed.')}</AlertDescription>
           </Alert>
         ) : null,
       )}
+      {test.isError ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {errorMessage(test.error, 'The connection test failed.')} {ConnectionDiagnostics.recovery(undefined)}
+          </AlertDescription>
+        </Alert>
+      ) : null}
       <DialogFooter className="dshx:flex-wrap">
         <Button type="button" variant="ghost" onClick={props.onCancel} disabled={save.isPending}>
           Cancel

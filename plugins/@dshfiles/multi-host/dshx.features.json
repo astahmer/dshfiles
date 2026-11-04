@@ -51,7 +51,7 @@
     {
       "id": "host-management",
       "title": "Manage hosts on a dedicated page",
-      "summary": "The Hosts page lists registered machines in destination-picker order, shows live one-minute load and memory use, and lets users open or copy a temporary remote-host link. Users can add existing folders or clone Git repositories with optional individually selected local-file copying. Auto selects the eligible runtime with the lowest normalized resource pressure; hosts can be hidden, reordered, reconnected, edited, or removed.",
+      "summary": "The Hosts page lists registered machines in destination-picker order, shows live one-minute load and memory use, and lets users open or copy a temporary remote-host link. Users can add existing folders or clone Git repositories with optional individually selected local-file copying. Auto selects the eligible runtime with the lowest normalized resource pressure; hosts can be hidden, reordered, reconnected, edited, or removed, and SSH rows with runtime errors can be diagnosed hop by hop.",
       "surfaces": ["client", "host", "storage"],
       "configuration": [],
       "states": [
@@ -65,10 +65,14 @@
         "hidden",
         "reordered",
         "remote-link-opened",
-        "remote-link-copied"
+        "remote-link-copied",
+        "diagnosing",
+        "diagnosed",
+        "diagnosis-failed"
       ],
       "failureModes": [
         "A partial or duplicate order is refused and the stored order stays.",
+        "Diagnosis marks the failed SSH, runtime, or identity hop, shows its message and recovery path, and exposes a copyable report; request failures direct users to edit the SSH target or remote DSH home.",
         "Hiding a host keeps its runtimes, threads and remote data; it only leaves the destination picker.",
         "A local file-copy failure leaves the cloned repository registered and reports that the selected files were not copied.",
         "Ignored files are not scanned unless explicitly requested; candidates are never selected automatically, and credential-like paths are blocked.",

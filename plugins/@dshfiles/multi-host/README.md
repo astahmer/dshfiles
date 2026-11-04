@@ -41,6 +41,9 @@ The New thread bar (rendered by `@dshfiles/jj-integration`) starts with the
 - **A host** — each registered host with a status dot (green: connected, with
   the round-trip in ms; grey: not connected yet; red: the last error).
   Opening the menu pings every host once.
+- On the Hosts page, **Diagnose** appears on SSH rows with a runtime error. It
+  tests SSH login, DSH runtime and multi-host identity, shows the failed hop and
+  recovery path, and can copy the report.
 - **Add host…** — choose an SSH destination from a searchable picker of
   `~/.ssh/config` aliases (following `Include`) and plain `known_hosts` names,
   or choose a custom destination for `user@host`. Give it a name, then use
