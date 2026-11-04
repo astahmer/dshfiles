@@ -3,7 +3,6 @@ import { spawn, spawnSync } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { homedir } from 'node:os'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../')
 if (process.versions.node !== '22.23.3') {
@@ -15,7 +14,12 @@ if (pnpmVersion.status !== 0 || pnpmVersion.stdout.trim() !== '12.5.1') {
   throw new Error(`Use pnpm 12.5.1 for DSH acceptance; found ${pnpmVersion.stdout.trim() || 'unavailable'}.`)
 }
 
-const dshOutput = spawnSync('dsh', ['--version'], { encoding: 'utf8' })
+const helperRoot = resolve(repoRoot, 'tooling/dshx/packages/dshx/dist/project')
+// The scratch environment drops node_modules/.bin from PATH, so the core is resolved once up front: DSHX_DSH_EXECUTABLE,
+// then this checkout's installed bin, then PATH, exactly as the E2E boot resolves it.
+const { resolveDshExecutable } = await import(pathToFileURL(resolve(helperRoot, 'dsh-executable.js')).href)
+const dshExecutable = await resolveDshExecutable(undefined, process.env, repoRoot)
+const dshOutput = spawnSync(dshExecutable, ['--version'], { encoding: 'utf8' })
 if (dshOutput.status !== 0 || dshOutput.stdout.trim() !== '0.2.1-rc.2') {
   throw new Error(`Scratch acceptance requires DSH 0.2.1-rc.2; found ${dshOutput.stdout.trim() || 'unavailable'}.`)
 }
@@ -29,7 +33,9 @@ const fixturePath = resolve(repoRoot, 'plugins/@dshfiles/agent-questions/tests/f
 const profileName = 'agent-questions'
 const scratch = await createScratchProfile({
   profileName,
-  sourceProfileRoot: resolve(homedir(), '.dsh/profiles/web'),
+  // Registry dependencies come from the checked-in seed, as in the E2E boot: a machine whose live DSH home is not
+  // ~/.dsh has no ~/.dsh/profiles/web, and the scratch run must not depend on a personal profile anyway.
+  sourceProfileRoot: process.env.DSH_E2E_SOURCE_PROFILE_ROOT ?? resolve(repoRoot, 'profiles/web'),
   bundleIds: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@dshfiles/agent-questions', '@dshfiles/agent-questions-cold-resume-fixture'],
   excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket'],
   extraDependencies: {
@@ -48,7 +54,7 @@ let output = ''
 const startHost = async () => {
   output = ''
   const environment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
-  const child = spawn('dsh', ['--profile', profileName, '--port', '0', '--no-open'], {
+  const child = spawn(dshExecutable, ['--profile', profileName, '--port', '0', '--no-open'], {
     cwd: repoRoot,
     env: environment,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -137,7 +143,7 @@ try {
   await writeFile(resolve(fixtureWorkspacePath, 'review-cancel.md'), '# Cancel target\nThis request may be cancelled.\n')
   await scratch.install()
   const environment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
-  const dump = spawnSync('dsh', ['--profile', profileName, '--dump-config'], {
+  const dump = spawnSync(dshExecutable, ['--profile', profileName, '--dump-config'], {
     cwd: repoRoot,
     env: environment,
     encoding: 'utf8',
