@@ -6,24 +6,24 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-364 features from 88 plugins.
+365 features from 84 plugins.
 
 ## Counts
 
-| Destination | agentToolOnly | attentionProvider | command | composerContribution | destinationSection | detail | entityProvider | infrastructure | rowAction | settingsSection | statusItem | threadFacet | transcriptCard | Total |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Threads |  |  |  |  | 10 |  | 1 |  | 12 |  |  |  |  | 23 |
-| Inbox |  | 18 |  |  | 1 |  |  |  |  |  |  |  |  | 19 |
-| Land |  |  | 1 |  | 6 | 2 | 1 |  | 4 |  |  |  |  | 14 |
-| Work |  |  | 1 |  | 7 | 2 | 1 |  | 5 |  |  |  |  | 16 |
-| Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  | 5 |
-| Observe |  |  |  |  | 18 |  |  |  | 2 |  |  |  |  | 20 |
-| Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  | 6 |
-| Settings |  |  |  |  |  |  |  |  | 1 | 44 |  |  |  | 45 |
-| Thread panel |  |  |  |  |  |  |  |  |  |  |  | 21 |  | 21 |
-| Composer |  |  |  | 46 |  |  |  |  |  |  |  |  |  | 46 |
-| Transcript |  |  |  |  |  |  |  |  |  |  |  |  | 17 | 17 |
-| No place of its own | 17 |  | 15 |  |  |  |  | 93 |  |  | 7 |  |  | 132 |
+| Destination | agentToolOnly | attentionProvider | command | composerContribution | destinationSection | detail | entityProvider | infrastructure | rowAction | rowDecorator | settingsSection | statusItem | threadFacet | transcriptCard | Total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Threads |  |  |  |  | 9 |  | 1 |  | 12 | 1 |  |  |  |  | 23 |
+| Inbox |  | 18 |  |  | 1 |  |  |  |  |  |  |  |  |  | 19 |
+| Land |  |  | 1 |  | 6 | 2 | 1 |  | 4 |  |  |  |  |  | 14 |
+| Work |  |  | 1 |  | 7 | 2 | 1 |  | 5 |  |  |  |  |  | 16 |
+| Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  |  | 5 |
+| Observe |  |  |  |  | 19 | 1 |  |  | 2 |  |  |  |  |  | 22 |
+| Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  |  | 6 |
+| Settings |  |  |  |  |  |  |  |  | 1 |  | 40 |  |  |  | 41 |
+| Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 21 |  | 21 |
+| Composer |  |  |  | 50 |  |  |  |  |  |  |  |  |  |  | 50 |
+| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 17 | 17 |
+| No place of its own | 19 |  | 16 |  |  |  |  | 89 |  |  |  | 7 |  |  | 131 |
 
 ## By current left-nav entry
 
@@ -39,7 +39,7 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | AI Accounts: Usage history | Observe | ai-accounts/usage-history-and-pricing → Observe (destinationSection) |
 | Background Jobs: Jobs | Observe | background-jobs/batch-stop-jobs → Observe (rowAction)<br>background-jobs/jobs-board → Observe (destinationSection) |
 | Backlog | Work, Inbox, Settings | backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/project-scope → Work (destinationSection)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/tweet-context-enrichment → Work (rowAction) |
-| Hosts | Observe | multi-host/host-management → Observe (destinationSection)<br>multi-host/isolated-runtime-views → Observe (rowAction) |
+| Hosts | Observe | multi-host/fleet-update → Observe (destinationSection)<br>multi-host/host-management → Observe (destinationSection)<br>multi-host/host-settings → Observe (detail)<br>multi-host/isolated-runtime-views → Observe (rowAction) |
 | Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
 | Land | Land | jj-integration/thread-integration-attention-view → Land (destinationSection)<br>jj-integration/thread-integration-empty → Land (destinationSection)<br>jj-integration/thread-integration-row-details → Land (detail)<br>jj-integration/thread-workspaces-panel → Land (destinationSection) |
 | MCP Servers: Servers | Settings | mcp-servers/batch-server-actions → Settings (rowAction)<br>mcp-servers/oauth-authorization → Settings (settingsSection)<br>mcp-servers/registry-catalog → Settings (settingsSection)<br>mcp-servers/server-configuration → Settings (settingsSection) |
@@ -63,28 +63,29 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 
 | Region today | Features | Destinations |
 | --- | ---: | --- |
-| agent tool | 22 | No place of its own 17, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
-| client | 14 | No place of its own 14 |
-| composer | 48 | Composer 45, Thread panel 2, Settings 1 |
+| agent tool | 23 | No place of its own 18, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
+| agent tools and Host watcher; no UI | 1 | No place of its own 1 |
+| client | 10 | No place of its own 10 |
+| composer | 51 | Composer 48, Thread panel 2, Settings 1 |
 | composer and transcript | 1 | Threads 1 |
 | conversation-view | 2 | Thread panel 2 |
 | dialog | 4 | Agents 1, No place of its own 1, Settings 1, Thread panel 1 |
-| home | 1 | Threads 1 |
 | host | 44 | No place of its own 44 |
 | Host contract | 1 | Inbox 1 |
+| Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
 | keyboard | 3 | No place of its own 3 |
-| left-nav | 85 | Observe 19, Work 15, Land 13, Inbox 12, Settings 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
+| left-nav | 87 | Observe 21, Work 15, Land 13, Inbox 12, Settings 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 10 | No place of its own 7, Thread panel 2, Settings 1 |
-| palette | 11 | No place of its own 11 |
+| palette | 12 | No place of its own 12 |
 | plugins-page | 2 | No place of its own 1, Settings 1 |
 | right-pane | 7 | Thread panel 5, No place of its own 2 |
-| settings | 26 | Settings 24, No place of its own 2 |
+| settings | 22 | Settings 20, No place of its own 2 |
 | shell | 7 | No place of its own 5, Threads 2 |
 | sidebar | 2 | Settings 2 |
 | sidebar-footer | 3 | No place of its own 3 |
 | status-strip | 6 | No place of its own 4, Composer 1, Observe 1 |
 | thread-header | 7 | Thread panel 3, Threads 3, No place of its own 1 |
-| thread-list | 21 | Threads 15, Inbox 3, No place of its own 2, Settings 1 |
+| thread-list | 22 | Threads 16, Inbox 3, No place of its own 2, Settings 1 |
 | toast | 1 | No place of its own 1 |
 | transcript | 22 | Transcript 17, Inbox 1, Knowledge 1, Land 1, Thread panel 1, Work 1 |
 | url | 1 | No place of its own 1 |
@@ -98,7 +99,6 @@ rail destination (default); 23 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| home/home-screen: New thread screen branding and shortcuts | destinationSection | home: New thread screen |
 | multi-host/remote-inventory: Every thread on every host | destinationSection | thread-list: All remote threads |
 | thread-sidebar/destination-rail: Switch destinations from the rail | destinationSection | shell: Navigation list (21 entries) and collapsed icon rail |
 | thread-sidebar/phone-tab-bar: Navigate from a bottom tab bar on a phone | destinationSection | shell: collapsed icon rail at phone width |
@@ -121,6 +121,7 @@ rail destination (default); 23 features.
 | thread-sidebar/thread-mute: Mute or snooze a thread | rowAction | thread-list: row menu › Mute |
 | thread-sidebar/thread-reference-mention: Mention another thread from its row, its tab, or a drag into the composer | rowAction | thread-list: row menu › Mention |
 | thread-sidebar/thread-referenced-by: See which threads reference one thread | rowAction | thread-list: row menu › Referenced by |
+| multi-host/logical-project-grouping: Group remote threads under matching local projects | rowDecorator | thread-list: remote threads under their local project |
 
 ### Inbox
 
@@ -206,7 +207,7 @@ rail destination; 5 features.
 
 ### Observe
 
-rail destination; 20 features.
+rail destination; 22 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -216,6 +217,7 @@ rail destination; 20 features.
 | ai-accounts/quota-forecast: Forecast when each account runs out, whether a kind kept an account free, and the order to use them in | destinationSection | left-nav: AI Accounts: Quota forecast |
 | ai-accounts/usage-history-and-pricing: Review usage history and cost forecasts | destinationSection | left-nav: AI Accounts: Usage history |
 | background-jobs/jobs-board: Cross-Session background jobs board | destinationSection | left-nav: Background Jobs: Jobs |
+| multi-host/fleet-update: Update every host from the Hosts page | destinationSection | left-nav: Hosts › Update hosts |
 | multi-host/host-management: Manage hosts on a dedicated page | destinationSection | left-nav: Hosts |
 | traces/boards-and-saved-views: Boards and saved views | destinationSection | left-nav: Traces: Explorer › Boards |
 | traces/log-explorer: Log search with trace correlation | destinationSection | left-nav: Traces: Explorer › Logs |
@@ -228,6 +230,7 @@ rail destination; 20 features.
 | usage/usage-jev-card: Jev API usage card | destinationSection | left-nav: Usage: Analytics › Charts › Jev |
 | usage/usage-request-log: Request log | destinationSection | left-nav: Usage: Analytics › Requests |
 | worktree-memory/memory-board: Process memory and Node origins | destinationSection | left-nav: Worktree Memory: RAM |
+| multi-host/host-settings: Weight Auto placement and fetch before new threads | detail | left-nav: Hosts › Edit host |
 | background-jobs/batch-stop-jobs: Stop a selection of running jobs | rowAction | left-nav: Background Jobs: Jobs › batch stop |
 | multi-host/isolated-runtime-views: Open the host's own DSH UI | rowAction | left-nav: Hosts › Open host UI |
 
@@ -246,7 +249,7 @@ rail destination; 6 features.
 
 ### Settings
 
-rail destination (bottom); 45 features.
+rail destination (bottom); 41 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -265,10 +268,7 @@ rail destination (bottom); 45 features.
 | mcp-servers/registry-catalog: Search curated providers and the MCP Registry | settingsSection | left-nav: MCP Servers: Servers › registry |
 | mcp-servers/server-configuration: Manage local and remote MCP server definitions | settingsSection | left-nav: MCP Servers: Servers |
 | multi-host/runtime-directory: Register and identify local DSH runtimes | settingsSection | composer: Run on Local › Add host |
-| plugin-marketplace/catalog-browse: Browse and filter the plugin catalog | settingsSection | settings: Built-in plugins › Framework Hub |
-| plugin-marketplace/guarded-plugin-install: Install a selected plugin with explicit consent | settingsSection | settings: Built-in plugins › Framework Hub › Install |
 | policies/deny-policies: Deny tool calls outright, after permissions | settingsSection | agent tool: policies_list (no UI) |
-| privacy-controls/feedback-privacy-settings: Control feedback and session-data sharing | settingsSection | settings: Feedback & privacy |
 | secret-catalog/alias-mutations: Create, edit, rename, and remove aliases safely | settingsSection | left-nav: Secrets › Add with details |
 | secret-catalog/backlog-jev-setup: Add a Jev key from the Backlog setting | settingsSection | plugins-page: View @dshfiles/backlog › Jev secret |
 | secret-catalog/bounded-secret-reveal: Reveal on click and copy without revealing | settingsSection | left-nav: Secrets › reveal |
@@ -276,7 +276,6 @@ rail destination (bottom); 45 features.
 | secret-catalog/inline-reference-setup: Create and bind from a secret-reference field | settingsSection | settings: secret-reference fields › Bind |
 | secret-catalog/reference-repair: Repair a secret reference that does not resolve | settingsSection | settings: secret-reference fields › repair |
 | secret-catalog/scoped-alias-catalog: Browse aliases by scope and environment | settingsSection | left-nav: Secrets |
-| session-warming/prompt-cache-warming: Keep an idle thread's prompt cache warm, within a budget | settingsSection | settings: Session warming |
 | settings-shell/dsh-release-notice: DSH release notice and TL;DR | settingsSection | sidebar: Settings trigger release mark › General |
 | settings-shell/modified-settings: Modified settings and reset to default | settingsSection | settings: Reset to default |
 | settings-shell/open-config-menu: Open the configuration file elsewhere | settingsSection | settings: Open configuration file |
@@ -326,7 +325,7 @@ facets of the active thread; 21 features.
 
 ### Composer
 
-run row, chips, `/` and `@` sources; 46 features.
+run row, chips, `/` and `@` sources; 50 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -371,9 +370,13 @@ run row, chips, `/` and `@` sources; 46 features.
 | send-after-upload/send-after-upload: Send when the attachment upload finishes | composerContribution | composer: Sending when upload finishes pill |
 | session-undo/turn-undo-redo: Undo and redo a turn: conversation and files together | composerContribution | composer: Undo last turn |
 | thread-sidebar/skill-mentions: Find human-invocable skills from @ autocomplete | composerContribution | composer: @ skills |
+| workspace-folder-picker/directory-only-mode: Start directly in the Host folder browser | composerContribution | Hosts › Add folder (directory-only picker) |
+| workspace-folder-picker/keyboard-folder-selection: Select project folders with keyboard navigation | composerContribution | composer: Choose workspace › keyboard rows |
 | workspace-folder-picker/project-clone: Add a project by cloning a repository | composerContribution | composer: Choose workspace › Add workspace › Clone repository |
 | workspace-folder-picker/project-create: Create a new project | composerContribution | composer: Choose workspace › Add workspace › New project |
 | workspace-folder-picker/project-registration-removal: Remove a project registration | composerContribution | composer: Choose workspace › Remove |
+| workspace-folder-picker/registered-project-search: Search projects and browse folder paths | composerContribution | composer: Choose workspace › search |
+| workspace-folder-picker/unregistered-recent-folders: Offer recent folders not yet registered as projects | composerContribution | composer: Choose workspace › Recent |
 | workspace-folder-picker/workspace-folder-add-flow: Add workspaces from the folder browser | composerContribution | composer: Choose workspace › Add workspace |
 | workspace-nav/new-thread-composer: Open a New thread's composer before the Host creates its Session | composerContribution | composer: New thread draft |
 
@@ -403,7 +406,7 @@ cards inline in the active thread; 17 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 132 features.
+palette commands, status items, agent tools, infrastructure; 131 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -418,6 +421,8 @@ palette commands, status items, agent tools, infrastructure; 132 features.
 | goal-stall-guard/bounded-goal-continuation: Extend or close goals within bounded policy | agentToolOnly | agent tool: extend_goal_budget / complete_blocked_goal |
 | html-render/page-screenshot: Agent screenshot of its own published page | agentToolOnly | agent tool: html_render_screenshot |
 | memory/memory-tools: Search, read and note memory from any agent | agentToolOnly | agent tool: memory_search / memory_read / memory_note |
+| multi-host/remote-delegation: Delegate a task to another machine | agentToolOnly | agent tool: multi_host_delegate |
+| pull-requests/github-pull-request-links: Link and watch GitHub pull requests from DSH threads | agentToolOnly | agent tools and Host watcher; no UI |
 | secret-catalog/metadata-only-agent-tools: Expose safe secret catalog tools to agents | agentToolOnly | agent tool: secret_list / secret_get / secret_reference_status |
 | session-controller/thread-local-model: Guarded thread-local model selection | agentToolOnly | agent tool: thread_local_model_state / thread_select_local_model |
 | thread-sidebar/navigation-counter: Count destination and section opens | agentToolOnly | agent tool: shell_navigation_counts / shell_navigation_reset |
@@ -437,6 +442,7 @@ palette commands, status items, agent tools, infrastructure; 132 features.
 | shortcuts/sidebar-toggle-chord: Toggle the sidebar with the platform primary chord | command | keyboard: Mod+B |
 | thread-sidebar/footer-more-menu: Reach Settings, sidebar pages, and hidden footer actions from both More menus | command | sidebar-footer: More menu |
 | thread-sidebar/moved-to-map: Find where a former sidebar page went | command | palette: Where did a page go? |
+| thread-sidebar/multi-model-fan-out: Send one prompt to several models | command | palette: Send to several models… |
 | thread-sidebar/palette-search-history: Search threads, files, and recent navigation | command | thread-list: Search threads |
 | thread-sidebar/prompt-links: Open a prefilled new thread from a prompt link | command | url: ?prompt= link |
 | agent-telemetry/agent-turn-spans: GenAI spans for every agent turn | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
@@ -492,10 +498,6 @@ palette commands, status items, agent tools, infrastructure; 132 features.
 | plugin-ui/typed-forms-and-accessible-tables: Compose validated forms and accessible data tables | infrastructure | client: library |
 | preview/render-html: Offline HTML screenshots for other Host plugins | infrastructure | host: preview-render contract |
 | project-checks/activity-projection: Project check receipts appear safely in the Activity Timeline | infrastructure | host: receipts into left-nav: Activity Timeline: Activity |
-| project-folder-picker/directory-only-mode: Start directly in the Host folder browser | infrastructure | client: library (project picker) |
-| project-folder-picker/keyboard-folder-selection: Select project folders with keyboard navigation | infrastructure | client: library (project picker) |
-| project-folder-picker/registered-project-search: Search projects and browse folder paths | infrastructure | client: library (project picker) |
-| project-folder-picker/unregistered-recent-folders: Offer recent folders not yet registered as projects | infrastructure | client: library (project picker) |
 | pulls-review/review-marks-migration: Move the Review page's marks into the one viewed-marks store | infrastructure | host: pulls-review reviewed record |
 | request-messages/dispatch-request-messages: Dispatch agent/request-messages on stock DSH | infrastructure | host: no UI |
 | rich-composer/composer-contract: Composer contract for other plugins | infrastructure | client: Composer contract |

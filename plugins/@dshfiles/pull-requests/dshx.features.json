@@ -7,6 +7,9 @@
       "title": "Link and watch GitHub pull requests from DSH threads",
       "summary": "Durably links GitHub.com pull requests to threads, polls each watched repository and number every two minutes through gh, queues concise state transitions, and asks thread-sidebar to settle merged or closed threads.",
       "surfaces": ["host", "tool", "integration"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tools and Host watcher; no UI",
       "configuration": [],
       "states": ["linked", "watched", "rate-limited", "merged", "closed"],
       "failureModes": [
