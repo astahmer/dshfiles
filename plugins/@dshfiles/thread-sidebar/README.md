@@ -1,5 +1,7 @@
 # Thread Sidebar
 
+![Send one prompt to multiple models](docs/screenshots/multi-model-fan-out.png)
+
 ![The Sidebar settings wheel belongs to the Threads panel, not the fixed app header](docs/screenshots/navigation-layout.png)
 
 ![The same account Preview docked as an ordinary view with its single tab row hidden](docs/screenshots/preview-as-regular-tab.png)
@@ -33,6 +35,8 @@ shown ones reorder around it. The project picker scopes rows to one workspace or
 unassigned sessions.
 
 The reusable board page is **Thread Sidebar: Board**.
+
+**Multi-model fan-out.** `thread_fan_out` creates two to six independent threads for one prompt. Each thread is created blank, assigned its requested provider/model (and optional reasoning effort), titled `<prompt prefix> · <model>`, then receives the prompt. Creations run at concurrency two; each result reports its thread ID or failure without cancelling sibling work. With jj-integration isolation enabled, every thread is created in its own workspace.
 
 **Tabbed left pane.** In the owned stack, Workbench tabs are mandatory, with no
 native-layout opt-out. The flexible middle belongs to its `shell.left` slot:

@@ -58,6 +58,12 @@ const archiveResultSchema = Schema.Struct({
   activity: Schema.Array(Schema.String).check(Schema.isMaxLength(16)),
 })
 
+const fanOutModelSchema = Schema.Struct({
+  provider: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(128)),
+  model: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)),
+  reasoningEffort: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(64))),
+})
+
 const ONLY_WHEN_ASKED = 'Call only when the user asked for this.'
 
 /** Thread and project lifecycle actions the sidebar exposes, served to the Agent as native tools. */
@@ -183,6 +189,37 @@ export const threadActionsApi = defineApi({
           if (output.prompt === 'refused') return `${head}${settled} Its first message was refused: ${output.promptError ?? 'no reason given'}.`
           return `${head}${settled}`
         },
+      },
+    }),
+    fanOut: method({
+      input: Schema.Struct({
+        projectId: Schema.optional(projectIdSchema),
+        cwd: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(1024))),
+        text: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(20_000)),
+        models: Schema.Array(fanOutModelSchema).check(Schema.isMinLength(2)).check(Schema.isMaxLength(6)),
+        titlePrefix: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(160))),
+      }).check(
+        Schema.makeFilter(input => (input.projectId === undefined || input.cwd === undefined ? undefined : 'Provide either projectId or cwd, not both.')),
+      ),
+      output: Schema.Struct({
+        results: Schema.Array(
+          Schema.Struct({
+            provider: Schema.String,
+            model: Schema.String,
+            reasoningEffort: Schema.optional(Schema.String),
+            sessionId: Schema.optional(Schema.String),
+            ok: Schema.Boolean,
+            error: Schema.optional(Schema.String),
+          }),
+        ).check(Schema.isMaxLength(6)),
+      }),
+      description: `Send one prompt to two through six models at once. Each model gets a new thread; its model is selected before the prompt is sent. Results report each thread and any per-model failure. ${ONLY_WHEN_ASKED}`,
+      tool: {
+        name: 'thread_fan_out',
+        render: output =>
+          output.results
+            .map(result => `${result.provider}/${result.model}: ${result.ok ? `thread ${result.sessionId}` : (result.error ?? 'failed')}`)
+            .join('\\n'),
       },
     }),
     create: method({

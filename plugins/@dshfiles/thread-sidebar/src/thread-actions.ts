@@ -125,6 +125,19 @@ export interface ThreadPromptInput {
   readonly text: string
   readonly mode?: 'queue' | 'steer' | undefined
 }
+export interface ThreadFanOutModel {
+  readonly provider: string
+  readonly model: string
+  readonly reasoningEffort?: string | undefined
+}
+export interface ThreadFanOutInput {
+  readonly projectId?: string | undefined
+  readonly cwd?: string | undefined
+  readonly text: string
+  readonly models: readonly ThreadFanOutModel[]
+  readonly titlePrefix?: string | undefined
+}
+
 export interface ThreadSelectModelInput {
   readonly sessionId?: string | undefined
   readonly provider: string
@@ -494,6 +507,49 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
   stop: Effect.fn('thread actions stop')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {
     yield* attempt(deps.stop(input.sessionId), `Could not stop thread ${input.sessionId}.`)
     return { sessionId: input.sessionId, accepted: true as const }
+  }),
+
+  fanOut: Effect.fn('thread actions fan out')(function* ({ input }: ThreadActionContext<ThreadFanOutInput>) {
+    const prefix = input.titlePrefix?.trim() || input.text.trim().split(/\s+/u).slice(0, 6).join(' ')
+    const runModel = (model: ThreadFanOutModel) => {
+      let sessionId: string | undefined
+      return Effect.gen(function* () {
+        const requestedProjectId = input.projectId ?? projectIdForPath(deps, input.cwd)
+        const projectId =
+          requestedProjectId === undefined ? undefined : yield* attempt(deps.ownWorkspaceFor(requestedProjectId), 'Could not start a new thread.')
+        const created = yield* attempt(
+          deps.create({
+            ...(projectId === undefined ? undefined : { projectId }),
+            ...(projectId === undefined && input.cwd !== undefined ? { cwd: input.cwd } : undefined),
+          }),
+          'Could not start a new thread.',
+        )
+        sessionId = created.sessionId
+        yield* attempt(
+          deps.selectModel({
+            sessionId,
+            provider: model.provider,
+            model: model.model,
+            ...(model.reasoningEffort === undefined ? undefined : { reasoningEffort: model.reasoningEffort }),
+          }),
+          'Could not select the model.',
+        )
+        yield* attempt(deps.rename(sessionId, `${prefix} · ${model.model}`), 'Could not title the thread.')
+        yield* attempt(deps.prompt({ sessionId, text: input.text, mode: 'queue' }), 'Could not send the prompt.')
+        return { ...model, sessionId, ok: true as const }
+      }).pipe(
+        Effect.catch(error =>
+          Effect.succeed({
+            ...model,
+            ...(sessionId === undefined ? undefined : { sessionId }),
+            ok: false as const,
+            error: error instanceof Error ? error.message.slice(0, MAX_ERROR_MESSAGE) : 'Could not create this model thread.',
+          }),
+        ),
+      )
+    }
+    const results = yield* Effect.all(input.models.map(runModel), { concurrency: 2 })
+    return { results }
   }),
 
   selectModel: Effect.fn('thread actions select model')(function* ({ input, caller }: ThreadActionContext<ThreadSelectModelInput>) {

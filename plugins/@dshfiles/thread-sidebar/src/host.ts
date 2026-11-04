@@ -197,6 +197,7 @@ export default DshxPlugin.make({
       prompt: (input, call) => ThreadActions.use(actions => actions.prompt({ input, caller: call.caller })),
       stop: (input, call) => ThreadActions.use(actions => actions.stop({ input, caller: call.caller })),
       selectModel: (input, call) => ThreadActions.use(actions => actions.selectModel({ input, caller: call.caller })),
+      fanOut: (input, call) => ThreadActions.use(actions => actions.fanOut({ input, caller: call.caller })),
       projectList: () => ThreadActions.use(actions => actions.projectList()),
       projectRegister: (input, call) => ThreadActions.use(actions => actions.projectRegister({ input, caller: call.caller })),
       projectRename: (input, call) => ThreadActions.use(actions => actions.projectRename({ input, caller: call.caller })),

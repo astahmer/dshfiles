@@ -632,6 +632,11 @@ export default defineClient({
     const subscribeLeftContent = (listener: () => void): (() => void) => ctx.slots.subscribe('shell.left', listener)
     const leftContentOverridden = (): boolean => ctx.slots.entriesOfSlot('shell.left').length > 0
     const SidebarRootAdapter = (props: SidebarShellBaseProps): JSX.Element => {
+      const loadModelCatalog = useCallback(async () => {
+        const result = await ctx.remote.session.modelCatalog()
+        if (!result.ok) throw new Error(result.error.message)
+        return result.value
+      }, [])
       const contentOverridden = useSyncExternalStore(subscribeLeftContent, leftContentOverridden)
       const [customizationTarget, setCustomizationTarget] = useState<HTMLElement | null>(null)
       const customizationActionRef = useRef<(() => void) | null>(null)
@@ -697,6 +702,7 @@ export default defineClient({
           subscribeClientRevisions={subscribeClientRevisions}
           openSession={openSessionRestoringArchived}
           runCommand={runCommand}
+          loadModelCatalog={loadModelCatalog}
         />
       )
     }
@@ -1037,6 +1043,14 @@ export default defineClient({
     ctx.effect(
       () =>
         PaletteBridge.addActions([
+          {
+            id: '@dshfiles/thread-sidebar/fan-out',
+            label: 'Send to several models…',
+            aliases: ['multi-model', 'fan out', 'compare models'],
+            group: 'action',
+            suggested: true,
+            run: context => PaletteBridge.openFanOut(context.workspace?.id ?? null),
+          },
           {
             id: '@dshfiles/thread-sidebar/open-board',
             label: () => translate('threadSidebarBoardTitle'),
