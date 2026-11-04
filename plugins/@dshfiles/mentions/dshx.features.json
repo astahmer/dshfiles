@@ -83,7 +83,7 @@
     {
       "id": "session-mention-links",
       "title": "Referenced threads open on click",
-      "summary": "A thread chip in the composer, the thread chip in a sent message and its \"Referenced session \u00b7 \u2026\" line open that thread. With @dshfiles/main-tabs the thread opens per the tabs openMode setting, and Cmd/Ctrl-click always opens a new tab.",
+      "summary": "A thread chip in the composer, the thread chip in a sent message (a higher-priority renderer of the native user-text session node), its \"Referenced session \u00b7 \u2026\" line (a Chat inline reference) and an Agent-written `@[label](dsh-session:\u2026)` link (a `dsh-session` link handler) open that thread. With @dshfiles/main-tabs the thread opens per the tabs openMode setting, and Cmd/Ctrl-click always opens a new tab.",
       "reach": [
         "seed tool-call-thread",
         "click button \"New session\"",
@@ -121,6 +121,18 @@
           "id": "mentions.referenced-sessions",
           "file": "plugins/@dshfiles/mentions/src/session-links.test.ts",
           "testName": "maps labels to the sessions a thread referenced, the latest reference winning"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mentions.session-chip-link",
+          "file": "plugins/@dshfiles/mentions/src/session-reference-links.test.tsx",
+          "testName": "gives a sent session chip link semantics; Mod-click asks for a new tab"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mentions.reference-line-link",
+          "file": "plugins/@dshfiles/mentions/src/session-reference-links.test.tsx",
+          "testName": "makes the Referenced-session line one link that opens the only thread it names"
         },
         {
           "kind": "unit-test",

@@ -118,7 +118,7 @@ When('a new thread mentions {string} and is sent', async ({ page }: { page: Page
 Then('the sent message links to {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'mentions-sent-reference-is-a-link', async () => {
     await expect(page.getByRole('link', { name: `Referenced session · ${title}` })).toBeVisible()
-    await expect(page.locator('[data-ref-chip="session"][role="link"]:visible')).toHaveCount(1)
+    await expect(page.locator('[role="link"][data-dshfiles-session-link]:has([data-ref-chip="session"]):visible')).toHaveCount(1)
   })
 })
 
@@ -134,7 +134,7 @@ Then('the thread {string} is shown', async ({ page }: { page: Page }, title: str
 
 When('the sending thread is shown again and its thread chip is Cmd-clicked', async ({ page }: { page: Page }) => {
   await page.getByText('Mention target what changed there?', { exact: false }).first().click()
-  const chip = page.locator('[data-ref-chip="session"][role="link"]:visible')
+  const chip = page.locator('[role="link"][data-dshfiles-session-link]:has([data-ref-chip="session"]):visible')
   await expect(chip).toHaveCount(1)
   await chip.click({ modifiers: ['ControlOrMeta'] })
 })
