@@ -365,6 +365,8 @@ const subscribe = (input) => Stream.unwrap(Effect.gen(function* () {
 | `z.infer<typeof S>`                     | `typeof S.Type` (`typeof S.Encoded` for the wire side)                                                                                                                                                                          | —                                               |
 | `zodToJsonSchema(S)`                    | `Schema.toJsonSchemaDocument(S, options)`; a Standard Schema consumer takes `Schema.toStandardSchemaV1(S)` / `toStandardJSONSchemaV1(S)`. Diff the emitted bytes against the zod output before landing a tool-schema migration. | `Schema.ts:1397,1418,18089`                     |
 
+**Running a migration.** One plugin per thread or subagent, in its own JJ workspace: the single-thread multi-plugin runs compacted 19–36 times and re-read the same Schema APIs after each compaction. Migrate a plugin before the plugins that import it, and land each only after `turbo run typecheck test --filter='...@dshfiles/<plugin>'` passes (skill `dsh-plugin-verify`).
+
 **Anti-patterns replaced:** zod residue; bespoke wrapper modules restating Schema APIs; `as` casts after `JSON.parse`; per-call `Schema.decodeUnknown(...)` construction; manual `typeof x === "object"` checks.
 
 ---
