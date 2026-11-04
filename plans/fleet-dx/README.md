@@ -20,7 +20,7 @@ feels different), b:184 (keep jj in sync across hosts).
 | 1   | **Fleet update dialog** (b:462): per-host DSH version and checkout revision, one "Update all" that runs `checkoutSync` → rebuild → runtime restart per host, live per-row state (waiting / updating / restarting / done / failed + Retry), threads on that host resume | A two-runtime scratch fleet updates from the dialog; a failing host shows its error and Retry; the version-drift line clears; agent tool `multi_host_update_all` mirrors it | partial   |
 | 2   | **Version-mismatch banner** in a remote thread's composer, with an Update button feeding milestone 1                                                                                                                                                                   | Banner appears only when versions differ; Update starts the single-host flow                                                                                                | partial   |
 | 3   | **Remote subagents** (b:482): `subagent` / `backlog_start_thread` accept a host (or Auto) and run the child as a mirrored thread there; the parent receives its result                                                                                                 | Scratch: a parent thread on A starts a child on B through Auto; the child result arrives in A; stopping the parent stops the child                                          | partial   |
-| 4   | **Per-step diagnosis on failure**: `testConnection` returns the steps it ran even when one fails; the host row and picker show which hop failed (SSH, runtime, identity) with its recovery                                                                             | Unit test per failing hop; dialog lists failed hop; Copy diagnostics includes it                                                                                            | partial   |
+| 4   | **Per-step diagnosis on failure**: `testConnection` returns the steps it ran even when one fails; the host row and picker show which hop failed (SSH, runtime, identity) with its recovery                                                                             | Unit test per failing hop; dialog lists failed hop; Copy diagnostics includes it                                                                                            | done      |
 | 5   | **Unreachable host polish**: a short disconnect grace delay before turning a host red; "Hide this host's threads" from the offline banner                                                                                                                              | No red flicker on a 2 s blip; hiding reuses the existing hidden-host flag                                                                                                   | partial   |
 | 6   | **Open the exact thread on the host**: `runtimeOpenView` takes an optional Session id and opens `?thread=` on the remote UI                                                                                                                                            | Host UI opens on the mirrored thread, not the home screen                                                                                                                   | done      |
 | 7   | **Native remote questions and approvals** (b:117, b:183): answer them from the local thread                                                                                                                                                                            | Tracked as milestone 6 of [remote-thread-composer](../remote-thread-composer/README.md)                                                                                     | external  |
@@ -38,7 +38,15 @@ update); 3 (remote subagents); 5, 8, 9 as polish. 7 follows its own plan.
 
 ## Resume here
 
-Done: 0, 0b, 6. Partial: 1, 2, 3, 4, 5, 8, 9.
+Done: 0, 0b, 4, 6. Partial: 1, 2, 3, 5, 8, 9.
+
+- **4** (done): Hosts rows with a runtime error offer Diagnose, which reruns the
+  hop-by-hop test inline with a recovery line and Copy diagnostics; chip-menu
+  rows use the same reconnect grace.
+- **8** (repo grouping): `projectOrigins` reads normalized `remote.origin.url`
+  locally and over one SSH command per host (cached 5 min); a remote thread whose
+  folder shares a registered project's origin groups under that project, keeping
+  its host badge. Not proven against a real SSH clone yet.
 
 - **4**: `testConnection` keeps its hops on failure and the Add host dialog shows
   them; the Hosts row and Run-on picker still show only the runtime's last error
@@ -74,7 +82,7 @@ time doctor runs (session-search registers `sessionQuery` after an async start).
 - **5**: a host that answered in the last 10 s reads as Reconnecting… on the
   chip and Hosts page; hiding a host also hides its threads in the sidebar, and
   an unreachable remote thread offers Hide this host. Not done: the chip menu's
-  per-host rows still show a failed ping at once (they are an explicit check).
+  per-host rows now use the same grace.
 - **8**: per-host Auto weight (×1, ×2, ×4) in Edit host and
   `multi_host_set_host_settings`; Auto divides pressure by it. Not done: grouping
   the same repository across hosts into one project (thread-sidebar owns project
