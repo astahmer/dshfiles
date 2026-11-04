@@ -6,11 +6,13 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@dshfiles/input-trigger/client'
+import { InlineReferences } from '@dshfiles/chat/inline-references'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
 import { AgentFocusModel } from './agent-focus.js'
+import { AgentInlineReference } from './agent-inline-reference.js'
 import { AgentMentions } from './agent-mentions.js'
 import { AgentReferenceOverlay } from './agent-reference-overlay.jsx'
 import { AgentsPanel, type AgentsPanelProps } from './agents-panel.js'
@@ -34,7 +36,8 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
 export default defineClient({
   name: '@dshfiles/agents',
   inject: ['slots', 'layout', 'sessions', 'remote', 'remote.session', 'uiWorkspace', 'workspaces', 'inputTriggers'],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
+    metadata?.plugin?.add(InlineReferences, AgentInlineReference.reference)
     const api = createApiClient(ctx, agentsApi)
 
     const startThread = async (request: AgentDispatchRequest): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> => {

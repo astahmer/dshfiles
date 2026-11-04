@@ -10,7 +10,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AgentAnchorModel } from './agent-anchor.js'
 import { AGENTS_QUERY_ROOT, type Agent, type AgentThread } from './agent.js'
 import { AgentReference, type AgentReferencePreviewRequest } from './agent-reference.js'
-import { installAgentReferenceLinks } from './agent-reference-links.js'
+import { AgentInlineReference } from './agent-inline-reference.js'
+import { installAgentMentionChips } from './agent-reference-links.js'
 import { agentsApi } from './api.js'
 
 const labelClass = 'dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground'
@@ -128,9 +129,9 @@ export const AgentReferenceOverlay = (props: {
   const handles = useMemo(() => new Set((list.data?.agents ?? []).map(agent => agent.handle)), [list.data])
   const handlesRef = useRef(handles)
   handlesRef.current = handles
-  // A saved or removed agent changes which mentions are references; the installer rescans the loaded transcript.
-  const handlesKey = [...handles].sort().join(',')
-  useEffect(() => installAgentReferenceLinks({ handles: () => handlesRef.current }), [handlesKey])
+  // A saved or removed agent changes which mentions are references; Chat re-renders the visible messages.
+  useEffect(() => AgentInlineReference.setHandles(handles), [handles])
+  useEffect(() => installAgentMentionChips({ handles: () => handlesRef.current }), [])
 
   const [request, setRequest] = useState<AgentReferencePreviewRequest | null>(null)
   const [anchor, setAnchor] = useState<AgentReferencePreviewRequest['anchor'] | null>(null)

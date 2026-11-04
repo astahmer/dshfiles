@@ -1107,7 +1107,7 @@
         {
           "kind": "unit-test",
           "id": "backlog.reference-preview-links",
-          "file": "plugins/@dshfiles/backlog/src/backlog-reference-links.test.ts",
+          "file": "plugins/@dshfiles/backlog/src/backlog-inline-reference.test.tsx",
           "testName": "links an item number in prose and in inline code"
         },
         {

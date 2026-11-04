@@ -252,9 +252,9 @@
           "testName": "follows a streaming message: a reference completes as its text grows and frozen blocks keep their nodes"
         },
         {
-          "kind": "gherkin",
-          "id": "chat.inline-reference-backlog-journey",
-          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+          "kind": "not-applicable",
+          "id": "chat.inline-references-browser",
+          "reason": "A registry with no UI of its own; the providers' journeys walk it in the browser (jujutsu.chat-references, agents.mention-preview, memory.reference-preview, mentions.session-mention-links)."
         }
       ],
       "telemetry": [

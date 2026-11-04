@@ -59,8 +59,10 @@
     "@effect/vitest": "catalog:",
     "@types/node": "22.19.20",
     "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "jsdom": "26.1.0",
     "react": "catalog:",
+    "react-dom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

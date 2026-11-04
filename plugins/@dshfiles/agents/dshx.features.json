@@ -227,13 +227,13 @@
           "kind": "unit-test",
           "id": "agents.reference-links-render",
           "file": "plugins/@dshfiles/agents/src/agent-reference-links.test.tsx",
-          "testName": "links a known mention in a sent message and in a compact Markdown comment"
+          "testName": "links a known mention, braced or legacy, and keeps the text as written"
         },
         {
           "kind": "unit-test",
           "id": "agents.reference-links-request",
           "file": "plugins/@dshfiles/agents/src/agent-reference-links.test.tsx",
-          "testName": "asks for a preview when one of those links is clicked"
+          "testName": "opens the card from a click or the keyboard, anchored on the link, and ignores a right click or a selection"
         },
         {
           "kind": "unit-test",
