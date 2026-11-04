@@ -18,6 +18,10 @@
       "types": "./src/api.ts",
       "default": "./dist/api.js"
     },
+    "./xstate-diagram": {
+      "types": "./src/xstate-diagram.ts",
+      "default": "./dist/xstate-diagram.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
@@ -26,7 +30,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
-    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
+    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs",
+    "machine-diagram": "node scripts/machine-diagram.mjs"
   },
   "dependencies": {
     "@dshfiles/dshx": "workspace:*",

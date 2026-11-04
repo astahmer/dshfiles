@@ -52,9 +52,9 @@
     },
     "plugins/@dshfiles/whiteboard": {
       // The Excalidraw editor is its own Vite build (vite.editor.config.ts → src/editor/entry.tsx) the Host serves
-      // lazily. The Host bundle inlines @dshfiles/sqlite-store, whose
+      // lazily; machine-diagram.mjs is a hand-run script. The Host bundle inlines @dshfiles/sqlite-store, whose
       // @effect/sql-sqlite-node import stays external and must resolve from this package at runtime.
-      "entry": ["dshx.config.ts", "vite.editor.config.ts", "src/{host,client}.{ts,tsx}!", "src/editor/entry.tsx!"],
+      "entry": ["dshx.config.ts", "vite.editor.config.ts", "src/{host,client}.{ts,tsx}!", "src/editor/entry.tsx!", "scripts/*.mjs"],
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@effect/sql-sqlite-node"],
     },
     "plugins/@dshfiles/goal-tool": {

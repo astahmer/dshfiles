@@ -94,6 +94,38 @@
           "testName": "binds every method as a tool; reads are read-only and delete needs confirm: true"
         }
       ]
+    },
+    {
+      "id": "xstate-diagram",
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "A pure function over a machine's state-node tree; it does no Host I/O."
+        }
+      ],
+      "title": "xstate machine diagrams",
+      "summary": "The xstate-diagram module turns any xstate v5 machine into a Mermaid flowchart for whiteboard_write or a stateDiagram-v2 for Markdown.",
+      "surfaces": ["api"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "module: @dshfiles/whiteboard/xstate-diagram",
+      "configuration": [],
+      "states": ["flowchart", "state-diagram"],
+      "failureModes": ["Targetless (action-only) transitions are left out of the diagram."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "whiteboard.xstate-flowchart",
+          "file": "tests/xstate-diagram.spec.ts",
+          "testName": "draws states, nested states, guards, delays and the initial marker as a flowchart"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "whiteboard.xstate-browser",
+          "reason": "A pure module with no UI of its own: its flowchart reaches the browser only through whiteboard_write, which the agent-mermaid journey covers."
+        }
+      ]
     }
   ]
 }
