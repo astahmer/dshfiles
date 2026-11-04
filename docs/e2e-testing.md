@@ -265,7 +265,7 @@ journey tasks — while a bundle shared by many compositions is not:
 | `@dshfiles/plugin-ui`                                                           |                        39 |
 | `@dshfiles/ui-styles`                                                           |                        38 |
 | `@dshfiles/shared-runtime`                                                      |                        36 |
-| `@dshfiles/command-palette`, `workspace-folder-picker`, `project-folder-picker` |                        30 |
+| `@dshfiles/command-palette`, `workspace-folder-picker` |                        30 |
 | `@dshfiles/ai-accounts`, `request-messages`, `secret-catalog`                   |                        23 |
 | `@dshfiles/thread-sidebar`                                                      |                        10 |
 | `@dshfiles/pulls-review`, `shortcuts`, `tool-meta`                              |                         3 |

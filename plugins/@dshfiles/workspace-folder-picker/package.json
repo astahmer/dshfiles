@@ -26,6 +26,10 @@
       "types": "./src/project-lifecycle-api.ts",
       "default": "./dist/project-lifecycle-api.js"
     },
+    "./picker": {
+      "types": "./src/picker/index.ts",
+      "default": "./dist/picker.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
@@ -43,7 +47,6 @@
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
-    "@dshfiles/project-folder-picker": "workspace:*",
     "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },

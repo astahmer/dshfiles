@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { createWorkspacePickerPorts, type WorkspacePickerRemote } from '@dshfiles/project-folder-picker'
+import { createWorkspacePickerPorts, type WorkspacePickerRemote } from '@dshfiles/workspace-folder-picker/picker'
 import { describe, expect, it } from '@effect/vitest'
 import { Deferred, Effect, Exit, Fiber, Ref } from 'effect'
 import { SecretCatalog } from './secret-catalog.js'

@@ -8,7 +8,7 @@ import {
   type ProjectFolderSelection,
   type RegisteredProject,
   type WorkspacePickerPorts,
-} from '@dshfiles/project-folder-picker'
+} from '@dshfiles/workspace-folder-picker/picker'
 import { useApi } from '@dshfiles/dshx/client'
 import { workspaceFolderBrowserApi } from '@dshfiles/workspace-folder-picker/directory-browser-api'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'

@@ -1110,12 +1110,12 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
-      '@dshfiles/project-folder-picker':
-        specifier: workspace:*
-        version: link:../project-folder-picker
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
+      '@dshfiles/workspace-folder-picker':
+        specifier: workspace:*
+        version: link:../workspace-folder-picker
       '@earendil-works/pi-ai':
         specifier: 'catalog:'
         version: 1.3.0(@aws-sdk/credential-provider-node@3.972.86)(@modelcontextprotocol/sdk@1.32.2(zod@4.4.3))(@smithy/signature-v4@5.7.4)(undici@8.12.2)(ws@8.22.0)(zod@4.4.3)
@@ -2985,9 +2985,6 @@ importers:
       '@dshfiles/project-checks':
         specifier: workspace:*
         version: link:../project-checks
-      '@dshfiles/project-folder-picker':
-        specifier: workspace:*
-        version: link:../project-folder-picker
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -3139,15 +3136,15 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
-      '@dshfiles/project-folder-picker':
-        specifier: workspace:*
-        version: link:../project-folder-picker
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
       '@dshfiles/workbench':
         specifier: workspace:*
         version: link:../workbench
+      '@dshfiles/workspace-folder-picker':
+        specifier: workspace:*
+        version: link:../workspace-folder-picker
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.1.0(effect@4.1.0)(redis@6.3.1(@opentelemetry/api@1.9.1))
@@ -3999,6 +3996,9 @@ importers:
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
+      '@dshfiles/workspace-folder-picker':
+        specifier: workspace:*
+        version: link:../workspace-folder-picker
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.1.0(effect@4.1.0)(redis@6.3.1(@opentelemetry/api@1.9.1))
@@ -4446,28 +4446,6 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5)(yaml@2.9.0))
 
-  plugins/@dshfiles/project-folder-picker:
-    dependencies:
-      '@dshfiles/plugin-ui':
-        specifier: workspace:*
-        version: link:../plugin-ui
-      react:
-        specifier: '>=18.2.0 <19'
-        version: 18.3.1
-    devDependencies:
-      '@dshfiles/dshx':
-        specifier: workspace:*
-        version: link:../../../tooling/dshx/packages/dshx
-      '@types/react':
-        specifier: 'catalog:'
-        version: 18.3.31
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5)(yaml@2.9.0))
-
   plugins/@dshfiles/prompt-stash:
     dependencies:
       '@deepseek-ai/dsh-tools':
@@ -4549,9 +4527,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
-      '@dshfiles/project-folder-picker':
+      '@dshfiles/workspace-folder-picker':
         specifier: workspace:*
-        version: link:../project-folder-picker
+        version: link:../workspace-folder-picker
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.1.0(effect@4.1.0)(redis@6.3.1(@opentelemetry/api@1.9.1))
@@ -5110,12 +5088,12 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
-      '@dshfiles/project-folder-picker':
-        specifier: workspace:*
-        version: link:../project-folder-picker
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
+      '@dshfiles/workspace-folder-picker':
+        specifier: workspace:*
+        version: link:../workspace-folder-picker
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.1.0(effect@4.1.0)(redis@6.3.1(@opentelemetry/api@1.9.1))
@@ -7189,9 +7167,6 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
-      '@dshfiles/project-folder-picker':
-        specifier: workspace:*
-        version: link:../project-folder-picker
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.1.0(effect@4.1.0)(redis@6.3.1(@opentelemetry/api@1.9.1))

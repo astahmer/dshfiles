@@ -33,7 +33,7 @@ import { ModelCuration } from './model-curation.js'
 import { ProviderGlyph } from './panel-primitives.js'
 import { QuotaSection } from './quota-section.js'
 import { AccountUsageSlot } from './account-usage-view.js'
-import type { WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
+import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 

@@ -38,7 +38,6 @@
     "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-checks": "workspace:*",
-    "@dshfiles/project-folder-picker": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/vcs-provider-port": "workspace:*",
     "@dshfiles/workbench": "workspace:*",

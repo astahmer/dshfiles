@@ -94,7 +94,6 @@ Every bundle directory under `plugins/@dshfiles/` is listed here; shared librari
 | [`credential-port`](plugins/@dshfiles/credential-port/README.md)             | The Host service port a secrets catalog provides and credential consumers call, shared so neither plugin depends on the other.                |
 | [`optmem-core`](plugins/@dshfiles/optmem-core/README.md)                     | Shared DSH-independent memory primitives used by `memory`, including redaction, UTF-8 handling and summary routing.                           |
 | [`plugin-ui`](plugins/@dshfiles/plugin-ui/README.md)                         | Shared UI components and Query, Table, Form, Machine, Chart, and Diff bindings.                                                               |
-| [`project-folder-picker`](plugins/@dshfiles/project-folder-picker/README.md) | Reusable picker for registered projects and Host folders.                                                                                     |
 | [`session-source-port`](plugins/@dshfiles/session-source-port/README.md)     | The Host port through which the Session controller accepts Sessions that run on another runtime, shared so neither side depends on the other. |
 
 Bundles are Cordis packages with a `cordis.patch.yml`. Shared libraries are

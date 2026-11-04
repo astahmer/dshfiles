@@ -1,6 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
-import { ProjectFolderPicker, type ProjectFolderSelection } from '@dshfiles/project-folder-picker'
+import { ProjectFolderPicker, type ProjectFolderSelection } from '@dshfiles/workspace-folder-picker/picker'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'

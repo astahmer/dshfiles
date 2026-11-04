@@ -37,7 +37,7 @@
     "@dshfiles/jj-cli": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
-    "@dshfiles/project-folder-picker": "workspace:*",
+    "@dshfiles/workspace-folder-picker": "workspace:*",
     "@effect/platform-node": "catalog:",
     "@pulls.review/core": "0.3.3",
     "effect": "catalog:"
