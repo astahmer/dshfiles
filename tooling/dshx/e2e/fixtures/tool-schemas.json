@@ -56,12 +56,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 466,
-  "apiToolBindings": 321,
-  "apiToolNameCount": 321,
-  "apiToolSchemas": 320,
+  "apiMethods": 470,
+  "apiToolBindings": 325,
+  "apiToolNameCount": 325,
+  "apiToolSchemas": 324,
   "definedTools": 22,
-  "tools": 342,
+  "tools": 346,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -2663,6 +2663,112 @@
         },
         "required": [
           "feedbackId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "changes_mark_viewed",
+      "description": "Mark changed files viewed (viewed: true) or not viewed (viewed: false) in a thread's review: per turn (sessionId, seq, path) or per revision range (workspacePath, base, head commit, path). Run only when the user asked to change review marks; viewed: false reverses it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "targets": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "turn"
+                      ]
+                    },
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "seq": {
+                      "type": "integer"
+                    },
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "sessionId",
+                    "seq",
+                    "path"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "range"
+                      ]
+                    },
+                    "workspacePath": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "workspacePath",
+                    "base",
+                    "head",
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "viewed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "targets",
+          "viewed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "changes_viewed_files",
+      "description": "The files marked viewed in one workspace's diff between a base and a head commit. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "workspacePath": {
+            "type": "string"
+          },
+          "base": {
+            "type": "string"
+          },
+          "head": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspacePath",
+          "base",
+          "head"
         ],
         "additionalProperties": false
       }
@@ -6302,6 +6408,79 @@
       "parameters": {
         "type": "object",
         "properties": {}
+      }
+    },
+    {
+      "name": "pull_request_create",
+      "description": "Create a GitHub pull request from a thread’s jj workspace after pull_request_create_preview: sets the bookmark on the previewed head commit, pushes it with jj git push, runs gh pr create (or reuses an open pull request for the bookmark), then links and watches it on the thread. Requires confirm: true and the preview’s headCommitId; refuses when the workspace moved. Publishes to GitHub. Call only when the user asked for this.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "bookmark": {
+            "type": "string"
+          },
+          "base": {
+            "type": "string"
+          },
+          "headCommitId": {
+            "type": "string"
+          },
+          "draft": {
+            "type": "boolean"
+          },
+          "watch": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "confirm",
+          "title",
+          "body",
+          "bookmark",
+          "base",
+          "headCommitId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "pull_request_create_preview",
+      "description": "Preview creating a GitHub pull request from a thread’s jj workspace: the repository, base branch, bookmark to push, the commits above the base, a title and body drafted from the thread with its model, an existing open pull request for the bookmark, and every blocking problem with its recovery. Changes nothing (it only reads jj, gh and the thread). Pass its bookmark, base, headCommitId, title and body to pull_request_create. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       }
     },
     {
