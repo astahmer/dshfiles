@@ -48,6 +48,11 @@ export interface PageProps extends Omit<React.ComponentPropsWithoutRef<'div'>, '
   readonly tabs?: PageTabs
   /** The page owns its scroll (`h-full overflow-y-auto`). Leave off when the host pane already scrolls. */
   readonly scroll?: boolean
+  /**
+   * Master–detail pages: the page fills its pane's height and the body (or the active tab) takes the rest, so
+   * its children own their scroll. Exclusive with `scroll`.
+   */
+  readonly fill?: boolean
   readonly bodyClassName?: string
 }
 
@@ -164,7 +169,7 @@ const PageHeaderRow = (props: {
  * into the overflow menu below 42rem.
  */
 export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
-  { heading, description, count, meta, primaryAction, actions, overflowLabel, tabs, scroll = false, bodyClassName, className, children, ...props },
+  { heading, description, count, meta, primaryAction, actions, overflowLabel, tabs, scroll = false, fill = false, bodyClassName, className, children, ...props },
   forwardedRef,
 ) {
   const rootRef = React.useRef<HTMLDivElement | null>(null)
@@ -178,7 +183,7 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
   )
   const compact = useCompact(rootRef)
   const body = (
-    <div data-slot="page-body" className={cn('dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3', bodyClassName)}>
+    <div data-slot="page-body" className={cn('dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3', fill && 'dshx:min-h-0 dshx:flex-1', bodyClassName)}>
       {children}
     </div>
   )
@@ -187,10 +192,20 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
       ref={setRef}
       data-slot="page"
       data-compact={compact ? '' : undefined}
-      className={cn('dshx-root dshx:@container dshx:min-w-0', scroll && 'dshx:h-full dshx:min-h-0 dshx:overflow-y-auto', className)}
+      className={cn(
+        'dshx-root dshx:@container dshx:min-w-0',
+        scroll && 'dshx:h-full dshx:min-h-0 dshx:overflow-y-auto',
+        fill && 'dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col',
+        className,
+      )}
       {...props}
     >
-      <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4 dshx:p-5 dshx:@max-pane-narrow:gap-3 dshx:@max-pane-narrow:p-3">
+      <div
+        className={cn(
+          'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4 dshx:p-5 dshx:@max-pane-narrow:gap-3 dshx:@max-pane-narrow:p-3',
+          fill && 'dshx:min-h-0 dshx:flex-1',
+        )}
+      >
         <PageHeaderRow
           heading={heading}
           description={description}
@@ -204,7 +219,11 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
         {tabs === undefined ? (
           body
         ) : (
-          <Tabs value={tabs.value} onValueChange={tabs.onValueChange} className="dshx:min-w-0 dshx:gap-3">
+          <Tabs
+            value={tabs.value}
+            onValueChange={tabs.onValueChange}
+            className={cn('dshx:min-w-0 dshx:gap-3', fill && 'dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col')}
+          >
             <div className="dshx:min-w-0 dshx:overflow-x-auto dshx:pb-0.5">
               <TabsList aria-label={tabs.label}>
                 {tabs.items.map(tab => (
@@ -215,7 +234,7 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
                 ))}
               </TabsList>
             </div>
-            <TabsContent value={tabs.value} className="dshx:min-w-0">
+            <TabsContent value={tabs.value} className={cn('dshx:min-w-0', fill && 'dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col')}>
               {body}
             </TabsContent>
           </Tabs>

@@ -194,6 +194,19 @@ describe('Page', () => {
     expect(onValueChange).toHaveBeenCalledWith('threads')
     expect(view.getByText('body')).toBeTruthy()
   })
+
+  it('fills the pane height and hands the rest to the active tab in fill mode', () => {
+    const view = render(
+      <Page heading="Memory" fill tabs={{ label: 'Memory views', value: 'notes', onValueChange: () => {}, items: [{ value: 'notes', label: 'Notes' }] }}>
+        <p>body</p>
+      </Page>,
+    )
+    const page = view.container.querySelector('[data-slot="page"]')
+    expect(page?.className).toContain('dshx:h-full')
+    expect(page?.className).toContain('dshx:flex-col')
+    expect(view.getByRole('tabpanel').className).toContain('dshx:flex-1')
+    expect(view.container.querySelector('[data-slot="page-body"]')?.className).toContain('dshx:min-h-0')
+  })
 })
 
 describe('EmptyState', () => {

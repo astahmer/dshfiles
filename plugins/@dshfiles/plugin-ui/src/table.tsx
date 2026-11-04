@@ -56,7 +56,7 @@ export const DataTable = <TFeatures extends TableFeatures, TData extends RowData
                   <TableHead
                     aria-sort={ariaSort(direction)}
                     className={cn(
-                      'dshx:h-9 dshx:px-4 dshx:text-[11px] dshx:font-semibold dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase',
+                      'dshx:h-9 dshx:px-4 dshx:text-xs dshx:font-medium dshx:text-muted-foreground',
                       props.cellClassName?.(column.id),
                     )}
                     colSpan={header.colSpan}
@@ -65,7 +65,7 @@ export const DataTable = <TFeatures extends TableFeatures, TData extends RowData
                   >
                     {sortable && isSortable(column) ? (
                       <button
-                        className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:uppercase dshx:hover:text-foreground"
+                        className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:hover:text-foreground"
                         onClick={column.getToggleSortingHandler()}
                         type="button"
                       >
