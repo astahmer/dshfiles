@@ -125,7 +125,7 @@ export default defineClient({
     )
 
     ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: 'Agents: Directory' }, PanelGlyph),
+      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: 'Agents' }, PanelGlyph),
     )
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))
     ctx.slots.inject('shell.overlay', () =>

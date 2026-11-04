@@ -9,7 +9,8 @@ When('{string} is commented on the open item', async ({ page }: { page: Page }, 
   const comment = peek(page).getByRole('textbox', { name: 'Comment', exact: true })
   await comment.fill(text)
   await peek(page).getByRole('button', { name: 'Reply', exact: true }).click()
-  await expect(comment).toHaveValue('')
+  // Backlog's comment box is a rich (contentEditable) editor, so it empties its text, not a value.
+  await expect(comment).toHaveText('')
 })
 
 Then('the agent thread {string} opens with its instructions for {string}', async ({ page }: { page: Page }, title: string, task: string) => {
@@ -69,7 +70,7 @@ Then('the task {string} is queued in the selected thread', async ({ page }: { pa
 })
 
 const openAgentsPanel = async (page: Page): Promise<void> => {
-  await openGlobalPanel(page, 'Agents: Directory')
+  await openGlobalPanel(page, 'Agents')
   await expect(page.getByRole('heading', { name: 'Agents', exact: true })).toBeVisible()
 }
 
@@ -100,10 +101,10 @@ When("the built-in agent's start-thread workspace picker is opened", async ({ pa
 
 Then('the workspace picker is a Combobox listing registered projects only', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'agents-thread-workspace-picker', async () => {
-    const picker = page.getByRole('combobox', { name: 'Thread workspace', exact: true })
+    const picker = page.getByRole('combobox', { name: 'Project', exact: true })
     await expect(picker).toHaveJSProperty('tagName', 'BUTTON')
     await picker.click()
-    await expect(page.getByRole('option', { name: 'Host default workspace', exact: true })).toBeVisible()
+    await expect(page.getByRole('option', { name: 'Default project', exact: true })).toBeVisible()
     await expect(page.getByRole('option', { name: /thread-[0-9a-f]{6}/u })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
@@ -167,7 +168,8 @@ When('the agent suggestion {string} is picked', async ({ page }: { page: Page },
 })
 
 Then('the comment box reads {string}', async ({ page }: { page: Page }, text: string) => {
-  await expect(commentBox(page)).toHaveValue(text)
+  // A contentEditable editor: compare its text (whitespace-normalised), not an input value.
+  await expect(commentBox(page)).toHaveText(text)
 })
 
 Then('no agent suggestion is offered', async ({ page }: { page: Page }) => {

@@ -1,8 +1,11 @@
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { useApi } from '@dshfiles/dshx/client'
+import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
+import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { PlusIcon, RotateCcwIcon, SendIcon, TrashIcon } from '@dshfiles/plugin-ui/icons'
@@ -41,7 +44,7 @@ export interface AgentsPanelProps {
 
 type Outcome = { readonly ok: true } | { readonly ok: false; readonly reason: string }
 
-const labelClass = 'dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground'
+const labelClass = 'dshx:text-xs dshx:font-medium dshx:text-muted-foreground'
 
 const draftOf = (agent: Agent | null): AgentDraft => ({
   handle: agent?.handle ?? '',
@@ -117,14 +120,14 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
     onSuccess: async result => {
       await client.invalidateQueries({ queryKey: [AGENTS_QUERY_ROOT, 'list'] })
       if (result.kind === 'limit') {
-        setNotice({ ok: false, reason: `At most ${String(agentLimits.agents)} agents are kept.` })
+        setNotice({ ok: false, reason: `At most ${String(agentLimits.agents)} agents are kept. Remove one you no longer use, then save again.` })
         return
       }
       setCreating(false)
       setSelected(result.agent.handle)
       setNotice({ ok: true })
     },
-    onError: error => setNotice({ ok: false, reason: errorMessage(error, 'The agent was not saved.') }),
+    onError: error => setNotice({ ok: false, reason: errorMessage(error, 'The agent was not saved. Check the fields, then save again.') }),
   })
 
   const remove = useMutation({
@@ -133,17 +136,17 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
       await client.invalidateQueries({ queryKey: [AGENTS_QUERY_ROOT, 'list'] })
       setConfirmingDelete(false)
       if (result.kind === 'built-in') {
-        setNotice({ ok: false, reason: 'The built-in @dsh agent cannot be removed.' })
+        setNotice({ ok: false, reason: 'The built-in @dsh agent cannot be removed. Turn it off with the Enabled switch instead.' })
         return
       }
       if (result.kind === 'missing') {
-        setNotice({ ok: false, reason: 'That agent was already gone.' })
+        setNotice({ ok: false, reason: 'That agent was already removed; the list now shows the current agents.' })
         return
       }
       setSelected(null)
       setNotice({ ok: true })
     },
-    onError: error => setNotice({ ok: false, reason: errorMessage(error, 'The agent was not removed.') }),
+    onError: error => setNotice({ ok: false, reason: errorMessage(error, 'The agent was not removed. Try Remove again.') }),
   })
 
   const dispatch = useMutation({
@@ -160,7 +163,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
       setNotice({ ok: true })
       await client.invalidateQueries({ queryKey: [AGENTS_QUERY_ROOT, 'list'] })
     },
-    onError: error => setNotice({ ok: false, reason: errorMessage(error, 'The thread was not started.') }),
+    onError: error => setNotice({ ok: false, reason: errorMessage(error, 'The thread was not started. Check the project and model route, then start again.') }),
   })
 
   const patch = (next: Partial<AgentDraft>): void => setDraft(currentDraft => ({ ...currentDraft, ...next }))
@@ -189,80 +192,85 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
     ...(routeOption?.efforts ?? []).map(effort => ({ value: effort, label: effort })),
   ]
   const targetOptions: readonly ComboboxOption[] = [
-    { value: 'default', label: 'Host default workspace' },
+    { value: 'default', label: 'Default project' },
     ...projects.map(project => ({ value: `project:${project.id}`, label: project.title })),
   ]
 
-  return (
-    <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:bg-background dshx:text-foreground">
-      <aside className="dshx:flex dshx:w-64 dshx:shrink-0 dshx:flex-col dshx:gap-1 dshx:border-r dshx:border-border dshx:p-2">
-        <div className="dshx:flex dshx:items-center dshx:justify-between dshx:px-1 dshx:pb-1">
-          <h2 className={labelClass}>Agents</h2>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label="New agent"
-            onClick={() => {
-              setCreating(true)
-              setSelected(null)
-              setConfirmingDelete(false)
-              setNotice(null)
-              setDraft(draftOf(null))
-            }}
-          >
-            <PlusIcon />
-          </Button>
-        </div>
-        {list.isPending ? <p className="dshx:px-1 dshx:text-[12px] dshx:text-muted-foreground">Loading…</p> : null}
-        {agents.map(agent => (
-          <button
-            key={agent.handle}
-            type="button"
-            onClick={() => {
-              setCreating(false)
-              setSelected(agent.handle)
-              setConfirmingDelete(false)
-              setNotice(null)
-            }}
-            className={cn(
-              'dshx:flex dshx:w-full dshx:flex-col dshx:gap-0.5 dshx:rounded-md dshx:px-2 dshx:py-1.5 dshx:text-left dshx:transition-colors dshx:hover:bg-accent',
-              selected === agent.handle && 'dshx:bg-accent',
-              !agent.enabled && 'dshx:opacity-50',
-            )}
-          >
-            <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-[13px]">
-              {agent.glyph === '' ? null : <span aria-hidden>{agent.glyph}</span>}
-              <span className="dshx:truncate dshx:font-medium">{agent.name}</span>
-              <span className="dshx:ml-auto dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">@{agent.handle}</span>
-            </span>
-            {agent.description === '' ? null : <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{agent.description}</span>}
-          </button>
-        ))}
-        {agents.length === 0 && !list.isPending ? <p className="dshx:px-1 dshx:text-[12px] dshx:text-muted-foreground">No agents yet.</p> : null}
-      </aside>
+  const startNew = (): void => {
+    setCreating(true)
+    setSelected(null)
+    setConfirmingDelete(false)
+    setNotice(null)
+    setDraft(draftOf(null))
+  }
 
-      <section className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-3">
-        <header className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-          <div className="dshx:min-w-0">
-            <h1 className="dshx:truncate dshx:text-[15px] dshx:font-semibold">{editing ? 'New agent' : (current?.name ?? 'Agent')}</h1>
-            <p className="dshx:text-[11px] dshx:text-muted-foreground">
-              {current === null
-                ? 'A handle, instructions, a model route and a tool preset.'
-                : `@${current.handle} · ${current.threadCount} thread${current.threadCount === 1 ? '' : 's'}`}
-            </p>
-          </div>
-          <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5">
+  return (
+    <main className="dshx-root dshx:h-full dshx:min-h-0 dshx:bg-background dshx:text-foreground">
+    <Page
+      heading="Agents"
+      description="Configured @handles: instructions, a model route and a tool preset that start threads."
+      {...(list.isPending ? {} : { count: agents.length })}
+      actions={[{ id: 'new-agent', label: 'New agent', icon: <PlusIcon />, onSelect: startNew }]}
+      scroll
+      bodyClassName="dshx:grid dshx:grid-cols-[16rem_minmax(0,1fr)] dshx:items-start dshx:gap-4 dshx:@max-pane-compact:grid-cols-1"
+    >
+      <PageSection heading="Configured">
+        {list.isPending ? (
+          <Spinner className="dshx:mx-auto dshx:my-6" />
+        ) : agents.length === 0 ? (
+          <EntityList>
+            <EmptyState action={{ label: 'New agent', onSelect: startNew }}>No agents yet.</EmptyState>
+          </EntityList>
+        ) : (
+          <EntityList aria-label="Agents">
+            {agents.map(agent => (
+              <EntityRow
+                key={agent.handle}
+                role="listitem"
+                selected={selected === agent.handle}
+                className={cn(!agent.enabled && 'dshx:opacity-50')}
+                onSelect={() => {
+                  setCreating(false)
+                  setSelected(agent.handle)
+                  setConfirmingDelete(false)
+                  setNotice(null)
+                }}
+                heading={
+                  <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
+                    {agent.glyph === '' ? null : <span aria-hidden>{agent.glyph}</span>}
+                    <span className="dshx:truncate dshx:font-medium">{agent.name}</span>
+                  </span>
+                }
+                meta={<span>@{agent.handle}</span>}
+                {...(agent.description === '' ? {} : { description: agent.description })}
+              />
+            ))}
+          </EntityList>
+        )}
+      </PageSection>
+
+      <PageSection
+        heading={editing ? 'New agent' : (current?.name ?? 'Agent')}
+        description={
+          current === null
+            ? 'A handle, instructions, a model route and a tool preset.'
+            : `@${current.handle} · ${current.threadCount} thread${current.threadCount === 1 ? '' : 's'}`
+        }
+        actions={
+          <>
             <Switch aria-label="Enabled" checked={draft.enabled} onCheckedChange={enabled => patch({ enabled })} />
             <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
               Save
             </Button>
-          </div>
-        </header>
-
+          </>
+        }
+        className="dshx:gap-3"
+      >
         {notice === null ? null : (
           <p
+            role={notice.ok ? 'status' : 'alert'}
             className={cn(
-              'dshx:rounded-md dshx:border dshx:px-2 dshx:py-1.5 dshx:text-[12px]',
+              'dshx:rounded-md dshx:border dshx:px-2 dshx:py-1.5 dshx:text-xs',
               notice.ok ? 'dshx:border-border dshx:text-muted-foreground' : 'dshx:border-destructive/60 dshx:text-destructive',
             )}
           >
@@ -445,7 +453,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
         {current === null ? null : (
           <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-2">
             <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-              <h3 className={labelClass}>Start a thread</h3>
+              <h3 className="dshx:text-sm dshx:font-semibold">Start a thread</h3>
               {confirmingDelete ? (
                 <span className="dshx:flex dshx:items-center dshx:gap-1.5">
                   <span className="dshx:text-[11px] dshx:text-muted-foreground">Remove @{current.handle}?</span>
@@ -471,16 +479,16 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
             />
             <div className="dshx:flex dshx:items-center dshx:gap-1.5">
               <Combobox
-                label="Thread workspace"
+                label="Project"
                 matchTriggerWidth
                 onValueChange={setTarget}
                 options={targetOptions}
                 searchAbove={0}
-                searchPlaceholder="Search workspaces…"
+                searchPlaceholder="Search projects…"
                 triggerClassName="dshx:flex-1"
                 value={target}
               />
-              <Button size="sm" onClick={() => dispatch.mutate()} disabled={dispatch.isPending}>
+              <Button size="sm" variant="outline" onClick={() => dispatch.mutate()} disabled={dispatch.isPending}>
                 <SendIcon />
                 Start
               </Button>
@@ -490,10 +498,10 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
 
         {current === null ? null : (
           <div className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-border dshx:p-2">
-            <h3 className={labelClass}>Threads started</h3>
-            {threads.isPending ? <p className="dshx:text-[11px] dshx:text-muted-foreground">Loading…</p> : null}
+            <h3 className="dshx:text-sm dshx:font-semibold">Threads started</h3>
+            {threads.isPending ? <Spinner className="dshx:mx-auto" /> : null}
             {!threads.isPending && (threads.data ?? []).length === 0 ? (
-              <p className="dshx:text-[11px] dshx:text-muted-foreground">No thread yet. Start one above; it stays listed here after a restart.</p>
+              <EmptyState className="dshx:py-3">No threads yet. Start one above; it stays listed here after a restart.</EmptyState>
             ) : null}
             {(threads.data ?? []).map(thread => (
               <button
@@ -517,7 +525,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
                 className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:py-1 dshx:text-left dshx:text-[12px] dshx:transition-colors dshx:hover:bg-accent"
               >
                 <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{schedule.title}</span>
-                <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{schedule.status}</span>
+                <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{schedule.status === 'active' ? 'Active' : 'Inactive'}</span>
               </button>
             ))}
           </div>
@@ -529,7 +537,8 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
             Mention it as @{current.handle} where a thread starts: a backlog comment or a start-thread dialog.
           </p>
         )}
-      </section>
+      </PageSection>
+    </Page>
     </main>
   )
 }

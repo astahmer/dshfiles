@@ -7,17 +7,17 @@
       "title": "Manage persistent agents",
       "summary": "Create, edit, enable and remove agents \u2014 handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort \u2014 from one Host-owned registry every browser and agent reads. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. A built-in @dsh agent ships with the harness defaults and cannot be deleted.",
       "reach": [
-        "click button \"Agents: Directory\"",
+        "click button \"Agents\"",
         "expect textbox \"Name\"",
         "click text \"@dsh\"",
-        "expect combobox \"Thread workspace\"",
-        "click combobox \"Thread workspace\"",
-        "expect option \"Host default workspace\""
+        "expect combobox \"Project\"",
+        "click combobox \"Project\"",
+        "expect option \"Default project\""
       ],
       "surfaces": ["client", "host", "storage", "tool"],
       "surface": "destinationSection",
       "destination": "agents",
-      "currentSurface": "left-nav: Agents: Directory",
+      "currentSurface": "left-nav: Agents",
       "configuration": [],
       "states": ["empty", "built-in-only", "editing", "enabled", "disabled", "thread-history", "delegation-listed"],
       "failureModes": [
@@ -253,7 +253,7 @@
         }
       ],
       "reach": [
-        "click button \"Agents: Directory\"",
+        "click button \"Agents\"",
         "fill textbox \"Name\" \"Luna\"",
         "click button \"Save\"",
         "expect text \"@luna\"",

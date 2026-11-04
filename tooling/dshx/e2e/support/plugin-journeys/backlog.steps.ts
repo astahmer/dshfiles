@@ -1207,7 +1207,7 @@ When('Backlog AI reply answers are enabled', async ({ page }: { page: Page }) =>
 })
 
 When('Backlog uses a configured fake-model agent for replies', async ({ page }: { page: Page }) => {
-  await openGlobalPanel(page, 'Agents: Directory')
+  await openGlobalPanel(page, 'Agents')
   await page.getByRole('button', { name: 'New agent', exact: true }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('reply-helper')
   await page.getByRole('textbox', { name: /^Instructions/u }).fill('Answer briefly and directly.')
