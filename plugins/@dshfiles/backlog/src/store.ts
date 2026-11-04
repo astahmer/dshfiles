@@ -19,6 +19,7 @@ import {
   type BacklogStatus,
 } from './item.js'
 import { BacklogSearch, type SearchMatch } from './search.js'
+import { BacklogSearchIndex } from './search-index.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 import { BacklogTriage } from './triage.js'
 
@@ -198,13 +199,18 @@ const detailIn = (view: StoreView, item: BacklogItem): BacklogDetail => ({
   backlinks: referencingIn(view, { type: 'item', target: String(item.id) }),
 })
 
-const listIn = (view: StoreView, query: BacklogListQuery) => {
+const listIn = (view: StoreView, query: BacklogListQuery, index?: BacklogSearchIndex) => {
   const at = view.at
+  const search = BacklogSearch.parse(query.query ?? '')
+  // The index only narrows which items get scored; the scorer below still ranks them, so results match a full scan.
+  index?.sync(view.records)
+  const candidates = index?.candidates(search.terms) ?? null
+  const pool = candidates === null ? [...view.records.values()] : [...candidates].flatMap(id => view.records.get(id) ?? [])
   const freshnessFilter = query.freshness ?? 'active'
   // A caller may still ask for the workspace an item was captured in; the item is filed under its project.
   const project = query.project === undefined ? undefined : BacklogItems.projectOf(query.project)
   const projects = query.projects?.map(candidate => (candidate === null ? null : BacklogItems.projectOf(candidate)))
-  const matching = [...view.records.values()]
+  const matching = pool
     .filter(item => query.statuses === undefined || query.statuses.length === 0 || query.statuses.includes(item.status))
     .filter(item => query.kinds === undefined || query.kinds.length === 0 || query.kinds.includes(item.kind))
     .filter(item => project === undefined || item.project === project)
@@ -218,7 +224,6 @@ const listIn = (view: StoreView, query: BacklogListQuery) => {
       const state = BacklogItems.freshness(item, at, view.dormantDays)
       return freshnessFilter === 'active' ? state === 'fresh' || state === 'stale' : state === freshnessFilter
     })
-  const search = BacklogSearch.parse(query.query ?? '')
   const scored = matching.flatMap(item => {
     const match = BacklogSearch.score(item, search, at)
     return match === null ? [] : [{ item, match }]
@@ -484,6 +489,7 @@ export class BacklogStore extends Context.Service<
         revision: yield* Clock.currentTimeMillis,
       })
       const writes = yield* Semaphore.make(1)
+      const searchIndex = new BacklogSearchIndex()
       const notices = yield* PubSub.unbounded<BacklogChangeNotice>()
 
       const view = Effect.gen(function* () {
@@ -1011,7 +1017,7 @@ export class BacklogStore extends Context.Service<
         acknowledge,
         dismissProposal,
         projects: Effect.map(view, projectsIn),
-        list: query => Effect.map(view, current => listIn(current, query)),
+        list: query => Effect.map(view, current => listIn(current, query, searchIndex)),
         get,
         getMany,
         referencing: link => Effect.map(view, current => referencingIn(current, link)),

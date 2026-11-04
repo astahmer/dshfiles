@@ -1139,7 +1139,7 @@
     {
       "id": "search-and-views",
       "title": "Search with reasons and saved views",
-      "summary": "Relevance-ranked search over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators; each result says where it matched. Typing filters the current view in place (Feed, Items, Board, Inbox, Projects); Enter opens the ranked results view. Multi-select status chips show counts for the current search and narrow results. Views save a view and search to the plugin settings.",
+      "summary": "Relevance-ranked search (a trigram index narrows which items are scored; ranking is the token scorer's) over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators; each result says where it matched. Typing filters the current view in place (Feed, Items, Board, Inbox, Projects); Enter opens the ranked results view. Multi-select status chips show counts for the current search and narrow results. Views save a view and search to the plugin settings.",
       "surfaces": [
         "client",
         "host",
@@ -1199,6 +1199,18 @@
           "id": "backlog.search-unit-recency",
           "file": "plugins/@dshfiles/backlog/src/search.test.ts",
           "testName": "filters by recency and matches ids exactly"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.search-index-parity",
+          "file": "plugins/@dshfiles/backlog/src/search-index.test.ts",
+          "testName": "ranks exactly like a full scan for every query over a generated corpus"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.search-index-store",
+          "file": "plugins/@dshfiles/backlog/src/search-index.test.ts",
+          "testName": "finds an item by its edited text and no longer by the text it lost"
         }
       ],
       "telemetry": [

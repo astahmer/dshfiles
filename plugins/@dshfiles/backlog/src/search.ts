@@ -125,15 +125,13 @@ const passesFilters = (item: BacklogItem, query: SearchQuery, now: number): bool
 }
 
 /**
- * Scores one item against a query, or null when it does not match. Every free-text term must hit some field; the
- * score adds each hit's field weight, and the result says which fields matched with a snippet of the best text hit.
+ * Every text a free-text term may hit, per field, in scoring order. The search index reads the same list, so an item
+ * the index skips is one this scorer could never have matched.
  */
-const score = (item: BacklogItem, query: SearchQuery, now: number): SearchMatch | null => {
-  if (!passesFilters(item, query, now)) return null
-  if (query.terms.length === 0) return { score: 0, fields: [], snippet: null }
+const sourcesOf = (item: BacklogItem): readonly (readonly [MatchField, readonly string[]])[] => {
   const comments = item.events.filter(event => event.kind === 'commented').map(event => event.detail)
   const capture = item.events.find(event => event.kind === 'created')?.detail ?? ''
-  const sources: readonly (readonly [MatchField, readonly string[]])[] = [
+  return [
     ['id', [`b:${String(item.id)}`, String(item.id)]],
     ['title', [item.title]],
     ['tag', item.tags.map(tag => `#${tag}`)],
@@ -143,6 +141,16 @@ const score = (item: BacklogItem, query: SearchQuery, now: number): SearchMatch 
     ['capture', [capture]],
     ['comment', comments],
   ]
+}
+
+/**
+ * Scores one item against a query, or null when it does not match. Every free-text term must hit some field; the
+ * score adds each hit's field weight, and the result says which fields matched with a snippet of the best text hit.
+ */
+const score = (item: BacklogItem, query: SearchQuery, now: number): SearchMatch | null => {
+  if (!passesFilters(item, query, now)) return null
+  if (query.terms.length === 0) return { score: 0, fields: [], snippet: null }
+  const sources = sourcesOf(item)
   let total = 0
   const fields = new Set<MatchField>()
   let snippet: string | null = null
@@ -164,4 +172,5 @@ const score = (item: BacklogItem, query: SearchQuery, now: number): SearchMatch 
 export class BacklogSearch {
   static readonly parse = parse
   static readonly score = score
+  static readonly sourcesOf = sourcesOf
 }
