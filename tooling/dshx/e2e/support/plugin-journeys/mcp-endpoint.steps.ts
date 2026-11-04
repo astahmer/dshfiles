@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import * as Schema from 'effect/Schema'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsPage } from '../steps.js'
 import { createScratchDirectory } from '../threads.js'
 
 const TITLE = 'Started from an outside agent'
@@ -10,7 +10,7 @@ const ANSWER = 'Answered for the MCP client'
 const tokens = new WeakMap<Page, string>()
 const threads = new WeakMap<Page, string>()
 
-const settingsDialog = (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true })
+const settingsDialog = (page: Page) => settingsPage(page)
 const endpointOf = (page: Page): string => `${new URL(page.url()).origin}/mcp`
 
 const toolArgumentsSchema = Schema.Record(Schema.String, Schema.Json)

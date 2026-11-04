@@ -6,30 +6,39 @@
 
 ![One Settings hub inside the tabbed workspace](docs/screenshots/settings-workbench-panels.png)
 
+![Settings grouped by task, with deep links](docs/screenshots/settings-task-groups.png)
+
 DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the native shell has no seat for.
 
 ## Use
 
-- **Open**: the sidebar gear, `Mod+,` (Desktop) / `Mod+Alt+,` (Web), the command palette (_Open Settings_, or
-  _Settings: <section>_ for each section), or another plugin (below).
-- **Workbench tab or Settings dialog**: the owned stack always uses Workbench pane chrome; Settings opens in a tab
-  through `@dshfiles/main-tabs`. Without that package it opens as the native Settings dialog. `openIn` chooses only the
-  Settings presentation, not a native-layout opt-out; it does not replace Workbench's centre or right-pane tab host.
-- **Side panel**: open **Settings Shell: Settings** from the Workbench **New tab** chooser or move its tab to the right pane through **Pane options › Move tab to**.
-  Without Workbench, the native guide still offers a _Settings_ card; `openIn: 'sidebar'` sends the gear, palette and
-  `Mod+,` through that original aside path. The Settings main tab dragged onto the open panel moves there, and the side
-  tab's _Move to main area_ row moves it back. Settings then fills a tab in that panel,
-  listing every section and plugin page; a narrow panel shows that list and one section at a time with a back button,
-  while a wide one keeps the dialog's two columns. The panel owns its tab, so closing it leaves Settings closed.
-- **Narrow windows**: dialogs and main-view tabs replace the wide section list with a searchable section picker. Header actions keep accessible names while collapsing to icons; the thread side panel keeps its existing drill/back behavior.
-- **Expand**: the dialog's expand button fills the window (VS Code's maximize); _Open in a tab_ moves an open dialog
-  into the main view, keeping the section.
-- Picking the Settings tab, or a reload that lands on it, reopens Settings there; leaving the panel closes it. With no
-  other tab left, main-tabs keeps showing Settings (it cannot show an empty main view).
+Settings is **one page in the stage** (plan [`plans/ade-ux`](../../../plans/ade-ux/README.md) §4.6).
 
-### Dockable settings pages
+- **Open**: the rail's **Settings**, the sidebar gear, `Mod+,` (Desktop) / `Mod+Alt+,` (Web), the command palette
+  (_Open Settings_, or _Settings: <entry>_ for each entry), or another plugin (below). Every one of them opens the same
+  page; with `@dshfiles/main-tabs` it gets a tab like any other page. Picking that tab, or a reload that lands on it,
+  reopens Settings; leaving it closes Settings. With no other tab left, main-tabs keeps showing Settings.
+- **Task groups**: the navigation lists **General** (appearance, language, Layout fixed/free docking, shortcuts, the
+  thread list), **Models & accounts**, **Agents**, **Tools & MCP**, **Projects & workspaces**, **Hosts & network**,
+  **Security**, **Notifications**, **Plugins**, **About**, and **Other** for anything not placed yet. The map lives in
+  [`src/settings-groups.ts`](src/settings-groups.ts): native `settings.section` ids, plugin settings namespaces, and the
+  stage pages other plugins own. Entries carry a person's name, never a package id (`agent-loop` reads _Agent loop_).
+- **Deep links**: **AI accounts**, **MCP servers**, **Secrets** and **Hosts** are entries that open the page their plugin
+  owns (_Open MCP servers_); Settings links them instead of copying their UI. AI accounts appears once: its section,
+  its plugin settings and the link to the accounts page share one entry. Every Jev setting (enable, key, thresholds) of
+  every plugin sits under **Tools & MCP › Jev**; the plugin's own page says so and links there.
+- **Scope**: plugin pages say they apply to every project and thread. No setting stores a per-project or per-thread
+  value today, so the page shows that as information instead of a scope control it could not honour.
+- **Narrow windows and phones**: the group list becomes a searchable entry picker above the page.
+- The former dialog, expanded dialog and side-panel presentations are gone. A `dshfiles:open-settings` request that
+  still names `surface: 'modal'` opens the page.
 
-Workbench's **New tab** chooser offers one **Settings Shell: Settings** hub, not a list of Settings leaf sections. That hub contains the actual section navigation, search and native/plugin forms. The shell remains the authorized `settings.section` renderer with genuine owner props and the shared ConfigForm; it invents no `settings.page` slot. Leaf registrations remain available for saved layouts and explicit deep links, but are hidden from primary chooser suggestions. Workbench tab hosts are mandatory in the owned stack, with no native layout switch. The full-height right pane preserves mounted Settings tabs while hidden. Separate Settings dialog/tab/side-panel presentations remain compatible.
+### Free docking
+
+With Layout › Free docking, Workbench's **New tab** chooser offers one **Settings** hub: the same grouped page in a
+pane, with its own navigation and search. The shell remains the authorized `settings.section` renderer with genuine
+owner props and the shared ConfigForm; it invents no `settings.page` slot. Leaf registrations remain available for
+saved layouts and explicit deep links, but are hidden from primary chooser suggestions.
 
 Panel identities are `dshfiles-settings.section/<UTF-8 hex section id>` and
 `dshfiles-settings.page/<UTF-8 hex pageId>`. Labels update with the live sources/locale without replacing the panel's
@@ -44,13 +53,15 @@ The Settings trigger shows a small badge when GitHub has a release newer than th
 ### Search
 
 One field at the top of Settings searches every setting the shell can draw: their titles, descriptions and key paths
-(`thread sidebar children` finds `maxChildren` on the Thread Sidebar page), plus the names of native sections. Every
+(`thread sidebar children` finds `maxChildren` on the Thread list page), plus entry and group names ("models &
+accounts") and key bindings, by command name or keys ("open settings", "⌘,"). Every
 word must match; accents and case are ignored; hidden and secret fields never match. Results replace the section as a
 flat list grouped by page, with matches highlighted, editable in place, and a count ("6 Settings Found"). The tree
 stays visible with a match count per entry; picking an entry with matches scrolls to its results. `Escape` clears the
-query before it closes the dialog. Leaving the Settings tab for another tab keeps the query, so returning to the tab
+query. Leaving the Settings tab for another tab keeps the query, so returning to the tab
 restores its results and the text in the field. Native sections draw their own rows, so a match on a section's name
-offers to open it; the namespaces behind native rows (theme, language, …) are searchable under _More settings_.
+offers to open it; the namespaces behind native rows (theme, language, …) stay searchable, and a match opens the
+section that draws them.
 
 A section can also publish the controls it draws as search entries (dshx `settings.section` `metadata.searchEntries`,
 see the dshx [client guide](../../../tooling/dshx/docs/guides/client.md#settings-search-entries)). The shell indexes
@@ -66,9 +77,9 @@ search section are gone, and the schema walking and ranking it did now live in `
 
 ### Plugin settings
 
-Every settings namespace with a visible field gets a page under **Plugins** in the Settings navigation (namespaces
-whose plugin draws its own native page sit under **More settings**), titled by its bundle's manifest, then its schema,
-then its id. The same renderer draws each dshx plugin's settings on its **Plugins** page detail, through dshx's
+Every settings namespace with a visible field gets a page in its task group (namespaces whose fields a native section
+already draws get no second row; they stay searchable), titled by the group map, then its bundle's manifest, then its
+schema, then its humanized id. The same renderer draws each dshx plugin's settings on its **Plugins** page detail, through dshx's
 settings page renderer seat (`provideSettingsPageRenderer`); without this plugin the built-in dshx form shows.
 
 Fields come from the serialized schemastery schema (`src/schema-form/schema-model.ts`): the title is the field's label
@@ -169,6 +180,6 @@ Deliberate differences from upstream:
 
 | Key      | Default | Meaning                                                                                                  |
 | -------- | ------- | -------------------------------------------------------------------------------------------------------- |
-| `openIn` | `auto`  | Where Settings opens: `auto` (a tab when Main tabs is loaded), `tab`, `modal`, or `sidebar` (the panel). |
+| `openIn` | `auto`  | Retired and hidden: Settings always opens as the page in the stage; a saved value still validates. |
 
 Build, test and typecheck with `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.

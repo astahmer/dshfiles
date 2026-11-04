@@ -9,15 +9,7 @@ import { zstdCompressSync } from 'node:zlib'
 import { accountConnectionSnapshotSchema, accountDraftSchema, accountsFileSchema } from '../../../../../plugins/@dshfiles/ai-accounts/src/api.js'
 import { threadAccountPreviewSchema } from '../../../../../plugins/@dshfiles/ai-accounts/src/thread-account-api.js'
 import { After, Given, Then, When } from '../bdd.js'
-import {
-  browserDiagnosticsFor,
-  finishJourneyAssertions,
-  openSettingsDialog,
-  profileFor,
-  recordAssertion,
-  restartScratchProfileInBrowser,
-  visitIsolatedPluginProfile,
-} from '../steps.js'
+import { browserDiagnosticsFor, finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion, restartScratchProfileInBrowser, visitIsolatedPluginProfile, settingsNavEntry } from '../steps.js'
 import { bootComposedPluginProfile } from '../boot.js'
 import { seedAiAccountsWorkspace } from '../ai-accounts-workspace.js'
 import { seedCancellationOnlyCodexCli } from '../fake-account-codex.js'
@@ -168,7 +160,7 @@ const openAccountsPanel = async (page: Page): Promise<void> => {
     await openGlobalPanel(page, 'AI Accounts: Accounts')
   } else {
     await openSettingsDialog(page)
-    await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+    await settingsNavEntry(page, 'AI accounts', 'AI Accounts').click()
     await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
   }
   await expect(providerAccounts(page)).toBeVisible()
@@ -683,14 +675,14 @@ Then('the inline credential action opens AI Accounts', async ({ page }: { page: 
 
 When('the AI Accounts settings section is opened', async ({ page }: { page: Page }) => {
   await openSettingsDialog(page)
-  await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+  await settingsNavEntry(page, 'AI accounts', 'AI Accounts').click()
   await expect(page.getByRole('heading', { name: 'Failure recovery' })).toBeVisible()
 })
 
 When('a verified loopback account is edited in manual save mode', async ({ page }: { page: Page }) => {
   await startFakeCommandCode(page)
   await openSettingsDialog(page)
-  await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+  await settingsNavEntry(page, 'AI accounts', 'AI Accounts').click()
   const manualSave = page.getByRole('radio', { name: /Manual/ })
   // The radio follows the stored setting, so it flips after the Host round trip rather than on click.
   await manualSave.click()
@@ -712,7 +704,7 @@ Then('the manual draft saves and persists when AI Accounts is reopened', async (
     // Confirm the Host persisted the draft; the redesigned manual footer has no saved-notice copy.
     await expect.poll(async () => (await readSavedAccounts(page))[0]?.displayName).toBe('E2E Draft Account')
     await openSettingsDialog(page)
-    await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+    await settingsNavEntry(page, 'AI accounts', 'AI Accounts').click()
     await expect(page.getByRole('radio', { name: /Manual/ })).toBeChecked()
     await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
     await selectedAccount(page).getByRole('tab', { name: 'Settings', exact: true }).click()
@@ -797,7 +789,7 @@ Then('the price refresh interval and explicit override can be changed and restor
     await expect(overrides).toHaveValue('codex/* = free')
     await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
     await openSettingsDialog(page)
-    await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+    await settingsNavEntry(page, 'AI accounts', 'AI Accounts').click()
     await expect(refreshInterval).toHaveText('2 days')
     await expect(overrides).toHaveValue('codex/* = free')
     await refreshInterval.click()
@@ -1385,7 +1377,7 @@ Then('the sidebar moves the current thread between accounts without the model pi
 Then('the usage strip shows its short name, renamed from AI Accounts settings', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-strip-shows-initials-by-default', () => expect(stripMeter(page)).toContainText('CC'))
   await openSettingsDialog(page)
-  await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+  await settingsNavEntry(page, 'AI accounts', 'AI Accounts').click()
   await expect(page.getByRole('switch', { name: 'Short names in the strip', exact: true })).toBeChecked()
   const shortName = page.getByRole('textbox', { name: 'Short name for Command Code 1', exact: true })
   await shortName.fill('WRK')
@@ -2163,7 +2155,7 @@ const failTurnOnExhaustedAccount = async (page: Page, key: string): Promise<void
   await addCommandCodeAccount(page, { name: 'Command Code 1', routeSlug: 'commandcode_work', key })
   // The inline recovery choice exists only while automatic exhausted-limit failover is off.
   await openSettingsDialog(page)
-  await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+  await settingsNavEntry(page, 'AI accounts', 'AI Accounts').click()
   const exhausted = page.getByRole('group', { name: /Usage exhausted/ })
   const failover = exhausted.getByRole('switch', { name: 'Fail over to the next account' })
   await failover.click()

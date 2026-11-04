@@ -1,8 +1,9 @@
 Feature: Settings shell
 
-  The ported Settings shell keeps the native sections, opens as a main-view tab
-  beside main-tabs and as the native dialog without it, renders every plugin's
-  settings with real controls, searches them inline, marks modified settings,
+  The ported Settings shell is one page in the stage (plans/ade-ux §4.6): it
+  keeps the native sections, groups every section and plugin page by task,
+  links the pages other plugins own, renders every plugin's settings with real
+  controls, searches them and key bindings inline, marks modified settings,
   and offers other ways to open the configuration file. These journeys use a
   fresh isolated Host profile with no provider credentials and the native
   sidebar.
@@ -11,8 +12,8 @@ Feature: Settings shell
   Scenario: The ported shell keeps the native sections, General rows and shortcut
     Given the isolated plugin profile "@dshfiles/settings-shell" is booted
     When Settings is opened from the sidebar
-    Then the native sections and General rows show in the Settings dialog
-    And the Settings shortcut closes and reopens the dialog
+    Then the native sections and General rows show on the Settings page
+    And the Settings shortcut closes and reopens the page
 
   @scenario:settings-shell.compact-navigation
   Scenario: Settings keep section navigation and search usable in narrow windows
@@ -33,14 +34,13 @@ Feature: Settings shell
     When Settings is opened from the sidebar
     Then Settings fills the main view under its own tab
 
-  @scenario:settings-shell.dialog-expand
-  Scenario: The dialog expands to the full window and moves into a tab
-    Given the isolated plugin profile "@dshfiles/settings-shell" is booted
+  @scenario:settings-shell.grouped-page
+  Scenario: Settings groups sections and plugin pages by task and finds key bindings
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
     When Settings is opened from the sidebar
-    And the Settings dialog is expanded
-    Then the dialog fills the window and can be restored
-    When the Settings dialog is moved into a tab
-    Then Settings fills the main view
+    Then the page lists its task groups with human page titles and no dialog
+    When Settings are searched for "open settings"
+    Then the Open Settings key binding is listed with its keys
 
   @scenario:settings-shell.search
   Scenario: Search lists matching settings grouped by page, highlighted and counted
@@ -105,15 +105,3 @@ Feature: Settings shell
     Then the Editor file-link preference is found switched on
     When the Editor file-link preference is switched off in the General section
     Then Settings search shows the Editor file-link preference switched off
-
-  @scenario:settings-shell.side-panel
-  Scenario: Settings opens as a tab in the thread's side panel
-    The right side panel lists Settings beside the other panel cards; picking it
-    opens a Settings tab in that panel, which lists every section and drills into
-    one when the panel is narrow.
-
-    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/workspace-folder-picker" is booted
-    When the side panel opens Settings
-    Then the side panel shows a Settings tab with its sections
-    When a section is picked in the side panel
-    Then the section fills the panel and Back returns to the section list

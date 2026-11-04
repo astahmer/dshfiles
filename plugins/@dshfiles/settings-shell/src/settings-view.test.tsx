@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
+import { SettingsGroups } from './settings-groups.js'
 import { SettingsTab, type SettingsViewProps } from './settings-view.js'
 
 const t: ShellTranslate = (key, values) => (values === undefined ? key : `${key} ${JSON.stringify(values)}`)
@@ -20,8 +21,10 @@ const mount = (overrides: Partial<SettingsViewProps>) => {
   }
   const onReveal = vi.fn()
   const props: SettingsViewProps = {
-    variant: 'tab',
+    groups: SettingsGroups.group({ sections: rows, pages: [], panels: new Set(['mcp-servers']) }),
     rows,
+    shortcuts: [{ id: 'settings.open', label: 'Open Settings', aliases: ['preferences'], keys: ['⌘', ','] }],
+    openPanel: vi.fn(),
     pluginPages: [],
     renderPluginPage: () => null,
     renderMatches: () => null,
@@ -35,11 +38,7 @@ const mount = (overrides: Partial<SettingsViewProps>) => {
     onSelect: () => {},
     onReveal,
     onSearch: () => {},
-    onBack: () => {},
     onClose: undefined,
-    onExpand: () => {},
-    onRestore: () => {},
-    onMoveToTab: () => {},
     ...overrides,
   }
   const host = document.createElement('div')
@@ -47,7 +46,7 @@ const mount = (overrides: Partial<SettingsViewProps>) => {
   document.body.append(host, container)
   const root = createRoot(container)
   act(() => root.render(<SettingsTab {...props} host={host} />))
-  return { host, sectionOwners, onReveal, unmount: () => act(() => root.unmount()) }
+  return { host, sectionOwners, onReveal, openPanel: props.openPanel, unmount: () => act(() => root.unmount()) }
 }
 
 afterEach(() => {
@@ -72,5 +71,26 @@ describe('settings view: section entries', () => {
     const plain = mount({ sectionTarget: undefined })
     expect(plain.sectionOwners.at(-1)).not.toHaveProperty('target')
     plain.unmount()
+  })
+})
+
+describe('settings view: one grouped page', () => {
+  it('lists entries under task groups and opens a linked page from its entry', () => {
+    const view = mount({ activeId: 'link:mcp-servers' })
+    const groups = [...view.host.querySelectorAll('[data-settings-group]')].map(group => group.getAttribute('aria-label'))
+    expect(groups).toEqual(['General', 'Tools & MCP', 'Other'])
+    const open = [...view.host.querySelectorAll('button')].find(button => button.textContent?.includes('entry.open'))
+    act(() => open?.click())
+    expect(view.openPanel).toHaveBeenCalledWith('mcp-servers')
+    view.unmount()
+  })
+
+  it('finds key bindings by command name and by keys', () => {
+    const byName = mount({ query: 'open settings' })
+    expect(byName.host.querySelector('[data-settings-shortcut="settings.open"]')?.textContent).toContain('Open Settings')
+    byName.unmount()
+    const byKeys = mount({ query: '⌘,' })
+    expect(byKeys.host.querySelector('[data-settings-shortcut="settings.open"]')).not.toBeNull()
+    byKeys.unmount()
   })
 })

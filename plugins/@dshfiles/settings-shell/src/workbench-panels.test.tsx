@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ShellRenderSlot } from './native/slots.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
 import type { SectionRow } from './settings-view.js'
+import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import { createSettingsWorkbenchHub, registerSettingsWorkbenchPanels, SETTINGS_WORKBENCH_HUB_ID, settingsWorkbenchPanelId } from './workbench-panels.js'
 import type { ShellTranslate } from './native/locales.js'
 
@@ -59,20 +60,24 @@ const definition = (definitions: ReadonlyMap<string, WorkbenchPanelDefinition>, 
 describe('Settings workbench sources', () => {
   it('keeps navigation inside each hub and renders the original section and plugin-page controls', async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
-    const sections = createSnapshotStore<readonly SectionRow[]>([{ id: 'general', label: 'General', order: 0 }])
-    const pages = createSnapshotStore<readonly PluginSettingsPage[]>([page])
+    const groups = createSnapshotStore<readonly GroupedEntries[]>(
+      SettingsGroups.group({ sections: [{ id: 'general', label: 'General', order: 0 }], pages: [page], panels: new Set() }),
+    )
     const modalNavigation = vi.fn()
     const close = vi.fn()
     const fields: unknown[] = []
     const t: ShellTranslate = key => key
     const Hub = createSettingsWorkbenchHub({
-      sections,
-      pages,
+      groups,
       closeSettings: close,
       view: input => {
         fields.push(input.field)
         return {
           ...input,
+          rows: [],
+          pluginPages: SettingsGroups.searchablePages(input.groups),
+          shortcuts: [],
+          openPanel: vi.fn(),
           sectionEntries: [],
           sectionTarget: undefined,
           onReveal: vi.fn(),
@@ -86,10 +91,6 @@ describe('Settings workbench sources', () => {
           t,
           onSelect: modalNavigation,
           onSearch: modalNavigation,
-          onBack: modalNavigation,
-          onExpand: modalNavigation,
-          onRestore: modalNavigation,
-          onMoveToTab: modalNavigation,
         }
       },
     })

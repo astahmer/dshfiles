@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
@@ -99,6 +99,24 @@ export const openSettingsDialog = async (page: Page, options?: { readonly timeou
   }
   await page.getByRole('menuitem', { name: /^Settings/ }).click(clickOptions)
 }
+
+/**
+ * Settings as the composition draws it: `@dshfiles/settings-shell`'s one page in the stage (plans/ade-ux §4.6), or the
+ * native Settings dialog in an isolated composition that does not load the shell.
+ */
+export const settingsPage = (page: Page): Locator =>
+  page.locator('[data-settings-view]').or(page.getByRole('dialog', { name: 'Settings', exact: true }))
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+
+/**
+ * One Settings navigation entry by its label, whatever task group holds it. Pass the native shell's label too when it
+ * differs ("AI accounts" here, "AI Accounts" natively).
+ */
+export const settingsNavEntry = (page: Page, label: string, ...nativeLabels: readonly string[]): Locator =>
+  settingsPage(page)
+    .getByRole('button', { name: new RegExp(`^(?:${[label, ...nativeLabels].map(escapeRegExp).join('|')})$`, 'u') })
+    .first()
 
 export const reloadPastProviderSetup = async (page: Page): Promise<void> => StartupDialogs.reloadPastProviderSetup(page)
 

@@ -10,6 +10,15 @@ export interface SectionEntryRow extends SettingsSearchEntry {
   readonly sectionLabel: string
 }
 
+/** One key binding, searched by its command name, aliases and keys. */
+export interface ShortcutRow {
+  readonly id: string
+  readonly label: string
+  readonly aliases: readonly string[]
+  /** Display keys, one per binding ("⌘", ","). */
+  readonly keys: readonly string[]
+}
+
 /** One page's matching settings, in schema order. */
 interface PageHits {
   readonly page: PluginSettingsPage
@@ -22,6 +31,8 @@ export interface SettingsSearchResult {
   readonly pages: readonly PageHits[]
   /** Section controls whose text matches, in section order. */
   readonly entries: readonly SectionEntryRow[]
+  /** Key bindings whose command name, alias or keys match. */
+  readonly shortcuts: readonly ShortcutRow[]
   /** Settings found, sections included, for "N Settings Found". */
   readonly total: number
   /** Matches per nav id, for the counts beside the tree. */
@@ -56,11 +67,12 @@ const searchSettings = (input: {
   readonly sections: readonly SectionRow[]
   readonly pages: readonly PluginSettingsPage[]
   readonly entries: readonly SectionEntryRow[]
+  readonly shortcuts?: readonly ShortcutRow[]
 }): SettingsSearchResult => {
   const needles = terms(input.query)
   const counts = new Map<string, number>()
-  if (needles.length === 0) return { sections: [], pages: [], entries: [], total: 0, counts }
-  const sections = input.sections.filter(section => matchesAll(fold(section.label), needles))
+  if (needles.length === 0) return { sections: [], pages: [], entries: [], shortcuts: [], total: 0, counts }
+  const sections = input.sections.filter(section => matchesAll(fold(`${section.label} ${section.keywords ?? ''}`), needles))
   for (const section of sections) counts.set(section.id, 1)
   const entries = matchSectionEntries({ query: input.query, entries: input.entries })
   for (const entry of entries) counts.set(entry.sectionId, (counts.get(entry.sectionId) ?? 0) + 1)
@@ -73,11 +85,15 @@ const searchSettings = (input: {
     counts.set(page.pageId, fields.length)
     return [{ page, fields }]
   })
+  const shortcuts = (input.shortcuts ?? []).filter(shortcut =>
+    matchesAll(fold(`${shortcut.label} ${shortcut.aliases.join(' ')} ${shortcut.keys.join(' ')} ${shortcut.keys.join('')} ${shortcut.id}`), needles),
+  )
   return {
     sections,
     pages,
     entries,
-    total: sections.length + entries.length + pages.reduce((sum, hit) => sum + hit.fields.length, 0),
+    shortcuts,
+    total: sections.length + entries.length + shortcuts.length + pages.reduce((sum, hit) => sum + hit.fields.length, 0),
     counts,
   }
 }

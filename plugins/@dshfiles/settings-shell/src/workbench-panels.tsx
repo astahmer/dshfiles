@@ -5,29 +5,27 @@ import { useState, type ReactNode } from 'react'
 import type { ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
+import type { GroupedEntries } from './settings-groups.js'
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import type { FieldTarget } from './shell-machine.js'
 
 export const SETTINGS_WORKBENCH_HUB_ID = 'dshfiles-settings'
 
 interface SettingsWorkbenchHubInput {
-  readonly rows: readonly SectionRow[]
-  readonly pluginPages: readonly PluginSettingsPage[]
+  readonly groups: readonly GroupedEntries[]
   readonly activeId: string | undefined
   readonly field: FieldTarget | undefined
   readonly query: string
 }
 
-/** The existing Settings navigator, with navigation/search owned by this pane rather than the modal actor. */
+/** The Settings page as a free-docking pane, with navigation and search owned by this pane rather than the shell actor. */
 export const createSettingsWorkbenchHub = (sources: {
-  readonly sections: ObservableSnapshot<readonly SectionRow[]>
-  readonly pages: ObservableSnapshot<readonly PluginSettingsPage[]>
-  readonly view: (input: SettingsWorkbenchHubInput) => Omit<SettingsViewProps, 'variant' | 'onClose'>
+  readonly groups: ObservableSnapshot<readonly GroupedEntries[]>
+  readonly view: (input: SettingsWorkbenchHubInput) => Omit<SettingsViewProps, 'onClose'>
   readonly closeSettings: () => void
 }): WorkbenchPanelDefinition['component'] =>
   function SettingsWorkbenchHub(props) {
-    const rows = useObservable(sources.sections)
-    const pluginPages = useObservable(sources.pages)
+    const groups = useObservable(sources.groups)
     const [activeId, setActiveId] = useState<string>()
     const [field, setField] = useState<FieldTarget>()
     const [query, setQuery] = useState('')
@@ -38,7 +36,7 @@ export const createSettingsWorkbenchHub = (sources: {
       setQuery('')
     }
     const close = props.onClose ?? sources.closeSettings
-    const view = sources.view({ rows, pluginPages, activeId, field, query })
+    const view = sources.view({ groups, activeId, field, query })
     const owner: SettingsSectionOwnerProps & {
       readonly openSection: (sectionId: string) => void
       readonly openSettingsTarget: (target: { readonly entryId: string; readonly fieldPath: readonly string[] }) => boolean
@@ -47,7 +45,7 @@ export const createSettingsWorkbenchHub = (sources: {
       close,
       openSection: select,
       openSettingsTarget: target => {
-        const page = pluginPages.find(candidate => candidate.ns === target.entryId)
+        const page = view.pluginPages.find(candidate => candidate.ns === target.entryId && candidate.fields.some(field => field.path[0] === target.fieldPath[0]))
         if (page === undefined) return false
         select(page.pageId)
         setField({ sectionId: page.pageId, fieldPath: target.fieldPath })
@@ -60,15 +58,10 @@ export const createSettingsWorkbenchHub = (sources: {
           <SettingsTab
             {...view}
             host={host}
-            variant="tab"
             sectionOwner={owner}
             onClose={close}
             onSelect={select}
             onSearch={setQuery}
-            onBack={() => {
-              setActiveId(undefined)
-              setQuery('')
-            }}
           />
         )}
       </div>

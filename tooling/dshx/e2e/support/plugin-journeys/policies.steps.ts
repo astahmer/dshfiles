@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsNavEntry } from '../steps.js'
 import { selectModelForNewThread, sendMessage } from '../threads.js'
 
 const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
@@ -13,7 +13,7 @@ const bashCall = (command: string): string => `[[call bash ${JSON.stringify({ co
 
 When('the deny rule {string} for bash calls matching {string} is saved in Settings', async ({ page }: { page: Page }, name: string, match: string) => {
   await openSettingsDialog(page)
-  await page.getByRole('group', { name: 'Plugins' }).getByRole('button', { name: 'Policies', exact: true }).click()
+  await settingsNavEntry(page, 'Policies').click()
   const rules = page.locator('[data-setting-path="rules"]').getByRole('textbox')
   await rules.fill(JSON.stringify([{ name, tool: 'bash', match, reason: 'policy journey', enabled: true }]))
   await rules.blur()

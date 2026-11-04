@@ -1,78 +1,51 @@
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsSectionSearchProps } from '@dshfiles/dshx/client'
-import {
-  IconAgentPresetOutlineMedium,
-  IconArchiveOutlineMedium,
-  IconCloseOutlineRegular,
-  IconDataOutlineMedium,
-  IconPersonalizationOutlineMedium,
-  IconSettingsOutlineMedium,
-  IconUserOutlineMedium,
-  Tooltip,
-  useModalLayer,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
-import {
-  AppWindowIcon,
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  Maximize2Icon,
-  Minimize2Icon,
-  PuzzleIcon,
-  SearchIcon,
-  XIcon,
-} from '@dshfiles/plugin-ui/icons'
+import { ArrowUpRightIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useId, useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
+import { Fragment, useId, useRef, type KeyboardEvent, type ReactNode, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
 import { Highlight } from './schema-form/settings-form.js'
 import type { SettingField } from './schema-form/schema-model.js'
-import { SettingsSearch, type SectionEntryRow, type SettingsSearchResult } from './settings-search.js'
+import { JEV_ENTRY_ID, SettingsGroups, type GroupedEntries, type SettingsEntry } from './settings-groups.js'
+import { SettingsSearch, type SectionEntryRow, type SettingsSearchResult, type ShortcutRow } from './settings-search.js'
 
 export interface SectionRow {
   readonly id: string
   readonly order: number
   readonly label: string
-}
-
-/** How the view is framed: the centered dialog, that dialog filling the window, the main view, or the side panel. */
-type ViewVariant = 'modal' | 'expanded' | 'tab' | 'sidebar'
-
-/** Nav glyph by section id, as the native shell draws it; unknown ids fall back to the settings gear. */
-const navIcon = (id: string): JSX.Element => {
-  const className = 'dshx:flex-none'
-  if (id === 'account') return <IconUserOutlineMedium className={className} size={16} />
-  if (id === 'models') return <IconDataOutlineMedium className={className} size={16} />
-  if (id === 'agent-presets') return <IconAgentPresetOutlineMedium className={className} size={16} />
-  if (id === 'plugins') return <IconPersonalizationOutlineMedium className={className} size={16} />
-  if (id === 'archived-sessions') return <IconArchiveOutlineMedium className={className} size={16} />
-  return <IconSettingsOutlineMedium className={className} size={16} />
+  /** Words that find the row in search without showing: its group, namespaces, former names. */
+  readonly keywords?: string
 }
 
 const headerButton =
   'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-[var(--dsw-radius-sm)] dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-[var(--dsw-alias-label-primary)] dshx:hover:bg-[var(--dsw-alias-interactive-bg-hover)] dshx:[&_svg]:size-3.5'
 const navCell =
-  'dshx:box-border dshx:flex dshx:h-10 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-[var(--dsw-radius-md)] dshx:border-none dshx:bg-transparent dshx:py-[9px] dshx:pr-3 dshx:pl-3 dshx:text-left dshx:text-[14px] dshx:leading-[22px] dshx:font-normal dshx:text-[var(--dsw-alias-label-primary)] dshx:hover:bg-[var(--dsw-specific-sidebar-nav-item-hover)]'
-const navCellActive = 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)]'
-const navGroup =
-  'dshx:mt-3 dshx:flex dshx:items-center dshx:gap-1 dshx:px-3 dshx:pb-1 dshx:text-[12px] dshx:font-medium dshx:text-[var(--dsw-alias-label-secondary)]'
+  'dshx:box-border dshx:flex dshx:h-8 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-[var(--dsw-radius-md)] dshx:border-none dshx:bg-transparent dshx:pr-2 dshx:pl-3 dshx:text-left dshx:text-[13px] dshx:leading-5 dshx:font-normal dshx:text-[var(--dsw-alias-label-primary)] dshx:hover:bg-[var(--dsw-specific-sidebar-nav-item-hover)]'
+const navCellActive = 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)] dshx:font-medium'
+const navGroup = 'dshx:mt-3 dshx:px-3 dshx:pb-1 dshx:text-[12px] dshx:font-medium dshx:text-[var(--dsw-alias-label-secondary)] dshx:first:mt-0'
 
 export interface SettingsViewProps {
-  readonly variant: ViewVariant
+  /** Every Settings entry, by task group (plan §4.6). */
+  readonly groups: readonly GroupedEntries[]
+  /** Native and plugin sections, for search. */
   readonly rows: readonly SectionRow[]
-  /** Pages the shell draws itself from each plugin's settings schema. */
+  /** Plugin pages as Settings shows them (human titles, Jev fields moved), for search. */
   readonly pluginPages: readonly PluginSettingsPage[]
-  readonly renderPluginPage: (page: PluginSettingsPage) => ReactNode
+  readonly renderPluginPage: (page: PluginSettingsPage, nested: boolean) => ReactNode
   /** Matching settings of one page, drawn with the query highlighted. */
   readonly renderMatches: (page: PluginSettingsPage, fields: readonly SettingField[], query: string) => ReactNode
   readonly activeId: string | undefined
   /** Controls live sections publish, searched while their sections stay unmounted. */
   readonly sectionEntries: readonly SectionEntryRow[]
+  /** Key bindings, searched by command name and keys. */
+  readonly shortcuts: readonly ShortcutRow[]
   /** The entry id the active section scrolls to, when search opened it. */
   readonly sectionTarget: string | undefined
   readonly query: string
@@ -82,36 +55,27 @@ export interface SettingsViewProps {
   readonly onSelect: (sectionId: string) => void
   readonly onReveal: (entry: { readonly sectionId: string; readonly target: string }) => void
   readonly onSearch: (query: string) => void
-  /** Leaves the drilled-in side-panel section for the section list; a no-op elsewhere. */
-  readonly onBack: () => void
+  /** Opens another plugin's page in the stage (MCP servers, Secrets, Hosts, AI accounts). */
+  readonly openPanel: (panelId: string) => void
   /** Absent in a tab the strip closes. */
   readonly onClose: (() => void) | undefined
-  readonly onExpand: () => void
-  readonly onRestore: () => void
-  readonly onMoveToTab: () => void
 }
 
-/** A nav entry: icon, name and, while searching, how many matches it holds. */
+/** A nav entry: name, a mark for a page that opens elsewhere and, while searching, how many matches it holds. */
 const NavCell = (props: {
-  readonly id: string
-  readonly label: string
-  readonly icon: ReactNode
+  readonly entry: SettingsEntry
   readonly active: boolean
   readonly count: number | undefined
-  readonly compact: boolean
-  readonly title?: string
   readonly onSelect: (id: string) => void
 }): JSX.Element => (
   <button
-    aria-current={props.active ? 'true' : undefined}
-    className={cn(navCell, props.compact && 'dshx:h-8 dshx:text-[13px]', props.active && navCellActive, props.count === 0 && 'dshx:opacity-45')}
-    data-nav-id={props.id}
-    onClick={() => props.onSelect(props.id)}
-    title={props.title}
+    aria-current={props.active ? 'page' : undefined}
+    className={cn(navCell, props.active && navCellActive, props.count === 0 && 'dshx:opacity-45')}
+    data-nav-id={props.entry.id}
+    onClick={() => props.onSelect(props.entry.id)}
     type="button"
   >
-    {props.icon}
-    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.label}</span>
+    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.entry.label}</span>
     {props.count !== undefined && props.count > 0 && (
       <span className="dshx:rounded-full dshx:bg-secondary dshx:px-1.5 dshx:text-[11px] dshx:leading-4 dshx:text-muted-foreground dshx:tabular-nums">
         {props.count}
@@ -137,7 +101,11 @@ const entryGroups = (
 const sectionOwnerWithTarget = (props: SettingsViewProps): SettingsSectionOwnerProps & SettingsSectionSearchProps =>
   props.sectionTarget === undefined ? props.sectionOwner : { ...props.sectionOwner, target: props.sectionTarget }
 
-const pageIcon = <PuzzleIcon className="dshx:size-3.5 dshx:flex-none dshx:text-[var(--dsw-alias-label-secondary)]" />
+const Kbd = (props: { readonly children: ReactNode }): JSX.Element => (
+  <kbd className="dshx:rounded dshx:border dshx:border-border dshx:bg-muted dshx:px-1.5 dshx:py-px dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">
+    {props.children}
+  </kbd>
+)
 
 /** VS Code's results view: a flat list of matching settings grouped by the page that holds them. */
 const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSearchResult }): JSX.Element => {
@@ -157,7 +125,6 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
                 onClick={() => props.onSelect(section.id)}
                 type="button"
               >
-                {navIcon(section.id)}
                 <Highlight query={props.query} text={section.label} />
               </button>
             ))}
@@ -201,6 +168,32 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
           ))}
         </section>
       ))}
+      {result.shortcuts.length > 0 && (
+        <section aria-label={t('search.shortcuts')} className="dshx:flex dshx:flex-col dshx:gap-1" data-results-page="shortcuts">
+          <button
+            className="dshx:flex dshx:cursor-pointer dshx:items-baseline dshx:gap-2 dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-left"
+            onClick={() => props.onSelect('general')}
+            type="button"
+          >
+            <h3 className="dshx:m-0 dshx:text-[15px] dshx:font-semibold dshx:text-foreground dshx:hover:underline">{t('search.shortcuts')}</h3>
+            <span className="dshx:text-xs dshx:text-muted-foreground">{t('search.editShortcuts')}</span>
+          </button>
+          <ul className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:p-0">
+            {result.shortcuts.map(shortcut => (
+              <li className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:px-2 dshx:py-1.5 dshx:text-[14px]" data-settings-shortcut={shortcut.id} key={shortcut.id}>
+                <span className="dshx:min-w-0 dshx:truncate">
+                  <Highlight query={props.query} text={shortcut.label} />
+                </span>
+                <span className="dshx:flex dshx:shrink-0 dshx:gap-1">
+                  {shortcut.keys.map(key => (
+                    <Kbd key={key}>{key}</Kbd>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {result.pages.map(hit => (
         <section aria-label={hit.page.title} className="dshx:flex dshx:scroll-mt-4 dshx:flex-col" data-results-page={hit.page.pageId} key={hit.page.pageId}>
           <button
@@ -220,43 +213,85 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
   )
 }
 
-/** Search field, navigation tree and the active section, or the search results; the frame decides dialog or tab. */
+/** What one entry shows: its heading, the page it links to, its section and the plugin settings merged into it. */
+const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; readonly groupLabel: string; readonly jevNamespaces: ReadonlySet<string> }): JSX.Element => {
+  const { entry, t } = props
+  const link = entry.link
+  // A section draws its own rows; a lone plugin page draws its own heading, so the entry heading would repeat it.
+  const ownHeading = entry.sectionId !== undefined || entry.pages.length !== 1 || link !== undefined
+  const jevHere = entry.id === JEV_ENTRY_ID ? [] : entry.pages.filter(page => props.jevNamespaces.has(page.ns))
+  return (
+    <div className="dshx:flex dshx:flex-col dshx:gap-5" data-settings-entry={entry.id}>
+      {ownHeading && (
+        <header className="dshx:flex dshx:flex-col dshx:gap-0.5">
+          {props.groupLabel !== entry.label && <p className="dshx:m-0 dshx:text-[12px] dshx:text-muted-foreground">{props.groupLabel}</p>}
+          <h2 className="dshx:m-0 dshx:text-[18px] dshx:font-semibold dshx:text-foreground">{entry.label}</h2>
+        </header>
+      )}
+      {link !== undefined && (
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:px-4 dshx:py-3" data-settings-link={link.panelId}>
+          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
+            <span className="dshx:text-[14px] dshx:text-foreground">{link.description}</span>
+            <span className="dshx:text-[12px] dshx:text-muted-foreground">{t('entry.opensPage')}</span>
+          </div>
+          <Button onClick={() => props.openPanel(link.panelId)} size="sm" variant="outline">
+            {t('entry.open', { page: link.label })}
+            <ArrowUpRightIcon aria-hidden="true" />
+          </Button>
+        </div>
+      )}
+      {entry.sectionId !== undefined && <div>{props.renderSlot('settings.section', sectionOwnerWithTarget(props), { only: entry.sectionId })}</div>}
+      {entry.pages.map(page => (
+        <Fragment key={page.pageId}>{props.renderPluginPage(page, ownHeading)}</Fragment>
+      ))}
+      {jevHere.length > 0 && (
+        <p className="dshx:m-0 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-[13px] dshx:text-muted-foreground" role="note">
+          {t('entry.jevMoved', { page: entry.label })}
+          <Button onClick={() => props.onSelect(JEV_ENTRY_ID)} size="xs" variant="link">
+            {t('entry.openJev')}
+          </Button>
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Search field, the grouped navigation and the active entry, or the search results. */
 const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): JSX.Element => {
   const { t } = props
-  const sidebar = props.variant === 'sidebar'
   const searching = props.query.trim() !== ''
-  const result = SettingsSearch.search({ query: props.query, sections: props.rows, pages: props.pluginPages, entries: props.sectionEntries })
-  const activePage = props.pluginPages.find(page => page.pageId === props.activeId)
-  const active = activePage?.pageId ?? props.rows.find(row => row.id === props.activeId)?.id ?? props.rows[0]?.id
-  // A narrow side panel shows one column: the section list until the user picks one, that section afterwards.
-  const drilled = sidebar && (searching || props.activeId !== undefined)
-  const plugins = props.pluginPages.filter(page => page.group === 'plugins')
-  const more = props.pluginPages.filter(page => page.group === 'more' && (!searching || (result.counts.get(page.pageId) ?? 0) > 0))
-  const [moreOpen, setMoreOpen] = useState(activePage?.group === 'more')
+  const result = SettingsSearch.search({
+    query: props.query,
+    sections: props.rows,
+    pages: props.pluginPages,
+    entries: props.sectionEntries,
+    shortcuts: props.shortcuts,
+  })
+  const active = SettingsGroups.entryFor(props.groups, props.activeId) ?? props.groups[0]?.entries[0]
+  const activeGroup = props.groups.find(group => group.entries.some(entry => entry.id === active?.id))?.group
+  const jevNamespaces = new Set(props.groups.flatMap(group => group.entries.filter(entry => entry.id === JEV_ENTRY_ID).flatMap(entry => entry.pages.map(page => page.ns))))
   const content = useRef<HTMLDivElement>(null)
-  const countOf = (id: string): number | undefined => (searching ? (result.counts.get(id) ?? 0) : undefined)
+  const countOf = (entry: SettingsEntry): number | undefined => {
+    if (!searching) return undefined
+    const ids = [entry.id, ...(entry.sectionId === undefined || entry.sectionId === entry.id ? [] : [entry.sectionId]), ...entry.pages.map(page => page.pageId)]
+    return ids.reduce((sum, id) => sum + (result.counts.get(id) ?? 0), 0)
+  }
   // While searching, a tree entry with matches scrolls to its results (VS Code filters the same way); others open.
   const select = (id: string): void => {
-    const group = searching ? content.current?.querySelector(`[data-results-page="${CSS.escape(id)}"]`) : null
-    if (group !== null && group !== undefined) group.scrollIntoView({ block: 'start' })
+    const entry = SettingsGroups.entryFor(props.groups, id)
+    const ids = entry === undefined ? [id] : [entry.id, entry.sectionId ?? '', ...entry.pages.map(page => page.pageId)]
+    const group = searching
+      ? ids.map(candidate => content.current?.querySelector(`[data-results-page="${CSS.escape(candidate)}"]`)).find(element => element !== null && element !== undefined)
+      : undefined
+    if (group !== undefined && group !== null) group.scrollIntoView({ block: 'start' })
     else props.onSelect(id)
   }
   const foundText = result.total === 1 ? t('search.foundOne') : t('search.found', { count: result.total })
-  const activeLabel = activePage?.title ?? props.rows.find(row => row.id === props.activeId)?.label ?? ''
   return (
     <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-      <div
-        className={cn(
-          'dshx:box-border dshx:flex dshx:h-[58px] dshx:flex-none dshx:items-center dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-4',
-          sidebar && 'dshx:h-11 dshx:gap-2 dshx:px-3',
-          !sidebar && 'dshx:@max-pane-compact:gap-2 dshx:@max-pane-compact:px-3',
-        )}
-      >
+      <div className="dshx:box-border dshx:flex dshx:h-[58px] dshx:flex-none dshx:items-center dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-4 dshx:@max-pane-compact:gap-2 dshx:@max-pane-compact:px-3">
         <div
-          className={cn(
-            'dshx:w-[176px] dshx:shrink-0 dshx:px-2 dshx:text-[16px] dshx:leading-6 dshx:font-medium dshx:text-[var(--dsw-alias-label-primary)]',
-            sidebar ? 'dshx:hidden dshx:@pane-compact:block' : 'dshx:@max-pane-compact:sr-only',
-          )}
+          className="dshx:w-[176px] dshx:shrink-0 dshx:px-2 dshx:text-[16px] dshx:leading-6 dshx:font-medium dshx:text-[var(--dsw-alias-label-primary)] dshx:@max-pane-compact:sr-only"
           id={props.titleId}
         >
           {props.renderSlot('settings.header', {})}
@@ -272,7 +307,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             data-modal-autofocus=""
             onChange={event => props.onSearch(event.currentTarget.value)}
             onKeyDown={event => {
-              // Escape clears a query first, as in VS Code; an empty field lets it close the dialog.
+              // Escape clears a query first, as in VS Code.
               if (event.key === 'Escape' && props.query !== '') {
                 event.preventDefault()
                 event.stopPropagation()
@@ -301,27 +336,6 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
         )}
         <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-end dshx:gap-1.5">
           {props.renderSlot('settings.action', {})}
-          {props.variant !== 'tab' && props.variant !== 'sidebar' && (
-            <Tooltip label={t('view.openInTab')}>
-              <button aria-label={t('view.openInTab')} className={headerButton} onClick={props.onMoveToTab} type="button">
-                <AppWindowIcon />
-              </button>
-            </Tooltip>
-          )}
-          {props.variant === 'modal' && (
-            <Tooltip label={t('view.expand')}>
-              <button aria-label={t('view.expand')} className={headerButton} onClick={props.onExpand} type="button">
-                <Maximize2Icon />
-              </button>
-            </Tooltip>
-          )}
-          {props.variant === 'expanded' && (
-            <Tooltip label={t('view.restore')}>
-              <button aria-label={t('view.restore')} className={headerButton} onClick={props.onRestore} type="button">
-                <Minimize2Icon />
-              </button>
-            </Tooltip>
-          )}
           {props.onClose !== undefined && (
             <button className={headerButton} onClick={props.onClose} type="button">
               <IconCloseOutlineRegular size={14} />
@@ -330,119 +344,37 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           )}
         </div>
       </div>
-      {!sidebar && (
-        <div className="dshx:hidden dshx:shrink-0 dshx:border-b dshx:border-border dshx:px-3 dshx:py-2 dshx:@max-pane-compact:block">
-          <Combobox
-            label={t('search.sections')}
-            value={active ?? ''}
-            options={[
-              ...props.rows.map(row => ({ value: row.id, label: row.label, group: t('search.sections') })),
-              ...props.pluginPages.map(page => ({
-                value: page.pageId,
-                label: page.title,
-                keywords: [page.ns],
-                group: t(page.group === 'plugins' ? 'nav.plugins' : 'nav.more'),
-              })),
-            ]}
-            onValueChange={select}
-            matchTriggerWidth
-          />
-        </div>
-      )}
+      <div className="dshx:hidden dshx:shrink-0 dshx:border-b dshx:border-border dshx:px-3 dshx:py-2 dshx:@max-pane-compact:block">
+        <Combobox
+          label={t('search.sections')}
+          value={active?.id ?? ''}
+          options={props.groups.flatMap(({ group, entries }) =>
+            entries.map(entry => ({ value: entry.id, label: entry.label, keywords: [entry.keywords], group: group.label })),
+          )}
+          onValueChange={select}
+          matchTriggerWidth
+        />
+      </div>
       <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
         <nav
           aria-label={t('title')}
-          className={cn(
-            'dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4',
-            sidebar && 'dshx:w-full dshx:@pane-compact:w-[208px]',
-            !sidebar && 'dshx:@max-pane-compact:hidden',
-            drilled && 'dshx:hidden dshx:@pane-compact:flex',
-          )}
+          className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4 dshx:@max-pane-compact:hidden"
         >
-          {props.rows.map(row => (
-            <NavCell
-              active={!searching && row.id === active}
-              count={countOf(row.id)}
-              compact={false}
-              icon={navIcon(row.id)}
-              id={row.id}
-              key={row.id}
-              label={row.label}
-              onSelect={select}
-            />
-          ))}
-          {plugins.length > 0 && (
-            <div aria-label={t('nav.plugins')} className="dshx:flex dshx:flex-col dshx:gap-0.5" role="group">
-              <span className={navGroup}>{t('nav.plugins')}</span>
-              {plugins.map(page => (
-                <NavCell
-                  active={!searching && page.pageId === active}
-                  compact
-                  count={countOf(page.pageId)}
-                  icon={pageIcon}
-                  id={page.pageId}
-                  key={page.pageId}
-                  label={page.title}
-                  onSelect={select}
-                  title={page.ns}
-                />
+          {props.groups.map(({ group, entries }) => (
+            <div aria-label={group.label} className="dshx:flex dshx:flex-col dshx:gap-0.5" data-settings-group={group.id} key={group.id} role="group">
+              <span className={navGroup}>{group.label}</span>
+              {entries.map(entry => (
+                <NavCell active={!searching && entry.id === active?.id} count={countOf(entry)} entry={entry} key={entry.id} onSelect={select} />
               ))}
             </div>
-          )}
-          {more.length > 0 && (
-            <div aria-label={t('nav.more')} className="dshx:flex dshx:flex-col dshx:gap-0.5" role="group">
-              <button
-                aria-expanded={moreOpen || searching}
-                className={cn(navGroup, 'dshx:cursor-pointer dshx:border-none dshx:bg-transparent')}
-                onClick={() => setMoreOpen(open => !open)}
-                type="button"
-              >
-                {moreOpen || searching ? <ChevronDownIcon className="dshx:size-3" /> : <ChevronRightIcon className="dshx:size-3" />}
-                {t('nav.more')}
-              </button>
-              {(moreOpen || searching) &&
-                more.map(page => (
-                  <NavCell
-                    active={!searching && page.pageId === active}
-                    compact
-                    count={countOf(page.pageId)}
-                    icon={pageIcon}
-                    id={page.pageId}
-                    key={page.pageId}
-                    label={page.title}
-                    onSelect={select}
-                    title={page.ns}
-                  />
-                ))}
-            </div>
-          )}
+          ))}
         </nav>
-        <div
-          className={cn(
-            'dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6',
-            sidebar && 'dshx:px-3 dshx:pt-3 dshx:@pane-compact:px-6 dshx:@pane-compact:pt-5',
-            !sidebar && 'dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3',
-            sidebar && !drilled && 'dshx:hidden dshx:@pane-compact:block',
-          )}
-          ref={content}
-        >
-          {drilled && (
-            <div className="dshx:mb-2 dshx:flex dshx:items-center dshx:gap-1.5 dshx:@pane-compact:hidden">
-              <button aria-label={t('sidebar.back')} className={headerButton} onClick={props.onBack} type="button">
-                <ChevronLeftIcon />
-              </button>
-              <span className="dshx:min-w-0 dshx:truncate dshx:text-[13px] dshx:font-medium dshx:text-[var(--dsw-alias-label-primary)]">
-                {searching ? t('search.placeholder') : activeLabel}
-              </span>
-            </div>
-          )}
+        <div className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3" ref={content}>
           <div className="dshx:max-w-[880px]">
             {searching && <SearchResults {...props} result={result} />}
-            {!searching && activePage !== undefined && props.renderPluginPage(activePage)}
-            {!searching &&
-              activePage === undefined &&
-              active !== undefined &&
-              props.renderSlot('settings.section', sectionOwnerWithTarget(props), { only: active })}
+            {!searching && active !== undefined && (
+              <EntryView {...props} entry={active} groupLabel={activeGroup?.label ?? ''} jevNamespaces={jevNamespaces} key={active.id} />
+            )}
           </div>
         </div>
       </div>
@@ -450,50 +382,15 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
   )
 }
 
-/**
- * The dialog frame, ported from the native `SettingsPanel` (@deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2,
- * MIT): body-portaled mask and panel closed by the header button, a mask click and document-level Escape. Expanded,
- * the panel fills the window below the frame chrome, like VS Code's maximized editor.
- */
-export const SettingsDialog = (props: SettingsViewProps): JSX.Element => {
-  const titleId = useId()
-  const panel = useRef<HTMLDivElement>(null)
-  const close = props.onClose ?? props.onRestore
-  useModalLayer(panel, true, close)
-  const expanded = props.variant === 'expanded'
-  return createPortal(
-    <div className="dshx:fixed dshx:inset-0 dshx:z-[1000] dshx:flex dshx:items-center dshx:justify-center" role="presentation">
-      <div
-        aria-hidden="true"
-        className="dshx:absolute dshx:inset-x-0 dshx:top-[var(--dsh-frame-chrome-top,0px)] dshx:bottom-0 dshx:bg-[var(--dsw-alias-bg-mask-1)] dshx:backdrop-blur-[var(--dsw-mask-blur)]"
-        onClick={close}
-      />
-      <div
-        aria-labelledby={titleId}
-        aria-modal="true"
-        className={cn(
-          'dshx:relative dshx:z-[1] dshx:flex dshx:overflow-hidden dshx:bg-[var(--dsw-alias-bg-layer-2)] dshx:shadow-[var(--dsw-elevation-prominent)] dshx:outline-none',
-          expanded
-            ? 'dshx:absolute dshx:inset-x-0 dshx:top-[var(--dsh-frame-chrome-top,0px)] dshx:bottom-0'
-            : 'dshx:h-[min(800px,calc(100vh-2*max(24px,var(--dsh-frame-overlay-top,24px))))] dshx:w-[960px] dshx:max-w-[calc(100vw-48px)] dshx:rounded-[var(--dsw-radius-panel)]',
-        )}
-        data-settings-view={props.variant}
-        data-shortcut-modal="settings"
-        ref={panel}
-        role="dialog"
-        tabIndex={-1}
-      >
-        <SettingsView {...props} titleId={titleId} />
-      </div>
-    </div>,
-    document.body,
-  )
+/** Keeps the page's events inside Settings: it is rendered from the sidebar's tree through a portal. */
+const stopPropagation = (event: SyntheticEvent): void => event.stopPropagation()
+/** Typing stays inside Settings; a chord (Mod+, closes Settings, the palette, tab keys) still reaches the shortcuts. */
+const stopTyping = (event: KeyboardEvent): void => {
+  if (event.metaKey || event.ctrlKey || event.altKey) return
+  event.stopPropagation()
 }
 
-/** Keeps the tab's events inside Settings: it is rendered from the sidebar's tree through a portal. */
-const stopPropagation = (event: SyntheticEvent): void => event.stopPropagation()
-
-/** The main-view frame: Settings fills the panel main-tabs gives a tab. */
+/** The one Settings page: it fills the stage (the main view panel main-tabs gives a tab, or a free-docking pane). */
 export const SettingsTab = (props: SettingsViewProps & { readonly host: HTMLElement }): ReactNode => {
   const titleId = useId()
   return createPortal(
@@ -502,31 +399,10 @@ export const SettingsTab = (props: SettingsViewProps & { readonly host: HTMLElem
       className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:w-full dshx:bg-[var(--dsw-alias-bg-layer-1)]"
       data-settings-view="tab"
       onClick={stopPropagation}
-      onKeyDown={stopPropagation}
+      onKeyDown={stopTyping}
       onPointerDown={stopPropagation}
     >
       <SettingsView {...props} titleId={titleId} />
-    </section>,
-    props.host,
-  )
-}
-
-/**
- * The side-panel frame: Settings fills the right sidebar's tab. The panel follows its own width, so a narrow one shows
- * the section list (then one section, with back) and a wide one keeps the dialog's two columns.
- */
-export const SettingsSidePanel = (props: SettingsViewProps & { readonly host: HTMLElement }): ReactNode => {
-  const titleId = useId()
-  return createPortal(
-    <section
-      aria-label={props.t('title')}
-      className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:w-full dshx:flex-col dshx:bg-[var(--dsw-alias-bg-layer-1)]"
-      data-settings-view="sidebar"
-      onClick={stopPropagation}
-      onKeyDown={stopPropagation}
-      onPointerDown={stopPropagation}
-    >
-      <SettingsView {...props} titleId={titleId} variant="sidebar" />
     </section>,
     props.host,
   )

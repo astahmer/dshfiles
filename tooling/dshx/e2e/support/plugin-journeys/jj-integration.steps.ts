@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsNavEntry } from '../steps.js'
 import { selectModelForNewThread } from '../threads.js'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
@@ -559,7 +559,7 @@ Then('the project opens with its saved draft {string}', async ({ page }: { page:
 
 When('new threads start in the shared checkout by default', async ({ page }: { page: Page }) => {
   await openSettingsDialog(page)
-  await page.getByRole('dialog').getByText('New thread', { exact: true }).click()
+  await settingsNavEntry(page, 'New thread').click()
   const isolateByDefault = page.getByRole('switch', { name: 'Own jj workspace by default', exact: true })
   if (await isolateByDefault.isChecked()) await isolateByDefault.click()
   await expect(isolateByDefault).not.toBeChecked()
@@ -568,7 +568,7 @@ When('new threads start in the shared checkout by default', async ({ page }: { p
 
 When('new threads start in their own jj workspace by default', async ({ page }: { page: Page }) => {
   await openSettingsDialog(page)
-  await page.getByRole('dialog').getByText('New thread', { exact: true }).click()
+  await settingsNavEntry(page, 'New thread').click()
   const isolateByDefault = page.getByRole('switch', { name: 'Own jj workspace by default', exact: true })
   await isolateByDefault.click()
   await expect(isolateByDefault).toBeChecked()

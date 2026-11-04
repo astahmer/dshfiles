@@ -3,7 +3,7 @@ import { globalPanelEntryPoint, openGlobalPanel } from '../plugin-view-names.js'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion, restartScratchProfileInBrowser } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion, restartScratchProfileInBrowser, settingsNavEntry } from '../steps.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { openActivity } from './activity-timeline.steps.js'
@@ -1436,11 +1436,11 @@ Then('the board card for b:{int} is titled {string}', async ({ page }: { page: P
 
 When('Backlog Jev is enabled without a secret reference', async ({ page }: { page: Page }) => {
   await openSettingsDialog(page)
-  await page.getByRole('group', { name: 'Plugins' }).getByRole('button', { name: 'Backlog', exact: true }).click()
-  const enabled = page.locator('[data-setting-path="jevEnabled"]').getByRole('switch')
+  await settingsNavEntry(page, 'Jev').click()
+  const enabled = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevEnabled"]').getByRole('switch')
   if ((await enabled.getAttribute('aria-checked')) !== 'true') await enabled.click()
   await expect(enabled).toHaveAttribute('aria-checked', 'true')
-  await expect(page.locator('[data-setting-path="jevSecret"] [data-secret-input="reference"]')).toHaveValue('')
+  await expect(page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] [data-secret-input="reference"]')).toHaveValue('')
   await page.keyboard.press('Escape')
 })
 
@@ -1465,8 +1465,8 @@ When('the Jev setup offer stores and binds a synthetic value', async ({ page }: 
 
 Then('Backlog stores only the secret reference for Jev', async ({ page }: { page: Page }) => {
   await openSettingsDialog(page)
-  await page.getByRole('group', { name: 'Plugins' }).getByRole('button', { name: 'Backlog', exact: true }).click()
-  const reference = page.locator('[data-setting-path="jevSecret"] [data-secret-input="reference"]')
+  await settingsNavEntry(page, 'Jev').click()
+  const reference = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] [data-secret-input="reference"]')
   await recordAssertion(page, 'backlog-jev-persists-reference-not-value', async () => {
     await expect(reference).toHaveValue('secret:TYPESAFE_API_KEY')
     expect(await page.locator('body').innerText()).not.toContain('synthetic-jev-setup-value')

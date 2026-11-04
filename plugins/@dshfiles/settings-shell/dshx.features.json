@@ -6,13 +6,28 @@
       "id": "settings-shell-port",
       "title": "Native Settings shell, ported",
       "summary": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
-      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"General\""],
-      "surfaces": ["client", "settings", "integration"],
+      "reach": [
+        "click button \"Account menu\"",
+        "click menuitem \"Settings*\"",
+        "expect button \"General\""
+      ],
+      "surfaces": [
+        "client",
+        "settings",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "sidebar: Account menu › Settings",
       "configuration": [],
-      "states": ["closed", "open", "compact-navigation", "onboarding", "disconnected", "update-available"],
+      "states": [
+        "closed",
+        "open",
+        "compact-navigation",
+        "onboarding",
+        "disconnected",
+        "update-available"
+      ],
       "failureModes": [
         "When the running DSH ships another version of the native Settings package, the Host warns at boot and General shows the running version, so the port is refreshed instead of drifting silently.",
         "The native welcome notice stores its acknowledgement in the switched-off row's namespace, so the shell ports that step and keeps the acknowledgement in its own namespace; someone who acknowledged the native notice sees it once more."
@@ -46,14 +61,28 @@
     {
       "id": "settings-workbench-panels",
       "title": "One dockable Settings hub with real navigation and forms",
-      "summary": "The New tab chooser offers one Settings Shell: Settings hub with actual section navigation, search and native/plugin forms. Leaf sections remain registered for saved layouts and explicit links but are hidden from primary suggestions. The authorized shell renderer and ConfigForm remain the owners. Workbench pane chrome is mandatory; hidden right-pane tabs retain their state. Standalone dialog/tab/side-panel compatibility is unchanged.",
-      "reach": ["click button \"Collapse sidebar\"", "click button \"New tab\"", "click button \"Settings Shell: Settings\"", "expect button \"General\""],
-      "surfaces": ["client", "integration"],
+      "summary": "The New tab chooser offers one Settings hub with actual section navigation, search and native/plugin forms. Leaf sections remain registered for saved layouts and explicit links but are hidden from primary suggestions. The authorized shell renderer and ConfigForm remain the owners. Workbench pane chrome is mandatory; hidden right-pane tabs retain their state. It is the same grouped page as the stage page, for free-docking layouts.",
+      "reach": [
+        "click button \"Collapse sidebar\"",
+        "click button \"New tab\"",
+        "click button \"Settings\"",
+        "expect button \"General\""
+      ],
+      "surfaces": [
+        "client",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "main-tabs: New tab › Settings Shell: Settings",
+      "currentSurface": "main-tabs: New tab › Settings",
       "configuration": [],
-      "states": ["registered", "open", "label-updated", "source-removed", "disposed"],
+      "states": [
+        "registered",
+        "open",
+        "label-updated",
+        "source-removed",
+        "disposed"
+      ],
       "failureModes": [
         "Without a mounted workbench the sources remain registered but no docked panel is shown.",
         "A removed settings section or namespace unregisters; an existing panel never falls through to another section.",
@@ -61,7 +90,11 @@
       ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "settings-shell.workbench-panels", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.workbench-panels",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
         {
           "kind": "unit-test",
           "id": "settings-shell.workbench-sources-unit",
@@ -86,13 +119,31 @@
       "id": "dsh-release-notice",
       "title": "DSH release notice and TL;DR",
       "summary": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, shows a concise English TL;DR across newer releases, links to the official notes, and lets the user dismiss that release notice.",
-      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"Check for DSH updates\""],
-      "surfaces": ["client", "host", "api", "tool", "storage"],
+      "reach": [
+        "click button \"Account menu\"",
+        "click menuitem \"Settings*\"",
+        "expect button \"Check for DSH updates\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "api",
+        "tool",
+        "storage"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "sidebar: Settings trigger release mark › General",
       "configuration": [],
-      "states": ["checking", "up-to-date", "update-available", "summary-expanded", "dismissed", "comparison-unknown", "unavailable"],
+      "states": [
+        "checking",
+        "up-to-date",
+        "update-available",
+        "summary-expanded",
+        "dismissed",
+        "comparison-unknown",
+        "unavailable"
+      ],
       "failureModes": [
         "GitHub is unavailable or returns an invalid payload; Settings stays usable and offers a manual retry.",
         "The installed version is absent from the bounded release history; the plugin reports that comparison is unknown instead of guessing.",
@@ -137,35 +188,33 @@
     },
     {
       "id": "settings-tab",
-      "title": "Settings as a main-view tab",
-      "summary": "With main-tabs loaded, Settings fills the main view and gets a tab like any other panel; picking that tab or reloading onto it reopens Settings, leaving the panel closes it.",
+      "title": "One Settings page in the stage",
+      "summary": "Settings has one place: a page in the stage (plans/ade-ux §4.6). The rail, the gear, the palette, Mod+, and other plugins' open requests all open it; the former dialog, expanded dialog and side-panel presentations are gone, and a request that still names one opens the page. With main-tabs it gets a tab like any other page; picking that tab or reloading onto it reopens Settings, leaving it closes Settings.",
       "reach": [
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"Settings: General\"",
-        "click option \"Settings: General*\"",
-        "click button \"Settings shell\"",
-        "click radio \"Automatic\"",
-        "press Escape",
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
         "click option \"Settings: General*\"",
         "expect tab \"Settings\""
       ],
-      "surfaces": ["client", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "settings",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "main-tabs: Settings tab",
-      "configuration": [
-        {
-          "key": "openIn",
-          "defaultValue": "auto",
-          "constraints": "Where Settings opens: auto (a tab when main-tabs is loaded), tab, modal, or sidebar.",
-          "choices": ["auto", "tab", "modal", "sidebar"],
-          "coveredBy": ["settings-shell.tab", "settings-shell.preference-unit"]
-        }
+      "currentSurface": "settings: the Settings page in the stage",
+      "configuration": [],
+      "states": [
+        "closed",
+        "open",
+        "panel-hidden",
+        "restored-on-reload"
       ],
-      "states": ["tab", "panel-hidden", "restored-on-reload"],
-      "failureModes": ["With no other tab left, main-tabs keeps showing Settings: it cannot show an empty main view."],
+      "failureModes": [
+        "With no other tab left, main-tabs keeps showing Settings: it cannot show an empty main view.",
+        "A plugin that still dispatches dshfiles:open-settings with surface modal gets the page; there is no dialog to open."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -177,112 +226,101 @@
           "kind": "unit-test",
           "id": "settings-shell.machine-unit-tab",
           "file": "plugins/@dshfiles/settings-shell/src/shell-machine.test.ts",
-          "testName": "opens as a main-view tab and closes when the main view leaves it"
-        },
-        {
-          "kind": "unit-test",
-          "id": "settings-shell.preference-unit",
-          "file": "plugins/@dshfiles/settings-shell/src/settings-preference.test.ts",
-          "testName": "opens a tab when main-tabs is loaded, the dialog otherwise, unless the user chose"
+          "testName": "opens in the stage and closes when the main view leaves it"
         }
       ],
       "telemetry": [
         {
           "kind": "not-applicable",
-          "reason": "Client-only: Settings as a main-view tab renders browser state and starts no Host work of its own."
+          "reason": "Client-only: the Settings page renders browser state and starts no Host work of its own."
         }
       ]
     },
     {
-      "id": "settings-side-panel",
-      "title": "Settings in the side panel",
-      "summary": "Settings can occupy a tab in the fullheight Workbench right pane; collapsing that pane preserves its tabs and shows no native guide. For deployments without Workbench, the original thread-side guide offers a Settings card, with narrow drill/back navigation and wide two-column presentation. The gear, palette and Mod+, can use that aside path. The guide-card reach below is the standalone compatibility journey, not an owned-stack layout opt-out.",
-      "reach": [
-        "click button \"Open right sidebar\"",
-        "click text \"Edit Settings in this panel.\"",
-        "click button \"General\"",
-        "expect button \"Back to all settings\""
-      ],
-      "surfaces": ["client", "settings"],
-      "surface": "settingsSection",
-      "destination": "settings",
-      "currentSurface": "right-pane: Settings",
-      "configuration": [],
-      "states": ["panel-collapsed", "list", "section", "searching", "narrow", "wide"],
-      "failureModes": [
-        "Without a thread on screen there is no side panel to open Settings in, so the guide card and the palette action do nothing.",
-        "The guide hides entry descriptions once it lists many entries; the catalog reach and its journey find the card by that description, so a crowded guide changes that path."
-      ],
-      "externalDependencies": [],
-      "verification": [
-        {
-          "kind": "gherkin",
-          "id": "settings-shell.side-panel",
-          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
-        },
-        {
-          "kind": "unit-test",
-          "id": "settings-shell.preference-unit-sidebar",
-          "file": "plugins/@dshfiles/settings-shell/src/settings-preference.test.ts",
-          "testName": "opens the side panel wherever the user chose it, whatever the main view offers"
-        },
-        {
-          "kind": "unit-test",
-          "id": "settings-shell.machine-unit-back",
-          "file": "plugins/@dshfiles/settings-shell/src/shell-machine.test.ts",
-          "testName": "drills into a side-panel section and goes back to the section list"
-        }
-      ],
-      "telemetry": [
-        {
-          "kind": "not-applicable",
-          "reason": "Client-only: Settings in the side panel renders browser state and starts no Host work of its own."
-        }
-      ]
-    },
-    {
-      "id": "settings-dialog-expand",
-      "title": "Settings dialog, expandable",
-      "summary": "Without main-tabs (or with openIn set to the dialog), Settings opens as the native dialog, which expands to the full window and back, or moves into a tab keeping its section. Walk its reach on a scratch DSH without @dshfiles/main-tabs: with it, Settings opens as a tab and main-tabs restores the Settings tab on reload.",
+      "id": "settings-task-groups",
+      "title": "Settings grouped by task, with deep links",
+      "summary": "Every native section and plugin settings page sits in one task group (General, Models & accounts, Agents, Tools & MCP, Projects & workspaces, Hosts & network, Security, Notifications, Plugins, About; unknown ones under Other) under a person's name, never a package id. AI accounts appears once: its section, its plugin settings and a link to the accounts page. MCP servers, Secrets, Hosts and the AI accounts page are entries that open the page their plugin owns. Every Jev setting sits under Tools & MCP › Jev, and Layout (fixed or free docking) under General. Plugin pages say they apply to every project and thread: no setting stores a per-project or per-thread value yet.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
         "click option \"Settings: General*\"",
-        "click button \"Expand to the full window\"",
-        "expect button \"Restore the dialog size\""
+        "expect group \"Models & accounts\""
       ],
-      "surfaces": ["client", "settings"],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "dialog: Settings",
+      "currentSurface": "settings: task groups in the Settings navigation",
       "configuration": [],
-      "states": ["modal", "expanded", "moved-to-tab"],
-      "failureModes": ["Escape clears a non-empty search before it closes the dialog."],
+      "states": [
+        "grouped",
+        "linked-page-loaded",
+        "linked-page-missing",
+        "jev-gathered",
+        "other-group"
+      ],
+      "failureModes": [
+        "A section or namespace nobody placed shows under Other with its own label until the group map in src/settings-groups.ts places it.",
+        "A linked page whose plugin is not loaded is left out rather than offered as a dead link.",
+        "Backlog and Memory still store their own Jev key: Tools & MCP › Jev shows both together until one shared key exists."
+      ],
       "externalDependencies": [],
       "verification": [
         {
           "kind": "gherkin",
-          "id": "settings-shell.dialog-expand",
+          "id": "settings-shell.grouped-page",
           "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
         },
         {
           "kind": "unit-test",
-          "id": "settings-shell.machine-unit-dialog",
-          "file": "plugins/@dshfiles/settings-shell/src/shell-machine.test.ts",
-          "testName": "opens the dialog on a section, expands it, and forgets the section on close"
+          "id": "settings-shell.groups-unit-places-everything",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
+          "testName": "places every section and page somewhere, unknown ones under Other"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.groups-unit-human-titles",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
+          "testName": "titles pages for people, never with a package or row id"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.groups-unit-ai-accounts-once",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
+          "testName": "shows AI accounts once: the section, its plugin settings and a link to the accounts page"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.groups-unit-links",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
+          "testName": "links stage pages owned by other plugins only while they are loaded"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.groups-unit-jev",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
+          "testName": "gathers every Jev setting in Tools & MCP and removes it from its plugin page"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.view-unit-groups",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-view.test.tsx",
+          "testName": "lists entries under task groups and opens a linked page from its entry"
         }
       ],
       "telemetry": [
         {
           "kind": "not-applicable",
-          "reason": "Client-only: Settings dialog, expandable renders browser state and starts no Host work of its own."
+          "reason": "Client-only: grouping and linking are browser projections over existing settings sources; writes keep their existing Host API spans."
         }
       ]
     },
     {
       "id": "settings-search",
       "title": "Search Settings inline",
-      "summary": "One search field at the top: matching settings replace the section as a flat list grouped by page, highlighted and editable in place, with a count; the tree shows matches per entry. Titles, descriptions and key paths match; hidden and secret fields never do.",
+      "summary": "One search field at the top: matching settings replace the section as a flat list grouped by page, highlighted and editable in place, with a count; the tree shows matches per entry. Titles, descriptions, key paths, page and group names match, and key bindings by command name or keys; hidden and secret fields never do.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
@@ -290,14 +328,21 @@
         "fill searchbox \"Search settings\" \"max tabs\"",
         "expect text \"1 Setting Found\""
       ],
-      "surfaces": ["client", "settings"],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Search settings",
       "configuration": [],
-      "states": ["empty-query", "results", "no-results"],
+      "states": [
+        "empty-query",
+        "results",
+        "no-results"
+      ],
       "failureModes": [
-        "Native sections draw their own rows: a match on a section's name offers to open it, and their settings are reached through the namespaces under More settings."
+        "Native sections draw their own rows: a match on a section's name offers to open it, and the settings they draw stay searchable and open that section."
       ],
       "externalDependencies": [],
       "verification": [
@@ -311,6 +356,12 @@
           "id": "settings-shell.search-unit-match",
           "file": "plugins/@dshfiles/settings-shell/src/settings-search.test.ts",
           "testName": "finds settings by title, description and key, never hidden ones, and counts them per page"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.search-unit-shortcuts",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-view.test.tsx",
+          "testName": "finds key bindings by command name and by keys"
         }
       ],
       "telemetry": [
@@ -333,12 +384,20 @@
         "click button \"Show coding view*\"",
         "expect switch \"Show coding view\""
       ],
-      "surfaces": ["client", "settings", "tool"],
+      "surfaces": [
+        "client",
+        "settings",
+        "tool"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Search settings › section controls",
       "configuration": [],
-      "states": ["entry-results", "section-opened-at-target", "invalid-entries-skipped"],
+      "states": [
+        "entry-results",
+        "section-opened-at-target",
+        "invalid-entries-skipped"
+      ],
       "failureModes": [
         "A section whose published entries do not decode is skipped with one console warning.",
         "A section registered imperatively must publish its own entries with publishSettingsSearchEntries."
@@ -397,13 +456,24 @@
         "click button \"Main tabs\"",
         "expect spinbutton \"Max tabs\""
       ],
-      "surfaces": ["client", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "settings",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: plugin pages",
       "configuration": [],
-      "states": ["ready", "read-only", "unavailable", "refused"],
-      "failureModes": ["A namespace whose plugin is not loaded shows its fields disabled with an explanation."],
+      "states": [
+        "ready",
+        "read-only",
+        "unavailable",
+        "refused"
+      ],
+      "failureModes": [
+        "A namespace whose plugin is not loaded shows its fields disabled with an explanation."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -438,13 +508,22 @@
         "press Enter",
         "expect button \"Reset to default\""
       ],
-      "surfaces": ["client", "settings"],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Reset to default",
       "configuration": [],
-      "states": ["default", "modified", "pending"],
-      "failureModes": ["A refused value shows under its row and the row returns to the stored value."],
+      "states": [
+        "default",
+        "modified",
+        "pending"
+      ],
+      "failureModes": [
+        "A refused value shows under its row and the row returns to the stored value."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -476,12 +555,21 @@
         "click button \"More ways to open the configuration file\"",
         "expect menuitem \"Copy path\""
       ],
-      "surfaces": ["client", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "settings",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Open configuration file",
       "configuration": [],
-      "states": ["no-document", "document", "copied", "failed"],
+      "states": [
+        "no-document",
+        "document",
+        "copied",
+        "failed"
+      ],
       "failureModes": [
         "If the document is absent or desktop path opening is unavailable, the native action creates/opens it in the Host's text editor.",
         "Remote (non-loopback) browsers get neither the action nor the path."

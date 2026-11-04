@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-359 features from 88 plugins.
+358 features from 88 plugins.
 
 ## Counts
 
@@ -19,7 +19,7 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  | 5 |
 | Observe |  |  |  |  | 18 |  |  |  | 2 |  |  |  |  | 20 |
 | Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  | 6 |
-| Settings |  |  |  |  |  |  |  |  | 1 | 45 |  |  |  | 46 |
+| Settings |  |  |  |  |  |  |  |  | 1 | 44 |  |  |  | 45 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  | 17 |  | 17 |
 | Composer |  |  |  | 46 |  |  |  |  |  |  |  |  |  | 46 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  | 17 | 17 |
@@ -68,17 +68,17 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | composer | 48 | Composer 45, Thread panel 2, Settings 1 |
 | composer and transcript | 1 | Threads 1 |
 | conversation-view | 2 | Thread panel 2 |
-| dialog | 5 | Settings 2, Agents 1, No place of its own 1, Thread panel 1 |
+| dialog | 4 | Agents 1, No place of its own 1, Settings 1, Thread panel 1 |
 | home | 1 | Threads 1 |
 | host | 42 | No place of its own 42 |
 | Host contract | 1 | Inbox 1 |
 | keyboard | 3 | No place of its own 3 |
 | left-nav | 85 | Observe 19, Work 15, Land 13, Inbox 12, Settings 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
-| main-tabs | 11 | No place of its own 7, Settings 2, Thread panel 2 |
+| main-tabs | 10 | No place of its own 7, Thread panel 2, Settings 1 |
 | palette | 11 | No place of its own 11 |
 | plugins-page | 2 | No place of its own 1, Settings 1 |
-| right-pane | 5 | No place of its own 2, Thread panel 2, Settings 1 |
-| settings | 24 | Settings 22, No place of its own 2 |
+| right-pane | 4 | No place of its own 2, Thread panel 2 |
+| settings | 26 | Settings 24, No place of its own 2 |
 | shell | 7 | No place of its own 5, Threads 2 |
 | sidebar | 2 | Settings 2 |
 | sidebar-footer | 3 | No place of its own 3 |
@@ -246,7 +246,7 @@ rail destination; 6 features.
 
 ### Settings
 
-rail destination (bottom); 46 features.
+rail destination (bottom); 45 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -281,13 +281,12 @@ rail destination (bottom); 46 features.
 | settings-shell/modified-settings: Modified settings and reset to default | settingsSection | settings: Reset to default |
 | settings-shell/open-config-menu: Open the configuration file elsewhere | settingsSection | settings: Open configuration file |
 | settings-shell/plugin-settings-controls: Plugin settings with real controls | settingsSection | settings: plugin pages |
-| settings-shell/settings-dialog-expand: Settings dialog, expandable | settingsSection | dialog: Settings |
 | settings-shell/settings-search: Search Settings inline | settingsSection | settings: Search settings |
 | settings-shell/settings-search-entries: Search section controls and open them at the control | settingsSection | settings: Search settings › section controls |
 | settings-shell/settings-shell-port: Native Settings shell, ported | settingsSection | sidebar: Account menu › Settings |
-| settings-shell/settings-side-panel: Settings in the side panel | settingsSection | right-pane: Settings |
-| settings-shell/settings-tab: Settings as a main-view tab | settingsSection | main-tabs: Settings tab |
-| settings-shell/settings-workbench-panels: One dockable Settings hub with real navigation and forms | settingsSection | main-tabs: New tab › Settings Shell: Settings |
+| settings-shell/settings-tab: One Settings page in the stage | settingsSection | settings: the Settings page in the stage |
+| settings-shell/settings-task-groups: Settings grouped by task, with deep links | settingsSection | settings: task groups in the Settings navigation |
+| settings-shell/settings-workbench-panels: One dockable Settings hub with real navigation and forms | settingsSection | main-tabs: New tab › Settings |
 | shortcuts/editable-command-keys: Rebindable command keys | settingsSection | settings: Keyboard shortcuts |
 | thread-sidebar/idle-archive-policy: Automatically settle eligible idle threads | settingsSection | settings: Thread sidebar › idle policy |
 | thread-sidebar/layout-mode: Choose a fixed or free-docking left column | settingsSection | settings: Thread sidebar › Layout |

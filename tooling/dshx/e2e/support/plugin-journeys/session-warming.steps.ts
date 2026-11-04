@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsNavEntry } from '../steps.js'
 
 const FIRST_MESSAGE = 'First message of the journey'
 
@@ -12,7 +12,7 @@ const requestsEndingWith = (page: Page, text: string): number =>
 
 When('session warming is switched on in Settings with a one-minute interval', async ({ page }: { page: Page }) => {
   await openSettingsDialog(page)
-  await page.getByRole('group', { name: 'Plugins' }).getByRole('button', { name: 'Session warming', exact: true }).click()
+  await settingsNavEntry(page, 'Prompt cache warming').click()
   const enabled = page.locator('[data-setting-path="enabled"]').getByRole('switch')
   await enabled.click()
   await expect(enabled).toBeChecked()

@@ -75,6 +75,14 @@ const soleSection = (destination: ResolvedDestination): string | undefined =>
   destination.id !== 'threads' && destination.id !== 'settings' && destination.sections.length === 1 ? destination.sections[0]?.panelId : undefined
 
 const PHONE_QUERY = '(max-width: 639.98px)'
+/** The main panel `@dshfiles/settings-shell` shows its one Settings page in. */
+const SETTINGS_PANEL_ID = 'dshfiles-settings'
+
+/**
+ * Opens `@dshfiles/settings-shell`'s Settings page in the stage through its documented cross-plugin request (plan §4.6).
+ * False when the shell is not loaded: the rail then only shows its list, never the native Settings dialog.
+ */
+const openSettingsPage = (): boolean => !window.dispatchEvent(new CustomEvent('dshfiles:open-settings', { detail: {}, cancelable: true }))
 const PHONE_NAV_HEIGHT = 'calc(56px + env(safe-area-inset-bottom, 0px))'
 
 const subscribePhone = (listener: () => void): (() => void) => {
@@ -399,6 +407,8 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
     setDestination(next.id)
     if (props.collapsed) props.toggleSidebar()
     const sole = soleSection(next)
+    // Settings is one page in the stage (plan §4.6): the rail opens it at once, its list keeps the deep links.
+    if (next.id === 'settings') openSettingsPage()
     if (sole === undefined) props.record({ destination: next.id, surface: 'rail' })
     else {
       props.selectPanel(sole)
@@ -495,6 +505,14 @@ const PhoneNavigation = (
     setMoreOpen(false)
     const target = props.destinations.find(candidate => candidate.id === next)
     const sole = target === undefined ? undefined : soleSection(target)
+    // Settings opens its page in the stage, which closes the list, like a destination with one page.
+    // Already on stage, the page does not change, so nothing else closes the list.
+    const alreadyShown = props.activePanelId === SETTINGS_PANEL_ID
+    if (next === 'settings' && openSettingsPage()) {
+      props.record({ destination: next, surface: 'tab-bar' })
+      if (alreadyShown && listOpen) props.toggleSidebar()
+      return
+    }
     if (sole !== undefined) {
       // The page is the list: show it in the stage, which closes the list.
       props.record({ destination: next, section: sole, surface: 'tab-bar' })

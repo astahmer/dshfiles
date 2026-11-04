@@ -1,10 +1,8 @@
 import { expect, test, type Page, type Request, type Response, type Route } from '@playwright/test'
 import { openGlobalPanel } from '../plugin-view-names.js'
-import { realpath } from 'node:fs/promises'
 import { Then, When } from '../bdd.js'
 import * as Schema from 'effect/Schema'
-import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion } from '../steps.js'
-import { registerWorkspaceFolder } from '../threads.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsNavEntry } from '../steps.js'
 
 const settingsView = (page: Page) => page.locator('[data-settings-view]')
 const searchField = (page: Page) => page.getByRole('searchbox', { name: 'Search settings', exact: true })
@@ -61,17 +59,18 @@ Then('the DSH release status and manual check action are available', async ({ pa
   await finishJourneyAssertions(page)
 })
 
-Then('the native sections and General rows show in the Settings dialog', async ({ page }: { page: Page }) => {
-  const dialog = page.getByRole('dialog', { name: 'Settings', exact: true })
+Then('the native sections and General rows show on the Settings page', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'settings-shell-port-keeps-native-sections', async () => {
-    await expect(dialog).toBeVisible()
-    for (const section of ['General', 'Models', 'Built-in plugins']) await expect(dialog.getByRole('button', { name: section, exact: true })).toBeVisible()
-    await expect(dialog.getByRole('switch', { name: 'Show coding view', exact: true })).toBeVisible()
-    await expect(dialog.getByText(/^Current version: \d/)).toBeVisible()
+    // One page in the stage: no dialog, no side panel.
+    await expect(settingsView(page)).toHaveAttribute('data-settings-view', 'tab')
+    await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0)
+    for (const section of ['General', 'Models', 'Built-in plugins']) await expect(settingsNavEntry(page, section)).toBeVisible()
+    await expect(page.getByRole('switch', { name: 'Show coding view', exact: true })).toBeVisible()
+    await expect(page.getByText(/^Current version: \d/)).toBeVisible()
   })
 })
 
-Then('the Settings shortcut closes and reopens the dialog', async ({ page }: { page: Page }) => {
+Then('the Settings shortcut closes and reopens the page', async ({ page }: { page: Page }) => {
   // The native command binds Web Mod+Alt+, on macOS and Windows only; Linux Web has no default to press.
   if (process.platform === 'linux') {
     await finishJourneyAssertions(page)
@@ -81,7 +80,7 @@ Then('the Settings shortcut closes and reopens the dialog', async ({ page }: { p
     await page.keyboard.press(`${primary()}+Alt+Comma`)
     await expect(settingsView(page)).toHaveCount(0)
     await page.keyboard.press(`${primary()}+Alt+Comma`)
-    await expect(settingsView(page)).toHaveAttribute('data-settings-view', 'modal')
+    await expect(settingsView(page)).toHaveAttribute('data-settings-view', 'tab')
   })
   await finishJourneyAssertions(page)
 })
@@ -99,30 +98,23 @@ Then('Settings fills the main view under its own tab', async ({ page }: { page: 
   await finishJourneyAssertions(page)
 })
 
-When('the Settings dialog is expanded', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Expand to the full window', exact: true }).click()
-})
-
-Then('the dialog fills the window and can be restored', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'settings-shell-dialog-expands', async () => {
-    await expect(settingsView(page)).toHaveAttribute('data-settings-view', 'expanded')
-    const viewport = page.viewportSize()
-    const box = await settingsView(page).boundingBox()
-    expect(box?.width).toBe(viewport?.width)
-    await page.getByRole('button', { name: 'Restore the dialog size', exact: true }).click()
-    await expect(settingsView(page)).toHaveAttribute('data-settings-view', 'modal')
+Then('the page lists its task groups with human page titles and no dialog', async ({ page }: { page: Page }) => {
+  const navigation = settingsView(page).getByRole('navigation', { name: 'Settings', exact: true })
+  await recordAssertion(page, 'settings-shell-groups-by-task', async () => {
+    await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0)
+    for (const group of ['General', 'Models & accounts', 'Plugins']) await expect(navigation.getByRole('group', { name: group, exact: true })).toBeVisible()
+    // Plugin pages sit in their task group under a person's name, never a package id.
+    await expect(navigation.getByRole('group', { name: 'General', exact: true }).getByRole('button', { name: 'Main tabs', exact: true })).toBeVisible()
+    const names = await navigation.getByRole('button').allTextContents()
+    for (const name of names) expect(name).not.toMatch(/^[a-z0-9@][a-z0-9@/._-]*$/u)
   })
 })
 
-When('the Settings dialog is moved into a tab', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Open in a tab', exact: true }).click()
-})
-
-Then('Settings fills the main view', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'settings-shell-dialog-moves-into-the-main-view', async () => {
-    await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0)
-    await expect(page.locator('[data-slot="main"] [data-settings-view="tab"]')).toBeVisible()
-    await expect(searchField(page)).toBeVisible()
+Then('the Open Settings key binding is listed with its keys', async ({ page }: { page: Page }) => {
+  const shortcut = page.locator('[data-settings-results] [data-settings-shortcut="settings.open"]')
+  await recordAssertion(page, 'settings-shell-search-finds-key-bindings', async () => {
+    await expect(shortcut).toContainText('Open settings')
+    await expect(shortcut.locator('kbd').first()).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
@@ -138,7 +130,7 @@ Then('the Main tabs settings are listed with highlights, a count and a tree coun
     await expect(results.getByRole('region', { name: 'Main tabs', exact: true })).toBeVisible()
     await expect(results.locator('[data-setting-path="maxTabs"]')).toBeVisible()
     await expect(results.locator('[data-setting-path="maxTabs"] mark').first()).toHaveText(/tabs/i)
-    await expect(page.getByRole('group', { name: 'Plugins' }).getByRole('button', { name: /^Main tabs \d+$/ })).toBeVisible()
+    await expect(page.getByRole('group', { name: 'General' }).getByRole('button', { name: /^Main tabs \d+$/ })).toBeVisible()
   })
 })
 
@@ -179,7 +171,7 @@ Then('the General section shows with the coding view switch focused', async ({ p
 
 When('the Main tabs page is opened in Settings', async ({ page }: { page: Page }) => {
   await openSettings(page)
-  await page.getByRole('group', { name: 'Plugins' }).getByRole('button', { name: 'Main tabs', exact: true }).click()
+  await settingsNavEntry(page, 'Main tabs').click()
   await expect(page.getByRole('region', { name: 'Main tabs', exact: true })).toBeVisible()
 })
 
@@ -316,8 +308,8 @@ Then('the Editor file-link preference is found switched on', async ({ page }: { 
 
 When('the Editor file-link preference is switched off in the General section', async ({ page }: { page: Page }) => {
   await searchField(page).fill('')
-  await page.getByRole('button', { name: 'General', exact: true }).click()
-  const fileLinksSwitch = page.getByRole('dialog').getByRole('switch', { name: 'Open file links in Editor' })
+  await settingsNavEntry(page, 'General').click()
+  const fileLinksSwitch = settingsView(page).getByRole('switch', { name: 'Open file links in Editor' })
   await recordAssertion(page, 'editor-file-links-native-general-row', () => expect(fileLinksSwitch).toHaveAttribute('aria-checked', 'true'))
   await fileLinksSwitch.click()
   await expect(fileLinksSwitch).toHaveAttribute('aria-checked', 'false')
@@ -328,47 +320,5 @@ Then('Settings search shows the Editor file-link preference switched off', async
   await recordAssertion(page, 'editor-file-links-native-row-writes-the-host-setting', () =>
     expect(fileLinksRow(page).getByRole('switch', { name: 'Open file links', exact: true })).toHaveAttribute('aria-checked', 'false'),
   )
-  await finishJourneyAssertions(page)
-})
-
-const sidePanelSettings = (page: Page) => page.locator('[data-settings-view="sidebar"]')
-
-When('the side panel opens Settings', async ({ page }: { page: Page }) => {
-  const openPanel = page.getByRole('button', { name: 'Open right sidebar', exact: true })
-  // The empty isolated profile has no selected project, so New session alone cannot expose the thread's side panel.
-  if (!(await openPanel.isVisible())) await registerWorkspaceFolder(page, await realpath(profileFor(page).homeRoot))
-  await expect(openPanel).toBeVisible()
-  await openPanel.click()
-  await page.getByText('Edit Settings in this panel.', { exact: true }).click()
-  await expect(sidePanelSettings(page)).toBeVisible()
-})
-
-Then('the side panel shows a Settings tab with its sections', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'settings-shell-side-panel-opens', async () => {
-    const panel = sidePanelSettings(page)
-    await expect(panel).toHaveAttribute('data-settings-view', 'sidebar')
-    await expect(panel.getByRole('searchbox', { name: 'Search settings', exact: true })).toBeVisible()
-    await expect(panel.getByRole('button', { name: 'General', exact: true })).toBeVisible()
-    await expect(panel.getByRole('button', { name: 'Models', exact: true })).toBeVisible()
-    // The side panel is not the dialog and not a main-view tab: Settings lives in the panel alone.
-    await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0)
-    await expect(page.locator('[data-slot="main"] [data-settings-view="tab"]')).toHaveCount(0)
-  })
-})
-
-When('a section is picked in the side panel', async ({ page }: { page: Page }) => {
-  await sidePanelSettings(page).getByRole('button', { name: 'General', exact: true }).click()
-})
-
-Then('the section fills the panel and Back returns to the section list', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'settings-shell-side-panel-drills-in', async () => {
-    const panel = sidePanelSettings(page)
-    await expect(panel.getByRole('switch', { name: 'Show coding view', exact: true })).toBeVisible()
-    const back = panel.getByRole('button', { name: 'Back to all settings', exact: true })
-    // A wide panel keeps the dialog's two columns, where the section list never leaves the screen.
-    if (!(await back.isVisible())) return
-    await back.click()
-    await expect(panel.getByRole('button', { name: 'Models', exact: true })).toBeVisible()
-  })
   await finishJourneyAssertions(page)
 })

@@ -6,7 +6,7 @@ import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Before, Given, Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsNavEntry, settingsPage } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
 
 /**
@@ -709,9 +709,9 @@ Then('the secret tools journey is complete', async ({ page }: { page: Page }) =>
 })
 
 When('the Memory Jev secret-reference setting is focused', async ({ page }: { page: Page }) => {
-  const settingsDialog = page.getByRole('dialog', { name: 'Settings', exact: true })
-  if (!(await settingsDialog.isVisible())) await openSettingsDialog(page)
-  await settingsDialog.getByRole('group', { name: 'Plugins', exact: true }).getByRole('button', { name: 'Memory', exact: true }).click()
+  if (!(await settingsPage(page).isVisible())) await openSettingsDialog(page)
+  // Jev settings of every plugin live together under Tools & MCP › Jev.
+  await settingsNavEntry(page, 'Jev').click()
   const field = page.locator('[data-settings-namespace="dshfiles-memory"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
   await expect(field).toBeVisible()
   await field.focus()

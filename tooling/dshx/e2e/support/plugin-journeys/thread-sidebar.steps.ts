@@ -1,12 +1,12 @@
 import { expect, type Locator, type Page, type Response, type TestInfo } from '@playwright/test'
-import { openGlobalPanel, reusableViewName } from '../plugin-view-names.js'
+import { openGlobalPanel, reusableViewName, viewNamePattern } from '../plugin-view-names.js'
 import { DEFAULT_PREFERENCES } from '../../../../../plugins/@dshfiles/thread-sidebar/src/organization.js'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion, settingsPage, settingsNavEntry } from '../steps.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFolder } from '../threads.js'
 import { materializeNonblankThread } from '../thread-composer.js'
@@ -1311,9 +1311,10 @@ Then('the selected attention color survives a browser reload', async ({ page }: 
  * the whole test timeout instead of failing where the section never opened.
  */
 const openThreadSidebarSettingsSection = async (page: Page): Promise<Locator> => {
-  const settingsDialog = page.getByRole('dialog', { name: 'Settings', exact: true })
+  // Settings is one page in the stage; the thread sidebar's section is General › Thread list.
+  const settingsDialog = settingsPage(page)
   const notifications = settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
-  const section = settingsDialog.getByRole('button', { name: 'Thread sidebar', exact: true }).first()
+  const section = settingsNavEntry(page, 'Thread list', 'Thread sidebar')
   const providerPrompt = page.getByRole('dialog', { name: /^(Add an API key to get started|Get started)$/ })
   const deadline = Date.now() + 45_000
   while (Date.now() < deadline) {
@@ -1461,7 +1462,7 @@ Then('the header menu offers Settings and Customize sidebar', async ({ page }: {
   })
   await settings.click()
   await recordAssertion(page, 'thread-sidebar-header-more-opens-settings', async () => {
-    await expect(page.getByRole('dialog').filter({ hasText: 'Built-in plugins' })).toBeVisible()
+    await expect(settingsPage(page).filter({ hasText: 'Built-in plugins' })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
@@ -1472,14 +1473,14 @@ When('the Workbench Navigation panel is opened in menu-only overflow', async ({ 
   await newTab.click()
   const chooser = main.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })
   await expect(chooser).toBeVisible()
-  await chooser.getByRole('button', { name: reusableViewName('Navigation'), exact: true }).click()
+  await chooser.getByRole('button', { name: viewNamePattern('Navigation') }).click()
   await expect(workbenchNavigation(page)).toBeVisible()
   await page.evaluate(
     ([key, preferences]) => localStorage.setItem(key ?? '', preferences ?? ''),
     [PREFERENCES_STORAGE_KEY, JSON.stringify({ ...DEFAULT_PREFERENCES, navigationOverflow: 'menu' })],
   )
   await page.reload()
-  const navigationTab = main.getByRole('tab', { name: reusableViewName('Navigation'), exact: true })
+  const navigationTab = main.getByRole('tab', { name: viewNamePattern('Navigation') })
   if ((await navigationTab.getAttribute('aria-selected')) !== 'true') await navigationTab.click()
   const navigation = workbenchNavigation(page)
   await expect(navigation).toBeVisible()
@@ -1496,7 +1497,7 @@ Then('the Workbench Navigation More menu offers Settings', async ({ page }: { pa
   })
   await menu.getByRole('option', { name: 'Settings', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-workbench-navigation-more-opens-settings', async () => {
-    await expect(page.getByRole('dialog').filter({ hasText: 'Built-in plugins' })).toBeVisible()
+    await expect(settingsPage(page).filter({ hasText: 'Built-in plugins' })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

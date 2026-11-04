@@ -9,7 +9,7 @@ import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
 import { After, Given, Then, When } from '../bdd.js'
 import { openGlobalPanel, reusableViewName, viewNamePattern } from '../plugin-view-names.js'
 import { bootComposedPluginProfile } from '../boot.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion, visitIsolatedPluginProfile, settingsNavEntry } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, selectModelForNewThread, sendMessage } from '../threads.js'
 
 const MAIN_LAYOUT_KEY = 'dshfiles.workbench.layout.v1'
@@ -820,7 +820,7 @@ Then('Main tabs settings still show disabled tabs and Preview opening', async ({
   await openSettingsDialog(page)
   const settings = mainSeat(page).locator('[data-settings-view]')
   await expect(settings).toBeVisible()
-  await settings.getByRole('group', { name: 'Plugins', exact: true }).getByRole('button', { name: 'Main tabs', exact: true }).click()
+  await settingsNavEntry(page, 'Main tabs').click()
   const controls = settings.getByRole('region', { name: 'Main tabs', exact: true })
   await recordAssertion(page, acceptanceId(page, 'legacy-disabled-preview-settings-are-real'), async () => {
     await expect(controls.getByRole('switch', { name: 'Enabled', exact: true })).not.toBeChecked()

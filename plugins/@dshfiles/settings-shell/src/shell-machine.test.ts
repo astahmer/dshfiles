@@ -10,25 +10,23 @@ const start = () => {
 }
 
 describe('settings shell machine', () => {
-  it('opens the dialog on a section, expands it, and forgets the section on close', () => {
+  it('opens the stage page on a section and forgets the section on close', () => {
     const { actor, calls } = start()
-    actor.send({ type: 'open', surface: 'modal', sectionId: 'models' })
-    expect(actor.getSnapshot().value).toEqual({ modal: 'normal' })
+    actor.send({ type: 'open', sectionId: 'models' })
+    expect(actor.getSnapshot().value).toBe('tab')
     expect(actor.getSnapshot().context.sectionId).toBe('models')
-    actor.send({ type: 'expand' })
-    expect(actor.getSnapshot().value).toEqual({ modal: 'expanded' })
     actor.send({ type: 'close' })
     expect(actor.getSnapshot().value).toBe('closed')
     expect(actor.getSnapshot().context.sectionId).toBeUndefined()
-    expect(calls).toEqual([])
+    expect(calls).toEqual(['show', 'leave'])
   })
 
-  it('opens as a main-view tab and closes when the main view leaves it', () => {
+  it('opens in the stage and closes when the main view leaves it', () => {
     const { actor, calls } = start()
-    actor.send({ type: 'open', surface: 'tab', sectionId: 'general' })
+    actor.send({ type: 'open', sectionId: 'general' })
     expect(actor.getSnapshot().value).toBe('tab')
     expect(calls).toEqual(['show'])
-    actor.send({ type: 'open', surface: 'modal', sectionId: 'models' })
+    actor.send({ type: 'open', sectionId: 'models' })
     expect(actor.getSnapshot().value).toBe('tab')
     expect(actor.getSnapshot().context.sectionId).toBe('models')
     actor.send({ type: 'panel.hidden' })
@@ -46,7 +44,7 @@ describe('settings shell machine', () => {
 
   it('opens on a field and forgets it once the user picks another section', () => {
     const { actor } = start()
-    actor.send({ type: 'open', surface: 'modal', field: { sectionId: 'plugin:thread-sidebar', fieldPath: ['maxChildren'] } })
+    actor.send({ type: 'open', field: { sectionId: 'plugin:thread-sidebar', fieldPath: ['maxChildren'] } })
     expect(actor.getSnapshot().context).toMatchObject({ sectionId: 'plugin:thread-sidebar', field: { fieldPath: ['maxChildren'] } })
     actor.send({ type: 'select', sectionId: 'general' })
     expect(actor.getSnapshot().context.field).toBeUndefined()
@@ -54,7 +52,7 @@ describe('settings shell machine', () => {
 
   it('reveals a section entry from search, clearing the query, and drops the target on the next navigation', () => {
     const { actor } = start()
-    actor.send({ type: 'open', surface: 'modal' })
+    actor.send({ type: 'open' })
     actor.send({ type: 'search', query: 'theme' })
     actor.send({ type: 'reveal', sectionId: 'appearance', target: 'theme' })
     expect(actor.getSnapshot().context).toMatchObject({ sectionId: 'appearance', target: 'theme', field: undefined, query: '' })
@@ -67,12 +65,12 @@ describe('settings shell machine', () => {
 
   it('opens a closed Settings at a section entry and forgets it on close', () => {
     const { actor, calls } = start()
-    actor.send({ type: 'open', surface: 'tab', sectionId: 'appearance', target: 'theme' })
+    actor.send({ type: 'open', sectionId: 'appearance', target: 'theme' })
     expect(actor.getSnapshot().context).toMatchObject({ sectionId: 'appearance', target: 'theme' })
     expect(calls).toEqual(['show'])
-    actor.send({ type: 'open', surface: 'modal', sectionId: 'models' })
+    actor.send({ type: 'open', sectionId: 'models' })
     expect(actor.getSnapshot().context.target).toBeUndefined()
-    actor.send({ type: 'open', surface: 'modal', target: 'orphan' })
+    actor.send({ type: 'open', target: 'orphan' })
     expect(actor.getSnapshot().context).toMatchObject({ sectionId: 'models', target: undefined })
     actor.send({ type: 'close' })
     expect(actor.getSnapshot().context.target).toBeUndefined()
@@ -80,7 +78,7 @@ describe('settings shell machine', () => {
 
   it('keeps the query when the main view hides the tab and shows it again', () => {
     const { actor } = start()
-    actor.send({ type: 'open', surface: 'tab' })
+    actor.send({ type: 'open' })
     actor.send({ type: 'search', query: 'max tabs' })
     actor.send({ type: 'panel.hidden' })
     expect(actor.getSnapshot().value).toBe('closed')
@@ -92,36 +90,23 @@ describe('settings shell machine', () => {
 
   it('keeps the query across sections opened without one, and drops it on close or a picked section', () => {
     const { actor } = start()
-    actor.send({ type: 'open', surface: 'modal', query: 'archive' })
+    actor.send({ type: 'open', query: 'archive' })
     expect(actor.getSnapshot().context.query).toBe('archive')
     actor.send({ type: 'search', query: 'tabs' })
-    actor.send({ type: 'open', surface: 'modal' })
+    actor.send({ type: 'open' })
     expect(actor.getSnapshot().context.query).toBe('tabs')
-    actor.send({ type: 'open', surface: 'modal', sectionId: 'models' })
+    actor.send({ type: 'open', sectionId: 'models' })
     expect(actor.getSnapshot().context.query).toBe('')
     actor.send({ type: 'search', query: 'tabs' })
     actor.send({ type: 'close' })
     expect(actor.getSnapshot().context.query).toBe('')
   })
 
-  it('moves an open dialog into a tab, keeping its section', () => {
-    const { actor, calls } = start()
-    actor.send({ type: 'open', surface: 'modal', sectionId: 'plugins' })
-    actor.send({ type: 'moveToTab' })
-    expect(actor.getSnapshot().value).toBe('tab')
-    expect(actor.getSnapshot().context.sectionId).toBe('plugins')
-    expect(calls).toEqual(['show'])
-  })
-
-  it('drills into a side-panel section and goes back to the section list', () => {
-    const { actor, calls } = start()
+  it('goes back to the first section and drops the query', () => {
+    const { actor } = start()
     actor.send({ type: 'select', sectionId: 'models' })
     actor.send({ type: 'search', query: 'tab' })
-    expect(actor.getSnapshot().value).toBe('closed')
-    expect(actor.getSnapshot().context).toMatchObject({ sectionId: 'models', query: 'tab' })
     actor.send({ type: 'back' })
-    expect(actor.getSnapshot().value).toBe('closed')
     expect(actor.getSnapshot().context).toMatchObject({ sectionId: undefined, query: '' })
-    expect(calls).toEqual([])
   })
 })
