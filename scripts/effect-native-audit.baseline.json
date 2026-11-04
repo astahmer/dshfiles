@@ -411,7 +411,7 @@
     "layerEmpty": 0,
     "promiseAdapters": 0,
     "moduleState": 0,
-    "timers": 6,
+    "timers": 0,
     "childProcess": 0,
     "nodeFs": 0,
     "globalFetch": 0,

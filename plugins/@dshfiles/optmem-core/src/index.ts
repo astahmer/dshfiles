@@ -1,18 +1,5 @@
 export { Capabilities } from './capabilities.ts'
 export type { CapabilityCheck, HarnessCapabilities, MemoryMode } from './capabilities.ts'
-export { createMemoryEngine, defaultMemoryConfig } from './engine.ts'
-export type {
-  AppendResult,
-  ContextEntry,
-  ContextResult,
-  MemoryEngine,
-  MemoryEngineOptions,
-  MemorySearchHit,
-  MemoryStatus,
-  StreamStatus,
-  ViewSnapshot,
-  ZoomResult,
-} from './engine.ts'
 export { MemoryError } from './memory-error.ts'
 export type { MemoryErrorCode } from './memory-error.ts'
 export { Redaction } from './redaction.ts'
