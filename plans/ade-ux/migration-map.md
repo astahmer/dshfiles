@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-365 features from 84 plugins.
+366 features from 84 plugins.
 
 ## Counts
 
@@ -21,7 +21,7 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  |  | 6 |
 | Settings |  |  |  |  |  |  |  |  | 1 |  | 40 |  |  |  | 41 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 21 |  | 21 |
-| Composer |  |  |  | 50 |  |  |  |  |  |  |  |  |  |  | 50 |
+| Composer |  |  |  | 51 |  |  |  |  |  |  |  |  |  |  | 51 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 17 | 17 |
 | No place of its own | 19 |  | 16 |  |  |  |  | 89 |  |  |  | 7 |  |  | 131 |
 
@@ -66,7 +66,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | agent tool | 23 | No place of its own 18, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
 | agent tools and Host watcher; no UI | 1 | No place of its own 1 |
 | client | 10 | No place of its own 10 |
-| composer | 51 | Composer 48, Thread panel 2, Settings 1 |
+| composer | 52 | Composer 49, Thread panel 2, Settings 1 |
 | composer and transcript | 1 | Threads 1 |
 | conversation-view | 2 | Thread panel 2 |
 | dialog | 4 | Agents 1, No place of its own 1, Settings 1, Thread panel 1 |
@@ -325,7 +325,7 @@ facets of the active thread; 21 features.
 
 ### Composer
 
-run row, chips, `/` and `@` sources; 50 features.
+run row, chips, `/` and `@` sources; 51 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -342,7 +342,7 @@ run row, chips, `/` and `@` sources; 50 features.
 | jj-integration/new-thread-preparation: New thread prepares its destination while the draft is written | composerContribution | composer: New thread draft |
 | jj-integration/new-thread-project-default: New thread returns to its project | composerContribution | composer: new-thread destination bar |
 | jj-integration/new-thread-project-picker: Pick a New-thread project | composerContribution | composer: Choose workspace |
-| jj-integration/thread-destination: New thread destination and workspace isolation | composerContribution | composer: new-thread destination bar |
+| jj-integration/thread-destination: New thread destination and workspace isolation | composerContribution | composer: run row Workspace segment |
 | mcp-servers/mcp-mentions: Reference configured MCP servers and tools in the composer | composerContribution | composer: @ MCP mentions |
 | mentions/ranked-mentions: Ranked @ mentions for files and threads | composerContribution | composer: @ menu files and threads |
 | model-effort-picker/account-swap: Swap to the next account offering the same model | composerContribution | composer: model picker › account swap |
@@ -362,6 +362,7 @@ run row, chips, `/` and `@` sources; 50 features.
 | queue-reorder/queue-ordering: Reorder pending messages | composerContribution | composer: queued messages |
 | queue-reorder/queued-attachment-previews: Preview queued attachments | composerContribution | composer: queued messages › attachment previews |
 | queue-reorder/queued-message-preview: Preview queued message text | composerContribution | composer: queued messages › preview |
+| rich-composer/composer-run-row: Run row and meter line | composerContribution | composer: run row above the new-thread input; summary chip on the meter line |
 | rich-composer/image-attachment-reference: Add inline references for image attachments | composerContribution | composer: image references |
 | rich-composer/image-reference-mentions: Reuse image references and open the selected image | composerContribution | composer: image reference chips |
 | rich-composer/large-paste-file: Attach a large paste as a text file | composerContribution | composer: large paste as file |
