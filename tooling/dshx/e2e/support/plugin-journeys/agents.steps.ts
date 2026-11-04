@@ -76,18 +76,24 @@ const openAgentsPanel = async (page: Page): Promise<void> => {
 
 const instructionsField = (page: Page) => page.getByRole('textbox', { name: /^Instructions/u })
 
+/** One agent's row in the list: its button names the agent, its @handle and its model line. */
+const agentRow = (page: Page, handle: string) =>
+  page
+    .getByRole('list', { name: 'Agents', exact: true })
+    .getByRole('button', { name: new RegExp(`@${handle}(?![a-z0-9-])`, 'u') })
+    .first()
+
 Then('the agent {string} is saved with instructions {string}', async ({ page }: { page: Page }, name: string, instructions: string) => {
   await openAgentsPanel(page)
-  await page.getByRole('button', { name: 'New agent', exact: true }).click()
+  await page.getByRole('button', { name: 'New agent', exact: true }).first().click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await instructionsField(page).fill(instructions)
-  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.getByRole('button', { name: 'Create agent', exact: true }).click()
   await expect(page.getByText('Saved.', { exact: true })).toBeVisible()
 })
 
 Then('the agent {string} may only message {string}', async ({ page }: { page: Page }, _name: string, peer: string) => {
-  await page.getByRole('combobox', { name: 'Delegation (messages)', exact: true }).click()
-  await page.getByRole('option', { name: 'Listed peers only', exact: true }).click()
+  await page.getByRole('radio', { name: 'Only listed', exact: true }).click()
   await page.getByRole('textbox', { name: 'Peers (handles)', exact: true }).fill(peer)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByText('Saved.', { exact: true })).toBeVisible()
@@ -95,8 +101,9 @@ Then('the agent {string} may only message {string}', async ({ page }: { page: Pa
 
 When("the built-in agent's start-thread workspace picker is opened", async ({ page }: { page: Page }) => {
   await openAgentsPanel(page)
-  await page.getByText('@dsh', { exact: true }).click()
-  await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toBeVisible()
+  await agentRow(page, 'dsh').click()
+  await page.getByRole('button', { name: 'Start thread', exact: true }).click()
+  await expect(page.getByRole('dialog').getByRole('textbox', { name: 'Prompt', exact: true })).toBeVisible()
 })
 
 Then('the workspace picker is a Combobox listing registered projects only', async ({ page }: { page: Page }) => {
@@ -112,12 +119,12 @@ Then('the workspace picker is a Combobox listing registered projects only', asyn
 
 Then('the Agents panel lists {string} with those instructions', async ({ page }: { page: Page }, name: string) => {
   await recordAssertion(page, 'agents-registry-persists-a-new-agent', async () => {
-    const row = page.getByRole('button', { name: new RegExp(`@${name.toLowerCase()}$`, 'u') })
+    const row = agentRow(page, name.toLowerCase())
     await expect(row).toBeVisible()
     await row.click()
     await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
     await expect(instructionsField(page)).toHaveValue('Prefer small findings.')
-    await expect(page.getByRole('combobox', { name: 'Delegation (messages)', exact: true })).toContainText('Listed peers only')
+    await expect(page.getByRole('radio', { name: 'Only listed', exact: true })).toHaveAttribute('data-state', 'on')
     await expect(page.getByRole('textbox', { name: 'Peers (handles)', exact: true })).toHaveValue('dsh')
   })
   await finishJourneyAssertions(page)
@@ -125,9 +132,11 @@ Then('the Agents panel lists {string} with those instructions', async ({ page }:
 
 When('a thread is started from the agent {string} with {string}', async ({ page }: { page: Page }, handle: string, prompt: string) => {
   await openAgentsPanel(page)
-  await page.getByRole('button', { name: new RegExp(`@${handle}$`, 'u') }).click()
-  await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill(prompt)
-  await page.getByRole('button', { name: 'Start', exact: true }).click()
+  await agentRow(page, handle).click()
+  await page.getByRole('button', { name: 'Start thread', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: `Start a thread with @${handle}` })
+  await dialog.getByRole('textbox', { name: 'Prompt', exact: true }).fill(prompt)
+  await dialog.getByRole('button', { name: 'Start thread', exact: true }).click()
   await expect(page.getByRole('treeitem', { name: new RegExp(`^${prompt}\\b`, 'u') })).toHaveAttribute('aria-selected', 'true')
 })
 
@@ -138,9 +147,10 @@ When('the browser page is reloaded with the Agents panel open', async ({ page }:
 
 Then('the agent {string} lists {string} and counts {int} thread', async ({ page }: { page: Page }, handle: string, title: string, count: number) => {
   await recordAssertion(page, 'agents-thread-history-survives-a-reload', async () => {
-    await page.getByRole('button', { name: new RegExp(`@${handle}$`, 'u') }).click()
+    await agentRow(page, handle).click()
     await expect(page.getByText(new RegExp(`@${handle} · ${String(count)} thread\\b`, 'u'))).toBeVisible()
-    await expect(page.getByRole('button', { name: new RegExp(`^${title}\\b`, 'u') })).toBeVisible()
+    await page.getByRole('tab', { name: `Threads ${String(count)}`, exact: true }).click()
+    await expect(page.getByRole('list', { name: 'Threads started' }).getByRole('button', { name: new RegExp(`^${title}\\b`, 'u') })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

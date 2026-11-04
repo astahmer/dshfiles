@@ -5,29 +5,32 @@
     {
       "id": "agent-registry",
       "title": "Manage persistent agents",
-      "summary": "Create, edit, enable and remove agents \u2014 handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort \u2014 from one Host-owned registry every browser and agent reads. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. A built-in @dsh agent ships with the harness defaults and cannot be deleted.",
+      "summary": "Create, edit, enable, duplicate and remove agents — handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort — from one Host-owned registry every browser and agent reads. The panel lists each agent with its glyph, handle, model and an enable switch; the editor groups identity, instructions, model and tools, delegation, and memory and routine, checks fields inline with a fix for each problem, and asks before dropping unsaved edits; a new agent can start from a template; removal asks first and offers Undo. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. On a phone the list and the editor take the whole pane in turn. A built-in @dsh agent ships with the harness defaults and cannot be deleted.",
       "reach": [
-        "click tab \"Agents\"",
-        "click button \"Directory\"",
-        "expect textbox \"Name\"",
-        "click text \"@dsh\"",
-        "expect combobox \"Project\"",
-        "click combobox \"Project\"",
-        "expect option \"Default project\""
+        "click button \"Agents\"",
+        "expect text \"Start from a template\"",
+        "click button \"Reviews diffs and pull requests*\"",
+        "expect textbox \"Instructions\"",
+        "click button \"Create agent\"",
+        "expect text \"Saved.\"",
+        "expect text \"@reviewer\""
       ],
       "surfaces": ["client", "host", "storage", "tool"],
       "surface": "destinationSection",
       "destination": "agents",
       "currentSurface": "left-nav: Agents",
       "configuration": [],
-      "states": ["empty", "built-in-only", "editing", "enabled", "disabled", "thread-history", "delegation-listed"],
+      "states": ["empty", "built-in-only", "editing", "unsaved", "invalid", "enabled", "disabled", "thread-history", "delegation-listed", "removed-undoable"],
       "failureModes": [
         "A handle is a slug; a name alone is enough to create one.",
         "Removing the built-in @dsh agent is refused and reported.",
         "Removing an already-removed agent reports it as missing.",
         "A save past the 100-agent limit is reported and existing agents stay.",
         "A listed delegation refuses a peer it does not name, with a reason naming both handles.",
-        "An agent with subagents off is refused a subagent or workflow call before it starts."
+        "An agent with subagents off is refused a subagent or workflow call before it starts.",
+        "A new agent whose handle is taken is refused before saving, with a free handle offered.",
+        "Leaving unsaved edits asks before discarding them.",
+        "A pinned route this Host does not offer is flagged, with a reset to the harness default."
       ],
       "externalDependencies": [],
       "verification": [
@@ -62,6 +65,18 @@
           "testName": "a scope prefix lists agents only"
         },
         {
+          "kind": "unit-test",
+          "id": "agents.editor-review",
+          "file": "plugins/@dshfiles/agents/src/agent-editor.test.ts",
+          "testName": "the review blocks a save without a name and over a taken handle, offering a free one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.editor-duplicate",
+          "file": "plugins/@dshfiles/agents/src/agent-editor.test.ts",
+          "testName": "a duplicate keeps the setup under a free handle and its own memory scope"
+        },
+        {
           "kind": "gherkin",
           "id": "agents.create-agent",
           "featureFile": "tooling/dshx/e2e/features/agents.feature"
@@ -76,7 +91,7 @@
           "kind": "unit-test",
           "id": "agents.registry-thread-prune",
           "file": "plugins/@dshfiles/agents/src/store.test.ts",
-          "testName": "lists an agent\u2019s threads newest first and drops one when the agent goes"
+          "testName": "lists an agent’s threads newest first and drops one when the agent goes"
         },
         {
           "kind": "gherkin",
@@ -93,7 +108,7 @@
           "kind": "unit-test",
           "id": "agents.routine-schedule-catalog",
           "file": "plugins/@dshfiles/agents/src/dispatch.test.ts",
-          "testName": "narrows the schedule catalog to one agent\u2019s threads"
+          "testName": "narrows the schedule catalog to one agent’s threads"
         },
         {
           "kind": "unit-test",
@@ -127,7 +142,7 @@
     {
       "id": "agent-mentions",
       "title": "Mention an agent where a thread starts",
-      "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was \u2014 the backlog reports the new thread in a toast whose Open action shows it \u2014 the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
+      "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was — the backlog reports the new thread in a toast whose Open action shows it — the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
       "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -168,7 +183,7 @@
           "kind": "unit-test",
           "id": "agents.comment-autocomplete-scopes",
           "file": "plugins/@dshfiles/backlog/src/inline-completion.test.ts",
-          "testName": "another source\u2019s scope keeps its own meaning, so no agent row appears"
+          "testName": "another source’s scope keeps its own meaning, so no agent row appears"
         },
         {
           "kind": "gherkin",
@@ -254,13 +269,12 @@
         }
       ],
       "reach": [
-        "click tab \"Agents\"",
-        "click button \"Directory\"",
+        "click button \"Agents\"",
+        "click button \"New agent\"",
         "fill textbox \"Name\" \"Luna\"",
-        "click button \"Save\"",
+        "click button \"Create agent\"",
         "expect text \"@luna\"",
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "fill textbox \"Capture\" \"Preview the agent mention\"",
         "press Enter",
         "click text \"Preview the agent mention\"",

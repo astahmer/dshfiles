@@ -57,14 +57,43 @@ where a thread starts.
 
 The reusable directory view is **Agents** in navigation and the Workbench chooser.
 
+## The Agents panel
+
+The page is built from the shared page kit (`Page` in fill mode, `PageSection`, `EntityList`/`EntityRow`, `EmptyState`) and
+follows [DESIGN.md](../../../DESIGN.md).
+
+- **List.** Each row shows the glyph, name, `@handle`, model and thread count, with an enable switch that saves at
+  once and a row menu: **Start thread…**, **Duplicate**, **Remove…**. A switched-off agent is greyed and says that
+  mentions ignore it. A filter field appears past six agents.
+- **Editor.** Five sections — Identity, Instructions, Model and tools, Delegation, Memory and routine — with the
+  instructions in a tall monospace editor. The model field is the kit's searchable, provider-grouped Combobox over the
+  Host model catalog (no owned plugin exports a model picker to reuse), and reasoning offers only that model's efforts.
+  Peers are typed or picked from the saved agents.
+- **Inline checks with a way out.** A missing name, a taken handle (with a free one offered), a bad memory scope (with
+  the default offered), an empty peer list (with “no messaging” offered) block the save and sit under their field; a
+  route this Host lacks, an unknown peer and instructions the 4,000-character opening message would clip are warnings.
+  A new agent's errors wait until a field is left or **Create agent** is pressed.
+- **Saving.** A save bar appears only with unsaved edits (or for a new agent), names what blocks it and jumps to the
+  first problem; ⌘S/Ctrl+S saves. Leaving unsaved edits asks first.
+- **Threads tab.** The threads the agent started and its routines' reminders, each opening its thread; an empty tab
+  offers **Start thread**.
+- **Start thread** opens a dialog: the task, the project it runs in (**Default project** or a registered one), and what the thread inherits (model, tools,
+  instructions). ⌘Enter starts it.
+- **Remove** asks first and says what goes (settings and the thread list; the threads stay), then offers **Undo**,
+  which saves the same settings again.
+- **First run.** With only `@dsh`, the panel explains agents and offers **New agent** or a Reviewer, Planner or
+  Explainer template.
+- **Phones and narrow panes.** Below 42rem the list and the editor take the whole pane in turn, with an **All agents** back button;
+  checked with Playwright WebKit at iPhone size.
+
 ## Surfaces
 
-| Surface              | Behavior                                                                                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Agents sidebar panel | List, create, edit, enable/disable and remove agents (the built-in `@dsh` is not removable), start a thread, and open a thread the agent started. |
-| `@` menu             | An `Agents` group in every composer; `@agent:` / `@a:` scopes the menu to agents. Picking inserts `@handle `.                                     |
-| Agent tools          | `agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove` (destructive, explicit opt-in).                                     |
-| Mention preview      | A rendered `@handle` opens a card with the agent's details and threads; **Open in Agents** selects it in the panel.                               |
+| Surface              | Behavior                                                                                                                                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agents sidebar panel | List, create (blank or from a template), edit, duplicate, enable/disable and remove agents with undo (the built-in `@dsh` is not removable), start a thread, and open a thread the agent started. |
+| `@` menu             | An `Agents` group in every composer; `@agent:` / `@a:` scopes the menu to agents. Picking inserts `@handle `.                                                                                     |
+| Agent tools          | `agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove` (destructive, explicit opt-in).                                                                                     |
+| Mention preview      | A rendered `@handle` opens a card with the agent's details and threads; **Open in Agents** selects it in the panel.                                                                               |
 
 ## Decisions
 
