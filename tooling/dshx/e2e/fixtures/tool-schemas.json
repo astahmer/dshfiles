@@ -58,12 +58,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 479,
-  "apiToolBindings": 334,
-  "apiToolNameCount": 334,
-  "apiToolSchemas": 333,
-  "definedTools": 22,
-  "tools": 355,
+  "apiMethods": 482,
+  "apiToolBindings": 335,
+  "apiToolNameCount": 335,
+  "apiToolSchemas": 334,
+  "definedTools": 24,
+  "tools": 358,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -7070,6 +7070,45 @@
       }
     },
     {
+      "name": "request_secret",
+      "description": "Ask the user to store a secret value under an alias in the Secret Catalog. The user types the value into a masked Secret Catalog form in this thread, never into chat, and the value is never returned to you. Waits for the answer and returns only the secret:ALIAS[@env] reference once stored, or a declined, expired or cancelled result. Check secret_list first: an alias that already exists does not need a request.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "alias": {
+            "description": "Alias to store the value under, e.g. OPENAI_API_KEY.",
+            "type": "string"
+          },
+          "purpose": {
+            "description": "One sentence shown to the user: what the secret is and what you will use it for.",
+            "type": "string"
+          },
+          "environment": {
+            "description": "Secret environment; defaults to prod.",
+            "type": "string"
+          },
+          "scope": {
+            "description": "global (default, usable from any folder), project (.secret.json of this thread folder) or local (.secret.local.json).",
+            "type": "string",
+            "enum": [
+              "global",
+              "project",
+              "local"
+            ]
+          },
+          "timeoutMs": {
+            "description": "How long to wait for the user, 10,000 to 3,600,000 ms; defaults to 600,000.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "alias",
+          "purpose"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "resolve_parent_feedback",
       "description": "Resolve up to 20 Markdown feedback items from direct children in one call. The Host validates parent ownership and checks each target revision before recording a resolution receipt.",
       "parameters": {
@@ -7693,6 +7732,58 @@
         "required": [
           "reference",
           "cwd"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "secret_remove_alias",
+      "description": "Remove one alias from its own config (global, or this thread folder for project/local), keeping the Bitwarden item it points to. Run only when the user asked to remove that alias, and pass confirm: true. Re-add it with request_secret or the Secret Catalog.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "alias": {
+            "description": "Alias to remove, as listed by secret_list.",
+            "type": "string"
+          },
+          "scope": {
+            "description": "The scope secret_list reports for that alias.",
+            "type": "string",
+            "enum": [
+              "global",
+              "project",
+              "local"
+            ]
+          },
+          "confirm": {
+            "description": "Must be true: the alias stops resolving for every consumer.",
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "alias",
+          "scope",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "secret_requests_pending",
+      "description": "List the secrets Agents are waiting for the user to store (alias, environment, scope and stated purpose). Never returns values. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "Only requests made in this Session; null lists every pending request."
+          }
+        },
+        "required": [
+          "sessionId"
         ],
         "additionalProperties": false
       }
