@@ -414,6 +414,14 @@ commits are never moved. A failed fetch lands in the activity timeline as
 bookmark is a routine `repository.fetched`. Each repository leaves a
 `jj-integration auto fetch` span with its status.
 
+A git-only repository runs `git fetch <remote>` instead. Fetching never moves a
+local git branch, so only `fastForwardBookmark` moves `main` to `<remote>/main`,
+and only when `main` is an ancestor of it: where `main` is checked out, that
+worktree fast-forwards (edits that block it fail as `repository.fetch-failed`
+and leave the branch); elsewhere the ref moves with compare-and-swap. Its span
+carries `dshx.fetch.vcs: git`, and git's stderr is credential-redacted before it
+reaches the timeline.
+
 ### Settle cleanup
 
 `autoCleanup.onSettle` (off by default) also removes a thread workspace the
@@ -514,8 +522,8 @@ use **Rebase**.
 
 ## Limits
 
-- Git-only repositories cover the thread-workspace flows above. Automatic fetch, the revision graph panel
-  ([`@dshfiles/jujutsu`](../jujutsu/README.md)) and pulls-review stay jj-only; remaining work is tracked in
+- Git-only repositories cover the thread-workspace flows above, automatic fetch and pulls-review. The revision graph
+  panel ([`@dshfiles/jujutsu`](../jujutsu/README.md)) stays jj-only; remaining work is tracked in
   [plans/vcs-adapters](../../../plans/vcs-adapters/README.md).
 - A thread workspace starts without `node_modules`; run project-specific
   preparation only after the thread starts and only when its memory-note

@@ -159,7 +159,10 @@
     {
       "id": "git-thread-workspaces",
       "title": "Thread workspaces in git-only repositories",
-      "summary": "The same isolate, status, rebase, discard, cleanup, snapshot and review-history flows run in a repository without .jj: a VCS backend port routes each call to the jj adapter when .jj exists (also colocated) and to a git adapter otherwise, which keeps one git worktree per thread on a dsh/<name> branch and lands by rebase plus a forward-only branch move.",
+      "summary": "The same isolate, status, rebase, discard, cleanup, snapshot and review-history flows run in a repository without .jj: a VCS backend port routes each call to the jj adapter when .jj exists (also colocated) and to a git adapter otherwise, which keeps one git worktree per thread on a dsh/<name> branch and lands by rebase plus a forward-only branch move. Automatic fetch runs git fetch there, with the same opt-in fast-forward.",
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: new-thread destination bar",
       "surfaces": ["host", "client", "tool", "integration"],
       "configuration": [
         {
@@ -180,7 +183,8 @@
         "Uncommitted edits in a git thread read as one undescribed working-tree revision, so landing asks for a commit instead of dropping them.",
         "A rebase conflict is aborted and reported with its files; the worktree is left as it was.",
         "When the target branch is checked out with edits that block a fast-forward, landing fails with a recovery hint and the branch does not move.",
-        "dshx checkout sync after a land is skipped in a git repository: the checked-out branch already fast-forwarded."
+        "dshx checkout sync after a land is skipped in a git repository: the checked-out branch already fast-forwarded.",
+        "Automatic fetch in a git repository never moves a local branch with its own commits; a failed fetch reports git's redacted error and the git command to rerun."
       ],
       "externalDependencies": [
         {
@@ -242,6 +246,18 @@
           "id": "jj-integration.git-host-api",
           "file": "plugins/@dshfiles/jj-integration/src/host-git.integration.test.ts",
           "testName": "isolates, reports, lands and discards a thread through the same API a jj repository uses"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-auto-fetch",
+          "file": "plugins/@dshfiles/jj-integration/src/auto-fetch-git.test.ts",
+          "testName": "refreshes origin/main without moving the local branch unless fast-forward is opted in"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-auto-fetch-keeps-local",
+          "file": "plugins/@dshfiles/jj-integration/src/auto-fetch-git.test.ts",
+          "testName": "keeps a local branch with its own commits where it is"
         }
       ],
       "telemetry": [
@@ -258,6 +274,12 @@
           "span": "git <verb>",
           "file": "plugins/@dshfiles/git-cli/src/git.test.ts",
           "testName": "records one git <verb> client span with value-free attributes and the exit code"
+        },
+        {
+          "kind": "custom",
+          "span": "jj-integration auto fetch",
+          "file": "plugins/@dshfiles/jj-integration/src/auto-fetch-git.test.ts",
+          "testName": "reports a failed git fetch with the git command to rerun and an error span"
         }
       ]
     },

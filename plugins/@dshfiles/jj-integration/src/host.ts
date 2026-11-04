@@ -1,4 +1,5 @@
 import type {} from '@deepseek-ai/dsh-subprocess'
+import { Git } from '@dshfiles/git-cli'
 import { Jj, JjViewReads } from '@dshfiles/jj-cli'
 import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
@@ -52,6 +53,8 @@ const JjIntegrationLive = Layer.mergeAll(MaintenanceLive, HostHooksLive, Integra
   Layer.provideMerge(ThreadWorkspaces.layer),
   Layer.provideMerge(JjViewReads.layer),
   Layer.provideMerge(Jj.layerWith({ timeout: JJ_TIMEOUT, maxStdoutBytes: MAX_JJ_STDOUT_BYTES, maxStderrBytes: MAX_JJ_STDERR_BYTES })),
+  // Automatic fetch runs git in a git-only repository; thread workspaces get their own Git through ThreadWorkspaces.layer.
+  Layer.provideMerge(Git.layer),
   Layer.provideMerge(BaseLive),
   Layer.provideMerge(PlatformLive),
 )

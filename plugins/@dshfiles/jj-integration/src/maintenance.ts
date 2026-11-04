@@ -62,8 +62,9 @@ export const MaintenanceLive = Layer.effectDiscard(
     const knownRepositoryRoots = Effect.map(located, entries => [
       ...new Set(entries.map(entry => (Option.isSome(entry.location) ? entry.location.value.repoRoot : entry.workspace.path))),
     ])
-    const jjRepositoryRoots = Effect.map(located, entries => [
-      ...new Set(entries.flatMap(entry => Option.toArray(entry.location).map(location => location.repoRoot))),
+    /** Each repository once, with the VCS that located it (a location built before git support is jj's). */
+    const repositoryRoots = Effect.map(located, entries => [
+      ...new Map(entries.flatMap(entry => Option.toArray(entry.location).map(location => [location.repoRoot, location.vcs ?? 'jj'] as const))).entries(),
     ])
 
     const reportAutoCleanup = (outcome: AutoCleanupOutcome) => {
@@ -108,13 +109,9 @@ export const MaintenanceLive = Layer.effectDiscard(
     const autoFetch = Effect.gen(function* () {
       const current = yield* settings.get
       if (!current.autoFetch.enabled) return
-      for (const repoRoot of yield* jjRepositoryRoots) {
-        const outcome = yield* AutoFetchModel.fetchRepository({
-          repoRoot,
-          remote: current.autoFetch.remote,
-          bookmark: current.bookmark,
-          fastForward: current.autoFetch.fastForwardBookmark,
-        })
+      for (const [repoRoot, vcs] of yield* repositoryRoots) {
+        const input = { repoRoot, remote: current.autoFetch.remote, bookmark: current.bookmark, fastForward: current.autoFetch.fastForwardBookmark }
+        const outcome = yield* vcs === 'git' ? AutoFetchModel.fetchGitRepository(input) : AutoFetchModel.fetchRepository(input)
         yield* reportAutoFetch(outcome)
       }
     })
