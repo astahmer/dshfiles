@@ -44,12 +44,14 @@ const repoPathSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLe
 const repoIdSchema = Schema.String.check(Schema.isUUID())
 const commitIdSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/))
 /**
- * A revision the caller names, as a full commit id, a unique hex prefix or a
- * change id — what `jj log` prints and what a chat reference carries. Read-only
- * tools resolve it against the repository; mutations still take full ids so a
+ * A revision the caller names, as a full commit id, a unique 1–64 hex commit id
+ * prefix or a 1–32 letter change id prefix — what `jj log` prints and what a
+ * chat reference carries. Read-only tools resolve it on the Host and refuse a
+ * prefix that names more than one revision; mutations still take full ids so a
  * typo can never pick the wrong revision to rewrite.
  */
-const revisionRefSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{4,64}|[k-z]{4,32})$/))
+const revisionRefSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{1,64}|[k-z]{1,32})$/))
+const REVISION_REF_HINT = 'Revisions may be a full commit id, a unique commit id prefix or a change id prefix, as jj log prints them.'
 const remoteNameSchema = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/))
 const bookmarkNameSchema = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/))
 export const workspaceNameSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
@@ -325,15 +327,15 @@ export const jujutsuApi = defineApi({
       tool: { name: 'jj_graph_navigation', readOnly: true, render: compactJson },
     }),
     revisionRelationship: method({
-      input: Schema.Struct({ repoId: repoIdSchema, commitId: commitIdSchema, targetCommitId: commitIdSchema }),
+      input: Schema.Struct({ repoId: repoIdSchema, commitId: revisionRefSchema, targetCommitId: revisionRefSchema }),
       output: Schema.Union([revisionRelationshipSchema, readFailureSchema]),
-      description: 'Exact ancestry counts between two revisions and the bounded graph sets around them; the relation is relative to the target. Read-only.',
+      description: `Exact ancestry counts between two revisions and the bounded graph sets around them; the relation is relative to the target. ${REVISION_REF_HINT} Read-only.`,
       tool: { name: 'jj_revision_relationship', readOnly: true, render: compactJson },
     }),
     graphSlice: method({
-      input: Schema.Struct({ repoId: repoIdSchema, commitId: commitIdSchema, mode: Schema.Literals(['history', 'exclusive']) }),
+      input: Schema.Struct({ repoId: repoIdSchema, commitId: revisionRefSchema, mode: Schema.Literals(['history', 'exclusive']) }),
       output: Schema.Union([graphSliceSchema, readFailureSchema]),
-      description: 'One bounded graph slice: one revision history, or the history exclusive of other heads, bookmarks and workspaces. Read-only.',
+      description: `One bounded graph slice: one revision history, or the history exclusive of other heads, bookmarks and workspaces. ${REVISION_REF_HINT} Read-only.`,
       tool: { name: 'jj_graph_slice', readOnly: true, render: compactJson },
     }),
     referenceGraph: method({
@@ -370,7 +372,7 @@ export const jujutsuApi = defineApi({
     details: method({
       input: Schema.Struct({ repoId: repoIdSchema, commitId: revisionRefSchema }),
       output: Schema.Union([detailsSchema, readFailureSchema]),
-      description: 'One revision: its description, files, patch and evolution log. Read-only.',
+      description: `One revision: its description, files, patch and evolution log. ${REVISION_REF_HINT} Read-only.`,
       tool: {
         name: 'jj_details',
         readOnly: true,
@@ -381,7 +383,7 @@ export const jujutsuApi = defineApi({
       },
     }),
     revisionFiles: method({
-      input: Schema.Struct({ repoId: repoIdSchema, commitIds: Schema.Array(commitIdSchema).check(Schema.isMinLength(1), Schema.isMaxLength(40)) }),
+      input: Schema.Struct({ repoId: repoIdSchema, commitIds: Schema.Array(revisionRefSchema).check(Schema.isMinLength(1), Schema.isMaxLength(40)) }),
       output: Schema.Struct({
         revisions: Schema.Array(
           Schema.Struct({
@@ -391,7 +393,7 @@ export const jujutsuApi = defineApi({
         ).check(Schema.isMaxLength(40)),
         truncated: Schema.Boolean,
       }),
-      description: 'Changed files and per-file stats for up to 40 revisions at once, the way the graph file list shows them. Read-only.',
+      description: `Changed files and per-file stats for up to 40 revisions at once, the way the graph file list shows them; each row carries the full commit id. ${REVISION_REF_HINT} Read-only.`,
       tool: {
         name: 'jj_revision_files',
         readOnly: true,
@@ -408,14 +410,14 @@ export const jujutsuApi = defineApi({
       },
     }),
     editTimes: method({
-      input: Schema.Struct({ repoId: repoIdSchema, commitIds: Schema.Array(commitIdSchema).check(Schema.isMinLength(1), Schema.isMaxLength(100)) }),
+      input: Schema.Struct({ repoId: repoIdSchema, commitIds: Schema.Array(revisionRefSchema).check(Schema.isMinLength(1), Schema.isMaxLength(100)) }),
       output: Schema.Struct({
         revisions: Schema.Array(Schema.Struct({ commitId: commitIdSchema, editedAt: Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))) })).check(
           Schema.isMaxLength(100),
         ),
       }),
       description:
-        "When each revision's own content last changed, from its evolution log: rebases and description edits do not count. editedAt is null when the content never changed after the revision was created. Read-only.",
+        "When each revision's own content last changed, from its evolution log: rebases and description edits do not count. editedAt is null when the content never changed after the revision was created. Revisions may be a full commit id, a unique commit id prefix or a change id prefix, as jj log prints them. Read-only.",
       tool: {
         name: 'jj_edit_times',
         readOnly: true,

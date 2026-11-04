@@ -292,7 +292,12 @@ const make = Effect.gen(function* () {
     readonly targetCommitId: string
   }) {
     const repo = yield* repositories.resolve(input.repoId)
-    return yield* GraphNavigationReads.readRevisionRelationship({ run: repositories.run(repo), commitId: input.commitId, targetCommitId: input.targetCommitId })
+    const run = repositories.run(repo)
+    const [commitId = input.commitId, targetCommitId = input.targetCommitId] = yield* RevisionReads.resolveCommitIds(run, [
+      input.commitId,
+      input.targetCommitId,
+    ])
+    return yield* GraphNavigationReads.readRevisionRelationship({ run, commitId, targetCommitId })
   })
 
   const slice = Effect.fn('jujutsu graph slice')(function* (input: {
@@ -301,7 +306,8 @@ const make = Effect.gen(function* () {
     readonly mode: 'history' | 'exclusive'
   }) {
     const repo = yield* repositories.resolve(input.repoId)
-    return yield* GraphNavigationReads.readGraphSlice({ run: repositories.run(repo), commitId: input.commitId, mode: input.mode })
+    const run = repositories.run(repo)
+    return yield* GraphNavigationReads.readGraphSlice({ run, commitId: yield* RevisionReads.resolveCommitId(run, input.commitId), mode: input.mode })
   })
 
   const referenceGraph = Effect.fn('jujutsu reference graph')(function* (input: { readonly repoId: string; readonly reference: string }) {
@@ -351,12 +357,18 @@ const make = Effect.gen(function* () {
   })
 
   const fileStats = Effect.fn('jujutsu revision files')(function* (input: { readonly repoId: string; readonly commitIds: readonly string[] }) {
-    return yield* RevisionReads.fileStats(repositories.run(yield* repositories.resolve(input.repoId)), [...new Set(input.commitIds)])
+    const run = repositories.run(yield* repositories.resolve(input.repoId))
+    return yield* RevisionReads.fileStats(run, [...new Set(yield* RevisionReads.resolveCommitIds(run, input.commitIds))])
   })
 
   const editTimes = Effect.fn('jujutsu edit times')(function* (input: { readonly repoId: string; readonly commitIds: readonly string[] }) {
     const repo = yield* repositories.resolve(input.repoId)
-    return yield* RevisionReads.editTimes(repositories.run(repo), { repositoryRoot: repo.root, commitIds: input.commitIds, cache: editTimeCache })
+    const run = repositories.run(repo)
+    return yield* RevisionReads.editTimes(run, {
+      repositoryRoot: repo.root,
+      commitIds: yield* RevisionReads.resolveCommitIds(run, input.commitIds),
+      cache: editTimeCache,
+    })
   })
 
   const workingDiff = Effect.fn('jujutsu working diff')(function* (repoId: string) {

@@ -220,12 +220,13 @@ export class RevisionNotFound extends Schema.TaggedError<RevisionNotFound>()(
   { dshxWireCode: 'revision-not-found' },
 ) {
   override get message(): string {
-    if (this.reason === 'ambiguous') return `"${this.reference}" does not name exactly one revision. Use a longer commit id prefix, or the full id from jj log.`
+    if (this.reason === 'ambiguous') return `"${this.reference}" is a prefix of more than one revision. Use a longer prefix, or the full commit id from jj log.`
     if (this.reason === 'no-match') return `No revision matches "${this.reference}". Check the id against jj log and try again.`
-    if (this.reason === 'multiple') return `"${this.reference}" matches more than one revision (${this.candidates.join(', ')}). Use a longer prefix.`
+    if (this.reason === 'multiple')
+      return `"${this.reference}" names ${String(this.candidates.length)} divergent revisions (${this.candidates.join(', ')}). Pass the full commit id of the one you mean, from jj log.`
     if (this.reason === 'unavailable') return 'Revision ' + this.reference.slice(0, 12) + ' is no longer available. Refresh and try again.'
     if (this.reason === 'not-at-operation') return 'Revision is unavailable at this operation.'
-    return 'That reference does not name one revision in this repository.'
+    return 'That reference does not name one revision in this repository. Use a commit id or change id prefix, or a bookmark, from jj log.'
   }
 }
 

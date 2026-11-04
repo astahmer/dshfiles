@@ -83,17 +83,33 @@ const fileStats = Effect.fnUntraced(function* (run: JjRun, commitIds: readonly s
   return { revisions, truncated: result.truncated || rows.some(row => row.files.length > 2000) }
 })
 
+/** What a caller may name a revision by: a 1–64 hex commit id prefix or a 1–32 letter (k–z) change id prefix. */
+const REVISION_REFERENCE = /^(?:[a-f0-9]{1,64}|[k-z]{1,32})$/u
+const MULTIPLE_CANDIDATES = 5
+
+/** jj's own words for a prefix that matches several ids; any other non-zero exit is "no such revision". */
+const isAmbiguousPrefix = (cause: unknown): boolean => {
+  const stderr = typeof cause === 'object' && cause !== null && 'stderr' in cause && typeof cause.stderr === 'string' ? cause.stderr : ''
+  return /prefix .* is ambiguous/iu.test(stderr)
+}
+
 /**
- * A full commit id, a unique hex prefix or a change id → the full commit id. `jj log` resolves prefixes and change
- * ids; a prefix matching two revisions errors rather than guessing, which is the same rule the CLI applies.
+ * A full commit id, a unique hex prefix or a change id prefix → the full commit id. The reference is read through
+ * `commit_id()` or `change_id()` (the alphabets do not overlap), so a bookmark or tag that happens to look like a
+ * prefix never shadows it. A prefix of several commits is refused as ambiguous, a change with divergent copies lists
+ * them, and an unknown one says so: none of them guesses.
  */
 const resolveCommitId = Effect.fnUntraced(function* (run: JjRun, reference: string) {
   if (JujutsuMutationModel.isCommitId(reference)) return reference
-  const resolved = yield* run([ignoreWorkingCopy, 'log', '--no-graph', '--revisions', reference, '--limit', '2', '--template', 'commit_id'], {
-    outputLimit: 1_000,
-  }).pipe(
-    // jj exits non-zero for both "no such revision" and an ambiguous prefix; neither is a repository failure.
-    Effect.catchTag('JujutsuCommandFailed', cause => Effect.fail(new RevisionNotFound({ reason: 'ambiguous', reference, candidates: [], cause }))),
+  if (!REVISION_REFERENCE.test(reference)) return yield* new RevisionNotFound({ reason: 'reference', reference, candidates: [] })
+  const revset = /^[a-f0-9]+$/u.test(reference) ? `commit_id(${reference})` : `change_id(${reference})`
+  const resolved = yield* run(
+    [ignoreWorkingCopy, 'log', '--no-graph', '--revisions', revset, '--limit', String(MULTIPLE_CANDIDATES + 1), '--template', 'commit_id ++ "\\n"'],
+    { outputLimit: 8_000 },
+  ).pipe(
+    Effect.catchTag('JujutsuCommandFailed', failed =>
+      Effect.fail(new RevisionNotFound({ reason: isAmbiguousPrefix(failed.cause) ? 'ambiguous' : 'no-match', reference, candidates: [], cause: failed })),
+    ),
   )
   const ids = [
     ...new Set(
@@ -106,7 +122,15 @@ const resolveCommitId = Effect.fnUntraced(function* (run: JjRun, reference: stri
   const [only] = ids
   if (ids.length === 1 && only !== undefined) return only
   if (ids.length === 0) return yield* new RevisionNotFound({ reason: 'no-match', reference, candidates: [] })
-  return yield* new RevisionNotFound({ reason: 'multiple', reference, candidates: ids.map(id => id.slice(0, 12)) })
+  return yield* new RevisionNotFound({ reason: 'multiple', reference, candidates: ids.slice(0, MULTIPLE_CANDIDATES).map(id => id.slice(0, 12)) })
+})
+
+/** Resolve several references at once, each at most once; full ids cost no jj process. */
+const resolveCommitIds = Effect.fnUntraced(function* (run: JjRun, references: readonly string[]) {
+  const unique = [...new Set(references)]
+  const resolved = yield* Effect.forEach(unique, reference => resolveCommitId(run, reference), { concurrency: 4 })
+  const byReference = new Map(unique.map((reference, index) => [reference, resolved[index] ?? reference]))
+  return references.map(reference => byReference.get(reference) ?? reference)
 })
 
 /** The part of a revision's details that a commit id fixes for good: its files, stats and patch against its parents. */
@@ -349,6 +373,7 @@ export class RevisionReads {
   static readonly paths = paths
   static readonly fileStats = fileStats
   static readonly resolveCommitId = resolveCommitId
+  static readonly resolveCommitIds = resolveCommitIds
   static readonly details = details
   static readonly editTimes = editTimes
 }

@@ -1082,7 +1082,7 @@
       },
       {
         "name": "revisionRelationship",
-        "description": "Exact ancestry counts between two revisions and the bounded graph sets around them; the relation is relative to the target. Read-only.",
+        "description": "Exact ancestry counts between two revisions and the bounded graph sets around them; the relation is relative to the target. Revisions may be a full commit id, a unique commit id prefix or a change id prefix, as jj log prints them. Read-only.",
         "tool": {
           "name": "jj_revision_relationship",
           "readOnly": true
@@ -1365,7 +1365,7 @@
       },
       {
         "name": "graphSlice",
-        "description": "One bounded graph slice: one revision history, or the history exclusive of other heads, bookmarks and workspaces. Read-only.",
+        "description": "One bounded graph slice: one revision history, or the history exclusive of other heads, bookmarks and workspaces. Revisions may be a full commit id, a unique commit id prefix or a change id prefix, as jj log prints them. Read-only.",
         "tool": {
           "name": "jj_graph_slice",
           "readOnly": true
@@ -2057,7 +2057,7 @@
       },
       {
         "name": "details",
-        "description": "One revision: its description, files, patch and evolution log. Read-only.",
+        "description": "One revision: its description, files, patch and evolution log. Revisions may be a full commit id, a unique commit id prefix or a change id prefix, as jj log prints them. Read-only.",
         "tool": {
           "name": "jj_details",
           "readOnly": true
@@ -2217,7 +2217,7 @@
       },
       {
         "name": "revisionFiles",
-        "description": "Changed files and per-file stats for up to 40 revisions at once, the way the graph file list shows them. Read-only.",
+        "description": "Changed files and per-file stats for up to 40 revisions at once, the way the graph file list shows them; each row carries the full commit id. Revisions may be a full commit id, a unique commit id prefix or a change id prefix, as jj log prints them. Read-only.",
         "tool": {
           "name": "jj_revision_files",
           "readOnly": true
@@ -2408,7 +2408,7 @@
       },
       {
         "name": "editTimes",
-        "description": "When each revision's own content last changed, from its evolution log: rebases and description edits do not count. editedAt is null when the content never changed after the revision was created. Read-only.",
+        "description": "When each revision's own content last changed, from its evolution log: rebases and description edits do not count. editedAt is null when the content never changed after the revision was created. Revisions may be a full commit id, a unique commit id prefix or a change id prefix, as jj log prints them. Read-only.",
         "tool": {
           "name": "jj_edit_times",
           "readOnly": true

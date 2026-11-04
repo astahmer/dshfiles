@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Clock, Effect } from 'effect'
 import { onTestFinished, test } from 'vitest'
-import { JujutsuCommandFailed } from './errors.ts'
+import { JujutsuCommandFailed, RevisionNotFound } from './errors.ts'
 import type { JjRun } from './jujutsu-commands.ts'
 import { makeEditTimeCache, makeRevisionDetailCache, RevisionReads } from './revision-reads.ts'
 
@@ -21,7 +21,7 @@ const jjAt =
       timeout: 20_000,
     })
     if (result.error !== undefined) throw result.error
-    if (result.status !== 0) throw new Error('Jujutsu command failed with exit code ' + String(result.status) + '.')
+    if (result.status !== 0) throw Object.assign(new Error('Jujutsu command failed with exit code ' + String(result.status) + '.'), { stderr: result.stderr })
     return result.stdout
   }
 
@@ -48,6 +48,11 @@ const clockAt = (millis: number): Clock.Clock => ({
   monotonicTimeNanos: Effect.succeed(BigInt(millis) * 1_000_000n),
   sleep: () => Effect.void,
 })
+
+const notFound = (error: { readonly _tag: string }): RevisionNotFound => {
+  assert.ok(error instanceof RevisionNotFound, `expected RevisionNotFound, got ${error._tag}`)
+  return error
+}
 
 const workingCopyCommitId = (jj: (argv: readonly string[]) => string): string =>
   jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@', '--template', 'commit_id']).trim()
@@ -93,7 +98,55 @@ test('an unknown prefix reports that no revision matches instead of a stale-revi
   const { run } = await scratchRepo()
 
   const error = await Effect.runPromise(Effect.flip(RevisionReads.details(run, 'deadbeef1234')))
-  assert.match(error.message, /does not name exactly one revision/u)
+  assert.equal(error.message, 'No revision matches "deadbeef1234". Check the id against jj log and try again.')
+})
+
+test('a short prefix of several commits is refused as ambiguous, and one of divergent copies lists them', async () => {
+  const { repo, jj, run } = await scratchRepo()
+  const commitIds: string[] = []
+  for (let index = 0; index < 20; index++) {
+    await writeFile(join(repo, `file-${String(index)}.txt`), `${String(index)}\n`)
+    jj(['commit', '--message', `commit ${String(index)}`])
+    commitIds.push(jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@-', '--template', 'commit_id']).trim())
+  }
+  const byFirst = new Map<string, string[]>()
+  for (const id of commitIds) byFirst.set(id.slice(0, 1), [...(byFirst.get(id.slice(0, 1)) ?? []), id])
+  const shared = [...byFirst.entries()].find(([, ids]) => ids.length > 1)?.[0]
+  assert.ok(shared !== undefined, 'twenty commits share a first hex digit')
+  const ambiguous = notFound(await Effect.runPromise(Effect.flip(RevisionReads.resolveCommitId(run, shared))))
+  assert.deepEqual(
+    [ambiguous.reason, ambiguous.message],
+    ['ambiguous', `"${shared}" is a prefix of more than one revision. Use a longer prefix, or the full commit id from jj log.`],
+  )
+  const only = [...byFirst.entries()].find(([, ids]) => ids.length === 1)
+  if (only !== undefined) assert.equal(await Effect.runPromise(RevisionReads.resolveCommitId(run, only[0])), only[1][0])
+
+  const change = jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@-', '--template', 'change_id']).trim()
+  const before = jj(['op', 'log', '--no-graph', '--limit', '1', '--template', 'self.id()']).trim()
+  jj(['describe', change, '--message', 'one copy'])
+  jj(['--at-op', before, 'describe', change, '--message', 'another copy'])
+  const divergent = notFound(await Effect.runPromise(Effect.flip(RevisionReads.resolveCommitId(run, change.slice(0, 8)))))
+  assert.equal(divergent.reason, 'multiple')
+  assert.equal(divergent.candidates.length, 2)
+  assert.match(divergent.message, /names 2 divergent revisions .* Pass the full commit id/u)
+})
+
+test('several references resolve once each and a full id costs no jj process', async () => {
+  const { repo, jj, run } = await scratchRepo()
+  await writeFile(join(repo, 'one.txt'), 'one\n')
+  jj(['status'])
+  const commitId = workingCopyCommitId(jj)
+  const changeId = jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@', '--template', 'change_id.shortest(1)']).trim()
+  let reads = 0
+  const counted: JjRun = (args, options) => {
+    reads += 1
+    return run(args, options)
+  }
+  const resolved = await Effect.runPromise(RevisionReads.resolveCommitIds(counted, [commitId, changeId, commitId.slice(0, 7), changeId]))
+  assert.deepEqual(resolved, [commitId, commitId, commitId, commitId])
+  assert.equal(reads, 2)
+  const malformed = notFound(await Effect.runPromise(Effect.flip(RevisionReads.resolveCommitId(run, 'main'))))
+  assert.equal(malformed.reason, 'reference')
 })
 
 test('details never snapshot the working copy, so a read cannot rewrite @ under other agents', async () => {
