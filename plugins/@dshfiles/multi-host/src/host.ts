@@ -1140,7 +1140,9 @@ const handlers = Api.handlers(multiHostApi, {
   runtimeCall: Effect.fn('multi-host runtime call')(function* (input) {
     const mutation = NativeRpc.isMutation(input.request)
     return yield* withRuntime(input.runtimeId, gateway => NativeRpc.call(gateway, input.request), { mutation, broken: brokenRpc }).pipe(
-      Effect.catch(error => Effect.succeed(isTaggedFailure(error) ? { ok: false as const, ...failed(error) } : unavailable())),
+      // A transport failure after a mutation was sent may hide an applied change: report it as an unknown outcome, never as
+      // 'unreachable', which reads as safe to retry and would replay the mutation.
+      Effect.catch(error => Effect.succeed(isTaggedFailure(error) ? NativeRpc.failureResult({ request: input.request, error }) : unavailable())),
     )
   }),
   sessionCursor: Effect.fn('multi-host session cursor')(function* (input) {
