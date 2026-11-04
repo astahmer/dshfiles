@@ -1,11 +1,15 @@
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Api, DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
+import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { Clock, Effect, Layer, Option, Schema } from 'effect'
 import { sessionActivity } from './adapters.js'
 import { activityEventPayloadSchema, ingestOfPayload } from './activity-event-payload.js'
 import { ActivityStore } from './activity-store.js'
 import { ActivityTimeline } from './activity-timeline.js'
 import { activityTimelineApi } from './api.js'
+import { attentionApi } from './attention-api.js'
+import { AttentionHost, attentionHandlers } from './attention-host.js'
+import { AttentionInbox } from './attention-store.js'
 import type { ActivityIngest } from './types.js'
 
 declare module '@deepseek-ai/cordis' {
@@ -58,17 +62,18 @@ const ActivityHostEvents = Layer.effectDiscard(
   }),
 )
 
-const ActivityTimelineLive = ActivityHostEvents.pipe(
-  Layer.provideMerge(ActivityTimeline.layer),
+const ActivityTimelineLive = Layer.mergeAll(ActivityHostEvents, AttentionHost.layer).pipe(
+  Layer.provideMerge(Layer.mergeAll(ActivityTimeline.layer, AttentionInbox.layer.pipe(Layer.provide(StorageDomain.layer)))),
   Layer.provide(ActivityStore.layer),
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
 )
 
 export default DshxPlugin.make({
   name: 'activity-timeline',
-  inject: ['agents'],
+  inject: ['agents', 'storageDomain'],
   layer: ActivityTimelineLive,
   apis: [
+    Api.bind(attentionApi, attentionHandlers),
     Api.bind(activityTimelineApi, {
       page: input => ActivityTimeline.use(timeline => timeline.page(input)),
       attention: input => ActivityTimeline.use(timeline => timeline.attention(input.limit ?? 20)).pipe(Effect.map(events => ({ events: [...events] }))),

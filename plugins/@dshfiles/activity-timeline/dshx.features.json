@@ -6,13 +6,30 @@
       "id": "activity-feed",
       "title": "Unified agent activity feed",
       "summary": "Normalizes session, communication, and jj integration events into one durable chronological feed with deduplication, bounded retention, cursor pagination, filtering, search, and provenance.",
-      "reach": ["click button \"Activity Timeline: Activity\"", "expect textbox \"Search activity\""],
-      "surfaces": ["host", "tool", "storage", "client", "integration"],
+      "reach": [
+        "click button \"Activity Timeline: Activity\"",
+        "expect textbox \"Search activity\""
+      ],
+      "surfaces": [
+        "host",
+        "tool",
+        "storage",
+        "client",
+        "integration"
+      ],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: Activity Timeline: Activity",
       "configuration": [],
-      "states": ["empty", "live", "paged", "filtered", "searched", "reconnected", "attention"],
+      "states": [
+        "empty",
+        "live",
+        "paged",
+        "filtered",
+        "searched",
+        "reconnected",
+        "attention"
+      ],
       "failureModes": [
         "A duplicate delivery is deduplicated by event id instead of appended twice.",
         "Out-of-order timestamps are re-sorted on ingest.",
@@ -108,12 +125,22 @@
       "id": "activity-condensation",
       "title": "Deterministic condensation and attention visibility",
       "summary": "Collapses routine runs and correlated events into traceable groups while keeping errors, blocked integrations, and attention-required events individually visible; a detailed mode expands every retained event.",
-      "surfaces": ["host", "tool", "client"],
+      "surfaces": [
+        "host",
+        "tool",
+        "client"
+      ],
       "surface": "attentionProvider",
       "destination": "inbox",
       "currentSurface": "left-nav: Activity Timeline: Activity › attention filter",
       "configuration": [],
-      "states": ["condensed", "detailed", "grouped", "attention-visible", "correlation-grouped"],
+      "states": [
+        "condensed",
+        "detailed",
+        "grouped",
+        "attention-visible",
+        "correlation-grouped"
+      ],
       "failureModes": [
         "A summary always carries the ids of its underlying events so it stays traceable.",
         "Attention events are never folded into a routine group.",
@@ -185,12 +212,25 @@
         "click button \"Agent started work*\"",
         "expect button \"Open Session\""
       ],
-      "surfaces": ["client", "host", "integration", "storage"],
+      "surfaces": [
+        "client",
+        "host",
+        "integration",
+        "storage"
+      ],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: Activity Timeline: Activity › receipt detail",
       "configuration": [],
-      "states": ["passed", "failed", "timed-out", "cancelled", "backfilled", "deduplicated", "session-opened"],
+      "states": [
+        "passed",
+        "failed",
+        "timed-out",
+        "cancelled",
+        "backfilled",
+        "deduplicated",
+        "session-opened"
+      ],
       "failureModes": [
         "Unknown schema versions and extra payload fields are rejected before the timeline stores an event.",
         "An archived or missing Session is reported unavailable without being revived or mutated.",
@@ -237,6 +277,118 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "attention-inbox",
+      "title": "One attention inbox for everything that needs you",
+      "summary": "Host-owned inbox items (reason, source, subject, severity, verbs, dedupe key) in the dshfiles_attention storage domain. Providers publish, resolve or reconcile through the attention-api module; the user and the Agent list, mark done, snooze (until a time or until it changes), reopen and mute a source; provider verbs such as Answer are handed to the owning plugin. Browsers follow a live changed event carrying the Needs you count.",
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "Host contract: attention-api module and attention_* agent tools",
+      "surfaces": [
+        "host",
+        "tool",
+        "storage",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "needs-you",
+        "other",
+        "snoozed",
+        "closed",
+        "muted",
+        "resolved",
+        "reopened",
+        "deduplicated",
+        "info-to-activity-log"
+      ],
+      "failureModes": [
+        "A repeat with the same source and dedupe key merges into one item instead of stacking; an unchanged repeat writes nothing.",
+        "A changed repeat lifts a snooze-until-change and a Done; a timed snooze holds until its time.",
+        "A resolved item reopens only when its source publishes it again; Reopen on a resolved item is refused with the reason.",
+        "Browsers and agents cannot publish, resolve or reconcile; those calls are refused as provider-only.",
+        "A provider verb with no loaded owner returns an outcome telling the user to open the thread instead of failing silently.",
+        "Info items never reach the inbox; they become one Activity log entry.",
+        "Closed items are pruned after seven days and the store is bounded at 2000 items."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/agent-questions",
+          "boundary": "Provider through the attention-api module (publish/resolve/reconcile, dshfiles/attention/act); the inbox never reads its storage.",
+          "deterministicFake": "Handlers are exercised with a Cordis act listener in src/attention-host.test.ts."
+        },
+        {
+          "id": "@dshfiles/thread-sidebar",
+          "boundary": "Provider of finished-turn items through the attention-api module.",
+          "deterministicFake": "Store semantics are pinned with fixed drafts in src/attention-store.test.ts."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.attention-dedupe",
+          "file": "plugins/@dshfiles/activity-timeline/src/attention-model.test.ts",
+          "testName": "dedupes a repeat with the same key and state into one unchanged item"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.attention-resolve-reopen",
+          "file": "plugins/@dshfiles/activity-timeline/src/attention-model.test.ts",
+          "testName": "resolves once and reopens as a new occurrence when the source publishes again"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.attention-snooze-until-change",
+          "file": "plugins/@dshfiles/activity-timeline/src/attention-model.test.ts",
+          "testName": "keeps a snooze-until-change through unchanged repeats and lifts it on a change"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.attention-reopen",
+          "file": "plugins/@dshfiles/activity-timeline/src/attention-model.test.ts",
+          "testName": "reopens a done item and a snoozed item, and refuses to reopen a resolved one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.attention-durable",
+          "file": "plugins/@dshfiles/activity-timeline/src/attention-store.test.ts",
+          "testName": "dedupes, resolves and keeps items across a restart"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.attention-reconcile",
+          "file": "plugins/@dshfiles/activity-timeline/src/attention-store.test.ts",
+          "testName": "reconcile publishes the listed items and resolves every other open item of the source"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.attention-provider-only",
+          "file": "plugins/@dshfiles/activity-timeline/src/attention-host.test.ts",
+          "testName": "accepts publish, resolve and reconcile only from a Host plugin"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.attention-act",
+          "file": "plugins/@dshfiles/activity-timeline/src/attention-host.test.ts",
+          "testName": "hands a provider verb to the owning plugin and explains when none answers"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "activity-timeline.attention-inbox-host-contract",
+          "reason": "Host contract and store with no UI of its own; the inbox-panel feature walks it in the browser."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     }

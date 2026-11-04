@@ -1,3 +1,6 @@
+import Storage from '@deepseek-ai/dsh-storage'
+import * as StorageDomainPlugin from '@deepseek-ai/dsh-storage-domain'
+import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import { isApiError } from '@dshfiles/dshx/api'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
@@ -6,6 +9,7 @@ import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { Effect, Schedule } from 'effect'
 import { activityTimelineApi } from './api.js'
+import { attentionApi } from './attention-api.js'
 import plugin from './host.js'
 import { temporaryStatePath } from './test-support.js'
 
@@ -29,8 +33,19 @@ const mountedTimeline = Effect.gen(function* () {
   // SAFETY: the timeline only injects `agents` to order its activation after it; it never calls the service.
   const releaseAgents = host.ctx.provide('agents', {} as never)
   yield* Effect.addFinalizer(() => Effect.sync(releaseAgents))
+  // The attention inbox stores its items in a real JSON storage domain under the same temporary home.
+  yield* Effect.promise(async () => {
+    await host.ctx.plugin(Storage)
+    await host.ctx.plugin(StorageJson, { root: join(dirname(statePath), 'storage') })
+    await host.ctx.plugin(StorageDomainPlugin, { backend: 'json' })
+  })
   yield* Effect.promise(() => host.mount(plugin, { packageId: '@dshfiles/activity-timeline' }))
-  return { host, home: dirname(statePath), client: createHostApiClient(host.ctx, activityTimelineApi, '@test/caller') }
+  return {
+    host,
+    home: dirname(statePath),
+    client: createHostApiClient(host.ctx, activityTimelineApi, '@test/caller'),
+    attention: createHostApiClient(host.ctx, attentionApi, '@test/provider'),
+  }
 })
 
 describe('activity-timeline Host', () => {
@@ -47,6 +62,29 @@ describe('activity-timeline Host', () => {
       )
       expect(page.items.map(item => item.id)).toEqual(['communication:message:message-1'])
       expect(existsSync(join(home, 'runtime', 'dshfiles', 'activity-timeline', 'state.json'))).toBe(true)
+    }),
+  )
+
+  it.live('serves the attention inbox to a provider plugin and refuses a stale reopen with its wire code', () =>
+    Effect.gen(function* () {
+      const { attention } = yield* mountedTimeline
+      const published = yield* Effect.promise(() =>
+        attention.publish({
+          source: 'test.provider',
+          dedupeKey: 'q1',
+          subject: { kind: 'session', id: 'session-a' },
+          reason: 'A question waits',
+          severity: 'blocking',
+          verbs: ['Open', 'Done'],
+        }),
+      )
+      const id = published.item?.id ?? ''
+      expect((yield* Effect.promise(() => attention.list({}))).counts.needsYou).toBe(1)
+      yield* Effect.promise(() => attention.resolve({ source: 'test.provider', dedupeKey: 'q1' }))
+      const failure = yield* Effect.flip(
+        Effect.tryPromise({ try: () => attention.reopen({ id }), catch: error => (isApiError(error) ? error : new Error('not an ApiError')) }),
+      )
+      expect(failure).toMatchObject({ remoteCode: 'attention-transition-refused' })
     }),
   )
 
