@@ -14,7 +14,11 @@
   "exports": {
     ".": "./dist/index.js",
     "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./api": {
+      "types": "./src/api.ts",
+      "default": "./dist/api.js"
+    }
   },
   "scripts": {
     "build": "node ../../../tooling/dshx/packages/dshx/dist/cli/bin.js build",

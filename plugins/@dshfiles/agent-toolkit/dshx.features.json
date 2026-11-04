@@ -153,6 +153,69 @@
           "reason": "Client-only: Open the agent toolkit from the command palette renders browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "thread-context-facet",
+      "title": "See what a thread loads into its context",
+      "summary": "The thread panel Context tab lists what is loaded for the thread on the stage, each with an estimated token cost at four characters per token: the AGENTS.md-compatible instruction files DSH's own loader finds for its folder, the agent that started it, the memory start block, the skill catalog lines, enabled MCP servers costed by their tools, and attached references. Read-only; a source whose plugin is not loaded is left out.",
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"context check\"",
+        "press Enter",
+        "expect text \"context check\"",
+        "click button \"Open right sidebar\"",
+        "click text \"Context\"",
+        "expect text \"loaded before your message\""
+      ],
+      "surfaces": ["client", "host"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "thread panel: Context tab",
+      "configuration": [],
+      "states": ["no-thread", "loading", "sources-listed", "source-missing", "source-failed", "size-unknown"],
+      "failureModes": [
+        "The instruction list uses the loader's default discovery settings; a profile row that renames candidate files is not read.",
+        "Estimates exclude tool schemas and DSH's own system prompt; billed tokens live in the Cost tab and Usage.",
+        "A source whose owner plugin is absent is hidden; any other failure names the source and says to reopen the tab."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.context-estimate",
+          "file": "plugins/@dshfiles/agent-toolkit/src/context-model.test.ts",
+          "testName": "estimates four characters per token and never rounds a non-empty source to zero"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.context-instructions",
+          "file": "plugins/@dshfiles/agent-toolkit/src/context-model.test.ts",
+          "testName": "lists instruction files by size and counts an unreadable one as unknown"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.context-skills-mcp",
+          "file": "plugins/@dshfiles/agent-toolkit/src/context-model.test.ts",
+          "testName": "costs a skill by its catalog line and an MCP server by its tool descriptions"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.context-total",
+          "file": "plugins/@dshfiles/agent-toolkit/src/context-model.test.ts",
+          "testName": "totals known estimates and formats them compactly"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agent-toolkit.context-facet",
+          "featureFile": "tooling/dshx/e2e/features/agent-toolkit.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     }
   ]
 }

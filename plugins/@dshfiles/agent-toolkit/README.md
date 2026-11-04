@@ -41,3 +41,21 @@ pnpm --dir plugins/@dshfiles/agent-toolkit test
 dshx dev up --name agent-toolkit --plugin @dshfiles/agent-toolkit --plugin @dshfiles/memory --plugin @dshfiles/mcp-servers --plugin @dshfiles/command-palette --plugin @dshfiles/thread-sidebar
 dshx dev open agent-toolkit/agent-toolkit-page --name agent-toolkit
 ```
+
+## Context facet
+
+![The thread panel Context tab: instructions, memory, skills and their estimated tokens](docs/screenshots/thread-context-facet.png)
+
+The thread panel's **Context** tab (plan `ade-ux` §4.4) lists what is loaded for the thread on the stage, each with an
+estimated token cost (four characters per token; tool schemas and DSH's own prompt are not counted):
+
+- **Instructions:** the AGENTS.md-compatible files DSH's own loader (`@deepseek-ai/dsh-agent-instructions`) finds for
+  the thread folder with its default discovery settings, sized on the Host (`instructionFiles`, agent tool
+  `context_instruction_files`).
+- **Agent:** instructions and routine of the agent that started the thread (`agents` `threadAgent`).
+- **Memory:** the start block (`memory` `startBlock`).
+- **Skills** and **MCP servers:** skill catalog lines and enabled servers' tool descriptions from the dshx registry.
+- **References:** attached references (`@dshfiles/references/api`).
+
+It is read-only; an owner that is not loaded leaves its section out. It registers like pulls-review's Changes facet: a
+`sidebarRightTabs` type plus its `sidebar.right.pane.tab` slot, following the thread the right pane shows.

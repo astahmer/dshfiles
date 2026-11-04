@@ -61,11 +61,13 @@ When('the Agent toolkit shows only {string} matching {string}', async ({ page }:
   await toolkit(page).getByRole('searchbox', { name: 'Search the agent toolkit', exact: true }).fill(query)
 })
 
-Then('only the agent toolkit plugin, its API and no tool remain', async ({ page }: { page: Page }) => {
+Then('only the agent toolkit plugin, its API and its own tool remain', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'agent-toolkit-filters-by-source-and-text', async () => {
-    await expect(section(page, /^Tools \(0\)$/)).toBeVisible()
+    // agent-toolkit's one agent tool is the Context facet's read of instruction files.
+    await expect(section(page, /^Tools \(1\)$/)).toContainText('context_instruction_files')
     await expect(section(page, /^Plugins \(1\)$/)).toContainText('@dshfiles/agent-toolkit')
-    await expect(section(page, /^Plugin API methods \(1\)$/)).toContainText('agent-toolkit.versions')
+    await expect(section(page, /^Plugin API methods \(2\)$/)).toContainText('agent-toolkit.versions')
+    await expect(section(page, /^Plugin API methods \(2\)$/)).toContainText('agent-toolkit.instructionFiles')
     await expect(section(page, /^MCP servers/)).toHaveCount(0)
     await expect(section(page, /^Skills/)).toHaveCount(0)
   })
@@ -88,6 +90,30 @@ Then('the Agent toolkit is about the thread {string}', async ({ page }: { page: 
   await recordAssertion(page, 'agent-toolkit-opens-about-the-thread', async () => {
     await expect(toolkit(page).getByRole('heading', { name: 'Agent toolkit', exact: true })).toBeVisible()
     await expect(toolkit(page).getByRole('combobox', { name: 'Thread', exact: true })).toContainText(title)
+  })
+  await finishJourneyAssertions(page)
+})
+
+const contextFacet = (page: Page) => page.locator('[data-context-facet]')
+
+When('the Context tab is opened in the thread panel', async ({ page }: { page: Page }) => {
+  const open = page.getByRole('button', { name: 'Open right sidebar', exact: true })
+  if (await open.isVisible()) await open.click()
+  await page.locator('[data-sidebar-right-guide-entry]').filter({ hasText: 'Context' }).first().click()
+  await expect(contextFacet(page)).toBeVisible()
+})
+
+Then('the Context tab lists the skill and the memory start block with token estimates', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'agent-toolkit-context-facet-sources', async () => {
+    await expect(contextFacet(page)).toContainText('loaded before your message')
+    await expect(contextFacet(page).locator('[data-context-section="skills"]')).toContainText('e2e-skill-mentions')
+    // A scratch project has no notes, so the start block is empty; the section still says so.
+    await expect(contextFacet(page).locator('[data-context-section="memory"]')).toBeVisible()
+    await expect(contextFacet(page).locator('[data-context-section="instructions"]')).toBeVisible()
+    await expect(contextFacet(page).locator('[data-context-section="references"]')).toContainText('No reference is attached to this thread.')
+  })
+  await recordAssertion(page, 'agent-toolkit-context-facet-estimates', async () => {
+    await expect(contextFacet(page).locator('[data-context-section="skills"]')).toContainText(/≈ \d+ tokens/u)
   })
   await finishJourneyAssertions(page)
 })

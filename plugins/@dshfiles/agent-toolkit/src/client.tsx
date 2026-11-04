@@ -3,13 +3,15 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type { UseSidebarRightTabInfo } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-host-plugin-inventory/remote'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { defineClient } from '@dshfiles/dshx/client'
-import { WrenchIcon } from '@dshfiles/plugin-ui/icons'
+import { LayersIcon, WrenchIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useSyncExternalStore } from 'react'
+import { ContextFacet } from './context-facet.js'
 import { AGENT_TOOLKIT_LOCALE_NAMESPACE, agentToolkitLocale, type AgentToolkitKey } from './locales.js'
 import { AgentToolkitPanel, type ToolkitThread } from './toolkit-panel.js'
 
@@ -17,13 +19,24 @@ const PANEL_ID = 'dshfiles-agent-toolkit'
 const MEMORY_PANEL_ID = 'dshfiles-memory-panel'
 const OPEN_SETTINGS_EVENT = 'dshfiles:open-settings'
 const THREAD_OPTIONS = 30
+/** The thread panel's Context facet: one page per thread. */
+const CONTEXT_TAB_ID = '@dshfiles/agent-toolkit/context'
+const CONTEXT_TAB_KIND = 'dshfiles-agent-toolkit-context'
+
+declare module '@deepseek-ai/dsh-client-ui-sidebar-right/client' {
+  interface SidebarRightTabParamsMap {
+    'dshfiles-agent-toolkit-context': Record<string, never>
+  }
+}
+
+const ContextGlyph = (props: { readonly size?: number | undefined }): JSX.Element => <LayersIcon aria-hidden size={props.size ?? 18} strokeWidth={1.6} />
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => <WrenchIcon aria-hidden size={props.size ?? 18} strokeWidth={1.6} />
 
 export default defineClient({
   name: '@dshfiles/agent-toolkit',
   locales: [agentToolkitLocale],
-  inject: ['slots', 'layout', 'sessions', 'remote', 'remote.pluginInventory'],
+  inject: ['slots', 'layout', 'sessions', 'remote', 'remote.pluginInventory', 'sidebarRight', 'sidebarRightTabs'],
   setup(ctx, decorate, metadata) {
     const t = (key: AgentToolkitKey, params?: Record<string, string | number>): string => ctx.locale.bind(AGENT_TOOLKIT_LOCALE_NAMESPACE)(key, params)
 
@@ -91,6 +104,49 @@ export default defineClient({
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 5, label: () => `Agent Toolkit: ${t('viewCapabilities')}` }, PanelGlyph),
     )
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, Panel))
+
+    // The Context facet follows the thread the right pane shows, remembered from setup so a tab that mounts after a
+    // switch still knows it (the same pattern pulls-review's Changes facet uses).
+    const panelThread = createSnapshotStore<string | undefined>(ctx.sidebarRight.mounted.getSnapshot())
+    ctx.effect(
+      () =>
+        ctx.sidebarRight.mounted.subscribe(() => {
+          const next = ctx.sidebarRight.mounted.getSnapshot()
+          if (next !== undefined && next !== panelThread.getSnapshot()) panelThread.set(next)
+        }),
+      'agent-toolkit follows the thread panel',
+    )
+    ctx.effect(
+      () =>
+        ctx.sidebarRightTabs.register({
+          id: CONTEXT_TAB_ID,
+          kind: CONTEXT_TAB_KIND,
+          title: () => 'Context',
+          guide: [
+            {
+              id: 'context',
+              order: 60,
+              title: () => 'Context',
+              description: () => 'See what this thread loads into its model context (instructions, skills, MCP, memory, references) and roughly what it costs.',
+              icon: ContextGlyph,
+            },
+          ],
+        }),
+      'agent-toolkit registers the Context facet tab type',
+    )
+    const ContextTab = decorate((_props: { readonly useTabInfo: UseSidebarRightTabInfo }) => {
+      const sessionId = useSyncExternalStore(panelThread.subscribe, panelThread.getSnapshot)
+      const cwd = useSyncExternalStore(ctx.sessions.list.subscribe, () => {
+        const row = sessionId === undefined ? undefined : Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate.id === sessionId)
+        return row?.cwd === undefined || row.cwd === '' ? undefined : row.cwd
+      })
+      return (
+        <PluginQueryProvider>
+          <ContextFacet sessionId={sessionId === undefined ? undefined : String(sessionId)} cwd={cwd} />
+        </PluginQueryProvider>
+      )
+    })
+    ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: CONTEXT_TAB_ID }, ContextTab))
 
     metadata?.plugin?.add(PaletteActions, {
       id: '@dshfiles/agent-toolkit/open',

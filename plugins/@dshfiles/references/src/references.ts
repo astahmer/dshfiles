@@ -7,25 +7,7 @@ import { commandAttributes } from '@dshfiles/dshx/tracing'
 import { Clock, Context, Duration, Effect, FileSystem, Layer, Path, Ref, Schema, Stream } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 
-const nameSchema = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9._-]{0,47}$/u))
-
-const referenceSchema = Schema.Struct({
-  name: nameSchema,
-  kind: Schema.Literals(['directory', 'git']),
-  /** The directory or the git URL the user gave. */
-  source: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
-  /** Branch or tag a git reference was cloned at; null for the remote's default branch or a directory. */
-  ref: Schema.NullOr(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))),
-  /** Where the agent reads it: the directory itself, or the clone under `$DSH_HOME/references`. */
-  path: Schema.String.check(Schema.isMinLength(1)),
-  description: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
-  createdAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
-})
-
-const attachmentSchema = Schema.Struct({
-  sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
-  names: Schema.Array(nameSchema).check(Schema.isMaxLength(32)),
-})
+import { attachmentSchema, nameSchema, referenceSchema } from './reference-schema.js'
 
 export type Reference = typeof referenceSchema.Type
 
