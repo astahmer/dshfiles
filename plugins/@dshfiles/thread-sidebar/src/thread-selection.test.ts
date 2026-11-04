@@ -1,12 +1,18 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
-import { isThreadSelectionBackgroundClick, ThreadSelectionModel } from './thread-selection.js'
+import { isThreadSelectionBackgroundClick, shouldClearUnreadOnReselect, ThreadSelectionModel } from './thread-selection.js'
 
 const ids = ['a', 'b', 'c', 'd', 'e'] as const
 
 afterEach(() => document.body.replaceChildren())
 
 describe('thread selection model', () => {
+  it('clears unread directly only when reselecting the active thread', () => {
+    expect(shouldClearUnreadOnReselect({ selectedSessionId: 'a', requestedSessionId: 'a' })).toBe(true)
+    expect(shouldClearUnreadOnReselect({ selectedSessionId: 'b', requestedSessionId: 'a' })).toBe(false)
+    expect(shouldClearUnreadOnReselect({ selectedSessionId: undefined, requestedSessionId: 'a' })).toBe(false)
+  })
+
   it('selects one row and records it as the range anchor', () => {
     expect(ThreadSelectionModel.selectOnly('c')).toEqual({ sessionIds: ['c'], anchorId: 'c' })
   })

@@ -159,6 +159,7 @@ import {
   EMPTY_THREAD_SELECTION,
   THREAD_MAIN_BUTTON_SELECTOR,
   isThreadSelectionBackgroundClick,
+  shouldClearUnreadOnReselect,
   ThreadSelectionModel,
   type ThreadSelectionState,
 } from './thread-selection.js'
@@ -2028,7 +2029,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const selectThread = (sessionId: SessionSummary['id'], options: { readonly linked?: boolean } = {}): void => {
     if (sessionId !== selectedSessionId) startInteraction('thread switch', { attributes: { 'dshx.thread.source': 'sidebar' } })
     const opened = attention.records.get(sessionId)
-    if (opened !== undefined) attention.clearUnread(sessionId, opened.version)
+    if (opened !== undefined && shouldClearUnreadOnReselect({ requestedSessionId: sessionId, selectedSessionId }))
+      attention.clearUnread(sessionId, opened.version)
     setRouteRequest(null)
     openedRouteId.current = sessionId
     suppressUrlForSession.current = null
