@@ -13,6 +13,11 @@ import { materializeNonblankThread } from '../thread-composer.js'
 import { ThreadSidebarJourney } from '../thread-list-grouping.js'
 
 const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
+
+Then('the fan-out command opens the model selection dialog', async ({ page }: { page: Page }) => {
+  await page.getByRole('option', { name: /Send to several models/u }).click()
+  await expect(page.getByRole('dialog', { name: 'Send to several models', exact: true })).toBeVisible()
+})
 const workbenchNavigation = (page: Page): Locator =>
   page.locator('[data-sidebar-workbench-source="dshfiles-thread-sidebar.workbench-navigation"]').getByRole('navigation', { name: 'Navigation', exact: true })
 

@@ -1,6 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
-import { ProjectFolderPicker, type ProjectFolderSelection } from '@dshfiles/project-folder-picker'
+import { ProjectFolderPicker, type ProjectFolderSelection } from '@dshfiles/workspace-folder-picker/picker'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -20,6 +20,7 @@ import {
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
+  SearchIcon,
   Trash2Icon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -30,6 +31,10 @@ import { remoteDirectoryPicker } from './remote-folders.js'
 import { HostDialog, hostState, type HostDraft } from './hosts-dialog.js'
 import { moveHostId, shiftHostId } from './host-order.js'
 import { CloneProjectDialog } from './clone-project-dialog.js'
+import { ConnectionDiagnostics } from './connection-diagnostics.js'
+import { ConnectionTestSteps } from './connection-test-steps.js'
+import { FleetUpdateDialog } from './fleet-update-dialog.js'
+import { DisconnectGrace } from './disconnect-grace.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 
 type DirectoryData = { readonly hosts: readonly HostSummary[]; readonly runtimes: readonly RuntimeSummary[] }
@@ -115,6 +120,7 @@ const HostRow = (props: {
   readonly host: HostSummary
   readonly runtime: RuntimeSummary | undefined
   readonly resource: ResourcePoolEntry | undefined
+  readonly localVersion: string | undefined
   readonly index: number
   readonly count: number
   readonly dragging: boolean
@@ -132,7 +138,8 @@ const HostRow = (props: {
 }) => {
   const { api, host, runtime } = props
   const queryClient = useQueryClient()
-  const state = hostState(runtime)
+  const state = DisconnectGrace.use(hostState(runtime))
+  const outdatedVersion = ConnectionDiagnostics.versionMismatch({ localVersion: props.localVersion, remoteVersion: runtime?.identity?.dshVersion })
   const [confirming, setConfirming] = useState(false)
   const [popupBlocked, setPopupBlocked] = useState(false)
   const reconnect = useMutation({
@@ -158,6 +165,33 @@ const HostRow = (props: {
       return 'copied'
     },
     onError: (_error, variables) => variables.tab?.close(),
+  })
+  const diagnose = useMutation({
+    mutationFn: async () => {
+      if (host.connector.kind !== 'ssh') throw new Error('Only SSH hosts can be diagnosed.')
+      return api.testConnection({ name: host.name, sshTarget: host.connector.sshTarget, remoteHome: runtime?.remoteHome ?? '' })
+    },
+  })
+  const diagnosisFailure = diagnose.data?.ok === false ? failure(diagnose.data) : undefined
+  const failedStep = diagnose.data?.steps?.find(step => !step.ok)
+  const copyDiagnostics = useMutation({
+    mutationFn: async () => {
+      const outcome =
+        diagnose.data?.ok === true
+          ? { kind: 'passed' as const, steps: diagnose.data.steps, dshVersion: diagnose.data.identity.dshVersion, profile: diagnose.data.identity.profile }
+          : {
+              kind: 'failed' as const,
+              steps: diagnose.data?.steps ?? [],
+              message: diagnosisFailure?.message ?? errorMessage(diagnose.error, 'The connection test failed.'),
+            }
+      const report = ConnectionDiagnostics.createReport({
+        sshTarget: host.connector.kind === 'ssh' ? host.connector.sshTarget : '',
+        remoteHome: runtime?.remoteHome ?? '',
+        localVersion: props.localVersion,
+        outcome,
+      })
+      if (!(await writeClipboard(report))) throw new Error('Could not copy the diagnostics. Allow clipboard access and try again.')
+    },
   })
   const openHost = (): void => {
     setPopupBlocked(false)
@@ -241,6 +275,37 @@ const HostRow = (props: {
         <>
           <span className="dshx:min-w-0 dshx:truncate">{state.label}</span>
           {props.resource === undefined ? null : <ResourceUsage hostName={host.name} resource={props.resource} />}
+          {outdatedVersion === undefined ? null : (
+            <span data-testid={`host-version-mismatch-${host.id}`} className="dshx:text-warning">
+              Runs DSH {outdatedVersion}; this machine runs {props.localVersion}. Update its DSH core on that machine, then restart it.
+            </span>
+          )}
+          {diagnose.data === undefined ? null : (
+            <ConnectionTestSteps steps={diagnose.data.steps ?? []} {...(diagnose.data.ok ? { identity: diagnose.data.identity } : {})} />
+          )}
+          {diagnosisFailure === undefined && !diagnose.isError ? null : (
+            <Alert variant="destructive">
+              <AlertDescription>
+                {diagnosisFailure?.message ?? errorMessage(diagnose.error, 'The connection test failed.')} {ConnectionDiagnostics.recovery(failedStep?.step)}
+              </AlertDescription>
+            </Alert>
+          )}
+          {diagnose.data !== undefined || diagnose.isError ? (
+            <span className="dshx:flex dshx:items-center dshx:gap-2">
+              <Button type="button" size="xs" variant="ghost" disabled={copyDiagnostics.isPending} onClick={() => copyDiagnostics.mutate()}>
+                <CopyIcon className="dshx:size-3.5" />
+                Copy diagnostics
+              </Button>
+              {copyDiagnostics.isSuccess ? (
+                <span role="status" className="dshx:text-success">
+                  Copied.
+                </span>
+              ) : null}
+              {copyDiagnostics.isError ? (
+                <span className="dshx:text-destructive">{errorMessage(copyDiagnostics.error, 'Allow clipboard access, then try again.')}</span>
+              ) : null}
+            </span>
+          ) : null}
           {reconnect.isError ? (
             <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-destructive">
               {errorMessage(reconnect.error, 'Reconnect failed.')}
@@ -306,6 +371,21 @@ const HostRow = (props: {
               >
                 <CopyIcon className="dshx:size-3.5" />
               </IconAction>
+              {runtime?.lastError === undefined ? null : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Diagnose ${host.name}`}
+                  disabled={diagnose.isPending}
+                  onClick={() => {
+                    copyDiagnostics.reset()
+                    diagnose.mutate()
+                  }}
+                >
+                  {diagnose.isPending ? <Spinner className="dshx:size-3.5" /> : <SearchIcon className="dshx:size-3.5" />}
+                  Diagnose
+                </Button>
+              )}
               <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onAddProject}>
                 <PlusIcon className="dshx:size-3.5" />
                 Add folder
@@ -349,6 +429,7 @@ export const HostsPage = () => {
   const queryClient = useQueryClient()
   const directory = useQuery(multiHostQueries.directory(api, 15_000))
   const resourcePool = useQuery(multiHostQueries.resourcePool(api, 15_000))
+  const localIdentity = useQuery(multiHostQueries.identity(api))
   const hosts = directory.data?.hosts ?? []
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dropId, setDropId] = useState<string | null>(null)
@@ -356,6 +437,8 @@ export const HostsPage = () => {
   const [form, setForm] = useState<HostDraft | null>(null)
   const [projectRuntimeId, setProjectRuntimeId] = useState<string | null>(null)
   const [cloneRuntimeId, setCloneRuntimeId] = useState<string | null>(null)
+  const [fleetOpen, setFleetOpen] = useState(false)
+  const [updateRequest, setUpdateRequest] = useState(0)
   const projectRuntime = directory.data?.runtimes.find(runtime => runtime.id === projectRuntimeId)
   const projectHost = projectRuntime === undefined ? undefined : hosts.find(host => host.id === projectRuntime.hostId)
 
@@ -439,6 +522,15 @@ export const HostsPage = () => {
           </Badge>
         }
         primaryAction={{ id: 'add-host', label: 'Add host', icon: <PlusIcon className="dshx:size-4" />, onSelect: () => setForm(blankDraft) }}
+        actions={[
+          {
+            id: 'update-hosts',
+            label: 'Update hosts',
+            icon: <RefreshCwIcon className="dshx:size-4" />,
+            disabled: hosts.length === 0,
+            onSelect: () => setFleetOpen(true),
+          },
+        ]}
       >
         {directory.isError ? retryAlert({ message: errorMessage(directory.error, 'Hosts are unavailable.'), retry: () => void directory.refetch() }) : null}
         {resourcePool.isError
@@ -501,6 +593,7 @@ export const HostsPage = () => {
                 host={host}
                 runtime={runtimeFor(host)}
                 resource={resourcePool.data?.hosts.find(entry => entry.hostId === host.id)}
+                localVersion={localIdentity.data?.dshVersion}
                 index={index}
                 count={ordered.length}
                 dragging={draggedId === host.id}
@@ -531,6 +624,8 @@ export const HostsPage = () => {
                     name: host.name,
                     sshTarget: host.connector.kind === 'ssh' ? host.connector.sshTarget : '',
                     remoteHome: runtimeFor(host)?.remoteHome ?? '',
+                    weight: host.weight,
+                    fetchBeforeThread: host.fetchBeforeThread,
                   })
                 }
                 onRemove={() => remove.mutate(host.id)}
@@ -563,6 +658,14 @@ export const HostsPage = () => {
           />
         ) : null}
         <HostDialog api={api} draft={form} onOpenChange={open => (open ? undefined : setForm(null))} />
+        <FleetUpdateDialog
+          api={api}
+          hosts={ordered}
+          open={fleetOpen}
+          updateRequest={updateRequest}
+          onUpdateAll={() => setUpdateRequest(current => current + 1)}
+          onOpenChange={setFleetOpen}
+        />
       </Page>
     </TooltipProvider>
   )

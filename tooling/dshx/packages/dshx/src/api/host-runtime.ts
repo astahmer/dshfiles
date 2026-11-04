@@ -101,7 +101,9 @@ function createDispatch(ctx: Context, packageId: string, registration: ApiHostRe
       ApiProtocolModel.jsonBytes(envelope.input)
       const input = await ApiProtocolModel.validate(methodDefinition.input, envelope.input)
       ApiProtocolModel.throwIfAborted(signal, contract.id, endpoint)
-      const output = await ApiProtocolModel.validate(methodDefinition.output, await handler({ input, ctx, signal, peer, caller } as never))
+      const validated = await ApiProtocolModel.validate(methodDefinition.output, await handler({ input, ctx, signal, peer, caller } as never))
+      // An absent optional output member written as `undefined` disappears on the wire, as it does for an input.
+      const output = validated === undefined ? undefined : ApiProtocolModel.jsonInput(validated)
       ApiProtocolModel.throwIfAborted(signal, contract.id, endpoint)
       ApiProtocolModel.jsonBytes(output)
       return { ok: true, value: { version: contract.version, output } }

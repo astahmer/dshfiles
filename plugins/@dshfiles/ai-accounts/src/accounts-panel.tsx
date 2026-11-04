@@ -12,7 +12,7 @@ import { QuotaContinuations } from './quota-continuations.js'
 import { useAccountsPanelState } from './use-accounts-panel-state.js'
 import { NativeProviderDetail } from './native-provider-detail.js'
 import type { AccountSection } from './account-connection-status.js'
-import type { WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
+import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import type { CredentialSetupPort } from './credential-setup-port.js'
 
 /** The reference's rail and detail share one selection; Query owns data and the existing queue owns writes. */

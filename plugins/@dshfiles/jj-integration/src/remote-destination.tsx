@@ -6,7 +6,7 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CheckIcon, FolderIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { ProjectFolderPicker, type RegisteredProject } from '@dshfiles/project-folder-picker'
+import { ProjectFolderPicker, type RegisteredProject } from '@dshfiles/workspace-folder-picker/picker'
 import {
   multiHostKeys,
   multiHostQueries,

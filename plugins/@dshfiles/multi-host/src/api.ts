@@ -6,11 +6,8 @@ import { defineApi, method as defineMethod, zodSchemaFromEffect } from '@dshfile
 import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
 import { nativeRpcRequestSchema } from '@dshfiles/dshx/platform/native-rpc'
 import type { NativeRpcRequest as DshxNativeRpcRequest } from '@dshfiles/dshx/platform/native-rpc'
-import { hostConnectorSchema, runtimeIdentitySchema, runtimeLocatorSchema } from './records.js'
+import { hostConnectorSchema, hostWeightSchema, runtimeIdentitySchema, runtimeLocatorSchema } from './records.js'
 import { SchemaFields } from './schema.js'
-
-/** A no-argument method publishes the closed empty object, so its tool takes no arguments instead of a bare `null`. */
-const noInput = Schema.Struct({})
 
 const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Output extends Schema.ConstraintDecoder<unknown>>(
   options: Omit<ApiMethodOptions<Input, Output>, 'tool'> & {
@@ -18,12 +15,7 @@ const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Out
     readonly output: Output
     readonly tool?: ApiToolExposure<Output['Type']>
   },
-) =>
-  defineMethod({
-    ...options,
-    // SAFETY: the closed empty object decodes exactly the values `Void` does (none), so the declaration keeps its input type.
-    input: (options.input.ast === Schema.Void.ast ? noInput : options.input) as Input,
-  })
+) => defineMethod(options)
 
 /** Model-facing text for a structured tool result. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
@@ -58,6 +50,8 @@ const hostSummarySchema = Schema.Struct({
   connector: hostConnectorSchema,
   runtimeCount: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
   hidden: Schema.Boolean,
+  weight: Schema.optional(hostWeightSchema),
+  fetchBeforeThread: Schema.optional(Schema.Boolean),
 })
 
 const failureSchema = Schema.Struct({ code: Schema.String.check(Schema.isMaxLength(128)), message: Schema.String.check(Schema.isMaxLength(2048)) })
@@ -134,6 +128,7 @@ const resourcePoolEntrySchema = Schema.Struct({
   runtimeId: Schema.NullOr(idSchema),
   destination: Schema.NullOr(Schema.Struct({ kind: Schema.Literal('runtime'), runtimeId: idSchema })),
   hidden: Schema.Boolean,
+  weight: Schema.optional(hostWeightSchema),
   probe: resourceProbeSchema,
   stale: Schema.Boolean,
   refreshing: Schema.Boolean,
@@ -218,6 +213,7 @@ const transcriptWaitingSchema = Schema.Struct({
   tool: Schema.String,
   since: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()),
 })
+const fetchBeforeThreadSchema = Schema.Struct({ ok: Schema.Boolean, detail: Schema.String })
 const remoteThreadSchema = Schema.Struct({
   runtimeId: idSchema,
   sessionId: sessionIdSchema,
@@ -366,6 +362,28 @@ const cloneDestinationSchema = Schema.Union([
   trimmedStringSchema(Schema.String.check(stringMinLength(3), Schema.isMaxLength(4096), Schema.isPattern(/^~\/(?!\.\.(?:\/|$))(?!.*\/\.\.(?:\/|$)).+$/u))),
 ])
 const localProjectPathSchema = trimmedStringSchema(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)))
+const protocolControlCharacterCodes = new Set([0, 9, 10, 13])
+const projectOriginPathSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)).check(
+  Schema.makeFilter(path =>
+    path.split('').every(character => !protocolControlCharacterCodes.has(character.charCodeAt(0))) ? true : 'Paths cannot contain protocol control characters.',
+  ),
+)
+const projectOriginsInputSchema = Schema.Struct({
+  localPaths: Schema.Array(projectOriginPathSchema).check(Schema.isMaxLength(200)),
+  remote: Schema.Array(Schema.Struct({ runtimeId: idSchema, paths: Schema.Array(projectOriginPathSchema).check(Schema.isMaxLength(200)) })).check(
+    Schema.isMaxLength(64),
+  ),
+})
+const projectOriginsOutputSchema = Schema.Struct({
+  origins: Schema.Array(
+    Schema.Struct({
+      kind: Schema.Literals(['local', 'remote']),
+      runtimeId: Schema.optional(idSchema),
+      path: projectOriginPathSchema,
+      origin: Schema.NullOr(Schema.String.check(Schema.isMaxLength(4096))),
+    }),
+  ).check(Schema.isMaxLength(13_000)),
+})
 const localProjectFilePathSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)).check(
   Schema.makeFilter(path =>
     !path.includes('\0') && !path.startsWith('/') && path.split('/').every(segment => segment.length > 0 && segment !== '.' && segment !== '..')
@@ -381,6 +399,8 @@ const repositoryUrlSchema = trimmedStringSchema(
     ),
   ),
 )
+export type ProjectOriginsInput = Schema.Schema.Type<typeof projectOriginsInputSchema>
+
 export const cloneProjectInputEffectSchema = Schema.Struct({
   runtimeId: idSchema,
   repositoryUrl: repositoryUrlSchema,
@@ -418,6 +438,16 @@ const remoteNodeSchema = Schema.Struct({
   version: Schema.optional(Schema.String),
   resolved: Schema.optional(Schema.String),
   nix: Schema.Boolean,
+})
+
+const hostUpdateResultSchema = Schema.Struct({
+  ok: Schema.Boolean,
+  applied: Schema.Boolean,
+  checkoutPath: Schema.String,
+  revision: Schema.optional(Schema.String),
+  rebuilt: Schema.Array(Schema.String),
+  restartNeeded: Schema.Boolean,
+  detail: Schema.String,
 })
 
 const remoteFactsSchema = Schema.Struct({
@@ -550,8 +580,15 @@ const effectMultiHostApi = defineApi({
       input: Schema.Struct({ id: idSchema, hidden: Schema.Boolean }),
       output: hostSummarySchema,
       description:
-        'Hide or show one host in the destination picker without removing it: its runtimes, threads and remote data stay. Call only when the user asked to hide or show that host.',
+        'Hide or show one host without removing it: a hidden host leaves the destination picker and its threads leave the sidebar; its runtimes, stored threads and remote data stay. Call only when the user asked to hide or show that host.',
       tool: { name: 'multi_host_set_host_hidden', render: compactJson },
+    }),
+    hostSetSettings: method({
+      input: Schema.Struct({ id: idSchema, weight: Schema.optional(hostWeightSchema), fetchBeforeThread: Schema.optional(Schema.Boolean) }),
+      output: hostSummarySchema,
+      description:
+        "Change one host's placement weight (1 to 10; Auto treats a weight-2 host as having twice the room) and whether a new thread there first runs jj git fetch in its folder. Call only when the user asked to change those settings.",
+      tool: { name: 'multi_host_set_host_settings', render: compactJson },
     }),
     hostReorder: method({
       input: Schema.Struct({ ids: Schema.Array(idSchema).check(Schema.isMinLength(1), Schema.isMaxLength(64)) }),
@@ -586,7 +623,7 @@ const effectMultiHostApi = defineApi({
       }),
       output: Schema.Union([
         Schema.Struct({ ok: Schema.Literal(true), steps: Schema.Array(connectionTestStepSchema), identity: runtimeIdentitySchema }),
-        failedSchema,
+        Schema.Struct({ ...failedSchema.fields, steps: Schema.optional(Schema.Array(connectionTestStepSchema)) }),
       ]),
       description:
         'Run the stepwise connection test for one host configuration (ssh, then runtime, then identity). Call only when the user asked to test that host.',
@@ -618,6 +655,12 @@ const effectMultiHostApi = defineApi({
       description:
         'Connection state of one remote DSH runtime: whether a connection is open, the last error, and when it was last seen. A cold or stale result returns immediately while one coalesced background refresh runs. Read-only.',
       tool: { name: 'multi_host_status', readOnly: true, render: compactJson },
+    }),
+    projectOrigins: method({
+      input: projectOriginsInputSchema,
+      output: projectOriginsOutputSchema,
+      description: 'Read the Git origin URL for local project paths and paths on registered remote runtimes, in bounded batches. Read-only.',
+      tool: { name: 'multi_host_project_origins', readOnly: true, render: compactJson },
     }),
     /** Connect if needed and round-trip once; the chip menu shows the latency as the host's status. */
     runtimePing: method({
@@ -778,12 +821,41 @@ const effectMultiHostApi = defineApi({
         model: Schema.optional(modelSelectionSchema),
       }),
       output: Schema.Union([
-        Schema.Struct({ ok: Schema.Literal(true), sessionId: sessionIdSchema }),
+        Schema.Struct({ ok: Schema.Literal(true), sessionId: sessionIdSchema, fetch: Schema.optional(fetchBeforeThreadSchema) }),
         Schema.Struct({ ...failedSchema.fields, sessionId: Schema.optional(sessionIdSchema) }),
       ]),
       description:
         'Start a thread on one remote runtime: its directory, the first message, and optionally an agent preset and model. Call only when the user asked to start a thread on that machine.',
       tool: { name: 'multi_host_start_thread', render: compactJson },
+    }),
+    delegate: method({
+      input: Schema.Struct({
+        runtimeId: Schema.optional(idSchema),
+        cwd: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)),
+        text: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(100_000)),
+        agentPreset: Schema.optional(Schema.String.check(Schema.isMaxLength(128))),
+        model: Schema.optional(modelSelectionSchema),
+        waitSeconds: Schema.Number.check(Schema.isFinite())
+          .check(Schema.isInt())
+          .check(Schema.isGreaterThanOrEqualTo(10))
+          .check(Schema.isLessThanOrEqualTo(3600))
+          .pipe(Schema.withDecodingDefault(Effect.succeed(600))),
+      }),
+      output: Schema.Union([
+        Schema.Struct({
+          ok: Schema.Literal(true),
+          runtimeId: idSchema,
+          sessionId: sessionIdSchema,
+          status: Schema.Literals(['finished', 'failed', 'waiting', 'running']),
+          answer: Schema.optional(Schema.String),
+          detail: Schema.optional(Schema.String),
+          waiting: Schema.optional(transcriptWaitingSchema),
+        }),
+        Schema.Struct({ ...failedSchema.fields, sessionId: Schema.optional(sessionIdSchema) }),
+      ]),
+      description:
+        'Run a task as a thread on another machine and wait for its answer, like a subagent on that host: give the remote directory and the full task. Without runtimeId, Auto picks the least-loaded visible SSH host. Returns the final assistant text when the turn finishes; status waiting when the remote agent asks a question (answer it on the host), running with the sessionId to follow with multi_host_thread_transcript when waitSeconds (default 600) runs out. Cancelling the call stops the remote turn. Call only when the user asked for work on another machine.',
+      tool: { name: 'multi_host_delegate', render: compactJson },
     }),
     /** The latest messages of a remote thread, reduced to text, for the local remote-thread view. */
     threadTranscript: method({
@@ -969,6 +1041,17 @@ const effectMultiHostApi = defineApi({
         'Fetch and rebase one checkout on an SSH host onto its bookmark origin, keeping that machine edits. Without apply it only reports the commands. Call only when the user asked to update that checkout.',
       tool: { name: 'multi_host_checkout_sync', render: compactJson },
     }),
+    hostUpdate: method({
+      input: Schema.Struct({
+        hostId: idSchema,
+        bookmark: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(128)).pipe(Schema.withDecodingDefault(Effect.succeed('main'))),
+        apply: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+      }),
+      output: Schema.Union([hostUpdateResultSchema, failedSchema]),
+      description:
+        "Bring one SSH host's dshfiles checkout onto the bookmark from origin: fetch, then its own dshx checkout sync rebases, installs and rebuilds what changed, and reports whether that host needs a restart. It never restarts the host. Without apply it reports what would change. Call only when the user asked to update that host.",
+      tool: { name: 'multi_host_update', render: compactJson },
+    }),
     runtimeCall: method({
       input: Schema.Struct({ runtimeId: idSchema, request: nativeRpcSchema }),
       output: nativeRpcResultSchema,
@@ -983,8 +1066,12 @@ const effectMultiHostApi = defineApi({
       }),
     }),
     runtimeOpenView: method({
-      input: Schema.Struct({ runtimeId: idSchema }),
-      output: Schema.Struct({ leaseId: Schema.String.check(Schema.isUUID()), launchUrl: SchemaFields.urlString }),
+      input: Schema.Struct({ runtimeId: idSchema, sessionId: Schema.optional(sessionIdSchema) }),
+      output: Schema.Struct({
+        leaseId: Schema.String.check(Schema.isUUID()),
+        launchUrl: SchemaFields.urlString,
+        threadUrl: Schema.optional(SchemaFields.urlString),
+      }),
     }),
     runtimeCloseView: method({
       input: Schema.Struct({ leaseId: Schema.String.check(Schema.isUUID()) }),

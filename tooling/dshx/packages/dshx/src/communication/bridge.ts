@@ -101,7 +101,7 @@ export interface CommunicationClient {
     readonly correlationId?: string
     readonly dedupeKey?: string
   }): Promise<CommunicationMessage>
-  inbox(input?: { readonly topic?: string; readonly limit?: number }): Promise<CommunicationInbox>
+  inbox(input?: { readonly topic?: string; readonly limit?: number; readonly includeSeen?: boolean }): Promise<CommunicationInbox>
   acknowledge(messageId: string): Promise<{ readonly acknowledged: boolean }>
 }
 
@@ -256,6 +256,7 @@ const dispatch = async (
       strictStruct({
         topic: Schema.optional(boundedString(1, 128)),
         limit: Schema.optional(boundedInteger(1, 500)),
+        includeSeen: Schema.optional(Schema.Boolean),
       }),
       request.input,
     )
@@ -264,6 +265,7 @@ const dispatch = async (
         principal: request.principal,
         ...(input.topic !== undefined && { topic: input.topic }),
         ...(input.limit !== undefined && { limit: input.limit }),
+        ...(input.includeSeen !== undefined && { includeSeen: input.includeSeen }),
       }),
     }
   }

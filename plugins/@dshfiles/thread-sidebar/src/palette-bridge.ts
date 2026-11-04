@@ -5,6 +5,24 @@ const DEFAULT_RECENT_LIMIT = 10
 
 let sidebarPlugin: PluginContext | undefined
 let recentLimit = DEFAULT_RECENT_LIMIT
+let fanOutWorkspaceId: string | null | undefined
+const fanOutListeners = new Set<() => void>()
+
+const openFanOut = (workspaceId: string | null): void => {
+  fanOutWorkspaceId = workspaceId
+  for (const listener of fanOutListeners) listener()
+}
+
+const subscribeFanOut = (listener: () => void): (() => void) => {
+  fanOutListeners.add(listener)
+  return () => fanOutListeners.delete(listener)
+}
+
+const readFanOutWorkspaceId = (): string | null | undefined => fanOutWorkspaceId
+const closeFanOut = (): void => {
+  fanOutWorkspaceId = undefined
+  for (const listener of fanOutListeners) listener()
+}
 
 const activePalette = () => {
   const live = sidebarPlugin?.use(CommandPalette).get()
@@ -53,5 +71,9 @@ export class PaletteBridge {
   static readonly open = open
   static readonly close = close
   static readonly setRecentLimit = setRecentLimit
+  static readonly openFanOut = openFanOut
+  static readonly closeFanOut = closeFanOut
+  static readonly subscribeFanOut = subscribeFanOut
+  static readonly readFanOutWorkspaceId = readFanOutWorkspaceId
   static readonly defaultRecentLimit = DEFAULT_RECENT_LIMIT
 }

@@ -60,6 +60,8 @@ export const runtimeIdentitySchema = Schema.Struct({
   capabilities: Schema.Array(Schema.Literals(['workspace', 'session', 'agent'])).check(Schema.isMaxLength(8)),
 })
 
+export const hostWeightSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(10))
+
 export const hostRecordSchema = Schema.Struct({
   schemaVersion: Schema.Literal(2),
   id: idSchema,
@@ -69,6 +71,10 @@ export const hostRecordSchema = Schema.Struct({
   hidden: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   /** Directory order, lowest first; the store fills it in for records written before it existed. */
   position: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+  /** Auto divides this host's resource pressure by its weight, so a weight-2 host takes about twice the load. Absent is 1. */
+  weight: Schema.optional(hostWeightSchema),
+  /** Run `jj git fetch` in a thread's folder on this host before the thread starts. */
+  fetchBeforeThread: Schema.optional(Schema.Boolean),
   createdAt: SchemaFields.dateTimeString,
 })
 

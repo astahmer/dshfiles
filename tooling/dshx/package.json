@@ -34,6 +34,7 @@
     "@deepseek-ai/dsh-llm": "catalog:",
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.1-rc.2",
+    "@hona/strobe": "0.6.0",
     "@hono/node-server": "catalog:",
     "@playwright/test": "1.56.1",
     "@types/node": "catalog:",

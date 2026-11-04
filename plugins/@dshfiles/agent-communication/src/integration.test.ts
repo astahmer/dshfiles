@@ -103,11 +103,13 @@ describe('Agent communication integration', () => {
     expect(await service.inbox({ principal: { kind: 'agent', id: completed.id }, topic: 'inbox' })).toMatchObject([
       { id: message.id, recipients: [{ readAt: 1_800_000_000_000 }] },
     ])
-    expect(await service.inbox({ principal: { kind: 'agent', id: completed.id }, topic: 'inbox' })).toHaveLength(1)
+    expect(await service.inbox({ principal: { kind: 'agent', id: completed.id }, topic: 'inbox' })).toHaveLength(0)
+    expect(await service.inbox({ principal: { kind: 'agent', id: completed.id }, topic: 'inbox', includeSeen: true })).toMatchObject([{ id: message.id }])
 
     await register(service, completed)
     const replayed = await service.inbox({ principal: { kind: 'agent', id: completed.id }, topic: 'inbox' })
-    expect(replayed.map(item => item.id)).toEqual([message.id])
+    expect(replayed).toEqual([])
+    expect(await service.inbox({ principal: { kind: 'agent', id: completed.id }, topic: 'inbox', includeSeen: true })).toMatchObject([{ id: message.id }])
     expect(await service.browseMessages({ agentId: completed.id })).toMatchObject({ totalMatching: 1 })
     expect(completed.interference).toEqual([])
     expect(sender.interference).toEqual([])

@@ -38,9 +38,9 @@ principals; DSH Agent identities are taken from the Host tool execution.
   The path itself is not stored in the topic or message.
 - Automatic registration never fails on capacity. A topic holds at most 512
   subscribers because a publish addresses one recipient per subscriber; a full
-  topic evicts its stalest subscribers (least recent communication activity,
-  then oldest row) so a new Session always starts. Only an explicit
-  `dshx_comm_subscribe` still reports `topic-full`.
+     topic evicts its stalest subscribers (least recent communication activity,
+   then oldest row) so a new Session always starts. Explicit CLI/MCP subscribe
+   still reports `topic-full`.
 - Agents also get a private inbox for direct messages, and it stores no
   subscription row: a direct message carries its recipient, and inbox reads
   filter on the recipient. Every inbox row from an older schema is dropped on
@@ -63,9 +63,11 @@ principals; DSH Agent identities are taken from the Host tool execution.
   sender-scoped `dedupeKey` makes a repeated publish/send return the stored
   message instead of storing a duplicate, and an opaque `correlationId` groups
   related messages for later readers and timelines.
-- `dshx_comm_inbox` is an explicit read performed during a natural Agent
-  execution. It records `readAt` but does not acknowledge; only the recipient's
-  `dshx_comm_ack` hides a message from later inbox reads.
+- `dshx_comm_inbox` returns messages not previously shown by default. Its
+  `includeSeen: true` option includes older unacknowledged messages. Reads record
+  `readAt` separately from acknowledgement; `dshx_comm_ack` removes messages from
+  both views. Existing `readAt` fields are reused, and older schemas migrate
+  unseen recipients with `readAt: null`.
 - `quiet`, `queue`, and `steer` exist only as legacy migration/input values.
   The service maps them to passive delivery. `urgent` is metadata only.
 - Unsubscribing from a workspace topic persists an automatic-join opt-out.
@@ -104,8 +106,8 @@ different:
 
 - **Health**: the Host bridge is reachable and the state file is readable.
 - **Tool activity**: a recorded call proves that Agent used that tool. Activity
-  is its own collection because read-only calls (`agents`, `topics`, `inbox`)
-  leave no trace in message state.
+  is its own collection because read-only calls (`agents`, `inbox`) leave no
+  trace in message state.
 - **Message lifecycle**: recipients, reads and acknowledgements prove that
   communication happened, not that an Agent acted on the message.
 
@@ -113,10 +115,13 @@ Older state (schema 1–3) is migrated in memory on read and written as version 
 only by the next mutation, so a report never rewrites history. State that fails
 to decode is reported as `state-unreadable` and left untouched.
 
-Live Agent use has not been observed yet: the last check of the running profile
-returned `host-unavailable`, and no live Agent turn was run to produce
-activity. To check a profile, run `dshx comm report --json` against it and read
-`activity` together with the health fields, not the counts alone.
+A 30-day activity study found fewer than 120 combined calls for the removed
+Agent tools (topics, diagnostics, browsing, recipients, workspace, history,
+publish and subscription management). Agent-to-Agent traffic is concentrated
+between separate top-level threads; within one parent/child tree, native DSH
+messaging performed better in the supplied A/B benchmark. The Agent surface
+therefore keeps peer discovery, direct send, inbox and acknowledgement, while
+UI, CLI and MCP remain available for their broader communication workflows.
 
 The owned `@dshfiles/agent-communication` bundle adds a channel/direct-message
 browser with debounced server-side search, cursor pagination, visible untrusted

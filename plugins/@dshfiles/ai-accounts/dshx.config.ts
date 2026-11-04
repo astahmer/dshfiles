@@ -13,6 +13,7 @@ export default defineConfig({
     'usage-overview-model': 'src/usage-overview-model.ts',
     'thread-account-api': 'src/thread-account-api.ts',
     'account-usage-view': 'src/account-usage-view.tsx',
+    'codex-credential': 'src/codex-credential.ts',
   },
   client: { entry: 'src/client.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },

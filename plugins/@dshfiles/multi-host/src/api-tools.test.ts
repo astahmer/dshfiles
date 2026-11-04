@@ -58,6 +58,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_checkout_sync',
       'multi_host_clone_project',
       'multi_host_create_thread',
+      'multi_host_delegate',
       'multi_host_doctor',
       'multi_host_exec',
       'multi_host_file_references',
@@ -69,6 +70,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_mkdir',
       'multi_host_models',
       'multi_host_open_folder',
+      'multi_host_project_origins',
       'multi_host_provision',
       'multi_host_reconnect',
       'multi_host_remove_host',
@@ -82,6 +84,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_save_ssh_host',
       'multi_host_session_jj_repositories',
       'multi_host_set_host_hidden',
+      'multi_host_set_host_settings',
       'multi_host_ssh_hosts',
       'multi_host_start_thread',
       'multi_host_status',
@@ -90,7 +93,22 @@ describe('multi-host tool exposure', () => {
       'multi_host_thread_stop',
       'multi_host_thread_transcript',
       'multi_host_threads',
+      'multi_host_update',
     ])
+  })
+
+  test('project origin lookup bounds local and remote path batches', async () => {
+    const inputSchema = multiHostApi.methods.projectOrigins.input
+    if (inputSchema === undefined) throw new Error('The project origin API must define an input schema.')
+    const accepts = async (input: unknown): Promise<boolean> => {
+      const result = await standard(inputSchema).validate(input)
+      return !('issues' in result)
+    }
+    expect(await accepts({ localPaths: ['/work/local'], remote: [{ runtimeId: 'runtime-a', paths: ['/work/remote'] }] })).toBe(true)
+    expect(await accepts({ localPaths: ['/work/with\t-tab'], remote: [] })).toBe(false)
+    expect(await accepts({ localPaths: new Array(201).fill('/work/local'), remote: [] })).toBe(false)
+    expect(await accepts({ localPaths: [], remote: new Array(65).fill({ runtimeId: 'runtime-a', paths: [] }) })).toBe(false)
+    expect(await accepts({ localPaths: [], remote: [{ runtimeId: 'runtime-a', paths: new Array(201).fill('/work/remote') }] })).toBe(false)
   })
 
   test('remote cloning accepts safe destinations and complete local-file selections', async () => {
@@ -164,6 +182,14 @@ describe('multi-host tool exposure', () => {
         { type: 'string', minLength: 3, maxLength: 4096, pattern: expect.any(String) },
       ],
     })
+  })
+
+  test('no-argument methods accept the undefined input the browser client sends', async () => {
+    const methods = [multiHostApi.methods.list, multiHostApi.methods.threadList, multiHostApi.methods.resourcePool]
+    for (const method of methods) {
+      if (method.input === undefined) throw new Error('A no-argument method still declares its Void input.')
+      expect('issues' in (await standard(method.input).validate(undefined))).toBe(false)
+    }
   })
 
   test('session ID tools validate strictly and publish their input JSON Schema', async () => {
@@ -317,6 +343,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_list',
       'multi_host_local_project_files',
       'multi_host_models',
+      'multi_host_project_origins',
       'multi_host_resource_pool',
       'multi_host_resource_snapshot',
       'multi_host_runtime_logs',

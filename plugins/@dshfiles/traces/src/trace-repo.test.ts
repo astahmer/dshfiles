@@ -2,8 +2,8 @@ import { describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import { TestClock } from 'effect/testing'
 import type { NormalizedLog, NormalizedMetricPoint, NormalizedSpan } from './otlp/normalize.js'
-import { TraceRepoTest } from './test-layers.test-support.js'
-import { TraceRepo, type LogSearchQuery, type TraceListQuery } from './trace-repo.js'
+import { TraceDbTest, TraceRepoTest } from './test-layers.test-support.js'
+import { TraceDb, TraceRepo, type LogSearchQuery, type TraceListQuery } from './trace-repo.js'
 
 const NOW = 1_700_000_000_000
 const retention = { maxAgeHours: 24, maxSpans: 10_000, maxLogs: 10_000, maxMetricPoints: 10_000 }
@@ -543,5 +543,17 @@ describe('session summary', () => {
         expect((yield* repo.searchLogs({ sessionId: 'session-t' })).logs.map(entry => entry.body).sort()).toEqual(['log 1', 'log 2'])
       }),
     ),
+  )
+})
+
+describe('span store indexes', () => {
+  it.effect('reads the spans that ended in an alert window through the end-time index', () =>
+    Effect.gen(function* () {
+      const sql = yield* TraceDb
+      const plan = yield* sql<{
+        readonly detail: string
+      }>`EXPLAIN QUERY PLAN SELECT trace_id FROM spans WHERE start_us >= 0 AND end_us >= ${NOW * 1000} ORDER BY end_us DESC`
+      expect(plan.map(row => row.detail).join('\n')).toContain('USING INDEX spans_end')
+    }).pipe(Effect.provide(TraceDbTest)),
   )
 })

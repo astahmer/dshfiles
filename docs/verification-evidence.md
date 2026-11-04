@@ -51,7 +51,7 @@ The Activity Timeline `verification-receipts` reach is exercised in an isolated 
 ```sh
 fnm exec --using=22.23.3 pnpm --dir tooling/dshx --filter @dshfiles/dshx build
 dshx() { fnm exec --using=22.23.3 node "$PWD/tooling/dshx/packages/dshx/dist/cli/bin.js" "$@"; }
-dshx dev up --plugin @dshfiles/activity-timeline --plugin @dshfiles/project-checks --plugin @dshfiles/ai-accounts --plugin @dshfiles/workspace-folder-picker --plugin @dshfiles/multi-host --plugin @dshfiles/jj-integration --plugin @dshfiles/home --name verification-evidence --json
+dshx dev up --plugin @dshfiles/activity-timeline --plugin @dshfiles/project-checks --plugin @dshfiles/ai-accounts --plugin @dshfiles/workspace-folder-picker --plugin @dshfiles/multi-host --plugin @dshfiles/jj-integration --plugin @dshfiles/workspace-nav --name verification-evidence --json
 dshx dev doctor --name verification-evidence
 dshx dev open activity-timeline/verification-receipts --name verification-evidence
 dshx dev shot --label verification-receipts --name verification-evidence --json

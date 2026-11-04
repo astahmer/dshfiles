@@ -355,6 +355,27 @@ describe('generic API runtime', () => {
     expect(validateOutput).toHaveBeenCalledOnce()
   })
 
+  it('drops output members that hold undefined, as the JSON wire does', async () => {
+    const fixture = connectionFixture()
+    const facts = defineApi({
+      id: 'optional-output',
+      version: 1,
+      methods: { get: method({}) },
+    })
+    await registerApi(
+      fixture.context as never,
+      '@scope/plugin',
+      facts.host({
+        get: () => ({ path: '/bin/jj', version: undefined, nested: [{ port: undefined, pid: 3 }] }),
+      }),
+    )
+    const endpoint = `${ApiChannelModel.apiChannel('@scope/plugin', 'optional-output').slice(1)}/get`
+    await expect(fixture.call('/api', endpoint, { version: 1, input: undefined })).resolves.toEqual({
+      ok: true,
+      value: { version: 1, output: { path: '/bin/jj', nested: [{ pid: 3 }] } },
+    })
+  })
+
   it('checks the JSON boundary before transforming Client input into a Host-only value', async () => {
     const fixture = connectionFixture()
     const transformed = defineApi({

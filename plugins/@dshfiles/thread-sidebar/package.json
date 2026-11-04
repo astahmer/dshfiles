@@ -25,6 +25,10 @@
       "types": "./src/auto-settle-api.ts",
       "default": "./dist/auto-settle-api.js"
     },
+    "./thread-actions-api": {
+      "types": "./src/thread-actions-api.ts",
+      "default": "./dist/thread-actions-api.js"
+    },
     "./attention-client": {
       "types": "./src/attention-client.ts",
       "default": "./dist/attention-client.js"

@@ -84,6 +84,7 @@ const createThreadActions = (deps: FixtureDeps) => {
     prompt: call(actions.prompt),
     stop: call(actions.stop),
     selectModel: call(actions.selectModel),
+    fanOut: call(actions.fanOut),
     projectList: () => Effect.runPromise(actions.projectList()),
     projectRegister: call(actions.projectRegister),
     projectRename: call(actions.projectRename),
@@ -124,6 +125,49 @@ const createDeps = (overrides: Partial<FixtureDeps> = {}): FixtureDeps => ({
 })
 
 const codeOf = (error: unknown): string | undefined => (error instanceof PluginApiError ? error.code : undefined)
+
+describe('thread actions: fan out', () => {
+  test('selects each model before prompting and keeps a failed model separate', async () => {
+    const calls: string[] = []
+    let created = 0
+    const actions = createThreadActions(
+      createDeps({
+        create: async () => ({ sessionId: `session-${++created}` }),
+        selectModel: async input => {
+          calls.push(`select:${input.sessionId}:${input.model}`)
+          return { provider: input.provider, model: input.model }
+        },
+        rename: async (sessionId, title) => {
+          calls.push(`rename:${sessionId}:${title}`)
+          return { title }
+        },
+        prompt: async input => {
+          calls.push(`prompt:${input.sessionId}`)
+          if (input.sessionId === 'session-2') throw new Error('prompt unavailable')
+        },
+      }),
+    )
+    const result = await actions.fanOut({
+      input: {
+        text: 'Compare these answers',
+        projectId: 'project-1',
+        models: [
+          { provider: 'one', model: 'alpha' },
+          { provider: 'two', model: 'beta' },
+        ],
+      },
+      caller: agent('caller'),
+      signal,
+    })
+    expect(result.results).toMatchObject([
+      { sessionId: 'session-1', ok: true },
+      { sessionId: 'session-2', ok: false, error: 'prompt unavailable' },
+    ])
+    expect(calls.indexOf('select:session-1:alpha')).toBeLessThan(calls.indexOf('prompt:session-1'))
+    expect(calls.indexOf('select:session-2:beta')).toBeLessThan(calls.indexOf('prompt:session-2'))
+    expect(calls).toContain('rename:session-1:Compare these answers · alpha')
+  })
+})
 
 describe('thread actions: list', () => {
   test('hides archived threads by default and reports pinned state', async () => {
@@ -829,6 +873,7 @@ describe('thread actions: tool exposure', () => {
       'thread_rename',
       'thread_fork',
       'thread_continue_in',
+      'thread_fan_out',
       'thread_create',
       'thread_prompt',
       'thread_stop',

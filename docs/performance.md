@@ -53,6 +53,24 @@ The final source was measured again at `4a1f4c76`: Native p50 **115.3 ms**, p95/
 observed HTTP API requests stayed below 250 ms. [Repeated redacted measurements](workbench-switch-performance-2026-10-26-final.json).
 This confirms the controlled result, not a production or large-history after-deployment claim.
 
+## Scratch switch audit (2026-11-04)
+
+No live DSH process at `127.0.0.1:3080` was restarted or load-tested. The isolated `strobe-bench` profile passed `dshx dev doctor` with 226 active entries and all 75 bundles loaded. The corrected `workspace-nav/new-thread-composer` reach now clicks `New thread` and verifies `Send message` plus the seeded sample (91 / 22 / 14 ms).
+
+Strobe did not produce benchmark results: `strobe bench --check` failed 0/4 cases before their hooks because `overCDP` timed out after 30 s connecting to fresh Chromium on macOS. Treat its timing as unproven; the fallback probes below are separate evidence.
+
+Host attribution stayed below the 250 ms budget: a 15 s `host-lag` probe reported p50 4 ms, p90 7 ms, p99 43 ms, max 67 ms and no stalls above 250 ms. Two 10 s Host CPU captures during switches found only 8–9 ms busy with no DSH/dshfiles frames. No Host gap was evidenced. Machine load immediately before the final browser profile was 9.09 / 9.13 / 9.68 on the 10-core Mac; treat these timings as descriptive, not a performance SLO.
+
+| Scratch interaction                   | Before                                                                                                 | After                                                                                                                                             | Interpretation                                                                                                                                                                                      |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manual-unread unfinished-draft switch | 3 requests: 2 `dshx-2113d713/clearUnread` + `session/page`                                             | 2 requests: 1 `clearUnread` + `session/page`                                                                                                      | Reproduced and fixed one redundant `@dshfiles/thread-sidebar` write; selection effect owns cross-Session clearing, direct clearing remains for reselecting the active Session.                      |
+| Short completed-thread switch         | 28 requests, 18 KB WebSocket; one sample 192/195 ms composer/history, another 501/507 ms at load 12.75 | Not an apples-to-apples timing comparison; after a rebuild, a different finished-attention state emitted one `acknowledge` and one `clearUnread`. | Keep counts separate from variable timings and attention state.                                                                                                                                     |
+| CDP browser CPU profile               | —                                                                                                      | 245 ms + 53 ms long tasks; top plugin-script sample 152 ms at `qV` in the `/plugins/` response                                                    | The response aggregates all 75 client bundles and exposes no useful per-plugin source map; this profile cannot safely assign the long task to one plugin. No CPU optimization was inferred from it. |
+
+The request-channel owners observed in the switch probe were `thread-sidebar` (`2113d713`), `ai-accounts` (`2c5a0dae`, `21995261`, `b3419035`), `preview` (`16a2d652`), `multi-host` (`9ca8a5fa`), `jj-integration` (`e1cc781b`), `session-undo` (`69ad52d4`), `session-controller` (`70188033`), and `annotations` (`624001b6`). `dshx-99e8ae68/status` was not mapped; native routes also included `agentPresets/list`, `credentials/describe`, `llm/*`, `schedule/list` and `session/modelCatalog`. These are owners present in the trace, not claims that each endpoint is redundant.
+
+Verified: `dshx dev open workspace-nav/new-thread-composer` reached the corrected action; a scratch UI probe reduced the exact manual-unread draft flow from 3 requests / 2 clears to 2 / 1; focused selection test, plugin typecheck, build and Host import passed. Unverified: Strobe timing (macOS CDP timeout), isolated source attribution within the `/plugins/` aggregator, and an apples-to-apples timing improvement for the normal completed-thread switch. `features:check` still reports 12 unrelated pre-existing `workspace-folder-picker` coverage issues.
+
 ## Why earlier attempts stalled
 
 Several audits planned from source reading, request logs and small scratch fixtures, then proposed new helper
@@ -94,6 +112,34 @@ the jj caches (live, same probe, 2026-10-20 02:00–03:00):
 | History visible                 | 0.3–1.4 s; 6.2 s at 26 MB                   | 0.3–0.6 s; the 26 MB thread 0.5 s warm, 1.4–1.7 s on a Host's first open of it |
 | Composer `context` / `threadAt` | up to 875 ms / 815 ms                       | ≤ 277 ms / ≤ 138 ms                                                            |
 | Host lag p99 (70 s)             | 126 ms                                      | 75 ms                                                                          |
+
+## Startup HAR and page-load profile (2026-11-04)
+
+A HAR taken 37 s after a Host start showed a ~2.4 s window with no span at page load, a 13.9 s `editTimes`, and a
+thread that failed to open ("All fibers interrupted"). On a warm Host a scripted page load stalls ~0.65 s; a CPU profile
+of the live Host during that load (20 s, 5.8 s busy) names the owners below.
+
+| Cost                                                     | Evidence                                                                                                                | Fix                                                                                       | Owner              |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------ |
+| Page load blocks the Host on `pluginManager/listBundles` | ~1.0 s of synchronous `readFileSync`/`readdirSync` in core `readPluginMeta` per call; 185 KB response; called each load | labels cached on the Host per set of Loader rows, served by `settings-shell/bundleLabels` | settings-shell     |
+| Alert evaluation every minute                            | `alert engine evaluate` p50 532 ms, p95 5.3 s; each rule read walked all 100k spans (135–236 ms sync SQLite)            | `spans_end` index: 24–46 ms per rule on a copy of the live store                          | traces             |
+| `editTimes` for a 100-revision page                      | one `jj evolog` per commit: 13.9 s in the HAR, 31 s sequential                                                          | one batched `evolog`, walked per commit: 2.3 s with identical results                     | jujutsu            |
+| Cold local thread opens asked every remote host          | multi-host `owns` ran `session/list` over SSH per runtime before the history read                                       | ids from this Host's own list answer locally                                              | session-controller |
+| Thread open failed with "All fibers interrupted"         | concurrent `owns` joined the fiber `FiberMap.run(onlyIfMissing)` interrupts                                             | join the running discovery                                                                | multi-host         |
+| Session log lookups                                      | core `findLog` scans all 726 project directories per lookup; one tail read spent 4.4 s in `stat`, 18 ms reading         | open                                                                                      | core (Host gap)    |
+
+After, on a scratch DSH with every owned bundle (`dshx dev up`, 79 bundles, 342 Loader rows; machine load ~24 on 10
+cores), ten alternating calls of each on the same Host, with a cheap RPC pinging alongside:
+
+| Call                                | p50 / max        | Ping stall while it runs (p50) | Bytes  |
+| ----------------------------------- | ---------------- | ------------------------------ | ------ |
+| `pluginManager/listBundles` (old)   | 1,019 / 3,073 ms | 1,012 ms                       | 182 KB |
+| `settings-shell/bundleLabels` (new) | 38 / 609 ms      | 27 ms                          | 153 KB |
+
+Each page load now sends one `bundleLabels` and no `listBundles`. Whole page loads on that machine stayed noisy
+(slowest early request 0.6–2.0 s, led by core `settings/describe`, `credentials/describe` and
+`dynamicCordisRunner/*`), so the per-call comparison is the evidence. The scratch trace store was migrated with
+`spans_end` on boot.
 
 ## Thread-content search (palette `#…`)
 

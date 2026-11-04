@@ -1,4 +1,6 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsRenderSlots, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import {
@@ -22,6 +24,8 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
+import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
@@ -79,6 +83,7 @@ import {
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
 import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
+import { threadActionsApi } from './thread-actions-api.js'
 import { KeyboardShortcutModel, parseChord } from './keyboard-shortcuts.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -119,6 +124,7 @@ interface SidebarShellExtras {
   openSession: (sessionId: SessionSummary['id']) => void
   /** Runs a Host shortcut command by id; null when this Host cannot run commands outside a key press. */
   runCommand: ((commandId: string) => boolean) | null
+  loadModelCatalog: () => Promise<ModelCatalog>
 }
 
 type SidebarLocation = NavigationLocation<SessionSummary['id'], SidebarPanelMetadata['id']>
@@ -309,6 +315,24 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const historyGroupRef = useRef<HTMLDivElement>(null)
   const historyHold = useRef<{ timer: number | undefined; opened: boolean }>({ timer: undefined, opened: false })
   const restartApi = useApi(threadSidebarRestartApi)
+  const fanOutApi = useApi(threadActionsApi)
+  const fanOutWorkspaceId = useSyncExternalStore(PaletteBridge.subscribeFanOut, PaletteBridge.readFanOutWorkspaceId, () => undefined)
+  const fanOutOpen = fanOutWorkspaceId !== undefined
+  const [fanOutCatalog, setFanOutCatalog] = useState<ModelCatalog | null>(null)
+  const [fanOutCatalogError, setFanOutCatalogError] = useState<string | null>(null)
+  const [fanOutText, setFanOutText] = useState('')
+  const [fanOutModels, setFanOutModels] = useState<readonly { provider: string; model: string; reasoningEffort?: string }[]>([])
+  const [fanOutBusy, setFanOutBusy] = useState(false)
+  const [fanOutError, setFanOutError] = useState<string | null>(null)
+  const loadModelCatalog = props.loadModelCatalog
+  useEffect(() => {
+    if (!fanOutOpen) return
+    setFanOutCatalog(null)
+    setFanOutCatalogError(null)
+    void loadModelCatalog()
+      .then(setFanOutCatalog)
+      .catch(error => setFanOutCatalogError(error instanceof Error ? error.message : 'Could not load model catalog.'))
+  }, [fanOutOpen, loadModelCatalog])
   const [restartSnapshot, sendRestart] = useRestartMachine(restartApi)
   const restartRequestPending = restartSnapshot.matches('requesting')
   const restartRequestFailed = restartSnapshot.matches('failed')
@@ -1010,6 +1034,36 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         )}
       </div>
     )
+  }
+
+  const toggleFanOutModel = (provider: string, model: string, reasoningEffort?: string): void => {
+    setFanOutModels(current => {
+      const selected = current.some(route => route.provider === provider && route.model === model)
+      if (selected) return current.filter(route => route.provider !== provider || route.model !== model)
+      if (current.length >= 6) return current
+      return [...current, { provider, model, ...(reasoningEffort === undefined ? undefined : { reasoningEffort }) }]
+    })
+  }
+  const sendFanOut = async (): Promise<void> => {
+    if (fanOutModels.length < 2 || fanOutModels.length > 6 || fanOutText.trim().length === 0 || fanOutBusy) return
+    setFanOutBusy(true)
+    setFanOutError(null)
+    try {
+      const result = await fanOutApi.fanOut({
+        ...(fanOutWorkspaceId === null ? undefined : { projectId: fanOutWorkspaceId }),
+        text: fanOutText.trim(),
+        models: fanOutModels,
+      })
+      const firstCreated = result.results.find(item => item.ok && item.sessionId !== undefined)
+      if (firstCreated?.sessionId !== undefined) props.openSession(SessionId(firstCreated.sessionId))
+      const failures = result.results.filter(item => !item.ok)
+      if (failures.length > 0) setFanOutError(failures.map(item => `${item.provider}/${item.model}: ${item.error ?? 'failed'}`).join(' · '))
+      else PaletteBridge.closeFanOut()
+    } catch (error) {
+      setFanOutError(error instanceof Error ? error.message : 'Could not start the model threads.')
+    } finally {
+      setFanOutBusy(false)
+    }
   }
 
   const paletteHint = parseChord(preferences.paletteChord)
@@ -1816,6 +1870,66 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Dialog
+        open={fanOutOpen}
+        onOpenChange={open => {
+          if (!open) PaletteBridge.closeFanOut()
+        }}
+      >
+        <DialogContent className="dshx-root dshx:max-h-[85vh] dshx:overflow-y-auto dshx:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Send to several models</DialogTitle>
+          </DialogHeader>
+          <Textarea aria-label="Prompt" value={fanOutText} onChange={event => setFanOutText(event.target.value)} />
+          <div className="dshx:max-h-64 dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:border-border dshx:p-2">
+            {fanOutCatalog?.groups.map(group => (
+              <section key={group.id} className="dshx:mb-2">
+                <h3 className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group.name}</h3>
+                {group.models.map(model => {
+                  const checked = fanOutModels.some(route => route.provider === group.id && route.model === model.id)
+                  return (
+                    <label
+                      key={`${group.id}/${model.id}`}
+                      className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:hover:bg-accent"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        disabled={!checked && fanOutModels.length >= 6}
+                        onCheckedChange={() => toggleFanOutModel(group.id, model.id, model.reasoning?.defaultEffort)}
+                      />
+                      <span>{model.name}</span>
+                    </label>
+                  )
+                })}
+              </section>
+            ))}
+            {fanOutCatalog === null && fanOutCatalogError === null ? <p role="status">Loading models…</p> : null}
+            {fanOutCatalog !== null && fanOutCatalog.groups.length === 0 && fanOutCatalogError === null ? (
+              <p role="status" className="dshx:p-2 dshx:text-sm dshx:text-muted-foreground">
+                No available models
+              </p>
+            ) : null}
+            {fanOutCatalogError === null ? null : (
+              <p role="alert" className="dshx:text-sm dshx:text-destructive">
+                {fanOutCatalogError}
+              </p>
+            )}
+          </div>
+          {fanOutError === null ? null : (
+            <p role="alert" className="dshx:text-sm dshx:text-destructive">
+              {fanOutError}
+            </p>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => PaletteBridge.closeFanOut()}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={fanOutBusy || fanOutModels.length < 2 || fanOutText.trim().length === 0} onClick={() => void sendFanOut()}>
+              {fanOutBusy ? 'Sending…' : 'Send'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   )
 }

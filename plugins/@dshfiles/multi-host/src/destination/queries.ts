@@ -10,6 +10,7 @@ export const multiHostKeys = {
   all: ['multi-host'] as const,
   directory: ['multi-host', 'directory'] as const,
   resourcePool: ['multi-host', 'resource-pool'] as const,
+  identity: ['multi-host', 'identity'] as const,
   status: (runtimeId: string) => ['multi-host', 'status', runtimeId] as const,
   models: (runtimeId: string) => ['multi-host', 'models', runtimeId] as const,
   browse: (runtimeId: string, path: string | undefined) => ['multi-host', 'browse', runtimeId, path ?? '~'] as const,
@@ -32,6 +33,13 @@ export const multiHostQueries = {
       queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 10_000, request: hostSignal => api.resourcePool(undefined, { signal: hostSignal }) }),
       staleTime: 5_000,
       refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : refetchInterval),
+      retry: false,
+    }),
+  identity: (api: MultiHostClient) =>
+    queryOptions({
+      queryKey: multiHostKeys.identity,
+      queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.identity(undefined, { signal: hostSignal }) }),
+      staleTime: Number.POSITIVE_INFINITY,
       retry: false,
     }),
   /** Connects the host if needed, so it doubles as the status probe of the chip menu. */

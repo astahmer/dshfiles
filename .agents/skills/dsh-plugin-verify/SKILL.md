@@ -32,6 +32,17 @@ fnm exec --using=22.23.3 node -e "import('./dist/index.js')"   # 22.23.3 = .node
 An import failure here is exactly what shows up at boot as "did not activate". `dist/` is not versioned.
 Changed classes? Rebuild `@dshfiles/ui-styles` too (skill `plugin-ui`).
 
+Changed an exported schema, API type or dshx module? Check every importer before landing, through turbo so
+dependencies (dshx included) are rebuilt first:
+
+```sh
+pnpm exec turbo run typecheck test --filter='...@dshfiles/<plugin>'   # the plugin and all its dependents
+```
+
+A per-plugin `pnpm typecheck` passes while a dependent breaks (a multi-host schema migration landed and broke
+`thread-sidebar`), and against a stale `tooling/dshx` build it reports errors that are only old generated
+declarations (`DshxFeatureCatalogSchema.safeParse is not a function`). Rebuild before debugging those.
+
 Then the catalog contract, spans included:
 
 ```sh

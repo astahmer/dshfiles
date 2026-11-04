@@ -47,20 +47,43 @@ export const trySessionControllerOperation = <Value>(operation: string, run: () 
     },
   })
 
-const servicesOf = (ctx: CordisContext) => ({
-  ctx,
-  sessionController: ctx.get('sessionController'),
-  commands: ctx.get('commands'),
-  workspaceRegistry: ctx.get('workspaceRegistry'),
-  sessionQuery: ctx.get('sessionQuery'),
-  agentPresets: ctx.get('agentPresets'),
-})
+interface SessionControllerHostServices {
+  readonly ctx: CordisContext
+  readonly sessionController: CordisContext['sessionController'] | undefined
+  readonly commands: CordisContext['commands'] | undefined
+  readonly workspaceRegistry: CordisContext['workspaceRegistry'] | undefined
+  readonly sessionQuery: CordisContext['sessionQuery'] | undefined
+  readonly agentPresets: CordisContext['agentPresets'] | undefined
+}
 
-export class SessionControllerHostRuntime extends Context.Service<SessionControllerHostRuntime, ReturnType<typeof servicesOf>>()(
+export class SessionControllerHostRuntime extends Context.Service<SessionControllerHostRuntime, SessionControllerHostServices>()(
   '@dshfiles/session-controller/HostRuntime',
 ) {}
 
-export const sessionControllerRootLayer = (ctx: CordisContext) => Layer.succeed(SessionControllerHostRuntime, servicesOf(ctx))
+/**
+ * Each service is read when a handler uses it, not once at setup: the native controller this plugin starts waits for
+ * `sessionQuery`, which an owned search backend registers after its worker starts, so a setup-time read could keep
+ * `undefined` for the life of the Host.
+ */
+export const sessionControllerRootLayer = (ctx: CordisContext) =>
+  Layer.succeed(SessionControllerHostRuntime, {
+    ctx,
+    get sessionController() {
+      return ctx.get('sessionController')
+    },
+    get commands() {
+      return ctx.get('commands')
+    },
+    get workspaceRegistry() {
+      return ctx.get('workspaceRegistry')
+    },
+    get sessionQuery() {
+      return ctx.get('sessionQuery')
+    },
+    get agentPresets() {
+      return ctx.get('agentPresets')
+    },
+  })
 
 const { hostApi, ...effectPlugin } = DshxEffect.plugin({
   layer: sessionControllerRootLayer,

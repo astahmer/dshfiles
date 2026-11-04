@@ -1,4 +1,0 @@
-# The settings namespace is this Loader entry id.
-- insert:
-    - id: dshfiles-home
-      name: '@dshfiles/home'

@@ -1,7 +1,9 @@
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { LlmError } from '@deepseek-ai/dsh-llm'
-import type { OAuthCredential } from '@earendil-works/pi-ai'
+import type { Credential, OAuthCredential } from '@earendil-works/pi-ai'
+import { AccountCredentialHomeWork } from './account-credential-home-work.js'
+import { CodexHomeModel, materializeCodexShadowHome, type CodexHomeInput, type CodexHomeLayout } from './codex-home.js'
 
 const decodeJwtPayload = (token: string): Record<string, unknown> | undefined => {
   const segment = token.split('.')[1]
@@ -82,4 +84,26 @@ export const persistCodexOAuthCredential = async (codexHome: string, credential:
   const tmp = `${path}.ai-accounts-tmp-${process.pid}-${Date.now()}`
   await writeFile(tmp, `${JSON.stringify(parsed, null, 2)}\n`, { mode: 0o600 })
   await rename(tmp, path)
+}
+
+/** The pi-ai credential read and refresh of one Codex account home, serialized with every other operation on that home. */
+export class CodexCredentialStore {
+  static readonly resolveLayout = (input: CodexHomeInput): CodexHomeLayout => CodexHomeModel.resolveLayout(input)
+
+  static readonly forLayout = (layout: CodexHomeLayout) => {
+    const codexHome = layout.effectiveHomePath
+    const read = async (): Promise<OAuthCredential | undefined> => {
+      await materializeCodexShadowHome(layout)
+      return readCodexOAuthCredential(codexHome)
+    }
+    const modify = (mutate: (current: Credential | undefined) => Promise<Credential | undefined>): Promise<Credential | undefined> =>
+      AccountCredentialHomeWork.update(codexHome, {
+        read,
+        mutate,
+        persist: async next => {
+          if (next !== undefined && next.type === 'oauth') await persistCodexOAuthCredential(codexHome, next)
+        },
+      })
+    return { read, modify }
+  }
 }

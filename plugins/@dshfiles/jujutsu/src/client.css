@@ -1,5 +1,5 @@
 @source './';
-@source '../../project-folder-picker/src';
+@source '../../workspace-folder-picker/src/picker';
 
 code[data-dshfiles-jj-reference-owner] {
   background-color: transparent;

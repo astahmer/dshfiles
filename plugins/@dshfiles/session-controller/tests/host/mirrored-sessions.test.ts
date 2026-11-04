@@ -141,6 +141,42 @@ describe('mirrored sessions', () => {
     ).resolves.toEqual({ accepted: true, via: 'local' })
   })
 
+  it('pages a cold Session this Host listed without asking any runtime whether it owns it', async () => {
+    const { mirrored, source } = await fixture()
+    const asked: string[] = []
+    mirrored.registry.register(
+      source({
+        rows: [],
+        owns: async sessionId => {
+          asked.push(sessionId)
+          return false
+        },
+      }),
+    )
+    await mirrored.merge([summary('session-cold', 100)], {}, new AbortController().signal)
+    const page = { records: [], hasMore: false }
+    await expect(
+      mirrored.page({ address: { kind: 'session', sessionId: SessionId('session-cold') }, throughSeq: 0 }, new AbortController().signal, async () => page),
+    ).resolves.toBe(page)
+    expect(asked).toEqual([])
+  })
+
+  it('falls back to the local implementation when a runtime fails to answer ownership', async () => {
+    const { mirrored, source } = await fixture()
+    mirrored.registry.register(
+      source({
+        rows: [],
+        owns: async () => {
+          throw new Error('All fibers interrupted without error')
+        },
+      }),
+    )
+    const page = { records: [], hasMore: false }
+    await expect(
+      mirrored.page({ address: { kind: 'session', sessionId: SessionId('session-other') }, throughSeq: 0 }, new AbortController().signal, async () => page),
+    ).resolves.toBe(page)
+  })
+
   it('routes a mirrored Session’s model selection and projections to its source, never the local controller', async () => {
     const { mirrored, source } = await fixture()
     const selected: unknown[] = []

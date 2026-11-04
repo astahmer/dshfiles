@@ -65,6 +65,7 @@ export class HostAgents extends Context.Service<
   {
     readonly list: Effect.Effect<readonly Agent[]>
     readonly isOwnedBy: (candidate: Agent, owner: Agent) => boolean
+    readonly titleOf: (agent: Agent) => string | undefined
     readonly communicationAgents: Effect.Effect<readonly CommunicationAgent[]>
     readonly emitActivity: (payload: CommunicationMessageActivityPayload | CommunicationOperationActivityPayload) => Effect.Effect<void>
   }
@@ -76,6 +77,7 @@ export class HostAgents extends Context.Service<
       return HostAgents.of({
         list,
         isOwnedBy: (candidate, owner) => host.ctx.agents.isOwnedBy(candidate.id, owner),
+        titleOf: agent => host.ctx.get('sessionTitle')?.get(agent.session)?.title,
         communicationAgents: Effect.map(list, agents =>
           agents.map((agent): CommunicationAgent => ({
             id: agent.id,
@@ -92,7 +94,13 @@ export class HostAgents extends Context.Service<
   static readonly layerTest = (agents: readonly CommunicationAgent[]) =>
     Layer.succeed(
       HostAgents,
-      HostAgents.of({ list: Effect.succeed([]), isOwnedBy: () => false, communicationAgents: Effect.succeed(agents), emitActivity: () => Effect.void }),
+      HostAgents.of({
+        list: Effect.succeed([]),
+        isOwnedBy: () => false,
+        titleOf: () => undefined,
+        communicationAgents: Effect.succeed(agents),
+        emitActivity: () => Effect.void,
+      }),
     )
 }
 

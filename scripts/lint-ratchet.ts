@@ -19,7 +19,7 @@ const astGrepBoundaries = [
   'plugins/@dshfiles/plugin-ui/src/shiki-slim.ts',
   'plugins/@dshfiles/plugin-ui/src/virtual.ts',
   'plugins/@dshfiles/plugin-ui/src/icons.ts',
-  'plugins/@dshfiles/project-folder-picker/src/index.ts',
+  'plugins/@dshfiles/workspace-folder-picker/src/picker/index.ts',
   'plugins/@dshfiles/project-checks/src/api.ts',
   'tooling/dshx/packages/dshx/src/effect/index.ts',
   'plugins/@dshfiles/credential-port/src/effect.ts',

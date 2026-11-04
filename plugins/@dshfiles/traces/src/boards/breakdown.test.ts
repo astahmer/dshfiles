@@ -112,7 +112,7 @@ describe('span breakdown', () => {
             groupBy: { kind: 'operation' },
           }),
         )
-        expect(byOperation.rows.map(row => row.key)).toEqual(['jujutsu/status', 'memory/search', 'GET /'])
+        expect(byOperation.rows.map(row => row.key)).toEqual(['jujutsu/status', 'GET /', 'memory/search'])
         const byService = yield* SpanBreakdown.compute(
           decodeStrict({
             windowMinutes: 60,

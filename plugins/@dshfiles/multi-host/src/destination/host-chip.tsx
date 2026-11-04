@@ -4,15 +4,39 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { CheckIcon, ChevronDownIcon, LaptopIcon, PlusIcon, ServerIcon, SettingsIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { queryOptions, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
-import type { RuntimeSummary } from '../api.js'
+import type { HostSummary, RuntimeSummary } from '../api.js'
 import { HostDialog, hostState, StatusDot } from './hosts-dialog.js'
 import { CloneProjectDialog } from './clone-project-dialog.js'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { runtimePingRefetchInterval } from '../runtime-status-refresh-policy.js'
+import { DisconnectGrace } from './disconnect-grace.js'
 import { multiHostQueries, type MultiHostClient } from './queries.js'
 import { hostDestination, openHostsPage, setHostDestination } from './state.js'
 
 const chipClassName = 'dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:font-medium'
+
+const HostMenuRow = (props: {
+  readonly host: HostSummary | undefined
+  readonly runtime: RuntimeSummary
+  readonly state: ReturnType<typeof hostState>
+  readonly selected: boolean
+  readonly onSelect: () => void
+}) => {
+  const state = DisconnectGrace.use(props.state)
+  return (
+    <CommandItem value={`host-${props.runtime.id}`} onSelect={props.onSelect}>
+      <ServerIcon className="dshx:size-3.5" />
+      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+        <span className="dshx:truncate">{props.host?.name ?? props.runtime.name}</span>
+        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground" title={state.label}>
+          {props.host?.connector.kind === 'ssh' ? props.host.connector.sshTarget : 'this machine'} · {state.label}
+        </span>
+      </span>
+      <StatusDot tone={state.tone} />
+      {props.selected ? <CheckIcon className="dshx:size-3.5" /> : null}
+    </CommandItem>
+  )
+}
 
 /**
  * The first chip of the new-thread destination bar: where the thread runs. Auto chooses a visible remote host with
@@ -60,7 +84,9 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
   }
   const selectedHost = hosts.find(host => host.id === selected?.hostId)
   const label = destination.kind === 'local' ? 'Local' : (selectedHost?.name ?? selected?.name ?? 'Unknown host')
-  const state = destination.kind === 'runtime' ? liveState(selected) : undefined
+  const rawState = destination.kind === 'runtime' ? liveState(selected) : undefined
+  const graceState = DisconnectGrace.use(rawState ?? { tone: 'idle', label: '' })
+  const state = rawState === undefined ? undefined : graceState
   if (isApiOwnerMissing(directory.error)) return null
 
   return (
@@ -106,30 +132,19 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
                   <span className="dshx:flex-1">Local</span>
                   {destination.kind === 'local' ? <CheckIcon className="dshx:size-3.5" /> : null}
                 </CommandItem>
-                {pickable.map(runtime => {
-                  const host = hosts.find(item => item.id === runtime.hostId)
-                  const runtimeState = liveState(runtime)
-                  return (
-                    <CommandItem
-                      key={runtime.id}
-                      value={`host-${runtime.id}`}
-                      onSelect={() => {
-                        setHostDestination({ kind: 'runtime', runtimeId: runtime.id })
-                        setOpen(false)
-                      }}
-                    >
-                      <ServerIcon className="dshx:size-3.5" />
-                      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-                        <span className="dshx:truncate">{host?.name ?? runtime.name}</span>
-                        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground" title={runtimeState.label}>
-                          {host?.connector.kind === 'ssh' ? host.connector.sshTarget : 'this machine'} · {runtimeState.label}
-                        </span>
-                      </span>
-                      <StatusDot tone={runtimeState.tone} />
-                      {destination.kind === 'runtime' && destination.runtimeId === runtime.id ? <CheckIcon className="dshx:size-3.5" /> : null}
-                    </CommandItem>
-                  )
-                })}
+                {pickable.map(runtime => (
+                  <HostMenuRow
+                    key={runtime.id}
+                    host={hosts.find(item => item.id === runtime.hostId)}
+                    runtime={runtime}
+                    state={liveState(runtime)}
+                    selected={destination.kind === 'runtime' && destination.runtimeId === runtime.id}
+                    onSelect={() => {
+                      setHostDestination({ kind: 'runtime', runtimeId: runtime.id })
+                      setOpen(false)
+                    }}
+                  />
+                ))}
               </CommandGroup>
               {cloneTargets.length > 0 ? (
                 <>

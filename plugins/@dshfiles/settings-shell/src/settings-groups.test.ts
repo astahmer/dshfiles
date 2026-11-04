@@ -33,7 +33,7 @@ const pages = [
   page('ai-accounts', 'AI Accounts', ['distribution']),
   page('bash-sandbox', 'bash-sandbox', ['mode']),
   page('subagent-model-selection-settings', 'tool-subagent/model-selection-settings', ['model']),
-  page('dshx-plugin-marketplace', 'Dshx plugin marketplace', ['source']),
+  page('dshfiles-hmr-gate', 'Hmr gate', ['mode']),
   page('web', 'web', ['port']),
   page('dshfiles-backlog', 'Backlog', ['autoTriage', 'jevEnabled', 'jevSecret']),
   page('dshfiles-memory', 'Memory', ['jevEnabled', 'jevSecret']),
@@ -70,7 +70,7 @@ describe('settings groups', () => {
 
   it('titles pages for people, never with a package or row id', () => {
     for (const label of labels) expect(label).not.toMatch(/^[a-z0-9@][a-z0-9@/._-]*$/u)
-    expect(labels).toEqual(expect.arrayContaining(['Agent loop', 'Shell sandbox', 'Subagent models', 'Plugin marketplace', 'Web server']))
+    expect(labels).toEqual(expect.arrayContaining(['Agent loop', 'Shell sandbox', 'Subagent models', 'Plugin updates', 'Web server']))
   })
 
   it('shows AI accounts once: the section, its plugin settings and a link to the accounts page', () => {

@@ -51,7 +51,6 @@ const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
   'dshfiles-mcp-endpoint': { group: 'tools', order: 20 },
   'dshfiles-new-thread': { group: 'projects', order: 0 },
   'dshfiles-network-access': { group: 'hosts', order: 20 },
-  'dshfiles-privacy-controls': { group: 'security', order: 30 },
   plugins: { group: 'plugins', order: 0 },
 }
 
@@ -73,7 +72,6 @@ const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
   // Models & accounts
   'ai-accounts': { group: 'models', entry: 'ai-accounts' },
   'dshfiles-model-effort-picker': { group: 'models', label: 'Model picker', order: 20 },
-  'dshfiles-session-warming': { group: 'models', label: 'Prompt cache warming', order: 30 },
   // Drawn by the native Account section when it is loaded (see DRAWN_BY_SECTION); otherwise their own entries here.
   'llm-deepseek-account': { group: 'models', label: 'DeepSeek account', order: 40 },
   'ui-settings-account': { group: 'models', label: 'Account display', order: 41 },
@@ -101,7 +99,6 @@ const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
   'jj-integration': { group: 'projects', label: 'Thread workspaces', order: 10 },
   'dshfiles-git-worktrees': { group: 'projects', label: 'Git worktrees', order: 11 },
   'dshfiles-jujutsu': { group: 'projects', label: 'Repository history', order: 12 },
-  'dshfiles-home': { group: 'projects', entry: 'dshfiles-new-thread' },
   'dshfiles-test-runs': { group: 'projects', label: 'Test runs', order: 30 },
   'dshfiles-preview': { group: 'projects', label: 'Preview and dev servers', order: 31 },
   'dshfiles-project-checks': { group: 'projects', label: 'Project checks', order: 32 },
@@ -114,7 +111,6 @@ const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
   'bash-sandbox': { group: 'security', label: 'Shell sandbox', order: 20 },
   'session-log-deepseek': { group: 'security', label: 'Thread log sharing', order: 40 },
   // Plugins
-  'dshx-plugin-marketplace': { group: 'plugins', label: 'Plugin marketplace', order: 10 },
   'dshfiles-hmr-gate': { group: 'plugins', label: 'Plugin updates', order: 20 },
   // About (diagnostics)
   'dshfiles-agent-telemetry': { group: 'about', label: 'Agent telemetry', order: 20 },

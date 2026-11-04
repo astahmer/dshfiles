@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { ArchiveIcon, CircleCheckIcon, ClockIcon, GitMergeIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, PluginQueryProvider, pluginQueryClient, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
+import { createWorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Schema } from 'effect'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'

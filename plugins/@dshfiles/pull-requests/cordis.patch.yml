@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-pull-requests
+      name: '@dshfiles/pull-requests'

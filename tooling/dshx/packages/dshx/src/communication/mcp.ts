@@ -55,6 +55,7 @@ const inboxInput = Schema.Struct({
   limit: Schema.optionalKey(
     Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(500)),
   ),
+  includeSeen: Schema.optionalKey(Schema.Boolean),
 })
 const messageIdInput = Schema.Struct({
   messageId: Schema.String.check(Schema.isPattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu)),

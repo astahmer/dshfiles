@@ -12,7 +12,7 @@ import { AccountDefaultReasoningControl, AccountInheritanceControl } from './acc
 import { RuntimePathsSection } from './runtime-paths-section.js'
 import type { AccountDraft, AccountsFile } from './api.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
-import type { WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
+import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 

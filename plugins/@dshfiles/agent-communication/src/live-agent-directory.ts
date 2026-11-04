@@ -11,6 +11,63 @@ interface LiveAgentDirectoryRecord {
 }
 
 export class LiveAgentDirectoryModel {
+  static readonly projectAgents = (input: {
+    readonly agents: readonly {
+      readonly id: string
+      readonly title: string
+      readonly status: string
+      readonly createdAt: number
+      readonly cwd?: string | undefined
+      readonly parentSessionId?: string | undefined
+    }[]
+    readonly callerId?: string | undefined
+    readonly callerParentSessionId?: string | undefined
+    readonly callerCwd?: string | undefined
+    readonly includeAll: boolean
+  }) => {
+    const callerWorkspace = LiveAgentDirectoryModel.communicationWorkspaceTopic(input.callerCwd)
+    const relationOf = (agent: (typeof input.agents)[number]) => {
+      if (agent.id === input.callerId) return 'self'
+      if (input.callerParentSessionId === agent.id) return 'parent'
+      if (agent.parentSessionId === input.callerId && input.callerId !== undefined) return 'child'
+      if (agent.parentSessionId !== undefined && agent.parentSessionId === input.callerParentSessionId) return 'sibling'
+      return 'other'
+    }
+    const relations = input.agents.map(agent => {
+      const relation = relationOf(agent)
+      const workspace = LiveAgentDirectoryModel.communicationWorkspaceTopic(agent.cwd)
+      return {
+        agent,
+        relation,
+        sameWorkspace: callerWorkspace !== undefined && workspace === callerWorkspace,
+      }
+    })
+    const relationOrder = new Map([
+      ['self', 0],
+      ['parent', 1],
+      ['child', 2],
+      ['sibling', 3],
+      ['other', 4],
+    ])
+    const visible = input.includeAll ? relations : relations.filter(({ agent }) => agent.status !== 'finished' && agent.status !== 'archived')
+    return visible
+      .sort(
+        (left, right) =>
+          Number(right.sameWorkspace) - Number(left.sameWorkspace) ||
+          (relationOrder.get(left.relation) ?? 4) - (relationOrder.get(right.relation) ?? 4) ||
+          right.agent.createdAt - left.agent.createdAt,
+      )
+      .slice(0, 100)
+      .map(({ agent, relation }) => ({
+        id: agent.id,
+        title: agent.title,
+        status: agent.status,
+        created_at: agent.createdAt,
+        parent_session_id: agent.parentSessionId ?? null,
+        relation,
+      }))
+  }
+
   static readonly communicationWorkspaceTopic = (cwd: string | undefined): string | undefined => {
     if (cwd === undefined || cwd.length === 0) return undefined
     const digest = createHash('sha256').update(resolve(cwd)).digest('hex').slice(0, 24)

@@ -127,6 +127,11 @@ const traceMigrations = {
   CREATE INDEX spans_resource ON spans (resource_id);
   CREATE INDEX logs_resource ON logs (resource_id);
   `),
+  // Alert rules sample the spans that ended in their window, newest first, every minute; by start time alone each read
+  // walked the whole six-hour lookback (135–236 ms of blocking SQLite per rule on a 100k-span store).
+  '6_spans_end': scriptOf(`
+  CREATE INDEX spans_end ON spans (end_us);
+  `),
 }
 
 /** The span store's SQLite file; its statements never open spans, so storing traces never traces itself. */

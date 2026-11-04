@@ -39,6 +39,8 @@ const addressedSessionId = (address: SessionAddress): SessionId | undefined => (
 export class MirroredSessions {
   readonly registry: SessionSourceRegistry = createSessionSourceRegistry()
   private readonly published = new Map<string, { readonly running: boolean }>()
+  /** Session ids this Host's own list last returned: cold, but local, so no runtime is asked whether it owns them. */
+  private listedLocally: ReadonlySet<string> = new Set()
 
   /** @param ctx - Host context used to publish list and status changes to the browser. */
   constructor(private readonly ctx: Context) {}
@@ -48,9 +50,9 @@ export class MirroredSessions {
     this.ctx.provide('sessionSources', this.registry)
   }
 
-  /** A Session this Host has attached belongs to this runtime, not to a source. */
+  /** A Session this Host has attached or listed belongs to this runtime, not to a source. */
   private isLocal(sessionId: SessionId): boolean {
-    return this.ctx.sessions.get(sessionId) !== undefined
+    return this.ctx.sessions.get(sessionId) !== undefined || this.listedLocally.has(sessionId)
   }
 
   /** The source that already claimed this Session, without any I/O. */
@@ -63,7 +65,8 @@ export class MirroredSessions {
     if (this.isLocal(sessionId)) return undefined
     const claimed = this.registry.ownerOf(sessionId)
     if (claimed !== undefined) return claimed
-    return this.registry.resolveOwner(sessionId)
+    // A runtime that cannot answer does not own the Session; the local implementation then reports it missing.
+    return this.registry.resolveOwner(sessionId).catch(() => undefined)
   }
 
   private async require(sessionId: SessionId, endpoint: string): Promise<MirroredSessionSource> {
@@ -89,6 +92,7 @@ export class MirroredSessions {
   async merge(local: readonly SessionSummary[], request: SessionListRequest, signal: AbortSignal): Promise<readonly SessionSummary[]> {
     const merged: SessionSummary[] = [...local]
     const known = new Set(local.map(item => String(item.sessionId)))
+    this.listedLocally = new Set(known)
     for (const source of this.registry.sources()) {
       let rows: readonly SessionSummary[]
       try {

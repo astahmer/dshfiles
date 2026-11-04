@@ -28,9 +28,9 @@
     "@dshfiles/jj-cli": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
-    "@dshfiles/project-folder-picker": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
+    "@dshfiles/workspace-folder-picker": "workspace:*",
     "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },

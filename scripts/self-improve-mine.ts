@@ -18,7 +18,7 @@ import { SessionLogs, type SessionLogRef } from './self-improve-log.ts'
  */
 
 /** Bump when extraction changes so a cached extraction is not reused. */
-const EXTRACTOR_VERSION = 4
+const EXTRACTOR_VERSION = 5
 
 const MAX_EXCERPT = 240
 const MAX_SAMPLES_PER_SIGNAL = 3
@@ -245,7 +245,18 @@ const assistantSchema = Schema.Struct({
     Schema.Struct({ source: Schema.optionalKey(Schema.Struct({ provider: Schema.optionalKey(Schema.String), model: Schema.optionalKey(Schema.String) })) }),
   ),
 })
-const editArgsSchema = Schema.Struct({ file_path: Schema.optionalKey(Schema.String), command: Schema.optionalKey(Schema.String) })
+const editArgsSchema = Schema.Struct({
+  file_path: Schema.optionalKey(Schema.String),
+  path: Schema.optionalKey(Schema.String),
+  command: Schema.optionalKey(Schema.String),
+})
+const FILE_PATH_EDIT_TOOLS = new Set(['edit', 'write'])
+const PATH_EDIT_TOOLS = new Set(['apply_patch', 'editor_write'])
+const editedPathOf = ({ tool, args }: { tool: string; args: typeof editArgsSchema.Type }): string | undefined => {
+  if (FILE_PATH_EDIT_TOOLS.has(tool)) return args.file_path
+  if (PATH_EDIT_TOOLS.has(tool)) return args.path
+  return undefined
+}
 const skillArgsSchema = Schema.Struct({ name: Schema.String })
 
 const collapse = (text: string): string => text.replace(/\s+/g, ' ').trim()
@@ -502,7 +513,8 @@ const extractSession = async (ref: SessionLogRef): Promise<SessionFacts> => {
           const named = ScriptJson.decodeUnknownSafe(skillArgsSchema, SessionLogs.decodeJsonSafe(skillArgsSchema, parsed.data.arguments ?? '{}') ?? {})
           if (named.success) skillLoads[named.data.name] = (skillLoads[named.data.name] ?? 0) + 1
         }
-        if (args.success && args.data.file_path !== undefined) fileEdits[args.data.file_path] = (fileEdits[args.data.file_path] ?? 0) + 1
+        const editedPath = args.success ? editedPathOf({ tool: parsed.data.name, args: args.data }) : undefined
+        if (editedPath !== undefined) fileEdits[editedPath] = (fileEdits[editedPath] ?? 0) + 1
         const command = args.success ? args.data.command : undefined
         if (command === undefined) break
         const jjCommand =

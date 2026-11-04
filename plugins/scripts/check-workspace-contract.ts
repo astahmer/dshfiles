@@ -12,6 +12,8 @@ import { ScriptJson } from '../../scripts/json.ts'
  * the same strictness. Every workspace manifest also names exact versions
  * outside peerDependencies, so an install never re-resolves a range, and the
  * package graph stays acyclic because pnpm and Turbo refuse a cyclic task graph.
+ * A Host bundle that spawns through DSH's `subprocess` service injects it, or
+ * Cordis may activate the bundle before that service exists.
  */
 
 const workspaceRoot = join(import.meta.dirname, '..')
@@ -147,6 +149,20 @@ const cycleProblems = (projects: readonly WorkspaceProject[]): string[] => {
     : [`workspace packages form a dependency cycle: ${cycle.join(' → ')} — break one edge; pnpm and Turbo refuse a cyclic task graph.`]
 }
 
+const sourceFiles = (directory: string): readonly string[] =>
+  readdirSync(directory, { withFileTypes: true, recursive: true })
+    .filter(entry => entry.isFile() && /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name))
+    .map(entry => join(entry.parentPath, entry.name))
+
+const subprocessInjectProblems = (directory: string): string[] => {
+  const source = join(directory, 'src')
+  if (!existsSync(source)) return []
+  const texts = sourceFiles(source).map(file => readFileSync(file, 'utf8'))
+  const spawns = texts.some(text => text.includes("'@dshfiles/dshx/effect/child-process-spawner'"))
+  const injects = texts.some(text => /inject:\s*\[[^\]]*'subprocess'/.test(text))
+  return spawns && !injects ? ["uses DshChildProcessSpawner without inject: ['subprocess'] — add it to DshxPlugin.make so Cordis waits for the service."] : []
+}
+
 const problemsFor = (name: string): string[] => {
   const directory = join(packagesRoot, name)
   const isBundle = existsSync(join(directory, 'cordis.patch.yml'))
@@ -158,6 +174,7 @@ const problemsFor = (name: string): string[] => {
   return [
     ...(manifest.success ? [] : describeFailure(manifest.error).map(problem => `package.json ${problem}`)),
     ...(tsconfig.success ? [] : describeFailure(tsconfig.error).map(problem => `tsconfig.json ${problem}`)),
+    ...(isBundle ? subprocessInjectProblems(directory) : []),
   ].map(problem => `@dshfiles/${name} ${problem}`)
 }
 
@@ -178,5 +195,5 @@ if (problems.length > 0) {
   process.exit(1)
 }
 console.log(
-  'Workspace contract: every package has its scripts, uses its declared strict tsconfig base, pins exact versions outside peers, and forms an acyclic package graph.',
+  'Workspace contract: every package has its scripts, uses its declared strict tsconfig base, pins exact versions outside peers, injects the services it spawns through, and forms an acyclic package graph.',
 )

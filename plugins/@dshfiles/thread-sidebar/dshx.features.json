@@ -2,6 +2,36 @@
   "schemaVersion": 1,
   "features": [
     {
+      "id": "multi-model-fan-out",
+      "title": "Send one prompt to several models",
+      "summary": "Create two to six independent threads for selected models, selecting each model before sending the same prompt and reporting per-model success or failure.",
+      "reach": ["click button \"Open command palette\"", "click text \"Send to several models…\"", "expect dialog \"Send to several models\""],
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["model-selection", "creating", "partial-success", "complete"],
+      "failureModes": ["A failed model thread does not cancel another model's creation.", "The model is selected before the first prompt is queued."],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "thread-sidebar.multi-model-fan-out", "featureFile": "tooling/dshx/e2e/features/thread-sidebar-fan-out.feature" },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.fan-out-model-selection-order",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-actions.test.ts",
+          "testName": "selects each model before prompting and keeps a failed model separate"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.fan-out-input-validation",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.test.ts",
+          "testName": "accepts two to six models and rejects invalid fan-out sizes"
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" }
+      ]
+    },
+    {
       "id": "workbench-sidebar-assemblies",
       "title": "Dock the actual sidebar content assemblies",
       "summary": "The owned stack always uses Workbench tabs with no native-layout opt-out. The actual New tab chooser tab offers Thread Sidebar: Threads, Thread Sidebar: Navigation, AI Accounts: Preview and AI Accounts: Controls alongside the Settings Shell: Settings hub, without a separate Rich Composer/current-conversation entry. Mixed or unlabeled footer assemblies use Thread Sidebar: Plugin previews or Thread Sidebar: Plugin controls instead of claiming one plugin owns them. Each group has far-right Pane options, without a persistent Workbench toolbar. The sidebar root delegates authorized slots with real owner props, contexts and live navigation selection; shell.left supplies the flexible tabbed area, including the existing account Preview assembly seated as an ordinary group. The fixed Preview is absent while that actual supported slot is overridden; standalone Sidebar keeps its fallback. Brand/history/palette, native account/settings toolbar and update notices stay fixed. The Threads panel owns its Sidebar settings wheel and the original customization editor's portal seat. Its original middle is absent-occupant compatibility only. The fullheight right pane retains tabs and real Session resources while collapsed, independently of the left/centre bottom row.",

@@ -1,5 +1,4 @@
 import { activateAccountRuntime } from './account-runtime.js'
-import { AccountCredentialHomeWork } from './account-credential-home-work.js'
 import { createServingAccountService } from './serving-account.js'
 import { servingAccountHostApi } from './serving-account-host.js'
 import { threadAccountHostApi } from './thread-account-host.js'
@@ -75,8 +74,7 @@ import { RequestRoutingHooks } from './request-routing-promise.js'
 import { FailureRecoveryModel } from './failure-recovery.js'
 import { RequestAccountRouting } from './request-account-routing.js'
 import { randomUUID } from 'node:crypto'
-import { materializeCodexShadowHome } from './codex-home.js'
-import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
+import { CodexCredentialStore } from './codex-credential.js'
 import { createQuotaContinuationService } from './quota-continuation.js'
 import { QuotaAttention } from './quota-attention.js'
 import { ProviderProfileModel, EffortPinnedAdapter } from './provider-profile.js'
@@ -536,8 +534,7 @@ const startAccountsHost = (input: {
             const route = routes.get(provider)
             if (route?.kind === GITHUB_COPILOT_KIND) return copilotCredentials.read(route.instanceId)
             if (route === undefined || route.kind !== CODEX_KIND) return undefined
-            await materializeCodexShadowHome(route.layout)
-            return readCodexOAuthCredential(route.layout.effectiveHomePath)
+            return CodexCredentialStore.forLayout(route.layout).read()
           },
           list: async () =>
             [...routes]
@@ -558,17 +555,7 @@ const startAccountsHost = (input: {
             if (route === undefined || route.kind !== CODEX_KIND) {
               throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
             }
-            const codexHome = route.layout.effectiveHomePath
-            return AccountCredentialHomeWork.update(codexHome, {
-              read: async () => {
-                await materializeCodexShadowHome(route.layout)
-                return readCodexOAuthCredential(codexHome)
-              },
-              mutate,
-              persist: async next => {
-                if (next !== undefined && next.type === 'oauth') await persistCodexOAuthCredential(codexHome, next)
-              },
-            })
+            return CodexCredentialStore.forLayout(route.layout).modify(mutate)
           },
           delete: async provider => {
             const route = routes.get(provider)

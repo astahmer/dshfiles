@@ -10,6 +10,26 @@ Manage hosts on a dedicated page:
 
 ![Manage remote hosts and inspect the resource pressure used by Auto placement](docs/screenshots/host-management.png)
 
+Update every host's dshfiles checkout from the same page:
+
+![Update hosts lists each host's sync result, with Retry on a failed host](docs/screenshots/fleet-update.png)
+
+Edit host sets how much Auto loads a host and whether new threads there fetch
+first:
+
+![Edit host with the Auto weight and the fetch-before-new-threads switch](docs/screenshots/host-settings.png)
+
+- **Auto weight** (×1, ×2, ×4): Auto divides each host's resource pressure by
+  its weight, so a ×2 host takes about twice the load before another host wins.
+- **Fetch jj before new threads**: a thread started there first runs
+  `jj git fetch` in its folder, so its bookmarks match origin. Fetch never
+  rebases a working copy; a failed fetch still starts the thread and says why.
+- **Hidden** hosts leave the destination picker and their threads leave the
+  sidebar; nothing is deleted. A remote thread whose host is unreachable offers
+  **Hide this host**.
+- A host that answered in the last 10 s reads as **Reconnecting…** instead of
+  turning red on a short network blip.
+
 The dedicated reusable hosts page is **Hosts** in navigation and the Workbench chooser.
 
 ## Using it
@@ -21,6 +41,9 @@ The New thread bar (rendered by `@dshfiles/jj-integration`) starts with the
 - **A host** — each registered host with a status dot (green: connected, with
   the round-trip in ms; grey: not connected yet; red: the last error).
   Opening the menu pings every host once.
+- On the Hosts page, **Diagnose** appears on SSH rows with a runtime error. It
+  tests SSH login, DSH runtime and multi-host identity, shows the failed hop and
+  recovery path, and can copy the report.
 - **Add host…** — choose an SSH destination from a searchable picker of
   `~/.ssh/config` aliases (following `Include`) and plain `known_hosts` names,
   or choose a custom destination for `user@host`. Give it a name, then use
@@ -72,9 +95,9 @@ With a host chosen:
 - The started thread opens in the main area as a **normal thread of this client**:
   this Host mirrors the remote Session, so the native chat, its live transcript,
   and this machine's own composer (commands, references, attachments, queue,
-  stop) work on it. **Host UI** still opens the host's own DSH in a new tab on a
-  stable loopback origin for what the mirror cannot answer yet (approvals,
-  terminals). If the host drops, the composer keeps its draft and the message is
+  stop) work on it. **Open on remote host** opens the host's own DSH in a new tab
+  on a stable loopback origin, on that same thread, for what the mirror cannot
+  answer yet (approvals, terminals). If the host drops, the composer keeps its draft and the message is
   refused until the host is back.
 - The **Remote threads** list shows every thread on every registered host,
   grouped by host and newest first: threads started from here keep their title,
@@ -97,7 +120,9 @@ With a host chosen:
 - The thread sidebar shows a **Remote** section: every thread started from
   here, badged with its host and whether its connection is open. A row opens the
   mirrored Session; a brand-new thread appears in the sidebar as soon as the host
-  reports it.
+  reports it. When a remote workspace shares a Git origin with a local project,
+  its row joins that project's group and keeps the host badge; unavailable origins
+  leave its existing host-specific group unchanged.
 
 ## Setting up a remote host
 
@@ -143,6 +168,16 @@ method with a `multi_host_*` tool:
 - `multi_host_checkout_sync` — fetch and rebase one checkout onto
   `<bookmark>@origin`, keeping that machine's edits; `apply: false` only reports
   the commands.
+- `multi_host_update` — the Hosts page's **Update hosts** for one host: fetch,
+  then the host's own `dshx checkout sync` rebases, installs and rebuilds what
+  changed and says whether DSH there needs a restart. `apply: false` is a dry
+  run. It never restarts the host, and only commits on `main@origin` reach it.
+
+Agents can also hand work to another machine: `multi_host_delegate` runs a task
+as a thread on a named host, or on the least-loaded visible SSH host when no
+host is named, waits for the turn and returns its final answer. A question on the
+host, a failed turn or a wait that runs out comes back with the thread id to
+follow; cancelling the call stops the remote turn.
 
 Provisioning never installs a package manager or edits the machine's own setup:
 a missing fnm or a stale nixfiles is reported, not patched. It also never
@@ -173,17 +208,22 @@ title}` for threads started here, so the sidebar and view can list them.
 
 ## Compared with bb and t3code
 
-|                                   | bb (desktop build)                                      | t3code nightly                                             | multi-host                                                         |
-| --------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------ |
-| Transport                         | enrolled daemon, WebSocket to server                    | `ssh -L` to `t3 serve`                                     | `ssh -L` to `dsh web` (BatchMode, strict host keys)                |
-| Add host                          | enroll key + `curl \| sh` command, poll until connected | Settings → Connections, ssh config/known_hosts suggestions | chip → Add host…, same suggestions, Find + stepwise Test           |
-| Provision remote server           | install script                                          | release archive, checksum, lock, `nohup serve`             | not done: the host's DSH is managed separately                     |
-| Persistent connection / reconnect | heartbeat 5 s, backoff 1–30 s                           | supervisor, backoff 2 s–5 min                              | pooled tunnel, lazy reconnect, ping on menu open, manual Reconnect |
-| Remote folders / branches         | `host.browse_directory`, `list_branch_options`          | env `filesystem.browse`, `vcs.listRefs`                    | host's multi-host listing, host's jj-integration                   |
-| Run and follow a thread           | RPC + event upload                                      | per-environment WebSocket                                  | create + prompt over the native API, transcript polled             |
-| Sidebar                           | "By machine" grouping                                   | machine icon on foreign threads                            | Remote section with host badges                                    |
-| Offline send                      | queued                                                  | blocked with toast                                         | blocked with Reconnect                                             |
-| Credentials                       | hostKey file 0600                                       | system ssh + askpass, safeStorage                          | system ssh agent/keys only; no password prompt                     |
+|                                   | bb (desktop build)                                      | t3code nightly                                             | multi-host                                                            |
+| --------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------- |
+| Transport                         | enrolled daemon, WebSocket to server                    | `ssh -L` to `t3 serve`                                     | `ssh -L` to `dsh web` (BatchMode, strict host keys)                   |
+| Add host                          | enroll key + `curl \| sh` command, poll until connected | Settings → Connections, ssh config/known_hosts suggestions | chip → Add host…, same suggestions, Find + stepwise Test              |
+| Provision remote server           | install script                                          | automatic on SSH connect: release archive, lock, serve     | stepwise opt-in `multi_host_provision` (node → runtime), `doctor`     |
+| Persistent connection / reconnect | heartbeat 5 s, backoff 1–30 s                           | supervisor, backoff 2 s–5 min                              | pooled tunnel, lazy reconnect, ping on menu open, manual Reconnect    |
+| Remote folders / branches         | `host.browse_directory`, `list_branch_options`          | env `filesystem.browse`, `vcs.listRefs`                    | host's multi-host listing, host's jj-integration                      |
+| Run and follow a thread           | RPC + event upload                                      | per-environment WebSocket                                  | create + prompt over the native API, transcript polled                |
+| Sidebar                           | "By machine" grouping                                   | machine icon on foreign threads                            | Remote section with host badges                                       |
+| Offline send                      | queued                                                  | blocked with toast                                         | blocked with Reconnect                                                |
+| Credentials                       | hostKey file 0600                                       | system ssh + askpass, safeStorage                          | system ssh agent/keys only; no password prompt                        |
+| Pairing without SSH               | —                                                       | `t3 pair` token/QR, Tailscale routes, T3 Connect relay     | none                                                                  |
+| Automatic placement               | —                                                       | Auto balance (cpu × free memory, 15 s freshness)           | Auto: lowest max(load/cores, memory used)                             |
+| Remote approvals, terminal, diffs | —                                                       | native: each environment is a full server connection       | open the host's own DSH (Host UI)                                     |
+| Fleet update                      | —                                                       | Update Everything dialog, version-mismatch banner          | Update hosts dialog (sync + rebuild, restart left to you), drift line |
+| Delegate across machines          | —                                                       | `delegate_task` with `target.environmentId`                | `multi_host_delegate`: host or Auto, waits for the answer             |
 
 ## Limits
 

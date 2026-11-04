@@ -162,6 +162,7 @@ import {
   EMPTY_THREAD_SELECTION,
   THREAD_MAIN_BUTTON_SELECTOR,
   isThreadSelectionBackgroundClick,
+  shouldClearUnreadOnReselect,
   ThreadSelectionModel,
   type ThreadSelectionState,
 } from './thread-selection.js'
@@ -1581,7 +1582,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const boardViewSettings = storedThreadBoardView.useValue() ?? DEFAULT_THREAD_BOARD_VIEW
   const threadView = isBoard ? boardViewSettings : listThreadView
   const activeWorkspaceFilter = isBoard ? boardViewSettings.projectFilter : preferences.workspaceFilter
-  const remoteThreads = useRemoteSidebarThreads(props.wide !== false)
+  const localProjectsForRemoteThreads = useMemo(
+    () => SidebarOrganization.projectWorkspaces(workspaceState.items).map(workspace => ({ workspaceId: workspace.workspaceId, path: workspace.path })),
+    [workspaceState.items],
+  )
+  const remoteThreads = useRemoteSidebarThreads(props.wide !== false, localProjectsForRemoteThreads)
   const [now, setNow] = useState(() => Date.now())
   // The render path reads `now`; gestures and notices stamp with this reader instead, outside render.
   const readNow = useCallback(() => Date.now(), [])
@@ -2150,7 +2155,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const selectThread = (sessionId: SessionSummary['id'], options: { readonly linked?: boolean } = {}): void => {
     if (sessionId !== selectedSessionId) startInteraction('thread switch', { attributes: { 'dshx.thread.source': 'sidebar' } })
     const opened = attention.records.get(sessionId)
-    if (opened !== undefined) attention.clearUnread(sessionId, opened.version)
+    if (opened !== undefined && shouldClearUnreadOnReselect({ requestedSessionId: sessionId, selectedSessionId }))
+      attention.clearUnread(sessionId, opened.version)
     setRouteRequest(null)
     if (isPrimarySurface) pageLoadThreadRoute.settle()
     openedRouteId.current = sessionId

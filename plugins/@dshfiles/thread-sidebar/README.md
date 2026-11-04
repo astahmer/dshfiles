@@ -8,6 +8,8 @@
 
 ![Where did a page go? lists each former sidebar page and opens its new home](docs/screenshots/moved-to-map.png)
 
+![Send one prompt to multiple models](docs/screenshots/multi-model-fan-out.png)
+
 ![The Sidebar settings wheel belongs to the Threads panel, not the fixed app header](docs/screenshots/navigation-layout.png)
 
 ![The same account Preview docked as an ordinary view with its single tab row hidden](docs/screenshots/preview-as-regular-tab.png)
@@ -41,6 +43,8 @@ shown ones reorder around it. The project picker scopes rows to one workspace or
 unassigned sessions.
 
 The reusable board page is **Thread Sidebar: Board** (Threads › Board in the rail).
+
+**Multi-model fan-out.** `thread_fan_out` creates two to six independent threads for one prompt. Each thread is created blank, assigned its requested provider/model (and optional reasoning effort), titled `<prompt prefix> · <model>`, then receives the prompt. Creations run at concurrency two; each result reports its thread ID or failure without cancelling sibling work. With jj-integration isolation enabled, every thread is created in its own workspace.
 
 **Status grouping (default).** **All threads** groups rows by the ADE status vocabulary (plan `plans/ade-ux` §4.3,
 §4.7; `src/thread-status.ts`): **Pinned** on top, then **Needs you**, **Working**, **Ready**, **Idle** and **Done**.
@@ -736,7 +740,7 @@ To reproduce, start a scratch DSH and seed it:
 
 ```sh
 node tooling/dshx/packages/dshx/dist/cli/bin.js dev up \
-  --plugin @dshfiles/jj-integration --plugin @dshfiles/home \
+  --plugin @dshfiles/jj-integration --plugin @dshfiles/workspace-nav \
   --plugin @dshfiles/thread-sidebar --plugin @dshfiles/ui-styles \
   --name sidebar-scale --skip-build --json
 node tooling/dshx/scripts/sidebar-scale-bench.mjs "$TMPDIR/dshx-dev/sidebar-scale/state.json" --seed 305 --rounds 5

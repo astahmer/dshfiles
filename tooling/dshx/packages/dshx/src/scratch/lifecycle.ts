@@ -2,6 +2,7 @@ import { readFile, rm } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { connectDshPlatformClient } from '../platform/client.js'
+import { BootWarning } from './boot-warning.js'
 import { ScratchSeedRuntime } from './seed.js'
 import {
   DEFAULT_IDLE_TIMEOUT_MINUTES,
@@ -116,14 +117,23 @@ export const scratchDoctor = async (options: { readonly state: ScratchState; rea
       ...(!ok && { fix: 'The first entry named is often a dependent; read the host log and run "dshx check --boot" in the plugin.' }),
     })
   }
-  const hostErrors = (await readFile(state.hostLog, 'utf8').catch(() => ''))
+  const hostLog = await readFile(state.hostLog, 'utf8').catch(() => '')
+  const late =
+    plugins === undefined
+      ? undefined
+      : BootWarning.lateActivation({
+          hostLog,
+          activeIds: new Set(plugins.filter(plugin => plugin.phase === 'active').map(plugin => plugin.id.slice(plugin.id.lastIndexOf(':') + 1))),
+        })
+  const hostErrors = hostLog
     .split('\n')
-    .filter(line => HOST_ERROR_LINE.test(line))
+    .filter(line => HOST_ERROR_LINE.test(line) && line.trim() !== late?.header)
     .map(line => ScratchStateRuntime.redactUrls(line).slice(0, 300))
+  const lateNote = late === undefined ? '' : `; ${String(late.entries.length)} entries the boot listed as pending are active now`
   checks.push({
     id: 'host-log',
     ok: hostErrors.length === 0,
-    detail: hostErrors.length === 0 ? 'no error lines' : hostErrors.slice(-10).join('\n'),
+    detail: hostErrors.length === 0 ? `no error lines${lateNote}` : hostErrors.slice(-10).join('\n'),
     ...(hostErrors.length !== 0 && { fix: `Read ${state.hostLog} (it holds the launch token; do not paste it).` }),
   })
   return checks

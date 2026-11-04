@@ -41,7 +41,8 @@ export const EDIT_TIME_TEMPLATE =
   '\',"edited":\' ++ if(self.predecessors().len() > 1 || (' +
   'self.predecessors().any(|p| stringify(p.parents().map(|c| c.commit_id().short(64)).join(",")) == stringify(self.commit().parents().map(|c| c.commit_id().short(64)).join(","))) ' +
   '&& self.inter_diff().files()), "true", "false") ++ ' +
-  '\',"time":\' ++ self.operation().time().end().utc().format("%+").escape_json() ++ \'}\' ++ "\\n"'
+  '\',"predecessors":[\' ++ self.predecessors().map(|c| c.commit_id().short(64).escape_json()).join(",") ++ ' +
+  '\'],"time":\' ++ self.operation().time().end().utc().format("%+").escape_json() ++ \'}\' ++ "\\n"'
 
 export const FILE_STATS_TEMPLATE =
   '\'{"commitId":\' ++ self.commit_id().short(64).escape_json() ++ ' +

@@ -35,7 +35,10 @@ describe('Host communication service', () => {
         recipients: [{ principal: recipient, delivery: 'passive', readAt: 1_800_000_000_000 }],
       },
     ])
-    await expect(service.inbox({ principal: recipient })).resolves.toMatchObject([{ id: message.id, recipients: [{ readAt: 1_800_000_000_000 }] }])
+    await expect(service.inbox({ principal: recipient })).resolves.toEqual([])
+    await expect(service.inbox({ principal: recipient, includeSeen: true })).resolves.toMatchObject([
+      { id: message.id, recipients: [{ readAt: 1_800_000_000_000 }] },
+    ])
 
     await expect(service.acknowledge(recipient, message.id)).resolves.toEqual({ acknowledged: true })
     await expect(service.acknowledge(recipient, message.id)).resolves.toEqual({ acknowledged: false })

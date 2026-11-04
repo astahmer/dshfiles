@@ -6,7 +6,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
 import { fromEffect } from '@dshfiles/session-source-port'
-import { Cause, Clock, ConfigProvider, Effect, Exit, Layer, Option, Ref, Schema, Scope, Stream } from 'effect'
+import { Cause, Clock, ConfigProvider, Effect, Exit, Layer, Option, Ref, Schedule, Schema, Scope, Stream } from 'effect'
 import { FetchHttpClient } from 'effect/http'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
@@ -14,7 +14,7 @@ import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
 import { Api, DshxPlugin, HostContext, hostServiceChanges } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
-import { fileUploadValueSchema, jjRepositoriesEffectSchema, multiHostApi } from './api.js'
+import { fileUploadValueSchema, jjRepositoriesEffectSchema, multiHostApi, type ModelSelection } from './api.js'
 import type { ConnectionTestStep } from './api.js'
 import { Connectors } from './connectors/connectors.js'
 import { Loopback } from './connectors/loopback.js'
@@ -39,10 +39,13 @@ import { HostDirectory } from './host-directory.js'
 import { RuntimeIdentity } from './identity.js'
 import { LaunchFile } from './launch-file.js'
 import { LocalProjectFiles } from './local-project-files.js'
+import { readProjectOrigins } from './project-origins.js'
 import { NativeRpc } from './native-rpc.js'
 import { MultiHostPaths } from './paths.js'
 import { hostConnectorSchema, runtimeLocatorSchema, runtimeOriginPort, type HostRecord, type RuntimeRecord } from './records.js'
 import { RemoteCheckout } from './remote-checkout.js'
+import { RemoteUpdate } from './remote-update.js'
+import { RemoteDelegation, type DelegationProgress } from './remote-delegation.js'
 import { RemoteDoctor, type RemoteFacts } from './remote-doctor.js'
 import { RemoteExec } from './remote-exec.js'
 import { RemoteIdentity } from './remote-identity.js'
@@ -59,6 +62,7 @@ import { SchemaFields } from './schema.js'
 import { Ssh, shellQuote } from './ssh.js'
 import { listSshConfigHosts } from './ssh-config.js'
 import { ViewLeases } from './view-leases.js'
+import { threadViewUrl } from './thread-launch-url.js'
 import { RemoteRuntime } from './remote-runtime.js'
 import { createLocalProjectCopyCommand } from './local-project-copy-command.js'
 import type { Gateway } from './connectors/gateway.js'
@@ -197,6 +201,8 @@ const hostSummary = (input: { readonly record: HostRecord; readonly runtimes: re
   connector: input.record.connector,
   runtimeCount: input.runtimes.filter(runtime => runtime.hostId === input.record.id).length,
   hidden: input.record.hidden,
+  ...(input.record.weight !== undefined && { weight: input.record.weight }),
+  ...(input.record.fetchBeforeThread !== undefined && { fetchBeforeThread: input.record.fetchBeforeThread }),
 })
 
 /** The remote home a locator targets, or the one the probe read; a target with neither cannot be reached. */
@@ -257,12 +263,16 @@ const withRuntime = <A, E>(
   })
 
 /** Probe one SSH target and DSH home and pin its identity; shared by the add-host test and the save. */
+type QualifyStep = { step: ConnectionTestStep['step']; ok: boolean; ms: number; code?: string; message?: string }
+
 const qualifyRuntime = Effect.fn('multi-host runtime qualify')(function* (input: {
   readonly host: HostRecord
   readonly locator: RuntimeRecord['locator']
   readonly name: string
+  /** Receives each step as it settles, so a caller still sees the hops that ran when a later one fails. */
+  readonly steps?: Array<QualifyStep>
 }) {
-  const steps: Array<{ step: ConnectionTestStep['step']; ok: boolean; ms: number; code?: string; message?: string }> = []
+  const steps = input.steps ?? []
   const timed = <A, E, R>(step: ConnectionTestStep['step'], run: Effect.Effect<A, E, R>) =>
     Effect.gen(function* () {
       const startedAt = yield* Clock.currentTimeMillis
@@ -371,7 +381,7 @@ const isTaggedFailure = (error: unknown): error is TaggedFailure & { readonly me
 
 /** What creating or starting a remote thread reports: the Session id survives a failure that already created it. */
 type SessionStartOutcome =
-  | { readonly ok: true; readonly sessionId: string }
+  | { readonly ok: true; readonly sessionId: string; readonly fetch?: { readonly ok: boolean; readonly detail: string } }
   | { readonly ok: false; readonly code: string; readonly message: string; readonly sessionId?: string }
 
 const threadRefused = (input: { readonly code: string; readonly message: string; readonly sessionId?: string }): SessionStartOutcome => ({
@@ -379,6 +389,123 @@ const threadRefused = (input: { readonly code: string; readonly message: string;
   code: input.code,
   message: input.message,
   ...(input.sessionId !== undefined && { sessionId: input.sessionId }),
+})
+
+type ThreadStartInput = {
+  readonly runtimeId: string
+  readonly cwd: string
+  readonly text: string
+  readonly agentPreset?: string | undefined
+  readonly model?: ModelSelection | undefined
+}
+
+/** A failed fetch never blocks the thread: the thread starts on what the host has and the result says why. */
+const fetchBeforeThread = Effect.fn('multi-host fetch before thread')(function* (input: { readonly sshTarget: string; readonly cwd: string }) {
+  return yield* RemoteExec.run({ sshTarget: input.sshTarget, command: RemoteCheckout.fetchBeforeThreadCommand(input.cwd), timeoutMs: 60_000 }).pipe(
+    Effect.map(result =>
+      result.ok
+        ? { ok: true, detail: 'fetched before the thread started' }
+        : { ok: false, detail: `jj git fetch failed on the host: ${result.stderr.trim().split('\n').at(-1) ?? `exit ${String(result.code)}`}` },
+    ),
+    Effect.catch(error => Effect.succeed({ ok: false, detail: `jj git fetch could not run on the host: ${failed(error).message}` })),
+  )
+})
+
+const startRemoteThread = Effect.fn('multi-host thread start')(function* (input: ThreadStartInput) {
+  const directory = yield* HostDirectory
+  const threads = yield* RemoteThreads
+  const runtime = yield* directory.findRuntime(input.runtimeId)
+  if (runtime === undefined) return threadRefused({ code: 'runtime-not-found', message: 'This host is no longer recorded.' })
+  const host = yield* directory.findHost(runtime.hostId)
+  const fetch =
+    host?.fetchBeforeThread === true && host.connector.kind === 'ssh'
+      ? yield* fetchBeforeThread({ sshTarget: host.connector.sshTarget, cwd: input.cwd })
+      : undefined
+  const state: { sessionId: string | undefined } = { sessionId: undefined }
+  return yield* withRuntime(
+    runtime.id,
+    gateway =>
+      Effect.gen(function* () {
+        const created = yield* NativeRpc.call(gateway, {
+          namespace: 'session',
+          method: 'create',
+          args: { request: { cwd: input.cwd, ...(input.agentPreset !== undefined && { agentPreset: input.agentPreset }) } },
+        })
+        if (!created.ok) return threadRefused({ code: created.code, message: created.message })
+        const sessionId = (yield* decodeSessionCreated(created.value)).sessionId
+        state.sessionId = sessionId
+        if (input.model !== undefined) {
+          const model = input.model
+          yield* gateway.run({
+            namespace: 'session',
+            method: 'selectModel',
+            args: {
+              request: {
+                sessionId,
+                provider: model.provider,
+                model: model.model,
+                ...(model.reasoningEffort !== undefined && { reasoningEffort: model.reasoningEffort }),
+              },
+            },
+          })
+        }
+        yield* threads.record({ runtimeId: runtime.id, sessionId, cwd: input.cwd, title: input.text.slice(0, 80), createdAt: new Date().toISOString() })
+        const prompted = yield* NativeRpc.call(gateway, {
+          namespace: 'session',
+          method: 'prompt',
+          args: { request: { requestId: randomUUID(), sessionId, mode: 'queue', content: [{ type: 'text', text: input.text }] } },
+        })
+        if (!prompted.ok) return threadRefused({ code: prompted.code, message: prompted.message, sessionId })
+        return { ok: true as const, sessionId, ...(fetch !== undefined && { fetch }) }
+      }).pipe(Effect.map((outcome): SessionStartOutcome => outcome)),
+    { mutation: true, broken: brokenRpc },
+  ).pipe(Effect.catch(error => Effect.succeed(threadRefused({ ...failed(error), ...(state.sessionId !== undefined && { sessionId: state.sessionId }) }))))
+})
+
+const readRemoteTranscript = Effect.fn('multi-host thread transcript')(function* (input: {
+  readonly runtimeId: string
+  readonly sessionId: string
+  readonly maxMessages?: number | undefined
+}) {
+  return yield* withRuntime(
+    input.runtimeId,
+    gateway =>
+      Effect.flatMap(
+        gateway.follow({
+          endpoint: 'session/follow',
+          args: { request: { address: { kind: 'session', sessionId: input.sessionId }, maxMessages: input.maxMessages ?? 60 } },
+          timeout: 15_000,
+        }),
+        frames =>
+          Effect.gen(function* () {
+            const snapshot = frames.flatMap(frame => Option.toArray(decodeSnapshot(frame)))[0]
+            if (snapshot === undefined) return yield* new SessionUnavailable()
+            const reduced = reduceTranscript(snapshot.records)
+            return {
+              ok: true as const,
+              cursor: snapshot.cursor,
+              ...(snapshot.header?.cwd !== undefined && { cwd: snapshot.header.cwd }),
+              ...(reduced.title !== undefined && { title: reduced.title }),
+              ...(reduced.model !== undefined && { model: reduced.model }),
+              ...(reduced.waiting !== undefined && { waiting: reduced.waiting }),
+              running: reduced.running,
+              entries: reduced.entries,
+            }
+          }),
+      ),
+    { mutation: false },
+  ).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
+})
+
+const stopRemoteThread = Effect.fn('multi-host thread stop')(function* (input: { readonly runtimeId: string; readonly sessionId: string }) {
+  return yield* withRuntime(
+    input.runtimeId,
+    gateway => NativeRpc.call(gateway, { namespace: 'session', method: 'cancel', args: { request: { sessionId: input.sessionId } } }),
+    { mutation: true, broken: brokenRpc },
+  ).pipe(
+    Effect.map(() => ({ ok: true as const })),
+    Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
+  )
 })
 
 const handlers = Api.handlers(multiHostApi, {
@@ -531,9 +658,10 @@ const handlers = Api.handlers(multiHostApi, {
         hidden: false,
         createdAt: new Date().toISOString(),
       }
-      return yield* qualifyRuntime({ host, locator, name: input.name }).pipe(
-        Effect.map(({ identity, steps }) => ({ ok: true as const, steps, identity })),
-        Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
+      const steps: Array<QualifyStep> = []
+      return yield* qualifyRuntime({ host, locator, name: input.name, steps }).pipe(
+        Effect.map(({ identity }) => ({ ok: true as const, steps, identity })),
+        Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error), steps })),
       )
     })
   }),
@@ -585,6 +713,11 @@ const handlers = Api.handlers(multiHostApi, {
     const record = yield* directory.setHostHidden(input)
     return hostSummary({ record, runtimes: yield* directory.listRuntimes() })
   }),
+  hostSetSettings: Effect.fn('multi-host host set settings')(function* (input) {
+    const directory = yield* HostDirectory
+    const record = yield* directory.setHostSettings(input)
+    return hostSummary({ record, runtimes: yield* directory.listRuntimes() })
+  }),
   hostReorder: Effect.fn('multi-host host reorder')(function* (input) {
     const directory = yield* HostDirectory
     const runtimes = yield* directory.listRuntimes()
@@ -617,10 +750,22 @@ const handlers = Api.handlers(multiHostApi, {
       return { ok: true as const, runtime: yield* runtimeSummaryOf(runtime, pool) }
     }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
   }),
+  hostUpdate: Effect.fn('multi-host host update')(function* (input) {
+    return yield* Effect.gen(function* () {
+      const directory = yield* HostDirectory
+      const host = yield* directory.findHost(input.hostId)
+      if (host === undefined) return yield* new HostNotFound({ hostId: input.hostId })
+      if (host.connector.kind !== 'ssh') return yield* new ConnectorKindMismatch()
+      const sshTarget = host.connector.sshTarget
+      const facts = yield* RemoteDoctor.readFacts({ sshTarget, profile: 'web', checkoutPath: undefined })
+      return yield* RemoteUpdate.run({ sshTarget, facts, nodePath: officialNodeOf({ facts }), bookmark: input.bookmark, apply: input.apply })
+    }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
+  }),
   runtimeStatus: Effect.fn('multi-host runtime status')(function* (input) {
     const status = yield* RuntimeStatus
     return yield* status.status(input.runtimeId)
   }),
+  projectOrigins: readProjectOrigins,
   runtimePing: Effect.fn('multi-host runtime ping')(function* (input) {
     const startedAt = yield* Clock.currentTimeMillis
     return yield* withRuntime(input.runtimeId, gateway => gateway.api('identity', undefined), { mutation: false }).pipe(
@@ -790,50 +935,50 @@ const handlers = Api.handlers(multiHostApi, {
       { mutation: true, broken: brokenRpc },
     ).pipe(Effect.catch(error => Effect.succeed(threadRefused({ ...failed(error), ...(state.sessionId !== undefined && { sessionId: state.sessionId }) }))))
   }),
-  threadStart: Effect.fn('multi-host thread start')(function* (input) {
-    const directory = yield* HostDirectory
-    const threads = yield* RemoteThreads
-    const runtime = yield* directory.findRuntime(input.runtimeId)
-    if (runtime === undefined) return threadRefused({ code: 'runtime-not-found', message: 'This host is no longer recorded.' })
-    const state: { sessionId: string | undefined } = { sessionId: undefined }
-    return yield* withRuntime(
-      runtime.id,
-      gateway =>
-        Effect.gen(function* () {
-          const created = yield* NativeRpc.call(gateway, {
-            namespace: 'session',
-            method: 'create',
-            args: { request: { cwd: input.cwd, ...(input.agentPreset !== undefined && { agentPreset: input.agentPreset }) } },
-          })
-          if (!created.ok) return threadRefused({ code: created.code, message: created.message })
-          const sessionId = (yield* decodeSessionCreated(created.value)).sessionId
-          state.sessionId = sessionId
-          if (input.model !== undefined) {
-            const model = input.model
-            yield* gateway.run({
-              namespace: 'session',
-              method: 'selectModel',
-              args: {
-                request: {
-                  sessionId,
-                  provider: model.provider,
-                  model: model.model,
-                  ...(model.reasoningEffort !== undefined && { reasoningEffort: model.reasoningEffort }),
-                },
-              },
-            })
-          }
-          yield* threads.record({ runtimeId: runtime.id, sessionId, cwd: input.cwd, title: input.text.slice(0, 80), createdAt: new Date().toISOString() })
-          const prompted = yield* NativeRpc.call(gateway, {
-            namespace: 'session',
-            method: 'prompt',
-            args: { request: { requestId: randomUUID(), sessionId, mode: 'queue', content: [{ type: 'text', text: input.text }] } },
-          })
-          if (!prompted.ok) return threadRefused({ code: prompted.code, message: prompted.message, sessionId })
-          return { ok: true as const, sessionId }
-        }).pipe(Effect.map((outcome): SessionStartOutcome => outcome)),
-      { mutation: true, broken: brokenRpc },
-    ).pipe(Effect.catch(error => Effect.succeed(threadRefused({ ...failed(error), ...(state.sessionId !== undefined && { sessionId: state.sessionId }) }))))
+  threadStart: startRemoteThread,
+  delegate: Effect.fn('multi-host delegate')(function* (input) {
+    const runtimeId = input.runtimeId ?? (yield* (yield* ResourcePool).read).selected?.runtimeId
+    if (runtimeId === undefined) {
+      return {
+        ok: false as const,
+        code: 'no-auto-host',
+        message: 'Auto found no visible SSH host with fresh resource data. Name a host with runtimeId, or check the Hosts page.',
+      }
+    }
+    const started = yield* startRemoteThread({
+      runtimeId,
+      cwd: input.cwd,
+      text: input.text,
+      ...(input.agentPreset !== undefined && { agentPreset: input.agentPreset }),
+      ...(input.model !== undefined && { model: input.model }),
+    })
+    if (!started.ok) return started
+    const sessionId = started.sessionId
+    const deadline = (yield* Clock.currentTimeMillis) + input.waitSeconds * 1000
+    const read = Effect.gen(function* () {
+      const transcript = yield* readRemoteTranscript({ runtimeId, sessionId, maxMessages: 40 })
+      const progress: DelegationProgress = transcript.ok ? RemoteDelegation.progressOf(transcript) : { state: 'working' }
+      return { progress, expired: (yield* Clock.currentTimeMillis) >= deadline }
+    })
+    const { progress: settled } = yield* read.pipe(
+      Effect.repeat({ schedule: Schedule.spaced('3 seconds'), until: poll => poll.progress.state !== 'working' || poll.expired }),
+      Effect.onInterrupt(() => Effect.ignore(stopRemoteThread({ runtimeId, sessionId }))),
+    )
+    const base = { ok: true as const, runtimeId, sessionId }
+    switch (settled.state) {
+      case 'finished':
+        return { ...base, status: 'finished' as const, answer: settled.answer }
+      case 'failed':
+        return { ...base, status: 'failed' as const, detail: settled.detail }
+      case 'waiting':
+        return { ...base, status: 'waiting' as const, waiting: settled.waiting }
+      case 'working':
+        return {
+          ...base,
+          status: 'running' as const,
+          detail: `Still running after ${String(input.waitSeconds)} s; follow it with multi_host_thread_transcript.`,
+        }
+    }
   }),
   runtimeModels: Effect.fn('multi-host runtime models')(function* (input) {
     return yield* withRuntime(
@@ -938,36 +1083,7 @@ const handlers = Api.handlers(multiHostApi, {
       return { ok: true as const, value }
     }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
   }),
-  threadTranscript: Effect.fn('multi-host thread transcript')(function* (input) {
-    return yield* withRuntime(
-      input.runtimeId,
-      gateway =>
-        Effect.flatMap(
-          gateway.follow({
-            endpoint: 'session/follow',
-            args: { request: { address: { kind: 'session', sessionId: input.sessionId }, maxMessages: input.maxMessages ?? 60 } },
-            timeout: 15_000,
-          }),
-          frames =>
-            Effect.gen(function* () {
-              const snapshot = frames.flatMap(frame => Option.toArray(decodeSnapshot(frame)))[0]
-              if (snapshot === undefined) return yield* new SessionUnavailable()
-              const reduced = reduceTranscript(snapshot.records)
-              return {
-                ok: true as const,
-                cursor: snapshot.cursor,
-                ...(snapshot.header?.cwd !== undefined && { cwd: snapshot.header.cwd }),
-                ...(reduced.title !== undefined && { title: reduced.title }),
-                ...(reduced.model !== undefined && { model: reduced.model }),
-                ...(reduced.waiting !== undefined && { waiting: reduced.waiting }),
-                running: reduced.running,
-                entries: reduced.entries,
-              }
-            }),
-        ),
-      { mutation: false },
-    ).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
-  }),
+  threadTranscript: readRemoteTranscript,
   threadList: Effect.fn('multi-host thread list')(function* () {
     const directory = yield* HostDirectory
     const threads = yield* RemoteThreads
@@ -1020,16 +1136,7 @@ const handlers = Api.handlers(multiHostApi, {
       Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
     )
   }),
-  threadStop: Effect.fn('multi-host thread stop')(function* (input) {
-    return yield* withRuntime(
-      input.runtimeId,
-      gateway => NativeRpc.call(gateway, { namespace: 'session', method: 'cancel', args: { request: { sessionId: input.sessionId } } }),
-      { mutation: true, broken: brokenRpc },
-    ).pipe(
-      Effect.map(() => ({ ok: true as const })),
-      Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
-    )
-  }),
+  threadStop: stopRemoteThread,
   runtimeCall: Effect.fn('multi-host runtime call')(function* (input) {
     const mutation = NativeRpc.isMutation(input.request)
     return yield* withRuntime(input.runtimeId, gateway => NativeRpc.call(gateway, input.request), { mutation, broken: brokenRpc }).pipe(
@@ -1058,7 +1165,8 @@ const handlers = Api.handlers(multiHostApi, {
   }),
   runtimeOpenView: Effect.fn('multi-host runtime open view')(function* (input) {
     const leases = yield* ViewLeases
-    return yield* leases.open(input.runtimeId)
+    const view = yield* leases.open(input.runtimeId)
+    return input.sessionId === undefined ? view : { ...view, threadUrl: threadViewUrl({ launchUrl: view.launchUrl, sessionId: input.sessionId }) }
   }),
   runtimeCloseView: Effect.fn('multi-host runtime close view')(function* (input) {
     const leases = yield* ViewLeases
@@ -1277,6 +1385,7 @@ const pluginLayer = (config: Schema.Schema.Type<typeof configSchema>) =>
 
 export default DshxPlugin.make({
   name: '@dshfiles/multi-host',
+  inject: ['subprocess'],
   Config: configSchema,
   layer: pluginLayer,
   apis: [Api.bind(multiHostApi, handlers)],

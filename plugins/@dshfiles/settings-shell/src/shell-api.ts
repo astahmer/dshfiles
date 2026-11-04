@@ -1,6 +1,7 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { settingsSearchEntryFields } from '@dshfiles/dshx/settings'
 import * as Schema from 'effect/Schema'
+import { bundleLabelSchema } from './bundle-labels.js'
 import { dshReleaseStatusSchema } from './release-status.js'
 
 /** One namespace's field patch: JSON values only, validated by the Host against that namespace's schema. */
@@ -25,6 +26,8 @@ export const settingsShellApi = defineApi({
      * not exist yet: the native action creates it on first open.
      */
     documentPath: method({ input: Schema.Void, output: Schema.Struct({ path: Schema.NullOr(Schema.String), exists: Schema.Boolean }) }),
+    /** Each Loader row's manifest title and description, cached on the Host until the rows change. */
+    bundleLabels: method({ input: Schema.Void, output: Schema.Array(bundleLabelSchema).check(Schema.isMaxLength(2000)) }),
     /** The native Settings package version the running DSH ships, against the version this shell was ported from. */
     upstream: method({
       input: Schema.Void,

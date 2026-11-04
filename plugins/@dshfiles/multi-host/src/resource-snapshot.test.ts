@@ -28,6 +28,7 @@ const entry = ({
   snapshot: resources,
   stale = false,
   hidden = false,
+  weight,
 }: {
   readonly hostId: string
   readonly hostName: string
@@ -35,12 +36,14 @@ const entry = ({
   readonly snapshot: ResourceSnapshot
   readonly stale?: boolean
   readonly hidden?: boolean
+  readonly weight?: number
 }): ResourcePoolEntry => ({
   hostId,
   hostName,
   runtimeId,
   destination: { kind: 'runtime', runtimeId },
   hidden,
+  ...(weight !== undefined && { weight }),
   probe: { ok: true, snapshot: resources },
   stale,
   refreshing: false,
@@ -58,6 +61,18 @@ it('ranks hosts by their highest normalized CPU or memory pressure', () => {
       entry({ hostId: 'memory', hostName: 'Memory host', runtimeId: 'runtime-memory', snapshot: memoryPressured }),
     ]),
   ).toEqual({ hostId: 'cpu', hostName: 'CPU host', runtimeId: 'runtime-cpu', score: 0.5 })
+})
+
+it("divides each host's pressure by its weight, so a heavier host takes more load", () => {
+  const busier = snapshot({ loadAverage1m: 6, cpuCount: 8, memoryFreeBytes: 80 })
+  const idler = snapshot({ loadAverage1m: 4, cpuCount: 8, memoryFreeBytes: 80 })
+
+  expect(
+    ResourceSnapshotModel.selectAutoHost([
+      entry({ hostId: 'idle', hostName: 'Idle', runtimeId: 'runtime-idle', snapshot: idler }),
+      entry({ hostId: 'big', hostName: 'Big', runtimeId: 'runtime-big', snapshot: busier, weight: 2 }),
+    ]),
+  ).toEqual({ hostId: 'big', hostName: 'Big', runtimeId: 'runtime-big', score: 0.375 })
 })
 
 it('keeps directory order as the deterministic tie-break and skips hidden or stale hosts', () => {
