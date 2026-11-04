@@ -1,5 +1,5 @@
 {
-  "hostBundles": 55,
+  "hostBundles": 56,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -32,6 +32,7 @@
     "@dshfiles/multi-host",
     "@dshfiles/policies",
     "@dshfiles/preview",
+    "@dshfiles/project-automations",
     "@dshfiles/project-checks",
     "@dshfiles/prompt-stash",
     "@dshfiles/pull-requests",
@@ -57,12 +58,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 472,
-  "apiToolBindings": 327,
-  "apiToolNameCount": 327,
-  "apiToolSchemas": 326,
+  "apiMethods": 479,
+  "apiToolBindings": 334,
+  "apiToolNameCount": 334,
+  "apiToolSchemas": 333,
   "definedTools": 22,
-  "tools": 348,
+  "tools": 355,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -1765,6 +1766,293 @@
         },
         "required": [
           "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "automation_delete",
+      "description": "Delete an automation and its run history; its webhook URL stops answering. Threads it started are kept. Requires confirm: true. Call only when the user asked for this.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "automation_list",
+      "description": "Every project automation with its trigger (schedule with next run, or webhook URL), project, prompt, agent preset, model, enabled state and latest run. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "automation_projects",
+      "description": "Registered projects an automation can start threads in, with the projectId automation_save takes. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "automation_run_now",
+      "description": "Start one run of an automation now: a new thread in its project with its prompt (webhook placeholders render empty). Its schedule is unchanged. Call only when the user asked for this.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "automation_runs",
+      "description": "Recent automation runs, newest first, with trigger, outcome, the started thread id and the reason a run failed or was refused. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "automationId": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "automation_save",
+      "description": "Create a project automation (omit id) or replace one (pass its id). A schedule trigger takes cron, daily, weekly or every timing with an explicit IANA time zone; a webhook trigger takes the HMAC secret as a secret:ALIAS reference and a per-minute rate limit. Each run starts a new thread in the project with the prompt; a webhook prompt may read {{body.path}} and {{headers.name}}. Call only when the user asked for this.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "agentPreset": {
+            "type": "string"
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "reasoningEffort": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "additionalProperties": false
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "trigger": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "schedule"
+                    ]
+                  },
+                  "timing": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "cron"
+                            ]
+                          },
+                          "expression": {
+                            "type": "string"
+                          },
+                          "timeZone": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "expression",
+                          "timeZone"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "daily"
+                            ]
+                          },
+                          "time": {
+                            "type": "string"
+                          },
+                          "timeZone": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "time",
+                          "timeZone"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "weekly"
+                            ]
+                          },
+                          "time": {
+                            "type": "string"
+                          },
+                          "timeZone": {
+                            "type": "string"
+                          },
+                          "weekdays": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "time",
+                          "timeZone",
+                          "weekdays"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "every"
+                            ]
+                          },
+                          "everySeconds": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "everySeconds"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "timing"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "webhook"
+                    ]
+                  },
+                  "secretRef": {
+                    "type": "string"
+                  },
+                  "ratePerMinute": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "secretRef"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "title",
+          "projectId",
+          "prompt",
+          "trigger"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "automation_set_enabled",
+      "description": "Pause (enabled false) or resume an automation. A resumed schedule runs from its next target after now; runs missed while paused are not made up. Call only when the user asked for this.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "enabled"
         ],
         "additionalProperties": false
       }
