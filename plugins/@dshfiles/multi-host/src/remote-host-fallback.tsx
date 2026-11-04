@@ -3,12 +3,12 @@ import { useState } from 'react'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ExternalLinkIcon, TriangleAlertIcon } from '@dshfiles/plugin-ui/icons'
-import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
+import { ExternalLinkIcon, EyeOffIcon, TriangleAlertIcon } from '@dshfiles/plugin-ui/icons'
+import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { multiHostApi } from './api.js'
 import { openRemoteView } from './open-remote-view.js'
 import { versionMismatch } from './destination/connection-diagnostics.js'
-import { multiHostQueries } from './destination/queries.js'
+import { multiHostKeys, multiHostQueries } from './destination/queries.js'
 
 export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => {
   const api = useApi(multiHostApi)
@@ -23,6 +23,11 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
   })
   const directory = useQuery({ ...multiHostQueries.directory(api), enabled: owner.data !== undefined && owner.data !== null })
   const localIdentity = useQuery({ ...multiHostQueries.identity(api), enabled: owner.data !== undefined && owner.data !== null })
+  const queryClient = useQueryClient()
+  const hideHost = useMutation({
+    mutationFn: (hostId: string) => api.hostSetHidden({ id: hostId, hidden: true }),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: multiHostKeys.all }),
+  })
   const openHost = useMutation({
     mutationFn: async ({ runtimeId, tab }: { readonly runtimeId: string; readonly tab: Window }) => {
       try {
@@ -45,6 +50,8 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
 
   const runtimeId = owner.data
   const hostVersion = directory.data?.runtimes.find(runtime => runtime.id === runtimeId)?.identity?.dshVersion
+  const ownerRuntime = directory.data?.runtimes.find(runtime => runtime.id === runtimeId)
+  const unreachable = ownerRuntime !== undefined && !ownerRuntime.connected && ownerRuntime.lastError !== undefined
   const outdatedVersion = versionMismatch({ localVersion: localIdentity.data?.dshVersion, remoteVersion: hostVersion })
   const open = (): void => {
     setPopupBlocked(false)
@@ -64,6 +71,13 @@ export const RemoteHostFallback = (props: { readonly sessionId: SessionId }) => 
       </Button>
       {openHost.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(openHost.error, 'Could not open the remote host.')}</span> : null}
       {popupBlocked ? <span className="dshx:text-xs dshx:text-destructive">Allow pop-ups to open the remote host.</span> : null}
+      {unreachable ? (
+        <Button type="button" variant="ghost" size="sm" disabled={hideHost.isPending} onClick={() => hideHost.mutate(ownerRuntime.hostId)}>
+          <EyeOffIcon aria-hidden />
+          Hide this host
+        </Button>
+      ) : null}
+      {hideHost.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(hideHost.error, 'Could not hide the host.')}</span> : null}
       {outdatedVersion === undefined ? null : (
         <span data-remote-host-version-drift="" className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-warning">
           <TriangleAlertIcon className="dshx:size-3.5" aria-hidden />

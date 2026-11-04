@@ -71,3 +71,12 @@ describe('remote checkout sync', () => {
     expect(run.detail).toContain('would fetch')
   })
 })
+
+describe('fetch before a remote thread', () => {
+  test('fetches the thread folder with jj on a usual PATH and quotes the folder', () => {
+    const command = RemoteCheckout.fetchBeforeThreadCommand("/Users/me/dev/it's here")
+    expect(command).toContain('/opt/homebrew/bin')
+    expect(command).toContain(`jj -R '/Users/me/dev/it'\\''s here' git fetch`)
+    expect(command).not.toContain('rebase')
+  })
+})

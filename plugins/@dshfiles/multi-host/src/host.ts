@@ -200,6 +200,8 @@ const hostSummary = (input: { readonly record: HostRecord; readonly runtimes: re
   connector: input.record.connector,
   runtimeCount: input.runtimes.filter(runtime => runtime.hostId === input.record.id).length,
   hidden: input.record.hidden,
+  ...(input.record.weight !== undefined && { weight: input.record.weight }),
+  ...(input.record.fetchBeforeThread !== undefined && { fetchBeforeThread: input.record.fetchBeforeThread }),
 })
 
 /** The remote home a locator targets, or the one the probe read; a target with neither cannot be reached. */
@@ -378,7 +380,7 @@ const isTaggedFailure = (error: unknown): error is TaggedFailure & { readonly me
 
 /** What creating or starting a remote thread reports: the Session id survives a failure that already created it. */
 type SessionStartOutcome =
-  | { readonly ok: true; readonly sessionId: string }
+  | { readonly ok: true; readonly sessionId: string; readonly fetch?: { readonly ok: boolean; readonly detail: string } }
   | { readonly ok: false; readonly code: string; readonly message: string; readonly sessionId?: string }
 
 const threadRefused = (input: { readonly code: string; readonly message: string; readonly sessionId?: string }): SessionStartOutcome => ({
@@ -396,11 +398,28 @@ type ThreadStartInput = {
   readonly model?: ModelSelection | undefined
 }
 
+/** A failed fetch never blocks the thread: the thread starts on what the host has and the result says why. */
+const fetchBeforeThread = Effect.fn('multi-host fetch before thread')(function* (input: { readonly sshTarget: string; readonly cwd: string }) {
+  return yield* RemoteExec.run({ sshTarget: input.sshTarget, command: RemoteCheckout.fetchBeforeThreadCommand(input.cwd), timeoutMs: 60_000 }).pipe(
+    Effect.map(result =>
+      result.ok
+        ? { ok: true, detail: 'fetched before the thread started' }
+        : { ok: false, detail: `jj git fetch failed on the host: ${result.stderr.trim().split('\n').at(-1) ?? `exit ${String(result.code)}`}` },
+    ),
+    Effect.catch(error => Effect.succeed({ ok: false, detail: `jj git fetch could not run on the host: ${failed(error).message}` })),
+  )
+})
+
 const startRemoteThread = Effect.fn('multi-host thread start')(function* (input: ThreadStartInput) {
   const directory = yield* HostDirectory
   const threads = yield* RemoteThreads
   const runtime = yield* directory.findRuntime(input.runtimeId)
   if (runtime === undefined) return threadRefused({ code: 'runtime-not-found', message: 'This host is no longer recorded.' })
+  const host = yield* directory.findHost(runtime.hostId)
+  const fetch =
+    host?.fetchBeforeThread === true && host.connector.kind === 'ssh'
+      ? yield* fetchBeforeThread({ sshTarget: host.connector.sshTarget, cwd: input.cwd })
+      : undefined
   const state: { sessionId: string | undefined } = { sessionId: undefined }
   return yield* withRuntime(
     runtime.id,
@@ -436,7 +455,7 @@ const startRemoteThread = Effect.fn('multi-host thread start')(function* (input:
           args: { request: { requestId: randomUUID(), sessionId, mode: 'queue', content: [{ type: 'text', text: input.text }] } },
         })
         if (!prompted.ok) return threadRefused({ code: prompted.code, message: prompted.message, sessionId })
-        return { ok: true as const, sessionId }
+        return { ok: true as const, sessionId, ...(fetch !== undefined && { fetch }) }
       }).pipe(Effect.map((outcome): SessionStartOutcome => outcome)),
     { mutation: true, broken: brokenRpc },
   ).pipe(Effect.catch(error => Effect.succeed(threadRefused({ ...failed(error), ...(state.sessionId !== undefined && { sessionId: state.sessionId }) }))))
@@ -691,6 +710,11 @@ const handlers = Api.handlers(multiHostApi, {
   hostSetHidden: Effect.fn('multi-host host set hidden')(function* (input) {
     const directory = yield* HostDirectory
     const record = yield* directory.setHostHidden(input)
+    return hostSummary({ record, runtimes: yield* directory.listRuntimes() })
+  }),
+  hostSetSettings: Effect.fn('multi-host host set settings')(function* (input) {
+    const directory = yield* HostDirectory
+    const record = yield* directory.setHostSettings(input)
     return hostSummary({ record, runtimes: yield* directory.listRuntimes() })
   }),
   hostReorder: Effect.fn('multi-host host reorder')(function* (input) {

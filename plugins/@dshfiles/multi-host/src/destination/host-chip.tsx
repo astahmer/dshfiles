@@ -9,6 +9,7 @@ import { HostDialog, hostState, StatusDot } from './hosts-dialog.js'
 import { CloneProjectDialog } from './clone-project-dialog.js'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { runtimePingRefetchInterval } from '../runtime-status-refresh-policy.js'
+import { DisconnectGrace } from './disconnect-grace.js'
 import { multiHostQueries, type MultiHostClient } from './queries.js'
 import { hostDestination, openHostsPage, setHostDestination } from './state.js'
 
@@ -60,7 +61,9 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
   }
   const selectedHost = hosts.find(host => host.id === selected?.hostId)
   const label = destination.kind === 'local' ? 'Local' : (selectedHost?.name ?? selected?.name ?? 'Unknown host')
-  const state = destination.kind === 'runtime' ? liveState(selected) : undefined
+  const rawState = destination.kind === 'runtime' ? liveState(selected) : undefined
+  const graceState = DisconnectGrace.use(rawState ?? { tone: 'idle', label: '' })
+  const state = rawState === undefined ? undefined : graceState
   if (isApiOwnerMissing(directory.error)) return null
 
   return (

@@ -83,6 +83,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_save_ssh_host',
       'multi_host_session_jj_repositories',
       'multi_host_set_host_hidden',
+      'multi_host_set_host_settings',
       'multi_host_ssh_hosts',
       'multi_host_start_thread',
       'multi_host_status',

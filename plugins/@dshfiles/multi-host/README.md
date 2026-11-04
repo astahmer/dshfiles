@@ -14,6 +14,22 @@ Update every host's dshfiles checkout from the same page:
 
 ![Update hosts lists each host's sync result, with Retry on a failed host](docs/screenshots/fleet-update.png)
 
+Edit host sets how much Auto loads a host and whether new threads there fetch
+first:
+
+![Edit host with the Auto weight and the fetch-before-new-threads switch](docs/screenshots/host-settings.png)
+
+- **Auto weight** (×1, ×2, ×4): Auto divides each host's resource pressure by
+  its weight, so a ×2 host takes about twice the load before another host wins.
+- **Fetch jj before new threads**: a thread started there first runs
+  `jj git fetch` in its folder, so its bookmarks match origin. Fetch never
+  rebases a working copy; a failed fetch still starts the thread and says why.
+- **Hidden** hosts leave the destination picker and their threads leave the
+  sidebar; nothing is deleted. A remote thread whose host is unreachable offers
+  **Hide this host**.
+- A host that answered in the last 10 s reads as **Reconnecting…** instead of
+  turning red on a short network blip.
+
 The dedicated reusable hosts page is **Multi-host: Hosts** in navigation and the Workbench chooser.
 
 ## Using it

@@ -23,8 +23,9 @@ export class ResourceSnapshotModel {
     let selected: ResourceSelection | undefined
     for (const entry of entries) {
       if (entry.hidden || entry.stale || entry.destination === null || !entry.probe.ok) continue
-      const score = ResourceSnapshotModel.resourcePressureScore(entry.probe.snapshot)
-      if (score === undefined) continue
+      const pressure = ResourceSnapshotModel.resourcePressureScore(entry.probe.snapshot)
+      if (pressure === undefined) continue
+      const score = pressure / (entry.weight ?? 1)
       if (selected === undefined || score < selected.score) {
         selected = {
           hostId: entry.hostId,

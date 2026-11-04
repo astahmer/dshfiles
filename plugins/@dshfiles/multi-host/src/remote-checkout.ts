@@ -82,7 +82,16 @@ const runCheckoutSync = Effect.fn('remote checkout sync')(function* ({
   return { ok: true, applied: true, plan, stdout, stderr, detail: `fetched and rebased onto ${bookmark}@origin` } satisfies CheckoutSyncRun
 })
 
+/**
+ * Fetch the repository a remote thread is about to work in, so its bookmarks match origin. Fetch only moves remote
+ * bookmarks (and tracked ones that did not diverge), never anyone's working copy. jj often lives outside a
+ * non-login shell's PATH, so the usual install locations come first.
+ */
+const fetchBeforeThreadCommand = (cwd: string): string =>
+  `PATH="$HOME/.nix-profile/bin:/etc/profiles/per-user/$USER/bin:/run/current-system/sw/bin:/opt/homebrew/bin:/usr/local/bin:$HOME/.cargo/bin:$PATH" jj -R ${shellQuote(cwd)} git fetch`
+
 export class RemoteCheckout {
+  static readonly fetchBeforeThreadCommand = fetchBeforeThreadCommand
   static readonly plan = planCheckoutSync
   static readonly run = runCheckoutSync
 }

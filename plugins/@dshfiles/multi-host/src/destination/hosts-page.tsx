@@ -29,6 +29,7 @@ import { moveHostId, shiftHostId } from './host-order.js'
 import { CloneProjectDialog } from './clone-project-dialog.js'
 import { versionMismatch } from './connection-diagnostics.js'
 import { FleetUpdateDialog } from './fleet-update-dialog.js'
+import { DisconnectGrace } from './disconnect-grace.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 
 type DirectoryData = { readonly hosts: readonly HostSummary[]; readonly runtimes: readonly RuntimeSummary[] }
@@ -103,7 +104,7 @@ const HostRow = (props: {
 }) => {
   const { api, host, runtime } = props
   const queryClient = useQueryClient()
-  const state = hostState(runtime)
+  const state = DisconnectGrace.use(hostState(runtime))
   const outdatedVersion = versionMismatch({ localVersion: props.localVersion, remoteVersion: runtime?.identity?.dshVersion })
   const [confirming, setConfirming] = useState(false)
   const [popupBlocked, setPopupBlocked] = useState(false)
@@ -497,6 +498,8 @@ export const HostsPage = () => {
                   name: host.name,
                   sshTarget: host.connector.kind === 'ssh' ? host.connector.sshTarget : '',
                   remoteHome: runtimeFor(host)?.remoteHome ?? '',
+                  weight: host.weight,
+                  fetchBeforeThread: host.fetchBeforeThread,
                 })
               }
               onRemove={() => remove.mutate(host.id)}

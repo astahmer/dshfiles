@@ -126,6 +126,8 @@ interface Change<Result> {
 }
 
 /** The private registry of hosts and their runtimes, one transaction at a time. */
+export type HostSettingsInput = { readonly id: string; readonly weight?: number | undefined; readonly fetchBeforeThread?: boolean | undefined }
+
 export class HostDirectory extends Context.Service<
   HostDirectory,
   {
@@ -136,6 +138,7 @@ export class HostDirectory extends Context.Service<
     readonly findRuntime: (id: string) => Effect.Effect<RuntimeRecord | undefined, DirectoryReadError>
     readonly upsertHost: (record: HostRecord) => Effect.Effect<HostRecord, DirectoryWriteError | HostConnectorInUse>
     readonly setHostHidden: (input: { readonly id: string; readonly hidden: boolean }) => Effect.Effect<HostRecord, DirectoryWriteError | HostNotFound>
+    readonly setHostSettings: (input: HostSettingsInput) => Effect.Effect<HostRecord, DirectoryWriteError | HostNotFound>
     readonly reorderHosts: (ids: readonly string[]) => Effect.Effect<readonly HostRecord[], DirectoryWriteError | HostOrderIncomplete>
     readonly upsertRuntime: (record: RuntimeRecord) => Effect.Effect<RuntimeRecord, DirectoryWriteError | HostNotFound | ConnectorKindMismatch>
     readonly removeRuntime: (id: string) => Effect.Effect<boolean, DirectoryWriteError>
@@ -227,6 +230,22 @@ export class HostDirectory extends Context.Service<
         )
       })
 
+      const setHostSettings = Effect.fn('multi-host directory set host settings')(function* (input: HostSettingsInput) {
+        return yield* transact(current =>
+          Effect.gen(function* () {
+            const previous = current.hosts.find(host => host.id === input.id)
+            if (previous === undefined) return yield* new HostNotFound({ hostId: input.id })
+            const record: HostRecord = {
+              ...previous,
+              ...(input.weight !== undefined && { weight: input.weight }),
+              ...(input.fetchBeforeThread !== undefined && { fetchBeforeThread: input.fetchBeforeThread }),
+            }
+            const next = yield* validNext({ ...current, hosts: current.hosts.map(host => (host.id === input.id ? record : host)) })
+            return { next, result: record }
+          }),
+        )
+      })
+
       const reorderHosts = Effect.fn('multi-host directory reorder hosts')(function* (ids: readonly string[]) {
         return yield* transact(current =>
           Effect.gen(function* () {
@@ -312,6 +331,7 @@ export class HostDirectory extends Context.Service<
         findRuntime: id => Effect.map(read, directory => directory.runtimes.find(runtime => runtime.id === id)),
         upsertHost,
         setHostHidden,
+        setHostSettings,
         reorderHosts,
         upsertRuntime,
         removeRuntime,

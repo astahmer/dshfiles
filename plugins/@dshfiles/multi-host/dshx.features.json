@@ -210,6 +210,59 @@
       ]
     },
     {
+      "id": "host-settings",
+      "title": "Weight Auto placement and fetch before new threads",
+      "summary": "Edit host sets an Auto weight (x1, x2, x4: Auto divides the host's resource pressure by it) and whether a thread started there first runs jj git fetch in its folder. A failed fetch never blocks the thread; the start result says why. Hiding a host also takes its threads out of the sidebar, and a remote thread whose host is unreachable offers Hide this host. A host that was online in the last 10 s reads as Reconnecting instead of turning red.",
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["weight-1", "weight-2", "weight-4", "fetch-on", "fetch-off", "reconnecting", "hidden"],
+      "failureModes": [
+        "A fetch that fails or times out (60 s) still starts the thread on what the host has.",
+        "Fetch only moves remote bookmarks; it never rebases a working copy on the host."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "seed multi-host-hosts",
+        "click button \"Multi-host: Hosts\"",
+        "expect heading \"Hosts\"",
+        "click button \"Edit Build box\"",
+        "expect heading \"Edit host\"",
+        "expect radio \"Weight 2\"",
+        "expect switch \"Fetch jj before new threads\""
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "multi-host.auto-weight",
+          "file": "plugins/@dshfiles/multi-host/src/resource-snapshot.test.ts",
+          "testName": "divides each host's pressure by its weight, so a heavier host takes more load"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.fetch-before-thread",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-checkout.test.ts",
+          "testName": "fetches the thread folder with jj on a usual PATH and quotes the folder"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "multi-host.host-settings-browser",
+          "reason": "The fetch only runs against a real SSH host; the dialog controls are reached through this entry's reach path."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "ssh command",
+          "file": "plugins/@dshfiles/multi-host/tests/ssh-spans.test.ts",
+          "testName": "records an ssh command span that fails on a refused target before ssh starts"
+        }
+      ]
+    },
+    {
       "id": "remote-delegation",
       "title": "Delegate a task to another machine",
       "summary": "The multi_host_delegate agent tool runs a task as a thread on a named host, or on the least-loaded visible SSH host through Auto, waits for its turn and returns the final answer, like a subagent on that machine. A pending question on the host, a failed turn and a wait that runs out each come back with the thread id to follow; cancelling the call stops the remote turn.",

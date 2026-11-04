@@ -6,7 +6,7 @@ import { defineApi, method as defineMethod, zodSchemaFromEffect } from '@dshfile
 import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
 import { nativeRpcRequestSchema } from '@dshfiles/dshx/platform/native-rpc'
 import type { NativeRpcRequest as DshxNativeRpcRequest } from '@dshfiles/dshx/platform/native-rpc'
-import { hostConnectorSchema, runtimeIdentitySchema, runtimeLocatorSchema } from './records.js'
+import { hostConnectorSchema, hostWeightSchema, runtimeIdentitySchema, runtimeLocatorSchema } from './records.js'
 import { SchemaFields } from './schema.js'
 
 const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Output extends Schema.ConstraintDecoder<unknown>>(
@@ -50,6 +50,8 @@ const hostSummarySchema = Schema.Struct({
   connector: hostConnectorSchema,
   runtimeCount: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
   hidden: Schema.Boolean,
+  weight: Schema.optional(hostWeightSchema),
+  fetchBeforeThread: Schema.optional(Schema.Boolean),
 })
 
 const failureSchema = Schema.Struct({ code: Schema.String.check(Schema.isMaxLength(128)), message: Schema.String.check(Schema.isMaxLength(2048)) })
@@ -126,6 +128,7 @@ const resourcePoolEntrySchema = Schema.Struct({
   runtimeId: Schema.NullOr(idSchema),
   destination: Schema.NullOr(Schema.Struct({ kind: Schema.Literal('runtime'), runtimeId: idSchema })),
   hidden: Schema.Boolean,
+  weight: Schema.optional(hostWeightSchema),
   probe: resourceProbeSchema,
   stale: Schema.Boolean,
   refreshing: Schema.Boolean,
@@ -210,6 +213,7 @@ const transcriptWaitingSchema = Schema.Struct({
   tool: Schema.String,
   since: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()),
 })
+const fetchBeforeThreadSchema = Schema.Struct({ ok: Schema.Boolean, detail: Schema.String })
 const remoteThreadSchema = Schema.Struct({
   runtimeId: idSchema,
   sessionId: sessionIdSchema,
@@ -552,8 +556,15 @@ const effectMultiHostApi = defineApi({
       input: Schema.Struct({ id: idSchema, hidden: Schema.Boolean }),
       output: hostSummarySchema,
       description:
-        'Hide or show one host in the destination picker without removing it: its runtimes, threads and remote data stay. Call only when the user asked to hide or show that host.',
+        'Hide or show one host without removing it: a hidden host leaves the destination picker and its threads leave the sidebar; its runtimes, stored threads and remote data stay. Call only when the user asked to hide or show that host.',
       tool: { name: 'multi_host_set_host_hidden', render: compactJson },
+    }),
+    hostSetSettings: method({
+      input: Schema.Struct({ id: idSchema, weight: Schema.optional(hostWeightSchema), fetchBeforeThread: Schema.optional(Schema.Boolean) }),
+      output: hostSummarySchema,
+      description:
+        "Change one host's placement weight (1 to 10; Auto treats a weight-2 host as having twice the room) and whether a new thread there first runs jj git fetch in its folder. Call only when the user asked to change those settings.",
+      tool: { name: 'multi_host_set_host_settings', render: compactJson },
     }),
     hostReorder: method({
       input: Schema.Struct({ ids: Schema.Array(idSchema).check(Schema.isMinLength(1), Schema.isMaxLength(64)) }),
@@ -780,7 +791,7 @@ const effectMultiHostApi = defineApi({
         model: Schema.optional(modelSelectionSchema),
       }),
       output: Schema.Union([
-        Schema.Struct({ ok: Schema.Literal(true), sessionId: sessionIdSchema }),
+        Schema.Struct({ ok: Schema.Literal(true), sessionId: sessionIdSchema, fetch: Schema.optional(fetchBeforeThreadSchema) }),
         Schema.Struct({ ...failedSchema.fields, sessionId: Schema.optional(sessionIdSchema) }),
       ]),
       description:

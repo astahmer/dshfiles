@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { CheckIcon, ChevronDownIcon, CopyIcon, PlusIcon, SearchIcon, ServerIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
@@ -14,7 +16,16 @@ import { connectionDiagnostics } from './connection-diagnostics.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 import { setHostDestination } from './state.js'
 
-export type HostDraft = { readonly hostId?: string; readonly name: string; readonly sshTarget: string; readonly remoteHome: string }
+export type HostDraft = {
+  readonly hostId?: string
+  readonly name: string
+  readonly sshTarget: string
+  readonly remoteHome: string
+  readonly weight?: number | undefined
+  readonly fetchBeforeThread?: boolean | undefined
+}
+
+const WEIGHTS = [1, 2, 4] as const
 
 const stepLabels: Record<ConnectionTestStep['step'], string> = { ssh: 'SSH login', runtime: 'DSH runtime', identity: 'multi-host identity' }
 
@@ -90,6 +101,7 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
         remoteHome: draft.remoteHome.trim(),
       })
       if (!result.ok) throw failure(result)
+      await api.hostSetSettings({ id: result.runtime.hostId, weight: draft.weight ?? 1, fetchBeforeThread: draft.fetchBeforeThread ?? false })
       return result.runtime
     },
     onSuccess: runtime => {
@@ -257,6 +269,29 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
           The DSH_HOME of a running DSH there; it publishes its launch URL in plugins/multi-host/launch.json.
         </span>
       </div>
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2 dshx:text-sm">
+        <span className="dshx:font-medium">Auto weight</span>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          aria-label="Auto weight"
+          value={String(draft.weight ?? 1)}
+          onValueChange={value => {
+            if (value !== '') setDraft({ ...draft, weight: Number(value) })
+          }}
+        >
+          {WEIGHTS.map(weight => (
+            <ToggleGroupItem key={weight} value={String(weight)} aria-label={`Weight ${weight}`}>
+              ×{weight}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+      <label className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:text-sm">
+        <span className="dshx:font-medium">Fetch jj before new threads</span>
+        <Switch checked={draft.fetchBeforeThread ?? false} onCheckedChange={checked => setDraft({ ...draft, fetchBeforeThread: checked })} />
+      </label>
       {test.data !== undefined ? (
         <ul className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs" aria-label="Connection test">
           {test.data.steps.map(step => (
