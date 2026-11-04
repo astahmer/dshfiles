@@ -65,7 +65,8 @@ default). Before starting, up runs "down" on every other instance under the stat
 and grace expired or whose dsh exited, and lists the ones waiting in their warning grace.
 
 Options:
-  --plugin <id>        Owned bundle to load, repeatable (default: every bundle under plugins/@dshfiles).
+  --plugin <id>        Owned bundle to load, repeatable (default: every owned bundle profiles/web depends
+                       on; opt-in bundles such as @dshfiles/tool-search load only when named).
   --bundle <id>        Also load a registry bundle the web profile installs (e.g. dsh-our-free-model), repeatable.
   --project <dir>      Register this folder instead of seeding a sample jj project; down keeps it.
   --port <port>        Host port (default: a free one; 3080 is refused).

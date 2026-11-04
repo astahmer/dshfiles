@@ -75,6 +75,34 @@ const stopGroup = async (pid: number): Promise<void> => {
 const scratchCordisPatch = (packageIds: readonly string[]): { readonly cordisPatch?: string } =>
   packageIds.includes('@dshfiles/traces') ? { cordisPatch: '- id: dshfiles-traces\n  config:\n    port: 0\n' } : {}
 
+/**
+ * The owned bundles a scratch composes when `up` names none: the ones the checked-in web profile seed depends on, so the
+ * scratch behaves like the profile users run. Opt-in bundles the seed leaves out (`@dshfiles/tool-search` hides every
+ * global tool behind `tool_search`, which made catalog reaches calling `bash` or `ask_user_question` fail with
+ * `UNKNOWN_TOOL`) load only through an explicit `--plugin`. An unreadable seed falls back to every owned bundle.
+ */
+export const defaultScratchPlugins = (
+  available: readonly { readonly packageId: string }[],
+  seedDependencies: ReadonlySet<string> | undefined,
+): string[] =>
+  available.map(bundle => bundle.packageId).filter(packageId => seedDependencies === undefined || seedDependencies.has(packageId))
+
+const readWebSeedDependencies = async (): Promise<ReadonlySet<string> | undefined> => {
+  const source = await readFile(join(DSHFILES_ROOT, 'profiles', 'web', 'package.json'), 'utf8').catch(() => undefined)
+  if (source === undefined) return undefined
+  try {
+    const manifest: unknown = JSON.parse(source)
+    if (typeof manifest !== 'object' || manifest === null) return undefined
+    const record = manifest as { readonly dependencies?: unknown; readonly devDependencies?: unknown }
+    const names = [record.dependencies, record.devDependencies].flatMap(deps =>
+      typeof deps === 'object' && deps !== null ? Object.keys(deps) : [],
+    )
+    return names.length === 0 ? undefined : new Set(names)
+  } catch {
+    return undefined
+  }
+}
+
 export const scratchUp = async (
   options: ScratchUpOptions,
 ): Promise<{ readonly state: ScratchState; readonly swept: readonly ReapedScratch[]; readonly warned: readonly WarnedScratch[] }> => {
@@ -119,7 +147,7 @@ export const scratchUp = async (
   }
 
   const available = await LocalBundleModel.listLocalBootBundles()
-  const requested = options.plugins.length > 0 ? options.plugins : available.map(bundle => bundle.packageId)
+  const requested = options.plugins.length > 0 ? options.plugins : defaultScratchPlugins(available, await readWebSeedDependencies())
   const bundles = LocalBundleModel.withSharedStylesheet(LocalBundleModel.resolveLocalBundles(requested, available), available)
   const [firstBundle, ...otherBundles] = bundles
   if (firstBundle === undefined) throw new ScratchError('no-bundles', 'No owned plugin bundles were selected.', 'Pass --plugin @dshfiles/<name>.')

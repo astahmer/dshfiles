@@ -27,7 +27,9 @@ dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/home --json
 Builds the named bundles (plus the client bundles they load), installs a scratch
 profile in a temp `DSH_HOME`, seeds a jj project `sample` with a `main`
 bookmark, starts `dsh` on a free port and a headless Chromium. Without
-`--plugin` it loads every owned bundle (slow). Treat any pending entry as a real
+`--plugin` it loads every owned bundle `profiles/web` depends on (slow); opt-in
+bundles the seed leaves out (`tool-search`, which hides `bash` and
+`ask_user_question` behind `tool_search`) load only when named. Treat any pending entry as a real
 failure; diagnose its provider/composition and activation contract instead of
 relaxing `doctor`. An absent owned provider is not a Host gap. `--skip-build` reuses `dist/`; `--project <dir>` registers a
 real folder instead (kept on `down`); `--name` runs another instance beside it.

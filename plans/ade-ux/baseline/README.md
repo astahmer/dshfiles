@@ -84,7 +84,10 @@ Severity is a judgement for the redesign, not a bug triage. "Both" means desktop
     `answered-question-stays-closed`), but the turn ended as "1 other tool call" with no question card; the reach's
     own `expect text "Which layout should the release notes use?"` timed out. Either the reach drifted or the
     composition answers the call immediately; triage it with `maintain-verify-dsh`. The screenshots show the thread
-    after that call.
+    after that call. **Resolved (scratch drift, not a product bug):** a bare `dev up` also composed the opt-in
+    `@dshfiles/tool-search`, which hides every global tool behind `tool_search`, so `bash` and `ask_user_question`
+    both returned `ToolNotFoundError UNKNOWN_TOOL` (the seed's "1 failed", then "1 other tool call"). `dev up` now
+    composes only the bundles `profiles/web` depends on; the card renders and the reach passes.
 
 ### Journey 4 — review and land
 
