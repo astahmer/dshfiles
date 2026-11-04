@@ -354,16 +354,38 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const [restartSnapshot, sendRestart] = useRestartMachine(restartApi)
   const restartRequestPending = restartSnapshot.matches('requesting')
   const restartRequestFailed = restartSnapshot.matches('failed')
+  const restartWaitingHost = restartSnapshot.matches('restarting')
+  const restartStalled = restartSnapshot.matches('stalled')
   const restartDialogOpen = !restartSnapshot.matches('closed')
   const restartAvailability = useApiQuery(threadSidebarRestartApi, 'availability')
   const restartAvailable = restartAvailability.data?.available === true
   const restartPending = restartAvailability.data?.pending ?? null
+  const restartRun = restartAvailability.data?.run
+  const restartAvailabilityFailed = restartAvailability.error !== null
   const refetchRestartAvailability = restartAvailability.refetch
   useEffect(() => {
     if (restartPending === null) return
     const timer = globalThis.setInterval(() => void refetchRestartAvailability(), 3_000)
     return () => globalThis.clearInterval(timer)
   }, [restartPending, refetchRestartAvailability])
+  // A restart waiting for idle ends when the Host drops its pending state or stops answering: from then on the page
+  // waits for the new Host like a Restart now does, and says so when it does not come back.
+  const idleRestartSeen = useRef<{ run: string | undefined } | null>(null)
+  const idleRestartCanceled = useRef(false)
+  useEffect(() => {
+    if (restartPending !== null && !restartAvailabilityFailed) {
+      idleRestartSeen.current = { run: restartRun }
+      return
+    }
+    const seen = idleRestartSeen.current
+    if (seen === null) return
+    idleRestartSeen.current = null
+    if (idleRestartCanceled.current) {
+      idleRestartCanceled.current = false
+      return
+    }
+    sendRestart({ type: 'watch', run: seen.run })
+  }, [restartPending, restartAvailabilityFailed, restartRun, sendRestart])
   const [idleRestartFailed, setIdleRestartFailed] = useState(false)
   const restartWhenIdle = (): void => {
     setIdleRestartFailed(false)
@@ -376,6 +398,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       .catch(() => setIdleRestartFailed(true))
   }
   const cancelPendingRestart = (): void => {
+    idleRestartCanceled.current = true
     void restartApi
       .cancelPendingRestart()
       .catch(() => undefined)
@@ -1847,51 +1870,79 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           sendRestart({ type: open ? 'open' : 'cancel' })
         }}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{text(props.t, 'threadSidebarRestartTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>{text(props.t, 'threadSidebarRestartDescription')}</AlertDialogDescription>
-            <AlertDialogDescription>{text(props.t, 'threadSidebarRestartIdleDescription')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          {restartPendingLabel === null ? null : (
-            <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:px-6 dshx:text-sm">
-              <p role="status" className="dshx:text-muted-foreground">
-                {restartPendingLabel}
+        {restartWaitingHost || restartStalled ? (
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{text(props.t, restartStalled ? 'threadSidebarRestartStalledTitle' : 'threadSidebarRestartPending')}</AlertDialogTitle>
+              {restartStalled ? (
+                <AlertDialogDescription role="alert">{text(props.t, 'threadSidebarRestartStalled')}</AlertDialogDescription>
+              ) : (
+                <AlertDialogDescription role="status">{text(props.t, 'threadSidebarRestartWaitingHost')}</AlertDialogDescription>
+              )}
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <Button type="button" variant="outline" onClick={() => sendRestart({ type: 'cancel' })}>
+                {text(props.t, 'threadSidebarRestartCancel')}
+              </Button>
+              {restartStalled ? (
+                <>
+                  <Button type="button" variant="outline" onClick={() => sendRestart({ type: 'retry' })}>
+                    {text(props.t, 'threadSidebarRestartKeepWaiting')}
+                  </Button>
+                  <Button type="button" onClick={() => globalThis.location.reload()}>
+                    {text(props.t, 'threadSidebarReload')}
+                  </Button>
+                </>
+              ) : null}
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        ) : (
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{text(props.t, 'threadSidebarRestartTitle')}</AlertDialogTitle>
+              <AlertDialogDescription>{text(props.t, 'threadSidebarRestartDescription')}</AlertDialogDescription>
+              <AlertDialogDescription>{text(props.t, 'threadSidebarRestartIdleDescription')}</AlertDialogDescription>
+            </AlertDialogHeader>
+            {restartPendingLabel === null ? null : (
+              <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:px-6 dshx:text-sm">
+                <p role="status" className="dshx:text-muted-foreground">
+                  {restartPendingLabel}
+                </p>
+                <Button type="button" variant="ghost" size="sm" onClick={cancelPendingRestart}>
+                  {text(props.t, 'threadSidebarRestartCancelPending')}
+                </Button>
+              </div>
+            )}
+            {pendingPlugins.length === 0 ? null : (
+              <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-6 dshx:text-sm">
+                <p className="dshx:text-muted-foreground">{text(props.t, 'threadSidebarUpdatesApplied')}</p>
+                <ul className="dshx:flex dshx:max-h-40 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:font-mono dshx:text-xs">
+                  {pendingPlugins.map(plugin => (
+                    <li key={plugin}>{plugin}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {restartRequestFailed || idleRestartFailed ? (
+              <p role="alert" className="dshx:px-6 dshx:text-sm dshx:text-destructive">
+                {text(props.t, 'threadSidebarRestartFailure')}
               </p>
-              <Button type="button" variant="ghost" size="sm" onClick={cancelPendingRestart}>
-                {text(props.t, 'threadSidebarRestartCancelPending')}
-              </Button>
-            </div>
-          )}
-          {pendingPlugins.length === 0 ? null : (
-            <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-6 dshx:text-sm">
-              <p className="dshx:text-muted-foreground">{text(props.t, 'threadSidebarUpdatesApplied')}</p>
-              <ul className="dshx:flex dshx:max-h-40 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:font-mono dshx:text-xs">
-                {pendingPlugins.map(plugin => (
-                  <li key={plugin}>{plugin}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {restartRequestFailed || idleRestartFailed ? (
-            <p role="alert" className="dshx:px-6 dshx:text-sm dshx:text-destructive">
-              {text(props.t, 'threadSidebarRestartFailure')}
-            </p>
-          ) : null}
-          <AlertDialogFooter>
-            <Button type="button" variant="outline" disabled={restartRequestPending} onClick={() => sendRestart({ type: 'cancel' })}>
-              {text(props.t, 'threadSidebarRestartCancel')}
-            </Button>
-            {restartPending === null ? (
-              <Button type="button" variant="outline" disabled={restartRequestPending} onClick={restartWhenIdle}>
-                {text(props.t, 'threadSidebarRestartWhenIdle')}
-              </Button>
             ) : null}
-            <Button type="button" variant="destructive" disabled={restartRequestPending} onClick={() => sendRestart({ type: 'confirm' })}>
-              {text(props.t, restartRequestPending ? 'threadSidebarRestartPending' : 'threadSidebarRestartConfirm')}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
+            <AlertDialogFooter>
+              <Button type="button" variant="outline" disabled={restartRequestPending} onClick={() => sendRestart({ type: 'cancel' })}>
+                {text(props.t, 'threadSidebarRestartCancel')}
+              </Button>
+              {restartPending === null ? (
+                <Button type="button" variant="outline" disabled={restartRequestPending} onClick={restartWhenIdle}>
+                  {text(props.t, 'threadSidebarRestartWhenIdle')}
+                </Button>
+              ) : null}
+              <Button type="button" variant="destructive" disabled={restartRequestPending} onClick={() => sendRestart({ type: 'confirm' })}>
+                {text(props.t, restartRequestPending ? 'threadSidebarRestartPending' : 'threadSidebarRestartConfirm')}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        )}
       </AlertDialog>
       <Dialog
         open={fanOutOpen}

@@ -9,6 +9,8 @@ export const threadSidebarRestartApi = defineApi({
       input: Schema.Void,
       output: Schema.Struct({
         available: Schema.Boolean,
+        /** This Host process; a new value after a restart tells the page the new Host is up. Absent on older Hosts. */
+        run: Schema.optional(Schema.String),
         /** A restart waiting for running turns to finish: since when, and how many turns are still running. */
         pending: Schema.optional(
           Schema.NullOr(

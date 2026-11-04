@@ -22,6 +22,8 @@ const withRestart = <A, E>(
     readonly fake: FakeHost
     readonly requestPath: string
     readonly home: string
+    /** Exit codes the post-appExit guard was armed with; the real guard would call process.exit in the test worker. */
+    readonly guards: ReadonlyArray<number>
   }) => Effect.Effect<A, E, RestartControl | RestartDrain | RecoveryStore | FileSystem.FileSystem | Path.Path>,
 ) =>
   Effect.gen(function* () {
@@ -29,12 +31,13 @@ const withRestart = <A, E>(
     const path = yield* Path.Path
     const fake = yield* makeFakeHost
     const env = (options.env ?? managed)(files.home, path)
+    const guards: number[] = []
     const layer = RestartDrain.layer.pipe(
-      Layer.provideMerge(RestartControl.layerWith({ env, homeDirectory: files.home })),
+      Layer.provideMerge(RestartControl.layerWith({ env, homeDirectory: files.home, armExitGuard: code => Effect.sync(() => void guards.push(code)) })),
       Layer.provideMerge(fakeSidebarHost(fake, { exitHook: options.exitHook ?? true })),
       Layer.provideMerge(RecoveryStore.layer.pipe(Layer.provide(Layer.succeed(StateFiles, files)))),
     )
-    return yield* body({ fake, requestPath: path.join(files.home, 'runtime', `dsh-web-restart-${RUN_ID}.request`), home: files.home }).pipe(
+    return yield* body({ fake, requestPath: path.join(files.home, 'runtime', `dsh-web-restart-${RUN_ID}.request`), home: files.home, guards }).pipe(
       Effect.provide(layer),
     )
   }).pipe(Effect.provide(temporaryStateFiles))
@@ -69,14 +72,18 @@ describe('managed restart', () => {
   )
 
   it.effect('restart request writes one marker and schedules a distinct graceful exit code', () =>
-    withRestart({}, ({ fake, requestPath }) =>
+    withRestart({}, ({ fake, requestPath, guards }) =>
       Effect.gen(function* () {
         const control = yield* RestartControl
+        expect(control.run).toBe(RUN_ID)
         yield* Ref.set(fake.running, ['working'])
         expect(yield* control.request).toEqual({ accepted: true })
         expect(yield* (yield* FileSystem.FileSystem).readFileString(requestPath)).toBe(RUN_ID)
         expect(yield* fake.exits).toEqual([])
+        expect(guards).toEqual([])
         expect(yield* eventually(Effect.andThen(TestClock.adjust('1 second'), fake.exits), exits => exits.length > 0)).toEqual([75])
+        // DSH may finish appExit without exiting; the guard that forces the exit is armed only after asking.
+        expect(guards).toEqual([75])
         expect((yield* RecoveryStore.use(store => store.list)).map(entry => [entry.sessionId, entry.reason])).toEqual([['working', 'restart']])
         expect((yield* Effect.flip(control.request))._tag).toBe('RestartRequestFailed')
       }),
@@ -84,12 +91,13 @@ describe('managed restart', () => {
   )
 
   it.effect('a failed recovery snapshot cancels the managed restart request', () =>
-    withRestart({}, ({ fake, requestPath }) =>
+    withRestart({}, ({ fake, requestPath, guards }) =>
       Effect.gen(function* () {
         yield* Ref.set(fake.persistenceFails, true)
         yield* RestartControl.use(control => control.request)
         expect(yield* eventually(Effect.andThen(TestClock.adjust('1 second'), exists(requestPath)), present => !present)).toBe(false)
         expect(yield* fake.exits).toEqual([])
+        expect(guards).toEqual([])
       }),
     ),
   )

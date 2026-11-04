@@ -8,14 +8,34 @@
       "destination": "none",
       "currentSurface": "palette: Send to several models…",
       "summary": "Create two to six independent threads for selected models, selecting each model before sending the same prompt and reporting per-model success or failure.",
-      "reach": ["click button \"Open command palette\"", "click text \"Send to several models…\"", "expect dialog \"Send to several models\""],
-      "surfaces": ["client", "host", "integration"],
+      "reach": [
+        "click button \"Open command palette\"",
+        "click text \"Send to several models…\"",
+        "expect dialog \"Send to several models\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "integration"
+      ],
       "configuration": [],
-      "states": ["model-selection", "creating", "partial-success", "complete"],
-      "failureModes": ["A failed model thread does not cancel another model's creation.", "The model is selected before the first prompt is queued."],
+      "states": [
+        "model-selection",
+        "creating",
+        "partial-success",
+        "complete"
+      ],
+      "failureModes": [
+        "A failed model thread does not cancel another model's creation.",
+        "The model is selected before the first prompt is queued."
+      ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "thread-sidebar.multi-model-fan-out", "featureFile": "tooling/dshx/e2e/features/thread-sidebar-fan-out.feature" },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.multi-model-fan-out",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar-fan-out.feature"
+        },
         {
           "kind": "unit-test",
           "id": "thread-sidebar.fan-out-model-selection-order",
@@ -30,8 +50,14 @@
         }
       ],
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" }
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -2514,7 +2540,7 @@
     {
       "id": "pending-host-restart",
       "title": "Warn when a host restart is required",
-      "summary": "Detect pending host-side plugin updates and ask for explicit confirmation before handing off a restart when the supervisor supports it.",
+      "summary": "Detect pending host-side plugin updates, ask for explicit confirmation before handing off a restart when the supervisor supports it, then make sure the old Host exits and tell the page when the new one is back or did not come back.",
       "reach": [
         "seed pending-restart",
         "expect button \"Restart DSH to apply updates*\"",
@@ -2535,11 +2561,16 @@
         "client-only-update",
         "host-update-pending",
         "confirmation-required",
-        "restarting"
+        "restarting",
+        "waiting-for-new-host",
+        "host-did-not-return"
       ],
       "failureModes": [
         "No restart is requested for unchanged or client-only bundles.",
-        "Missing supervisor handoff is reported without restarting the user instance."
+        "Missing supervisor handoff is reported without restarting the user instance.",
+        "A Host whose DSH shutdown finishes without exiting (a plugin timer outlives disposal) is forced to exit with the restart code 10 s after it asked, by a detached fiber disposal cannot cancel, and logs what still held it.",
+        "A Host that wrote its restart request but never exits is stopped by the supervisor (SIGTERM, then SIGKILL) and still restarted; every supervisor step is logged with a [dsh-supervisor] prefix.",
+        "The page waits for a Host with a new run id after Restart now or a fired Restart when idle; after 2 minutes it says where to look and how to start DSH again instead of reconnecting silently forever."
       ],
       "externalDependencies": [],
       "verification": [
@@ -2601,6 +2632,36 @@
           "id": "thread-sidebar.restart-recovery-unit-dismiss-one",
           "file": "plugins/@dshfiles/thread-sidebar/src/restart-recovery.test.ts",
           "testName": "dismiss removes one recovery candidate without changing other entries"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.pending-host-restart-unit-exit-guard",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart-exit-guard.test.ts",
+          "testName": "forces the restart exit code after the grace and names what still holds the Host"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.pending-host-restart-unit-exit-guard-outlives-scope",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart-exit-guard.test.ts",
+          "testName": "outlives the plugin scope that armed it, so plugin disposal cannot cancel the exit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.pending-host-restart-unit-waits-for-new-host",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart-machine.test.ts",
+          "testName": "requests a restart, waits for the new Host and closes once a new run answers"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.pending-host-restart-unit-host-did-not-return",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart-machine.test.ts",
+          "testName": "says the Host did not come back after the stall limit, and keeps waiting when asked"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.pending-host-restart-unit-idle-restart-watched",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart-machine.test.ts",
+          "testName": "watches a restart started elsewhere (Restart when idle) like its own"
         }
       ],
       "telemetry": [

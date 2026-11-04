@@ -142,7 +142,7 @@ export default DshxPlugin.make({
       availability: () =>
         Effect.gen(function* () {
           const control = yield* RestartControl
-          return { available: control.available, pending: yield* RestartDrain.use(drain => drain.pending) }
+          return { available: control.available, run: control.run, pending: yield* RestartDrain.use(drain => drain.pending) }
         }),
       requestRestart: () => RestartControl.use(control => control.request),
       requestRestartWhenIdle: () => RestartDrain.use(drain => drain.request),

@@ -446,8 +446,23 @@ updates (N plugins)" row sits above the foot (a ↻ icon on the rail) listing th
 packages; it opens the restart confirmation, and the `>` palette entry carries
 the same label. Identical rebuilds flag nothing. Host-only packages without a
 client bundle are not listed by that registry and are not tracked. Hosts
-started before this plugin version report nothing. Keyboard entry
-points:
+started before this plugin version report nothing.
+
+**Restarting.** Restart now and Restart when idle exist only under the managed
+launcher (`scripts/supervise-dsh.mjs`). The Host writes the supervisor's request
+file, records running threads, asks DSH to exit with code 75 and then arms an
+exit guard: DSH 0.2.1-rc.2 can finish its shutdown without exiting (it skips
+some plugin disposers, so a leftover timer keeps a Host whose web server is
+already closed alive). Ten seconds later the guard logs what still holds the
+process (`[thread-sidebar] restart: …`) and exits with 75. The supervisor logs
+every step (`[dsh-supervisor] …`) and stops a Host that asked for a restart but
+is still running 30 s later. Meanwhile the dialog says DSH is restarting and
+closes when a Host with a new run id answers; the page's cookie survives the
+restart, so it reconnects without a new launch URL. After two minutes without
+a new Host the dialog says so, points at those log lines and offers Keep waiting
+and Reload page.
+
+Keyboard entry points:
 
 - Capture-phase chords claimed before the browser: ⌘K / Ctrl+K palette,
   ⌘P / Ctrl+P file search (thread search has no chord by default; it stays on

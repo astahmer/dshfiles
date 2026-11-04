@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { Clock, Context, Effect, FiberHandle, FileSystem, Layer, Option, Path, Ref } from 'effect'
+import { restartExitGuard } from './restart-exit-guard.js'
 import { RecoveryStore } from './restart-recovery.js'
 import { RestartRecordFailed, RestartRequestFailed, RestartUnavailable } from './sidebar-errors.js'
 import { SidebarHost } from './sidebar-host-promise.js'
@@ -23,12 +25,22 @@ export class RestartControl extends Context.Service<
   RestartControl,
   {
     readonly available: boolean
+    /**
+     * Identifies this Host process: the supervisor's run id under the managed launcher, a random id otherwise. A page
+     * that asked for a restart polls it to tell the new Host from the old one.
+     */
+    readonly run: string
     readonly request: Effect.Effect<{ readonly accepted: true }, RestartUnavailable | RestartRequestFailed>
     /** The tokenized launch URL the supervisor recorded, when it is a loopback URL. */
     readonly launchUrl: Effect.Effect<string | null>
   }
 >()('@dshfiles/thread-sidebar/RestartControl') {
-  static readonly layerWith = (input: { readonly env: RestartEnvironment; readonly homeDirectory: string }) =>
+  static readonly layerWith = (input: {
+    readonly env: RestartEnvironment
+    readonly homeDirectory: string
+    /** Armed right after `appExit`; forces the exit DSH may never finish on its own (see restart-exit-guard.ts). */
+    readonly armExitGuard?: (code: number) => Effect.Effect<void>
+  }) =>
     Layer.effect(
       RestartControl,
       Effect.gen(function* () {
@@ -53,24 +65,43 @@ export class RestartControl extends Context.Service<
             : Option.none()
         const appExit = host.appExit
         const available = Option.isSome(handOff) && Option.isSome(appExit)
+        const run = Option.match(handOff, { onNone: () => randomUUID(), onSome: request => request.runId })
+        const armExitGuard = input.armExitGuard ?? (code => restartExitGuard({ code }))
 
         const recordRunning = Effect.gen(function* () {
           yield* host.flushPersistence
-          yield* recovery.record({ sessionIds: yield* host.runningSessionIds, reason: 'restart' })
+          const sessionIds = yield* host.runningSessionIds
+          yield* recovery.record({ sessionIds, reason: 'restart' })
+          yield* Effect.annotateCurrentSpan('dshx.restart.recorded_sessions', sessionIds.length)
+          return sessionIds.length
         }).pipe(Effect.mapError(cause => new RestartRecordFailed({ cause })))
 
         const exitLater = (request: { readonly requestPath: string }, exit: (code: number) => void) =>
           Effect.sleep(EXIT_DELAY).pipe(
             Effect.andThen(recordRunning),
+            Effect.tap(recorded =>
+              Effect.logInfo(
+                `thread-sidebar: restart: recorded ${String(recorded)} running thread(s) to resume; asking DSH to exit with code ${String(RESTART_EXIT_CODE)} for the supervisor`,
+              ),
+            ),
             Effect.andThen(Effect.sync(() => exit(RESTART_EXIT_CODE))),
+            Effect.andThen(armExitGuard(RESTART_EXIT_CODE)),
             Effect.catch(error =>
-              fs.remove(request.requestPath, { force: true }).pipe(Effect.ignore, Effect.andThen(Effect.logError('thread-sidebar: restart canceled', error))),
+              fs
+                .remove(request.requestPath, { force: true })
+                .pipe(
+                  Effect.ignore,
+                  Effect.andThen(
+                    Effect.logError('thread-sidebar: restart canceled: running threads could not be recorded, so DSH keeps running. Retry Restart DSH.', error),
+                  ),
+                ),
             ),
             Effect.withSpan('restart exit'),
           )
 
         return RestartControl.of({
           available,
+          run,
           request: Effect.gen(function* () {
             if (Option.isNone(handOff) || Option.isNone(appExit)) return yield* new RestartUnavailable()
             const request = handOff.value
@@ -83,6 +114,7 @@ export class RestartControl extends Context.Service<
               ),
               Effect.mapError(cause => new RestartRequestFailed({ cause })),
             )
+            yield* Effect.logInfo(`thread-sidebar: restart: request ${request.runId} written for the supervisor; DSH exits in ${EXIT_DELAY}`)
             yield* Effect.forkIn(exitLater(request, appExit.value), scope)
             return { accepted: true as const }
           }).pipe(Effect.withSpan('restart request')),
@@ -133,6 +165,13 @@ export class RestartDrain extends Context.Service<
 
       const drainThenRestart = idleTwice.pipe(
         Effect.timeoutOption(DRAIN_LIMIT),
+        Effect.tap(idle =>
+          Effect.logInfo(
+            Option.isSome(idle)
+              ? 'thread-sidebar: restart when idle: no turn is running; restarting DSH'
+              : `thread-sidebar: restart when idle: turns still running after ${DRAIN_LIMIT}; restarting DSH anyway, they resume after the restart`,
+          ),
+        ),
         Effect.andThen(Ref.set(since, Option.none())),
         Effect.andThen(control.request),
         Effect.catch(error => Effect.logWarning('thread-sidebar: the restart waiting for idle could not start', error)),

@@ -384,6 +384,11 @@ const en = {
   threadSidebarRestartConfirm: 'Restart now',
   threadSidebarRestartPending: 'Restarting DSH…',
   threadSidebarRestartFailure: 'The restart request could not be confirmed. DSH may still be restarting.',
+  threadSidebarRestartWaitingHost: 'This page reconnects on its own as soon as the new Host answers.',
+  threadSidebarRestartStalledTitle: 'DSH has not come back',
+  threadSidebarRestartStalled:
+    'No new DSH Host answered within 2 minutes. Check the terminal that runs dsh: lines starting with [dsh-supervisor] or [thread-sidebar] say what happened. If DSH stopped, run dsh again, then reload this page.',
+  threadSidebarRestartKeepWaiting: 'Keep waiting',
   threadSidebarRestartWhenIdle: 'Restart when idle',
   threadSidebarRestartWaiting: 'Restart pending: waiting for running turns to finish',
   threadSidebarRestartWaitingIdle: 'Restart pending: restarting now that no turn is running',
@@ -830,6 +835,11 @@ const zh = {
   threadSidebarRestartConfirm: '立即重启',
   threadSidebarRestartPending: '正在重启 DSH…',
   threadSidebarRestartFailure: '无法确认重启请求是否成功；DSH 可能仍在重新启动。',
+  threadSidebarRestartWaitingHost: '新的 Host 一响应，此页面就会自动重新连接。',
+  threadSidebarRestartStalledTitle: 'DSH 尚未恢复',
+  threadSidebarRestartStalled:
+    '2 分钟内没有新的 DSH Host 响应。请查看运行 dsh 的终端：以 [dsh-supervisor] 或 [thread-sidebar] 开头的行说明了发生的情况。如果 DSH 已停止，请重新运行 dsh，然后重新加载此页面。',
+  threadSidebarRestartKeepWaiting: '继续等待',
   threadSidebarRestartWhenIdle: '空闲时重启',
   threadSidebarRestartWaiting: '重启待定：等待运行中的任务结束',
   threadSidebarRestartWaitingIdle: '重启待定：已无运行中的任务，正在重启',
