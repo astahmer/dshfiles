@@ -31,6 +31,7 @@
     "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/settings-shell": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workspace-folder-picker": "workspace:*",
     "@effect/platform-node": "catalog:",

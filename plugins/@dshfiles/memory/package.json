@@ -43,6 +43,7 @@
     "@dshfiles/jev": "workspace:*",
     "@dshfiles/optmem-core": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/settings-shell": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/sqlite-store": "workspace:*",
     "@dshfiles/usage": "workspace:*",

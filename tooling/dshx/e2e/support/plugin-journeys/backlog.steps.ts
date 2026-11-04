@@ -151,19 +151,20 @@ When('the Backlog settings are opened', async ({ page }: { page: Page }) => {
 Then('the Jev settings controls are available', async ({ page }: { page: Page }) => {
   await expect(page.getByRole('checkbox', { name: 'Enable Jev' })).toBeVisible()
   await expect(page.getByRole('checkbox', { name: 'Triage new items automatically' })).toBeVisible()
-  await expect(page.getByRole('textbox', { name: 'TypeSafe API key reference' })).toHaveAttribute('data-secret-input', 'reference')
+  // The key is the one shared Jev key in Settings › Tools & MCP › Jev; the panel links there instead of holding a field.
+  await expect(page.getByRole('textbox', { name: 'TypeSafe API key reference' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Open Jev settings', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Save Jev settings', exact: true })).toBeEnabled()
 })
 
 When('Jev settings are saved with a secret reference', async ({ page }: { page: Page }) => {
   await page.getByRole('checkbox', { name: 'Enable Jev' }).check()
-  await page.getByRole('textbox', { name: 'TypeSafe API key reference' }).fill('secret:DSH_TEST_JEV')
   await page.getByRole('button', { name: 'Save Jev settings', exact: true }).click()
 })
 
 Then('the Jev settings show a successful save', async ({ page }: { page: Page }) => {
   await expect(page.getByRole('status').filter({ hasText: 'Jev settings saved.' })).toBeVisible()
-  await expect(page.getByRole('textbox', { name: 'TypeSafe API key reference' })).toHaveValue('secret:DSH_TEST_JEV')
+  await expect(page.getByRole('checkbox', { name: 'Enable Jev' })).toBeChecked()
 })
 
 When('the image references are submitted with the capture', async ({ page }: { page: Page }) => {
@@ -994,7 +995,7 @@ When('an image is opened from the inline backlog preview', async ({ page }: { pa
 
 Then('the inline backlog preview gallery opens above its card and navigates both images', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-reference-image-gallery', async () => {
-    const preview = page.locator('[data-dshfiles-backlog-preview]')
+    const preview = page.locator('[data-dshfiles-entity-preview="backlog"]')
     const gallery = page.getByRole('dialog', { name: 'Image preview', exact: true })
     await expect(gallery).toBeVisible()
     await expect(gallery.getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
@@ -1243,7 +1244,7 @@ When('Backlog automatic triage is configured to use the local fake model', async
   await openGlobalPanel(page, 'Plugins')
   await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
   const settings = page.locator('[data-settings-namespace="dshfiles-backlog"]')
-  await expect(settings.locator('[data-setting-path="jevSecret"]')).toBeVisible()
+  await expect(settings.locator('[data-setting-path="triageProvider"]')).toBeVisible()
   await settings.locator('[data-setting-path="triageProvider"] input').fill('commandcode_work')
   await settings.locator('[data-setting-path="triageModel"] input').fill('gpt-6-luna')
   const autoTriage = settings.getByRole('switch', { name: 'Auto triage', exact: true })
@@ -1439,7 +1440,7 @@ When('Backlog Jev is enabled without a secret reference', async ({ page }: { pag
   const enabled = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevEnabled"]').getByRole('switch')
   if ((await enabled.getAttribute('aria-checked')) !== 'true') await enabled.click()
   await expect(enabled).toHaveAttribute('aria-checked', 'true')
-  await expect(page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] [data-secret-input="reference"]')).toHaveValue('')
+  await expect(page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] [data-secret-input="reference"]')).toHaveValue('')
   await page.keyboard.press('Escape')
 })
 
@@ -1465,7 +1466,7 @@ When('the Jev setup offer stores and binds a synthetic value', async ({ page }: 
 Then('Backlog stores only the secret reference for Jev', async ({ page }: { page: Page }) => {
   await openSettingsDialog(page)
   await settingsNavEntry(page, 'Jev').click()
-  const reference = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] [data-secret-input="reference"]')
+  const reference = page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] [data-secret-input="reference"]')
   await recordAssertion(page, 'backlog-jev-persists-reference-not-value', async () => {
     await expect(reference).toHaveValue('secret:TYPESAFE_API_KEY')
     expect(await page.locator('body').innerText()).not.toContain('synthetic-jev-setup-value')

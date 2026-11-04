@@ -181,5 +181,18 @@ Deliberate differences from upstream:
 | Key      | Default | Meaning                                                                                                  |
 | -------- | ------- | -------------------------------------------------------------------------------------------------------- |
 | `openIn` | `auto`  | Retired and hidden: Settings always opens as the page in the stage; a saved value still validates. |
+| `jevSecret` | `''` | The one TypeSafe Jev key (`secret:ALIAS[@env]`, Secret Catalog picker), read by Backlog and Memory. |
+
+### One Jev key
+
+![Settings › Tools & MCP › Jev leads with the one shared Key](docs/screenshots/shared-jev-key.png)
+
+`jevSecret` is the one TypeSafe key every Jev reader uses (plan `ade-ux` §4.6). It is published with the rest of this
+namespace as the `@dshfiles/settings-shell/settings` dshx module, so Backlog, Memory and Secret Catalog read it without a
+cycle; Settings › Tools & MCP › Jev shows it first as **Key**, then each plugin's Jev switches. Backlog's and Memory's
+earlier `jevSecret` fields stay stored but hidden: each is the fallback while the shared key is empty, and each plugin
+copies its value into an empty shared key once on start (`SharedJevKey` in `@dshfiles/credential-port/jev-key`, written
+against the revision it read empty, so a set key is never overwritten). Clearing the shared key brings their own keys
+back. Agents change it with `settings_set`.
 
 Build, test and typecheck with `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.

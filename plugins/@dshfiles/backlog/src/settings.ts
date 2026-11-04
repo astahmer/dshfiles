@@ -10,12 +10,15 @@ export const backlogSettings = defineSettings({
     jevEnabled: Schema.boolean()
       .default(false)
       .description(
-        "Ask TypeSafe's Jev whether an item is work to do and whether it repeats an open item. Needs a key: bind one below, or set TYPESAFE_API_KEY in the Host environment.",
+        "Ask TypeSafe's Jev whether an item is work to do and whether it repeats an open item. Needs the Jev key in Settings › Tools & MCP › Jev, or TYPESAFE_API_KEY in the Host environment.",
       ),
+    // Moved to the one shared key in Settings › Tools & MCP › Jev (settings-shell). Kept, hidden, as the fallback while
+    // the shared key is empty, so moving it loses nothing and clearing the shared key restores this value.
     jevSecret: Schema.string()
       .role('secret-ref')
       .default('')
-      .description('Secret Catalog alias holding the TypeSafe key, written as secret:ALIAS or secret:ALIAS@env. The value never leaves the Host.'),
+      .hidden()
+      .description('Earlier Backlog-only TypeSafe key reference. Set the key once in Settings › Tools & MCP › Jev instead.'),
     triageProvider: Schema.string()
       .default('')
       .description('Provider id for the triage model (as the model picker names it). Empty skips the model; Jev alone still triages.'),

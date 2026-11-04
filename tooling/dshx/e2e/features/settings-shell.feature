@@ -105,3 +105,10 @@ Feature: Settings shell
     Then the Editor file-link preference is found switched on
     When the Editor file-link preference is switched off in the General section
     Then Settings search shows the Editor file-link preference switched off
+
+  @scenario:settings-shell.shared-jev-key
+  Scenario: The one Jev key leads Settings › Tools & MCP › Jev
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/backlog, @dshfiles/memory" is booted
+    When Settings is opened from the sidebar
+    And Settings are searched for "Jev"
+    Then the shared Jev key is listed once and the plugins' earlier key fields are not

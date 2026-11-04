@@ -4,6 +4,8 @@ import { KeyRoundIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { backlogApi } from '@dshfiles/backlog/api'
 import { backlogSettings } from '@dshfiles/backlog/settings'
+import { SharedJevKey } from '@dshfiles/credential-port/jev-key'
+import { settingsShellSettings } from '@dshfiles/settings-shell/settings'
 import { useLayoutEffect, useSyncExternalStore, useState } from 'react'
 import { JevChatTurnTimeline } from './jev-chat-turn-timeline.js'
 import { jevSetupView } from './jev-inline-setup-model.js'
@@ -26,10 +28,15 @@ export const JevInlineSetup = (props: {
 }): JSX.Element | null => {
   const backlog = useApi(backlogApi)
   const settings = useSettings(backlogSettings)
+  // The one Jev key lives in Settings › Tools & MCP › Jev (settings-shell); Backlog's earlier key is the fallback.
+  const shared = useSettings(settingsShellSettings)
   const queryClient = useQueryClient()
   const [saved, setSaved] = useState(false)
   const jevEnabled = settings.status === 'ready' && settings.value?.jevEnabled === true
-  const secretReference = settings.status === 'ready' ? (settings.value?.jevSecret.trim() ?? '') : ''
+  const secretReference =
+    settings.status === 'ready'
+      ? SharedJevKey.reference({ shared: shared.status === 'ready' ? (shared.value?.jevSecret ?? '') : '', legacy: settings.value?.jevSecret ?? '' })
+      : ''
 
   useLayoutEffect(() => {
     chatTurnTimeline.publish(props.sessionId, props.turn.turn)
@@ -61,9 +68,15 @@ export const JevInlineSetup = (props: {
     )
   }
   const setupView = jevSetupView({ enabled: jevEnabled, needsSetup: status.data?.needsSetup === true, reference: secretReference })
-  if (setupView === 'hidden' || !settings.writable) return null
+  const sharedWritable = shared.status === 'ready' && shared.writable
+  if (setupView === 'hidden' || (!sharedWritable && !settings.writable)) return null
   const bindReference = async (reference: string): Promise<void> => {
-    if (!settings.writable || settings.status !== 'ready') throw new Error('Backlog cannot accept a secret reference right now.')
+    // The shared key when its namespace is served; an older Host without it keeps Backlog's own field working.
+    if (sharedWritable) {
+      if (!(await shared.set('jevSecret', reference))) throw new Error('Settings refused the Jev key. Set it in Settings › Tools & MCP › Jev.')
+      return
+    }
+    if (!settings.writable || settings.status !== 'ready') throw new Error('The Jev key cannot be saved right now. Set it in Settings › Tools & MCP › Jev.')
     if (!(await settings.set('jevSecret', reference))) throw new Error('Backlog refused the secret reference.')
   }
   if (setupView === 'repair') {

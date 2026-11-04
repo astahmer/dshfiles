@@ -30,9 +30,10 @@ body or an item link can carry it without becoming a secret.
 
 ```ts
 import { SecretReferenceResolver } from '@dshfiles/credential-port'
+import { SharedJevKey } from '@dshfiles/credential-port/jev-key'
 
 const apiKey = await SecretReferenceResolver.resolve({
-  referenceText: settings.jevSecret,
+  referenceText: SharedJevKey.reference({ shared: shared.jevSecret, legacy: settings.jevSecret }),
   values: ctx.get('secretCatalogValues'),
   environmentValue: process.env.TYPESAFE_API_KEY,
 })
@@ -110,8 +111,11 @@ Open in Secret Catalog and Re-check. A consumer only needs the attribute or the
 
 ## Adopted by
 
-- `@dshfiles/backlog` — `jevSecret`, the TypeSafe key for triage.
-- `@dshfiles/memory` — `jevSecret`, the TypeSafe key for signal and recall gates.
+- `@dshfiles/settings-shell` — `jevSecret`, the one TypeSafe Jev key (Settings › Tools & MCP › Jev), read by
+  `@dshfiles/backlog` for triage and `@dshfiles/memory` for signal and recall gates. Their earlier per-plugin
+  `jevSecret` fields stay stored but hidden: each is the fallback while the shared key is empty, and each plugin copies
+  its value into an empty shared key once (`SharedJevKey.adopt` in `@dshfiles/credential-port/jev-key`, written only
+  against the revision it read empty, so a set shared key is never overwritten).
 - `@dshfiles/mcp-servers` — environment and header bindings of every server
   (global aliases; a DSH credential name still works).
 - `@dshfiles/secret-catalog` itself — `request_secret` returns a reference to

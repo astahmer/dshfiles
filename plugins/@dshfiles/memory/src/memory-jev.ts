@@ -1,4 +1,7 @@
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
+import { SharedJevKey } from '@dshfiles/credential-port/jev-key'
+import { Settings } from '@dshfiles/dshx/effect/settings'
+import { settingsShellSettings, type SettingsShellSettings } from '@dshfiles/settings-shell/settings'
 import { Jev, type JevCredential, type JevError, type JevQuestion, type JevVerdict } from '@dshfiles/jev'
 import { Utf8 } from '@dshfiles/optmem-core'
 import { Context, Effect, Layer, Option, Redacted } from 'effect'
@@ -40,6 +43,9 @@ export const jevQuestions = {
  * Memory's optional Jev use: digest signals, the recall gate and on-demand note review. Each answered call is counted
  * in memory's own usage and cost tables; a failed one bumps `jev.failures` and the caller treats it as "unknown".
  */
+/** Settings-shell's namespace, which holds the one Jev key every Jev reader shares (plans/ade-ux §4.6). */
+export const SharedJevSettingsTag = Settings.Tag<SettingsShellSettings>(settingsShellSettings.namespace)
+
 export class MemoryJev extends Context.Service<
   MemoryJev,
   {
@@ -62,11 +68,22 @@ export class MemoryJev extends Context.Service<
       const jev = yield* Jev
       const repo = yield* MemoryRepo
 
+      // The one shared key (Settings › Tools & MCP › Jev) wins; Memory's earlier key stays the fallback. Absent in a
+      // composition without settings-shell, where only the earlier key and the environment apply.
+      const shared = yield* Effect.serviceOption(SharedJevSettingsTag)
+      if (Option.isSome(shared)) {
+        yield* SharedJevKey.adopt(shared.value, (yield* settings.get).jevSecret).pipe(
+          Effect.tap(result => (result.kind === 'deferred' ? Effect.logWarning('memory: the earlier Jev key stays in Memory settings until the shared key can be written', result.cause) : Effect.void)),
+          Effect.forkScoped,
+        )
+      }
+
       const credential = Effect.gen(function* () {
         const current = yield* settings.get
+        const sharedReference = Option.isSome(shared) ? (yield* shared.value.get).jevSecret : ''
         const resolved = yield* secrets
           .resolveWithLabel({
-            referenceText: current.jevSecret,
+            referenceText: SharedJevKey.reference({ shared: sharedReference, legacy: current.jevSecret }),
             environmentValue: process.env[TYPESAFE_ENV_KEY],
             environmentVariableName: TYPESAFE_ENV_KEY,
           })

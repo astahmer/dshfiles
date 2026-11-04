@@ -134,7 +134,7 @@
         {
           "key": "dshfiles-backlog.jevSecret",
           "defaultValue": "",
-          "constraints": "Secret Catalog reference only; value resolves on the Host.",
+          "constraints": "Hidden since the one shared key (dshfiles-settings-shell.jevSecret, Settings › Tools & MCP › Jev): kept as the fallback while the shared key is empty, and adopted into it once when that is empty. Secret Catalog reference only; value resolves on the Host.",
           "coveredBy": [
             "backlog.jev-settings-panel"
           ]

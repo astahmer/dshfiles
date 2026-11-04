@@ -1765,6 +1765,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/settings-shell':
+        specifier: workspace:*
+        version: link:../settings-shell
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -3876,6 +3879,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/settings-shell':
+        specifier: workspace:*
+        version: link:../settings-shell
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -5655,6 +5661,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/settings-shell':
+        specifier: workspace:*
+        version: link:../settings-shell
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime

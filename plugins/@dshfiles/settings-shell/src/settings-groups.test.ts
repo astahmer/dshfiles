@@ -106,6 +106,23 @@ describe('settings groups', () => {
     expect(SettingsGroups.entryForField(grouped, 'dshfiles-backlog', ['autoTriage'])?.id).toBe('plugin:dshfiles-backlog')
   })
 
+  it('leads the Jev entry with the one shared key, titled Key, before the plugins that use it', () => {
+    const withShared = SettingsGroups.group({
+      sections,
+      pages: [page('dshfiles-backlog', 'Backlog', ['autoTriage', 'jevEnabled']), page('dshfiles-memory', 'Memory', ['jevEnabled']), page('dshfiles-settings-shell', 'Settings shell', ['jevSecret'])],
+      panels,
+    }).flatMap(group => group.entries)
+    const jev = withShared.find(entry => entry.id === JEV_ENTRY_ID)
+    expect(jev?.pages.map(current => [current.title, current.ns, current.fields.map(each => each.key)])).toEqual([
+      ['Key', 'dshfiles-settings-shell', ['jevSecret']],
+      ['Backlog', 'dshfiles-backlog', ['jevEnabled']],
+      ['Memory', 'dshfiles-memory', ['jevEnabled']],
+    ])
+    expect(jev?.pages[0]?.description).toBe('One TypeSafe key for every Jev reader: Backlog triage and Memory signals.')
+    // Settings' own page held only the key (its other fields are hidden), so it has no page of its own.
+    expect(withShared.some(entry => entry.id === 'plugin:dshfiles-settings-shell')).toBe(false)
+  })
+
   it('puts Layout in General and keeps the rest of the thread sidebar under Thread list', () => {
     const general = all.find(entry => entry.id === 'general')
     expect(general?.pages.map(current => [current.title, current.fields.map(each => each.key)])).toEqual([['Layout', ['layoutMode']]])

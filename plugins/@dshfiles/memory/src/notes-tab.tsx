@@ -524,6 +524,13 @@ const NoteDetail = (props: {
   )
 }
 
+/** Opens Settings on the one shared Jev key (Tools & MCP › Jev), which Memory's signal gates and review use. */
+const openJevSettings = (): void => {
+  window.dispatchEvent(
+    new CustomEvent('dshfiles:open-settings', { detail: { setting: { entryId: 'dshfiles-settings-shell', fieldPath: ['jevSecret'] } }, cancelable: true }),
+  )
+}
+
 export const NotesTab = (props: {
   readonly project: string | undefined
   readonly openThread: (id: string) => void
@@ -793,9 +800,14 @@ export const NotesTab = (props: {
             </div>
           ) : null}
           {review.isError ? (
-            <p className="dshx:border-b dshx:border-border dshx:p-3 dshx:text-xs dshx:text-destructive">
-              {errorMessage(review.error, 'Jev review is unavailable. Check that Jev is on in Settings, then review again.')}
-            </p>
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:p-3">
+              <p role="alert" className="dshx:min-w-0 dshx:flex-1 dshx:text-xs dshx:text-destructive">
+                {errorMessage(review.error, 'Jev review is unavailable. Check that Jev is on and has a key in Jev settings, then review again.')}
+              </p>
+              <Button size="xs" variant="outline" onClick={openJevSettings}>
+                Open Jev settings
+              </Button>
+            </div>
           ) : null}
           {review.data === undefined ? null : (
             <section

@@ -1,11 +1,12 @@
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
+import { SharedJevKey } from '@dshfiles/credential-port/jev-key'
 import { Llm } from '@dshfiles/dshx/effect/llm'
 import { Jev, type JevCredential } from '@dshfiles/jev'
 import { Clock, Context, Effect, FiberSet, Layer, Option, Redacted } from 'effect'
 import { AiActivity } from './ai-activity.js'
 import type { BacklogDetailResult } from './api.js'
 import type { TriageOutcome } from './backfill.js'
-import { BacklogSettingsTag } from './backlog-settings.js'
+import { BacklogSettingsTag, SharedJevSettingsTag } from './backlog-settings.js'
 import { BacklogWriteFailed, LlmCompletionFailed, TriageUnconfigured } from './errors.js'
 import { ReplyRouting, type ReplyRouteResult } from './reply-routing.js'
 import type { BacklogSettings } from './settings.js'
@@ -54,10 +55,26 @@ export class Triage extends Context.Service<
       const activity = yield* AiActivity
       const background = yield* FiberSet.make()
 
+      // The one shared key (Settings › Tools & MCP › Jev) wins; this plugin's earlier key stays the fallback. Absent in
+      // a composition without settings-shell, where only the earlier key and the environment apply.
+      const shared = yield* Effect.serviceOption(SharedJevSettingsTag)
+      const sharedKey = Option.match(shared, { onNone: () => Effect.succeed(''), onSome: service => Effect.map(service.get, value => value.jevSecret) })
+      if (Option.isSome(shared)) {
+        const legacy = (yield* settings.get).jevSecret
+        yield* SharedJevKey.adopt(shared.value, legacy).pipe(
+          Effect.tap(result => (result.kind === 'deferred' ? Effect.logWarning('backlog: the earlier Jev key stays in Backlog settings until the shared key can be written', result.cause) : Effect.void)),
+          Effect.forkScoped,
+        )
+      }
+
       const resolveCredential = (current: BacklogSettings) =>
-        secrets
-          .resolveWithLabel({ referenceText: current.jevSecret, environmentValue: process.env[TYPESAFE_ENV_KEY], environmentVariableName: TYPESAFE_ENV_KEY })
-          .pipe(Effect.map(Option.map((resolved): JevCredential => ({ apiKey: Redacted.make(resolved.value), label: resolved.label }))))
+        Effect.flatMap(sharedKey, sharedReference =>
+          secrets.resolveWithLabel({
+            referenceText: SharedJevKey.reference({ shared: sharedReference, legacy: current.jevSecret }),
+            environmentValue: process.env[TYPESAFE_ENV_KEY],
+            environmentVariableName: TYPESAFE_ENV_KEY,
+          }),
+        ).pipe(Effect.map(Option.map((resolved): JevCredential => ({ apiKey: Redacted.make(resolved.value), label: resolved.label }))))
 
       const credential = (current: BacklogSettings) =>
         current.jevEnabled

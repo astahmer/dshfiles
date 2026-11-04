@@ -25,7 +25,8 @@ export class SecretInputBinding {
   }
 
   static isBacklogJevSetting(input: { readonly namespace: string | null; readonly path: string | null }): boolean {
-    return input.namespace === 'dshfiles-backlog' && input.path === 'jevSecret'
+    // The one shared key (settings-shell) and Backlog's earlier field both hold the TypeSafe key.
+    return (input.namespace === 'dshfiles-settings-shell' || input.namespace === 'dshfiles-backlog') && input.path === 'jevSecret'
   }
 
   /**

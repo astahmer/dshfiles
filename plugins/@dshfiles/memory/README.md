@@ -65,7 +65,7 @@ Message text is indexed with contentless FTS5 tables (the index only; the text s
 shapes, bearer tokens, `key=value` secrets and tokenized URLs are redacted before anything is indexed, digested,
 noted or returned, and an excerpt never shows tool output that names a credential file.
 
-Optional: TypeSafe's Jev (`jevEnabled`; key from `jevSecret`, a Secret Catalog reference, else `TYPESAFE_API_KEY`) flags user messages as durable signals at digest time, gates whether a new thread gets thread pointers, and on demand classifies saved notes for relevance. A low Jev relevance score is only a suggestion: the note stays active until the user archives it. Any failure is shown as unknown and never changes storage.
+Optional: TypeSafe's Jev (`jevEnabled`; key from the one Jev key in Settings › Tools & MCP › Jev, else Memory's earlier hidden `jevSecret`, else `TYPESAFE_API_KEY`) flags user messages as durable signals at digest time, gates whether a new thread gets thread pointers, and on demand classifies saved notes for relevance. A low Jev relevance score is only a suggestion: the note stays active until the user archives it. Any failure is shown as unknown and never changes storage.
 
 Out of scope: promoting facts into AGENTS.md or skills, reading `~/.agents`, mid-thread injection, thread handoff.
 

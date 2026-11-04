@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-385 features from 87 plugins.
+390 features from 89 plugins.
 
 ## Counts
 
@@ -19,11 +19,11 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  |  | 5 |
 | Observe |  |  |  |  | 21 | 1 |  |  | 2 |  |  |  |  |  | 24 |
 | Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  |  | 6 |
-| Settings |  |  |  |  |  |  |  |  | 1 |  | 42 |  |  |  | 43 |
-| Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 24 |  | 24 |
+| Settings |  |  |  |  | 2 |  |  |  | 1 |  | 43 |  |  |  | 46 |
+| Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 25 |  | 25 |
 | Composer |  |  |  | 54 |  |  |  |  |  |  |  |  |  |  | 54 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 21 | 21 |
-| No place of its own | 19 |  | 17 |  |  |  |  | 91 |  |  |  | 7 |  |  | 134 |
+| No place of its own | 19 |  | 17 |  |  |  | 1 | 91 |  |  |  | 7 |  |  | 135 |
 
 ## By current left-nav entry
 
@@ -49,6 +49,7 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | Review | Thread panel | pulls-review/ai-scope-summaries → Thread panel (threadFacet)<br>pulls-review/batch-reviewed-marks → Thread panel (threadFacet)<br>pulls-review/thread-review-scopes → Thread panel (threadFacet) |
 | Revision graph | Land, No place of its own | jujutsu/graph-navigation → Land (destinationSection)<br>jujutsu/panel-scopes → No place of its own (infrastructure)<br>jujutsu/previewed-revision-mutations → Land (rowAction)<br>jujutsu/revision-detail-and-diff → Land (detail)<br>jujutsu/revision-graph → Land (destinationSection)<br>jujutsu/workspace-at-revision → Land (rowAction)<br>jujutsu/workspace-cleanup → Land (command)<br>jujutsu/workspace-overflow → Land (rowAction)<br>jujutsu/workspace-removal → Land (rowAction) |
 | Secrets | Settings | secret-catalog/alias-mutations → Settings (settingsSection)<br>secret-catalog/bounded-secret-reveal → Settings (settingsSection)<br>secret-catalog/inline-quick-add → Settings (settingsSection)<br>secret-catalog/scoped-alias-catalog → Settings (settingsSection) |
+| Settings | Settings | capabilities-hub/capabilities-hub → Settings (destinationSection)<br>plugin-guide/plugin-guide → Settings (destinationSection) |
 | Source control | Land | jujutsu/source-control → Land (destinationSection) |
 | Thread Sidebar: Board | Threads | thread-sidebar/thread-classification → Threads (destinationSection) |
 | Traces: Explorer | Inbox, Observe | traces/alert-rules → Inbox (attentionProvider)<br>traces/boards-and-saved-views → Observe (destinationSection)<br>traces/log-explorer → Observe (destinationSection)<br>traces/metric-charts → Observe (destinationSection)<br>traces/service-map → Observe (destinationSection)<br>traces/trace-explorer → Observe (destinationSection)<br>traces/trace-insights → Observe (destinationSection) |
@@ -69,27 +70,29 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | composer | 55 | Composer 52, Thread panel 2, Settings 1 |
 | composer and transcript | 1 | Threads 1 |
 | conversation-view | 2 | Thread panel 2 |
-| dialog | 4 | Agents 1, No place of its own 1, Settings 1, Thread panel 1 |
+| dialog | 3 | No place of its own 1, Settings 1, Thread panel 1 |
 | host | 45 | No place of its own 45 |
 | Host contract | 1 | Inbox 1 |
 | Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
 | keyboard | 3 | No place of its own 3 |
-| left-nav | 89 | Observe 21, Work 16, Land 13, Settings 13, Inbox 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
+| left-nav | 91 | Observe 21, Work 16, Settings 15, Land 13, Inbox 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 10 | No place of its own 7, Thread panel 2, Settings 1 |
 | observe | 2 | Observe 2 |
+| overlay | 4 | Agents 1, Knowledge 1, No place of its own 1, Work 1 |
 | palette | 13 | No place of its own 13 |
 | plugins-page | 2 | No place of its own 1, Settings 1 |
 | rail | 1 | Work 1 |
 | right-pane | 7 | Thread panel 5, No place of its own 2 |
-| settings | 23 | Settings 21, No place of its own 2 |
+| settings | 24 | Settings 22, No place of its own 2 |
 | shell | 7 | No place of its own 5, Threads 2 |
 | sidebar | 2 | Settings 2 |
 | sidebar-footer | 3 | No place of its own 3 |
 | status-strip | 6 | No place of its own 4, Composer 1, Observe 1 |
+| thread panel | 1 | Thread panel 1 |
 | thread-header | 7 | Thread panel 3, Threads 3, No place of its own 1 |
 | thread-list | 22 | Threads 16, Inbox 3, No place of its own 2, Settings 1 |
 | toast | 1 | No place of its own 1 |
-| transcript | 26 | Transcript 21, Inbox 1, Knowledge 1, Land 1, Thread panel 1, Work 1 |
+| transcript | 24 | Transcript 21, Inbox 1, Land 1, Thread panel 1 |
 | url | 1 | No place of its own 1 |
 | workbench | 16 | No place of its own 12, Thread panel 3, Settings 1 |
 
@@ -190,7 +193,7 @@ rail destination; 18 features.
 | backlog/board-links-and-history: Board, links, backlinks and history | detail | left-nav: Backlog › Board / item detail |
 | backlog/rich-item-text: Write descriptions and replies like a capture | detail | left-nav: Backlog › item detail |
 | backlog/secret-link-reveal: Reveal an item's secret link in place | detail | left-nav: Backlog › item detail › Relationships |
-| backlog/reference-preview: Preview a referenced item from a conversation | entityProvider | transcript: b:<id> reference card |
+| backlog/reference-preview: Preview a referenced item from a conversation | entityProvider | overlay: shared reference preview card (input-trigger entity registry), backlog kind |
 | backlog/inline-title-edit: Rename an item in place | rowAction | left-nav: Backlog › rows |
 | backlog/multi-select-items: Select items in ranges and batch-edit them | rowAction | left-nav: Backlog › rows |
 | backlog/selection-context-menu: Apply every context-menu action to the selection | rowAction | left-nav: Backlog › row menu |
@@ -207,7 +210,7 @@ rail destination; 5 features.
 | agent-communication/human-browser: Post messages from the communication browser | destinationSection | left-nav: Messages › post |
 | agent-communication/passive-messaging: Store and browse passive messages | destinationSection | left-nav: Messages |
 | agents/agent-registry: Manage persistent agents | destinationSection | left-nav: Agents |
-| agents/agent-mention-preview: Preview an agent from its mention | entityProvider | dialog: agent reference preview card |
+| agents/agent-mention-preview: Preview an agent from its mention | entityProvider | overlay: shared reference preview card (input-trigger entity registry), agent kind |
 
 ### Observe
 
@@ -250,15 +253,17 @@ rail destination; 6 features.
 | memory/usage-telemetry: Show what memory costs and whether it holds up | destinationSection | left-nav: Memory › Analytics |
 | references/session-references: Attach named outside directories and git repositories to a thread | destinationSection | agent tool: reference_* and /reference (no UI) |
 | resource-packs/local-properties: Typed packs on referenced resources | destinationSection | left-nav: Resource Packs: Resources (not mounted) |
-| memory/memory-reference-preview: Preview cited memory inline | entityProvider | transcript: memory: <id> reference card |
+| memory/memory-reference-preview: Preview cited memory inline | entityProvider | overlay: shared reference preview card (input-trigger entity registry), memory kind |
 | memory/batch-forget-notes: Forget a selection of notes | rowAction | left-nav: Memory › Select notes |
 
 ### Settings
 
-rail destination (bottom); 43 features.
+rail destination (bottom); 46 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
+| capabilities-hub/capabilities-hub: Open the manager for skills, MCP servers or plugins from one page | destinationSection | left-nav: Settings › Capabilities hub |
+| plugin-guide/plugin-guide: Browse where a plugin can extend DSH | destinationSection | left-nav: Settings › Plugin guide |
 | mcp-servers/batch-server-actions: Batch enable, disable and remove MCP servers | rowAction | left-nav: MCP Servers: Servers › batch actions |
 | ai-accounts/account-lifecycle: Manage provider account drafts | settingsSection | left-nav: AI Accounts: Accounts |
 | ai-accounts/failure-recovery: Recover failed account requests per failure kind | settingsSection | settings: AI Accounts › failure recovery |
@@ -293,6 +298,7 @@ rail destination (bottom); 43 features.
 | settings-shell/settings-tab: One Settings page in the stage | settingsSection | settings: the Settings page in the stage |
 | settings-shell/settings-task-groups: Settings grouped by task, with deep links | settingsSection | settings: task groups in the Settings navigation |
 | settings-shell/settings-workbench-panels: One dockable Settings hub with real navigation and forms | settingsSection | main-tabs: New tab › Settings |
+| settings-shell/shared-jev-key: Set the Jev key once | settingsSection | settings: Tools & MCP › Jev › Key |
 | shortcuts/editable-command-keys: Rebindable command keys | settingsSection | settings: Keyboard shortcuts |
 | thread-sidebar/idle-archive-policy: Automatically settle eligible idle threads | settingsSection | settings: Thread sidebar › idle policy |
 | thread-sidebar/layout-mode: Choose a fixed or free-docking left column | settingsSection | settings: Thread sidebar › Layout |
@@ -305,11 +311,12 @@ rail destination (bottom); 43 features.
 
 ### Thread panel
 
-facets of the active thread; 24 features.
+facets of the active thread; 25 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | agent-toolkit/agent-toolkit-page: Agent toolkit page | threadFacet | left-nav: Agent Toolkit: Capabilities |
+| agent-toolkit/thread-context-facet: See what a thread loads into its context | threadFacet | thread panel: Context tab |
 | annotations/preview-file: Annotate an HTML preview | threadFacet | dialog: annotate an HTML preview |
 | background-jobs/thread-jobs-facet: Thread panel Jobs facet | threadFacet | workbench: Choose a view › Thread panels › Jobs |
 | btw/btw-side-chat: /btw side chat | threadFacet | right-pane: btw tab |
@@ -425,7 +432,7 @@ cards inline in the active thread; 21 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 134 features.
+palette commands, status items, agent tools, infrastructure; 135 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -465,6 +472,7 @@ palette commands, status items, agent tools, infrastructure; 134 features.
 | thread-sidebar/multi-model-fan-out: Send one prompt to several models | command | palette: Send to several models… |
 | thread-sidebar/palette-search-history: Search threads, files, and recent navigation | command | thread-list: Search threads |
 | thread-sidebar/prompt-links: Open a prefilled new thread from a prompt link | command | url: ?prompt= link |
+| input-trigger/entity-registry: One mention and reference-preview registry | entityProvider | overlay: shared reference preview card; composer: @ menu groups |
 | agent-telemetry/agent-turn-spans: GenAI spans for every agent turn | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
 | agent-telemetry/auxiliary-and-wait-spans: Purpose model calls and wait spans | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
 | agent-telemetry/content-capture: Metadata only unless content capture is switched on | infrastructure | settings: Agent telemetry › capture content |

@@ -9,6 +9,7 @@ describe('secret input binding', () => {
 
   it('recognizes only the Backlog Jev secret setting as a setup target', () => {
     expect(SecretInputBinding.isBacklogJevSetting({ namespace: 'dshfiles-backlog', path: 'jevSecret' })).toBe(true)
+    expect(SecretInputBinding.isBacklogJevSetting({ namespace: 'dshfiles-settings-shell', path: 'jevSecret' })).toBe(true)
     expect(SecretInputBinding.isBacklogJevSetting({ namespace: 'dshfiles-memory', path: 'jevSecret' })).toBe(false)
     expect(SecretInputBinding.isBacklogJevSetting({ namespace: 'dshfiles-backlog', path: 'autoTriage' })).toBe(false)
   })

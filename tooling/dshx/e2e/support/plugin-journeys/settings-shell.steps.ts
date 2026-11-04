@@ -322,3 +322,15 @@ Then('Settings search shows the Editor file-link preference switched off', async
   )
   await finishJourneyAssertions(page)
 })
+
+Then("the shared Jev key is listed once and the plugins' earlier key fields are not", async ({ page }: { page: Page }) => {
+  const results = page.locator('[data-settings-results]')
+  await recordAssertion(page, 'settings-shell-shared-jev-key-listed', async () => {
+    await expect(results.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"]')).toHaveCount(1)
+    await expect(results.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')).toBeVisible()
+    // Backlog and Memory keep their Jev switches; their earlier key fields are hidden (stored, not shown).
+    await expect(results.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevEnabled"]')).toBeVisible()
+    await expect(results.locator('[data-setting-path="jevSecret"]')).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})

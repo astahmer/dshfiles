@@ -1040,6 +1040,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "EntityKinds",
+      "importFrom": "@dshfiles/input-trigger/entity-registry",
+      "owner": "@dshfiles/input-trigger",
+      "source": "plugins/@dshfiles/input-trigger/src/entity-registry.ts:64",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/input-trigger.entity-kind",
+      "kind": "registry",
+      "title": "EntityKinds",
+      "summary": "Plugins contribute with `plugin.add(EntityKinds, { kind, label, mentionPrefixes, mentionSource, Preview })`.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(EntityKinds, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/input-trigger renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/input-trigger.entity-kind"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/input-trigger/image-attachment-contract",
       "kind": "module",
       "title": "@dshfiles/input-trigger/image-attachment-contract",
@@ -1362,6 +1384,29 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "referencesApi",
+      "importFrom": "@dshfiles/references/api",
+      "owner": "@dshfiles/references",
+      "source": "plugins/@dshfiles/references/src/api.ts:21",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "api:@dshfiles/references:references",
+      "kind": "api",
+      "title": "referencesApi (references)",
+      "summary": "Host API served by @dshfiles/references.",
+      "scope": "host, called from clients, other Host plugins and agents",
+      "mode": "host methods",
+      "registration": "useApi(referencesApi) in a Client slot, or createHostApiClient(ctx, referencesApi, packageId) on the Host",
+      "risk": "additive",
+      "riskNote": "Calling is additive; @dshfiles/references owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
+      "details": [
+        "Methods: list, save, remove, attach, detach",
+        "Agent tools: references_list (read-only), reference_save, reference_remove, reference_attach, reference_detach"
+      ],
+      "docs": "tooling/dshx/docs/guides/api.md",
+      "command": null
+    },
+    {
       "publicSymbol": "resourcePacksApi",
       "importFrom": "@dshfiles/resource-packs/api",
       "owner": "@dshfiles/resource-packs",
@@ -1573,6 +1618,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/session-search/src/search-worker.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/settings-shell/settings",
+      "kind": "module",
+      "title": "@dshfiles/settings-shell/settings",
+      "summary": "Public module of @dshfiles/settings-shell.",
+      "publicSymbol": "settingsShellSettings, SettingsShellSettings",
+      "importFrom": "@dshfiles/settings-shell/settings",
+      "owner": "@dshfiles/settings-shell",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/settings-shell/src/settings.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2101,12 +2166,12 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "static",
       "occupants": [
         "@dshfiles/agent-toolkit › agent-toolkit-page",
+        "@dshfiles/agent-toolkit › thread-context-facet",
         "@dshfiles/annotations › preview-file",
-        "@dshfiles/background-jobs › thread-jobs-facet",
-        "@dshfiles/btw › btw-side-chat"
+        "@dshfiles/background-jobs › thread-jobs-facet"
       ],
       "details": [
-        "Used by 24 catalog feature(s)",
+        "Used by 25 catalog feature(s)",
         "Destinations in use: thread-panel"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2299,7 +2364,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 42 catalog feature(s)",
+        "Used by 43 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2351,12 +2416,12 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [
         "@dshfiles/agents › agent-mention-preview",
         "@dshfiles/backlog › reference-preview",
-        "@dshfiles/jujutsu › chat-references",
-        "@dshfiles/memory › memory-reference-preview"
+        "@dshfiles/input-trigger › entity-registry",
+        "@dshfiles/jujutsu › chat-references"
       ],
       "details": [
-        "Used by 5 catalog feature(s)",
-        "Destinations in use: agents, knowledge, land, threads, work"
+        "Used by 6 catalog feature(s)",
+        "Destinations in use: agents, knowledge, land, none, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
       "docs": "docs/observability.md",

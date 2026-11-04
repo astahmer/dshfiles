@@ -1,3 +1,4 @@
+import { settingsShellSettings } from '@dshfiles/settings-shell/settings'
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Llm } from '@dshfiles/dshx/effect/llm'
@@ -42,7 +43,7 @@ const platform = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)
 /** The Host services memory reads through dshx, and the edges that adapt DSH's Promise services and TypeSafe. */
 const hostEdges = Layer.mergeAll(Summarizer.layer, AgentScopes.layer).pipe(
   Layer.provideMerge(Layer.mergeAll(SessionReads.layer, Jev.layer)),
-  Layer.provideMerge(Layer.mergeAll(Settings.layer(memorySettings), HostApis.layer, SecretReferenceResolver.layer, Llm.layer, FetchHttpClient.layer, platform)),
+  Layer.provideMerge(Layer.mergeAll(Settings.layer(memorySettings), Settings.layer(settingsShellSettings), HostApis.layer, SecretReferenceResolver.layer, Llm.layer, FetchHttpClient.layer, platform)),
 )
 
 /** Every memory service and background loop of one activation. */

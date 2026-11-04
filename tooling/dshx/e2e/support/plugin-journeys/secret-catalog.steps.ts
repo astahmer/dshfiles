@@ -107,9 +107,10 @@ const openCatalog = async (page: Page): Promise<void> => {
 }
 
 const openBacklogSettings = async (page: Page): Promise<void> => {
-  await openGlobalPanel(page, 'Plugins')
-  await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
-  await expect(page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"]')).toBeVisible()
+  // The one Jev key and Backlog's Jev switch sit together under Settings › Tools & MCP › Jev.
+  if (!(await settingsPage(page).isVisible())) await openSettingsDialog(page)
+  await settingsNavEntry(page, 'Jev').click()
+  await expect(page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"]')).toBeVisible()
 }
 
 When('the Secret Catalog is opened', async ({ page }: { page: Page }) => {
@@ -121,13 +122,14 @@ Given('Backlog Jev triage is enabled without a resolvable key', async ({ page }:
   const enabled = page.getByRole('switch', { name: 'Jev enabled', exact: true })
   if (!(await enabled.isChecked())) await enabled.click()
   await expect(enabled).toBeChecked()
-  await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).not.toBeChecked()
+  // Auto triage is off by default (Backlog's own page); this page holds only Jev settings.
+  await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).toHaveCount(0)
   const globalKey = (await readStore(page)).rows.filter(row => row.alias === 'jev-api-key-optmem' && row.scope === 'global')
   expect(globalKey).toHaveLength(0)
 })
 
 Given('Backlog Jev has an unresolved configured reference', async ({ page }: { page: Page }) => {
-  const field = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
+  const field = page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
   await field.fill('secret:MISSING_JEV_FOR_E2E')
   await field.press('Enter')
   await expect(field).toHaveValue('secret:MISSING_JEV_FOR_E2E')
@@ -147,7 +149,7 @@ Given('Backlog Jev has a resolvable configured reference', async ({ page }: { pa
   })
   store.vault['item-dsh-jev-backlog'] = 'synthetic-valid-jev-value'
   await writeFile(fixture.storePath, JSON.stringify(store))
-  const field = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
+  const field = page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
   await field.fill('secret:DSH_JEV_BACKLOG')
   await field.press('Enter')
   await expect(field).toHaveValue('secret:DSH_JEV_BACKLOG')
@@ -155,7 +157,7 @@ Given('Backlog Jev has a resolvable configured reference', async ({ page }: { pa
 
 When('the Backlog Jev secret setup is opened from Settings', async ({ page }: { page: Page }) => {
   await openBacklogSettings(page)
-  const jevRow = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"]')
+  const jevRow = page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"]')
   await expect(jevRow).toBeVisible()
   await jevRow.locator('input[data-secret-input="reference"]').focus()
   const addSecret = page.getByTestId('secret-input-jev-setup')
@@ -218,13 +220,12 @@ When('the Jev API key {string} is entered and saved', async ({ page }: { page: P
   const existingJevKey = store.rows.some(row => row.alias === 'jev-api-key-optmem' && row.scope === 'global' && row.environment === 'prod')
   const saveButton = existingJevKey ? 'Replace and bind' : 'Add and bind'
   await setup.getByRole('button', { name: saveButton, exact: true }).click()
-  const jevRow = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"]')
+  const jevRow = page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"]')
   await expect(jevRow.locator('input[data-secret-input="reference"]')).toHaveValue('secret:jev-api-key-optmem')
   await expect(setup).toHaveCount(0)
   await page.reload()
-  await openGlobalPanel(page, 'Plugins')
-  await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
-  await expect(page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')).toHaveValue(
+  await openBacklogSettings(page)
+  await expect(page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')).toHaveValue(
     'secret:jev-api-key-optmem',
   )
   expect(await page.locator('body').innerText()).not.toContain(value)
@@ -242,7 +243,8 @@ Then('the global Jev secret is stored with value {string} without exposing it in
     expect(projectMatches).toHaveLength(1)
     expect(store.vault[projectMatches[0]?.item ?? '']).toBe(jevProjectValue)
     await expect(page.getByRole('switch', { name: 'Jev enabled', exact: true })).not.toBeChecked()
-    await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).not.toBeChecked()
+    // Auto triage lives on Backlog's own page and is off by default; Settings › Jev shows Jev fields only.
+    await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -308,7 +310,7 @@ Then('{string} is stored once as a global alias and the reference resolves', asy
 
 Then('the settings field shows the repair card for {string}', async ({ page }: { page: Page }, reference: string) => {
   await recordAssertion(page, 'secret-catalog-reference-repair-settings-field', async () => {
-    const field = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
+    const field = page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
     await field.focus()
     await expect(page.getByTestId('secret-input-jev-setup')).toHaveAttribute('data-reference-state', 'alias-missing')
     const card = page.getByTestId('secret-input-panel').getByTestId('secret-reference-repair')
@@ -383,11 +385,12 @@ Then('the chat Jev setup stores a global key and binds only its reference', asyn
     expect(JSON.stringify(chatTurns)).not.toContain(value)
   })
   await openBacklogSettings(page)
-  await expect(page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')).toHaveValue(
+  await expect(page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')).toHaveValue(
     'secret:TYPESAFE_API_KEY',
   )
   await expect(page.getByRole('switch', { name: 'Jev enabled', exact: true })).toBeChecked()
-  await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).not.toBeChecked()
+  // Auto triage lives on Backlog's own page and is off by default; Settings › Jev shows Jev fields only.
+    await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).toHaveCount(0)
   await expect(page.locator('body')).not.toContainText(value)
   await finishJourneyAssertions(page)
 })
@@ -708,11 +711,11 @@ Then('the secret tools journey is complete', async ({ page }: { page: Page }) =>
   await finishJourneyAssertions(page)
 })
 
-When('the Memory Jev secret-reference setting is focused', async ({ page }: { page: Page }) => {
+When('a marked secret-reference setting is focused', async ({ page }: { page: Page }) => {
   if (!(await settingsPage(page).isVisible())) await openSettingsDialog(page)
-  // Jev settings of every plugin live together under Tools & MCP › Jev.
-  await settingsNavEntry(page, 'Jev').click()
-  const field = page.locator('[data-settings-namespace="dshfiles-memory"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
+  // Brave web search's key: an ordinary secret-reference setting (the Jev key carries its own Jev setup button).
+  await settingsNavEntry(page, 'Web search (Brave)').click()
+  const field = page.locator('[data-settings-namespace="dshfiles-web-search-brave"] [data-setting-path="apiKey"] input[data-secret-input="reference"]')
   await expect(field).toBeVisible()
   await field.focus()
   await expect(page.getByRole('button', { name: 'Bind a secret', exact: true })).toBeVisible()
@@ -746,7 +749,7 @@ When('the duplicate alias is entered in setup', async ({ page }: { page: Page })
 Then('setup offers to bind that alias without storing another copy', async ({ page }: { page: Page }) => {
   const panel = page.getByTestId('secret-input-panel')
   await panel.getByRole('button', { name: 'Use existing secret', exact: true }).click()
-  const field = page.locator('[data-settings-namespace="dshfiles-memory"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
+  const field = page.locator('[data-settings-namespace="dshfiles-web-search-brave"] [data-setting-path="apiKey"] input[data-secret-input="reference"]')
   await expect(field).toHaveValue('secret:SYNTHETIC_SETUP_TOKEN@staging')
   const store = await readStore(page)
   await recordAssertion(page, 'secret-catalog-duplicate-setup-binds-existing-row', async () => {
@@ -792,7 +795,7 @@ When('a secret is created and bound with the value {string}', async ({ page }: {
   await secretValue.fill(value)
   await panel.getByRole('button', { name: 'Create and bind', exact: true }).click()
   await expect(page.getByTestId('secret-input-panel')).toHaveCount(0)
-  const field = page.locator('[data-settings-namespace="dshfiles-memory"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
+  const field = page.locator('[data-settings-namespace="dshfiles-web-search-brave"] [data-setting-path="apiKey"] input[data-secret-input="reference"]')
   await expect(field).toHaveValue('secret:SYNTHETIC_SETUP_TOKEN@staging')
   await field.press('Enter')
 })
@@ -800,7 +803,7 @@ When('a secret is created and bound with the value {string}', async ({ page }: {
 Then('the field stores only {string} while the fake CLI stores the synthetic value', async ({ page }: { page: Page }, reference: string) => {
   const store = await readStore(page)
   const entry = store.rows.find(row => row.alias === 'SYNTHETIC_SETUP_TOKEN')
-  const field = page.locator('[data-settings-namespace="dshfiles-memory"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
+  const field = page.locator('[data-settings-namespace="dshfiles-web-search-brave"] [data-setting-path="apiKey"] input[data-secret-input="reference"]')
   await recordAssertion(page, 'secret-catalog-setup-stores-value-on-host-and-reference-in-field', async () => {
     expect(entry?.scope).toBe('global')
     expect(entry?.environment).toBe('staging')

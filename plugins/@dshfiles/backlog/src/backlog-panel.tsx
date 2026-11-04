@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import {
+  KeyRoundIcon,
   ArrowDownWideNarrowIcon,
   BookmarkIcon,
   FolderIcon,
@@ -281,11 +282,17 @@ export interface StartThreadPorts {
   readonly start: (request: StartThreadRequest) => Promise<StartThreadOutcome>
 }
 
+/** Opens Settings on the one shared Jev key (settings-shell's `jevSecret`, under Tools & MCP › Jev). */
+const openJevKeySettings = (): void => {
+  window.dispatchEvent(
+    new CustomEvent('dshfiles:open-settings', { detail: { setting: { entryId: 'dshfiles-settings-shell', fieldPath: ['jevSecret'] } }, cancelable: true }),
+  )
+}
+
 const BacklogSettingsPanel = (): JSX.Element => {
   const settings = useSettings(backlogSettings)
   const [jevEnabled, setJevEnabled] = useState(settings.value?.jevEnabled ?? false)
   const [autoTriage, setAutoTriage] = useState(settings.value?.autoTriage ?? false)
-  const [jevSecret, setJevSecret] = useState(settings.value?.jevSecret ?? '')
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -294,8 +301,7 @@ const BacklogSettingsPanel = (): JSX.Element => {
     if (dirty || settings.status !== 'ready') return
     setJevEnabled(settings.value?.jevEnabled ?? false)
     setAutoTriage(settings.value?.autoTriage ?? false)
-    setJevSecret(settings.value?.jevSecret ?? '')
-  }, [dirty, settings.status, settings.value?.autoTriage, settings.value?.jevEnabled, settings.value?.jevSecret])
+  }, [dirty, settings.status, settings.value?.autoTriage, settings.value?.jevEnabled])
 
   const save = async (): Promise<void> => {
     setError(null)
@@ -304,7 +310,6 @@ const BacklogSettingsPanel = (): JSX.Element => {
       if (settings.status !== 'ready' || !settings.writable) throw new Error('Backlog settings are not writable right now.')
       if (!(await settings.set('jevEnabled', jevEnabled))) throw new Error('Backlog could not save Jev settings.')
       if (!(await settings.set('autoTriage', autoTriage))) throw new Error('Backlog could not save automatic triage settings.')
-      if (!(await settings.set('jevSecret', jevSecret.trim()))) throw new Error('Backlog could not save the Jev secret reference.')
       setDirty(false)
       setSaved(true)
     } catch (cause) {
@@ -363,27 +368,16 @@ const BacklogSettingsPanel = (): JSX.Element => {
             <span className="dshx:text-xs dshx:text-muted-foreground">Run configured triage in the background when an item is captured.</span>
           </span>
         </label>
-        <label className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm">
-          <span className="dshx:font-medium">TypeSafe API key reference</span>
+        <div className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm">
+          <span className="dshx:font-medium">TypeSafe API key</span>
           <span className="dshx:text-xs dshx:text-muted-foreground">
-            Enter a Secret Catalog reference, such as secret:TYPESAFE_API_KEY. The key value stays in the Host vault.
+            One key serves Backlog triage and Memory. Set it in Settings › Tools & MCP › Jev; without it, TYPESAFE_API_KEY from the DSH Host
+            environment is used.
           </span>
-          <input
-            type="text"
-            data-secret-input="reference"
-            aria-label="TypeSafe API key reference"
-            placeholder="secret:TYPESAFE_API_KEY"
-            value={jevSecret}
-            disabled={!settings.writable || settings.status !== 'ready'}
-            onChange={event => {
-              setJevSecret(event.currentTarget.value)
-              setDirty(true)
-              setSaved(false)
-            }}
-            className="dshx:font-mono! dshx:h-9 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-3 dshx:text-sm dshx:outline-none dshx:focus-visible:border-ring"
-          />
-          <span className="dshx:text-xs dshx:text-muted-foreground">Leave blank to use TYPESAFE_API_KEY from the DSH Host environment.</span>
-        </label>
+          <Button type="button" variant="outline" size="sm" className="dshx:self-start" onClick={openJevKeySettings}>
+            <KeyRoundIcon aria-hidden /> Open Jev settings
+          </Button>
+        </div>
         {error === null ? null : (
           <p className="dshx:text-sm dshx:text-destructive" role="alert">
             {error}

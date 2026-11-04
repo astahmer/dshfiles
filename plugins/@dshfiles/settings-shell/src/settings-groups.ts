@@ -234,6 +234,9 @@ const PROMOTED_FIELDS: ReadonlyArray<{ readonly ns: string; readonly key: string
   { ns: 'thread-sidebar', key: 'layoutMode', entry: 'general', title: 'Layout' },
 ]
 
+/** The namespace holding the one Jev key (this plugin's own settings). */
+const SHARED_JEV_NAMESPACE = 'dshfiles-settings-shell'
+
 /** Jev settings live together in Tools & MCP: every field whose key names Jev. */
 const isJevField = (field: SettingField): boolean => /^jev/iu.test(field.key)
 
@@ -283,7 +286,15 @@ const groupEntries = (input: {
     const jev = kept.filter(isJevField)
     const rest = kept.filter(field => !isJevField(field))
     const title = pageTitle(original)
-    if (jev.length > 0) jevPages.push({ ...original, pageId: `${JEV_ENTRY_ID}:${original.ns}`, title, fields: jev })
+    // The one shared key (this plugin's own field) leads the Jev entry; the plugins that use it follow with their switches.
+    if (jev.length > 0 && original.ns === SHARED_JEV_NAMESPACE) jevPages.unshift({
+        ...original,
+        pageId: `${JEV_ENTRY_ID}:${original.ns}`,
+        title: 'Key',
+        description: 'One TypeSafe key for every Jev reader: Backlog triage and Memory signals.',
+        fields: jev,
+      })
+    else if (jev.length > 0) jevPages.push({ ...original, pageId: `${JEV_ENTRY_ID}:${original.ns}`, title, fields: jev })
     // A page whose every field moved elsewhere (to Jev, to General) has nothing left to show.
     if (rest.length === 0 && original.fields.length > 0) continue
     const drawnBy = DRAWN_BY_SECTION[original.ns]

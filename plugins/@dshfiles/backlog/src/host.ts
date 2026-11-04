@@ -16,7 +16,7 @@ import { AiActivity } from './ai-activity.js'
 import { BacklogAttention } from './attention-provider.js'
 import { backlogApi } from './api.js'
 import { AttachmentExport } from './attachment-file.js'
-import { backlogSettingsLayer } from './backlog-settings.js'
+import { backlogSettingsLayer, sharedJevSettingsLayer } from './backlog-settings.js'
 import { HostSpeech, hostEdgeLayer } from './host-edge-promise.js'
 import { BacklogTables } from './backlog-tables.js'
 import { LifecycleSignals } from './lifecycle-signals.js'
@@ -34,6 +34,7 @@ const platform = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)
 /** DSH services the backlog reads through dshx, and the platform and network clients its services run on. */
 const hostEdges = Layer.mergeAll(
   backlogSettingsLayer,
+  sharedJevSettingsLayer,
   StorageDomain.layer,
   HostApis.layer,
   SecretReferenceResolver.layer,

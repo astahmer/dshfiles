@@ -21,6 +21,10 @@
       "types": "./src/effect.ts",
       "default": "./dist/effect.js"
     },
+    "./jev-key": {
+      "types": "./src/jev-key.ts",
+      "default": "./dist/jev-key.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

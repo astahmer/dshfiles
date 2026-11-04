@@ -588,6 +588,83 @@
           "reason": "Client-only: Open the configuration file elsewhere renders browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "shared-jev-key",
+      "title": "Set the Jev key once",
+      "summary": "Settings › Tools & MCP › Jev leads with one Key: a secret:ALIAS reference (Secret Catalog picker) that Backlog triage and Memory's signal gates both resolve on the Host. Each plugin's earlier key stays stored but hidden as the fallback while the shared key is empty, and is copied into an empty shared key once, never over a set one. Backlog's Jev section and Memory's review link here.",
+      "reach": [
+        "click button \"Settings\"",
+        "fill searchbox \"Search settings\" \"Jev\"",
+        "expect text \"Key\""
+      ],
+      "surfaces": [
+        "client",
+        "host"
+      ],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Tools & MCP › Jev › Key",
+      "configuration": [
+        {
+          "key": "dshfiles-settings-shell.jevSecret",
+          "defaultValue": "",
+          "constraints": "Secret Catalog reference only (secret:ALIAS or secret:ALIAS@env); resolves on the Host. Empty falls back to each plugin's earlier key, then TYPESAFE_API_KEY.",
+          "coveredBy": [
+            "settings-shell.jev-key-adopt",
+            "settings-shell.jev-key-first"
+          ]
+        }
+      ],
+      "states": [
+        "shared-set",
+        "shared-empty-legacy-fallback",
+        "adopted-once",
+        "adoption-deferred",
+        "environment-fallback"
+      ],
+      "failureModes": [
+        "A Host without settings-shell's namespace keeps each plugin reading its own earlier key and the environment.",
+        "When Backlog and Memory held different earlier keys, the first adopted one becomes shared; the other stays stored in its plugin and is used again if the shared key is cleared."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.jev-key-adopt",
+          "file": "plugins/@dshfiles/credential-port/src/jev-key.test.ts",
+          "testName": "copies a plugin key into an empty shared key once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.jev-key-kept",
+          "file": "plugins/@dshfiles/credential-port/src/jev-key.test.ts",
+          "testName": "never overwrites a shared key that is already set"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.jev-key-race",
+          "file": "plugins/@dshfiles/credential-port/src/jev-key.test.ts",
+          "testName": "loses a race to a concurrent write instead of overwriting it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.jev-key-first",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
+          "testName": "leads the Jev entry with the one shared key, titled Key, before the plugins that use it"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.shared-jev-key",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "A settings field plus a one-time settings write through DSH's settings forms on Host start; no fetch, socket, process or long job. The Jev calls that use the key keep their jev classify span."
+        }
+      ]
     }
   ]
 }
