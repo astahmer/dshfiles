@@ -7,9 +7,12 @@
       "dependsOn": [],
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__frame-layout.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__hmr-gate.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__plugin-ui.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__shared-runtime.sha256",
+        "$TURBO_ROOT$/plugins/@dshfiles/frame-layout/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/frame-layout/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/hmr-gate/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/hmr-gate/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/cordis.patch.yml",

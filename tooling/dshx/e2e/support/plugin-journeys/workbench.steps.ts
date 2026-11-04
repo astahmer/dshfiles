@@ -11,6 +11,7 @@ import { openGlobalPanel, reusableViewName, viewNamePattern } from '../plugin-vi
 import { bootComposedPluginProfile } from '../boot.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion, visitIsolatedPluginProfile, settingsNavEntry } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, selectModelForNewThread, sendMessage } from '../threads.js'
+import { ThreadSidebarJourney } from '../thread-list-grouping.js'
 
 const MAIN_LAYOUT_KEY = 'dshfiles.workbench.layout.v1'
 const DOCK_LAYOUT_KEY = 'dshfiles.workbench.dock-layout.v1'
@@ -66,6 +67,11 @@ const setPluginEnabled = async (page: Page, packageId: string, enabled: boolean)
   if (enabled) await expect(toggle).toBeChecked()
   else await expect(toggle).not.toBeChecked()
 }
+
+// The fixed rail layout is the default; the Dockview left panes these journeys move exist only in free docking.
+When('the sidebar uses Settings › Layout › Free docking', async ({ page }: { page: Page }) => {
+  await ThreadSidebarJourney.useFreeDocking(page)
+})
 
 When('the Workbench is opened', async ({ page }: { page: Page }) => {
   await openWorkbench(page)
@@ -1774,8 +1780,12 @@ const assertFullHeightRightPane = async (page: Page, bottomShown: boolean): Prom
   await expect
     .poll(async () => {
       const right = await page.locator('[data-workbench-region="right"]').boundingBox()
-      const frame = await page.locator('[data-rightbar-col]').locator('..').boundingBox()
+      const outer = await page.locator('[data-rightbar-col]').locator('..').boundingBox()
       const bottom = bottomShown ? await page.locator('[data-shell-bottom]').boundingBox() : null
+      // The frame's status strip spans its last row under every column (plans/ade-ux §4.1); the columns end above it.
+      const strips = page.locator('[data-status-strip]')
+      const strip = (await strips.count()) === 0 ? null : await strips.first().boundingBox()
+      const frame = outer === null ? null : { ...outer, height: outer.height - (strip?.height ?? 0) }
       if (right === null || frame === null || right.width <= 0) return false
       const fullHeight = Math.abs(right.y - frame.y) <= 2 && Math.abs(right.y + right.height - frame.y - frame.height) <= 2
       if (!bottomShown) return fullHeight

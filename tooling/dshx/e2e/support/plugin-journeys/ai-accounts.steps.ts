@@ -11,7 +11,7 @@ import { threadAccountPreviewSchema } from '../../../../../plugins/@dshfiles/ai-
 import { After, Given, Then, When } from '../bdd.js'
 import { browserDiagnosticsFor, finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion, restartScratchProfileInBrowser, visitIsolatedPluginProfile, settingsNavEntry } from '../steps.js'
 import { bootComposedPluginProfile } from '../boot.js'
-import { seedAiAccountsWorkspace } from '../ai-accounts-workspace.js'
+import { AI_ACCOUNTS_WORKSPACE_SEED_KEY, seedAiAccountsWorkspace } from '../ai-accounts-workspace.js'
 import { seedCancellationOnlyCodexCli } from '../fake-account-codex.js'
 import {
   fakeCommandCodeFor,
@@ -166,9 +166,21 @@ const openAccountsPanel = async (page: Page): Promise<void> => {
   await expect(providerAccounts(page)).toBeVisible()
 }
 
+/** AI Accounts with the frame that seats its Quota status item: the usage strip lives in frame-layout's status strip. */
+Given('the isolated AI Accounts profile with the status strip is booted', async ({ page }: { page: Page }) => {
+  const profile = await bootComposedPluginProfile({
+    packageIds: ['@dshfiles/ai-accounts', '@dshfiles/frame-layout'],
+    profileLabel: 'ai-accounts-status-strip',
+    seedHome: seedAiAccountsWorkspace,
+    seedKey: AI_ACCOUNTS_WORKSPACE_SEED_KEY,
+  })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
 Given('the isolated AI Accounts and thread account controller profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
-    packageIds: ['@dshfiles/ai-accounts', '@dshfiles/session-controller'],
+    // Quota lives in frame-layout's status strip (plans/ade-ux §4.1 R5); without the frame there is no usage strip.
+    packageIds: ['@dshfiles/ai-accounts', '@dshfiles/session-controller', '@dshfiles/frame-layout'],
     profileLabel: 'ai-accounts-thread-account-controller',
     seedHome: seedAiAccountsWorkspace,
     seedKey: 'ai-accounts-thread-account-controller-v1',
@@ -178,7 +190,7 @@ Given('the isolated AI Accounts and thread account controller profile is booted'
 
 Given('the isolated account dashboard reference profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
-    packageIds: ['@dshfiles/ai-accounts', '@dshfiles/usage'],
+    packageIds: ['@dshfiles/ai-accounts', '@dshfiles/usage', '@dshfiles/frame-layout'],
     profileLabel: 'ai-accounts-dashboard-reference',
     seedHome: seedAiAccountsWorkspace,
     seedKey: 'ai-accounts-dashboard-reference-v1',
@@ -389,7 +401,7 @@ Then('the dashboard model routing and sign-out controls preserve saved account s
 
 Given('the isolated provisional account connections profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
-    packageIds: ['@dshfiles/ai-accounts'],
+    packageIds: ['@dshfiles/ai-accounts', '@dshfiles/frame-layout'],
     profileLabel: 'ai-accounts-provisional-connections',
     seedHome: async home => {
       await seedAiAccountsWorkspace(home)

@@ -27,6 +27,7 @@ Feature: Content-only single-tab groups
   @scenario:workbench.sidebar-preview-legacy-migration
   Scenario: An existing sidebar gains the regular Preview without resetting its other groups
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
+    And the sidebar uses Settings › Layout › Free docking
     When an old saved sidebar without a docked Preview is restored
     Then its existing views and hidden row survive the once-only Preview conversion
     And resetting the layout restores the default visible rows and regular Preview

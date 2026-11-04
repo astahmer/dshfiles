@@ -37,6 +37,19 @@ const newThreadButton = (page: Page): Locator => page.getByRole('button', { name
 const useFreeDocking = async (page: Page): Promise<void> => {
   const rail = page.getByRole('navigation', { name: 'Destinations', exact: true })
   if ((await rail.count()) === 0) return
+  // The palette command switches without opening the Settings page as a main tab; the rail's Settings list is the
+  // fallback in compositions without the command palette.
+  const palette = page.getByRole('dialog', { name: 'Command palette', exact: true })
+  const paletteButton = page.getByRole('button', { name: 'Open command palette', exact: true }).filter({ visible: true }).first()
+  if ((await paletteButton.count()) > 0) {
+    await paletteButton.click()
+    if (await palette.waitFor({ state: 'visible', timeout: 3_000 }).then(() => true, () => false)) {
+      await palette.getByRole('combobox').fill('Layout: free docking')
+      await palette.getByRole('option', { name: /Layout: free docking/u }).first().click()
+      await expect(rail).toHaveCount(0)
+      return
+    }
+  }
   await rail.getByRole('tab', { name: 'Settings', exact: true }).click()
   await page.getByRole('radiogroup', { name: 'Layout', exact: true }).getByRole('radio', { name: 'Free docking', exact: true }).click()
   // Free docking drops the rail; its header is `Sidebar navigation` or, in a Workbench profile, a Navigation panel.

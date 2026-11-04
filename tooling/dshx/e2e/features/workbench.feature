@@ -244,6 +244,7 @@ Feature: Workbench layouts
   @scenario:workbench.right-pane-toggle
   Scenario: The original right toggle keeps a full-height live view while the bottom is open
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
+    And the sidebar uses Settings › Layout › Free docking
     When the original right sidebar shortcut opens the Workbench pane
     Then the right Workbench pane fills the frame height
     When a disposable Workbench workspace has two real threads
@@ -262,6 +263,7 @@ Feature: Workbench layouts
   @scenario:workbench.responsive-main
   Scenario: Main surface controls stay reachable at narrow widths and in a split layout
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/main-tabs, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/jujutsu, @dshfiles/editor, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
+    And the sidebar uses Settings › Layout › Free docking
     When the unified Workbench is ready
     And the main workbench adds the registered "Jujutsu" panel
     Then the quiet pane tab strips fit at 360 480 768 and 1024 pixels
@@ -273,6 +275,7 @@ Feature: Workbench layouts
   @scenario:workbench.every-pane-views
   Scenario: The custom Threads plugin view can replace content in every pane
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/thread-sidebar, @dshfiles/workspace-folder-picker, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/jujutsu" is booted
+    And the sidebar uses Settings › Layout › Free docking
     When the unified Workbench is ready
     And the main workbench opens an empty dock and bottom row
     And the real Threads view is opened through every pane chooser
@@ -285,6 +288,7 @@ Feature: Workbench layouts
   @scenario:workbench.layout-recovery
   Scenario: Reset recovers moved chat tabs and stays recovered after reload
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/main-tabs, @dshfiles/thread-sidebar, @dshfiles/workspace-folder-picker, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/jujutsu" is booted
+    And the sidebar uses Settings › Layout › Free docking
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     And the Dockview thread tab is pinned from its context menu
@@ -304,6 +308,7 @@ Feature: Workbench layouts
   @scenario:workbench.reusable-view-picker
   Scenario: New tab choosers offer reusable plugin views rather than individual chat trajectories
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/thread-sidebar, @dshfiles/workspace-folder-picker, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
+    And the sidebar uses Settings › Layout › Free docking
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     Then the reusable view picker offers plugins without per-thread trajectories
@@ -353,6 +358,7 @@ Feature: Workbench layouts
   @scenario:workbench.reset-visible-current-chat
   Scenario: Reset reveals the current chat and left thread list from tools and legacy floats
     Given an isolated Workbench recovery profile with Main Tabs and demo views is booted
+    And the sidebar uses Settings › Layout › Free docking
     When the unified Workbench is ready
     And a disposable Workbench workspace has two real threads
     And each fixed-session conversation receives its own draft

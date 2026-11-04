@@ -97,7 +97,7 @@ Feature: AI Accounts
 
   @scenario:ai-accounts.quota-display
   Scenario: Read account quota windows from the provider
-    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    Given the isolated AI Accounts profile with the status strip is booted
     When a Command Code account backed by a local fake provider is added
     Then the account shows the session and weekly windows the provider reports
     When a second Command Code account whose verification fails is attempted
@@ -105,7 +105,7 @@ Feature: AI Accounts
 
   @scenario:ai-accounts.unavailable-accounts
   Scenario: Keep enabled accounts visible when provider quota sign-in expires
-    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    Given the isolated AI Accounts profile with the status strip is booted
     When two verified accounts use a controllable loopback quota provider
     Then an expired quota login keeps its sidebar identity without inventing a percentage
     And quota recovery and explicit hiding preserve saved account identity and order
@@ -121,14 +121,14 @@ Feature: AI Accounts
 
   @scenario:ai-accounts.strip-short-names
   Scenario: Rename an account's short name in the usage strip and hide short names
-    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    Given the isolated AI Accounts profile with the status strip is booted
     When a Command Code account backed by a local fake provider is added
     Then the usage strip shows its short name, renamed from AI Accounts settings
     And the strip's context menu hides and shows short names
 
   @scenario:ai-accounts.usage-popover-resize
   Scenario: Resize the usage popover until its accounts sit side by side
-    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    Given the isolated AI Accounts profile with the status strip is booted
     When a Command Code account backed by a local fake provider is added
     And a second healthy Command Code account is added
     Then widening the usage popover from its grip lays the accounts out side by side
@@ -136,7 +136,7 @@ Feature: AI Accounts
 
   @scenario:ai-accounts.priority-sidebar-sync
   Scenario: Share account priority order between the page and sidebar tiles
-    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    Given the isolated AI Accounts profile with the status strip is booted
     When a Command Code account backed by a local fake provider is added
     And a second healthy Command Code account is added
     And the second Command Code account is moved earlier on the accounts page
@@ -144,7 +144,7 @@ Feature: AI Accounts
 
   @scenario:ai-accounts.active-chat-switch
   Scenario: Follow the actual account when switching between chats and a blank draft
-    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    Given the isolated AI Accounts profile with the status strip is booted
     When a Command Code account backed by a local fake provider is added
     And a second healthy Command Code account is added
     And two healthy threads use different accounts
