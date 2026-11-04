@@ -95,6 +95,21 @@ the jj caches (live, same probe, 2026-10-20 02:00–03:00):
 | Composer `context` / `threadAt` | up to 875 ms / 815 ms                       | ≤ 277 ms / ≤ 138 ms                                                            |
 | Host lag p99 (70 s)             | 126 ms                                      | 75 ms                                                                          |
 
+## Startup HAR and page-load profile (2026-11-04)
+
+A HAR taken 37 s after a Host start showed a ~2.4 s window with no span at page load, a 13.9 s `editTimes`, and a
+thread that failed to open ("All fibers interrupted"). On a warm Host a scripted page load stalls ~0.65 s; a CPU profile
+of the live Host during that load (20 s, 5.8 s busy) names the owners below.
+
+| Cost                                                     | Evidence                                                                                                                | Fix                                                                                       | Owner              |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------ |
+| Page load blocks the Host on `pluginManager/listBundles` | ~1.0 s of synchronous `readFileSync`/`readdirSync` in core `readPluginMeta` per call; 185 KB response; called each load | labels cached on the Host per set of Loader rows, served by `settings-shell/bundleLabels` | settings-shell     |
+| Alert evaluation every minute                            | `alert engine evaluate` p50 532 ms, p95 5.3 s; each rule read walked all 100k spans (135–236 ms sync SQLite)            | `spans_end` index: 24–46 ms per rule on a copy of the live store                          | traces             |
+| `editTimes` for a 100-revision page                      | one `jj evolog` per commit: 13.9 s in the HAR, 31 s sequential                                                          | one batched `evolog`, walked per commit: 2.3 s with identical results                     | jujutsu            |
+| Cold local thread opens asked every remote host          | multi-host `owns` ran `session/list` over SSH per runtime before the history read                                       | ids from this Host's own list answer locally                                              | session-controller |
+| Thread open failed with "All fibers interrupted"         | concurrent `owns` joined the fiber `FiberMap.run(onlyIfMissing)` interrupts                                             | join the running discovery                                                                | multi-host         |
+| Session log lookups                                      | core `findLog` scans all 726 project directories per lookup; one tail read spent 4.4 s in `stat`, 18 ms reading         | open                                                                                      | core (Host gap)    |
+
 ## Thread-content search (palette `#…`)
 
 One search took 21 s to 1.4 min and stalled every other request (`modelCatalog`, `credentials/describe`, `state`,
