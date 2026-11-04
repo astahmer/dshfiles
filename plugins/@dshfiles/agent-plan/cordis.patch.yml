@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-agent-plan
+      name: '@dshfiles/agent-plan'

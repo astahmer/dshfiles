@@ -35,6 +35,7 @@
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__activity-timeline.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-communication.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-plan.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-preset.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-questions.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-telemetry.sha256",
@@ -122,6 +123,8 @@
         "$TURBO_ROOT$/plugins/@dshfiles/activity-timeline/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-communication/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-communication/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/agent-plan/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/agent-plan/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-preset/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-preset/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-questions/cordis.patch.yml",
@@ -311,6 +314,7 @@
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__activity-timeline.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-communication.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-plan.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-preset.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-questions.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-telemetry.sha256",
@@ -398,6 +402,8 @@
         "$TURBO_ROOT$/plugins/@dshfiles/activity-timeline/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-communication/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-communication/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/agent-plan/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/agent-plan/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-preset/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-preset/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-questions/cordis.patch.yml",

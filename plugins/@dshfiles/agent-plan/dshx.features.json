@@ -1,0 +1,287 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "plan-card",
+      "title": "Plan card for todo_write",
+      "summary": "Each todo_write call is drawn as a plan card: \"Step 2 of 3 · Fix the rounding bug\", expanding to every step with a done, active or pending glyph and how long it took. Timing comes from the times of successive todo_write calls, followed back across turns while the plan keeps a step. A call the card cannot read, or that failed, shows the native todo row.",
+      "reach": [
+        "seed jev-setup-chat-thread",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"pending\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
+        "press Enter",
+        "expect text \"Step 1 of 3*\"",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"completed\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
+        "press Enter",
+        "expect button \"Step 2 of 3: Fix the rounding bug. Show the plan\"",
+        "click button \"Step 2 of 3: Fix the rounding bug. Show the plan\"",
+        "expect list \"Plan steps\""
+      ],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: todo_write tool card",
+      "configuration": [
+        {
+          "key": "enabled",
+          "defaultValue": "true",
+          "constraints": "Boolean; master switch for every agent-plan card. Off restores every native view.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "agent-plan.plan-progress"
+          ]
+        },
+        {
+          "key": "planCard",
+          "defaultValue": "true",
+          "constraints": "Boolean; draw todo_write calls as the plan card instead of the native todo row.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "agent-plan.plan-card"
+          ]
+        },
+        {
+          "key": "stepTiming",
+          "defaultValue": "true",
+          "constraints": "Boolean; show how long each step took, from successive todo_write call times.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "agent-plan.plan-timing"
+          ]
+        }
+      ],
+      "states": [
+        "first-write",
+        "step-in-progress",
+        "all-done",
+        "failed-call",
+        "disabled"
+      ],
+      "failureModes": [
+        "A plan whose earlier todo_write calls fell outside the loaded history times its steps only from the writes still loaded.",
+        "A step the agent marked done without first marking it in progress is timed from the write before it."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-plan.plan-card",
+          "featureFile": "tooling/dshx/e2e/features/agent-plan.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-plan.plan-progress",
+          "file": "plugins/@dshfiles/agent-plan/src/plan-progress.test.ts",
+          "testName": "times each step from the writes that started and finished it and points at the active step"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-plan.plan-timing",
+          "file": "plugins/@dshfiles/agent-plan/src/plan-progress.test.ts",
+          "testName": "reads only valid todo_write arguments and follows a plan back across turns until an unrelated or restarted one"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the plan card renders browser state from Session events and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "pinned-step",
+      "title": "Current plan step pinned beside the composer",
+      "summary": "While the latest turn's plan has steps left, a chip beside the native plan-mode control says \"Step 2 of 3 · Fix the rounding bug · 12s\" and opens the whole plan. It sits beside the native control rather than replacing it.",
+      "reach": [
+        "seed jev-setup-chat-thread",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"completed\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
+        "press Enter",
+        "expect button \"Step 2 of 3: Fix the rounding bug. Show the plan\""
+      ],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: plan chip beside plan mode",
+      "configuration": [
+        {
+          "key": "pinnedStep",
+          "defaultValue": "true",
+          "constraints": "Boolean; pin the current plan step beside the composer.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "agent-plan.pinned-step"
+          ]
+        }
+      ],
+      "states": [
+        "hidden-no-plan",
+        "step-in-progress",
+        "hidden-plan-done",
+        "hidden-new-turn",
+        "disabled"
+      ],
+      "failureModes": [
+        "A plan from an earlier turn is not pinned once a new turn starts, matching the native todo dock."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-plan.pinned-step",
+          "featureFile": "tooling/dshx/e2e/features/agent-plan.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the pinned step renders browser state from Session events and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "live-activity-strip",
+      "title": "Live activity strip beside the composer controls",
+      "summary": "While anything runs, a strip beside the native composer activity says what: the running tool call, background jobs and subagents, with a live timer; it opens the full list with a timer per row. It reads Session events only (tool/call, tool/result, job/registered, job/settled) and renders nothing while idle.",
+      "reach": [
+        "seed jev-setup-chat-thread",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call bash {\\\"command\\\":\\\"sleep 20\\\",\\\"description\\\":\\\"Wait twenty seconds\\\"}]]\"",
+        "press Enter",
+        "expect button \"Running now: bash*\""
+      ],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: activity strip",
+      "configuration": [
+        {
+          "key": "activityStrip",
+          "defaultValue": "true",
+          "constraints": "Boolean; show the live activity strip beside the composer controls.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "agent-plan.activity-strip"
+          ]
+        }
+      ],
+      "states": [
+        "idle-hidden",
+        "tool-running",
+        "jobs-running",
+        "subagents-running",
+        "disabled"
+      ],
+      "failureModes": [
+        "Background jobs registered before the loaded history window are not listed until their next event.",
+        "Queued messages are not counted here: the native queue dock above the composer already lists them."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-plan.activity-strip",
+          "featureFile": "tooling/dshx/e2e/features/agent-plan.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-plan.activity-model",
+          "file": "plugins/@dshfiles/agent-plan/src/live-activity.test.ts",
+          "testName": "keeps calls without a result, background jobs and subagents apart until they settle"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the live activity strip renders browser state from Session events and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "failure-card",
+      "title": "Retry and Ask to fix under failed turns",
+      "summary": "Under a native turn-error row, and under a model-retry row once retrying gave up, a bar shows the retry count and two actions: Retry puts a retry request in the composer, Ask to fix inserts the failure with a request to fix it. Neither sends: the user reviews and sends. Stopped or interrupted turns get no actions.",
+      "reach": [
+        "seed jev-setup-chat-thread",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[fail The fake provider rejected this request]]\"",
+        "press Enter",
+        "expect button \"Ask to fix\""
+      ],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: turn error row",
+      "configuration": [
+        {
+          "key": "failureCard",
+          "defaultValue": "true",
+          "constraints": "Boolean; add the retry count and Retry / Ask to fix actions under failure rows.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "agent-plan.failure-card"
+          ]
+        }
+      ],
+      "states": [
+        "turn-error",
+        "retry-scheduled",
+        "retry-gave-up",
+        "stopped",
+        "no-composer",
+        "disabled"
+      ],
+      "failureModes": [
+        "Without a Composer provider (@dshfiles/rich-composer) the actions are hidden and only the retry count shows.",
+        "Retry does not resend the failed request: it writes a message the user sends, so the next turn starts fresh."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-plan.failure-card",
+          "featureFile": "tooling/dshx/e2e/features/agent-plan.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-plan.failure-model",
+          "file": "plugins/@dshfiles/agent-plan/src/failure.test.ts",
+          "testName": "reads a turn error, offers actions unless the turn was stopped, and quotes it in the fix prompt"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the failure card renders browser state from Session events and starts no Host work of its own."
+        }
+      ]
+    }
+  ]
+}
