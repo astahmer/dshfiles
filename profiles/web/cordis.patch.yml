@@ -146,8 +146,11 @@
               provider: spawn
           - id: tool-workflow
             name: '@deepseek-ai/dsh-tool-workflow'
+      # @dshfiles/tool-ask-user is a description-only fork: the question form renders markdown and ```html preview
+      # views, and this tells the model so (b:6). Outside the managed region: an existing profile needs this one-line
+      # `name` edit in its own preset-standard row.
       - id: tool-ask-user
-        name: '@deepseek-ai/dsh-tool-ask-user'
+        name: '@dshfiles/tool-ask-user'
         config:
           mode: timed
           timeout: 300

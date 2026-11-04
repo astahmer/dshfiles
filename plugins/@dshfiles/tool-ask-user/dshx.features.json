@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "markdown-question-guidance",
+      "title": "ask_user_question tells the model that questions are markdown",
+      "summary": "The forked ask_user_question tool keeps the upstream schema and answer encoding and only rewrites its description text: question text and option descriptions are Markdown, the first paragraph is the heading, and a ```html preview fence becomes a sandboxed HTML view with no network and no same-origin access.",
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["legacy", "timed"],
+      "failureModes": [
+        "A profile whose preset-standard row still names @deepseek-ai/dsh-tool-ask-user keeps the native description; the form still renders markdown, but the model is not told about it.",
+        "A model that sends a plain ```html fence gets a code block, not a page."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "tool-ask-user.same-schema",
+          "file": "plugins/@dshfiles/tool-ask-user/src/schema.test.ts",
+          "testName": "keeps the upstream schema exactly, descriptions aside"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-ask-user.markdown-guidance",
+          "file": "plugins/@dshfiles/tool-ask-user/src/schema.test.ts",
+          "testName": "tells the model that questions are markdown with sandboxed html previews"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: ask_user_question"
+    }
+  ]
+}

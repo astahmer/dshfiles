@@ -55,6 +55,11 @@
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "src/native/index.ts!"],
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
+    "plugins/@dshfiles/tool-ask-user": {
+      // The Host entry is the vendored native module dshx.config names, not a forwarding host.ts.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "src/native/index.ts!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+    },
     "plugins/@dshfiles/agent-communication": {
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
       // dshx's communication module, bundled into the Host entry, imports write-file-atomic at runtime.

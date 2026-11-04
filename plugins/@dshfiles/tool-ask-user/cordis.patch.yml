@@ -1,0 +1,4 @@
+# The model-facing tool is a child of an agent preset, not a global Loader row: mounting it globally would add
+# ask_user_question to every agent regardless of its preset. profiles/web/cordis.patch.yml swaps the
+# preset-standard child `tool-ask-user` to this package, so this bundle only makes the package resolvable.
+[]

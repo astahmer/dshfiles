@@ -64,6 +64,7 @@ const astGrepVendored = [
   'plugins/@dshfiles/session-controller/src/native/**',
   'plugins/@dshfiles/subprocess-local/src/native/**',
   'plugins/@dshfiles/goal-tool/src/native/**',
+  'plugins/@dshfiles/tool-ask-user/src/native/**',
   'plugins/@dshfiles/session-controller/src/host.ts',
   'plugins/@dshfiles/subprocess-local/src/host.ts',
   'plugins/@dshfiles/session-controller/typert/**',

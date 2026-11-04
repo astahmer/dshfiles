@@ -1,0 +1,15 @@
+{
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change.",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "package": "@deepseek-ai/dsh-tool-ask-user",
+    "version": "0.2.1-rc.2",
+    "ref": "dsh-v0.2.1-rc.2",
+    "path": "packages/interaction/tool-ask-user"
+  },
+  "files": [
+    { "upstream": "src", "local": "src/native" },
+    { "upstream": "locale", "local": "locale" }
+  ],
+  "delta": ["src/native/index.ts", "src/native/timed.ts"]
+}
