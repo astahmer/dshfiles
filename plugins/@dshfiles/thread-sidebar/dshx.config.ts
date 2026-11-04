@@ -10,6 +10,7 @@ export default defineConfig({
   modules: {
     'attention-api': 'src/attention-api.ts',
     'auto-settle-api': 'src/auto-settle-api.ts',
+    'thread-actions-api': 'src/thread-actions-api.ts',
     'attention-client': 'src/attention-client.ts',
     'thread-views-api': 'src/thread-views-api.ts',
     snapshots: 'src/snapshots.ts',

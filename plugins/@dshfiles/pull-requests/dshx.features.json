@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "github-pull-request-links",
+      "title": "Link and watch GitHub pull requests from DSH threads",
+      "summary": "Durably links GitHub.com pull requests to threads, polls each watched repository and number every two minutes through gh, queues concise state transitions, and asks thread-sidebar to settle merged or closed threads.",
+      "surfaces": ["host", "tool", "integration"],
+      "configuration": [],
+      "states": ["linked", "watched", "rate-limited", "merged", "closed"],
+      "failureModes": [
+        "If gh is missing, unauthenticated, or returns an invalid response, the watcher keeps its last known state and records a bounded error code; a later poll retries.",
+        "GitHub rate limits increase a persisted per-PR delay exponentially from two minutes up to one hour.",
+        "If thread-sidebar is not loaded, the state still updates and the Host logs that notification or settlement was skipped."
+      ],
+      "externalDependencies": [
+        {
+          "id": "github-cli",
+          "boundary": "Runs gh repo view for number-plus-cwd links and gh pr view with state, mergeable, mergeStateStatus, reviewDecision, statusCheckRollup, comments and reviews; uses the CLI's configured login without reading or storing credentials. GitHub.com only.",
+          "deterministicFake": "tests/pull-request-model.spec.ts supplies fixed CLI-shaped JSON to the production Effect Schema decoder; tests/host.spec.ts uses a real test Host without invoking GitHub."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "pull-requests.github-json",
+          "file": "plugins/@dshfiles/pull-requests/tests/pull-request-model.spec.ts",
+          "testName": "decodes the requested gh JSON fields and summarizes checks, comments and reviews"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pull-requests.transitions",
+          "file": "plugins/@dshfiles/pull-requests/tests/pull-request-model.spec.ts",
+          "testName": "detects CI failure, new comments and reviews, and newly conflicting state once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pull-requests.storage-and-tools",
+          "file": "plugins/@dshfiles/pull-requests/tests/host.spec.ts",
+          "testName": "links, lists, unwatches and unlinks a PR through the served API"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "pull-requests.no-browser-journey",
+          "reason": "This capability is intentionally Host-only and exposes every user action as an Agent tool; there is no browser UI to drive. The served API is exercised through a real test Host in tests/host.spec.ts."
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "custom",
+          "span": "pull request gh repo",
+          "file": "plugins/@dshfiles/pull-requests/tests/telemetry.spec.ts",
+          "testName": "records one span for repository discovery and pull-request polling"
+        },
+        {
+          "kind": "custom",
+          "span": "pull request gh view",
+          "file": "plugins/@dshfiles/pull-requests/tests/telemetry.spec.ts",
+          "testName": "records one span for repository discovery and pull-request polling"
+        }
+      ]
+    }
+  ]
+}
