@@ -4980,7 +4980,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         <div
           ref={scrollAreaRef}
           data-testid="thread-sidebar-scroll"
-          className={cn('dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3', isBoard && 'dshx:p-4')}
+          // A floor of about two rows: in a short docked column (free docking with the bottom pane open) the section
+          // scrolls past its controls instead of squeezing the list to a sliver no row fits in.
+          className={cn('dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3', isBoard && 'dshx:p-4')}
           onKeyDown={event => {
             if (!isBoard) navigateThreadList(event.nativeEvent)
           }}

@@ -764,6 +764,20 @@ const openThreadRow = async (page: Page, id: string): Promise<void> => {
           button: Object.fromEntries(
             [...(element.querySelector('button[data-thread-main-action]')?.attributes ?? [])].map(attribute => [attribute.name, attribute.value]),
           ),
+          rowBounds: bounds(element),
+          buttonBounds: (() => {
+            const button = element.querySelector('button[data-thread-main-action]')
+            return button === null ? null : bounds(button)
+          })(),
+          clippedBy: (() => {
+            // The nearest ancestors that hide overflow, with their boxes: a short docked column clips rows here.
+            const clips = []
+            for (let parent = element.parentElement; parent !== null && clips.length < 4; parent = parent.parentElement) {
+              const style = getComputedStyle(parent)
+              if (style.overflowY !== 'visible' || style.overflowX !== 'visible') clips.push({ tag: parent.tagName, cls: parent.className.toString().slice(0, 120), overflow: style.overflowY, ...bounds(parent) })
+            }
+            return clips
+          })(),
         })),
         slotErrors: [...document.querySelectorAll('[data-slot-error]')].map(element => element.textContent?.slice(0, 500)),
       }
