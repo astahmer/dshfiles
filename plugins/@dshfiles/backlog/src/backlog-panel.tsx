@@ -409,6 +409,8 @@ export const BacklogPanel = (props: {
   readonly panelId?: string | undefined
   readonly visible?: boolean | undefined
   readonly openThread: OpenThread
+  /** Opens the one Inbox; every count of what needs the user lives there, not on this panel. */
+  readonly openInbox?: (() => void) | undefined
   readonly listThreads: () => readonly ComposerThread[]
   readonly startThread: StartThreadPorts
   readonly agentForThread: (sessionId: string) => Promise<{ readonly name: string } | null>
@@ -593,10 +595,6 @@ export const BacklogPanel = (props: {
       }),
     [attention.data, attentionOwnerMissing, all, inboxThreadsMode, props],
   )
-  const inboxEntries = inboxRows({ items: inboxItems, threads: inboxThreads })
-  const unread = inboxEntries.filter(
-    row => row.threads.length > 0 || row.item.acknowledgedAt === null || row.item.acknowledgedAt < row.item.lastActivityAt,
-  ).length
   const tags = useMemo(() => [...new Set(all.flatMap(item => item.tags))].sort(), [all])
   const threads = props.listThreads()
   const projectPaths = useMemo(() => {
@@ -734,16 +732,6 @@ export const BacklogPanel = (props: {
                     >
                       <Icon aria-hidden className="dshx:size-3.5" />
                       <span className="dshx:@max-pane-compact:sr-only">{viewLabels[entry]}</span>
-                      {entry === 'inbox' && inboxEntries.length > 0 ? (
-                        <span
-                          className={cn(
-                            'dshx:min-w-4 dshx:rounded-full dshx:px-1 dshx:text-center dshx:text-[10px] dshx:tabular-nums',
-                            unread > 0 ? 'dshx:bg-info dshx:text-white' : 'dshx:bg-muted dshx:text-muted-foreground',
-                          )}
-                        >
-                          {inboxEntries.length}
-                        </span>
-                      ) : null}
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>{`${viewLabels[entry]} (${String(index + 1)})`}</TooltipContent>
@@ -934,6 +922,7 @@ export const BacklogPanel = (props: {
                 openId={openId}
                 select={select}
                 openThread={props.openThread}
+                openInbox={props.openInbox}
                 acknowledgeThread={thread =>
                   void attentionApi.safe.acknowledge({ sessionId: thread.sessionId, version: thread.version }).then(() => attention.refetch())
                 }

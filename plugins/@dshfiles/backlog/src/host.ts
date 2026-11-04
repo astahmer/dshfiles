@@ -13,6 +13,7 @@ import { Effect, Layer } from 'effect'
 import { FetchHttpClient } from 'effect/http'
 import { ActivityPublisher } from './activity-publisher.js'
 import { AiActivity } from './ai-activity.js'
+import { BacklogAttention } from './attention-provider.js'
 import { backlogApi } from './api.js'
 import { AttachmentExport } from './attachment-file.js'
 import { backlogSettingsLayer } from './backlog-settings.js'
@@ -51,7 +52,7 @@ const backlogServices = Layer.mergeAll(ThreadStart.layer, TriageBackfill.layer, 
 )
 
 /** Every backlog service and background loop of one activation. */
-const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals).pipe(Layer.provideMerge(backlogServices), Layer.provideMerge(hostEdges))
+const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, BacklogAttention.layer).pipe(Layer.provideMerge(backlogServices), Layer.provideMerge(hostEdges))
 
 const backlogHandlers = Api.handlers(backlogApi, {
   list: input => BacklogStore.use(store => store.list(input)),

@@ -55,6 +55,7 @@ export const InboxView = (props: {
   readonly cursorId: number | null
   readonly select: (id: number) => void
   readonly openThread: (sessionId: string) => void
+  readonly openInbox?: (() => void) | undefined
   readonly acknowledgeThread: (thread: InboxThread) => void
   readonly inspector: ReactNode
   readonly loaded: boolean
@@ -99,6 +100,14 @@ export const InboxView = (props: {
             )
           })}
         </div>
+        {props.openInbox === undefined ? null : (
+          <p className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">
+            Backlog items that need you also appear in the
+            <button type="button" className="dshx:font-medium dshx:text-foreground dshx:underline-offset-2 dshx:hover:underline" onClick={props.openInbox}>
+              Inbox
+            </button>
+          </p>
+        )}
         <ul className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">
           {props.loaded && rows.length === 0 ? (
             <li className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:px-6 dshx:py-20 dshx:text-center">

@@ -275,6 +275,8 @@ export default defineClient({
               const session = Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate?.id === sessionId)
               if (session !== undefined) ctx.uiWorkspace.openSession(session.id)
             }}
+            // SAFETY: activity-timeline registers the Inbox as this main-slot key; without it the panel id is simply unknown.
+            openInbox={() => ctx.layout.selectPanel('attention-inbox' as MainPanelId)}
             agentForThread={async sessionId => {
               try {
                 const result = await agents.threadAgent({ sessionId })
