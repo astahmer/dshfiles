@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "jira-provider",
+      "title": "Sync backlog items with a Jira Cloud project",
+      "summary": "Serves the backlog's backlog-provider Host API as the jira kind: a connection (site base URL, account email, API token reference) names the Atlassian account and discovers the projects it can browse; a binding to a project pulls issues changed since an updated checkpoint through POST /rest/api/3/search/jql with nextPageToken paging, reading the minute again in the account's time zone, and maps summary, the ADF description as markdown, the status category, labels, priority names, parent, Blocks/Relates/Duplicate links, the due date and two optional custom fields (acceptance criteria, summary) both ways. Status changes go through workflow transitions planned towards the target category or the binding's status name, refusing an unreachable one with the reachable statuses; comments flow both ways in ADF; deleting a linked item transitions its issue to a Won't Do-like status. Requests of a connection are spaced 100 ms apart and wait for Retry-After on 429 and 503.",
+      "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "Backlog settings › Remote sync › Add Jira connection (rendered by @dshfiles/backlog)",
+      "configuration": [
+        {
+          "key": "connection.credential",
+          "defaultValue": "",
+          "constraints": "A secret:ALIAS reference to an Atlassian API token, resolved on the Host; empty falls back to JIRA_API_TOKEN.",
+          "coveredBy": ["backlog-jira.identity", "backlog-jira.refused-token"]
+        },
+        {
+          "key": "connection.baseUrl",
+          "defaultValue": "",
+          "constraints": "The site, https://<site>.atlassian.net; required, https only (http only on loopback).",
+          "coveredBy": ["backlog-jira.preflight", "backlog-jira.connect-bind-import-transition"]
+        },
+        {
+          "key": "connection.options.email",
+          "defaultValue": "",
+          "constraints": "The Atlassian account email for Basic auth; empty falls back to JIRA_EMAIL. Never logged or shown back.",
+          "coveredBy": ["backlog-jira.identity", "backlog-jira.preflight"]
+        },
+        {
+          "key": "binding.container",
+          "defaultValue": "",
+          "constraints": "A project key (letters, digits, underscores), or empty for the only project the account can browse.",
+          "coveredBy": ["backlog-jira.preflight", "backlog-jira.pull-checkpoint"]
+        },
+        {
+          "key": "binding.options.jql",
+          "defaultValue": "",
+          "constraints": "A JQL clause ANDed to the project clause; an issue that leaves it reads as removed.",
+          "coveredBy": ["backlog-jira.mapping"]
+        },
+        {
+          "key": "binding.options.issueType",
+          "defaultValue": "Task",
+          "constraints": "The issue type created items get.",
+          "coveredBy": ["backlog-jira.create-archive"]
+        },
+        {
+          "key": "binding.options.priorityValues",
+          "defaultValue": "",
+          "constraints": "Comma-separated priority=Name pairs (urgent=P0); unmapped priorities use Highest, High, Medium, Low.",
+          "coveredBy": ["backlog-jira.fields"]
+        },
+        {
+          "key": "binding.options.archiveStatus",
+          "defaultValue": "",
+          "constraints": "The status a deleted item's issue moves to; empty picks a Won't Do-like status, else Done.",
+          "coveredBy": ["backlog-jira.create-archive"]
+        },
+        {
+          "key": "binding.options.criteriaField",
+          "defaultValue": "",
+          "constraints": "A customfield_<n> id holding acceptance criteria; anything else fails the binding with target-missing.",
+          "coveredBy": ["backlog-jira.custom-fields"]
+        },
+        {
+          "key": "binding.options.summaryField",
+          "defaultValue": "",
+          "constraints": "A customfield_<n> id holding the summary; anything else fails the binding with target-missing.",
+          "coveredBy": ["backlog-jira.custom-fields"]
+        }
+      ],
+      "states": ["discovering", "pulling", "pushing", "transitioning", "creating", "archiving", "rate-limited", "failed"],
+      "failureModes": [
+        "A refused email or token (401/403) fails the call with its recovery: check the key, the email and the project access; neither appears in the message.",
+        "A missing base URL, a non-https site, a missing email or an invalid project key or custom field id fails before any request with target-missing or credential-missing, naming what to set.",
+        "A status no transition reaches within three hops fails with unsupported, naming the reachable statuses; other fields still sync.",
+        "Still rate-limited after three Retry-After waits fails the call with a 429; the next pass retries from the same checkpoint.",
+        "Unknown ADF nodes (tables, panels, media) read as their text; rewriting such a description replaces them with that text."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jira-cloud-rest-api",
+          "boundary": "HTTPS requests to the connection's https://<site>.atlassian.net with Basic auth (account email and API token): /rest/api/3/myself, project/search, search/jql, issue, issue/{key}/transitions, issue/{key}/comment and issueLink.",
+          "deterministicFake": "src/jira-fake.ts answers the same paths in memory through an HttpClient stand-in: project ENG, a workflow with a two-hop path and a dead end, issues with ADF descriptions, links, comments and custom fields, nextPageToken paging, JQL dates read in Asia/Kolkata, minute-granular updated times and 429s on demand; the provider, its rate limiter, transition planner and decoding run for real."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.identity",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "names the account and discovers its projects with Basic auth, never the email"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.preflight",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "refuses a missing email, a non-https site and an invalid project key before any request"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.pull-checkpoint",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "pulls in pages with an updated checkpoint read in the account time zone, and still sees an edit within the same minute"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.fields",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "reads and writes priority, labels, parent, links and the due date"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.transitions",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "moves status through transitions: direct, two hops, a named status, and refuses an unreachable one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.adf-body",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "converts the description and comments between ADF and markdown, and never re-sends an equivalent body"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.adf-round-trips",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-adf.test.ts",
+          "testName": "keeps unknown nodes and marks as text and reports them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.custom-fields",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "maps acceptance criteria and a summary to the custom fields the binding names"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.create-archive",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "creates an issue in the project with its fields and status, then archives it through a transition"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.references",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "resolves issue keys and site URLs, and refuses anything else without a request"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.mapping",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-mapping.test.ts",
+          "testName": "writes JQL dates to the minute in the account time zone, and reads Jira timestamps"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.rate-limit",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "waits for Retry-After on a 429, then gives up after three retries"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.refused-token",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "reports a refused token with its recovery and never echoes the token or the email"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-jira.host-api",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "answers the backlog over its Host API with the failure code and status intact"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog-jira.connect-bind-import-transition",
+          "featureFile": "tooling/dshx/e2e/features/backlog-jira.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jira request",
+          "file": "plugins/@dshfiles/backlog-jira/src/jira-provider.test.ts",
+          "testName": "records one jira request span per call, with the operation and status only"
+        }
+      ],
+      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Backlog settings\"", "expect button \"Add Jira connection\""]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "semi": false,
+  "singleQuote": true,
+  "arrowParens": "avoid",
+  "printWidth": 160,
+  "ignorePatterns": ["dist/**", "node_modules/**", "pnpm-lock.yaml"]
+}
