@@ -22,6 +22,12 @@
     "plugins/@dshfiles/thread-sidebar/src/restart-controller.ts",
     "tooling/dshx/packages/dshx/bench/**",
     "tooling/antislop/effect/tests/oxlint/**",
+    // Hand-run helpers and a hand-written boot fixture, loaded by path rather than imported: the pull-requests
+    // Host import check (its README), the Strobe bench seeder (bench/strobe/README.md) and the failing-client
+    // bundle the client-boot-failure journey loads.
+    "plugins/@dshfiles/pull-requests/scripts/host-import-check.mjs",
+    "tooling/dshx/bench/**",
+    "tooling/dshx/e2e/fixtures/failing-client/**",
   ],
   // Foreign binaries the hand-run scripts call: ffmpeg is installed on the Host, and bddgen/vitest come
   // from the tooling/dshx workspace the scripts are executed from.

@@ -42,7 +42,6 @@
     "@deepseek-ai/dsh-client-ui-workspace": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
-    "@effect/vitest": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",

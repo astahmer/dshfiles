@@ -37,6 +37,10 @@ describe.skipIf(!gitAvailable)('thread workspaces in a git-only repository', () 
     root = realpathSync(mkdtempSync(join(tmpdir(), 'git-threads-')))
     repo = join(root, 'repo')
     execFileSync('git', ['init', '-q', '-b', 'main', repo], { env: gitEnv })
+    // The Host's git does not see this file's env overrides, and a CI runner has no name to fall back on:
+    // give the repository (and so every worktree) its own identity.
+    git(repo, 'config', 'user.name', 'Test')
+    git(repo, 'config', 'user.email', 'test@example.com')
     commit(repo, 'shared.txt', 'one\n', 'base')
   })
 
