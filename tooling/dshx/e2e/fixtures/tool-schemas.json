@@ -1,5 +1,5 @@
 {
-  "hostBundles": 56,
+  "hostBundles": 57,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -53,6 +53,7 @@
     "@dshfiles/turn-summary",
     "@dshfiles/tweet-context",
     "@dshfiles/usage",
+    "@dshfiles/web-fetch-readable",
     "@dshfiles/web-search-brave",
     "@dshfiles/workbench",
     "@dshfiles/workspace-folder-picker",
