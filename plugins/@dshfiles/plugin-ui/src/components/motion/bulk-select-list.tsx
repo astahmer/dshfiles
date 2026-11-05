@@ -37,6 +37,8 @@ export interface BulkSelectListProps extends Omit<React.HTMLAttributes<HTMLEleme
   readonly headerAction?: React.ReactNode
   /** Plural noun for the toast ("files", "threads", "revisions"). */
   readonly noun?: string
+  /** `false` drops the count/Delete header, for a list nested under a header the caller owns. */
+  readonly showHeader?: boolean
 }
 
 const tileTone = {
@@ -65,6 +67,7 @@ export function BulkSelectList({
   onConfirm,
   headerAction,
   noun = 'files',
+  showHeader = true,
   className,
   ...props
 }: BulkSelectListProps) {
@@ -218,33 +221,37 @@ export function BulkSelectList({
       }}
       {...props}
     >
-      <header className="dshx:flex dshx:h-11 dshx:items-center dshx:gap-2 dshx:px-3">
-        <HeaderSwap swapKey={count > 0 ? 'selected' : 'idle'}>
-          {count > 0 ? (
-            <>
-              <span className="dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-sm dshx:font-medium" aria-live="polite">
-                <RollingNumber value={count} /> selected
-              </span>
-              <button
-                type="button"
-                onClick={() => onDelete?.(selectedVisible)}
-                className="dshx:ml-auto dshx:inline-flex dshx:h-8 dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:bg-destructive/10 dshx:px-3 dshx:text-sm dshx:font-medium dshx:text-destructive dshx:outline-none dshx:hover:bg-destructive/15 dshx:focus-visible:ring-2 dshx:focus-visible:ring-destructive/40"
-              >
-                <Trash2Icon aria-hidden className="dshx:size-4" />
-                Delete
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="dshx:inline-flex dshx:min-w-0 dshx:items-baseline dshx:gap-1.5 dshx:text-sm dshx:font-medium">
-                <span className="dshx:truncate">{heading}</span>
-                <RollingNumber value={visible.length} className="dshx:font-normal dshx:text-muted-foreground" />
-              </span>
-              {headerAction ? <span className="dshx:ml-auto dshx:shrink-0 dshx:text-sm dshx:text-muted-foreground">{headerAction}</span> : null}
-            </>
-          )}
-        </HeaderSwap>
-      </header>
+      {showHeader ? (
+        <header className="dshx:flex dshx:h-11 dshx:items-center dshx:gap-2 dshx:px-3">
+          <HeaderSwap swapKey={count > 0 ? 'selected' : 'idle'}>
+            {count > 0 ? (
+              <>
+                <span className="dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-sm dshx:font-medium" aria-live="polite">
+                  <RollingNumber value={count} /> selected
+                </span>
+                {onDelete === undefined ? null : (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(selectedVisible)}
+                    className="dshx:ml-auto dshx:inline-flex dshx:h-8 dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:bg-destructive/10 dshx:px-3 dshx:text-sm dshx:font-medium dshx:text-destructive dshx:outline-none dshx:hover:bg-destructive/15 dshx:focus-visible:ring-2 dshx:focus-visible:ring-destructive/40"
+                  >
+                    <Trash2Icon aria-hidden className="dshx:size-4" />
+                    Delete
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <span className="dshx:inline-flex dshx:min-w-0 dshx:items-baseline dshx:gap-1.5 dshx:text-sm dshx:font-medium">
+                  <span className="dshx:truncate">{heading}</span>
+                  <RollingNumber value={visible.length} className="dshx:font-normal dshx:text-muted-foreground" />
+                </span>
+                {headerAction ? <span className="dshx:ml-auto dshx:shrink-0 dshx:text-sm dshx:text-muted-foreground">{headerAction}</span> : null}
+              </>
+            )}
+          </HeaderSwap>
+        </header>
+      ) : null}
       <div
         ref={listRef}
         role="listbox"

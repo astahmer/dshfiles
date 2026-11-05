@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import { openGlobalPanel } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -536,6 +536,9 @@ After(async ({ page }: { page: Page }) => {
   await rm(fixture.temporaryRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
+/** A cleanup target row of the kit BulkSelectList, found by its exact target name. */
+const cleanupOption = (dialog: Locator, name: string): Locator => dialog.getByRole('option').filter({ has: dialog.page().getByText(name, { exact: true }) })
+
 /** The repository state before the cleanup dialog opened, so its preview is proven to remove nothing. */
 const cleanupSnapshots = new WeakMap<Page, string>()
 
@@ -576,8 +579,8 @@ Then('the cleanup dialog shows age presets without removing anything', async ({ 
     expect(dialog.getByText(/empty revisions? will be abandoned/)).toBeVisible({ timeout: 20_000 }),
   )
   await dialog.getByRole('button', { name: /Untracked folders/ }).click()
-  await expect(dialog.getByRole('checkbox', { name: `Select ${cleanupFolderNames.selected}`, exact: true })).toBeVisible()
-  await expect(dialog.getByRole('checkbox', { name: `Select ${cleanupFolderNames.preserved}`, exact: true })).toBeVisible()
+  await expect(cleanupOption(dialog, cleanupFolderNames.selected)).toBeVisible()
+  await expect(cleanupOption(dialog, cleanupFolderNames.preserved)).toBeVisible()
   expect(existsSync(paths.selected)).toBe(true)
   expect(existsSync(paths.preserved)).toBe(true)
   expect(snapshotRepository(fixture)).toBe(cleanupSnapshots.get(page))
@@ -591,12 +594,12 @@ When('one stale untracked folder and the older-page workspace are selected for c
   const dialog = page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })
   await dialog.getByRole('radio', { name: 'All', exact: true }).click()
   await dialog.getByRole('button', { name: /^Empty/ }).click()
-  const selectedWorkspace = dialog.getByRole('checkbox', { name: `Select ${cleanupFixture.workspaceName}`, exact: true })
+  const selectedWorkspace = cleanupOption(dialog, cleanupFixture.workspaceName)
   await selectedWorkspace.click()
-  await expect(selectedWorkspace).toBeChecked()
-  const selectedFolder = dialog.getByRole('checkbox', { name: `Select ${cleanupFolderNames.selected}`, exact: true })
+  await expect(selectedWorkspace).toHaveAttribute('aria-selected', 'true')
+  const selectedFolder = cleanupOption(dialog, cleanupFolderNames.selected)
   await selectedFolder.click()
-  await expect(selectedFolder).toBeChecked()
+  await expect(selectedFolder).toHaveAttribute('aria-selected', 'true')
   await expect(dialog.getByRole('button', { name: 'Clean up 2', exact: true })).toBeEnabled()
 })
 

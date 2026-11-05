@@ -1,4 +1,5 @@
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
+import { BulkSelectList } from '@dshfiles/plugin-ui/components/motion/bulk-select-list'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
@@ -26,6 +27,8 @@ const KIND_CHOICES: readonly { readonly kind: CleanupKindView; readonly label: s
   { kind: 'untracked', label: 'Untracked folders' },
   { kind: 'secondary', label: 'Other JJ workspaces' },
 ]
+
+const KIND_TAG = { empty: 'WS', integrated: 'WS', secondary: 'JJ', untracked: 'DIR' } as const satisfies Record<CleanupKindView, string>
 
 const AGE_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 
@@ -105,11 +108,11 @@ export const WorkspaceCleanupDialog = (props: {
   const allSelected = rows.length > 0 && removable === rows.length
   const partiallySelected = removable > 0 && !allSelected
 
-  const toggleRow = (row: CleanupRow, checked: boolean): void => {
+  const selectGroup = (groupRows: readonly CleanupRow[], keys: readonly string[]): void => {
     setSelected(current => {
       const next = new Set(current)
-      if (checked) next.add(row.key)
-      else next.delete(row.key)
+      for (const row of groupRows) next.delete(row.key)
+      for (const key of keys) next.add(key)
       return next
     })
   }
@@ -222,20 +225,20 @@ export const WorkspaceCleanupDialog = (props: {
                   {groupSelected > 0 && <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{groupSelected} selected</span>}
                 </div>
                 {isExpanded && (
-                  <ul className="dshx:space-y-1 dshx:px-5 dshx:pb-3 dshx:pl-12">
-                    {groupRows.map(row => (
-                      <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:py-1.5" key={row.key}>
-                        <Checkbox
-                          aria-label={`Select ${row.target.name}`}
-                          checked={selected.has(row.key)}
-                          onCheckedChange={checkedValue => toggleRow(row, checkedValue === true)}
-                        />
-                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm">{row.target.name}</span>
-                        {row.missing && <span className="dshx:shrink-0 dshx:text-xs dshx:text-warning">Folder missing</span>}
-                        <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{formatAge(row.at)}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <BulkSelectList
+                    className="dshx:mx-5 dshx:mb-3 dshx:ml-12 dshx:rounded-xl dshx:p-1 dshx:shadow-none"
+                    heading={choice.label}
+                    items={groupRows.map(row => ({
+                      id: row.key,
+                      title: row.target.name,
+                      meta: row.missing ? `Folder missing · ${formatAge(row.at)}` : formatAge(row.at),
+                      tag: KIND_TAG[row.target.kind],
+                      tone: row.missing ? 'warning' : 'muted',
+                    }))}
+                    onSelectionChange={keys => selectGroup(groupRows, keys)}
+                    selectedIds={groupRows.filter(row => selected.has(row.key)).map(row => row.key)}
+                    showHeader={false}
+                  />
                 )}
               </section>
             )
