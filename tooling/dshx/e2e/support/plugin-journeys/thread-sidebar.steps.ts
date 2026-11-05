@@ -1938,6 +1938,47 @@ Then('its Inbox item leaves the Inbox', async ({ page }: { page: Page }) => {
   await finishJourneyAssertions(page)
 })
 
+let waitingThreadId: string | null = null
+
+When("a thread's turn fails while another thread is open", async ({ page }: { page: Page }) => {
+  waitingThreadId = await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill('thread sidebar jump next waiting target')
+  await composer.press('Enter')
+  await expect(threadRow(page, waitingThreadId)).toHaveCount(1)
+  // Leave before the provider-less turn fails, so the failure stays unread and lands in Needs you.
+  await startBlankThread(page)
+  await expect.poll(() => currentThreadId(page)).not.toBe(waitingThreadId)
+  const inbox = await connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/activity-timeline', apiId: 'attention', version: 1 })
+  const needsYou = Schema.decodeUnknownSync(Schema.Struct({ items: Schema.Array(Schema.Struct({ subject: Schema.Struct({ id: Schema.String }) })) }))
+  await expect
+    .poll(async () => needsYou(await inbox('list', { view: 'needs-you' })).items.map(item => item.subject.id), { timeout: 30_000 })
+    .toContain(waitingThreadId)
+})
+
+Then('the palette lists Jump to next waiting with its Option-J binding', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'activity-timeline-jump-next-waiting-in-palette', async () => {
+    await page.getByRole('button', { name: 'Open command palette', exact: true }).click()
+    await expect(paletteDialog(page)).toBeVisible()
+    await paletteInput(page).fill('Jump to next waiting')
+    await expect(paletteDialog(page).getByRole('option', { name: /Jump to next waiting/u })).toBeVisible()
+    await expect(async () => {
+      await page.keyboard.press('Escape')
+      await expect(paletteDialog(page)).toBeHidden({ timeout: 1_000 })
+    }).toPass({ timeout: 10_000 })
+  })
+})
+
+Then('pressing Option-J opens the failed thread', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'activity-timeline-option-j-opens-the-waiting-thread', async () => {
+    await expect(async () => {
+      await page.locator('body').press('Alt+KeyJ')
+      await expect.poll(() => currentThreadId(page), { timeout: 3_000 }).toBe(waitingThreadId)
+    }).toPass({ timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the thread-sidebar command palette is searched for restart', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Open command palette', exact: true }).click()
   await expect(paletteDialog(page)).toBeVisible()

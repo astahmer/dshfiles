@@ -215,6 +215,13 @@ Feature: Thread sidebar journeys
     When the same thread is marked unread again and opened
     Then its Inbox item leaves the Inbox
 
+  @scenario:activity-timeline.jump-next-waiting
+  Scenario: Option-J jumps to the next thread that needs you
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/activity-timeline, @dshfiles/command-palette" is booted
+    When a thread's turn fails while another thread is open
+    Then the palette lists Jump to next waiting with its Option-J binding
+    And pressing Option-J opens the failed thread
+
   @scenario:thread-sidebar.restart-confirmation
   Scenario: No restart action is offered without pending Host changes
     Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/command-palette" is booted

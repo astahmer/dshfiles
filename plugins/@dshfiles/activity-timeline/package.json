@@ -42,6 +42,7 @@
     "@deepseek-ai/dsh-api-workspace-controller": "catalog:",
     "@deepseek-ai/dsh-client-connection": "catalog:",
     "@deepseek-ai/dsh-client-locale": "catalog:",
+    "@deepseek-ai/dsh-client-shortcuts": "catalog:",
     "@deepseek-ai/dsh-client-ui-layout": "catalog:",
     "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
@@ -69,6 +70,7 @@
     "@deepseek-ai/dsh-api-workspace-controller": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-connection": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-locale": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-shortcuts": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-layout": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.1-rc.2 <0.3.0-0",
@@ -91,6 +93,7 @@
         "@deepseek-ai/dsh-api-gateway",
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-shortcuts",
         "@deepseek-ai/dsh-api-session-controller",
         "@deepseek-ai/dsh-api-workspace-controller",
         "@deepseek-ai/dsh-client-ui-workspace"
