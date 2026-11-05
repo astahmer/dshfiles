@@ -500,7 +500,7 @@ When('the backlink to b:{int} is followed', async ({ page }: { page: Page }, id:
 
 Then('its activity records the move {string} by the user', async ({ page }: { page: Page }, move: string) => {
   await recordAssertion(page, 'backlog-activity-history', async () => {
-    const activity = peek(page).getByRole('list', { name: 'Activity' })
+    const activity = peek(page).getByRole('list', { name: 'Conversation' })
     // Runs of same-actor changes fold into "made N changes" until opened.
     await activity.getByRole('button', { name: /made \d+ changes/ }).click()
     await expect(activity).toContainText(`moved it ${move}`)
@@ -1151,7 +1151,7 @@ When('a comment {string} is added', async ({ page }: { page: Page }, text: strin
 
 Then('the item activity shows the comment', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-rich-text-comment', async () => {
-    await expect(peek(page).getByRole('list', { name: 'Activity' })).toContainText('Confirmed in the scratch profile')
+    await expect(peek(page).getByRole('list', { name: 'Conversation' })).toContainText('Confirmed in the scratch profile')
   })
   await finishJourneyAssertions(page)
 })
@@ -1163,11 +1163,11 @@ When('a reply with an image is added', async ({ page }: { page: Page }) => {
   const comment = itemPeek.getByRole('textbox', { name: 'Comment', exact: true })
   await comment.fill('Original reply')
   await comment.press('Enter')
-  await expect(itemPeek.getByRole('list', { name: 'Activity' })).toContainText('Original reply')
+  await expect(itemPeek.getByRole('list', { name: 'Conversation' })).toContainText('Original reply')
 })
 
 When('the user reply is edited with keyboard navigation', async ({ page }: { page: Page }) => {
-  const activity = peek(page).getByRole('list', { name: 'Activity' })
+  const activity = peek(page).getByRole('list', { name: 'Conversation' })
   const reply = activity.getByText('Original reply', { exact: true })
   const edit = activity.getByRole('button', { name: 'Edit reply', exact: true })
   const actions = edit.locator('..')
@@ -1194,14 +1194,14 @@ When('the user reply is edited with keyboard navigation', async ({ page }: { pag
 })
 
 Then('the edited reply has only its replacement attachment', async ({ page }: { page: Page }) => {
-  const activity = peek(page).getByRole('list', { name: 'Activity' })
+  const activity = peek(page).getByRole('list', { name: 'Conversation' })
   await expect(activity).toContainText('Edited reply')
   await expect(activity.getByRole('button', { name: 'Open blue.png', exact: true })).toBeVisible()
   await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toHaveCount(0)
 })
 
 When('the user reply is deleted after confirmation', async ({ page }: { page: Page }) => {
-  const activity = peek(page).getByRole('list', { name: 'Activity' })
+  const activity = peek(page).getByRole('list', { name: 'Conversation' })
   let confirmationMessage: string | undefined
   page.once('dialog', dialog => {
     confirmationMessage = dialog.message()
@@ -1214,7 +1214,7 @@ When('the user reply is deleted after confirmation', async ({ page }: { page: Pa
 
 Then('the reply and its attachment are removed from the activity', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-reply-delete-attachment', async () => {
-    const activity = peek(page).getByRole('list', { name: 'Activity' })
+    const activity = peek(page).getByRole('list', { name: 'Conversation' })
     await expect(activity).not.toContainText('Edited reply')
     await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toHaveCount(0)
   })
@@ -1310,14 +1310,14 @@ Then('the reply starts a linked work thread with an in-app and browser notice', 
       'data-test-notification',
       await withBacklogRefs(page, 'Backlog thread started|b:1 · Improve the flaky test'),
     )
-    await expect(peek(page).getByRole('list', { name: 'Activity' })).toContainText('Please fix the flaky test')
+    await expect(peek(page).getByRole('list', { name: 'Conversation' })).toContainText('Please fix the flaky test')
     await expect(peek(page).getByRole('list', { name: 'Related' }).getByRole('listitem')).toHaveCount(1)
   })
 })
 
 Then('the discussion reply gets an AI answer without starting another thread', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-smart-reply-discussion', async () => {
-    const activity = peek(page).getByRole('list', { name: 'Activity' })
+    const activity = peek(page).getByRole('list', { name: 'Conversation' })
     await expect(activity).toContainText('Why is this flaky?')
     await expect(activity).toContainText('@reply-helper')
     await expect(activity).toContainText('Answered by ALPHA1', { timeout: 30_000 })
@@ -1355,7 +1355,11 @@ Then('automatic triage applies the fake model title to the item', async ({ page 
     await expect(row(page, 'Automatic triage proposal')).toBeVisible({ timeout: 30_000 })
     await row(page, 'Automatic triage proposal').click()
     await expect(peek(page)).toContainText('Automatic triage proposal')
-    await expect(peek(page).getByRole('list', { name: 'Activity' })).toContainText('triage applied title')
+    // Automatic triage is system work: it reads in the work log, folded until opened.
+    await peek(page)
+      .getByRole('button', { name: /^Work log/u })
+      .click()
+    await expect(peek(page).getByRole('list', { name: 'Work log' })).toContainText('triage applied title')
   })
   await finishJourneyAssertions(page)
 })

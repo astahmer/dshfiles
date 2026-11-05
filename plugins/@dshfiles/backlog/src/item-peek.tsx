@@ -80,6 +80,8 @@ import { workspaceReferenceLabel } from './workspace-reference-label.js'
 import { SecretLinkRevealSlot } from './secret-link-reveal.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
+import { ItemTimeline } from './item-timeline.js'
 import { BacklogReference } from './backlog-reference.js'
 
 type OpenThread = (sessionId: string) => void
@@ -525,16 +527,17 @@ const ReplyComposer = (props: {
 }
 
 /** Comments read as messages; every other event folds into one "made N changes" line per actor run, opened on demand. */
-const Conversation = (props: {
+const TimelineRuns = (props: {
+  readonly label: string
   readonly events: readonly BacklogEvent[]
-  readonly links: readonly BacklogLink[]
+  readonly threadIdsByEvent: ReadonlyMap<BacklogEvent, string>
   readonly attention: BacklogAttention
   readonly itemId: number
   readonly threads: readonly ComposerThread[]
   readonly projects: readonly string[]
   readonly threadLabel: ThreadLabel
   readonly openThread: OpenThread
-  readonly agentReplying: boolean
+  readonly children?: ReactNode
 }): JSX.Element => {
   const attention = props.attention
   const actions = useBacklogActions()
@@ -543,11 +546,7 @@ const Conversation = (props: {
   const [revertFailure, setRevertFailure] = useState<{ readonly key: string; readonly message: string } | null>(null)
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set())
   const [openDiffs, setOpenDiffs] = useState<ReadonlySet<string>>(new Set())
-  const threadIdsByEvent = new Map<BacklogEvent, string>()
-  for (const [eventIndex, event] of props.events.entries()) {
-    const threadId = BacklogActivityReferences.threadIdOf({ event, eventIndex, events: props.events, links: props.links })
-    if (threadId !== undefined) threadIdsByEvent.set(event, threadId)
-  }
+  const threadIdsByEvent = props.threadIdsByEvent
   const runs: ConversationRun[] = []
   for (const event of props.events) {
     const last = runs.at(-1)
@@ -556,7 +555,7 @@ const Conversation = (props: {
     else runs.push({ kind: 'changes', events: [event] })
   }
   return (
-    <ol aria-label="Activity" className="dshx:relative dshx:flex dshx:flex-col dshx:gap-3">
+    <ol aria-label={props.label} className="dshx:relative dshx:flex dshx:flex-col dshx:gap-3">
       <span aria-hidden className="dshx:absolute dshx:inset-y-2 dshx:left-[9px] dshx:w-px dshx:bg-border" />
       {runs.map((run, index) => {
         if (run.kind === 'comment') {
@@ -742,22 +741,75 @@ const Conversation = (props: {
           </li>
         )
       })}
-      {props.agentReplying ? (
-        <li
-          role="status"
-          aria-label="Agent is thinking"
-          className="dshx:relative dshx:flex dshx:items-center dshx:gap-2.5 dshx:text-xs dshx:text-muted-foreground"
-        >
-          <span
-            aria-hidden
-            className="dshx:z-10 dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:border dshx:border-border dshx:bg-background"
-          >
-            <StatusDot size="sm" tone="info" className="dshx:animate-pulse" />
-          </span>
-          <span className="dshx:animate-pulse">Thinking…</span>
-        </li>
-      ) : null}
+      {props.children}
     </ol>
+  )
+}
+
+/**
+ * The item timeline in two lanes: the conversation (what you did and said, and what was said to you) stays open, and
+ * the work log (agent progress, moves, links, triage, sync) folds into one summary line until opened.
+ */
+const Conversation = (props: {
+  readonly events: readonly BacklogEvent[]
+  readonly links: readonly BacklogLink[]
+  readonly attention: BacklogAttention
+  readonly itemId: number
+  readonly threads: readonly ComposerThread[]
+  readonly projects: readonly string[]
+  readonly threadLabel: ThreadLabel
+  readonly openThread: OpenThread
+  readonly agentReplying: boolean
+}): JSX.Element => {
+  const [workLogOpen, setWorkLogOpen] = useState(false)
+  const threadIdsByEvent = new Map<BacklogEvent, string>()
+  for (const [eventIndex, event] of props.events.entries()) {
+    const threadId = BacklogActivityReferences.threadIdOf({ event, eventIndex, events: props.events, links: props.links })
+    if (threadId !== undefined) threadIdsByEvent.set(event, threadId)
+  }
+  const lanes = ItemTimeline.split(props.events)
+  const workSummary = ItemTimeline.summaryText({ summary: ItemTimeline.summarize(lanes.work), ago: at => ItemGlyphs.ago(at) })
+  const shared = {
+    threadIdsByEvent,
+    attention: props.attention,
+    itemId: props.itemId,
+    threads: props.threads,
+    projects: props.projects,
+    threadLabel: props.threadLabel,
+    openThread: props.openThread,
+  }
+  return (
+    <div className="dshx:flex dshx:flex-col dshx:gap-3">
+      {lanes.work.length === 0 ? null : (
+        <Collapsible open={workLogOpen} onOpenChange={setWorkLogOpen} className="dshx:flex dshx:flex-col dshx:gap-2">
+          <CollapsibleTrigger className="dshx:group dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:text-left dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:underline">
+            <ChevronRightIcon aria-hidden className="dshx:size-3 dshx:shrink-0 dshx:transition-transform dshx:group-data-[state=open]:rotate-90" />
+            <span className="dshx:shrink-0 dshx:font-medium dshx:text-foreground">Work log</span>
+            <span className="dshx:min-w-0 dshx:truncate">{workSummary}</span>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <TimelineRuns label="Work log" events={lanes.work} {...shared} />
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+      <TimelineRuns label="Conversation" events={lanes.conversation} {...shared}>
+        {props.agentReplying ? (
+          <li
+            role="status"
+            aria-label="Agent is thinking"
+            className="dshx:relative dshx:flex dshx:items-center dshx:gap-2.5 dshx:text-xs dshx:text-muted-foreground"
+          >
+            <span
+              aria-hidden
+              className="dshx:z-10 dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:border dshx:border-border dshx:bg-background"
+            >
+              <StatusDot size="sm" tone="info" className="dshx:animate-pulse" />
+            </span>
+            <span className="dshx:animate-pulse">Thinking…</span>
+          </li>
+        ) : null}
+      </TimelineRuns>
+    </div>
   )
 }
 

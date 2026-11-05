@@ -433,7 +433,9 @@ Then('backlog item b:{int} is titled {string} without a suggestion', async ({ pa
 Then('backlog item b:{int} keeps its title without a suggestion', async ({ page }: { page: Page }, id: number) => {
   await recordAssertion(page, 'backlog-proposal-dismissed', async () => {
     await expect(peek(page).getByRole('region', { name: 'Triage suggestion', exact: true })).toHaveCount(0)
-    const activity = peek(page).getByRole('list', { name: 'Activity' })
+    const activity = peek(page).getByRole('list', { name: 'Conversation' })
+    // The system's suggestion sits in the work log, so the capture and the dismissal fold into one run of the user's changes.
+    await activity.getByRole('button', { name: /made \d+ changes/u }).click()
     await expect(activity).toContainText('dismissed a suggestion')
     await expect(activity).not.toContainText('applied')
     await showInboxFilter(page, 'Suggestions')

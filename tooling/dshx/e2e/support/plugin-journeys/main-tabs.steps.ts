@@ -393,7 +393,7 @@ When('the kept thread tab is dropped into its description and reply', async ({ p
   await threadTab(page, sessionId).dragTo(reply)
   await expect(reply).toContainText(reference)
   await page.getByRole('button', { name: 'Reply', exact: true }).click()
-  await expect(page.getByRole('list', { name: 'Activity', exact: true })).toContainText('Backlog capture typing')
+  await expect(page.getByRole('list', { name: 'Conversation', exact: true })).toContainText('Backlog capture typing')
 })
 
 Then('Backlog remains the active main tab after capture typing', async ({ page }: { page: Page }) => {
