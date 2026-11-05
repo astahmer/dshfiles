@@ -43,6 +43,13 @@ describe('status strip preferences', () => {
     expect(ids(StatusStripPreferencesModel.list(items, saved)).global).toEqual(['working', 'quota', 'restart'])
   })
 
+  it('names the registered items the user hid, in list order, so the strip can offer them back', () => {
+    const saved = preferences({ hidden: ['cost', 'unknown', 'restart', 'working', 'quota'] })
+    expect(StatusStripPreferencesModel.hiddenItems(items, saved).map(entry => entry.id)).toEqual(['working', 'quota', 'restart', 'cost'])
+    expect(ids(StatusStripPreferencesModel.visible(items, saved))).toEqual({ global: [], thread: [] })
+    expect(StatusStripPreferencesModel.hiddenItems(items, DEFAULT_STATUS_STRIP_PREFERENCES)).toEqual([])
+  })
+
   it('moves an item within its side and keeps saved ids of absent items', () => {
     const saved = preferences({ order: ['gone'] })
     const moved = StatusStripPreferencesModel.move({ items, preferences: saved, id: 'restart', direction: 'up' })

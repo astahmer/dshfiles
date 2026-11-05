@@ -3,7 +3,9 @@
  * row collapses to one chip that opens the items as a list above it, so the strip never wraps or scrolls sideways.
  */
 import { useRegistry } from '@dshfiles/dshx/client'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { EyeOffIcon } from '@dshfiles/plugin-ui/icons'
 import { Component, createContext, useContext, useMemo, useState } from 'react'
 import type { ComponentType, ErrorInfo, ReactNode } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -32,13 +34,49 @@ class ItemBoundary extends Component<{ readonly id: string; readonly children: R
   }
 }
 
+/** "Show <item>" for each hidden item, so a hidden item comes back where the user hid it. */
+const showHiddenActions = (settings: StatusStripSettings, hidden: readonly StatusItem[]): readonly { readonly id: string; readonly label: string; readonly run: () => void }[] => {
+  const save = settings.save
+  if (save === undefined) return []
+  return hidden.map(item => ({
+    id: item.id,
+    label: `Show ${item.label}`,
+    run: () => save(StatusStripPreferencesModel.setHidden({ preferences: settings.preferences, id: item.id, hidden: false })),
+  }))
+}
+
+/**
+ * Every item hidden: the strip keeps one small control instead of vanishing, so the items come back in place rather than
+ * only through Settings.
+ */
+const HiddenItemsControl = (props: { readonly settings: StatusStripSettings; readonly hidden: readonly StatusItem[] }): ReactNode => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <button type="button" className={css.statusItemButton} aria-label="Show hidden status items" data-status-restore="">
+        <EyeOffIcon aria-hidden="true" size={12} />
+      </button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent className="dshx-root" align="start" side="top">
+      {showHiddenActions(props.settings, props.hidden).map(action => (
+        <DropdownMenuItem key={action.id} onSelect={action.run}>
+          {action.label}
+        </DropdownMenuItem>
+      ))}
+      {props.settings.save === undefined ? null : <DropdownMenuSeparator />}
+      <DropdownMenuItem onSelect={openStatusBarSettings}>Status bar settings…</DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+)
+
 const StatusItemView = (props: {
   readonly item: StatusItem
   readonly compact: boolean
   readonly useSessions: StatusStripProps['useSessions']
   readonly settings: StatusStripSettings
+  readonly hidden: readonly StatusItem[]
 }): ReactNode => {
   const { item, settings } = props
+  const showActions = showHiddenActions(settings, props.hidden)
   const View = item.component
   const content = (
     <ItemBoundary id={item.id}>
@@ -66,6 +104,12 @@ const StatusItemView = (props: {
             Hide this item
           </ContextMenuItem>
         )}
+        {showActions.length === 0 ? null : <ContextMenuSeparator />}
+        {showActions.map(action => (
+          <ContextMenuItem key={action.id} onSelect={action.run}>
+            {action.label}
+          </ContextMenuItem>
+        ))}
         <ContextMenuItem onSelect={openStatusBarSettings}>Status bar settings…</ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
@@ -77,12 +121,22 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
   const items = useRegistry(StatusItems)
   const preferences = props.settings.preferences
   const arranged = useMemo(() => StatusStripPreferencesModel.visible(items, preferences), [items, preferences])
+  const hidden = useMemo(() => StatusStripPreferencesModel.hiddenItems(items, preferences), [items, preferences])
   const [open, setOpen] = useState(false)
   const count = arranged.global.length + arranged.thread.length
   const renderItem = (item: StatusItem, compact: boolean): ReactNode => (
-    <StatusItemView key={item.id} item={item} compact={compact} useSessions={props.useSessions} settings={props.settings} />
+    <StatusItemView key={item.id} item={item} compact={compact} useSessions={props.useSessions} settings={props.settings} hidden={hidden} />
   )
-  if (count === 0) return null
+  if (count === 0 && hidden.length === 0) return null
+  if (count === 0) {
+    return (
+      <div className={css.statusStrip} data-status-strip={props.narrow ? 'compact' : 'hidden'} role="status" aria-label="Status">
+        <div className={css.statusSide}>
+          <HiddenItemsControl settings={props.settings} hidden={hidden} />
+        </div>
+      </div>
+    )
+  }
   if (props.narrow) {
     return (
       <div className={css.statusStrip} data-status-strip="compact" role="status">
@@ -106,7 +160,10 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
   }
   return (
     <div className={css.statusStrip} data-status-strip="full" role="status" aria-label="Status">
-      <div className={css.statusSide}>{arranged.global.map(item => renderItem(item, false))}</div>
+      <div className={css.statusSide}>
+        {arranged.global.map(item => renderItem(item, false))}
+        {hidden.length === 0 ? null : <HiddenItemsControl settings={props.settings} hidden={hidden} />}
+      </div>
       <div className={css.statusSide} data-side="thread">
         {arranged.thread.map(item => renderItem(item, false))}
       </div>

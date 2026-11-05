@@ -359,6 +359,47 @@
       ]
     },
     {
+      "id": "status-strip-restore",
+      "title": "Bring back hidden status items in place",
+      "summary": "When every status item is hidden the strip keeps one small control (Show hidden status items) that offers Show <item> for each hidden item and Status bar settings; each visible item's context menu also lists the hidden ones.",
+      "reach": [
+        "click tab \"Settings\"",
+        "click button \"Status bar\"",
+        "click switch \"Working\"",
+        "expect button \"Show hidden status items\"",
+        "click switch \"Restart\"",
+        "click button \"Show hidden status items\"",
+        "expect menuitem \"Show Working\""
+      ],
+      "surfaces": ["client"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "status-strip: Show hidden status items",
+      "configuration": [],
+      "states": ["some-hidden", "all-hidden", "restored"],
+      "failureModes": ["While the Host cannot store the choice the control offers only Status bar settings, which says how to recover."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.status-strip-restore-unit-hidden-items",
+          "file": "plugins/@dshfiles/frame-layout/src/status-strip-preferences.test.ts",
+          "testName": "names the registered items the user hid, in list order, so the strip can offer them back"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "frame-layout.status-strip-restore-browser",
+          "reason": "Walked in a scratch DSH with dshx dev open frame-layout/status-strip-restore; a journey needs a status item that renders content, which only seeded turns or ai-accounts provide."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: it reads and writes the frame-layout settings namespace through the existing settings form."
+        }
+      ]
+    },
+    {
       "id": "status-item-open",
       "title": "Click a status item to open its page",
       "summary": "A status item may declare open: the strip renders it as a button that opens its full page (Working: the thread list on its Working view; Restart: the Plugins page with the HMR updates row) and its context menu offers Open <label>. An item that draws its own buttons (Quota) declares controls, so its meters keep their popover and Open Quota (Usage › Quota) stays in the context menu.",

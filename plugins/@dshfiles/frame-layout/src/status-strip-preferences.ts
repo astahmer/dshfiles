@@ -41,6 +41,13 @@ const visible = (items: readonly StatusItem[], preferences: StatusStripPreferenc
   return { global: listed.global.filter(item => !hidden.has(item.id)), thread: listed.thread.filter(item => !hidden.has(item.id)) }
 }
 
+/** The registered items the user hid, in list order: what the strip offers to show again in place. */
+const hiddenItems = (items: readonly StatusItem[], preferences: StatusStripPreferences): readonly StatusItem[] => {
+  const listed = list(items, preferences)
+  const hidden = new Set(preferences.hidden)
+  return [...listed.global, ...listed.thread].filter(item => hidden.has(item.id))
+}
+
 /** Swap one item with its neighbour on the same side; ids of items not registered now keep their saved entries. */
 const move = (input: {
   readonly items: readonly StatusItem[]
@@ -70,6 +77,7 @@ const setHidden = (input: { readonly preferences: StatusStripPreferences; readon
 export class StatusStripPreferencesModel {
   static readonly list = list
   static readonly visible = visible
+  static readonly hiddenItems = hiddenItems
   static readonly move = move
   static readonly setHidden = setHidden
 }
