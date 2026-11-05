@@ -75,7 +75,7 @@ Feature: Settings shell
     And Max tabs is set to 8
     Then the Max tabs row is marked modified and offers Reset to default
     When Max tabs is reset to its default
-    Then Max tabs is back to 12 and no longer marked modified
+    Then Max tabs is back to 10 and no longer marked modified
 
   @scenario:settings-shell.reset-while-saving
   Scenario: Reset to default right after a change resets once the change is saved
@@ -85,7 +85,7 @@ Feature: Settings shell
     And Max tabs is set to 8
     And Max tabs is reset to its default
     And the held settings writes finish
-    Then the Host accepted both writes and Max tabs is back to 12
+    Then the Host accepted both writes and Max tabs is back to 10
 
   @scenario:settings-shell.open-config-menu
   Scenario: The configuration file split button offers other ways to open it
