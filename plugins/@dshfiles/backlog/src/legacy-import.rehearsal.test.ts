@@ -5,6 +5,7 @@ import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Layer, Option, Schema } from 'effect'
 import { BacklogRepo } from './backlog-repo.js'
 import { BacklogItems, type BacklogItem } from './item.js'
+import { BacklogOrigins } from './event-origin.js'
 import { BacklogOps } from './op-log.js'
 import { BacklogStore } from './store.js'
 import { LegacySyncMappings } from './sync-legacy-mapping.js'
@@ -114,14 +115,16 @@ describe.skipIf(directory === undefined)('legacy import rehearsal', () => {
         const mismatches: { readonly id: number; readonly fields: readonly string[] }[] = []
         const counts = { items: items.length, equal: 0, foldEqual: 0, comments: 0, events: 0, links: 0, tags: 0, actors: 0 }
         for (const legacy of items) {
-          const expected = { ...legacy, project: BacklogItems.projectOf(legacy.project) }
+          // A missing event origin is derived on read (P2), so the served item carries it and the JSON one does not.
+          const expected = { ...legacy, project: BacklogItems.projectOf(legacy.project), events: legacy.events.map(BacklogOrigins.stamped) }
           const actual = served.get(legacy.id)
           counts.comments += legacy.events.filter(event => event.kind === 'commented').length
           counts.events += legacy.events.length
           counts.links += legacy.links.length
           counts.tags += legacy.tags.length
           counts.actors += legacy.actors.length
-          if (BacklogOps.sameValue(folded.get(legacy.id), actual)) counts.foldEqual += 1
+          const fold = folded.get(legacy.id)
+          if (fold !== undefined && BacklogOps.sameValue({ ...fold, events: fold.events.map(BacklogOrigins.stamped) }, actual)) counts.foldEqual += 1
           if (actual !== undefined && BacklogOps.sameValue(expected, actual)) {
             counts.equal += 1
             continue
@@ -155,6 +158,37 @@ describe.skipIf(directory === undefined)('legacy import rehearsal', () => {
         const fresh = yield* store.capture({ text: 'rehearsal: a new item gets a short alias', actor: { kind: 'user' } })
         const freshRef = fresh.item.ref ?? ''
 
+        // A fresh peer Host pulls the whole log page by page and folds every item the same, under the refs it shows.
+        const peer = yield* Effect.map(Layer.build(backlogStoreLayer()), context => ({
+          store: Context.get(context, BacklogStore),
+          repo: Context.get(context, BacklogRepo),
+        }))
+        const peerStarted = performance.now()
+        const cursor = { at: 0, pages: 0 }
+        for (;;) {
+          const page = yield* repo.opsSince({ cursor: cursor.at, limit: 500, maxBytes: 4_000_000 })
+          if (page.ops.length === 0) break
+          const records = yield* Effect.forEach(page.ops, wire =>
+            Effect.map(Schema.decodeUnknownEffect(BacklogOps.json)(wire.op), op => ({
+              opId: wire.opId,
+              itemId: wire.itemId,
+              hlc: wire.hlc,
+              origin: wire.origin,
+              op,
+            })),
+          )
+          yield* peer.store.ingestPeerOps(records)
+          cursor.at = page.ops[page.ops.length - 1]?.seq ?? cursor.at
+          cursor.pages += 1
+        }
+        const peerMs = performance.now() - peerStarted
+        const comparable = (rows: Effect.Success<typeof repo.exportRows>) =>
+          new Map(rows.items.map(row => [row.itemId, { ...row.item, id: 0, ref: undefined }] as const))
+        const here = comparable(yield* repo.exportRows)
+        const there = comparable(yield* peer.repo.exportRows)
+        const peerMismatches = [...here].filter(([itemId, item]) => !BacklogOps.sameValue(item, there.get(itemId))).map(([itemId]) => itemId)
+        const peerRefs = (yield* peer.store.list({ freshness: 'all', limit: 2_000 })).items.filter(item => item.ref !== undefined).length
+
         const listTimes: number[] = []
         const searchTimes: number[] = []
         const operatorTimes: number[] = []
@@ -176,6 +210,7 @@ describe.skipIf(directory === undefined)('legacy import rehearsal', () => {
           attachments: { files: files.length, live: attachmentsMatched + attachmentsMissing, matched: attachmentsMatched, missing: attachmentsMissing },
           mappings: { legacy: mappings.length, matched: mappingsMatched },
           aliases: { legacy: items.length, resolved: aliasesResolved, itemLinks: itemLinks.length, itemLinksResolved, newItemRef: freshRef },
+          peer: { items: there.size, mismatches: peerMismatches.length, withRef: peerRefs, pages: cursor.pages, ms: Math.round(peerMs) },
           importReport: Option.getOrUndefined(yield* imported.repo.importReport),
           tables: yield* repo.counts,
           nextCapture: yield* repo.nextId,
@@ -194,6 +229,9 @@ describe.skipIf(directory === undefined)('legacy import rehearsal', () => {
         expect(attachmentsMissing).toBe(0)
         expect(mappingsMatched).toBe(mappings.length)
         expect(aliasesResolved).toBe(items.length)
+        expect(there.size).toBe(here.size)
+        expect(peerMismatches).toEqual([])
+        expect(peerRefs).toBe(there.size)
         expect(freshRef).toMatch(/^[0-9a-hjkmnp-tv-z]{4}$/u)
         expect(yield* store.resolve(freshRef)).toBe(fresh.item.id)
         expect(yield* store.resolve(String(fresh.item.id))).toBeUndefined()
