@@ -1,0 +1,39 @@
+[
+ {
+  "name": "d1-threads",
+  "steps": [
+   "click css \"[role=tab][data-destination=threads]\"",
+   "wait 1500"
+  ]
+ },
+ {
+  "name": "d2-thread-stage",
+  "steps": [
+   "click text \"Fake thread title\"",
+   "wait 2500"
+  ]
+ },
+ {
+  "name": "d3-inbox",
+  "steps": [
+   "click css \"[role=tab][data-destination=inbox]\"",
+   "wait 2000"
+  ]
+ },
+ {
+  "name": "d4-observe-usage",
+  "steps": [
+   "click css \"[role=tab][data-destination=observe]\"",
+   "wait 800",
+   "click css \"[data-section=dshfiles-usage]\"",
+   "wait 3000"
+  ]
+ },
+ {
+  "name": "d5-settings",
+  "steps": [
+   "click css \"[role=tab][data-destination=settings]\"",
+   "wait 2500"
+  ]
+ }
+]

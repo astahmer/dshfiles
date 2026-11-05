@@ -1,0 +1,235 @@
+[
+ {
+  "name": "00-start",
+  "steps": []
+ },
+ {
+  "name": "01-threads",
+  "steps": [
+   "tap-tab threads",
+   "wait 1500"
+  ]
+ },
+ {
+  "name": "01b-row-menu",
+  "steps": [
+   "tap css \"[data-testid=thread-row-menu]\"",
+   "wait 800"
+  ]
+ },
+ {
+  "name": "02-thread-stage",
+  "steps": [
+   "press Escape",
+   "wait 300",
+   "tap css \"[data-phone-list] [data-thread-main-action]:has-text('Fake thread title')\"",
+   "wait 2500"
+  ]
+ },
+ {
+  "name": "02b-panels-sheet",
+  "steps": [
+   "tap css \"[data-phone-panels]\"",
+   "wait 1500"
+  ]
+ },
+ {
+  "name": "02c-facet-changes",
+  "steps": [
+   "tap-if css \"[data-phone-sheet] button[aria-label='New tab']\"",
+   "wait 800",
+   "tap css \"[data-phone-sheet] button:has-text('Changes')\"",
+   "wait 2500"
+  ]
+ },
+ {
+  "name": "02d-facet-cost",
+  "steps": [
+   "tap css \"[data-phone-sheet] button[aria-label='New tab']\"",
+   "wait 800",
+   "tap css \"[data-phone-sheet] button:has-text('Cost')\"",
+   "wait 2500"
+  ]
+ },
+ {
+  "name": "02e-facet-jobs",
+  "steps": [
+   "tap css \"[data-phone-sheet] button[aria-label='New tab']\"",
+   "wait 800",
+   "tap css \"[data-phone-sheet] button:has-text('Jobs')\"",
+   "wait 2500"
+  ]
+ },
+ {
+  "name": "02f-facet-context",
+  "steps": [
+   "tap css \"[data-phone-sheet] button[aria-label='New tab']\"",
+   "wait 800",
+   "tap css \"[data-phone-sheet] button:has-text('Context')\"",
+   "wait 2500"
+  ]
+ },
+ {
+  "name": "02f-sheet-closed",
+  "steps": [
+   "tap css \"[data-phone-sheet-close]\"",
+   "wait 800"
+  ]
+ },
+ {
+  "name": "03-composer-keyboard",
+  "steps": [
+   "tap-tab new",
+   "wait 1500",
+   "tap css \"[role=textbox]\"",
+   "keyboard-sim 336",
+   "wait 600"
+  ]
+ },
+ {
+  "name": "03b-back-to-threads",
+  "steps": [
+   "keyboard-sim-off",
+   "press Escape",
+   "tap css \"[data-phone-back]\"",
+   "wait 1200"
+  ]
+ },
+ {
+  "name": "04-composer-new",
+  "steps": [
+   "tap-tab new",
+   "wait 1500"
+  ]
+ },
+ {
+  "name": "05-inbox",
+  "steps": [
+   "tap-tab inbox",
+   "wait 2000"
+  ]
+ },
+ {
+  "name": "06-more",
+  "steps": [
+   "tap-tab more",
+   "wait 800"
+  ]
+ },
+ {
+  "name": "07-land",
+  "steps": [
+   "tap css \"[data-destination=land]\"",
+   "wait 1200"
+  ]
+ },
+ {
+  "name": "07b-land-workspaces",
+  "steps": [
+   "tap button \"Workspaces*\"",
+   "wait 2000"
+  ]
+ },
+ {
+  "name": "07c-land-back",
+  "steps": [
+   "tap css \"[data-phone-back]\"",
+   "wait 1000"
+  ]
+ },
+ {
+  "name": "08-work",
+  "steps": [
+   "tap-tab more",
+   "wait 500",
+   "tap css \"[data-destination=work]\"",
+   "wait 1200"
+  ]
+ },
+ {
+  "name": "08b-work-backlog",
+  "steps": [
+   "tap button \"Backlog*\"",
+   "wait 2500"
+  ]
+ },
+ {
+  "name": "09-agents",
+  "steps": [
+   "tap-tab more",
+   "wait 500",
+   "tap css \"[data-destination=agents]\"",
+   "wait 1200"
+  ]
+ },
+ {
+  "name": "09b-agents-directory",
+  "steps": [
+   "tap button \"Directory*\"",
+   "wait 2500"
+  ]
+ },
+ {
+  "name": "10-observe",
+  "steps": [
+   "tap-tab more",
+   "wait 500",
+   "tap css \"[data-destination=observe]\"",
+   "wait 1200"
+  ]
+ },
+ {
+  "name": "10b-observe-usage",
+  "steps": [
+   "tap button \"Usage*\"",
+   "wait 3000"
+  ]
+ },
+ {
+  "name": "10c-observe-processes",
+  "steps": [
+   "tap-tab more",
+   "wait 500",
+   "tap css \"[data-destination=observe]\"",
+   "wait 800",
+   "tap button \"Processes*\"",
+   "wait 3000"
+  ]
+ },
+ {
+  "name": "10d-observe-traces",
+  "steps": [
+   "tap-tab more",
+   "wait 500",
+   "tap css \"[data-destination=observe]\"",
+   "wait 800",
+   "tap button \"Traces*\"",
+   "wait 3000"
+  ]
+ },
+ {
+  "name": "11-knowledge",
+  "steps": [
+   "tap-tab more",
+   "wait 500",
+   "tap css \"[data-destination=knowledge]\"",
+   "wait 1200"
+  ]
+ },
+ {
+  "name": "12-settings",
+  "steps": [
+   "tap-tab more",
+   "wait 500",
+   "tap css \"[data-destination=settings]\"",
+   "wait 2500"
+  ]
+ },
+ {
+  "name": "13-status-chip",
+  "steps": [
+   "tap css \"[data-status-strip] button\"",
+   "wait 600"
+  ]
+ }
+]
