@@ -2658,6 +2658,152 @@
           "testName": "writes JSONL with one folded item per line, then the op log on request, and one bounded span"
         }
       ]
+    },
+    {
+      "id": "shipped-digest",
+      "title": "See what shipped per hour, day, week, month or year",
+      "summary": "The Shipped view lists items that reached done per period (Hour, Day, Week, Month, Year), newest first, as a timeline with each period's count and its change against the period before, grouped by project, each item with its kind, linked revisions and pull requests. Only items done now count, once, at their last move to done; dropped items never count; items an agent captured count with an Agent badge. Empty periods fold into one quiet line, and the header project filter applies. Agents call backlog_shipped (also with a custom from–to range).",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Ship the shipped digest\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"Fix the period switcher\"",
+        "press Enter",
+        "click button \"Feed\"",
+        "expect feed \"Backlog feed\"",
+        "rightclick text \"Ship the shipped digest\"",
+        "hover menuitem \"Status\"",
+        "click menuitemradio \"Done\"",
+        "rightclick text \"Fix the period switcher\"",
+        "hover menuitem \"Status\"",
+        "click menuitemradio \"Done\"",
+        "click button \"Shipped\"",
+        "expect heading \"Shipped\"",
+        "click radio \"Day\"",
+        "expect listitem \"Today: 2 shipped\""
+      ],
+      "surfaces": ["client", "host", "tool"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › Shipped",
+      "configuration": [],
+      "states": ["empty-period", "shipped", "agent-item", "quiet-periods", "host-predates-shipped"],
+      "failureModes": [
+        "A Host older than the view has no shipped method: the view says to restart the DSH Host process and the other backlog views keep working.",
+        "A custom range without both bounds, or with from after to, is refused with what to change."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.shipped-digest",
+          "featureFile": "tooling/dshx/e2e/features/backlog-history.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.shipped-digest-buckets",
+          "file": "plugins/@dshfiles/backlog/src/shipped.test.ts",
+          "testName": "counts an item reopened then done again once, at its last done, and leaves reopened and dropped items out"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "shipped-summary",
+      "title": "Summarize a shipped period with the triage model",
+      "summary": "Each period in the Shipped view with done items has Summarize: the triage model (Backlog settings › Triage) writes a short overview, cached in the backlog database per period, bucket and project filter, so reopening the view never calls the model again. A summary whose items changed since shows Out of date; Regenerate calls the model again. Without a triage model the view says where to pick one. Agents call backlog_summarize_shipped only when the user asked.",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Ship the shipped digest\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"Fix the period switcher\"",
+        "press Enter",
+        "click button \"Feed\"",
+        "expect feed \"Backlog feed\"",
+        "rightclick text \"Ship the shipped digest\"",
+        "hover menuitem \"Status\"",
+        "click menuitemradio \"Done\"",
+        "rightclick text \"Fix the period switcher\"",
+        "hover menuitem \"Status\"",
+        "click menuitemradio \"Done\"",
+        "click button \"Shipped\"",
+        "expect heading \"Shipped\"",
+        "click radio \"Day\"",
+        "expect listitem \"Today: 2 shipped\""
+      ],
+      "surfaces": ["client", "host", "storage", "tool"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › Shipped › Summarize",
+      "configuration": [
+        {
+          "key": "dshfiles-backlog.triageProvider",
+          "defaultValue": "",
+          "constraints": "Provider id of the triage model; empty means no summary can be written.",
+          "coveredBy": ["backlog.shipped-summary-unconfigured"]
+        },
+        {
+          "key": "dshfiles-backlog.triageModel",
+          "defaultValue": "",
+          "constraints": "A cheap model on that provider; the same one triage uses.",
+          "coveredBy": ["backlog.shipped-summary-cache"]
+        }
+      ],
+      "states": ["not-summarized", "summarized", "cached", "stale", "regenerated"],
+      "failureModes": [
+        "No triage model is set: the error names Backlog settings › Triage and offers a button to open them.",
+        "The model does not answer: the error names the provider and model and asks to check AI Accounts or pick another model.",
+        "A period with nothing shipped is refused instead of calling the model."
+      ],
+      "externalDependencies": [
+        {
+          "id": "dsh-llm",
+          "boundary": "On-demand cheap-model call through the DSH llm service on triageProvider/triageModel with the bucket's item titles and refs; only a summary request calls it, and a cached summary is reused.",
+          "deterministicFake": "An injected Llm complete returns fixed text in src/shipped-summaries.test.ts."
+        }
+      ],
+      "verification": [
+        { "kind": "gherkin", "id": "backlog.shipped-summary", "featureFile": "tooling/dshx/e2e/features/backlog-history.feature" },
+        {
+          "kind": "host-test",
+          "id": "backlog.shipped-summary-cache",
+          "file": "plugins/@dshfiles/backlog/src/shipped-summaries.test.ts",
+          "testName": "generates with the triage model, caches per bucket, marks a changed bucket stale and regenerates on request, in one span each"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.shipped-summary-unconfigured",
+          "file": "plugins/@dshfiles/backlog/src/shipped-summaries.test.ts",
+          "testName": "asks for a triage model when none is set, and refuses an empty period"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "backlog shipped summary",
+          "file": "plugins/@dshfiles/backlog/src/shipped-summaries.test.ts",
+          "testName": "generates with the triage model, caches per bucket, marks a changed bucket stale and regenerates on request, in one span each"
+        }
+      ]
     }
   ],
   "kind": "bundle"

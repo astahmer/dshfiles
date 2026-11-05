@@ -50,3 +50,33 @@ Feature: Backlog item references and history
     Then the project cards count 1 project
     When agent items are shown in the Backlog
     Then the project cards count 2 projects once agent items show
+
+  @scenario:backlog.shipped-digest
+  Scenario: Shipped lists what reached done per period, with agent items marked
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
+    And a Command Code account backed by a local fake provider is added
+    And the Backlog panel is opened
+    And "Shipped demo" is captured
+    When the Shipped view is opened
+    And the Shipped period is set to "Day"
+    Then today's Shipped bucket shows nothing shipped yet
+    When backlog item b:1 is moved to "Done" from its feed context menu
+    And the Shipped view is opened
+    Then today's Shipped bucket lists "Shipped demo" without an agent badge
+    When an agent thread captures "Agent shipped fix" as done
+    And the Backlog panel is opened
+    And the Shipped view is opened
+    Then today's Shipped bucket lists "Agent shipped fix" with an agent badge
+    When the Shipped period is set to "Week"
+    Then this week's Shipped bucket counts 2 shipped
+
+  @scenario:backlog.shipped-summary
+  Scenario: Summarizing a shipped period without a triage model says where to pick one
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Summary demo" is captured
+    And backlog item b:1 is moved to "Done" from its feed context menu
+    And the Shipped view is opened
+    And the Shipped period is set to "Day"
+    And today's shipped period is summarized
+    Then the summary asks for a triage model and opens the Backlog settings
