@@ -1,0 +1,19 @@
+{
+  "name": "@dshfiles-e2e/failing-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "E2E fixture: a bundle whose client entry throws in apply, so the failed-entry boot scenario has a real failure to report.",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./client": "./lib/client.js"
+  },
+  "files": ["lib", "cordis.patch.yml"],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web", "inject": [] }
+  }
+}

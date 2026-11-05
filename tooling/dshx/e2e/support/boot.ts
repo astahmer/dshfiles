@@ -427,6 +427,24 @@ export const bootComposedPluginProfile = async (request: {
   return profile
 }
 
+/**
+ * Boot a scratch profile around one fixture bundle that lives outside plugins/@dshfiles (under e2e/fixtures), so a
+ * scenario can compose a deliberately broken bundle without it ever joining the owned plugin set. The fixture's client
+ * entry is expected, so a boot that never loads it fails instead of looking clean.
+ */
+export const bootFixtureBundleProfile = async (
+  fixture: { readonly projectRoot: string; readonly packageId: string },
+  timeoutMs = 90_000,
+): Promise<BootedProfile> => {
+  const prepared = await prepareComposedBootProfile([fixture], { sourceProfileRoot })
+  try {
+    return await startScratchProfile(prepared, fixture.packageId, [fixture.packageId], timeoutMs)
+  } catch (error) {
+    await prepared.dispose()
+    throw error
+  }
+}
+
 export const bootPluginProfile = async (packageId: string, timeoutMs = 90_000): Promise<BootedProfile> =>
   bootComposedPluginProfile({
     packageIds: [packageId],

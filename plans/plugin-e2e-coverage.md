@@ -18,11 +18,8 @@ catalog file that is not linked.
       so it separates failing, unrun and browser-verified features.
 - [ ] **Fresh green baseline on stock rc.2.** Run `test:e2e` end to end; most
       journeys landed 2026-10-13 and have not run together since.
-- [ ] **Contain Host egress.** Only the browser is restricted; the Host can
-      still reach the network during a journey.
-- [ ] **Failed-entry boot scenario.** The step "every client entry that failed
-      to activate is reported by id" (`e2e/support/steps.ts`) has no scenario;
-      add one with a fixture bundle whose `apply` throws, or delete the step.
+- [x] **Contain Host egress.** Done: a per-profile refusing proxy (`e2e/support/host-egress-guard.ts`), proven by `network-boundary.feature`; see [docs/e2e-testing.md](../docs/e2e-testing.md#choices).
+- [x] **Failed-entry boot scenario.** Done: `client-boot-failure.feature` boots the `e2e/fixtures/failing-client` bundle and the step reports `@dshfiles-e2e/failing-client: failed`.
 - [x] **Scaffold a catalog.** `create-dshx` emits `dshx.features.json` for a
       new plugin (`create-dshx/src/templates.ts`).
 - [ ] **Review catalogs against the running product** in a scratch profile and

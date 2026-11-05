@@ -80,7 +80,21 @@ cell and a native entry was still registered behind it.
 - **The browser is contained.** Every journey routes requests so only the
   scratch profile's origin is reachable (HTTP and WebSocket) and service
   workers are off; `network-boundary.feature` proves external and other
-  loopback requests are blocked. Host-side egress is not contained yet.
+  loopback requests are blocked.
+- **The scratch Host is contained too.** `e2e/support/host-egress-guard.ts`
+  starts a loopback proxy per booted profile that refuses every request, and
+  points the Host's `HTTP(S)_PROXY`/`ALL_PROXY` at it with `NO_PROXY` for
+  loopback and `NODE_USE_ENV_PROXY=1`. DSH's process-wide dispatcher, Node's
+  own `http`/`fetch` and spawned children all honour it; loopback fakes and the
+  SSH fixture stay direct. A raw `net.connect` to a public address is not
+  covered. `profile.egressAttempts()` lists the refused `host:port` targets;
+  `network-boundary.feature` proves a models.dev refresh is refused. Set
+  `DSHX_E2E_HOST_EGRESS=allow` only while recording a new fake.
+- **Boot failures are reported by entry id.** `client-boot-failure.feature`
+  boots `e2e/fixtures/failing-client`, a hand-written bundle (in `lib/`, since
+  `dist/` is ignored) whose client `apply` throws, and asserts the boot card
+  names `@dshfiles-e2e/failing-client: failed`. The fixture never joins a
+  real profile.
 
 ## Feature catalogs
 

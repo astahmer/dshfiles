@@ -1,0 +1,4 @@
+# E2E fixture only (tooling/dshx/e2e/features/client-boot.feature); never added to a real profile.
+- insert:
+    - id: dshfiles-e2e-failing-client
+      name: '@dshfiles-e2e/failing-client'

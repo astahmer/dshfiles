@@ -655,3 +655,39 @@ Then(
     completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
   },
 )
+
+// The failed-entry boot scenario (client-boot-failure.feature): a fixture bundle whose client `apply` throws, so the
+// "reported by id" step above has a real failure to report. It lives here because it needs this file's private profile
+// and evidence state; boot.js is imported lazily to keep this an append to the file.
+const FAILING_CLIENT_FIXTURE = {
+  projectRoot: join(DSHFILES_ROOT, 'tooling/dshx/e2e/fixtures/failing-client'),
+  packageId: '@dshfiles-e2e/failing-client',
+} as const
+
+Given('a scratch profile with a client entry that throws in apply is booted', async ({ page }: { page: Page }) => {
+  const { bootFixtureBundleProfile } = await import('./boot.js')
+  const profile = await bootFixtureBundleProfile(FAILING_CLIENT_FIXTURE)
+  profiles.set(page, profile)
+  try {
+    await visitScratchProfile(page, profile)
+    completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
+    await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
+  } catch (error) {
+    await profile.close()
+    profiles.delete(page)
+    throw error
+  }
+})
+
+Then('the client entry {string} is reported as failed by its id', async ({ page }: { page: Page }, entryId: string) => {
+  const profile = profileFor(page)
+  const outcome = await readProfileOutcome(page, profile)
+  const failures = ClientBootCheckModel.clientEntryFailures(ClientBootCheckModel.parseBootText(outcome.text), profile.expectedClientEntries)
+  await recordAssertion(page, 'fixture-client-entry-is-reported-failed-by-id', () => {
+    expect(outcome.text, 'No boot card was shown for a client entry that throws in apply.').not.toBe('')
+    expect(
+      failures.map(entry => `${entry.id}: ${entry.state}`),
+      outcome.text,
+    ).toContain(`${entryId}: failed`)
+  })
+})
