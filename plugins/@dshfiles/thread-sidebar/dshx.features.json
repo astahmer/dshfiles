@@ -3595,6 +3595,94 @@
       ]
     },
     {
+      "id": "phone-stack-navigation",
+      "title": "Navigate the phone as a stack",
+      "summary": "Below 640px the fixed layout is a stack (plans/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers Thread panels, which opens the thread panel as a bottom sheet. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
+      "surfaces": [
+        "client"
+      ],
+      "surface": "destinationSection",
+      "destination": "threads",
+      "currentSurface": "shell: phone tab bar only; the stage kept the desktop tab strip and no Back",
+      "configuration": [],
+      "states": [
+        "list",
+        "stage-thread",
+        "stage-page",
+        "stage-draft",
+        "keyboard-open"
+      ],
+      "failureModes": [
+        "Without the Workbench's toggle command the bar offers no Thread panels button instead of a dead control.",
+        "An older Host that rejects the new 'back' navigation surface only loses that count; navigation never waits on it."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.phone-stack-thread",
+          "file": "plugins/@dshfiles/thread-sidebar/src/phone-shell.test.ts",
+          "testName": "names a thread on the stage and goes back to Threads, offering its panels"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.phone-stack-inbox-origin",
+          "file": "plugins/@dshfiles/thread-sidebar/src/phone-shell.test.ts",
+          "testName": "returns a thread opened from the Inbox to the Inbox"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.phone-stack-lists",
+          "file": "plugins/@dshfiles/thread-sidebar/src/phone-shell.test.ts",
+          "testName": "shows the open list: tab roots have no Back, a destination opened from More goes back to More"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.phone-stack-browser",
+          "reason": "The Gherkin harness runs Chromium at 1440x900 only; the WebKit 390x844 browser journey is the scripted phone journey plans/ade-ux/phase6/capture/journey-plan.json (open a thread from Threads, Back, Inbox Open then Back to Inbox, Back through More)."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only presentation; the destination opens it causes are counted by the navigation counter's api-dispatch span (surface 'back' for Back)."
+        }
+      ]
+    },
+    {
+      "id": "touch-row-menu",
+      "title": "Open a thread's actions by touch",
+      "summary": "On a coarse pointer each thread row shows a ⋯ button that opens the row's own actions menu (the right-click menu, which holds every hover action: pin, mute, move, settle, open in side panel…), anchored under the button. Touch has no hover and iOS WebKit fires no contextmenu on a long press, so the hover strip is hidden there and the inline status verb (Answer, Land, Retry) moves left of the ⋯ button. A fine pointer keeps the hover strip and no extra button.",
+      "surfaces": [
+        "client"
+      ],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-list: hover action strip and right-click menu only",
+      "configuration": [],
+      "states": [
+        "coarse-pointer",
+        "fine-pointer"
+      ],
+      "failureModes": [
+        "An offscreen row renders its menu button only once near the viewport, like its hover actions."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.touch-row-menu-browser",
+          "reason": "Pointer media queries need a touch browser: the WebKit iPhone audit plans/ade-ux/phase6/capture/audit-plan.json screen 01b-row-menu opens the menu from the button; Chromium Gherkin runs a fine pointer."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only presentation; the menu items call the same thread verbs whose Host calls already carry api-dispatch spans."
+        }
+      ]
+    },
+    {
       "id": "layout-mode",
       "title": "Choose a fixed or free-docking left column",
       "summary": "Settings › Layout (and the palette's Layout commands) switch the left column between the fixed rail-and-list layout, the default, and free docking, which mounts the movable Workbench panes again. The Workbench's saved left layout and named layouts are not touched while fixed is on, so switching back to free docking restores them; Move tab to stops offering the left region while it is absent.",

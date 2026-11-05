@@ -12,7 +12,7 @@ const panelIdSchema = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0
 const countSchema = Schema.Number.check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))
 const timestampSchema = Schema.NullOr(countSchema)
 
-export const NAVIGATION_SURFACES = ['rail', 'tab-bar', 'index', 'palette', 'moved-to'] as const
+export const NAVIGATION_SURFACES = ['rail', 'tab-bar', 'index', 'palette', 'moved-to', 'back'] as const
 export const navigationSurfaceSchema = Schema.Literals(NAVIGATION_SURFACES)
 
 export const navigationRecordSchema = SchemaHelpers.strictStruct(
@@ -69,7 +69,7 @@ export const threadSidebarNavigationApi = defineApi({
       input: SchemaHelpers.strictStruct(Schema.Struct({})),
       output: navigationCountsSchema,
       description:
-        'Read how often each rail destination and section was opened in the DSH GUI, and from which surface (rail, phone tab bar, list index, palette, moved-to help). Ids and counts only. Read-only.',
+        'Read how often each rail destination and section was opened in the DSH GUI, and from which surface (rail, phone tab bar, list index, palette, moved-to help, phone Back). Ids and counts only. Read-only.',
       tool: { name: 'shell_navigation_counts', readOnly: true, render },
     }),
     reset: method({

@@ -125,7 +125,13 @@ interface SidebarShellExtras {
   /** Runs a Host shortcut command by id; null when this Host cannot run commands outside a key press. */
   runCommand: ((commandId: string) => boolean) | null
   loadModelCatalog: () => Promise<ModelCatalog>
+  /** The Session the stage shows right now (a draft's local key until its first message creates it); optional for old callers. */
+  readStageSession?: () => string | undefined
+  subscribeStageSession?: (listener: () => void) => () => void
 }
+
+const NO_STAGE_SESSION = (): undefined => undefined
+const NO_SUBSCRIPTION = (): (() => void) => () => undefined
 
 type SidebarLocation = NavigationLocation<SessionSummary['id'], SidebarPanelMetadata['id']>
 
@@ -236,6 +242,8 @@ const SELF_COMMAND_IDS = new Set(['commandPalette.open'])
 /** The cancelable cross-plugin event `@dshfiles/settings-shell` listens for; handled when dispatch returns false. */
 const OPEN_SETTINGS_EVENT = 'dshfiles:open-settings'
 const SETTINGS_COMMAND_ID = 'settings.open'
+/** `@dshfiles/workbench`'s right-pane toggle; on a phone that pane is the thread panel's bottom sheet. */
+const THREAD_PANEL_COMMAND_ID = 'workbench.toggleSidePanel'
 
 export const requestSettings = (runCommand: ((commandId: string) => boolean) | null): void => {
   if (runCommand?.(SETTINGS_COMMAND_ID) === true) return
@@ -296,6 +304,16 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const activePanelId = props.usePanelInfo(info => info.activePanelId)
   const hostShortcuts = props.useShortcuts(entries => entries)
   const { preferences, updatePreferences, openPalette, selectedThreadId, threadTitle } = useSidebarState()
+  // The phone top bar names the thread on the stage. The live stage Session wins over the list selection, which a
+  // draft that became a thread does not update; read reactively so a rename (a first turn's title) shows at once.
+  const stageSession = useSyncExternalStore(props.subscribeStageSession ?? NO_SUBSCRIPTION, props.readStageSession ?? NO_STAGE_SESSION, NO_STAGE_SESSION)
+  // A blank Session (a new-thread draft before its first message) is not a thread yet: no title, no panels.
+  const stageThread = props.useSessions(state => {
+    const find = (id: string | null | undefined) => (id === undefined || id === null ? undefined : Object.values(state.byId).find(session => session.id === id))
+    const stage = find(stageSession) ?? (stageSession === undefined ? find(selectedThreadId) : undefined)
+    return stage === undefined || stage.blank ? undefined : stage.id
+  })
+  const stageTitle = props.useSessions(state => (stageThread === undefined ? undefined : Object.values(state.byId).find(session => session.id === stageThread)?.displayTitle))
   // Fixed (default): the rail and one list; the Workbench left panes render only in free docking (plans/ade-ux §4.1).
   const docking = preferences.layoutMode === 'docking'
   const contentOverridden = props.contentOverridden && docking
@@ -1284,6 +1302,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             contributed={contributedSections}
             activePanelId={activePanelId ?? null}
             selectedThreadId={selectedThreadId ?? null}
+            stageThreadId={stageThread ?? null}
             collapsed={props.collapsed}
             renderPanelIcon={(panelId, size, active) => props.renderSlot('sidebar.panellist', { size, active }, { only: panelId })}
             threadList={props.renderSlot('sidebar.workspaces', {
@@ -1303,6 +1322,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             useDocking={() => updatePreferences({ layoutMode: 'docking' })}
             toggleSidebar={toggleSidebar}
             record={recordNavigation}
+            stageTitle={stageTitle}
+            // The Workbench's thread panel (a bottom sheet on a phone) through its registered command; none without it.
+            togglePanels={props.runCommand === null ? null : () => void props.runCommand?.(THREAD_PANEL_COMMAND_ID)}
           />
         )}
         <MovedToDialog

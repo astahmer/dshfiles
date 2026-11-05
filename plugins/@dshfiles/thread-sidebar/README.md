@@ -6,6 +6,10 @@
 
 ![On a phone the rail becomes a bottom tab bar; More lists the other destinations](docs/screenshots/phone-tab-bar.png)
 
+![On a phone the stage is a stack: a top bar names the thread or page, Back returns to the list it came from, and Thread panels opens the thread panel](docs/screenshots/phone-stack-navigation.png)
+
+![On a touch screen each thread row has a ⋯ button that opens its actions menu](docs/screenshots/touch-row-menu.png)
+
 ![Where did a page go? lists each former sidebar page and opens its new home](docs/screenshots/moved-to-map.png)
 
 ![Send one prompt to multiple models](docs/screenshots/multi-model-fan-out.png)

@@ -208,6 +208,9 @@ export default defineClient({
 
     // The revision each client bundle this page runs reports, compared against the Host's served graph to tell a
     // page that missed a rebuild from one that hot-reloaded it: the rows advance as reloads are applied.
+    // The Session the stage shows (the phone top bar names it and offers its panels): the public root source.
+    const readStageSession = (): string | undefined => ctx.uiSession.adapter.current.getSnapshot().key
+    const subscribeStageSession = (listener: () => void): (() => void) => ctx.uiSession.adapter.current.subscribe(listener)
     const readClientRevisionKey = (): string => JSON.stringify((ctx.modules.manifest.modules ?? []).map(row => [row.id, row.rev] as const))
     const subscribeClientRevisions = (listener: () => void): (() => void) => ctx.modules.entries.state.subscribe(listener)
 
@@ -708,6 +711,8 @@ export default defineClient({
           readFooterSnapshot={readFooterSnapshot}
           subscribeFooterSnapshot={subscribeFooterSnapshot}
           readClientRevisionKey={readClientRevisionKey}
+          readStageSession={readStageSession}
+          subscribeStageSession={subscribeStageSession}
           subscribeClientRevisions={subscribeClientRevisions}
           openSession={openSessionRestoringArchived}
           runCommand={runCommand}

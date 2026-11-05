@@ -81,6 +81,7 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
+  EllipsisIcon,
   ActivityIcon,
   BellIcon,
   BellOffIcon,
@@ -1006,6 +1007,15 @@ const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => (
   </ContextMenu>
 )
 
+/** Opens a row's right-click menu from a touch control, anchored under that control. */
+const ThreadRowMenu = {
+  open(row: HTMLElement | null, anchor: HTMLElement): void {
+    if (row === null) return
+    const rect = anchor.getBoundingClientRect()
+    row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: rect.left, clientY: rect.bottom }))
+  },
+} as const
+
 /** Memoized so a session update re-renders only its own row, not the whole list. */
 const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const { session, archived, pinned, parked, settled, rowStyle } = props
@@ -1188,7 +1198,8 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               className={cn(
                 'dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
-                inlineVerb !== undefined && 'dshx:pr-20',
+                // Touch: the row's actions menu button takes the top-right corner, so the inline verb moves left of it.
+              inlineVerb !== undefined ? 'dshx:pr-20 dshx:pointer-coarse:pr-30' : 'dshx:pointer-coarse:pr-11',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
               )}
               data-thread-id={session.id}
@@ -1364,7 +1375,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               type="button"
               size="xs"
               variant={workStatus.status === 'ready' ? 'outline' : 'default'}
-              className="dshx:absolute dshx:top-1.5 dshx:right-1.5 dshx:h-6 dshx:px-2"
+              className="dshx:absolute dshx:top-1.5 dshx:right-1.5 dshx:h-6 dshx:px-2 dshx:pointer-coarse:right-10"
               data-testid="thread-row-verb"
               data-verb={inlineVerb}
               onClick={() => props.actions.actOnStatus(session.id, workStatus)}
@@ -1375,12 +1386,28 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
           {nearViewport && !props.renaming ? (
             <div
               data-testid="thread-row-actions"
-              className="dshx:pointer-events-none dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100"
+              className="dshx:pointer-events-none dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden"
             >
               {props.rowActions.map(action => (
                 <Fragment key={action}>{renderRowAction(action)}</Fragment>
               ))}
             </div>
+          ) : null}
+          {nearViewport && !props.renaming ? (
+            // Touch has no hover and iOS WebKit fires no contextmenu on a long press: this button opens the row's own
+            // actions menu (the right-click menu, which also holds every hover action) at the button.
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              data-testid="thread-row-menu"
+              aria-label={t('threadSidebarContextMenu')}
+              aria-haspopup="menu"
+              className="dshx:absolute dshx:top-1 dshx:right-1 dshx:hidden dshx:text-muted-foreground dshx:pointer-coarse:inline-flex"
+              onClick={event => ThreadRowMenu.open(rowRef.current, event.currentTarget)}
+            >
+              <EllipsisIcon className="dshx:size-4" aria-hidden="true" />
+            </Button>
           ) : null}
         </div>
         {childCount > 0 && props.childrenOpen ? (

@@ -6,13 +6,13 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-390 features from 89 plugins.
+394 features from 89 plugins.
 
 ## Counts
 
 | Destination | agentToolOnly | attentionProvider | command | composerContribution | destinationSection | detail | entityProvider | infrastructure | rowAction | rowDecorator | settingsSection | statusItem | threadFacet | transcriptCard | Total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Threads |  |  |  |  | 9 |  | 1 |  | 12 | 1 |  |  |  |  | 23 |
+| Threads |  |  |  |  | 10 |  | 1 |  | 13 | 1 |  |  |  |  | 25 |
 | Inbox |  | 18 |  |  | 1 |  |  |  |  |  |  |  |  |  | 19 |
 | Land |  |  | 1 |  | 6 | 2 | 1 |  | 4 |  |  |  |  |  | 14 |
 | Work |  |  | 1 |  | 8 | 3 | 1 |  | 5 |  |  |  |  |  | 18 |
@@ -20,10 +20,10 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Observe |  |  |  |  | 21 | 1 |  |  | 2 |  |  |  |  |  | 24 |
 | Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  |  | 6 |
 | Settings |  |  |  |  | 2 |  |  |  | 1 |  | 43 |  |  |  | 46 |
-| Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 25 |  | 25 |
+| Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 26 |  | 26 |
 | Composer |  |  |  | 54 |  |  |  |  |  |  |  |  |  |  | 54 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 21 | 21 |
-| No place of its own | 19 |  | 17 |  |  |  | 1 | 91 |  |  |  | 7 |  |  | 135 |
+| No place of its own | 19 |  | 17 |  |  |  | 1 | 92 |  |  |  | 7 |  |  | 136 |
 
 ## By current left-nav entry
 
@@ -66,7 +66,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | --- | ---: | --- |
 | agent tool | 23 | No place of its own 18, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
 | agent tools | 1 | No place of its own 1 |
-| client | 11 | No place of its own 11 |
+| client | 12 | No place of its own 12 |
 | composer | 55 | Composer 52, Thread panel 2, Settings 1 |
 | composer and transcript | 1 | Threads 1 |
 | conversation-view | 2 | Thread panel 2 |
@@ -84,28 +84,29 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | rail | 1 | Work 1 |
 | right-pane | 7 | Thread panel 5, No place of its own 2 |
 | settings | 24 | Settings 22, No place of its own 2 |
-| shell | 7 | No place of its own 5, Threads 2 |
+| shell | 8 | No place of its own 5, Threads 3 |
 | sidebar | 2 | Settings 2 |
 | sidebar-footer | 3 | No place of its own 3 |
 | status-strip | 6 | No place of its own 4, Composer 1, Observe 1 |
 | thread panel | 1 | Thread panel 1 |
 | thread-header | 7 | Thread panel 3, Threads 3, No place of its own 1 |
-| thread-list | 22 | Threads 16, Inbox 3, No place of its own 2, Settings 1 |
+| thread-list | 23 | Threads 17, Inbox 3, No place of its own 2, Settings 1 |
 | toast | 1 | No place of its own 1 |
 | transcript | 24 | Transcript 21, Inbox 1, Land 1, Thread panel 1 |
 | url | 1 | No place of its own 1 |
-| workbench | 16 | No place of its own 12, Thread panel 3, Settings 1 |
+| workbench | 17 | No place of its own 12, Thread panel 4, Settings 1 |
 
 ## By destination
 
 ### Threads
 
-rail destination (default); 23 features.
+rail destination (default); 25 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | multi-host/remote-inventory: Every thread on every host | destinationSection | thread-list: All remote threads |
 | thread-sidebar/destination-rail: Switch destinations from the rail | destinationSection | shell: Navigation list (21 entries) and collapsed icon rail |
+| thread-sidebar/phone-stack-navigation: Navigate the phone as a stack | destinationSection | shell: phone tab bar only; the stage kept the desktop tab strip and no Back |
 | thread-sidebar/phone-tab-bar: Navigate from a bottom tab bar on a phone | destinationSection | shell: collapsed icon rail at phone width |
 | thread-sidebar/section-order: Group remote threads with each view | destinationSection | thread-list: Thread list settings › Remote group |
 | thread-sidebar/status-grouped-thread-list: See every thread grouped by what it needs from you | destinationSection | thread-list: All threads › Group: Status |
@@ -126,6 +127,7 @@ rail destination (default); 23 features.
 | thread-sidebar/thread-mute: Mute or snooze a thread | rowAction | thread-list: row menu › Mute |
 | thread-sidebar/thread-reference-mention: Mention another thread from its row, its tab, or a drag into the composer | rowAction | thread-list: row menu › Mention |
 | thread-sidebar/thread-referenced-by: See which threads reference one thread | rowAction | thread-list: row menu › Referenced by |
+| thread-sidebar/touch-row-menu: Open a thread's actions by touch | rowAction | thread-list: hover action strip and right-click menu only |
 | multi-host/logical-project-grouping: Group remote threads under matching local projects | rowDecorator | thread-list: remote threads under their local project |
 
 ### Inbox
@@ -311,7 +313,7 @@ rail destination (bottom); 46 features.
 
 ### Thread panel
 
-facets of the active thread; 25 features.
+facets of the active thread; 26 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -338,6 +340,7 @@ facets of the active thread; 25 features.
 | traces/span-cost: List-price cost on traces | threadFacet | conversation-view: Traces tab › cost |
 | traces/thread-traces-tab: Per-thread Traces tab | threadFacet | conversation-view: Traces / Requests tabs |
 | usage/thread-cost-facet: Thread panel Cost facet | threadFacet | workbench: Choose a view › Thread panels › Cost |
+| workbench/phone-thread-panel-sheet: Open the thread panel as a bottom sheet on a phone | threadFacet | workbench: right pane as a narrow column; phone reached facets only through the main pane's New tab |
 | workbench/terminal-pages: Open native terminals from any pane's view chooser | threadFacet | main-tabs: New tab › Terminal: Terminal |
 | workbench/thread-facets: Open thread facets from any pane's view chooser | threadFacet | workbench: Choose a view › Thread panels |
 
@@ -432,7 +435,7 @@ cards inline in the active thread; 21 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 135 features.
+palette commands, status items, agent tools, infrastructure; 136 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -524,6 +527,7 @@ palette commands, status items, agent tools, infrastructure; 135 features.
 | plugin-ui/debounced-client-values: Debounce fast-changing client input | infrastructure | client: library |
 | plugin-ui/query-client-binding: Provide host-backed client queries | infrastructure | client: library |
 | plugin-ui/schema-validated-persistent-values: Persist schema-validated client values | infrastructure | client: library |
+| plugin-ui/touch-targets: Give kit controls a 44px touch target | infrastructure | client: library |
 | plugin-ui/typed-forms-and-accessible-tables: Compose validated forms and accessible data tables | infrastructure | client: library |
 | preview/render-html: Offline HTML screenshots for other Host plugins | infrastructure | host: preview-render contract |
 | project-automations/project-automation-webhooks: Start threads from signed webhooks | infrastructure | host: /automations/webhook/<id> route |

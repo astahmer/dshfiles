@@ -7,6 +7,7 @@ import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import {
   ActivityIcon,
   BotIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
   EllipsisIcon,
   GitMergeIcon,
@@ -14,6 +15,7 @@ import {
   LibraryIcon,
   ListTodoIcon,
   MessagesSquareIcon,
+  PanelBottomOpenIcon,
   PlusIcon,
   SettingsIcon,
   SearchIcon,
@@ -36,6 +38,7 @@ import {
   type ResolvedDestination,
 } from './destinations.js'
 import type { NavigationRecord } from './navigation-api.js'
+import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard } from './phone-shell.js'
 
 const ICONS: Record<DestinationIcon, LucideIcon> = {
   'messages-square': MessagesSquareIcon,
@@ -75,8 +78,6 @@ const soleSection = (destination: ResolvedDestination): string | undefined =>
   destination.id !== 'threads' && destination.id !== 'settings' && destination.sections.length === 1 ? destination.sections[0]?.panelId : undefined
 
 const PHONE_QUERY = '(max-width: 639.98px)'
-/** The main panel `@dshfiles/settings-shell` shows its one Settings page in. */
-const SETTINGS_PANEL_ID = 'dshfiles-settings'
 
 /**
  * Opens `@dshfiles/settings-shell`'s Settings page in the stage through its documented cross-plugin request (plan §4.6).
@@ -84,6 +85,8 @@ const SETTINGS_PANEL_ID = 'dshfiles-settings'
  */
 const openSettingsPage = (): boolean => !window.dispatchEvent(new CustomEvent('dshfiles:open-settings', { detail: {}, cancelable: true }))
 const PHONE_NAV_HEIGHT = 'calc(56px + env(safe-area-inset-bottom, 0px))'
+/** The phone top bar (Back, title, thread panels; the frame's status chip takes its trailing 48px). */
+const PHONE_TOP_HEIGHT = 'calc(44px + env(safe-area-inset-top, 0px))'
 
 const subscribePhone = (listener: () => void): (() => void) => {
   if (typeof window.matchMedia !== 'function') return () => undefined
@@ -101,6 +104,8 @@ export interface DestinationShellProps {
   readonly activePanelId: string | null
   /** The thread the stage shows; a change closes the phone list (the stage was pushed). */
   readonly selectedThreadId: string | null
+  /** The Host thread on the stage, also once a draft became one (the list selection may lag); null for a draft. */
+  readonly stageThreadId?: string | null
   readonly collapsed: boolean
   /** The `sidebar.panellist` glyph of one page: the Inbox draws its own Needs you badge in it. */
   readonly renderPanelIcon: (panelId: string, size: number, active: boolean) => ReactNode
@@ -120,6 +125,10 @@ export interface DestinationShellProps {
   readonly openMovedTo: () => void
   /** Settings › Layout: switch to free docking (the Workbench left panes). */
   readonly useDocking: () => void
+  /** The thread the stage shows, as its title (the phone top bar names the stage). */
+  readonly stageTitle?: string | undefined
+  /** Opens or closes the thread panel (a bottom sheet on a phone); null when no owner serves it. */
+  readonly togglePanels?: (() => void) | null
   readonly toggleSidebar: () => void
   readonly record: (record: NavigationRecord) => void
 }
@@ -238,6 +247,8 @@ const DestinationIndex = (props: {
   readonly openMovedTo: () => void
   readonly useDocking: () => void
   readonly renderPanelIcon: DestinationShellProps['renderPanelIcon']
+  /** Phone: the top bar already names the destination, so the heading stays for assistive tech only. */
+  readonly phone?: boolean
 }): JSX.Element => {
   const mapped = props.destination.sections.filter(section => !section.unmapped)
   const unmapped = props.destination.sections.filter(section => section.unmapped)
@@ -246,7 +257,7 @@ const DestinationIndex = (props: {
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col" data-destination-index={props.destination.id}>
       <header className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:gap-0.5 dshx:px-3 dshx:pt-1 dshx:pb-2">
-        <h2 className="dshx:text-sm dshx:font-semibold">{props.destination.label}</h2>
+        <h2 className={cn('dshx:text-sm dshx:font-semibold', props.phone === true && 'dshx:sr-only')}>{props.destination.label}</h2>
         <p className="dshx:text-xs dshx:text-muted-foreground">{props.destination.description}</p>
       </header>
       <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-1.5">
@@ -319,7 +330,9 @@ const DestinationIndex = (props: {
   )
 }
 
-const ListPane = (props: DestinationShellProps & { readonly destination: ResolvedDestination; readonly openSection: (panelId: string) => void }): JSX.Element =>
+const ListPane = (
+  props: DestinationShellProps & { readonly destination: ResolvedDestination; readonly openSection: (panelId: string) => void; readonly phone?: boolean },
+): JSX.Element =>
   props.destination.id === 'threads' ? (
     <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col" data-destination-index="threads">
       {props.searchThreads === null && props.customizeThreads === undefined ? null : (
@@ -372,6 +385,7 @@ const ListPane = (props: DestinationShellProps & { readonly destination: Resolve
       openMovedTo={props.openMovedTo}
       useDocking={props.useDocking}
       renderPanelIcon={props.renderPanelIcon}
+      phone={props.phone === true}
     />
   )
 
@@ -485,21 +499,38 @@ const PhoneNavigation = (
     const root = document.documentElement
     root.setAttribute('data-shell-phone-nav', '')
     root.style.setProperty('--dsh-phone-nav-height', PHONE_NAV_HEIGHT)
+    root.style.setProperty('--dsh-phone-top-height', PHONE_TOP_HEIGHT)
+    // Safe-area insets only resolve under viewport-fit=cover; the bars pad by them (home indicator, notch, landscape).
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]')
+    const previous = meta?.getAttribute('content') ?? null
+    if (meta !== null && previous !== null && !/viewport-fit\s*=/u.test(previous)) meta.setAttribute('content', `${previous}, viewport-fit=cover`)
     return () => {
       root.removeAttribute('data-shell-phone-nav')
       root.style.removeProperty('--dsh-phone-nav-height')
+      root.style.removeProperty('--dsh-phone-top-height')
+      if (meta !== null && previous !== null) meta.setAttribute('content', previous)
     }
   }, [])
+  useSoftwareKeyboard()
   // Opening a thread or a page from the list pushes the stage: close the list.
-  const shown = useRef({ thread: props.selectedThreadId, panel: props.activePanelId })
+  const shown = useRef({ thread: props.selectedThreadId, panel: props.activePanelId, stage: props.stageThreadId ?? null })
+  // A thread opened from a page on the stage (an Inbox item's Open) remembers that page for Back; any other route
+  // to a thread (the list, New, the palette) forgets it.
+  const [origin, setOrigin] = useState<{ readonly panelId: string } | undefined>(undefined)
   useEffect(() => {
-    const changed = shown.current.thread !== props.selectedThreadId || shown.current.panel !== props.activePanelId
-    shown.current = { thread: props.selectedThreadId, panel: props.activePanelId }
+    // A selection that only catches up with the thread already on the stage (a draft's first message created it) is
+    // not a pick: it must not close a list the user just opened.
+    const caughtUp = shown.current.panel === props.activePanelId && props.selectedThreadId !== null && props.selectedThreadId === shown.current.stage
+    const changed = !caughtUp && (shown.current.thread !== props.selectedThreadId || shown.current.panel !== props.activePanelId)
+    const from = shown.current.panel
+    const owned = (panelId: string | null): boolean => panelId !== null && Destinations.owning(props.destinations, panelId) !== undefined
+    if (changed) setOrigin(!listOpen && owned(from) && !owned(props.activePanelId) && from !== null ? { panelId: from } : undefined)
+    shown.current = { thread: props.selectedThreadId, panel: props.activePanelId, stage: props.stageThreadId ?? null }
     if (changed && listOpen) {
       setMoreOpen(false)
       props.toggleSidebar()
     }
-  }, [props.selectedThreadId, props.activePanelId, listOpen, props.toggleSidebar])
+  }, [props.selectedThreadId, props.activePanelId, props.stageThreadId, listOpen, props.toggleSidebar, props.destinations])
   const open = (next: DestinationId): void => {
     props.setDestination(next)
     setMoreOpen(false)
@@ -555,17 +586,91 @@ const PhoneNavigation = (
     return target === undefined ? null : destinationIcon(props, target, current === tab)
   }
   const others = props.destinations.filter(candidate => candidate.id !== 'threads' && candidate.id !== 'inbox')
+  const bar = PhoneTopBarModel.resolve({
+    listOpen,
+    moreOpen,
+    destination: props.destination,
+    destinations: props.destinations,
+    activePanelId: props.activePanelId,
+    selectedThreadId: props.stageThreadId === undefined ? props.selectedThreadId : props.stageThreadId,
+    stageTitle: props.stageTitle,
+    origin,
+  })
+  // Back pops one level of the stack: the stage returns to the list it came from, a destination list to More.
+  const back = (): void => {
+    if (bar.back === null) return
+    if (bar.back.to === 'page') {
+      setOrigin(undefined)
+      props.selectPanel(bar.back.panelId)
+      return
+    }
+    if (bar.back.to === 'more') {
+      setMoreOpen(true)
+      if (!listOpen) props.toggleSidebar()
+      return
+    }
+    props.setDestination(bar.back.to)
+    setMoreOpen(false)
+    props.record({ destination: bar.back.to, surface: 'back' })
+    if (!listOpen) props.toggleSidebar()
+  }
+  const togglePanels = props.togglePanels ?? null
+  // Tapping the row of the thread (or the page) already on the stage changes no selection, so the effect above would
+  // leave the list open: close it after the click, unless the selection change already did.
+  const listOpenRef = useRef(listOpen)
+  listOpenRef.current = listOpen
+  const closeAfterPick = (event: React.MouseEvent<HTMLElement>): void => {
+    if (!(event.target instanceof Element) || event.target.closest('[data-thread-main-action], [data-section]') === null) return
+    requestAnimationFrame(() => {
+      if (listOpenRef.current) props.toggleSidebar()
+    })
+  }
   return createPortal(
     <div className="dshx-root">
+      <header
+        data-phone-top-bar=""
+        data-phone-stage={listOpen ? undefined : bar.thread ? 'thread' : (props.activePanelId ?? 'none')}
+        className="dshx:fixed dshx:inset-x-0 dshx:top-0 dshx:z-[41] dshx:flex dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-end dshx:border-b dshx:border-border dshx:bg-background dshx:pt-[env(safe-area-inset-top,0px)] dshx:pr-12 dshx:pl-[max(4px,env(safe-area-inset-left,0px))] dshx:text-foreground"
+        style={{ height: PHONE_TOP_HEIGHT }}
+      >
+        <div className="dshx:flex dshx:h-11 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-0.5">
+          {bar.back === null ? null : (
+            <button
+              type="button"
+              data-phone-back=""
+              aria-label={`Back to ${bar.back.label}`}
+              onClick={back}
+              className="dshx:flex dshx:h-11 dshx:min-w-11 dshx:max-w-[40%] dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:pr-2 dshx:pl-1 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
+            >
+              <ChevronLeftIcon className="dshx:size-5 dshx:shrink-0" aria-hidden="true" />
+              <span className="dshx:min-w-0 dshx:truncate">{bar.back.label}</span>
+            </button>
+          )}
+          <h1 data-phone-title="" className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[15px] dshx:leading-tight dshx:font-semibold', bar.back === null && 'dshx:pl-2.5')}>
+            {bar.title}
+          </h1>
+          {bar.thread && togglePanels !== null ? (
+            <button
+              type="button"
+              data-phone-panels=""
+              aria-label="Thread panels"
+              onClick={togglePanels}
+              className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
+            >
+              <PanelBottomOpenIcon className="dshx:size-5" aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+      </header>
       {listOpen ? (
         <div
           data-phone-list=""
-          className="dshx:fixed dshx:inset-x-0 dshx:top-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:text-foreground dshx:pt-[env(safe-area-inset-top,0px)]"
-          style={{ bottom: PHONE_NAV_HEIGHT }}
+          onClick={closeAfterPick}
+          className="dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:pt-2 dshx:text-foreground"
+          style={{ top: PHONE_TOP_HEIGHT, bottom: PHONE_NAV_HEIGHT }}
         >
           {moreOpen ? (
-            <nav aria-label="More destinations" className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-y-auto dshx:p-2">
-              <h2 className="dshx:px-2 dshx:pt-1 dshx:pb-2 dshx:text-sm dshx:font-semibold">More</h2>
+            <nav aria-label="More destinations" className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-y-auto dshx:px-2 dshx:pb-2">
               <EntityList aria-label="More destinations">
                 {others.map(candidate => (
                   <EntityRow
@@ -587,14 +692,14 @@ const PhoneNavigation = (
               </EntityList>
             </nav>
           ) : (
-            <ListPane {...props} destination={props.destination} openSection={panelId => props.openSection(panelId, 'index')} />
+            <ListPane {...props} phone destination={props.destination} openSection={panelId => props.openSection(panelId, 'index')} />
           )}
         </div>
       ) : null}
       <nav
         aria-label="Destinations"
         data-phone-tab-bar=""
-        className="dshx:fixed dshx:inset-x-0 dshx:bottom-0 dshx:z-40 dshx:flex dshx:border-t dshx:border-border dshx:bg-background dshx:pb-[env(safe-area-inset-bottom,0px)]"
+        className="dshx:fixed dshx:inset-x-0 dshx:bottom-0 dshx:z-40 dshx:flex dshx:border-t dshx:border-border dshx:bg-background dshx:pr-[env(safe-area-inset-right,0px)] dshx:pb-[env(safe-area-inset-bottom,0px)] dshx:pl-[env(safe-area-inset-left,0px)] dshx:in-data-phone-keyboard:hidden"
       >
         {PHONE_TABS.map(tab => (
           <button
