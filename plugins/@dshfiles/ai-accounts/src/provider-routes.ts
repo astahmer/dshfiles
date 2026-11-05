@@ -28,6 +28,12 @@ export interface CodexRoute {
   readonly layout: CodexHomeLayout
 }
 
+const DEFAULT_KEY_ENV_BY_KIND = {
+  [OPENCODE_KIND]: 'OPENCODE_API_KEY',
+  [COMMANDCODE_KIND]: DEFAULT_COMMANDCODE_KEY_ENV,
+  [MISTRAL_KIND]: DEFAULT_MISTRAL_KEY_ENV,
+} as const satisfies Record<KeyedRoute['kind'], string>
+
 export interface KeyedRoute {
   readonly kind: typeof OPENCODE_KIND | typeof COMMANDCODE_KIND | typeof MISTRAL_KIND
   readonly instanceId: string
@@ -81,14 +87,7 @@ export class ProviderRoutes {
     return trimmed
   }
 
-  static keyEnvFor = (route: KeyedRoute): string =>
-    route.apiKeyEnv.trim().length > 0
-      ? route.apiKeyEnv.trim()
-      : route.kind === COMMANDCODE_KIND
-        ? DEFAULT_COMMANDCODE_KEY_ENV
-        : route.kind === MISTRAL_KIND
-          ? DEFAULT_MISTRAL_KEY_ENV
-          : 'OPENCODE_API_KEY'
+  static keyEnvFor = (route: KeyedRoute): string => (route.apiKeyEnv.trim().length > 0 ? route.apiKeyEnv.trim() : DEFAULT_KEY_ENV_BY_KIND[route.kind])
 
   /**
    * `takenProviders` are provider ids another plugin already registered. DSH rejects a duplicate adapter for the whole

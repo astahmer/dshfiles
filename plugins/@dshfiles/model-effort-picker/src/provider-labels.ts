@@ -8,4 +8,5 @@ export const PROVIDER_LABEL = {
   commandcode: 'Command Code',
   'github-copilot': 'GitHub Copilot',
   cursor: 'Cursor',
+  mistral: 'Mistral',
 } satisfies Record<AccountKind, string>

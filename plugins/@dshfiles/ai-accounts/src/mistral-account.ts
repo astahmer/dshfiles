@@ -1,10 +1,9 @@
-import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import * as Schema from 'effect/Schema'
-import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import type { UsageCard } from './api.js'
+import { readKeychainSecret } from './keychain.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { AiAccountsSchema } from './effect-schema.js'
 import { providerFetch } from './provider-request.js'
@@ -25,7 +24,6 @@ export const MISTRAL_LOGIN_HINT = 'vibe --setup   # choose Launch browser and si
 /** Mistral Vibe's keyring services, newest first (`vibe/cli-rust/src/credentials/keyring.rs`). */
 const VIBE_KEYCHAIN_SERVICES = ['ai.mistral.vibe', 'vibe'] as const
 const CATALOG_TIMEOUT_MS = 10_000
-const KEYCHAIN_TIMEOUT_MS = 5_000
 
 /** `$VIBE_HOME` when it is an absolute path, else `~/.vibe`: the directory Mistral Vibe reads its `.env` from. */
 const vibeHome = (env: NodeJS.ProcessEnv = process.env, home: string = homedir()): string => {
@@ -50,24 +48,7 @@ const parseVibeEnvKey = (text: string, name: string = DEFAULT_MISTRAL_KEY_ENV): 
   return found
 }
 
-/**
- * macOS Keychain lookup through the system `security` tool, in an `ai-accounts keychain read` span that records only
- * the service and whether a value was found; any failure is simply no login.
- */
-const readKeychainPassword = (service: string, account: string): Promise<string> =>
-  withSpan(
-    'ai-accounts keychain read',
-    { attributes: pluginAttributes({ plugin: 'ai-accounts', attributes: { provider: MISTRAL_KIND, service } }) },
-    async span => {
-      const value = await new Promise<string>(resolve => {
-        execFile('/usr/bin/security', ['find-generic-password', '-s', service, '-a', account, '-w'], { timeout: KEYCHAIN_TIMEOUT_MS }, (error, stdout) =>
-          resolve(error === null ? stdout.trim() : ''),
-        )
-      })
-      span.setAttribute('ai_accounts.found', value !== '')
-      return value
-    },
-  )
+const readKeychainPassword = async (service: string, account: string): Promise<string> => (await readKeychainSecret({ service, account })) ?? ''
 
 export interface VibeLoginSources {
   readonly directory?: string

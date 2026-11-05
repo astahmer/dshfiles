@@ -213,6 +213,19 @@ const buildAccountsFile = async (
   ),
 })
 
+const directLoginHint = (kind: AccountDraft['kind']): string => {
+  switch (kind) {
+    case 'commandcode':
+      return 'cmd login'
+    case 'cursor':
+      return CURSOR_LOGIN_HINT
+    case 'mistral':
+      return MISTRAL_LOGIN_HINT
+    default:
+      return ''
+  }
+}
+
 /** Reuse the established home rules without materializing, copying or reading authentication. */
 const connectionMetadata = (draft: AccountDraft, shadowRoot: string): Pick<AccountProfile, 'mode' | 'loginHint'> => {
   if (draft.kind === 'codex') {
@@ -223,7 +236,7 @@ const connectionMetadata = (draft: AccountDraft, shadowRoot: string): Pick<Accou
     return { mode: 'direct', loginHint: ClaudeAccountModel.claudeLoginHint(ClaudeAccountModel.resolveClaudeConfigDir(draft.homePath)) }
   return {
     mode: 'direct',
-    loginHint: draft.kind === 'commandcode' ? 'cmd login' : draft.kind === 'cursor' ? CURSOR_LOGIN_HINT : draft.kind === 'mistral' ? MISTRAL_LOGIN_HINT : '',
+    loginHint: directLoginHint(draft.kind),
   }
 }
 

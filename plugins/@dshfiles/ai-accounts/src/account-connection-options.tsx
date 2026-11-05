@@ -135,6 +135,19 @@ const ConnectionHomes = (props: ConnectionOptionsProps): JSX.Element => {
   )
 }
 
+const keyEnvExample = (kind: AccountProfile['kind']): string => {
+  switch (kind) {
+    case 'commandcode':
+      return 'COMMANDCODE_API_KEY'
+    case 'opencode-go':
+      return 'OPENCODE_API_KEY'
+    case 'mistral':
+      return 'MISTRAL_API_KEY'
+    default:
+      return 'CLAUDE_WORK_API_KEY'
+  }
+}
+
 export const ExistingConnectionReference = (props: ConnectionOptionsProps): JSX.Element => {
   const form = useAppForm({
     defaultValues: { apiKeyEnv: props.account.apiKeyEnv },
@@ -142,14 +155,7 @@ export const ExistingConnectionReference = (props: ConnectionOptionsProps): JSX.
     validators: { onDynamic: existingKeyFormSchema },
     onSubmit: ({ value }) => props.configure(value),
   })
-  const example =
-    props.account.kind === 'commandcode'
-      ? 'COMMANDCODE_API_KEY'
-      : props.account.kind === 'opencode-go'
-        ? 'OPENCODE_API_KEY'
-        : props.account.kind === 'mistral'
-          ? 'MISTRAL_API_KEY'
-          : 'CLAUDE_WORK_API_KEY'
+  const example = keyEnvExample(props.account.kind)
   return (
     <form
       className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3"
