@@ -181,7 +181,9 @@ export class Triage extends Context.Service<
         if (!(yield* settings.get).autoTriage) return
         yield* FiberSet.run(
           background,
-          activity.track(item(id)).pipe(Effect.catch(error => Effect.logWarning(`backlog: triage of b:${String(id)} failed`, error))),
+          activity
+            .track(item(id))
+            .pipe(Effect.catch(error => Effect.flatMap(store.labelOf(id), label => Effect.logWarning(`backlog: triage of ${label} failed`, error)))),
           { startImmediately: true },
         )
       })

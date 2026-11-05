@@ -339,9 +339,12 @@ export class BacklogSync extends Context.Service<
         Effect.orDie,
       )
       const mappingOf = (id: number) => Effect.map(tables.mappings.get(String(id)).pipe(Effect.orDie), Option.getOrUndefined)
-      const save = (mapping: SyncMapping) =>
-        tables.mappings.put(String(mapping.itemId), mapping).pipe(Effect.mapError(cause => new SyncWriteFailed({ itemId: mapping.itemId, cause })))
       const itemOf = (id: number) => Effect.map(store.get(id), found => (found.ok ? found.value.item : undefined))
+      /** The `b:<ref>` an error names the item by, or nothing once the item is gone. */
+      const refFor = (id: number) => Effect.map(itemOf(id), item => (item === undefined ? undefined : BacklogReference.refOf(item)))
+      const writeFailed = (itemId: number) => (cause: unknown) =>
+        Effect.flatMap(refFor(itemId), ref => Effect.fail(new SyncWriteFailed({ itemId, ref, cause })))
+      const save = (mapping: SyncMapping) => tables.mappings.put(String(mapping.itemId), mapping).pipe(Effect.catch(writeFailed(mapping.itemId)))
 
       const backendFor = (input: { readonly backend: SyncBackendKind; readonly project: string | null; readonly reference?: string | undefined }) =>
         Effect.gen(function* () {
@@ -521,7 +524,7 @@ export class BacklogSync extends Context.Service<
       const syncNow = Effect.fn('backlog sync now')(function* (input: { readonly id?: number | undefined; readonly project?: string | null | undefined }) {
         if (input.id !== undefined) {
           const mapping = yield* mappingOf(input.id)
-          if (mapping === undefined) return yield* new SyncItemNotLinked({ itemId: input.id })
+          if (mapping === undefined) return yield* new SyncItemNotLinked({ itemId: input.id, ref: yield* refFor(input.id) })
           return { results: [yield* syncLocked(mapping)] }
         }
         const project = input.project === undefined ? undefined : BacklogItems.projectOf(input.project)
@@ -535,7 +538,7 @@ export class BacklogSync extends Context.Service<
       const unlink = Effect.fnUntraced(function* (id: number, actor: BacklogActor) {
         const mapping = yield* mappingOf(id)
         if (mapping === undefined) return { item: null, result: null }
-        yield* tables.mappings.delete(String(id)).pipe(Effect.mapError(cause => new SyncWriteFailed({ itemId: id, cause })))
+        yield* tables.mappings.delete(String(id)).pipe(Effect.catch(writeFailed(id)))
         yield* store.link({ id, link: { type: 'url', target: mapping.url }, remove: true, actor })
         return { item: null, result: null }
       })
@@ -556,11 +559,11 @@ export class BacklogSync extends Context.Service<
         const at = yield* Clock.currentTimeMillis
         const remote = input.create === true ? undefined : yield* backend.resolve(input.reference ?? '')
         if (existing !== undefined && (remote === undefined || existing.remoteId !== remote.id || existing.backend !== input.backend)) {
-          return yield* new SyncAlreadyLinked({ itemId: input.id, remoteKey: existing.remoteKey })
+          return yield* new SyncAlreadyLinked({ itemId: input.id, ref: BacklogReference.refOf(item), remoteKey: existing.remoteKey })
         }
         if (remote !== undefined && existing === undefined) {
           const other = (yield* mappings).find(mapping => mapping.backend === input.backend && mapping.remoteId === remote.id)
-          if (other !== undefined) return yield* new SyncAlreadyLinked({ itemId: other.itemId, remoteKey: other.remoteKey })
+          if (other !== undefined) return yield* new SyncAlreadyLinked({ itemId: other.itemId, ref: yield* refFor(other.itemId), remoteKey: other.remoteKey })
         }
         const issue = remote ?? (yield* backend.create({ title: item.title, body: item.body, status: item.status, kind: item.kind, tags: item.tags }))
         const created = remote === undefined
@@ -689,8 +692,9 @@ export class BacklogSync extends Context.Service<
       })
 
       const deleteItem = Effect.fn('backlog sync delete item')(function* (input: { readonly id: number }) {
+        const ref = yield* refFor(input.id)
         const deleted = yield* store.delete(input)
-        yield* tables.mappings.delete(String(input.id)).pipe(Effect.mapError(cause => new SyncWriteFailed({ itemId: input.id, cause })))
+        yield* tables.mappings.delete(String(input.id)).pipe(Effect.mapError(cause => new SyncWriteFailed({ itemId: input.id, ref, cause })))
         return deleted
       }, lock.withPermit)
 

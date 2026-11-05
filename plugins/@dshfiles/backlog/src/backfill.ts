@@ -31,6 +31,8 @@ export interface BackfillRun<E, R> {
   /** Records that triage found nothing to change, so the next run skips the item. */
   readonly markTriaged: (id: number) => Effect.Effect<void, E, R>
   readonly onProgress?: ((progress: BackfillProgress) => Effect.Effect<void, never, R>) | undefined
+  /** How a log line names the item (`b:<ref>`); `b:<id>` when absent. */
+  readonly labelOf?: ((id: number) => Effect.Effect<string, never, R>) | undefined
 }
 
 export interface BackfillProgress {
@@ -77,7 +79,13 @@ const run = <E, R>(request: BackfillRun<E, R>): Effect.Effect<BackfillReport, E,
     for (const [index, id] of request.selection.ids.entries()) {
       const outcome = yield* request
         .triage(id)
-        .pipe(Effect.catch(error => Effect.as(Effect.logWarning(`backlog backfill: triage of b:${String(id)} failed`, error), 'failed' as const)))
+        .pipe(
+          Effect.catch(error =>
+            Effect.flatMap(request.labelOf?.(id) ?? Effect.succeed(`b:${String(id)}`), label =>
+              Effect.as(Effect.logWarning(`backlog backfill: triage of ${label} failed`, error), 'failed' as const),
+            ),
+          ),
+        )
       if (outcome === 'applied') counts.applied += 1
       if (outcome === 'proposed') counts.proposed += 1
       if (outcome === 'failed' || outcome === 'missing') counts.failed += 1

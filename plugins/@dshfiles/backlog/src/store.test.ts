@@ -131,7 +131,7 @@ describe('store', () => {
       const fromProject = yield* store.capture({ text: 'ship the board', actor: agent })
 
       expect(fromWorkspace.item.project).toBe('/work/dshfiles')
-      expect(yield* store.projects).toEqual([expect.objectContaining({ project: '/work/dshfiles', counts: expect.objectContaining({ inbox: 2 }) })])
+      expect(yield* store.projects({})).toEqual([expect.objectContaining({ project: '/work/dshfiles', counts: expect.objectContaining({ inbox: 2 }) })])
       expect((yield* store.list({ project: '/work/dshfiles-threads/thread-1b7a8c' })).items.map(item => item.id).sort()).toEqual([1, 2])
       expect((yield* store.list({ project: '/work/dshfiles' })).total).toBe(2)
       expect(fromProject.item.project).toBe('/work/dshfiles')
@@ -616,6 +616,23 @@ describe('hiding agent items', () => {
 
       expect((yield* store.list({ hideAgentItems: true, query: 'noise' })).hiddenAgentItems).toBe(1)
       expect((yield* store.list({ hideAgentItems: true, query: 'captured' })).hiddenAgentItems).toBe(0)
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('leaves unclaimed agent items out of the project counts only when asked, like the lists', () =>
+    Effect.gen(function* () {
+      const store = yield* openStore()
+      yield* store.capture({ text: 'captured by me', project: '/work/dshfiles', actor: user })
+      yield* store.capture({ text: 'agent noise', actor: agent })
+      yield* store.capture({ text: 'agent-only project', project: '/work/agent-only', actor: agent })
+
+      const all = yield* store.projects({})
+      expect(all.find(row => row.project === '/work/dshfiles')?.counts.inbox).toBe(2)
+      expect(all.map(row => row.project)).toContain('/work/agent-only')
+
+      const hidden = yield* store.projects({ hideAgentItems: true })
+      expect(hidden.find(row => row.project === '/work/dshfiles')?.counts.inbox).toBe(1)
+      expect(hidden.map(row => row.project)).not.toContain('/work/agent-only')
     }).pipe(Effect.scoped),
   )
 })

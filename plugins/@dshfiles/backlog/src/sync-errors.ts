@@ -3,6 +3,8 @@ import { Schema } from 'effect'
 const backendSchema = Schema.Literals(['linear', 'github'])
 const label = (backend: 'linear' | 'github'): string => (backend === 'linear' ? 'Linear' : 'GitHub')
 const settingsHint = 'Open Backlog settings › Remote sync'
+/** An item named by its ref when the caller knows it, else by its number. */
+const itemLabel = (error: { readonly itemId: number; readonly ref?: string | undefined }): string => `b:${error.ref ?? String(error.itemId)}`
 
 /** No enabled backend row serves the item's project. */
 export class SyncBackendUnconfigured extends Schema.TaggedError<SyncBackendUnconfigured>()(
@@ -106,33 +108,33 @@ export class SyncReferenceUnrecognized extends Schema.TaggedError<SyncReferenceU
 /** The item is not linked to a remote issue yet. */
 export class SyncItemNotLinked extends Schema.TaggedError<SyncItemNotLinked>()(
   'SyncItemNotLinked',
-  { itemId: Schema.Number },
+  { itemId: Schema.Number, ref: Schema.optional(Schema.String) },
   { dshxWireCode: 'sync-item-not-linked' },
 ) {
   override get message(): string {
-    return `b:${String(this.itemId)} is not linked to a remote issue. Use “Link to Linear issue…” or “Create in Linear” from its menu first.`
+    return `${itemLabel(this)} is not linked to a remote issue. Use “Link to Linear issue…” or “Create in Linear” from its menu first.`
   }
 }
 
 /** The item already mirrors another issue. */
 export class SyncAlreadyLinked extends Schema.TaggedError<SyncAlreadyLinked>()(
   'SyncAlreadyLinked',
-  { itemId: Schema.Number, remoteKey: Schema.String },
+  { itemId: Schema.Number, ref: Schema.optional(Schema.String), remoteKey: Schema.String },
   { dshxWireCode: 'sync-already-linked' },
 ) {
   override get message(): string {
-    return `b:${String(this.itemId)} is already linked to ${this.remoteKey}. Unlink it from its menu first to link another issue.`
+    return `${itemLabel(this)} is already linked to ${this.remoteKey}. Unlink it from its menu first to link another issue.`
   }
 }
 
 /** The mapping could not be stored. */
 export class SyncWriteFailed extends Schema.TaggedError<SyncWriteFailed>()(
   'SyncWriteFailed',
-  { itemId: Schema.Number, cause: Schema.optional(Schema.Defect()) },
+  { itemId: Schema.Number, ref: Schema.optional(Schema.String), cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'sync-write-failed' },
 ) {
   override get message(): string {
-    return `The sync state of b:${String(this.itemId)} could not be saved. Retry; if it keeps failing, check the Host log for the storage error.`
+    return `The sync state of ${itemLabel(this)} could not be saved. Retry; if it keeps failing, check the Host log for the storage error.`
   }
 }
 

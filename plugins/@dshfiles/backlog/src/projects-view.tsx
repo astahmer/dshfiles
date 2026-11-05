@@ -355,7 +355,12 @@ export const ProjectsView = (props: {
   readonly triageOff: boolean
 }): JSX.Element => {
   const api = useApi(backlogApi)
-  const query = useQuery({ queryKey: [BacklogQueries.key, 'projects'], queryFn: ({ signal }) => api.projects(undefined, { signal }) })
+  const query = useQuery({
+    queryKey: [BacklogQueries.key, 'projects', props.hideAgentItems],
+    queryFn: ({ signal }) =>
+      // A Host that predates the filter refuses its input; it still answers the unfiltered counts.
+      api.projects(BacklogViews.projectsInput(props.hideAgentItems), { signal }).catch(() => api.projects(undefined, { signal })),
+  })
   const projects = useMemo(
     (): Project[] =>
       (query.data ?? [])

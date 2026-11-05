@@ -79,6 +79,7 @@ export class TriageBackfill extends Context.Service<
           selection,
           triage: id => triage.pass({ id, setup: setup.success }),
           markTriaged: store.markTriaged,
+          labelOf: store.labelOf,
           onProgress: progress =>
             patch(input.jobId, {
               completed: progress.completed + total - selection.ids.length,

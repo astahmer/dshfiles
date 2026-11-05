@@ -323,7 +323,14 @@ export const backlogApi = defineApi({
       description: 'Whether Host-scheduled backlog AI work is currently running. Presentation-only status; not an agent tool.',
     }),
     projects: method({
-      input: Schema.Void,
+      /** Optional so a Client older than the agent-item filter still calls it with no input. */
+      input: Schema.UndefinedOr(
+        Schema.Struct({
+          hideAgentItems: Schema.Boolean.pipe(Schema.optional).annotate({
+            description: 'Leave out items an agent captured that the user never touched, like the views that hide agent items.',
+          }),
+        }),
+      ),
       output: Schema.Array(
         Schema.Struct({
           project: Schema.NullOr(Schema.String),
@@ -763,6 +770,9 @@ export class BacklogViews {
    */
   static readonly hidingAgentItems = <Input extends object>(input: Input, hidden: boolean): Input | (Input & { readonly hideAgentItems: true }) =>
     hidden ? { ...input, hideAgentItems: true } : input
+
+  /** The projects input for a view: no input at all unless it hides agent items, so a Host that predates the filter answers. */
+  static readonly projectsInput = (hidden: boolean): { readonly hideAgentItems: true } | undefined => (hidden ? { hideAgentItems: true } : undefined)
 
   static readonly detail = (value: BacklogDetailInput): BacklogDetailView => Schema.decodeUnknownSync(detailSchema)(value)
 

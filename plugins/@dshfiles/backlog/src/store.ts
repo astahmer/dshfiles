@@ -253,9 +253,12 @@ const listIn = (view: StoreView, query: BacklogListQuery, index?: BacklogSearchI
   }
 }
 
-const projectsIn = (view: StoreView) => {
+const projectsIn = (view: StoreView, query: { readonly hideAgentItems?: boolean | undefined }) => {
   const byProject = new Map<string | null, BacklogItem[]>()
-  for (const item of view.records.values()) byProject.set(item.project, [...(byProject.get(item.project) ?? []), item])
+  for (const item of view.records.values()) {
+    if (query.hideAgentItems === true && BacklogItems.isUnclaimedAgentItem(item)) continue
+    byProject.set(item.project, [...(byProject.get(item.project) ?? []), item])
+  }
   return [...byProject].map(([project, group]) => ({
     project,
     counts: {
@@ -514,9 +517,11 @@ export class BacklogStore extends Context.Service<
     readonly acknowledge: (input: { readonly ids: readonly number[] }) => Effect.Effect<void, BacklogWriteFailed>
     readonly dismissProposal: (input: { readonly id: number; readonly actor: BacklogActor }) => Detailed
     /** Per-project counts over every item, so project progress never depends on how many rows a list returned. */
-    readonly projects: Effect.Effect<ReturnType<typeof projectsIn>>
+    readonly projects: (query: { readonly hideAgentItems?: boolean | undefined }) => Effect.Effect<ReturnType<typeof projectsIn>>
     readonly list: (query: BacklogListQuery) => Effect.Effect<ReturnType<typeof listIn>>
     readonly get: (id: number) => Effect.Effect<BacklogResult<BacklogDetail>>
+    /** How a log line or an error names an item: `b:<ref>`, or `b:<id>` once the item is gone. */
+    readonly labelOf: (id: number) => Effect.Effect<string>
     /** The id of the item a caller names: its number, or a `b:<ref>` (`k3f9`, `b:k3f9`, a legacy `12`). */
     readonly resolve: (key: number | string) => Effect.Effect<number | undefined>
     /** Several items in one call, in the order asked, with the ids that do not exist kept separate. */
@@ -557,13 +562,13 @@ export class BacklogStore extends Context.Service<
       const unchanged = (item: BacklogItem) => Effect.map(detailOf(item), found)
       const serialized = <A, E, R>(effect: Effect.Effect<A, E, R>) => writes.withPermit(effect)
 
-      const writeFailed = (itemId: number, operation: BacklogWriteFailed['operation']) => (cause: unknown) =>
-        new BacklogWriteFailed({ itemId, operation, cause })
+      const writeFailed = (item: Pick<BacklogItem, 'id' | 'ref'>, operation: BacklogWriteFailed['operation']) => (cause: unknown) =>
+        new BacklogWriteFailed({ itemId: item.id, ref: BacklogReference.refOf(item), operation, cause })
 
       /** Appends the ops from the stored item to `item`, by `origin`, then serves the new item. */
       const persist = Effect.fnUntraced(function* (item: BacklogItem, origin: string) {
         const prev = (yield* Ref.get(state)).records.get(item.id)
-        if (prev !== undefined) yield* repo.append({ prev, next: item, origin }).pipe(Effect.mapError(writeFailed(item.id, 'put')))
+        if (prev !== undefined) yield* repo.append({ prev, next: item, origin }).pipe(Effect.mapError(writeFailed(item, 'put')))
         const at = yield* Clock.currentTimeMillis
         yield* Ref.update(state, current => ({
           ...current,
@@ -572,18 +577,18 @@ export class BacklogStore extends Context.Service<
         }))
       })
 
-      const putFile = (itemId: number, file: { readonly attachment: BacklogAttachment; readonly data: string }) =>
-        repo.putFile({ itemId, attachment: file.attachment, data: file.data }).pipe(Effect.mapError(writeFailed(itemId, 'put')))
+      const putFile = (item: BacklogItem, file: { readonly attachment: BacklogAttachment; readonly data: string }) =>
+        repo.putFile({ itemId: item.id, attachment: file.attachment, data: file.data }).pipe(Effect.mapError(writeFailed(item, 'put')))
 
-      const deleteFile = (itemId: number, attachmentId: string) =>
-        repo.deleteFile({ itemId, attachmentId }).pipe(Effect.mapError(writeFailed(itemId, 'delete')))
+      const deleteFile = (item: BacklogItem, attachmentId: string) =>
+        repo.deleteFile({ itemId: item.id, attachmentId }).pipe(Effect.mapError(writeFailed(item, 'delete')))
 
       const filesOf = (input: readonly BacklogFileInput[], at: number) =>
         input.slice(0, BacklogItems.maxAttachments).map(file => ({ attachment: attachmentOf(file, at), data: file.data }))
 
-      const storeFiles = Effect.fnUntraced(function* (itemId: number, input: readonly BacklogFileInput[], at: number) {
+      const storeFiles = Effect.fnUntraced(function* (item: BacklogItem, input: readonly BacklogFileInput[], at: number) {
         const kept = filesOf(input, at)
-        yield* Effect.forEach(kept, file => putFile(itemId, file), { discard: true })
+        yield* Effect.forEach(kept, file => putFile(item, file), { discard: true })
         return kept.map(file => file.attachment)
       })
 
@@ -687,7 +692,7 @@ export class BacklogStore extends Context.Service<
           lastActivityAt: at,
           events: [createdEvent],
         }
-        yield* repo.create({ item, origin: actorId, nextId: id + 1, files }).pipe(Effect.mapError(writeFailed(id, 'put')))
+        yield* repo.create({ item, origin: actorId, nextId: id + 1, files }).pipe(Effect.mapError(writeFailed(item, 'put')))
         yield* Ref.update(state, current => ({ ...current, nextId: id + 1 }))
         yield* persist(item, actorId)
         yield* PubSub.publish(notices, { item, event: createdEvent })
@@ -703,7 +708,7 @@ export class BacklogStore extends Context.Service<
           Effect.gen(function* () {
             if (item.attachments.length >= BacklogItems.maxAttachments) return yield* unchanged(item)
             const attachment = attachmentOf(input.file, yield* Clock.currentTimeMillis)
-            yield* putFile(input.id, { attachment, data: input.file.data })
+            yield* putFile(item, { attachment, data: input.file.data })
             return found(
               yield* touch(item, input.actor, { kind: 'edited', detail: `attached ${attachment.name}` }, { attachments: [...item.attachments, attachment] }),
             )
@@ -723,7 +728,7 @@ export class BacklogStore extends Context.Service<
             const imported = item.tweetContextUrls ?? []
             if (imported.includes(input.url) || imported.length >= 20) return yield* unchanged(item)
             const additions = yield* storeFiles(
-              input.id,
+              item,
               input.files.slice(0, BacklogItems.maxAttachments - item.attachments.length),
               yield* Clock.currentTimeMillis,
             )
@@ -757,7 +762,7 @@ export class BacklogStore extends Context.Service<
           Effect.gen(function* () {
             const attachment = item.attachments.find(candidate => candidate.id === input.attachmentId)
             if (attachment === undefined) return yield* unchanged(item)
-            yield* deleteFile(input.id, input.attachmentId)
+            yield* deleteFile(item, input.attachmentId)
             const attachments = item.attachments.filter(candidate => candidate.id !== input.attachmentId)
             return found(yield* touch(item, input.actor, { kind: 'edited', detail: `removed ${attachment.name}` }, { attachments }))
           }),
@@ -767,7 +772,7 @@ export class BacklogStore extends Context.Service<
       const remove = Effect.fn('backlog store delete')(function* (input: { readonly id: number }) {
         const item = yield* find(input.id)
         if (item === undefined) return notFound
-        yield* repo.remove({ item, origin: 'user' }).pipe(Effect.mapError(writeFailed(input.id, 'delete')))
+        yield* repo.remove({ item, origin: 'user' }).pipe(Effect.mapError(writeFailed(item, 'delete')))
         const at = yield* Clock.currentTimeMillis
         yield* Ref.update(state, current => {
           const next = new Map(current.records)
@@ -833,7 +838,7 @@ export class BacklogStore extends Context.Service<
         return yield* withItem(input.id, item =>
           Effect.gen(function* () {
             const commentFiles = input.files ?? []
-            const attachments = commentFiles.length === 0 ? [] : yield* storeFiles(input.id, commentFiles, yield* Clock.currentTimeMillis)
+            const attachments = commentFiles.length === 0 ? [] : yield* storeFiles(item, commentFiles, yield* Clock.currentTimeMillis)
             const links = BacklogItems.uniqueLinks([...item.links, ...BacklogItems.extractLinks(input.text), ...callerLinks(input.actor)])
             const actor = input.actor
             const sourceThread = actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '' ? { threadId: actor.sessionId } : {}
@@ -864,10 +869,10 @@ export class BacklogStore extends Context.Service<
             const existing = item.events[commentIndex]
             if (existing === undefined) return notFound
             const replacements = input.files
-            const attachments = replacements === undefined ? existing.attachments : yield* storeFiles(input.id, replacements, yield* Clock.currentTimeMillis)
+            const attachments = replacements === undefined ? existing.attachments : yield* storeFiles(item, replacements, yield* Clock.currentTimeMillis)
             if (replacements !== undefined) {
               const dropped = (existing.attachments ?? []).filter(attachment => !replacements.some(file => file.id === attachment.id))
-              yield* Effect.forEach(dropped, attachment => deleteFile(input.id, attachment.id), { discard: true })
+              yield* Effect.forEach(dropped, attachment => deleteFile(item, attachment.id), { discard: true })
             }
             const events = item.events.map((event, index) =>
               index === commentIndex
@@ -895,7 +900,7 @@ export class BacklogStore extends Context.Service<
             const commentIndex = userCommentIndex(item, input.commentId)
             const existing = item.events[commentIndex]
             if (existing === undefined) return notFound
-            yield* Effect.forEach(existing.attachments ?? [], attachment => deleteFile(input.id, attachment.id), { discard: true })
+            yield* Effect.forEach(existing.attachments ?? [], attachment => deleteFile(item, attachment.id), { discard: true })
             const events = item.events.filter((_event, index) => index !== commentIndex)
             return found(yield* touch({ ...item, events }, input.actor, { kind: 'edited', detail: 'deleted a reply' }, {}))
           }),
@@ -910,7 +915,7 @@ export class BacklogStore extends Context.Service<
       }) {
         const item = yield* find(input.id)
         if (item === undefined) return notFound
-        const records = yield* repo.opsOf(input.id).pipe(Effect.mapError(writeFailed(input.id, 'put')))
+        const records = yield* repo.opsOf(input.id).pipe(Effect.mapError(writeFailed(item, 'put')))
         const planned = FieldRevert.plan({ records, id: input.id, at: input.at, field: input.field })
         if (planned.kind === 'missing') return notFound
         if (planned.kind === 'stale') {
@@ -1129,10 +1134,11 @@ export class BacklogStore extends Context.Service<
         settleAnsweredQuestion,
         acknowledge,
         dismissProposal,
-        projects: Effect.map(view, projectsIn),
+        projects: query => Effect.map(view, current => projectsIn(current, query)),
         list: query => Effect.map(view, current => listIn(current, query, searchIndex)),
         get,
         resolve: key => Effect.map(Ref.get(state), current => resolveIn(current.records, key)),
+        labelOf: id => Effect.map(find(id), item => BacklogReference.labelOf(item ?? { id })),
         getMany,
         referencing: link => Effect.map(view, current => referencingIn(current, link)),
       })

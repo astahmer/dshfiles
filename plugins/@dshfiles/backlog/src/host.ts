@@ -97,7 +97,7 @@ const backlogHandlers = Api.handlers(backlogApi, {
     }),
   revision: () => BacklogStore.use(store => store.revision),
   aiActivity: () => AiActivity.use(activity => Effect.map(activity.isActive, active => ({ active }))),
-  projects: () => BacklogStore.use(store => store.projects),
+  projects: input => BacklogStore.use(store => store.projects({ hideAgentItems: input?.hideAgentItems === true })),
   referencing: input => BacklogStore.use(store => store.referencing(input)),
   capture: (input, call) =>
     Effect.gen(function* () {
