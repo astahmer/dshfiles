@@ -1,6 +1,6 @@
 # Secret input binding
 
-Resume here: adopt `data-secret-input` on MCP server env fields and AI Accounts refs (the last open item below).
+Resume here: adopt `data-secret-input` on AI Accounts refs, the last open item (MCP server bindings shipped in phase 6; checked 2026-11-05).
 
 ## Why
 

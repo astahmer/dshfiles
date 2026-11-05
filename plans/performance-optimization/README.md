@@ -1,5 +1,8 @@
 # Performance optimization plan
 
+Resume here: C02 (virtualize the thread sidebar; still pending on 2026-11-05), then C05/C15, T03/T05/T06, the T02
+slot-scan remainder, and Host H05, H10–H15, H22. See the Progress table's implementation row.
+
 ## Context
 
 Repository-wide audit of the 46 owned package directories, dshx, profile/build/check orchestration, and their supported DSH boundaries. Requested outcome: find practical optimization opportunities and plan their fixes, not implement them in this turn.

@@ -80,7 +80,7 @@ porting library code, so cards look native and follow the theme.
 6. ~~Turn summary~~: done in `@dshfiles/turn-summary` (line counts, tests, duration, lists).
 7. ~~Failure card~~ done in `@dshfiles/agent-plan`; then P2s one plugin at a time.
 
-**Resume here:** promote `@dshfiles/agent-plan` into `profiles/web`, then the P2s (context meter first).
+**Resume here:** the P1s are done and `@dshfiles/agent-plan` is in the `profiles/web` seed (checked 2026-11-05); start the P2s, context meter first.
 
 Each step: a scratch-DSH screenshot through the fake provider (`[[call <tool> {...}]]` directives, see `test-runs`
 verification) and a catalog `reach`.

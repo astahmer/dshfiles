@@ -7,6 +7,12 @@ we see those machines, statically (what states and transitions exist) and live (
 **Resume here:** the static path shipped in `@dshfiles/whiteboard` (below). Live inspection is a recommendation, not
 built; pick it up only when a debugging session needs it.
 
+| Step                                             | State                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------- |
+| Static machine → Mermaid, CLI, whiteboard export | done (`whiteboard/src/xstate-diagram.ts`, `machine-diagram` script) |
+| Live inspection behind a dev switch              | not started; on demand                                              |
+| Local live view (actor snapshot registry)        | not started; only if repeated debugging asks for it                 |
+
 | Option                                                    | Static diagram   | Live state | Runs offline | Data leaves the machine              | Cost here                                                             | Verdict                            |
 | --------------------------------------------------------- | ---------------- | ---------- | ------------ | ------------------------------------ | --------------------------------------------------------------------- | ---------------------------------- |
 | `@statelyai/inspect` 0.7.2 (MIT) `createBrowserInspector` | yes (Stately UI) | yes        | no           | every event + snapshot to stately.ai | popup window to stately.ai; per-actor `inspect` option in each plugin | dev-only, opt-in, never shipped    |

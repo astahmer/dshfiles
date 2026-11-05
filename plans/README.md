@@ -26,11 +26,12 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [pulls.review-style thread review](pulls-review/README.md)           | Host API, review panel, command and palette action, scratch-DSH verification.                                                                                                            |
 | [VCS adapters](vcs-adapters/README.md)                               | Thread workspaces, automatic fetch and pulls-review work in git-only repositories; open: the jujutsu graph panel for git and git browser journeys.                                       |
 | [Backlog](backlog/README.md)                                         | Agent triage, lifecycle signals from threads/revisions/PRs, `@b:` mentions and backlinks, rich bodies, Discord import.                                                                   |
-| [Secret input binding](secret-input/README.md)                       | Bind a form input to a Secret Catalog alias (`secret:ALIAS`) instead of storing a value; backlog triage key first.                                                                       |
+| [Secret input binding](secret-input/README.md)                       | `data-secret-input` shipped for settings, Backlog and MCP servers; open: AI Accounts refs.                                                                                                 |
 | [DOM hook refactor](dom-hook-refactor.md)                            | Replace transcript/stat/frame/thread DOM mutations with typed owner-rendered extension points.                                                                                           |
 | [HextaUI blocks](hextaui-blocks.md)                                  | Port MIT components; rebuild Pro blocks as references: shared CodeBlock/StackTrace, edit cards, bash stack traces, then P2 polish.                                                       |
 | [Inline chat UI](inline-chat-ui.md)                                  | Shared tool-card kit, edit cards, tool-group summary, plan progress, live activity strip, turn summary; ported from AI Elements / prompt-kit, affectUI as reference.                     |
 | [Typed chat drafts](typed-chat-drafts/README.md)                     | Activation only: the user picks a restart, then the New chat / typed-draft GUI check.                                                                                                    |
+| [One Agent Development Environment](ade-ux/README.md)                | Phases 0–6 landed (kit, inbox, rail, thread loop, Usage/Processes, phone); open: one follow-up checklist, then a plan per Phase 7 bet.                                                  |
 | [Thread sharing](thread-share/README.md)                             | v1 shipped as `@dshfiles/thread-share` (opt-in, not seeded); open: v2 collaborative threads (design and risks only), opentunnel revisit.                                                  |
 | [xstate visualization](xstate-viz/README.md)                         | Static machine → Mermaid shipped in `@dshfiles/whiteboard`; open: opt-in live inspection (`@statelyai/inspect` behind a dev switch) when a debugging session needs it.                   |
 | [Component adoption](component-adoption/README.md)                  | Use the gallery components that no plugin imports yet: TraceWaterfall in traces, MergeChecks in the Land card, TestRunResults, FallbackChain, ActivityFeed, RoutineList; delete or keep the rest. |
@@ -70,8 +71,6 @@ Leftovers of finished plans. The plan files were deleted; each line links to the
 
 Written plans for ideas that were scoped but not started:
 
-- [One Agent Development Environment](ade-ux/README.md): unified UI/UX redesign: thread as the primary object, one
-  inbox, seven destinations, a plugin presentation contract, phone layout; research in `ade-ux/research/`.
 - [Agent Calendar](agent-calendar.md): a turn-time Calendar tab inside Usage.
 - [External usage history](external-usage-history.md): opt-in cross-harness token usage in Usage.
 

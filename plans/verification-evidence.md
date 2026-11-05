@@ -2,6 +2,16 @@
 
 The receipt projection, bounded backfill, attention handling, Session navigation, and scratch-browser journey have shipped. Their current behavior and prior verification record live in the [verification-evidence guide](../docs/verification-evidence.md), [Project Checks README](../plugins/@dshfiles/project-checks/README.md), and [Activity Timeline README](../plugins/@dshfiles/activity-timeline/README.md). This plan now tracks only gaps found in the updated codebase; this refresh inspected checked-in source on 2026-10-25 and did not rerun tests or touch the live profile.
 
+Resume here: the Activity Timeline half of items 1–3 (a v2 event contract without peer keys, the stage in the Activity
+summary, a persisted-event sentinel test), then item 4. The Project Checks half shipped 2026-11-04.
+
+| Item                                  | Project Checks           | Activity Timeline                  |
+| ------------------------------------- | ------------------------ | ---------------------------------- |
+| 1. Peer details out of the event      | done (fields sent empty) | open (v2 schema)                   |
+| 2. Verification stage visible         | done                     | open                               |
+| 3. Regression evidence                | done (sentinels, stage)  | open (persisted sentinel, journey) |
+| 4. Docs, catalogs, security re-review | open                     | open                               |
+
 ## Current shipped baseline
 
 - Project Checks owns bounded receipts, records before/after revisions, recalculates source freshness, and stores a `verificationStage` of `manual`, `completion`, or `rebase`. Configuration equivalence deliberately remains `unknown`; no command/argument fingerprint is stored.

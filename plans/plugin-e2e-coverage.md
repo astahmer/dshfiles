@@ -10,6 +10,9 @@ linked bundle features, 151 have a Gherkin reference, 16 have an explicit
 lack `dshx.features` manifest references and are skipped; one has an existing
 catalog file that is not linked.
 
+Resume here: run the journeys in CI (the workflow only lists scenarios with `--list`; checked 2026-11-05), then a fresh
+full `test:e2e` baseline. Three of the six items below are done.
+
 ## Remaining
 
 - [ ] **Run the journeys in CI.** `plugin-e2e-coverage.yml` lists scenarios but
