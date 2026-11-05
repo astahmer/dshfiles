@@ -1,4 +1,6 @@
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createDockview, type DockviewApi } from 'dockview-react'
+import type { ComponentType } from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { SavedLayout } from './saved-layouts.js'
 import type { SemanticScopeLayouts } from './semantic-layouts.js'
@@ -16,6 +18,7 @@ beforeAll(() => {
 const disposers: Array<() => void> = []
 afterEach(() => {
   for (const dispose of disposers.splice(0).reverse()) dispose()
+  cleanup()
   globalThis.dshfilesWorkbenchTabsV1 = undefined
   document.body.replaceChildren()
 })
@@ -77,7 +80,7 @@ const fixture = (scopeLayouts?: SemanticScopeLayouts) => {
   api.layout(1000, 600)
   disposers.push(() => api.dispose())
   const registry = createWorkbenchPanelRegistry()
-  const threadComponent = vi.fn(() => () => null)
+  const threadComponent = vi.fn((): ComponentType => () => null)
   const panelComponent = vi.fn(() => () => null)
   const open = vi.fn((id: string) => {
     api.addPanel({ id, component: 'body', title: registry.get(id)?.title ?? id })
@@ -456,5 +459,33 @@ describe('semantic tab Dockview adapter', () => {
     ])
     expect(tabs.api.activePanel?.id).toBe(tabPanelId('panel:jujutsu#one'))
     expect(tabs.registry.list().every(definition => definition.hiddenFromAdd)).toBe(true)
+  })
+
+  it.each([
+    { preview: true, kept: 1 },
+    { preview: false, kept: 0 },
+  ])('keeps a preview tab once the user types inside it (preview=$preview)', ({ preview, kept }) => {
+    const tabs = fixture()
+    tabs.threadComponent.mockImplementation(() => () => <textarea aria-label="Draft" />)
+    tabs.set([thread('a', { preview })])
+    const Body = tabs.registry.get(tabPanelId('thread:a'))?.component
+    if (Body === undefined) throw new Error('The semantic tab has no registered body.')
+    render(<Body panelId={tabPanelId('thread:a')} />)
+    fireEvent.input(screen.getByRole('textbox', { name: 'Draft' }), { target: { value: 'unsent' } })
+    expect(tabs.actions.keep).toHaveBeenCalledTimes(kept)
+    if (kept > 0) expect(tabs.actions.keep).toHaveBeenCalledWith('thread:a')
+  })
+
+  it('keeps a preview tab when a rich editor cancels beforeinput and no input event follows', () => {
+    const tabs = fixture()
+    tabs.threadComponent.mockImplementation(() => () => (
+      <div role="textbox" aria-label="Composer" contentEditable suppressContentEditableWarning onBeforeInput={event => event.preventDefault()} />
+    ))
+    tabs.set([thread('a')])
+    const Body = tabs.registry.get(tabPanelId('thread:a'))?.component
+    if (Body === undefined) throw new Error('The semantic tab has no registered body.')
+    render(<Body panelId={tabPanelId('thread:a')} />)
+    fireEvent(screen.getByRole('textbox', { name: 'Composer' }), new InputEvent('beforeinput', { bubbles: true, cancelable: true, data: 'x' }))
+    expect(tabs.actions.keep).toHaveBeenCalledWith('thread:a')
   })
 })

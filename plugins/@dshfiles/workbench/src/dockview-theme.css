@@ -45,6 +45,27 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* VS Code tab chrome: the selected tab carries an accent top edge (muted outside the focused group) on the base
+ * background, and close buttons appear on the selected tab, on hover and with keyboard focus. */
+.dshfiles-workbench-theme .dv-tabs-container > .dv-tab.dv-active-tab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  pointer-events: none;
+  background-color: var(--dsw-alias-border-l3);
+}
+
+.dshfiles-workbench-theme .dv-groupview.dv-active-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-active-tab::before {
+  background-color: var(--dsw-alias-state-business-primary);
+}
+
+.dshfiles-workbench-theme .dv-tab.dv-inactive-tab:not(:hover):not(:focus-within) [data-workbench-tab-close] {
+  opacity: 0;
+}
+
 /* Only a root region's immediate native Dockview owns window-wide floats.
  * Nested surfaces keep native local bounds inside their paint-contained panel.
  * Dockview writes this host's geometry inline on layout. Override those four

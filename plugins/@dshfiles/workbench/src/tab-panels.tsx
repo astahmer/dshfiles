@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import type { DockviewApi } from 'dockview-react'
 import type { WorkbenchPanelDefinition, WorkbenchPanelRegistry, WorkbenchPanelProps } from './registry.js'
 import { semanticLayouts, type SemanticScopeLayouts } from './semantic-layouts.js'
@@ -43,6 +43,30 @@ export const semanticTabMove = (input: {
   return toIndex === fromIndex ? null : { tabId: moved.id, toIndex }
 }
 
+/** Rich editors cancel `beforeinput` and apply the edit themselves, so no `input` follows; plain fields only fire `input`. */
+const EDIT_EVENTS = ['beforeinput', 'input'] as const
+
+/** Editing inside a preview tab keeps it, VS Code style, so the next open cannot replace unsent work. */
+const KeepPreviewOnEdit = (props: { readonly tabId: string; readonly children: ReactNode }): JSX.Element => {
+  const [element, setElement] = useState<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (element === null) return
+    const keep = (): void => {
+      const channel = workbenchTabs()
+      if (channel.getSnapshot().tabs.some(tab => tab.id === props.tabId && tab.preview)) channel.actions.keep(props.tabId)
+    }
+    for (const type of EDIT_EVENTS) element.addEventListener(type, keep, true)
+    return () => {
+      for (const type of EDIT_EVENTS) element.removeEventListener(type, keep, true)
+    }
+  }, [element, props.tabId])
+  return (
+    <div ref={setElement} style={{ display: 'contents' }}>
+      {props.children}
+    </div>
+  )
+}
+
 /** Deterministic, storage-safe identity independent of region and project set. */
 export const tabPanelId = (tabId: string): string => `tab/${Array.from(new TextEncoder().encode(tabId), byte => byte.toString(16).padStart(2, '0')).join('')}`
 
@@ -65,10 +89,18 @@ export const createTabPanelAdapter = (input: {
     if (tab.target.kind === 'start') return () => channel.renderStart()
     if (tab.target.kind === 'thread') {
       const Thread = input.thread(tab.target.sessionId)
-      return () => <Thread />
+      return () => (
+        <KeepPreviewOnEdit tabId={tab.id}>
+          <Thread />
+        </KeepPreviewOnEdit>
+      )
     }
     const Panel = input.panel(tab.target.panelId, tab.target.scope)
-    return props => <Panel {...props} />
+    return props => (
+      <KeepPreviewOnEdit tabId={tab.id}>
+        <Panel {...props} />
+      </KeepPreviewOnEdit>
+    )
   }
   const reconcile = (): void => {
     const snapshot = channel.getSnapshot()
