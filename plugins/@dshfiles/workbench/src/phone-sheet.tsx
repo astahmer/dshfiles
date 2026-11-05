@@ -62,7 +62,12 @@ export const phoneAwareDockActions = (desktop: DockPaneActions, phone: () => boo
  * same dock surface, with its facet tabs and Choose a view, rises from above the tab bar; the scrim and Close put it
  * away, and so does Escape. Geometry comes from the phone shell's published bar heights, with no-shell fallbacks.
  */
-export const PhoneSheet = (props: { readonly shown: boolean; readonly heading: string; readonly onClose: () => void; readonly children: ReactNode }): JSX.Element => {
+export const PhoneSheet = (props: {
+  readonly shown: boolean
+  readonly heading: string
+  readonly onClose: () => void
+  readonly children: ReactNode
+}): JSX.Element => {
   const { shown, onClose } = props
   useEffect(() => {
     if (!shown) return
@@ -91,13 +96,17 @@ export const PhoneSheet = (props: { readonly shown: boolean; readonly heading: s
         hidden={!shown}
         className="dshx-root dshx:fixed dshx:inset-x-0 dshx:z-[43] dshx:flex dshx:flex-col dshx:overflow-hidden dshx:rounded-t-xl dshx:border-t dshx:border-border dshx:bg-background dshx:pr-[env(safe-area-inset-right,0px)] dshx:pl-[env(safe-area-inset-left,0px)] dshx:text-foreground dshx:shadow-[0_-8px_24px_rgb(0_0_0/0.18)]"
         style={{
-          ...(shown ? {} : { display: 'none' }),
+          // React writes no display for undefined, so a shown sheet keeps its stylesheet display.
+          display: shown ? undefined : 'none',
           bottom: 'var(--dsh-phone-nav-height, env(safe-area-inset-bottom, 0px))',
           height: 'min(80dvh, calc(100dvh - var(--dsh-phone-top-height, 44px) - var(--dsh-phone-nav-height, 0px) - 16px))',
         }}
       >
         <header className="dshx:relative dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:pl-4">
-          <span aria-hidden="true" className="dshx:absolute dshx:top-1.5 dshx:left-1/2 dshx:h-1 dshx:w-9 dshx:-translate-x-1/2 dshx:rounded-full dshx:bg-muted-foreground/30" />
+          <span
+            aria-hidden="true"
+            className="dshx:absolute dshx:top-1.5 dshx:left-1/2 dshx:h-1 dshx:w-9 dshx:-translate-x-1/2 dshx:rounded-full dshx:bg-muted-foreground/30"
+          />
           <h2 className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-semibold">{props.heading}</h2>
           <button
             type="button"

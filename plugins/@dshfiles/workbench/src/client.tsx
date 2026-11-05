@@ -728,17 +728,16 @@ export default defineClient({
     }, 'workbench: nested surface identities')
     ctx.effect(() => {
       const resources = sidebarResourcePanels()
-      const registrations = resourceRegistrations
       const placedIn = (id: string) => regions.entries().find(([, api]) => api.getPanel(id) !== undefined)
       /** Where each facet kind was last shown: a page that arrives after its predecessor left lands there, not in a hidden right pane. */
       const facetHome = new Map<string, WorkbenchRegionId>()
       const release = (id: string): void => {
-        const registration = registrations.get(id)
+        const registration = resourceRegistrations.get(id)
         const region = placedIn(id)?.[0]
         if (registration !== undefined && region !== undefined && threadFacets.follows(registration.record)) facetHome.set(registration.record.kind, region)
         for (const [, api] of regions.entries()) api.getPanel(id)?.api.close()
         registration?.dispose()
-        registrations.delete(id)
+        resourceRegistrations.delete(id)
       }
       /**
        * A thread facet follows the on-screen thread: the new thread's page takes the place of the previous thread's
@@ -747,7 +746,7 @@ export default defineClient({
        */
       const takeFacetPlace = (resource: SidebarResourcePanel): boolean => {
         if (!threadFacets.follows(resource) || resource.sessionId !== ctx.sidebarRight.mounted.getSnapshot()) return false
-        for (const [id, registration] of registrations) {
+        for (const [id, registration] of resourceRegistrations) {
           if (id === resource.id || registration.record.kind !== resource.kind || registration.record.sessionId === resource.sessionId) continue
           const placed = placedIn(id)
           const previous = placed?.[1].getPanel(id)
@@ -764,8 +763,8 @@ export default defineClient({
             })
           previous.api.close()
           if (!resources.list().some(entry => entry.id === id)) {
-            registrations.get(id)?.dispose()
-            registrations.delete(id)
+            resourceRegistrations.get(id)?.dispose()
+            resourceRegistrations.delete(id)
           }
           following.delete(id)
           facetHome.set(resource.kind, region)
@@ -786,7 +785,7 @@ export default defineClient({
         settleTimer = undefined
         const onScreen = ctx.sidebarRight.mounted.getSnapshot()
         for (const id of [...following.keys()]) {
-          const registration = registrations.get(id)
+          const registration = resourceRegistrations.get(id)
           if (registration === undefined || placedIn(id) === undefined || resources.list().some(entry => entry.id === id)) {
             following.delete(id)
             continue
@@ -803,7 +802,7 @@ export default defineClient({
         // thread's body until a thread comes on screen, which runs `sync` again.
         if (onScreen === undefined) return
         for (const [id, state] of [...following]) {
-          const registration = registrations.get(id)
+          const registration = resourceRegistrations.get(id)
           if (registration === undefined || placedIn(id) === undefined) {
             following.delete(id)
             continue
@@ -823,7 +822,7 @@ export default defineClient({
         const entries = resources.list()
         const workbench = ctx.get('mainSurface')?.mode() === 'workbench'
         const onScreen = ctx.sidebarRight.mounted.getSnapshot()
-        for (const [id, registration] of registrations) {
+        for (const [id, registration] of resourceRegistrations) {
           if (!workbench || entries.some(entry => entry.id === id)) continue
           if (threadFacets.follows(registration.record) && onScreen !== registration.record.sessionId && placedIn(id) !== undefined) {
             if (!following.has(id)) following.set(id, { askedFor: undefined })
@@ -833,7 +832,7 @@ export default defineClient({
           release(id)
         }
         for (const resource of entries) {
-          const previous = registrations.get(resource.id)
+          const previous = resourceRegistrations.get(resource.id)
           if (previous?.revision === resource.navigationRevision) continue
           const dispose = registry.register({
             id: resource.id,
@@ -843,7 +842,7 @@ export default defineClient({
             beforeClose: () => resources.close(resource.id),
           })
           previous?.dispose()
-          registrations.set(resource.id, { dispose, revision: resource.navigationRevision, record: resource })
+          resourceRegistrations.set(resource.id, { dispose, revision: resource.navigationRevision, record: resource })
           if (terminalSource.admit(resource.id)) continue
           if (facetAdmission.admit(resource.id)) continue
           if (workbench) {
@@ -871,8 +870,8 @@ export default defineClient({
         offScreen()
         if (settleTimer !== undefined) clearTimeout(settleTimer)
         following.clear()
-        for (const entry of registrations.values()) entry.dispose()
-        registrations.clear()
+        for (const entry of resourceRegistrations.values()) entry.dispose()
+        resourceRegistrations.clear()
       }
     }, 'workbench: authorized resource panels')
 
