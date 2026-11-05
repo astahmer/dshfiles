@@ -8,7 +8,8 @@ import type {} from '@deepseek-ai/dsh-hmr'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { hmrGateApi, type DeferredPackage, type HmrGateStatus } from './api.js'
 import { DeferredUpdateAttention } from './host/attention.js'
-import { BundleWatch, type BundleRead, type BundleStat, type BundleWatcher } from './host/bundle-watcher.js'
+import { BundleWatch, type BundleWatcherHandle } from './host/bundle-watcher-promise.js'
+import type { BundleRead, BundleStat } from './host/bundle-watcher.js'
 import { HmrGateModel, digestOf, hostArtifactOf } from './host/gate.js'
 
 /**
@@ -134,7 +135,7 @@ const registerGate = (ctx: Context): GateRuntime => {
     publishDeferred()
   }
 
-  let bundles: BundleWatcher | undefined
+  let bundles: BundleWatcherHandle | undefined
 
   const syncWatches = (): void => {
     const rows = new Map<string, BundledRow>()

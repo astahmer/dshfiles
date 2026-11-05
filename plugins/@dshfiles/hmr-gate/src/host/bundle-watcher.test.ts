@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { BundleWatch, type BundleRead, type BundleWatcher } from './bundle-watcher.js'
+import { BundleWatch, type BundleWatcherHandle } from './bundle-watcher-promise.js'
+import type { BundleRead } from './bundle-watcher.js'
 
 const bundleIn = (root: string, name: string): string => {
   mkdirSync(join(root, name, 'dist'), { recursive: true })
@@ -34,7 +35,7 @@ const recorder = () => {
   }
 }
 
-let watcher: BundleWatcher | undefined
+let watcher: BundleWatcherHandle | undefined
 afterEach(() => watcher?.dispose())
 
 describe('bundle watcher', () => {
