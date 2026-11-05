@@ -4,14 +4,12 @@ import { AgentRoster, type RosterAgent } from '@dshfiles/plugin-ui/components/mo
 import { CheckpointGraph, type Checkpoint } from '@dshfiles/plugin-ui/components/motion/checkpoint-graph'
 import { ContextGraph, type GraphNode } from '@dshfiles/plugin-ui/components/motion/context-graph'
 import { DelegatorBoard, type DelegatorItem, type DelegatorSection } from '@dshfiles/plugin-ui/components/motion/delegator-board'
-import { MergeChecklist, type MergeCheck } from '@dshfiles/plugin-ui/components/motion/merge-checklist'
 import { ShapeshiftCard, type ShapeshiftPhase, type ShapeshiftView } from '@dshfiles/plugin-ui/components/motion/shapeshift-card'
 import { StepTrail, type TrailStep } from '@dshfiles/plugin-ui/components/motion/step-trail'
 import { RollingNumber, Typewriter } from '@dshfiles/plugin-ui/components/motion/text'
 import { WorkflowRun, type FlowStep, type RunEntry } from '@dshfiles/plugin-ui/components/motion/workflow-run'
 import {
   BookMarkedIcon,
-  BotIcon,
   BugIcon,
   CoinsIcon,
   CreditCardIcon,
@@ -556,60 +554,6 @@ function WorkflowRunDemo() {
   )
 }
 
-// ── MergeChecklist ────────────────────────────────────────────────────────────
-
-function MergeChecklistDemo() {
-  const [strategy, setStrategy] = React.useState('squash')
-  const [state, setState] = React.useState<'idle' | 'merging' | 'merged'>('idle')
-  const [cycle, setCycle] = React.useState(0)
-  const tick = useTick(800, state !== 'idle')
-  const local = tick - cycle
-  const stage = (start: number): MergeCheck['status'] => (local < start ? 'pending' : local < start + 2 ? 'running' : 'passed')
-  const checks: MergeCheck[] = [
-    {
-      id: 'checks',
-      label: stage(1) === 'passed' ? 'All checks passed' : 'Checks running',
-      meta: stage(1) === 'passed' ? '4 of 4' : `${Math.min(4, Math.max(0, local))} of 4`,
-      status: stage(1),
-    },
-    { id: 'review', label: stage(3) === 'passed' ? 'Approved by julius' : 'Waiting for review', meta: '1 of 1 required', status: stage(3) },
-    { id: 'conflicts', label: 'No conflicts with main', meta: strategy === 'squash' ? 'squash · 3 commits' : '3 commits', status: stage(4) },
-  ]
-  const ready = checks.every(check => check.status === 'passed')
-  React.useEffect(() => {
-    let id: number | undefined
-    if (state === 'idle' && ready) id = window.setTimeout(() => setState('merging'), 3200)
-    if (state === 'merging') id = window.setTimeout(() => setState('merged'), 1300)
-    if (state === 'merged')
-      id = window.setTimeout(() => {
-        setState('idle')
-        setCycle(tick + 1)
-      }, 2200)
-    return () => window.clearTimeout(id)
-  }, [state, ready, tick])
-  return (
-    <div className="dshx:mx-auto dshx:flex dshx:max-w-lg dshx:flex-col dshx:gap-2">
-      <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm">
-        <BotIcon aria-hidden className="dshx:size-4 dshx:text-muted-foreground" />
-        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-medium">Move the composer context row into a tray</span>
-      </div>
-      <MergeChecklist
-        checks={checks}
-        strategies={[
-          { id: 'squash', label: 'Squash and merge' },
-          { id: 'rebase', label: 'Rebase onto main' },
-          { id: 'merge', label: 'Create a merge commit' },
-        ]}
-        strategy={strategy}
-        onStrategyChange={setStrategy}
-        onMerge={() => setState('merging')}
-        onOpenCheck={() => undefined}
-        state={state}
-      />
-    </div>
-  )
-}
-
 export const agents2Demos: readonly GalleryDemo[] = [
   {
     id: 'agents-2-delegator-board',
@@ -663,12 +607,5 @@ export const agents2Demos: readonly GalleryDemo[] = [
     source: "import { WorkflowRun } from '@dshfiles/plugin-ui/components/motion/workflow-run'",
     wide: true,
     render: () => <WorkflowRunDemo />,
-  },
-  {
-    id: 'agents-2-merge-checklist',
-    title: 'MergeChecklist',
-    description: 'What a thread’s jj revision must clear before it lands on main; the merge button wakes up only when every row is green.',
-    source: "import { MergeChecklist } from '@dshfiles/plugin-ui/components/motion/merge-checklist'",
-    render: () => <MergeChecklistDemo />,
   },
 ]
