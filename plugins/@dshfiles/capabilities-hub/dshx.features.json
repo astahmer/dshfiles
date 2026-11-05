@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "capabilities-hub",
+      "title": "Open the manager for skills, MCP servers or plugins from one page",
+      "summary": "Settings › Capabilities hub lists the three kinds of capability an agent or DSH can gain: skills (agent instructions), MCP servers (tools and credentials) and DSH plugins (executable code), each with its own trust label, a read-only count from its owner (the dshx registry's skills, the MCP servers list, the plugin inventory) and a button that opens that owner's page. Skills also link out to skills.sh and offer a copyable install command with telemetry off and a pinned CLI version; DSH never runs it. The hub stores nothing, installs nothing and makes no network call. The capabilities_hub_overview agent tool returns the same routing and guidance.",
+      "reach": ["click tab \"Settings\"", "click button \"Capabilities hub\"", "expect heading \"Capabilities hub\""],
+      "surfaces": ["client", "host", "api", "tool"],
+      "surface": "destinationSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: Settings › Capabilities hub",
+      "configuration": [],
+      "states": ["counting", "counted", "owner-missing", "manager-missing", "command-copied"],
+      "failureModes": [
+        "A manager page that is not loaded keeps its card with a disabled Open button and names the package to add to the profile.",
+        "An owner API that is absent shows which plugin the count needs instead of a number.",
+        "skills.sh search needs a Vercel OIDC login DSH cannot hold, so the hub links to the site instead of searching in place."
+      ],
+      "externalDependencies": [
+        {
+          "id": "skills.sh",
+          "boundary": "A plain link to https://skills.sh and a copyable `npx skills@<pinned> add` command with DISABLE_TELEMETRY=1; the plugin makes no request to skills.sh and runs no CLI.",
+          "deterministicFake": "None needed: src/hub-panel.test.tsx asserts the link target and the copied command."
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "capabilities-hub.launchpad",
+          "featureFile": "tooling/dshx/e2e/features/capabilities-hub.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "capabilities-hub.panel",
+          "file": "plugins/@dshfiles/capabilities-hub/src/hub-panel.test.tsx",
+          "testName": "shows each kind with its count and trust label, and opens its own manager"
+        },
+        {
+          "kind": "unit-test",
+          "id": "capabilities-hub.skills-sh",
+          "file": "plugins/@dshfiles/capabilities-hub/src/hub-panel.test.tsx",
+          "testName": "links out to skills.sh and copies the telemetry-off command without running it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "capabilities-hub.manager-missing",
+          "file": "plugins/@dshfiles/capabilities-hub/src/hub-panel.test.tsx",
+          "testName": "keeps a missing manager visible with the fix instead of a dead button"
+        },
+        {
+          "kind": "host-test",
+          "id": "capabilities-hub.agent-tool",
+          "file": "plugins/@dshfiles/capabilities-hub/src/host.test.ts",
+          "testName": "serves the launchpad over its API and as a read-only agent tool"
+        }
+      ]
+    }
+  ]
+}
