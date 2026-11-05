@@ -312,8 +312,6 @@ These are understood and deliberately open, not forgotten:
   Linux Host also kills the process.
 - The session-search index still opens its own `DatabaseSync`; moving it onto `@dshfiles/sqlite-store` needs a
   copy-based proof on the multi-gigabyte live index.
-- memory's `bench/host-loop-freezes.ts` has no clean before/after: the "before" run spends its time in the stock
-  session-query engine indexing a large backlog rather than in memory's own code.
 
 ## Reference plugins
 
