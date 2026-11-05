@@ -30,13 +30,15 @@
 
 ![File and scope items by project](docs/screenshots/project-scope.png)
 
+![See what shipped per hour, day, week, month or year](docs/screenshots/shipped-digest.png)
+
 One capture feed for notes, tasks, bugs, ideas and questions, shared by the user and every agent. It
 replaces a "TODO" chat channel: adding something costs one line, the feed stays ordered by activity so
 idle things sink, and the tracker parts (status, actors, links, search, board) come for free.
 
 Plan and open steps: [plans/backlog](../../../plans/backlog/README.md).
 
-Open the reusable **Backlog** view from navigation or the Workbench chooser. Items, Board, Projects and Inbox remain the page’s own view controls.
+Open the reusable **Backlog** view from navigation or the Workbench chooser. Items, Board, Projects, Shipped and Inbox remain the page’s own view controls.
 
 ## Capture
 
@@ -363,6 +365,8 @@ dropping the rest of the draft.
 | `backlog_triage_backfill`      | write: triage items captured before triage was set up, oldest first; over 5 items needs `confirm: true`                       |
 | `backlog_start_thread`         | write: start one thread for items, in the item project's own jj workspace, linked                                             |
 | `backlog_projects`             | read: per-project counts, who needs you, people; `hideAgentItems` counts like the views                                       |
+| `backlog_shipped`              | read: items that reached done per hour/day/week/month/year or a custom range, by project, with the previous count             |
+| `backlog_summarize_shipped`    | write (model call): a cached short summary of one shipped period by the triage model; `regenerate` writes a new one           |
 | `backlog_accept_proposal`      | write                                                                                                                         |
 | `backlog_dismiss_proposal`     | write                                                                                                                         |
 | `backlog_sync_status`          | read: remote sync backends and each linked item's issue, state, last sync and errors                                          |
@@ -461,6 +465,32 @@ negates any operator, word or `"quoted phrase"`; an item matching one negated te
 **Views** saves the current view and search under a name in the plugin's settings (`savedViews`), so every
 browser lists the same views.
 
+## Shipped
+
+**Shipped** (after Projects, key `6`) answers "what got done?" like Linear Pulse. Pick **Hour**, **Day**, **Week**
+(Monday start), **Month** or **Year**; the timeline lists that many periods newest first (24 hours, 14 days, 12 weeks,
+12 months, 5 years), each with its count and its change against the period before. Periods with nothing shipped fold
+into one "N quiet days" line; the current one always shows. Items are grouped by project and show their kind, `b:<ref>`,
+an **Agent** badge when an agent captured them, their linked jj revisions and pull requests, and when they were done.
+`j`/`k`/`Enter` move through them and open the item beside the timeline like every other view. The header project
+filter applies; Hide agent items and the kind filter do not, since an agent's finished work is still shipped work.
+
+What counts is derived from each item's events on every read, as of now: an item counts when it is `done` now, once,
+in the period of its last move to `done` (a `status` field change, or a legacy `→ done` move); one reopened and done
+again moves to its new period, one reopened and still open leaves, and `dropped` never counts. Buckets follow the
+browser's time zone (`tzOffsetMinutes`).
+
+**Summarize** on a period asks the triage model (Backlog settings › Triage provider and model) for a short overview of
+that period's items and caches it in the `shipped_summaries` table per period, bucket start and project filter, so
+reopening the view never calls the model again. When the period's items changed since (a title edit, another item done,
+one reopened), the summary shows **Out of date** until **Regenerate** writes a new one. Without a triage model the
+error says where to pick one and offers **Backlog settings**. A Host older than the view answers neither method: the
+view says to restart the DSH Host process, and the other views keep working.
+
+Agents read the same digest with `backlog_shipped` (`period`, optional `count`, `projects`, `tzOffsetMinutes`, or
+`period: "custom"` with `from`/`to` epoch ms for one range compared with the same span before) and write a summary
+with `backlog_summarize_shipped`, which calls the model and so runs only when the user asked.
+
 ## Project scope
 
 The header's searchable project filter narrows the feed, Inbox, Items, Board and search to any number of
@@ -511,14 +541,15 @@ Board 208–269 ms, Feed 243–405 ms, search 82–550 ms, Projects 458–775 ms
 One SQLite file owned by the Host, `$DSH_HOME/plugins/backlog/backlog.db`, opened through `@dshfiles/sqlite-store`
 (WAL, migrations, `BEGIN IMMEDIATE`), so every browser and agent reads the same rows:
 
-| Table           | Holds                                                                                                                                                                                    |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ops`           | The append-only op log, the source of truth: `op_id` (ULID), `item_id`, a hybrid logical clock (`hlc_wall` ms, `hlc_counter`, `hlc_host`), `origin` (the actor) and `op` JSON            |
-| `items`         | Each item folded from its ops, a cache rebuilt from `ops` whenever the fold version changes; indexed by status, project, last activity and origin                                        |
-| `aliases`       | `alias → item_id` with its kind: `legacy` (the public `b:<n>` of an item created before short aliases), `short` (the `b:<ref>` of a newer one) and `key` (a newer item's private number) |
-| `attachments`   | Per item and attachment: the SHA-256, media type and size of the bytes                                                                                                                   |
-| `sync_mappings` | One remote-sync mapping per linked item (remote id, last synced value of each side, carried-over comment ids, state, recent conflicts, last error), keyed by item id                     |
-| `meta`          | The host id, the next item id, the fold version and the import receipt                                                                                                                   |
+| Table               | Holds                                                                                                                                                                                    |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ops`               | The append-only op log, the source of truth: `op_id` (ULID), `item_id`, a hybrid logical clock (`hlc_wall` ms, `hlc_counter`, `hlc_host`), `origin` (the actor) and `op` JSON            |
+| `items`             | Each item folded from its ops, a cache rebuilt from `ops` whenever the fold version changes; indexed by status, project, last activity and origin                                        |
+| `aliases`           | `alias → item_id` with its kind: `legacy` (the public `b:<n>` of an item created before short aliases), `short` (the `b:<ref>` of a newer one) and `key` (a newer item's private number) |
+| `attachments`       | Per item and attachment: the SHA-256, media type and size of the bytes                                                                                                                   |
+| `sync_mappings`     | One remote-sync mapping per linked item (remote id, last synced value of each side, carried-over comment ids, state, recent conflicts, last error), keyed by item id                     |
+| `meta`              | The host id, the next item id, the fold version and the import receipt                                                                                                                   |
+| `shipped_summaries` | One AI summary of a shipped period per period, bucket start and project filter, with the hash of the items it summarized, the model and when it was written                              |
 
 Op kinds: `create`, `set {field, value}`, `unset`, `add`/`remove {field: tags | links | actors, value}`, `attach`/`detach`,
 `event` (moved, linked, triaged, edited and the rest of the activity), `comment`, `comment-edit`, `comment-delete` and
