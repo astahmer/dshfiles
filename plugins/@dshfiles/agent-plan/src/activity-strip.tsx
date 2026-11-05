@@ -1,43 +1,32 @@
-import { PresenceList, type PresenceListItem } from '@dshfiles/plugin-ui/components/motion/presence-list'
+import { AgentRunSteps, type AgentRunStep } from '@dshfiles/plugin-ui/components/motion/agent-run-steps'
 import { StepGlyph } from '@dshfiles/plugin-ui/components/motion/step-glyph'
 import { ShimmerText } from '@dshfiles/plugin-ui/components/motion/text'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
-import { BotIcon, TerminalIcon, WrenchIcon } from '@dshfiles/plugin-ui/icons'
 import type { ReactNode } from 'react'
 import { LiveActivity, type LiveActivity as LiveActivityView } from './live-activity.js'
 import { PlanProgress } from './plan-progress.js'
 import { useNow } from './use-now.js'
 
-/** One row's content; `PresenceList` supplies the `<li>` so rows can enter and leave. */
-const Row = (props: {
-  readonly icon: ReactNode
-  readonly label: string
-  readonly detail?: string
-  readonly since: number
-  readonly now: number
-}): JSX.Element => (
-  <>
-    {props.icon}
-    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono">{props.label}</span>
-    {props.detail !== undefined && <span className="dshx:shrink-0 dshx:text-muted-foreground">{props.detail}</span>}
-    <span className="dshx:shrink-0 dshx:tabular-nums dshx:text-muted-foreground">{PlanProgress.formatDuration(props.now - props.since)}</span>
-  </>
-)
-
-const Section = (props: { readonly title: string; readonly items: readonly PresenceListItem[] }): JSX.Element => (
-  <section className="dshx:flex dshx:flex-col dshx:gap-1">
-    <h3 className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.title}</h3>
-    <PresenceList
-      as="ul"
-      className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs"
-      itemAs="li"
-      itemClassName="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2"
-      items={props.items}
-    />
-  </section>
-)
-
-const ICON = 'dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground'
+/** Tool calls, then background jobs, then subagents, each ticking from its own start. */
+const runSteps = (activity: LiveActivityView): AgentRunStep[] => [
+  ...activity.tools.map((tool): AgentRunStep => ({ id: tool.callId, kind: 'tool', label: tool.name, status: 'running', startedAt: tool.startedAt })),
+  ...activity.jobs.map((job): AgentRunStep => ({
+    id: job.jobId,
+    kind: 'run',
+    label: job.kind,
+    target: job.label,
+    status: 'running',
+    startedAt: job.startedAt,
+  })),
+  ...activity.subagents.map((job): AgentRunStep => ({
+    id: job.jobId,
+    kind: 'agent',
+    label: 'Subagent',
+    target: job.label,
+    status: 'running',
+    startedAt: job.startedAt,
+  })),
+]
 
 /**
  * What runs now, beside the native composer activity: the oldest running tool call with a live timer and counts of
@@ -66,34 +55,8 @@ export const ActivityStrip = (props: { readonly activity: LiveActivityView | und
           <span className="dshx:shrink-0 dshx:tabular-nums">{PlanProgress.formatDuration(now - oldest)}</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="dshx-root dshx:flex dshx:w-80 dshx:flex-col dshx:gap-3 dshx:p-3" side="top">
-        {activity.tools.length > 0 && (
-          <Section
-            items={activity.tools.map(tool => ({
-              key: tool.callId,
-              node: <Row icon={<WrenchIcon aria-hidden className={ICON} />} label={tool.name} now={now} since={tool.startedAt} />,
-            }))}
-            title="Tool calls"
-          />
-        )}
-        {activity.jobs.length > 0 && (
-          <Section
-            items={activity.jobs.map(job => ({
-              key: job.jobId,
-              node: <Row detail={job.kind} icon={<TerminalIcon aria-hidden className={ICON} />} label={job.label} now={now} since={job.startedAt} />,
-            }))}
-            title="Background jobs"
-          />
-        )}
-        {activity.subagents.length > 0 && (
-          <Section
-            items={activity.subagents.map(job => ({
-              key: job.jobId,
-              node: <Row icon={<BotIcon aria-hidden className={ICON} />} label={job.label} now={now} since={job.startedAt} />,
-            }))}
-            title="Subagents"
-          />
-        )}
+      <PopoverContent align="end" className="dshx-root dshx:w-80 dshx:p-0 dshx:pt-3 dshx:pb-1" side="top">
+        <AgentRunSteps heading="Running now" status="working" startedAt={oldest} steps={runSteps(activity)} />
       </PopoverContent>
     </Popover>
   )

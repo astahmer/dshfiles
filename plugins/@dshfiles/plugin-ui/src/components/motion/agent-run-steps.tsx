@@ -16,6 +16,8 @@ import {
   XIcon,
   BrainIcon,
   GlobeIcon,
+  BotIcon,
+  WrenchIcon,
 } from '../../icons.js'
 import { Button } from '../ui/button.js'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js'
@@ -24,7 +26,7 @@ import { HeightReveal } from './height-reveal.js'
 import { PresenceList } from './presence-list.js'
 import { ShimmerText } from './text.js'
 
-export type AgentRunStepKind = 'plan' | 'think' | 'read' | 'search' | 'edit' | 'run' | 'web'
+export type AgentRunStepKind = 'plan' | 'think' | 'read' | 'search' | 'edit' | 'run' | 'web' | 'tool' | 'agent'
 export type AgentRunStepStatus = 'running' | 'done' | 'failed'
 export type AgentRunStatus = 'working' | 'done' | 'failed' | 'stopped'
 
@@ -37,6 +39,8 @@ export interface AgentRunStep {
   readonly target?: string
   readonly status: AgentRunStepStatus
   readonly durationMs?: number
+  /** Epoch ms the step started; a running step ticks its elapsed time from it. */
+  readonly startedAt?: number
   /** Expandable body: tool output, a diff summary, matched files. */
   readonly output?: React.ReactNode
 }
@@ -44,7 +48,8 @@ export interface AgentRunStep {
 export interface AgentRunStepsProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
   /** The run's task, shown as the card heading. */
   readonly heading: string
-  readonly model: { readonly name: string; readonly tone?: AgentTone }
+  /** Omit when the run's model is unknown; the status and clock keep the row. */
+  readonly model?: { readonly name: string; readonly tone?: AgentTone }
   readonly status: AgentRunStatus
   /** Epoch ms the run started; the clock ticks from it while working. */
   readonly startedAt: number
@@ -62,6 +67,8 @@ const stepIcons = {
   edit: FilePenLineIcon,
   run: TerminalIcon,
   web: GlobeIcon,
+  tool: WrenchIcon,
+  agent: BotIcon,
 } as const satisfies Record<AgentRunStepKind, LucideIcon>
 
 const statusLabel = { working: 'Working', done: 'Done', failed: 'Failed', stopped: 'Stopped' } as const satisfies Record<AgentRunStatus, string>
@@ -111,8 +118,14 @@ export function AgentRunSteps({ heading, model, status, startedAt, endedAt, step
           ) : null}
         </div>
         <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-muted-foreground">
-          <AgentAvatar name={model.name} tone={model.tone ?? 'chart-4'} size="xs" decorative />
-          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{model.name}</span>
+          {model === undefined ? (
+            <span className="dshx:flex-1" />
+          ) : (
+            <>
+              <AgentAvatar name={model.name} tone={model.tone ?? 'chart-4'} size="xs" decorative />
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{model.name}</span>
+            </>
+          )}
           <RunStatus status={status} />
           <span ref={clockRef} aria-label="Elapsed" className="dshx:w-10 dshx:text-right dshx:tabular-nums" />
         </div>
@@ -174,6 +187,7 @@ function StepRow({ step }: { readonly step: AgentRunStep }) {
           )}
         </span>
         {step.durationMs !== undefined && !running ? <StepDuration ms={step.durationMs} /> : null}
+        {running && step.startedAt !== undefined ? <StepElapsed startedAt={step.startedAt} /> : null}
         {step.status === 'done' ? <PopIcon tone="success" /> : null}
         {step.status === 'failed' ? <PopIcon tone="destructive" /> : null}
         {hasOutput ? (
@@ -201,6 +215,21 @@ function StepRow({ step }: { readonly step: AgentRunStep }) {
       ) : null}
     </div>
   )
+}
+
+/** Written before paint and every frame after, so a running step's time ticks without re-rendering the list. */
+function StepElapsed({ startedAt }: { readonly startedAt: number }) {
+  const ref = React.useRef<HTMLSpanElement>(null)
+  React.useLayoutEffect(() => {
+    const element = ref.current
+    if (element == null) return
+    element.textContent = clock(Date.now() - startedAt)
+    return everyFrame(() => {
+      const text = clock(Date.now() - startedAt)
+      if (element.textContent !== text) element.textContent = text
+    })
+  }, [startedAt])
+  return <span ref={ref} className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground" />
 }
 
 function StepDuration({ ms }: { readonly ms: number }) {

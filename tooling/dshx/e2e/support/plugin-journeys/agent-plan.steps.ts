@@ -85,8 +85,8 @@ Then('the activity strip names the running tool call with a timer', async ({ pag
   await strip.click()
   await recordAssertion(page, 'agent-plan-activity-strip-lists-call', async () => {
     const details = page.getByRole('dialog')
-    const toolCalls = details.locator('section').filter({ has: page.getByRole('heading', { name: 'Tool calls' }) })
-    await expect(toolCalls.getByText('bash', { exact: true })).toBeVisible()
+    const runningSteps = details.getByRole('list', { name: 'Steps' })
+    await expect(runningSteps.getByText('bash', { exact: true })).toBeVisible()
   })
   await page.keyboard.press('Escape')
   await finishJourneyAssertions(page)
