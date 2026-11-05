@@ -174,7 +174,9 @@ export const ModelRow = (props: {
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1 dshx:overflow-hidden">
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[11px] dshx:font-medium">{name}</span>
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[11px] dshx:font-medium" data-model-picker-name>
+                {name}
+              </span>
             </TooltipTrigger>
             <TooltipContent side="top">{name}</TooltipContent>
           </Tooltip>
