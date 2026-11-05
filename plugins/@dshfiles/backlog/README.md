@@ -593,8 +593,12 @@ A provider is a plugin serving the `backlog-provider` Host API, the `vcs-provide
 `create`, `comment` and `remove` (called only when the descriptor's `delete` is `archive` or `delete`), all in the
 canonical record shape. A descriptor may list `bindingOptions` (key, label, placeholder): the binding form shows one
 text field per option, the binding stores them as `options`, and every call scoped to that binding carries them
-(Notion's property names). The backlog lists served providers once a minute; a built-in kind wins over one of the same
-name. The built-ins implement the same in-process `BacklogProvider` interface. `@dshfiles/backlog-notion` is the
+(Notion's property names). A handler fails with `BacklogProviderFailed` (its `dshxWireCode` is
+`backlog-provider-failed`): the backlog calls providers through `HostApis.typed` with that class declared, so its code
+(`not-found`, `rejected`, …), HTTP status and detail arrive intact and the user sees the provider's own recovery
+(“share the page with the integration”, “check the key”) rather than a generic refusal; only a call that never reached
+the provider reads as `transport` or `unsupported`. The backlog lists served providers once a minute; a built-in kind
+wins over one of the same name. The built-ins implement the same in-process `BacklogProvider` interface. `@dshfiles/backlog-notion` is the
 reference external provider.
 
 ## Search and saved views

@@ -1,4 +1,4 @@
-import type { EffectApiClient } from '@dshfiles/dshx/effect'
+import type { Api } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Clock, Context, Effect, Layer, Ref } from 'effect'
 import { BacklogProviderFailed, BacklogProviders, type BacklogProvider, type BacklogProviderMethods, type ProviderDescriptor } from './provider-port.js'
@@ -7,10 +7,13 @@ import { SyncProviderUnknown } from './sync-errors.js'
 const OWNER = '@dshfiles/backlog'
 const DESCRIBE_TTL_MS = 60_000
 
+/** A client of one plugin's `backlog-provider` API: its own `BacklogProviderFailed` comes back whole, code and status included. */
+export type ExternalProviderClient = Api.TypedApiClient<BacklogProviderMethods, BacklogProviderFailed>
+
 /** One plugin serving the `backlog-provider` API, with a client to call it. */
 export interface ExternalProviderEndpoint {
   readonly owner: string
-  readonly client: EffectApiClient<BacklogProviderMethods>
+  readonly client: ExternalProviderClient
 }
 
 /** Where external providers come from: every served `backlog-provider` API but the backlog's own. Injectable for tests. */
@@ -26,7 +29,7 @@ export class ExternalProviderEndpoints extends Context.Service<
         list: Effect.map(apis.list, listed =>
           listed
             .filter(api => api.id === BacklogProviders.apiId && api.owner !== OWNER)
-            .map(api => ({ owner: api.owner, client: apis.client(BacklogProviders.contract(api.owner)) })),
+            .map(api => ({ owner: api.owner, client: apis.typed(BacklogProviders.contract(api.owner), { errors: [BacklogProviderFailed] }) })),
         ).pipe(Effect.withSpan('backlog providers list')),
       })
     }),
@@ -36,16 +39,29 @@ export class ExternalProviderEndpoints extends Context.Service<
     Layer.succeed(ExternalProviderEndpoints, ExternalProviderEndpoints.of({ list: Effect.succeed(endpoints) }))
 }
 
-/** A failed wire call as a provider failure: the remote message survives, the transport kind decides the code. */
-const failureOf = (label: string) => (error: { readonly kind: string; readonly message: string; readonly remoteCode?: string | undefined }) =>
-  new BacklogProviderFailed({
-    provider: label,
-    code: error.kind === 'transport' || error.kind === 'unavailable' ? 'transport' : error.kind === 'contract' ? 'unsupported' : 'rejected',
-    detail: error.message.slice(0, 300),
-  })
+/**
+ * A failed wire call as a provider failure. The provider's own `BacklogProviderFailed` arrives decoded, with its code
+ * and status, and passes through; only a call that never reached it (transport, owner unloaded, contract mismatch) or
+ * a failure it did not declare is classified here.
+ */
+const failureOf =
+  (label: string) =>
+  (error: BacklogProviderFailed | Api.ApiCallFailure): BacklogProviderFailed => {
+    switch (error._tag) {
+      case 'BacklogProviderFailed':
+        return error
+      case 'ApiTransportError':
+      case 'ApiUnavailableError':
+        return new BacklogProviderFailed({ provider: label, code: 'transport', detail: error.message.slice(0, 300) })
+      case 'ApiContractError':
+        return new BacklogProviderFailed({ provider: label, code: 'unsupported', detail: error.message.slice(0, 300) })
+      case 'ApiRemoteError':
+        return new BacklogProviderFailed({ provider: label, code: 'rejected', detail: error.message.slice(0, 300) })
+    }
+  }
 
 /** An external provider kind behind the same in-process interface the built-ins implement. */
-const adapt = (descriptor: ProviderDescriptor, client: EffectApiClient<BacklogProviderMethods>): BacklogProvider => {
+const adapt = (descriptor: ProviderDescriptor, client: ExternalProviderClient): BacklogProvider => {
   const fail = failureOf(descriptor.label)
   return {
     descriptor,

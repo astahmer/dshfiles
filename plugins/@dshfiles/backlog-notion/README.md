@@ -64,7 +64,8 @@ source has no option for is left unwritten; select statuses and priorities creat
   requests of one connection are spaced 340 ms apart, and a 429 or 529 waits for `Retry-After` (capped at 60 s, three
   retries) and holds back that connection's next requests too.
 - **Errors.** 401/403 ask to check the key, 404 asks to share the page or database with the integration, anything
-  else carries Notion's message; the key never appears in an error, a log or a span.
+  else carries Notion's message; the key never appears in an error, a log or a span. The failure reaches the backlog
+  over its Host API with its code and status, so the sync chip shows this recovery, not a generic refusal.
 
 ## Telemetry
 

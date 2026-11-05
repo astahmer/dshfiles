@@ -1,6 +1,8 @@
-import type { ProviderConnection, ProviderScope } from '@dshfiles/backlog/backlog-provider'
+import { BacklogProviderFailed, BacklogProviders, type ProviderConnection, type ProviderScope } from '@dshfiles/backlog/backlog-provider'
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
-import { DshxEffect } from '@dshfiles/dshx/effect'
+import { DshxEffect, HostContext } from '@dshfiles/dshx/effect'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
+import { createTestHost } from '@dshfiles/dshx/testing'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Fiber, Layer } from 'effect'
@@ -9,6 +11,7 @@ import { TestClock } from 'effect/testing'
 import { NotionClient } from './notion-client.js'
 import { fakeNotion } from './notion-fake.js'
 import { NotionMapping } from './notion-mapping.js'
+import { makeNotionPlugin, NotionPlugin } from './notion-plugin.js'
 import { makeNotionProvider } from './notion-provider.js'
 
 const connection: ProviderConnection = { instanceId: 'notion', kind: 'notion', label: 'Notion', credential: 'secret:NOTION_KEY', baseUrl: '' }
@@ -267,6 +270,48 @@ describe('the Notion provider', () => {
       expect(refused.message).not.toContain('ntn_wrong')
     }).pipe(Effect.provide(wrongKey))
   })
+
+  it.effect('answers the backlog over its Host API with the failure code, status and recovery intact', () =>
+    Effect.gen(function* () {
+      const fake = fakeNotion()
+      const host = yield* Effect.acquireRelease(
+        Effect.promise(() => createTestHost()),
+        testHost => Effect.promise(() => testHost.dispose()),
+      )
+      const services = (key: string) =>
+        Layer.mergeAll(Layer.succeed(HttpClient.HttpClient, fake.client), SecretReferenceResolver.layerTest({ resolve: async () => key }))
+      yield* Effect.promise(() =>
+        host.mount(makeNotionPlugin({ services: services(fake.key), client: { minIntervalMs: 0 } }), { packageId: NotionPlugin.owner }),
+      )
+      const apis = yield* Effect.provide(
+        HostApis,
+        HostApis.layer.pipe(Layer.provide(Layer.succeed(HostContext, HostContext.of({ ctx: host.ctx, packageId: '@dshfiles/backlog' })))),
+      )
+      const notion = apis.typed(BacklogProviders.contract(NotionPlugin.owner), { errors: [BacklogProviderFailed] })
+      const missing = yield* Effect.flip(notion.resolve({ ...scopeOf(fake), reference: '0123456789abcdef0123456789abcdef' }))
+      expect(missing).toBeInstanceOf(BacklogProviderFailed)
+      expect(missing).toMatchObject({ provider: 'Notion', code: 'not-found' })
+      expect(missing.message).toContain('Notion has no item matching that reference')
+      expect(missing.message).toContain('share the page or database with the integration')
+      expect(missing.message).not.toContain('refused')
+
+      const otherHost = yield* Effect.acquireRelease(
+        Effect.promise(() => createTestHost()),
+        testHost => Effect.promise(() => testHost.dispose()),
+      )
+      yield* Effect.promise(() =>
+        otherHost.mount(makeNotionPlugin({ services: services('ntn_wrong'), client: { minIntervalMs: 0 } }), { packageId: NotionPlugin.owner }),
+      )
+      const wrongKey = (yield* Effect.provide(
+        HostApis,
+        HostApis.layer.pipe(Layer.provide(Layer.succeed(HostContext, HostContext.of({ ctx: otherHost.ctx, packageId: '@dshfiles/backlog' })))),
+      )).typed(BacklogProviders.contract(NotionPlugin.owner), { errors: [BacklogProviderFailed] })
+      const refused = yield* Effect.flip(wrongKey.identity({ connection }))
+      expect(refused).toMatchObject({ code: 'rejected', status: 401 })
+      expect(refused.message).toContain("check that the connection's key is valid")
+      expect(JSON.stringify(refused)).not.toContain('ntn_wrong')
+    }).pipe(Effect.scoped),
+  )
 
   it.effect('records one notion request span per call, with the operation and status only', () =>
     Effect.gen(function* () {

@@ -1,9 +1,11 @@
-import type { EffectApiClient } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
+import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from '@effect/vitest'
-import { Effect } from 'effect'
+import { Effect, Layer } from 'effect'
 import { LinearMapping } from './provider-linear.js'
-import { BacklogProviders, type BacklogProviderMethods, type ProviderDescriptor, type RemoteRecord } from './provider-port.js'
-import { BacklogProviderRegistry } from './provider-registry.js'
+import { BacklogProviderFailed, BacklogProviders, type ProviderDescriptor, type RemoteRecord } from './provider-port.js'
+import { BacklogProviderRegistry, type ExternalProviderClient } from './provider-registry.js'
 import { BacklogStore } from './store.js'
 import { fakeLinear } from './sync-fakes.js'
 import { BacklogSync } from './sync-service.js'
@@ -34,7 +36,7 @@ const page: RemoteRecord = {
 }
 
 /** A provider another plugin would serve over the `backlog-provider` API, as its Host API client. */
-const notionClient = (calls: string[]): EffectApiClient<BacklogProviderMethods> => ({
+const notionClient = (calls: string[]): ExternalProviderClient => ({
   describe: () => Effect.succeed({ providers: [notionDescriptor, { ...notionDescriptor, kind: 'linear', label: 'Impostor' }] }),
   identity: () => Effect.succeed({ account: 'notion-bot', credentialSource: 'none' as const, containers: [{ key: 'db-1', name: 'Roadmap' }] }),
   pull: () => Effect.succeed({ records: [page], nextPage: null, checkpoint: '1', complete: true }),
@@ -62,7 +64,7 @@ const trashingDescriptor: ProviderDescriptor = {
   bindingOptions: [{ key: 'statusProperty', label: 'Status property', placeholder: 'Status' }],
 }
 
-const trashingClient = (calls: string[]): EffectApiClient<BacklogProviderMethods> => ({
+const trashingClient = (calls: string[]): ExternalProviderClient => ({
   ...notionClient(calls),
   describe: () => Effect.succeed({ providers: [trashingDescriptor] }),
   resolve: input => {
@@ -107,5 +109,61 @@ describe('the provider registry', () => {
       yield* sync.deleteItem({ id: imported.detail.item.id })
       expect(calls).toEqual(['resolve {"statusProperty":"Stage"}', 'remove page-1 {"statusProperty":"Stage"}'])
     }).pipe(Effect.provide(syncTestLayer({ client: fakeLinear().client, external: [{ owner: '@acme/notion', client: trashingClient(calls) }] })))
+  })
+
+  it.effect('keeps a provider plugin failure code, status and recovery across the Host API instead of a generic refusal', () => {
+    const owner = '@acme/notion'
+    const notFound = new BacklogProviderFailed({
+      provider: 'Notion',
+      code: 'not-found',
+      detail: 'page-9 — share the page or database with the integration if it exists',
+      cause: new Error('upstream body'),
+    })
+    const refused = new BacklogProviderFailed({ provider: 'Notion', code: 'rejected', status: 401, detail: 'API token is invalid.' })
+    const serving = DshxPlugin.make({
+      name: owner,
+      layer: Layer.empty,
+      apis: [
+        Api.bind(BacklogProviders.contract(owner), {
+          describe: () => Effect.succeed({ providers: [{ ...notionDescriptor, kind: 'notion-wire' }] }),
+          identity: () => Effect.fail(refused),
+          pull: () => Effect.fail(refused),
+          fetch: () => Effect.fail(refused),
+          resolve: () => Effect.fail(notFound),
+          push: () => Effect.fail(refused),
+          create: () => Effect.fail(refused),
+          comment: () => Effect.fail(refused),
+          remove: () => Effect.fail(refused),
+        }),
+      ],
+    })
+    return Effect.gen(function* () {
+      const host = yield* Effect.acquireRelease(
+        Effect.promise(() => createTestHost()),
+        testHost => Effect.promise(() => testHost.dispose()),
+      )
+      yield* Effect.promise(() => host.mount(serving, { packageId: owner }))
+      const apis = yield* Effect.provide(
+        HostApis,
+        HostApis.layer.pipe(Layer.provide(Layer.succeed(HostContext, HostContext.of({ ctx: host.ctx, packageId: '@dshfiles/backlog' })))),
+      )
+      const client = apis.typed(BacklogProviders.contract(owner), { errors: [BacklogProviderFailed] })
+      return yield* Effect.gen(function* () {
+        const sync = yield* BacklogSync
+        yield* sync.saveConnection({ connection: { instanceId: 'notion', kind: 'notion-wire', label: 'Notion', credential: '', baseUrl: '' } })
+        yield* sync.saveBinding({ binding: { id: 'roadmap', connectionId: 'notion', container: 'db-1' } })
+        const missing = yield* Effect.flip(sync.importRemote({ reference: 'https://notion.so/page-9', actor: { kind: 'user' } }))
+        expect(missing).toMatchObject({ _tag: 'BacklogProviderFailed', provider: 'Notion', code: 'not-found' })
+        expect(missing.message).toContain('Notion has no item matching that reference (page-9 — share the page or database with the integration')
+        expect(missing.message).not.toContain('refused')
+        expect(missing.message).not.toContain('upstream body')
+
+        const registry = yield* BacklogProviderRegistry
+        const provider = yield* registry.get('notion-wire')
+        const key = yield* Effect.flip(provider.identity({ instanceId: 'notion', kind: 'notion-wire', label: 'Notion', credential: '', baseUrl: '' }))
+        expect(key).toMatchObject({ code: 'rejected', status: 401 })
+        expect(key.message).toContain("check that the connection's key is valid")
+      }).pipe(Effect.provide(syncTestLayer({ client: fakeLinear().client, external: [{ owner, client }] })))
+    }).pipe(Effect.scoped)
   })
 })
