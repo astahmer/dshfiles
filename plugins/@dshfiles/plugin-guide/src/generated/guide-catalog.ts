@@ -850,7 +850,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "InlineReferences",
       "importFrom": "@dshfiles/chat/inline-references",
       "owner": "@dshfiles/chat",
-      "source": "plugins/@dshfiles/chat/src/inline-references.tsx:95",
+      "source": "plugins/@dshfiles/chat/src/inline-references.tsx:94",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/chat.inline-reference",

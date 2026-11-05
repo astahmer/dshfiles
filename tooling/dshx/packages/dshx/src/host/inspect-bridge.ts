@@ -6,6 +6,7 @@ import process from 'node:process'
 import { join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { JsonLineTransport } from '../bridge/json-line.js'
+import { InspectRequestFibers } from './inspect-requests-promise.js'
 import type { RuntimePluginStatus } from './runtime-plugins.js'
 import * as Result from 'effect/Result'
 import { decodeJson, decodeJsonSafe, jsonObjectSchema, jsonValueSchema } from '../json.js'
@@ -289,6 +290,10 @@ const startHostInspectBridge = async (ctx: Context, metadata: HostInspectBridgeM
   await chmod(location.directory, 0o700)
   await removeStaleEndpoint(location)
 
+  // In-flight requests belong to the bridge: they are closed after the server, interrupting what is left.
+  const requests = InspectRequestFibers.make()
+  const closeRequests = (): Promise<void> => requests.close()
+
   const server: Server = createServer(socket => {
     JsonLineTransport.accept(socket, MAX_MESSAGE_BYTES, {
       onTooLarge: () => JsonLineTransport.write(socket, responseError('unknown', 'services', 'DSHX3203', 'Inspect bridge request exceeds the size limit.')),
@@ -299,23 +304,28 @@ const startHostInspectBridge = async (ctx: Context, metadata: HostInspectBridgeM
           const request = parseRequest(text, token)
           requestId = request.requestId
           target = request.target
-          void queryComposition(ctx, metadata, target, request.input)
-            .then(items =>
+          requests.run(async () => {
+            try {
+              const items = await queryComposition(ctx, metadata, request.target, request.input)
               JsonLineTransport.write(
                 socket,
-                { version: PROTOCOL_VERSION, requestId, ok: true, target, items },
+                { version: PROTOCOL_VERSION, requestId: request.requestId, ok: true, target: request.target, items },
                 {
                   maxBytes: MAX_MESSAGE_BYTES,
-                  onTooLarge: () => responseError(requestId, target, 'DSHX3203', 'Inspect bridge response exceeds the size limit.'),
+                  onTooLarge: () => responseError(request.requestId, request.target, 'DSHX3203', 'Inspect bridge response exceeds the size limit.'),
                 },
-              ),
-            )
-            .catch(error =>
-              JsonLineTransport.write(socket, responseError(requestId, target, error instanceof BridgeFailure ? error.code : 'DSHX3202', errorMessage(error)), {
-                maxBytes: MAX_MESSAGE_BYTES,
-                onTooLarge: () => responseError(requestId, target, 'DSHX3203', 'Inspect bridge response exceeds the size limit.'),
-              }),
-            )
+              )
+            } catch (error) {
+              JsonLineTransport.write(
+                socket,
+                responseError(request.requestId, request.target, error instanceof BridgeFailure ? error.code : 'DSHX3202', errorMessage(error)),
+                {
+                  maxBytes: MAX_MESSAGE_BYTES,
+                  onTooLarge: () => responseError(request.requestId, request.target, 'DSHX3203', 'Inspect bridge response exceeds the size limit.'),
+                },
+              )
+            }
+          })
         } catch (error) {
           JsonLineTransport.write(socket, responseError(requestId, target, error instanceof BridgeFailure ? error.code : 'DSHX3203', errorMessage(error)), {
             maxBytes: MAX_MESSAGE_BYTES,
@@ -343,6 +353,7 @@ const startHostInspectBridge = async (ctx: Context, metadata: HostInspectBridgeM
     await chmod(location.metadataPath, 0o600)
   } catch (error) {
     await new Promise<void>(resolve => server.close(() => resolve())).catch(() => undefined)
+    await closeRequests()
     await rm(location.socketPath, { force: true })
     await rm(location.metadataPath, { force: true })
     throw error
@@ -353,6 +364,7 @@ const startHostInspectBridge = async (ctx: Context, metadata: HostInspectBridgeM
     if (closed) return
     closed = true
     await new Promise<void>(resolve => server.close(() => resolve()))
+    await closeRequests()
     await rm(location.socketPath, { force: true })
     await rm(location.metadataPath, { force: true })
   }
