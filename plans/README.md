@@ -56,6 +56,10 @@ Leftovers of finished plans. The plan files were deleted; each line links to the
   the idle background tax of the activity timeline and usage store writes against the 5 ms/s gate; never measured.
 - **Workbench main view** ([docking decisions](../plugins/@dshfiles/workbench/docs/docking-decisions.md#the-main-view)):
   the user restarts the `web` Host and confirms the Workbench centre live.
+- **Capabilities hub** ([README](../plugins/@dshfiles/capabilities-hub/README.md#skillssh)): in-app skills.sh search
+  and install wait for an official authenticated catalog contract.
+- **Plugin guide** ([README](../plugins/@dshfiles/plugin-guide/README.md#decisions)): live slot occupancy needs a
+  Host-owned typed read API, designed and approved first.
 
 ## Proposed, not started
 
@@ -64,9 +68,7 @@ Written plans for ideas that were scoped but not started:
 - [One Agent Development Environment](ade-ux/README.md): unified UI/UX redesign: thread as the primary object, one
   inbox, seven destinations, a plugin presentation contract, phone layout; research in `ade-ux/research/`.
 - [Agent Calendar](agent-calendar.md): a turn-time Calendar tab inside Usage.
-- [Capabilities hub](capabilities-hub.md): one launchpad for Skills, MCP and DSH plugin managers.
 - [External usage history](external-usage-history.md): opt-in cross-harness token usage in Usage.
-- [Plugin Guide](plugin-guide.md): a developer panel over a versioned catalog of public extension surfaces.
 
 Ideas that were investigated but never built. Their plan files were deleted; this line is what survives. Reopen one by
 writing a new plan.
