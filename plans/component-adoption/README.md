@@ -2,8 +2,8 @@
 
 **Written:** 2026-11-05, from an import audit of `@dshfiles/component-gallery` against `plugins/@dshfiles/*/src`.
 
-Resume here: nothing adopted yet; start with A1 (`TraceWaterfall` in traces), then A2–A6 in table order. Each
-adoption is one revision with a before/after screenshot of the screen it changes.
+Resume here: A1–A8 are done (2026-11-05). What is left: A9 (`ContextGraph` in the Context facet, optional), then
+write a plan for each "keep for a future feature" component whose feature has none, and run `complete-plan`.
 
 The gallery shows 53 demos (about 50 components) from `@dshfiles/plugin-ui`. Counts below are import files and JSX call sites in
 `plugins/@dshfiles/*/src`, excluding `component-gallery`, `plugin-ui` and tests (2026-11-05,
@@ -16,16 +16,17 @@ grep -rEn --include='*.tsx' '<TraceWaterfall([ >/]|$)' */src | grep -v '^compone
 
 ## Progress
 
-| #   | Adoption                                                                    | State       |
-| --- | --------------------------------------------------------------------------- | ----------- |
-| A1  | `TraceWaterfall` replaces the hand-built span tree in traces                | not started |
-| A2  | `MergeChecks` replaces the Land card rows in pulls-review                   | not started |
-| A3  | `TestRunResults` vs test-runs' own `FileRow`/`TestRow`: adopt or delete one | not started |
-| A4  | `FallbackChain` in model-effort-picker's fallbacks section                  | not started |
-| A5  | `ActivityFeed` for the Activity log rows                                    | not started |
-| A6  | `RoutineList` for project-automations rows                                  | not started |
-| A7  | `BulkSelectList` for the jujutsu workspace cleanup selection                | not started |
-| A8  | Decide: delete or keep each "future feature" component below                | not started |
+| #   | Adoption                                                                    | State                                                                                                                                                                        |
+| --- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1  | `TraceWaterfall` replaces the hand-built span tree in traces                | done: also `AgentTimeline` (session traces) and `CallStackTree` (span exceptions)                                                                                            |
+| A2  | `MergeChecks` replaces the Land card rows in pulls-review                   | done; `MergeChecklist` deleted; `MergeConflictGraph` in jj-integration's workspace menu (the conflict notice lives there, not in `thread-notices.tsx`)                       |
+| A3  | `TestRunResults` vs test-runs' own `FileRow`/`TestRow`: adopt or delete one | done: kit `TestRunResults` deleted. It is a streaming view, test-runs only shows finished runs, and its counts would be wrong for Vitest's default reporter                  |
+| A4  | `FallbackChain` in model-effort-picker's fallbacks section                  | done, with a "Serving now" rung; also `CreditsUsage` (quota windows, `QuotaMeter` deleted) and `SpendMap` (Usage › Cost)                                                     |
+| A5  | `ActivityFeed` for the Activity log rows                                    | done                                                                                                                                                                         |
+| A6  | `RoutineList` for project-automations rows                                  | done                                                                                                                                                                         |
+| A7  | `BulkSelectList` for the jujutsu workspace cleanup selection                | done; also `AgentRoster` (agent-communication), `StepTrail` (plan steps) and `AgentRunSteps` (activity strip popover), and `PipelineRun` (project-checks receipts)           |
+| A8  | Decide: delete or keep each "future feature" component below                | done: `Typewriter` deleted (no caller); `SessionRecap` deleted, `ActivityDock` adopted for the turn walkthrough card; the rest kept for the named feature in the table below |
+| A9  | `ContextGraph` in agent-toolkit's Context facet                             | not started (optional)                                                                                                                                                       |
 
 ## Used outside the gallery
 
