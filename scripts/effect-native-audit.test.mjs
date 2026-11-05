@@ -24,6 +24,12 @@ export const plugin = DshxEffect.plugin({ layer: Layer.empty })
 export const load = Effect.tryPromise({ try: () => loadStore(), catch: cause => new ReadError({ cause }) })
 export const external = Effect.tryPromise({ try: () => helper(), catch: cause => new ReadError({ cause }) })
 export const remote = Effect.promise(() => fetch('https://example.test'))
+class Provider {
+  fetch(request: string): Promise<string> {
+    return Promise.resolve(request)
+  }
+}
+export const hint = 'raise the cap in Settings → Web fetch (readable)'
 export const decode = Effect.gen(function* () {
   return Schema.decodeUnknownSync(Schema.String)(yield* load)
 })

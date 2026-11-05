@@ -132,6 +132,15 @@ const wrappedRoot = snippet => {
   return undefined
 }
 
+/** A class or object method named `fetch` (for example a native Promise provider's entry point), not a call. */
+const fetchMethodPattern = /^[ \t]*(?:(?:public|private|protected|static|async|override)\s+)*fetch\s*\([^)]*\)\s*(?::[^{;\n]*)?\{/gmu
+
+/** Calls to a bare `fetch(`; text inside string literals and methods that are merely named `fetch` do not count. */
+const globalFetchCalls = source => {
+  const code = withoutLiterals(source)
+  return count(code, /(?<![\w$.])fetch\s*\(/gu) - count(code, fetchMethodPattern)
+}
+
 const isOwnSpecifier = specifier => specifier.startsWith('.') || specifier.startsWith('@dshfiles/')
 
 const promiseAdapters = source => {
@@ -171,7 +180,7 @@ const hostMetrics = (source, file) => {
     timers: count(withoutLiterals(source), /(?<![\w$.])(?:globalThis\.)?(?:setTimeout|setInterval)\s*\(/gu),
     childProcess: importsModule(source, new Set(['node:child_process', 'child_process'])),
     nodeFs: importsModule(source, new Set(['node:fs', 'node:fs/promises', 'fs', 'fs/promises'])),
-    globalFetch: count(source, /(?<![\w$.])fetch\s*\(/gu),
+    globalFetch: globalFetchCalls(source),
     causelessErrors: errors.filter(fields => !/\bDefect\b/u.test(fields)).length,
     runOutsideEdges: promiseEdge ? 0 : count(source, /\.run(?:Promise|Fork|Sync|Callback)(?:Exit)?\s*\(/gu),
     syncDecodeInEffect: /\bEffect\.(?:gen|fn)\b/u.test(source) ? count(source, /\bdecodeUnknownSync\b/gu) : 0,
