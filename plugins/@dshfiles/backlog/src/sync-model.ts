@@ -213,6 +213,9 @@ const backendLabel = (backend: SyncBackendKind): string => (backend === 'linear'
 const importedCommentText = (backend: SyncBackendKind, comment: RemoteComment): string =>
   `${backendLabel(backend)} · ${comment.author}: ${comment.body}`.slice(0, BacklogItems.maxBodyChars)
 
+/** The tracker a comment carried over by `importedCommentText` came from, read back from its prefix. */
+const importedCommentBackend = (text: string): SyncBackendKind | undefined => backends.find(backend => text.startsWith(`${backendLabel(backend)} · `))
+
 /** A local comment as it lands on the remote issue. */
 const exportedCommentText = (itemLabel: string, actor: string, text: string): string =>
   `${text}\n\n— ${actor === 'user' ? 'you' : actor} on backlog ${itemLabel}`
@@ -249,5 +252,6 @@ export class BacklogSyncModel {
   static readonly conflictNote = conflictNote
   static readonly backendLabel = backendLabel
   static readonly importedCommentText = importedCommentText
+  static readonly importedCommentBackend = importedCommentBackend
   static readonly exportedCommentText = exportedCommentText
 }

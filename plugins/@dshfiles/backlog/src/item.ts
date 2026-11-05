@@ -36,6 +36,8 @@ const linkSchema = Schema.Struct({
 })
 /** `user`, `system`, or `agent:<sessionId>`. */
 const actorIdSchema = Schema.String.check(Schema.isPattern(/^(user|system|agent:[\w.-]+)$/))
+/** Who wrote an event, set once: an actor id, or `remote:<backend>` for what a remote tracker carried over. */
+const originSchema = Schema.String.check(Schema.isPattern(/^(user|system|agent:[\w.-]+|remote:[\w.:-]+)$/))
 const fieldChangeSchema = Schema.Struct({
   field: Schema.Literals(humanFieldNames),
   before: Schema.String.check(Schema.isMaxLength(MAX_BODY_CHARS)),
@@ -60,10 +62,14 @@ const attachmentFields = {
 } satisfies Schema.Struct.Fields
 const attachmentSchema = Schema.Struct(attachmentFields)
 
-/** `attachments` came later: events written before it decode without one, and a comment may carry images or files. */
+/**
+ * `attachments` and `origin` came later: events written before them decode without one, and a comment may carry images
+ * or files. A missing `origin` is derived on read (`BacklogOrigins.of`), so older ops are never rewritten.
+ */
 const eventSchema = Schema.Struct({
   at: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   actor: actorIdSchema,
+  origin: Schema.optionalKey(originSchema),
   commentId: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
   kind: Schema.Literals(['created', 'edited', 'moved', 'linked', 'unlinked', 'commented', 'triaged']),
   detail: Schema.String.check(Schema.isMaxLength(MAX_BODY_CHARS)),
@@ -297,6 +303,7 @@ export class BacklogItems {
   static readonly kindSchema = kindSchema
   static readonly statusSchema = statusSchema
   static readonly actorIdSchema = actorIdSchema
+  static readonly originSchema = originSchema
   static readonly triage = triage
   static readonly triageNoChange = triageNoChange
   static readonly extractLinks = extractLinks

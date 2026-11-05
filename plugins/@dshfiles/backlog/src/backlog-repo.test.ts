@@ -6,6 +6,7 @@ import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Layer, Option } from 'effect'
 import { TestClock } from 'effect/testing'
 import { BacklogRepo } from './backlog-repo.js'
+import { BacklogOrigins } from './event-origin.js'
 import type { BacklogItem } from './item.js'
 import { BacklogOps } from './op-log.js'
 import { BacklogStore } from './store.js'
@@ -221,9 +222,10 @@ describe('the legacy import', () => {
       })
       const { store, repo } = yield* open(rows)
 
-      const imported = byId(yield* storedItems(store, [3, 7]))
-      expect(imported).toEqual([{ ...legacy[0], project: '/work/dshfiles' }, legacy[1]])
-      expect(byId(yield* repo.foldAll)).toEqual(imported)
+      const expected = [{ ...legacy[0], project: '/work/dshfiles' }, legacy[1]].flatMap(item => (item === undefined ? [] : [item]))
+      // The import rewrites no op: the log folds back to the legacy events, and only a read derives their origin.
+      expect(byId(yield* repo.foldAll)).toEqual(expected)
+      expect(byId(yield* storedItems(store, [3, 7]))).toEqual(expected.map(item => ({ ...item, events: (item.events ?? []).map(BacklogOrigins.stamped) })))
       expect(yield* store.readFile({ id: 3, attachmentId: 'legacy-file-1' })).toEqual({ ok: true, value: { dataUrl: 'data:image/png;base64,aGk=' } })
       expect(Option.getOrThrow(yield* repo.mappings.get('3'))).toEqual(mapping(3))
       expect((yield* store.capture({ text: 'next', actor: user })).item.id).toBe(9)

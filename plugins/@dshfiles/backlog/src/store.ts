@@ -5,6 +5,7 @@ import { BacklogSettingsTag } from './backlog-settings.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogRepo } from './backlog-repo.js'
 import { BacklogWriteFailed } from './errors.js'
+import { BacklogOrigins } from './event-origin.js'
 import {
   BacklogItems,
   type BacklogAttachment,
@@ -164,7 +165,7 @@ const notFound = { ok: false, reason: 'not-found' } as const
 
 const found = <T>(value: T): BacklogResult<T> => ({ ok: true, value })
 
-type EventDraft = Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments' | 'commentId'>
+type EventDraft = Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments' | 'commentId' | 'origin'>
 
 /** One stored event of one item, as the Activity timeline hears about it. */
 export interface BacklogChangeNotice {
@@ -202,7 +203,9 @@ const detailIn = (view: StoreView, item: BacklogItem): BacklogDetail => ({
   item: {
     ...item,
     events: item.events.map((event, index) =>
-      event.kind === 'commented' && event.commentId === undefined ? { ...event, commentId: `legacy-${String(event.at)}-${String(index)}` } : event,
+      BacklogOrigins.stamped(
+        event.kind === 'commented' && event.commentId === undefined ? { ...event, commentId: `legacy-${String(event.at)}-${String(index)}` } : event,
+      ),
     ),
     freshness: BacklogItems.freshness(item, view.at, view.dormantDays),
   },
@@ -453,6 +456,8 @@ export class BacklogStore extends Context.Service<
       readonly text: string
       readonly files?: readonly BacklogFileInput[] | undefined
       readonly actor: BacklogActor
+      /** Who wrote it when that is not the actor, such as `remote:linear` for a comment sync carried over. */
+      readonly origin?: string | undefined
     }) => Detailed
     readonly editComment: (input: {
       readonly id: number
@@ -601,7 +606,7 @@ export class BacklogStore extends Context.Service<
           ...change,
           actors: withActor(change.actors ?? item.actors, actorId, 'contributor'),
           lastActivityAt: at,
-          events: [...item.events, { at, actor: actorId, ...event, ...(fieldChanges.length !== 0 && { fieldChanges }) }],
+          events: [...item.events, { at, actor: actorId, origin: actorId, ...event, ...(fieldChanges.length !== 0 && { fieldChanges }) }],
         }
         yield* persist(next, actorId)
         const stored = next.events.at(-1)
@@ -658,8 +663,8 @@ export class BacklogStore extends Context.Service<
         const startedInThread = actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '' ? actor.sessionId : null
         const createdEvent: BacklogEvent =
           startedInThread === null
-            ? { at, actor: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars) }
-            : { at, actor: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars), threadId: startedInThread }
+            ? { at, actor: actorId, origin: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars) }
+            : { at, actor: actorId, origin: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars), threadId: startedInThread }
         const item: BacklogItem = {
           id,
           ref,
@@ -823,6 +828,7 @@ export class BacklogStore extends Context.Service<
         readonly text: string
         readonly files?: readonly BacklogFileInput[] | undefined
         readonly actor: BacklogActor
+        readonly origin?: string | undefined
       }) {
         return yield* withItem(input.id, item =>
           Effect.gen(function* () {
@@ -832,7 +838,13 @@ export class BacklogStore extends Context.Service<
             const actor = input.actor
             const sourceThread = actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '' ? { threadId: actor.sessionId } : {}
             const commentId = globalThis.crypto.randomUUID()
-            const event = { kind: 'commented' as const, detail: input.text.slice(0, BacklogItems.maxBodyChars), ...sourceThread, commentId }
+            const event = {
+              kind: 'commented' as const,
+              detail: input.text.slice(0, BacklogItems.maxBodyChars),
+              ...sourceThread,
+              commentId,
+              ...(input.origin !== undefined && { origin: input.origin }),
+            }
             return found(yield* touch(item, actor, attachments.length > 0 ? { ...event, attachments } : event, { links }))
           }),
         )
@@ -921,7 +933,10 @@ export class BacklogStore extends Context.Service<
         const item = yield* find(id)
         if (item === undefined) return
         const at = yield* Clock.currentTimeMillis
-        yield* persist({ ...item, events: [...item.events, { at, actor: 'system', kind: 'triaged', detail: BacklogItems.triageNoChange }] }, 'system')
+        yield* persist(
+          { ...item, events: [...item.events, { at, actor: 'system', origin: 'system', kind: 'triaged', detail: BacklogItems.triageNoChange }] },
+          'system',
+        )
       }, serialized)
 
       const propose = Effect.fn('backlog store propose')(function* (input: { readonly id: number; readonly proposal: BacklogProposal }) {

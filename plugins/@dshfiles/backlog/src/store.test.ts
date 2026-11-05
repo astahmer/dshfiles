@@ -205,6 +205,7 @@ describe('store', () => {
       expect(moved.ok && moved.value.item.events.at(-1)).toEqual({
         at: 5,
         actor: 'user',
+        origin: 'user',
         kind: 'moved',
         detail: 'inbox → doing',
         fieldChanges: [{ field: 'status', before: 'inbox', after: 'doing' }],
@@ -315,6 +316,7 @@ describe('triage proposals', () => {
       expect(applied.ok && applied.value.item.events.at(-1)).toEqual({
         at: 9,
         actor: 'system',
+        origin: 'system',
         kind: 'triaged',
         detail: 'applied kind note',
         fieldChanges: [{ field: 'kind', before: 'task', after: 'note' }],
@@ -436,6 +438,7 @@ describe('lifecycle signals', () => {
       expect(started.ok && started.value.item.events.at(-1)).toEqual({
         at: 9,
         actor: 'system',
+        origin: 'system',
         kind: 'moved',
         detail: 'inbox → doing (mentioned in a thread)',
         threadId: 'session-abc123',
@@ -714,6 +717,36 @@ describe('attention and inbox', () => {
         comments: 2,
         last: { at: 3, actor: 'agent:session-abc123', kind: 'moved', detail: 'inbox → doing' },
       })
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('records each event origin once, keeps it across a restart, and derives it for events written before it', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(3)
+      const rows = backlogRows({
+        legacy: {
+          items: [
+            legacyItem({
+              id: 1,
+              events: [
+                { at: 9, actor: 'user', kind: 'created', detail: 'legacy item' },
+                { at: 10, actor: 'system', kind: 'commented', detail: 'Linear · Ada: synced before origins' },
+              ],
+            }),
+          ],
+        },
+      })
+      const store = yield* openStore(rows)
+      yield* store.comment({ id: 1, text: 'agent progress', actor: agent })
+      yield* store.comment({ id: 1, text: 'GitHub · octo: from the tracker', actor: { kind: 'system' }, origin: 'remote:github' })
+      const reopened = yield* openStore(rows)
+      const detail = yield* reopened.get(1)
+      expect(detail.ok && detail.value.item.events.map(event => [event.actor, event.origin])).toEqual([
+        ['user', 'user'],
+        ['system', 'remote:linear'],
+        ['agent:session-abc123', 'agent:session-abc123'],
+        ['system', 'remote:github'],
+      ])
     }).pipe(Effect.scoped),
   )
 

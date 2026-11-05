@@ -369,7 +369,12 @@ export class BacklogSync extends Context.Service<
         // Sequential on purpose (forEach's default): comments land in the order they were written.
         const pulledPairs = yield* Effect.forEach(incoming, comment =>
           Effect.map(
-            store.comment({ id: mapping.itemId, text: BacklogSyncModel.importedCommentText(mapping.backend, comment), actor: { kind: 'system' } }),
+            store.comment({
+              id: mapping.itemId,
+              text: BacklogSyncModel.importedCommentText(mapping.backend, comment),
+              actor: { kind: 'system' },
+              origin: `remote:${mapping.backend}`,
+            }),
             result => ({
               local: result.ok ? (result.value.item.events.findLast(event => event.kind === 'commented')?.commentId ?? '') : '',
               remote: comment.id,
