@@ -1,9 +1,9 @@
 import { createRequire } from 'node:module'
 import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
-import { Effect, Layer, Option } from 'effect'
+import { Context, Effect, Layer, Option } from 'effect'
 import * as Schema from 'effect/Schema'
 import { pluginGuideApi } from './api.js'
-import { PluginGuide } from './catalog-model.js'
+import { PluginGuide, type GuideFreshness } from './catalog-model.js'
 import { GUIDE_CATALOG } from './generated/guide-catalog.js'
 
 /** The DSH core this Host resolves, read once from its package manifest; null when it cannot be found. */
@@ -16,16 +16,19 @@ const runtimeDshVersion = (): string | null => {
   }
 }
 
-const freshness = PluginGuide.freshness(GUIDE_CATALOG, runtimeDshVersion())
+/** The catalog's freshness against the running core, computed once when the plugin's runtime starts. */
+class GuideFreshnessRef extends Context.Service<GuideFreshnessRef, GuideFreshness>()('@dshfiles/plugin-guide/GuideFreshness') {
+  static readonly layer = Layer.sync(GuideFreshnessRef, () => PluginGuide.freshness(GUIDE_CATALOG, runtimeDshVersion()))
+}
 
 /** Serves the build-time catalog read-only. It never calls Cordis Inspect or reads live slot registrations. */
 export default DshxPlugin.make({
   name: 'dshfiles-plugin-guide',
-  layer: Layer.empty,
+  layer: GuideFreshnessRef.layer,
   apis: [
     Api.bind(pluginGuideApi, {
-      catalog: () => Effect.succeed({ freshness, catalog: GUIDE_CATALOG }),
-      search: input => Effect.succeed({ freshness, ...PluginGuide.search(GUIDE_CATALOG, input) }),
+      catalog: () => GuideFreshnessRef.use(freshness => Effect.succeed({ freshness, catalog: GUIDE_CATALOG })),
+      search: input => GuideFreshnessRef.use(freshness => Effect.sync(() => ({ freshness, ...PluginGuide.search(GUIDE_CATALOG, input) }))),
     }),
   ],
 })
