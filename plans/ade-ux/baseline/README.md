@@ -166,7 +166,7 @@ as a Phase 3 input.
 
 ## How it was captured
 
-Workspace `ade-baseline` (`/Users/tbrowang/Documents/dshfiles-threads/ade-baseline`).
+Workspace `ade-baseline` (a JJ workspace beside the repository).
 
 ```sh
 pnpm exec turbo run build --filter=@dshfiles/dshx

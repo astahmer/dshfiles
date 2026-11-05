@@ -5,7 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const WS = '/Users/tbrowang/Documents/dshfiles-threads/ade-baseline'
+const WS = process.env.ADE_WS ?? process.cwd()
 const { webkit } = await import(join(WS, 'tooling/dshx/packages/dshx/node_modules/playwright/index.mjs'))
 const { StartupDialogs } = await import(join(WS, 'tooling/dshx/packages/dshx/dist/project/startup-dialogs.js'))
 

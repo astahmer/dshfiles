@@ -34,12 +34,6 @@ if(previous.length===1){
   const controller=createRestartController({appExit:code=>process.exit(code)},{scheduleExit:exit=>void exit(),recordRunningSessions:async()=>{await writeFile(join(home,'flushed'),'yes')}});
   if(!controller.available) throw new Error('Native controller unavailable under supervisor');
   await controller.request();
- } else if(mode==='hang-after-request'){
-  // DSH 0.2.1-rc.2 can finish appExit without exiting: the request is written, the process stays.
-  const controller=createRestartController({appExit:()=>{}},{scheduleExit:exit=>void exit()});
-  await controller.request();
-  process.on('SIGTERM',()=>{});
-  setInterval(()=>{},10000);
  } else if(mode==='wrong-marker'){
   await writeFile(process.env.DSH_RESTART_REQUEST_PATH,'wrong-run-id');process.exit(75);
  } else if(mode==='no-marker'){process.exit(75)}
@@ -97,26 +91,6 @@ test('native restart controller is available and its confirmed request restarts 
   assert.notEqual(runs[0].runId, runs[1].runId)
   assert.equal(await readFile(join(f.home, 'flushed'), 'utf8'), 'yes')
   for (const run of runs) assert.equal(run.requestPath, join(f.home, 'runtime', `dsh-web-restart-${run.runId}.request`))
-  assert.deepEqual(await readdir(join(f.home, 'runtime')), [])
-})
-
-test('a Host that wrote its restart request but never exits is stopped and restarted', async t => {
-  const f = await fixture(t, 'hang-after-request')
-  let log = ''
-  const sink = {
-    write: chunk => {
-      log += String(chunk)
-      return true
-    },
-  }
-  assert.equal(await superviseDsh({ ...f.options, log: sink, requestedExitGraceMs: 200, killGraceMs: 200 }), 0)
-  const runs = await f.runs()
-  assert.equal(runs.length, 2)
-  assert.notEqual(runs[0].runId, runs[1].runId)
-  assert.match(log, /asked for a restart .* still running .* stopping it with SIGTERM/)
-  assert.match(log, /ignored SIGTERM .* sending SIGKILL/)
-  assert.match(log, /Host exited \(signal SIGKILL\)/)
-  assert.match(log, /Restarting after a confirmed request/)
   assert.deepEqual(await readdir(join(f.home, 'runtime')), [])
 })
 

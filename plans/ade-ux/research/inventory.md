@@ -1,6 +1,6 @@
 # ADE feature inventory (pre-redesign research)
 
-Snapshot: 2026-11-04, repository `/Users/tbrowang/Documents/dshfiles`, profile seed `profiles/web/package.json`.
+Snapshot: 2026-11-04, the repository root, profile seed `profiles/web/package.json`.
 Read-only research; nothing else was modified.
 
 Method:
