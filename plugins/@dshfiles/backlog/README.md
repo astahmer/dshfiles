@@ -32,13 +32,15 @@
 
 ![See what shipped per hour, day, week, month or year](docs/screenshots/shipped-digest.png)
 
+![Pull the next ready item from the Ready view](docs/screenshots/ready-queue.png)
+
 One capture feed for notes, tasks, bugs, ideas and questions, shared by the user and every agent. It
 replaces a "TODO" chat channel: adding something costs one line, the feed stays ordered by activity so
 idle things sink, and the tracker parts (status, actors, links, search, board) come for free.
 
 Plan and open steps: [plans/backlog](../../../plans/backlog/README.md).
 
-Open the reusable **Backlog** view from navigation or the Workbench chooser. Items, Board, Projects, Shipped and Inbox remain the page’s own view controls.
+Open the reusable **Backlog** view from navigation or the Workbench chooser. Items, Board, Projects, Shipped, Ready and Inbox remain the page’s own view controls.
 
 ## Capture
 
@@ -65,6 +67,8 @@ Structure comes from the text:
 
 - `bug:`, `idea:`, `note:`, `question:`, `task:`/`todo:` set the kind; a first line ending in `?` is a
   question; anything else is a task. The first line is the title, the rest the markdown body.
+- `!1` (urgent), `!2` (high), `!3` (medium) or `!4` (low) as a word of its own on the first line sets the priority
+  and leaves the title; Linear's P1–P4.
 - `#tag` adds a tag; `b:<ref>` links another item; `jj:<rev>` a revision; `branch:<name>`, `workspace:<path>`,
   a `session-…` id and URLs become typed links.
 - An agent capture links the calling thread, names the agent as owner and takes its working directory as
@@ -158,6 +162,43 @@ The description box and the reply box are the capture composer's own text box: M
 for agents, backlog items and threads, and images or files picked with the paperclip, pasted or dropped.
 A description's files are kept with the item; a reply's files belong to that comment and open in the
 same gallery from the conversation. User-authored replies can be edited or deleted; their actions and the edit form are keyboard-operable, with visible focus and accessible labels. Reply cards have a little extra separation in the activity list.
+
+## Work queue: priority, sub-issues, ready, claims
+
+Agents pull work from the backlog the way Beads' `bd ready` and Linear's agent delegation work.
+
+- **Priority** is Linear's set: none, urgent, high, medium, low. Set it from the bars glyph at the start of an
+  Items row, the inspector, or the **Priority** submenu of any item menu; while a priority menu is open, `0` clears it
+  and `1`–`4` pick urgent to low. Items sorts by priority (urgent first, then oldest) and groups by it; a change shows
+  under Show changes and can be reverted.
+- **Sub-issues**: an item can sit under a parent, three levels deep at most. The inspector's **Sub-issues** section
+  lists them with `done/total` and a progress bar (dropped ones leave the total), and **Sub-issue** captures one under
+  the item in its project. **Set parent** takes a `b:<ref>`; the parent shows as a link with a cross to remove it. A
+  parent that is the item itself, sits under it, or would make a fourth level is refused with the reason. Rows and
+  cards show the roll-up as `2/5`; Items can group by parent. In Shipped a parent counts only itself: its sub-issues
+  count on their own when they are done.
+- **Ready** (the last view, key `7`) lists open items that are ready to start: in Inbox or Todo, not snoozed, waiting
+  on no open item (it `depends-on` an open item, or an open item `blocks` it), with no open sub-issue and no live claim,
+  grouped by priority, urgent first then oldest. Rows show a red link chip with the count of open items an item waits
+  on. Agents read the same queue with `backlog_ready`.
+- **Owner and delegate**: the owner is whoever captured the item and never changes; the delegate is the agent thread
+  working on it for its owner, set by a claim or by a thread started from the item. The inspector shows **Owner ·
+  Delegate**.
+- **Claims**: `backlog_claim` hands an item to the calling agent thread in one transaction: delegate, `doing`, a link
+  to the thread and a lease (`leases` table). Another agent's claim is refused with the holder named and when it lapses.
+  Every write by the holder renews the lease; it ends when the item is done or dropped (the delegate stays, so Shipped
+  says who did it), with `backlog_release` or the inspector's **Release** (or the item menu's **Release claim**), after
+  `leaseIdleMinutes` (30 by default) without a write, or once a minute sweep finds the holder's thread archived,
+  settled or gone. A released or lapsed claim clears the delegate and returns a `doing` item to `todo`, so it is ready
+  again. Rows and cards show a lock chip for a live claim.
+- **Agent run state**: an open item worked on by an agent thread (its delegate, else its most recently active linked
+  thread) shows that thread's state on rows, cards and the inspector: **Working** while its turn runs, **Awaiting
+  input** when the turn stopped on a question or approval, **Error** when it failed, **Stale** after 30 minutes idle and
+  **Done** otherwise. It reads the session list and thread-sidebar's attention records, so a thread this browser does
+  not list shows nothing.
+
+A Host older than these fields answers without them: every item reads as no priority, unclaimed and not ready, and
+writes that need them are refused with a hint to restart the DSH Host process.
 
 ## Item references
 
@@ -352,8 +393,11 @@ dropping the rest of the draft.
 | `backlog_get`                  | read: one item with history and backlinks                                                                                     |
 | `backlog_get_many`             | read: up to 50 items at once, unknown ids listed separately                                                                   |
 | `backlog_referencing`          | read: items linking to a thread, revision, branch, workspace, URL or item                                                     |
-| `backlog_capture`              | write                                                                                                                         |
-| `backlog_update`               | write: edit or move                                                                                                           |
+| `backlog_capture`              | write; `priority` and `parent` (a sub-issue) besides the text                                                                 |
+| `backlog_update`               | write: edit or move; `priority`, `parent` (null makes it top-level)                                                           |
+| `backlog_ready`                | read: the ready queue, urgent first then oldest; `project`, `limit` (20)                                                      |
+| `backlog_claim`                | write: claim an item for this thread (delegate, `doing`, thread link, lease); refused while another agent holds it            |
+| `backlog_release`              | write: give up a claim; the item returns to `todo`                                                                            |
 | `backlog_link`                 | write: link or unlink                                                                                                         |
 | `backlog_comment`              | write, optionally with images or files                                                                                        |
 | `backlog_attach_file`          | write: keep one base64 image or file with an item                                                                             |
@@ -383,7 +427,8 @@ with `confirm: true`. The panel never passes it.
 ## Remote sync (Linear, GitHub Issues)
 
 Items can mirror an issue in Linear or GitHub Issues, so the backlog lives somewhere shared without giving up
-the local feed. **Backlog settings › Remote sync** holds one row per project and tracker, saved as you edit:
+the local feed. Priority, parent, delegate and claims are not mapped to either tracker yet; the provider port of
+backlog v2 P5 maps them. **Backlog settings › Remote sync** holds one row per project and tracker, saved as you edit:
 
 - a `secret:ALIAS` reference to a Linear personal API key or a GitHub token. Empty falls back to `LINEAR_API_KEY`,
   or to `GITHUB_TOKEN`, `GH_TOKEN` and then `gh auth token` on the Host;
@@ -449,15 +494,19 @@ tag, description, comment, original capture, project, link), with the matching w
 dormant and archived items. Picking a view leaves the results and keeps the words as its filter; `Esc`
 clears them. Words must all match; `"quoted phrases"` stay whole. Operators combine freely:
 
-| Operator                | Example                                                  |
-| ----------------------- | -------------------------------------------------------- |
-| kind, status, attention | `kind:bug`, `status:doing`, `is:blocked`, `is:needs-you` |
-| tag, project            | `#composer`, `project:welii`                             |
-| who touched it          | `by:agent`, `by:me`                                      |
-| who captured it         | `created:me`, `created:agent`, `created:system`          |
-| what it links           | `has:thread`, `has:revision`, `has:url`                  |
-| activity                | `updated:<7d`, `updated:>30d`                            |
-| leave out (any of them) | `-by:agent`, `-created:agent`, `-kind:note`, `-#tag`     |
+| Operator                | Example                                                                |
+| ----------------------- | ---------------------------------------------------------------------- |
+| kind, status, attention | `kind:bug`, `status:doing`, `is:blocked`, `is:needs-you`               |
+| tag, project            | `#composer`, `project:welii`                                           |
+| who touched it          | `by:agent`, `by:me`                                                    |
+| who captured it         | `created:me`, `created:agent`, `created:system`                        |
+| what it links           | `has:thread`, `has:revision`, `has:url`                                |
+| activity                | `updated:<7d`, `updated:>30d`                                          |
+| priority                | `priority:urgent`, `priority:none`                                     |
+| sub-issues              | `parent:b:k3f9`, `has:children`, `has:parent`                          |
+| work queue              | `is:ready`, `is:blocked-by-deps`, `is:claimed`                         |
+| delegate                | `is:delegated`, `delegate:agent`                                       |
+| leave out (any of them) | `-by:agent`, `-created:agent`, `-kind:note`, `-#tag`, `-priority:none` |
 
 `created:` reads the item's owner (who captured it), while `by:` matches anyone who touched it. A leading `-`
 negates any operator, word or `"quoted phrase"`; an item matching one negated term is left out.
@@ -471,7 +520,9 @@ browser lists the same views.
 (Monday start), **Month** or **Year**; the timeline lists that many periods newest first (24 hours, 14 days, 12 weeks,
 12 months, 5 years), each with its count and its change against the period before. Periods with nothing shipped fold
 into one "N quiet days" line; the current one always shows. Items are grouped by project and show their kind, `b:<ref>`,
-an **Agent** badge when an agent captured them, their linked jj revisions and pull requests, and when they were done.
+an **Agent** badge when an agent captured them, who did them for whom when an agent did (`done by Agent 1a2b3c for You`:
+the delegate when a signal closed it), their linked jj revisions and pull requests, and when they were done. A parent
+counts only itself; its sub-issues count when they are done.
 `j`/`k`/`Enter` move through them and open the item beside the timeline like every other view. The header project
 filter applies; Hide agent items and the kind filter do not, since an agent's finished work is still shipped work.
 
@@ -550,6 +601,7 @@ One SQLite file owned by the Host, `$DSH_HOME/plugins/backlog/backlog.db`, opene
 | `sync_mappings`     | One remote-sync mapping per linked item (remote id, last synced value of each side, carried-over comment ids, state, recent conflicts, last error), keyed by item id                     |
 | `meta`              | The host id, the next item id, the fold version and the import receipt                                                                                                                   |
 | `shipped_summaries` | One AI summary of a shipped period per period, bucket start and project filter, with the hash of the items it summarized, the model and when it was written                              |
+| `leases`            | One live or lapsed claim per item: holder (`agent:<sessionId>`), acquired, last write and expiry; written in the same transaction as the item's ops, removed with the claim              |
 
 Op kinds: `create`, `set {field, value}`, `unset`, `add`/`remove {field: tags | links | actors, value}`, `attach`/`detach`,
 `event` (moved, linked, triaged, edited and the rest of the activity), `comment`, `comment-edit`, `comment-delete` and

@@ -2804,6 +2804,269 @@
           "testName": "generates with the triage model, caches per bucket, marks a changed bucket stale and regenerates on request, in one span each"
         }
       ]
+    },
+    {
+      "id": "item-priority",
+      "title": "Set an item's priority",
+      "summary": "Every item has a Linear priority: none, urgent, high, medium or low. Set it from the row's priority glyph, the inspector, or the Priority submenu of any item menu (keys 0 to 4 while the menu is open), or write `!1` (urgent) to `!4` (low) anywhere in a capture. Items can be sorted and grouped by priority, searched with `priority:high` or `-priority:none`, and a priority change can be reverted from the item history. Agents pass `priority` to backlog_capture and backlog_update.",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"!2 Priority demo\"",
+        "press Enter",
+        "click button \"Items\"",
+        "expect table \"Backlog items\""
+      ],
+      "surfaces": ["client", "host", "storage", "tool"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › Items › priority column",
+      "configuration": [],
+      "states": ["none", "urgent", "high", "medium", "low"],
+      "failureModes": [
+        "A Host older than priorities answers without them: every item reads as no priority until the DSH Host process restarts, and a priority write is refused with the same restart hint."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.item-priority",
+          "featureFile": "tooling/dshx/e2e/features/backlog-work-queue.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.item-priority-store",
+          "file": "plugins/@dshfiles/backlog/src/work-queue.test.ts",
+          "testName": "stores, edits, searches and reverts a priority"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "sub-issues",
+      "title": "Break an item into sub-issues with a progress roll-up",
+      "summary": "An item can sit under a parent as a sub-issue, three levels deep at most. The inspector lists sub-issues with a done/total progress bar, adds one with Sub-issue, and links back to the parent (Set parent takes a `b:<ref>`, the cross removes it). Rows and cards show the roll-up as 2/5. A loop, an item under itself or a fourth level is refused with the reason. Search with `parent:b:k3f9` and `has:children`; group the Items view by parent. In Shipped a parent counts only itself. Agents pass `parent` to backlog_capture and backlog_update.",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Sub-issue demo\"",
+        "press Enter",
+        "click text \"Sub-issue demo\"",
+        "expect complementary \"Item detail\"",
+        "click button \"Add sub-issue\"",
+        "expect textbox \"Sub-issue title\""
+      ],
+      "surfaces": ["client", "host", "storage", "tool"],
+      "surface": "detail",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › item detail › Sub-issues",
+      "configuration": [],
+      "states": ["no-children", "in-progress", "complete", "nested"],
+      "failureModes": [
+        "A parent that is the item itself, sits under it, or would make a fourth level is refused with what to pick instead.",
+        "A parent reference that names no item is refused and points to backlog_get."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.sub-issue-rollup",
+          "featureFile": "tooling/dshx/e2e/features/backlog-work-queue.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.sub-issues-store",
+          "file": "plugins/@dshfiles/backlog/src/work-queue.test.ts",
+          "testName": "nests items, rolls their progress up and refuses loops and a fourth level"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "ready-queue",
+      "title": "Pull the next ready item from the Ready view",
+      "summary": "The Ready view lists open items (Inbox or Todo) that are not snoozed, wait on no open item (a `depends-on` link, or another item's `blocks` link), have no open sub-issue and are not claimed, grouped by priority, urgent first then oldest. `is:ready` and `is:blocked-by-deps` search the same states. Agents read it with backlog_ready (read-only, project filter and limit) and claim the first item before working on it.",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"!1 Fix the login outage\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"!2 Write the release notes\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"!2 Review the claim lease sweep\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"!4 Tidy the changelog\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"Plan the team offsite\"",
+        "press Enter",
+        "click button \"Ready\"",
+        "expect table \"Backlog items\""
+      ],
+      "surfaces": ["client", "host", "tool"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › Ready",
+      "configuration": [],
+      "states": ["empty", "ready", "blocked-by-deps", "claimed"],
+      "failureModes": ["A Host older than the ready queue marks nothing ready: the empty view says to restart the DSH Host process."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.ready-queue",
+          "featureFile": "tooling/dshx/e2e/features/backlog-work-queue.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.ready-queue-order",
+          "file": "plugins/@dshfiles/backlog/src/work-queue.test.ts",
+          "testName": "serves open, unblocked, childless and unclaimed items, urgent first then oldest"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "agent-claims",
+      "title": "Agents claim items with a lease; you release them",
+      "summary": "backlog_claim hands an item to the calling agent thread in one write: it becomes the delegate (the owner stays whoever captured it), moves to In progress, links the thread and starts a lease. Another agent's claim is refused with the holder named. Every write by the holder renews the lease; it ends after the idle time in Backlog settings (30 minutes by default), when the holder's thread is archived, settled or gone, when the item is done or dropped, or with backlog_release; a lapsed or abandoned claim returns the item to Todo. The inspector shows Owner · Delegate and the claim with a Release action; rows and cards show a lock chip. `is:claimed`, `is:delegated` and `delegate:agent` search them. Starting a thread from an item also makes that thread its delegate.",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Claim demo\"",
+        "press Enter",
+        "click text \"Claim demo\"",
+        "expect complementary \"Item detail\""
+      ],
+      "surfaces": ["client", "host", "storage", "tool"],
+      "surface": "detail",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › item detail › Owner · Delegate › Release",
+      "configuration": [
+        {
+          "key": "dshfiles-backlog.leaseIdleMinutes",
+          "defaultValue": "30",
+          "constraints": "1 to 1440 minutes without a write by the holder before its claim lapses.",
+          "coveredBy": ["backlog.agent-claims-lease"]
+        }
+      ],
+      "states": ["unclaimed", "claimed", "renewed", "released", "lapsed", "thread-ended"],
+      "failureModes": [
+        "Another agent holds a live claim: the claim or release is refused with the holder and the lapse time, and says to pick another item with backlog_ready.",
+        "A closed item or a caller that is not an agent thread cannot be claimed; the refusal says what to do instead.",
+        "Without thread-sidebar only the idle time ends a claim."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.claim-conflict",
+          "featureFile": "tooling/dshx/e2e/features/backlog-work-queue.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.agent-claims-conflict",
+          "file": "plugins/@dshfiles/backlog/src/work-queue.test.ts",
+          "testName": "claims for one thread, refuses another and releases back to the ready queue"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.agent-claims-lease",
+          "file": "plugins/@dshfiles/backlog/src/work-queue.test.ts",
+          "testName": "renews on every write by the holder, lapses when idle, ends when the item is done, and survives a restart"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "backlog lease sweep",
+          "file": "plugins/@dshfiles/backlog/src/work-queue.test.ts",
+          "testName": "sweeps a lapsed claim back to todo and one whose thread is archived, in one bounded span"
+        }
+      ]
+    },
+    {
+      "id": "agent-run-state",
+      "title": "See what the agent on an item is doing",
+      "summary": "Open items worked on by an agent thread (its delegate, else its most recent linked thread) show the agent's run state on rows, cards and the inspector: Working while its turn runs, Awaiting input when the turn stopped on a question, Error when it failed, Stale after half an hour idle, Done otherwise. Shipped rows say who did the work for whom (done by an agent for You).",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Run state demo\"",
+        "press Enter",
+        "click button \"Items\"",
+        "expect table \"Backlog items\""
+      ],
+      "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › Items, Board and item detail › agent chip",
+      "configuration": [],
+      "states": ["working", "awaiting-input", "error", "done", "stale"],
+      "failureModes": [
+        "A thread this browser does not list shows no chip rather than a guess.",
+        "Without thread-sidebar, finished turns read as Done or Stale only."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "backlog.agent-run-state-browser",
+          "reason": "Each state needs a thread turn caught mid-run; the unit tests drive every state, and the claim journey (backlog.claim-conflict) asserts the Done chip of the claiming thread in the inspector."
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.agent-run-state",
+          "file": "plugins/@dshfiles/backlog/src/agent-run-state.test.ts",
+          "testName": "follows the delegate thread: working, awaiting input, error, done, stale"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.agent-run-state-fallback",
+          "file": "plugins/@dshfiles/backlog/src/agent-run-state.test.ts",
+          "testName": "falls back to the most recently active linked thread and shows nothing for closed items or unknown threads"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the chip derives from the session list and thread-attention records the panel already reads, and starts no Host work."
+        }
+      ]
     }
   ],
   "kind": "bundle"
