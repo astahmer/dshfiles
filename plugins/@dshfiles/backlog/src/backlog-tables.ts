@@ -34,12 +34,29 @@ export const backlogFileDomain = defineDomain({
 
 export type BacklogFileRecord = typeof storedFileSchema.Type
 
-/** The two durable tables the backlog keeps: one row per item, one per attachment. */
+/**
+ * The next item id, kept apart from the items so it never moves backwards: deriving it from the largest stored id
+ * would hand a deleted item's id to the next capture after a restart. A new domain, so the item rows keep their v1.
+ */
+const idCounterSchema = Schema.Struct({ nextId: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)) })
+
+export const backlogMetaDomain = defineDomain({
+  name: 'backlog_meta',
+  version: 1,
+  tables: {
+    counters: { valueSchema: zodSchemaFromEffect(idCounterSchema), __key: 'counters' },
+  },
+})
+
+export type BacklogIdCounter = typeof idCounterSchema.Type
+
+/** The durable tables the backlog keeps: one row per item, one per attachment, and the id counter. */
 export class BacklogTables extends Context.Service<
   BacklogTables,
   {
     readonly items: StorageTable<string, BacklogItem>
     readonly files: StorageTable<string, BacklogFileRecord>
+    readonly counters: StorageTable<string, BacklogIdCounter>
   }
 >()('@dshfiles/backlog/BacklogTables') {
   static readonly layer = Layer.effect(
@@ -48,13 +65,17 @@ export class BacklogTables extends Context.Service<
       const storage = yield* StorageDomain
       const items = yield* storage.open(backlogDomain)
       const files = yield* storage.open(backlogFileDomain)
-      return BacklogTables.of({ items: items.table('items'), files: files.table('files') })
+      const meta = yield* storage.open(backlogMetaDomain)
+      return BacklogTables.of({ items: items.table('items'), files: files.table('files'), counters: meta.table('counters') })
     }),
   )
 
   /** Tables over plain maps, standing in for the Host storage domain; pass the same maps again to model a restart. */
-  static readonly layerMemory = (rows: { readonly items: Map<string, BacklogItem>; readonly files: Map<string, BacklogFileRecord> }) =>
-    Layer.succeed(BacklogTables, BacklogTables.of({ items: memoryTable(rows.items), files: memoryTable(rows.files) }))
+  static readonly layerMemory = (rows: {
+    readonly items: Map<string, BacklogItem>
+    readonly files: Map<string, BacklogFileRecord>
+    readonly counters: Map<string, BacklogIdCounter>
+  }) => Layer.succeed(BacklogTables, BacklogTables.of({ items: memoryTable(rows.items), files: memoryTable(rows.files), counters: memoryTable(rows.counters) }))
 
   /** One table over a plain map, for any backlog domain a test stands in for. */
   static readonly memoryTable = <Value>(rows: Map<string, Value>): StorageTable<string, Value> => memoryTable(rows)

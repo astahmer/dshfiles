@@ -70,6 +70,7 @@ export interface BacklogUpdate {
 
 export type BacklogResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly reason: 'not-found' }
 
+const ID_COUNTER_KEY = 'items'
 const DEFAULT_LIST_LIMIT = 100
 const MAX_LIST_LIMIT = 2_000
 
@@ -483,9 +484,10 @@ export class BacklogStore extends Context.Service<
       const settings = yield* BacklogSettingsTag
       const loaded = yield* tables.items.entries.pipe(Effect.orDie)
       const records = new Map(loaded.map(([, item]) => [item.id, withProject(item)]))
+      const storedCounter = yield* tables.counters.get(ID_COUNTER_KEY).pipe(Effect.orDie)
       const state = yield* Ref.make<StoreState>({
         records,
-        nextId: Math.max(0, ...records.keys()) + 1,
+        nextId: Math.max(Option.match(storedCounter, { onNone: () => 1, onSome: counter => counter.nextId }), Math.max(0, ...records.keys()) + 1),
         revision: yield* Clock.currentTimeMillis,
       })
       const writes = yield* Semaphore.make(1)
@@ -590,6 +592,10 @@ export class BacklogStore extends Context.Service<
         const { text, project, status, kind, actor } = input
         const at = yield* Clock.currentTimeMillis
         const id = (yield* Ref.get(state)).nextId
+        yield* tables.counters
+          .put(ID_COUNTER_KEY, { nextId: id + 1 })
+          .pipe(Effect.mapError(cause => new BacklogWriteFailed({ itemId: id, operation: 'put', cause })))
+        yield* Ref.update(state, current => ({ ...current, nextId: id + 1 }))
         const triaged = BacklogItems.triage(text)
         const actorId = actorIdOf(actor)
         const attachments = yield* storeFiles(id, input.files ?? [], at)
@@ -620,7 +626,6 @@ export class BacklogStore extends Context.Service<
           events: [createdEvent],
         }
         yield* persist(item)
-        yield* Ref.update(state, current => ({ ...current, nextId: id + 1 }))
         yield* PubSub.publish(notices, { item, event: createdEvent })
         return yield* detailOf(item)
       }, serialized)

@@ -252,6 +252,33 @@ describe('store', () => {
       expect((yield* reopened.capture({ text: 'three', actor: user })).item.id).toBe(3)
     }).pipe(Effect.scoped),
   )
+
+  it.effect('never reuses the id of a deleted newest item after a Host restart', () =>
+    Effect.gen(function* () {
+      const rows = backlogRows()
+      const first = yield* openStore(rows)
+      yield* first.capture({ text: 'one', actor: user })
+      const newest = yield* first.capture({ text: 'two', actor: user })
+      yield* first.delete({ id: newest.item.id })
+
+      const reopened = yield* openStore(rows)
+      expect((yield* reopened.capture({ text: 'three', actor: user })).item.id).toBe(3)
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('continues after the largest stored id when the counter lags behind it', () =>
+    Effect.gen(function* () {
+      const rows = backlogRows()
+      const first = yield* openStore(rows)
+      yield* first.capture({ text: 'one', actor: user })
+      yield* first.capture({ text: 'two', actor: user })
+      rows.counters.clear()
+
+      const reopened = yield* openStore(rows)
+      expect((yield* reopened.capture({ text: 'three', actor: user })).item.id).toBe(3)
+    }).pipe(Effect.scoped),
+  )
+
 })
 
 describe('triage proposals', () => {
