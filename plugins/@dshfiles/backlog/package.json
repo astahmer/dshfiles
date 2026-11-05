@@ -28,6 +28,10 @@
     "./secret-link-reveal": {
       "types": "./src/secret-link-reveal.tsx",
       "default": "./dist/secret-link-reveal.js"
+    },
+    "./backlog-provider": {
+      "types": "./src/provider-port.ts",
+      "default": "./dist/backlog-provider.js"
     }
   },
   "scripts": {
@@ -59,7 +63,8 @@
     "@dshfiles/workbench": "workspace:*",
     "@effect/platform-node": "catalog:",
     "@effect/sql-sqlite-node": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "yaml": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

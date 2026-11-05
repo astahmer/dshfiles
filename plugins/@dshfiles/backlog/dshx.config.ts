@@ -3,7 +3,13 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/backlog',
-  modules: { api: 'src/api.ts', settings: 'src/settings.ts', 'secret-link-reveal': 'src/secret-link-reveal.tsx' },
+  modules: {
+    api: 'src/api.ts',
+    settings: 'src/settings.ts',
+    'secret-link-reveal': 'src/secret-link-reveal.tsx',
+    // The provider port other plugins serve (`backlog-provider` Host API) to add a sync source.
+    'backlog-provider': 'src/provider-port.ts',
+  },
   host: {
     entry: 'src/host.ts',
     bundleDependencies: [

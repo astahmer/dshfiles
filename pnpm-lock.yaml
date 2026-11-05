@@ -1865,6 +1865,9 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.1.0
+      yaml:
+        specifier: 'catalog:'
+        version: 2.9.0
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.4
