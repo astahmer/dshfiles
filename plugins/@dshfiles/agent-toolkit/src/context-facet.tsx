@@ -5,7 +5,7 @@
  * thread's agent). An owner that is not loaded leaves its section out instead of failing the facet.
  */
 import { agentsApi } from '@dshfiles/agents/contract'
-import { dshxRegistryApi, isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { dshxRegistryApi, isApiOwnerMissing, type RegistryListInput } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import { decodeSnapshot, mcpServersApi } from '@dshfiles/mcp-servers/api'
 import { memoryApi } from '@dshfiles/memory/api'
@@ -21,7 +21,14 @@ import { AgentToolkit } from './toolkit-model.js'
 
 const QUERY_ROOT = ['dshfiles-agent-toolkit', 'context'] as const
 
-const headings: Record<ContextSectionId, { readonly title: string; readonly description: string; readonly empty: string }> = {
+/** A context section's heading, its one-line explanation and what it says when empty. */
+interface SectionHeading {
+  readonly title: string
+  readonly description: string
+  readonly empty: string
+}
+
+const headings = {
   instructions: {
     title: 'Instructions',
     description: 'AGENTS.md-compatible files DSH loads for this folder, user-global first. Default discovery settings.',
@@ -29,14 +36,18 @@ const headings: Record<ContextSectionId, { readonly title: string; readonly desc
   },
   agent: { title: 'Agent', description: 'Instructions and routine of the agent that started this thread.', empty: 'No configured agent started this thread.' },
   memory: { title: 'Memory', description: 'The start block a new thread in this folder gets.', empty: 'Memory has no start block for this project.' },
-  skills: { title: 'Skills', description: 'Each skill costs its catalog line; its instructions load only when it is used.', empty: 'No skills are available here.' },
+  skills: {
+    title: 'Skills',
+    description: 'Each skill costs its catalog line; its instructions load only when it is used.',
+    empty: 'No skills are available here.',
+  },
   mcp: { title: 'MCP servers', description: "Enabled servers, costed by their tools' names and descriptions.", empty: 'No MCP server is enabled.' },
   references: {
     title: 'References',
     description: 'Attached references add one context line each; their files are read on demand.',
     empty: 'No reference is attached to this thread.',
   },
-}
+} satisfies Record<ContextSectionId, SectionHeading>
 
 const tokensLabel = (section: { readonly tokens: number; readonly unknown: number }): string =>
   `≈ ${ContextModel.formatTokens(section.tokens)} tokens${section.unknown > 0 ? ' +' : ''}`
@@ -91,6 +102,14 @@ const Section = (props: {
   )
 }
 
+/** The registry listing for this Session and workspace, naming only the parts that are known. */
+const registryListInput = (sessionId: string | undefined, cwd: string | undefined): RegistryListInput => {
+  if (sessionId !== undefined && cwd !== undefined) return { sessionId, cwd }
+  if (sessionId !== undefined) return { sessionId }
+  if (cwd !== undefined) return { cwd }
+  return {}
+}
+
 export const ContextFacet = (props: { readonly sessionId: string | undefined; readonly cwd: string | undefined }): ReactNode => {
   const toolkit = useApi(agentToolkitApi)
   const registry = useApi(dshxRegistryApi)
@@ -109,8 +128,7 @@ export const ContextFacet = (props: { readonly sessionId: string | undefined; re
   })
   const listing = useQuery({
     queryKey: [...QUERY_ROOT, 'registry', sessionId ?? null, cwd ?? null],
-    queryFn: async ({ signal }) =>
-      AgentToolkit.decodeListing(await registry.list({ ...(sessionId === undefined ? {} : { sessionId }), ...(cwd === undefined ? {} : { cwd }) }, { signal })),
+    queryFn: async ({ signal }) => AgentToolkit.decodeListing(await registry.list(registryListInput(sessionId, cwd), { signal })),
     enabled: ready,
     retry: false,
   })
@@ -172,8 +190,8 @@ export const ContextFacet = (props: { readonly sessionId: string | undefined; re
           {tokensLabel(total)} <span className="dshx:font-normal dshx:text-muted-foreground">loaded before your message</span>
         </p>
         <p className="dshx:text-xs dshx:text-muted-foreground">
-          Estimates at {ContextModel.charsPerToken} characters per token; tool schemas and DSH&apos;s own system prompt are not counted. The Cost tab
-          and Usage show billed tokens.
+          Estimates at {ContextModel.charsPerToken} characters per token; tool schemas and DSH&apos;s own system prompt are not counted. The Cost tab and Usage
+          show billed tokens.
         </p>
       </header>
       <Section id="instructions" section={instructions.data} query={instructions} />
