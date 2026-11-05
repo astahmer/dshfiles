@@ -1,0 +1,101 @@
+[
+  {
+    "name": "j0-seed-question-thread",
+    "steps": [
+      "tap-tab new",
+      "wait 1200",
+      "fill css \"[role=textbox]\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"question\\\":\\\"Which layout should the phone notes use ({{nonce}})?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin\\\"},{\\\"label\\\":\\\"One flat list\\\"}]}],\\\"timeout\\\":-1}]]\"",
+      "press Enter",
+      "expect text \"Which layout should the phone notes use*\""
+    ]
+  },
+  {
+    "name": "j1-open-thread-from-threads",
+    "steps": [
+      "tap-tab threads",
+      "assert-css \"[data-phone-list] [data-destination-index=threads]\"",
+      "tap css \"[data-phone-list] [data-work-status=needs-you]\"",
+      "assert-css \"[data-phone-top-bar][data-phone-stage=thread]\"",
+      "assert-no-css \"[data-phone-list]\"",
+      "assert-css \"[aria-label='Back to Threads']\""
+    ]
+  },
+  {
+    "name": "j2-answer-in-thread",
+    "steps": [
+      "tap text \"Grouped by plugin\"",
+      "tap button \"Submit\"",
+      "wait 2500",
+      "assert-no-css \"button:has-text('Submit')\""
+    ]
+  },
+  {
+    "name": "j3-send-message",
+    "steps": [
+      "tap css \"[role=textbox]\"",
+      "fill css \"[role=textbox]\" \"Phone journey check {{nonce}} [[once call bash {\\\"command\\\":\\\"sleep 6 && echo phone-journey\\\"}]]\"",
+      "press Enter",
+      "expect text \"Phone journey check*\""
+    ]
+  },
+  {
+    "name": "j4-changes-sheet",
+    "steps": [
+      "tap css \"[data-phone-panels]\"",
+      "assert-css \"[data-phone-sheet]\"",
+      "tap css \"[data-phone-sheet] button[aria-label='New tab']\"",
+      "tap css \"[data-phone-sheet] button:has-text('Changes')\"",
+      "expect text \"Whole thread\""
+    ]
+  },
+  {
+    "name": "j4b-sheet-closed",
+    "steps": [
+      "tap css \"[data-phone-sheet-close]\"",
+      "assert-no-css \"[data-phone-sheet]\""
+    ]
+  },
+  {
+    "name": "j5-inbox-open-item",
+    "steps": [
+      "tap-tab inbox",
+      "assert-css \"[data-phone-title]:has-text('Inbox')\"",
+      "tap-if tab \"Other*\"",
+      "assert-css \"[data-attention-item] button:has-text('Open')\"",
+      "tap css \"[data-attention-item] button:has-text('Open')\"",
+      "assert-css \"[data-phone-top-bar][data-phone-stage=thread]\"",
+      "assert-css \"[aria-label='Back to Inbox']\""
+    ]
+  },
+  {
+    "name": "j6-back-to-inbox",
+    "steps": [
+      "tap css \"[aria-label='Back to Inbox']\"",
+      "assert-css \"[data-phone-title]:has-text('Inbox')\"",
+      "assert-css \"[data-attention-item]\""
+    ]
+  },
+  {
+    "name": "j7-inbox-item-done",
+    "steps": [
+      "tap-if tab \"Other*\"",
+      "tap css \"[data-attention-item] button:has-text('Done')\"",
+      "wait 1500",
+      "tap tab \"Done*\"",
+      "assert-css \"[data-attention-item]\""
+    ]
+  },
+  {
+    "name": "j8-back-through-more",
+    "steps": [
+      "tap-tab more",
+      "tap css \"[data-destination=land]\"",
+      "tap css \"[data-phone-list] [data-section=jj-integration]\"",
+      "assert-css \"[aria-label='Back to Land']\"",
+      "tap css \"[aria-label='Back to Land']\"",
+      "assert-css \"[data-phone-list] [data-destination-index=land]\"",
+      "tap css \"[aria-label='Back to More']\"",
+      "assert-css \"[data-phone-list] nav[aria-label='More destinations']\""
+    ]
+  }
+]

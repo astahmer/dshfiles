@@ -1,0 +1,469 @@
+{
+ "errors": [],
+ "report": [
+  {
+   "name": "j0-seed-question-thread",
+   "out": "j0-seed-question-thread-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 21,
+     "total": 28,
+     "samples": [
+      "Fake thread title 73x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Open right sidebar 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Copy 28x28",
+      "Ask questionwaiting 303x24"
+     ]
+    },
+    "hoverOnly": {
+     "count": 2,
+     "samples": [
+      "Increase font size",
+      "Decrease font size"
+     ]
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "j1-open-thread-from-threads",
+   "out": "j1-open-thread-from-threads-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 21,
+     "total": 28,
+     "samples": [
+      "Fake thread title 73x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Open right sidebar 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Copy 28x28",
+      "Ask questionwaiting 303x24"
+     ]
+    },
+    "hoverOnly": {
+     "count": 2,
+     "samples": [
+      "Increase font size",
+      "Decrease font size"
+     ]
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "j2-answer-in-thread",
+   "out": "j2-answer-in-thread-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 32,
+     "total": 40,
+     "samples": [
+      "Fake thread title 73x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Open right sidebar 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Copy 28x28",
+      "Completed in 3s 308x33"
+     ]
+    },
+    "hoverOnly": {
+     "count": 2,
+     "samples": [
+      "Increase font size",
+      "Decrease font size"
+     ]
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "j3-send-message",
+   "out": "j3-send-message-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 40,
+     "total": 48,
+     "samples": [
+      "Fake thread title 73x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Open right sidebar 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Copy 28x28",
+      "Completed in 3s 303x33"
+     ]
+    },
+    "hoverOnly": {
+     "count": 2,
+     "samples": [
+      "Increase font size",
+      "Decrease font size"
+     ]
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "j4-changes-sheet",
+   "out": "j4-changes-sheet-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 53,
+     "total": 69,
+     "samples": [
+      "Fake thread title 101x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Copy 28x28",
+      "Completed in 3s 303x33",
+      "Asked questions 128x20"
+     ]
+    },
+    "hoverOnly": {
+     "count": 2,
+     "samples": [
+      "Increase font size",
+      "Decrease font size"
+     ]
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "j4b-sheet-closed",
+   "out": "j4b-sheet-closed-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 40,
+     "total": 48,
+     "samples": [
+      "Fake thread title 73x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Open right sidebar 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Copy 28x28",
+      "Completed in 3s 303x33"
+     ]
+    },
+    "hoverOnly": {
+     "count": 2,
+     "samples": [
+      "Increase font size",
+      "Decrease font size"
+     ]
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "j5-inbox-open-item",
+   "out": "j5-inbox-open-item-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 40,
+     "total": 48,
+     "samples": [
+      "Fake thread title 73x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Open right sidebar 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Copy 28x28",
+      "Completed in 3s 303x33"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "j6-back-to-inbox",
+   "out": "j6-back-to-inbox-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 3,
+     "total": 13,
+     "samples": [
+      "Fake thread title 91x16",
+      "Snooze 79x28",
+      "More actions 30x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "j7-inbox-item-done",
+   "out": "j7-inbox-item-done-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 6,
+     "total": 22,
+     "samples": [
+      "Fake thread title 91x16"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "j8-back-through-more",
+   "out": "j8-back-through-more-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 8,
+     "total": 13,
+     "samples": [
+      "More actions 28x28",
+      "LandWorkspaces ready to land, and reposi 296x36",
+      "WorkBacklog items and schedules that sta 296x36",
+      "AgentsConfigured agents and their messag 296x36",
+      "ObserveUsage, activity, traces, jobs and 296x36",
+      "KnowledgeMemory and reference material a 296x36",
+      "SettingsAccounts, tools, secrets and plu 296x36",
+      "Where did a page go?Every former sidebar 320x36"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  }
+ ]
+}

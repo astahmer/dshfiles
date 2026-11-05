@@ -1,0 +1,1253 @@
+{
+ "errors": [],
+ "report": [
+  {
+   "name": "00-start",
+   "out": "00-start-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 44,
+     "total": 52,
+     "samples": [
+      "Fake thread title 73x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Open right sidebar 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Copy 28x28",
+      "Completed in 3s 303x33"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "01-threads",
+   "out": "01-threads-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 52,
+     "total": 69,
+     "samples": [
+      "Fake thread title 73x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Open right sidebar 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Copy 28x28",
+      "Completed in 3s 303x33"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "01b-row-menu",
+   "out": "01b-row-menu-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 52,
+     "total": 83,
+     "samples": [
+      "Fake thread title 73x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Open right sidebar 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Copy 28x28",
+      "Completed in 3s 303x33"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "02-thread-stage",
+   "out": "02-thread-stage-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 28,
+     "total": 38,
+     "samples": [
+      "Fake thread title 73x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Open right sidebar 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Ran 1 command 105x16",
+      "Copy 28x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "02b-panels-sheet",
+   "out": "02b-panels-sheet-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 33,
+     "total": 85,
+     "samples": [
+      "Fake thread title 101x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Ran 1 command 105x16",
+      "Copy 28x28",
+      "Good response 28x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "02c-facet-changes",
+   "out": "02c-facet-changes-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 35,
+     "total": 53,
+     "samples": [
+      "Fake thread title 101x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Ran 1 command 105x16",
+      "Copy 28x28",
+      "Good response 28x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "02d-facet-cost",
+   "out": "02d-facet-cost-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 37,
+     "total": 49,
+     "samples": [
+      "Fake thread title 101x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Ran 1 command 105x16",
+      "Copy 28x28",
+      "Good response 28x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "02e-facet-jobs",
+   "out": "02e-facet-jobs-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 39,
+     "total": 54,
+     "samples": [
+      "Fake thread title 101x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Ran 1 command 105x16",
+      "Copy 28x28",
+      "Good response 28x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "02f-facet-context",
+   "out": "02f-facet-context-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 39,
+     "total": 51,
+     "samples": [
+      "Fake thread title 101x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Ran 1 command 105x16",
+      "Copy 28x28",
+      "Good response 28x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "02f-sheet-closed",
+   "out": "02f-sheet-closed-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 28,
+     "total": 38,
+     "samples": [
+      "Fake thread title 73x28",
+      "Open in Finder 23x23",
+      "More ways to open 18x23",
+      "Workspace actions for sample 101x28",
+      "More thread actions 28x28",
+      "Open right sidebar 28x28",
+      "Chat 29x2",
+      "Trajectory 63x2",
+      "Traces 41x2",
+      "Requests 58x2",
+      "Ran 1 command 105x16",
+      "Copy 28x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "03-composer-keyboard",
+   "out": "03-composer-keyboard-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 10,
+     "total": 12,
+     "samples": [
+      "Open right sidebar 28x28",
+      "Choose workspace 97x28",
+      "Run on Local 91x28",
+      "Workspace: In place 106x28",
+      "Standard mode 149x28",
+      "Command Code 1 · gpt-6-luna, reasoning P 195x32",
+      "Add files or run commands 28x28",
+      "Annotate an element 32x28",
+      "Prompts 30x28",
+      "Send message 34x34"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 0,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "03b-back-to-threads",
+   "out": "03b-back-to-threads-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 10,
+     "total": 16,
+     "samples": [
+      "Open right sidebar 28x28",
+      "Choose workspace 97x28",
+      "Run on Local 91x28",
+      "Workspace: In place 106x28",
+      "Standard mode 149x28",
+      "Command Code 1 · gpt-6-luna, reasoning P 195x32",
+      "Add files or run commands 28x28",
+      "Annotate an element 32x28",
+      "Prompts 30x28",
+      "Send message 34x34"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "04-composer-new",
+   "out": "04-composer-new-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 10,
+     "total": 16,
+     "samples": [
+      "Open right sidebar 28x28",
+      "Choose workspace 97x28",
+      "Run on Local 91x28",
+      "Workspace: In place 106x28",
+      "Standard mode 149x28",
+      "Command Code 1 · gpt-6-luna, reasoning P 195x32",
+      "Add files or run commands 28x28",
+      "Annotate an element 32x28",
+      "Prompts 30x28",
+      "Send message 34x34"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "05-inbox",
+   "out": "05-inbox-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 0,
+     "total": 8,
+     "samples": []
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "06-more",
+   "out": "06-more-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 7,
+     "total": 15,
+     "samples": [
+      "LandWorkspaces ready to land, and reposi 296x36",
+      "WorkBacklog items and schedules that sta 296x36",
+      "AgentsConfigured agents and their messag 296x36",
+      "ObserveUsage, activity, traces, jobs and 296x36",
+      "KnowledgeMemory and reference material a 296x36",
+      "SettingsAccounts, tools, secrets and plu 296x36",
+      "Where did a page go?Every former sidebar 320x36"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "07-land",
+   "out": "07-land-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 0,
+     "total": 14,
+     "samples": []
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "07b-land-workspaces",
+   "out": "07b-land-workspaces-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 1,
+     "total": 7,
+     "samples": [
+      "More actions 28x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "07c-land-back",
+   "out": "07c-land-back-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 1,
+     "total": 12,
+     "samples": [
+      "More actions 28x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "08-work",
+   "out": "08-work-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 1,
+     "total": 11,
+     "samples": [
+      "More actions 28x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "08b-work-backlog",
+   "out": "08b-work-backlog-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 24,
+     "total": 31,
+     "samples": [
+      "Feed 34x28",
+      "Inbox 34x28",
+      "Items 34x28",
+      "Board 34x28",
+      "Projects 34x28",
+      "Search backlog 96x16",
+      "Saved views 30x28",
+      "Filter by project 30x28",
+      "Sort by last update 30x28",
+      "Filter 30x28",
+      "Backlog settings 30x28",
+      "Backfill triage 30x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "09-agents",
+   "out": "09-agents-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 24,
+     "total": 35,
+     "samples": [
+      "Feed 34x28",
+      "Inbox 34x28",
+      "Items 34x28",
+      "Board 34x28",
+      "Projects 34x28",
+      "Search backlog 96x16",
+      "Saved views 30x28",
+      "Filter by project 30x28",
+      "Sort by last update 30x28",
+      "Filter 30x28",
+      "Backlog settings 30x28",
+      "Backfill triage 30x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "09b-agents-directory",
+   "out": "09b-agents-directory-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 8,
+     "total": 23,
+     "samples": [
+      "More actions 28x28",
+      "🛠DSH@dshThe harness itself: default mod 335x36",
+      "Enabled 32x18",
+      "INPUT 361x32",
+      "agent 361x32",
+      "agent:agent 361x32"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "10-observe",
+   "out": "10-observe-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 8,
+     "total": 29,
+     "samples": [
+      "More actions 28x28",
+      "🛠DSH@dshThe harness itself: default mod 335x36",
+      "Enabled 32x18",
+      "INPUT 361x32",
+      "agent 361x32",
+      "agent:agent 361x32"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "10b-observe-usage",
+   "out": "10b-observe-usage-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 1,
+     "total": 50,
+     "samples": [
+      "More actions 28x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "10c-observe-processes",
+   "out": "10c-observe-processes-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 3,
+     "total": 29,
+     "samples": [
+      "More actions 28x28",
+      "Search jobs 336x32",
+      "Group 160x32"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "10d-observe-traces",
+   "out": "10d-observe-traces-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 5,
+     "total": 25,
+     "samples": [
+      "More actions 28x28",
+      "Views 32x28",
+      "Search traces 331x32",
+      "Service 361x28",
+      "Min duration (ms) 144x32"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "11-knowledge",
+   "out": "11-knowledge-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 7,
+     "total": 20,
+     "samples": [
+      "Memory project 128x28",
+      "Search memories 204x34",
+      "Filter by type 72x28",
+      "Filter by status 80x28",
+      "Filter by source 84x28",
+      "Sort notes 86x28",
+      "Select notes 28x28"
+     ]
+    },
+    "hoverOnly": {
+     "count": 0,
+     "samples": []
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "12-settings",
+   "out": "12-settings-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 7,
+     "total": 33,
+     "samples": [
+      "Search settings 234x32",
+      "Open configuration file 34x26",
+      "More ways to open the configuration file 24x26",
+      "Close 28x28",
+      "Sections 366x32",
+      "Workspace Write 164x36",
+      "English 101x36"
+     ]
+    },
+    "hoverOnly": {
+     "count": 2,
+     "samples": [
+      "Increase font size",
+      "Decrease font size"
+     ]
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  },
+  {
+   "name": "13-status-chip",
+   "out": "13-status-chip-phone.png",
+   "ok": true,
+   "results": [],
+   "metrics": {
+    "overflow": {
+     "scrollWidth": 390,
+     "clientWidth": 390,
+     "bodyScrollWidth": 390
+    },
+    "pastEdge": {
+     "count": 0,
+     "samples": []
+    },
+    "clipped": {
+     "count": 0,
+     "samples": []
+    },
+    "smallTargets": {
+     "count": 10,
+     "total": 36,
+     "samples": [
+      "Search settings 234x32",
+      "Open configuration file 34x26",
+      "More ways to open the configuration file 24x26",
+      "Close 28x28",
+      "Sections 366x32",
+      "Workspace Write 164x36",
+      "English 101x36",
+      "Command Code 1: Weekly limit: 10% left,  100x32",
+      "Add AI account 32x32",
+      "AI account settings 32x32"
+     ]
+    },
+    "hoverOnly": {
+     "count": 2,
+     "samples": [
+      "Increase font size",
+      "Decrease font size"
+     ]
+    },
+    "viewportMeta": "width=device-width, initial-scale=1, viewport-fit=cover",
+    "tabBarBottom": 844,
+    "scrollY": 0,
+    "innerHeight": 844
+   }
+  }
+ ]
+}
