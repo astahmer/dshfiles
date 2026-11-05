@@ -41,6 +41,8 @@ export interface ShippedItem {
   readonly byAgent: boolean
   readonly revisions: readonly string[]
   readonly pullRequests: readonly string[]
+  /** The final summary written when it closed. */
+  readonly summary?: string
 }
 
 export interface ShippedProjectGroup {
@@ -146,8 +148,9 @@ const shippedItemOf = (item: BacklogItem, done: DoneEvent): ShippedItem => {
     revisions: item.links.filter(link => link.type === 'revision').map(link => link.target),
     pullRequests: item.links.filter(link => link.type === 'url' && pullRequestPattern.test(link.target)).map(link => link.target),
   }
-  if (item.ref === undefined) return shipped
-  return { ...shipped, ref: item.ref }
+  const summarized = item.summary === undefined ? shipped : { ...shipped, summary: item.summary }
+  if (item.ref === undefined) return summarized
+  return { ...summarized, ref: item.ref }
 }
 
 const byProject = (items: readonly ShippedItem[]): ShippedProjectGroup[] => {
@@ -208,7 +211,7 @@ const render = (shippedDigest: ShippedDigest): string => {
       const lines = bucket.projects.flatMap(group =>
         group.items.map(
           item =>
-            `  ${BacklogReference.labelOf(item)} ${item.title} · ${item.kind}${group.project === null ? '' : ` · ${group.project}`}${item.byAgent ? ' · agent' : ''}`,
+            `  ${BacklogReference.labelOf(item)} ${item.title} · ${item.kind}${group.project === null ? '' : ` · ${group.project}`}${item.byAgent ? ' · agent' : ''}${item.summary === undefined ? '' : `\n    ${item.summary.replace(/\s+/g, ' ').slice(0, 200)}`}`,
         ),
       )
       return [heading, ...lines].join('\n')

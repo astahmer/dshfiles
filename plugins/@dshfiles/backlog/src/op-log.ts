@@ -54,9 +54,26 @@ const setOpSchema = Schema.Union([
   setOf('priority', BacklogItems.prioritySchema),
   setOf('parent', BacklogItems.itemRefSchema),
   setOf('delegate', BacklogItems.delegateSchema),
+  setOf('criteria', BacklogItems.criteriaSchema),
+  setOf('plan', Schema.String),
+  setOf('planApproval', BacklogItems.planApprovalSchema),
+  setOf('summary', Schema.String),
 ])
 
-const optionalFields = ['proposal', 'attention', 'acknowledgedAt', 'snoozedUntil', 'tweetContextUrls', 'priority', 'parent', 'delegate'] as const
+const optionalFields = [
+  'proposal',
+  'attention',
+  'acknowledgedAt',
+  'snoozedUntil',
+  'tweetContextUrls',
+  'priority',
+  'parent',
+  'delegate',
+  'criteria',
+  'plan',
+  'planApproval',
+  'summary',
+] as const
 type OptionalField = (typeof optionalFields)[number]
 
 const memberOf = <const Kind extends 'add' | 'remove'>(kind: Kind) =>
@@ -193,6 +210,18 @@ const applySet = (item: MutableItem, op: typeof setOpSchema.Type): void => {
       return
     case 'delegate':
       item.delegate = op.value
+      return
+    case 'criteria':
+      item.criteria = op.value
+      return
+    case 'plan':
+      item.plan = op.value
+      return
+    case 'planApproval':
+      item.planApproval = op.value
+      return
+    case 'summary':
+      item.summary = op.value
   }
 }
 
@@ -221,6 +250,18 @@ const unsetField = (item: MutableItem, field: OptionalField): void => {
       return
     case 'delegate':
       delete item.delegate
+      return
+    case 'criteria':
+      delete item.criteria
+      return
+    case 'plan':
+      delete item.plan
+      return
+    case 'planApproval':
+      delete item.planApproval
+      return
+    case 'summary':
+      delete item.summary
   }
 }
 
@@ -326,6 +367,14 @@ const setOpFor = (
       return next.parent === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.parent }
     case 'delegate':
       return next.delegate === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.delegate }
+    case 'criteria':
+      return next.criteria === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.criteria }
+    case 'plan':
+      return next.plan === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.plan }
+    case 'planApproval':
+      return next.planApproval === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.planApproval }
+    case 'summary':
+      return next.summary === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.summary }
   }
 }
 

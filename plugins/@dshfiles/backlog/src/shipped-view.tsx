@@ -55,7 +55,10 @@ const ItemRow = (props: {
     >
       <ItemGlyphs.KindIcon kind={entry.kind} />
       <span className="dshx:w-12 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{label}</span>
-      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{entry.title}</span>
+      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+        {entry.title}
+        {entry.summary === undefined ? null : <span className="dshx:text-muted-foreground"> — {entry.summary}</span>}
+      </span>
       {entry.byAgent ? (
         <span className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:bg-info/12 dshx:px-1.5 dshx:text-[11px] dshx:text-info">
           <BotIcon aria-hidden className="dshx:size-3" />

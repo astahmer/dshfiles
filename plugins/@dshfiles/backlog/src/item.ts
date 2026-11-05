@@ -21,7 +21,25 @@ const attentions = ['none', 'needs-input', 'blocked', 'waiting'] as const
 const freshnessStates = ['fresh', 'stale', 'dormant', 'archived'] as const
 /** Linear's set, in its order: `none` is no priority, then urgent (1) to low (4). */
 const priorities = ['none', 'urgent', 'high', 'medium', 'low'] as const
-const humanFieldNames = ['title', 'body', 'kind', 'status', 'project', 'tags', 'pinned', 'attention', 'priority', 'parent'] as const
+const humanFieldNames = [
+  'title',
+  'body',
+  'kind',
+  'status',
+  'project',
+  'tags',
+  'pinned',
+  'attention',
+  'priority',
+  'parent',
+  'criteria',
+  'plan',
+  'planApproval',
+  'summary',
+] as const
+const MAX_CRITERIA = 50
+const MAX_CRITERION_CHARS = 500
+const planApprovals = ['pending', 'approved'] as const
 /** Deepest parent chain: an item, its child and a grandchild. */
 const MAX_PARENT_DEPTH = 3
 const imageMediaTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const
@@ -34,6 +52,14 @@ const attentionSchema = Schema.Literals(attentions)
 const prioritySchema = Schema.Literals(priorities)
 /** The `b:<ref>` of another item, without its `b:` prefix: a short alias or a legacy number. */
 const itemRefSchema = Schema.String.check(Schema.isPattern(/^([0-9a-hjkmnp-tv-z]{4,5}|[1-9]\d{0,9})$/))
+/** One acceptance criterion: checked off on its own, rolled up as `3/5` on the item. */
+const criterionSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isPattern(/^[a-z0-9-]{1,40}$/)),
+  text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_CRITERION_CHARS)),
+  done: Schema.Boolean,
+})
+const criteriaSchema = Schema.Array(criterionSchema).check(Schema.isMaxLength(MAX_CRITERIA))
+const planApprovalSchema = Schema.Literals(planApprovals)
 /** The agent an item is handed to: `agent:<sessionId>`. */
 const delegateSchema = Schema.String.check(Schema.isPattern(/^agent:[\w.-]+$/))
 /** `relation` and `provenance` came later: rows written before them decode as a plain related link. */
@@ -141,9 +167,19 @@ const itemSchema = Schema.Struct({
   parent: Schema.optionalKey(itemRefSchema),
   /** The agent working on it for its owner, set by a claim or a thread started from it; the owner stays the creator. */
   delegate: Schema.optionalKey(delegateSchema),
+  /** Acceptance criteria, each checked off on its own. */
+  criteria: Schema.optionalKey(criteriaSchema),
+  /** How the work will be done; an agent may write it. */
+  plan: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(MAX_BODY_CHARS))),
+  /** `pending` while the plan waits for the user's approval, `approved` once given; absent when nobody asked. */
+  planApproval: Schema.optionalKey(planApprovalSchema),
+  /** What was done, written when the item closes; Shipped shows it. */
+  summary: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(MAX_BODY_CHARS))),
 })
 
 export type BacklogPriority = typeof prioritySchema.Type
+export type BacklogCriterion = typeof criterionSchema.Type
+export type BacklogPlanApproval = typeof planApprovalSchema.Type
 export type BacklogProposal = typeof proposalSchema.Type
 export type BacklogKind = typeof kindSchema.Type
 export type BacklogStatus = typeof statusSchema.Type
@@ -301,6 +337,50 @@ const isUnclaimedAgentItem = (item: Pick<BacklogItem, 'actors' | 'events' | 'att
   (item.attention ?? 'none') === 'none' &&
   (item.proposal ?? null) === null
 
+/** Criteria checked out of all of them: what the `3/5` roll-up shows. */
+const criteriaRollup = (criteria: readonly BacklogCriterion[] | undefined) => ({
+  total: criteria?.length ?? 0,
+  done: criteria?.filter(criterion => criterion.done).length ?? 0,
+})
+
+const criterionSalt = (text: string): string => {
+  let hash = 0
+  for (const char of text) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  return hash.toString(36).slice(0, 6)
+}
+
+const criterionId = (text: string, index: number): string => `c${String(index + 1)}-${criterionSalt(text)}`
+
+/** Criteria from lines of text: `- [x] done`, `- [ ] open` or a bare line, with stable ids for the ones already known. */
+const criteriaFromText = (text: string, known: readonly BacklogCriterion[] = []): BacklogCriterion[] =>
+  text
+    .split('\n')
+    .map(line => /^\s*(?:[-*]\s*)?(?:\[([ xX])\]\s*)?(.*)$/.exec(line))
+    .flatMap(match => {
+      const textPart = match?.[2]?.trim() ?? ''
+      if (textPart === '') return []
+      return [{ text: textPart.slice(0, MAX_CRITERION_CHARS), done: (match?.[1] ?? ' ').toLowerCase() === 'x' }]
+    })
+    .slice(0, MAX_CRITERIA)
+    .map((criterion, index) => ({ id: known.find(own => own.text === criterion.text)?.id ?? criterionId(criterion.text, index), ...criterion }))
+
+
+/** How an event shows a field change: lists and criteria as short text, never `[object Object]`. */
+const displayValue = (value: unknown): string => {
+  if (value === null || value === undefined) return ''
+  if (Array.isArray(value))
+    return value
+      .map(entry =>
+        typeof entry === 'object' && entry !== null && 'text' in entry && 'done' in entry
+          ? `[${entry.done === true ? 'x' : ' '}] ${String(entry.text)}`
+          : typeof entry === 'object' && entry !== null && 'kind' in entry && 'target' in entry
+            ? `${String(entry.kind)}:${String(entry.target)}`
+            : String(entry),
+      )
+      .join(', ')
+  return String(value)
+}
+
 /** The marker a backfill leaves when triage looked at an item and found nothing to change; not activity of its own. */
 const triageNoChange = 'found nothing to change'
 
@@ -316,6 +396,16 @@ export class BacklogItems {
   static readonly priorityRank = priorityRank
   static readonly itemRefSchema = itemRefSchema
   static readonly delegateSchema = delegateSchema
+  static readonly criterionSchema = criterionSchema
+  static readonly criteriaSchema = criteriaSchema
+  static readonly planApprovalSchema = planApprovalSchema
+  static readonly planApprovals = planApprovals
+  static readonly maxCriteria = MAX_CRITERIA
+  static readonly criteriaRollup = criteriaRollup
+  static readonly criteriaFromText = criteriaFromText
+  static readonly criterionId = criterionId
+  static readonly maxCriterionChars = MAX_CRITERION_CHARS
+  static readonly displayValue = displayValue
   static readonly maxParentDepth = MAX_PARENT_DEPTH
   static readonly attentionSchema = attentionSchema
   static readonly relationSchema = relationSchema

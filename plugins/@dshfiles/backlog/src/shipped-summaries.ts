@@ -71,7 +71,7 @@ const modelInputOf = (bucket: ShippedBucket): string =>
       `Project ${group.project ?? '(none)'}:`,
       ...group.items.map(
         item =>
-          `- ${BacklogReference.labelOf(item)} [${item.kind}] ${item.title}${item.pullRequests.length > 0 ? ` (PR ${item.pullRequests.join(', ')})` : ''}`,
+          `- ${BacklogReference.labelOf(item)} [${item.kind}] ${item.title}${item.pullRequests.length > 0 ? ` (PR ${item.pullRequests.join(', ')})` : ''}${item.summary === undefined ? '' : `: ${item.summary.replace(/\s+/g, ' ').slice(0, 400)}`}`,
       ),
     ]),
   ].join('\n')

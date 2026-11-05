@@ -16,7 +16,9 @@ import {
   type BacklogHumanField,
   type BacklogItem,
   type BacklogKind,
+  type BacklogCriterion,
   type BacklogLink,
+  type BacklogPlanApproval,
   type BacklogPriority,
   type BacklogProposal,
   type BacklogStatus,
@@ -24,20 +26,20 @@ import {
 import { ItemRelations, type BacklogLease, type ItemRelationIndex } from './item-relations.js'
 import type { LeaseWrite } from './backlog-repo.js'
 import { FieldRevert } from './field-revert.js'
+import { BacklogOps } from './op-log.js'
 import { BacklogShipped, type ShippedDigest, type ShippedQuery } from './shipped.js'
 import { BacklogSearch, type SearchMatch } from './search.js'
 import { BacklogSearchIndex } from './search-index.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 import { BacklogTriage } from './triage.js'
 
-/**
- * The fields one edit replaces, mutable because a handler assembles them before the record is rewritten. `parent` and
- * `delegate` take null to remove them.
- */
-type BacklogChange = { -readonly [K in Exclude<keyof BacklogItem, 'parent' | 'delegate'>]?: BacklogItem[K] } & {
-  parent?: string | null
-  delegate?: string | null
-}
+/** Optional fields an edit may remove: null clears them, undefined leaves them as they are. */
+const clearableFields = ['parent', 'delegate', 'criteria', 'plan', 'planApproval', 'summary'] as const
+type ClearableField = (typeof clearableFields)[number]
+type ClearableChange = { -readonly [K in ClearableField]?: NonNullable<BacklogItem[K]> | null | undefined }
+
+/** The fields one edit replaces, mutable because a handler assembles them before the record is rewritten. */
+type BacklogChange = { -readonly [K in Exclude<keyof BacklogItem, ClearableField>]?: BacklogItem[K] } & ClearableChange
 /** The optional dimensions an upload carries; mutable while the attachment is assembled. */
 type AttachmentDimensions = { -readonly [K in 'width' | 'height']?: BacklogAttachment[K] }
 type ProposalDraft = { -readonly [K in keyof BacklogProposal]?: BacklogProposal[K] }
@@ -84,6 +86,20 @@ export interface BacklogUpdate {
   readonly priority?: BacklogPriority | undefined
   /** The ref of the item to nest this one under, or null to make it top-level again. */
   readonly parent?: string | null | undefined
+  /** Every acceptance criterion, replacing the list; null removes them. A criterion without id keeps the id of one with the same text. */
+  readonly criteria?: readonly CriterionInput[] | null | undefined
+  /** Checks or unchecks criteria by id without rewriting the list. */
+  readonly criteriaChecks?: readonly { readonly id: string; readonly done: boolean }[] | undefined
+  readonly plan?: string | null | undefined
+  /** `pending` asks the user to approve the plan (attention needs-input); only the user sets `approved`. */
+  readonly planApproval?: BacklogPlanApproval | null | undefined
+  readonly summary?: string | null | undefined
+}
+
+export interface CriterionInput {
+  readonly id?: string | undefined
+  readonly text: string
+  readonly done?: boolean | undefined
 }
 
 export type BacklogResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly reason: 'not-found' }
@@ -188,6 +204,8 @@ const summarize = (
   ready: relations.isReady(item),
   blockedBy: relations.openBlockersOf(item).map(blocker => BacklogReference.refOf(blocker)),
   lease: leaseView(relations.leaseOf(item)),
+  criteriaProgress: BacklogItems.criteriaRollup(item.criteria),
+  planApproval: item.planApproval ?? null,
 })
 
 /** Pinned first, then newest activity: the Discord order, where idle things sink on their own. */
@@ -353,8 +371,23 @@ const userCommentIndex = (item: BacklogItem, commentId: string): number =>
       (event.commentId === commentId || (event.commentId === undefined && commentId === `legacy-${String(event.at)}-${String(index)}`)),
   )
 
+/** A criteria list from a caller: trimmed, unique ids, and each criterion keeps the id and check of the one it names. */
+const criteriaOf = (input: readonly CriterionInput[], known: readonly BacklogCriterion[]): BacklogCriterion[] => {
+  const used = new Set<string>()
+  return input.slice(0, BacklogItems.maxCriteria).flatMap((criterion, index) => {
+    const text = criterion.text.trim().slice(0, BacklogItems.maxCriterionChars)
+    if (text === '') return []
+    const candidate = criterion.id ?? known.find(own => own.text === text && !used.has(own.id))?.id ?? BacklogItems.criterionId(text, index)
+    const id = used.has(candidate) ? BacklogItems.criterionId(text, index + used.size) : candidate
+    used.add(id)
+    return [{ id, text, done: criterion.done ?? known.find(own => own.id === id)?.done ?? false }]
+  })
+}
+
+const sameText = (left: string | undefined, right: string | null | undefined): boolean => (left ?? '') === (right ?? '')
+
 /** What one `update` call changes, the fields it records, and the fields that become the user's. */
-const updateChange = (item: BacklogItem, fields: Omit<BacklogUpdate, 'id'>) => {
+const updateChange = (item: BacklogItem, fields: Omit<BacklogUpdate, 'id'>, actor: BacklogActor) => {
   const change: BacklogChange = {}
   const changed: BacklogHumanField[] = []
   const userChanged = new Set<BacklogHumanField>()
@@ -416,6 +449,44 @@ const updateChange = (item: BacklogItem, fields: Omit<BacklogUpdate, 'id'>) => {
     recordChange('parent')
   }
   if (fields.snoozedUntil !== undefined && fields.snoozedUntil !== (item.snoozedUntil ?? null)) change.snoozedUntil = fields.snoozedUntil
+  const knownCriteria = item.criteria ?? []
+  const replacedCriteria = fields.criteria === undefined ? undefined : fields.criteria === null ? null : criteriaOf(fields.criteria, knownCriteria)
+  const checked = (replacedCriteria ?? knownCriteria).map(criterion => {
+    const check = fields.criteriaChecks?.find(candidate => candidate.id === criterion.id)
+    return check === undefined || check.done === criterion.done ? criterion : { ...criterion, done: check.done }
+  })
+  const nextCriteria = replacedCriteria === null ? null : replacedCriteria !== undefined || fields.criteriaChecks !== undefined ? checked : undefined
+  if (nextCriteria === null && item.criteria !== undefined) {
+    change.criteria = null
+    recordChange('criteria')
+  }
+  if (nextCriteria !== null && nextCriteria !== undefined && !BacklogOps.sameValue(nextCriteria, knownCriteria)) {
+    change.criteria = nextCriteria.length === 0 ? null : nextCriteria
+    recordChange('criteria')
+  }
+  if (fields.plan !== undefined && !sameText(item.plan, fields.plan)) {
+    change.plan = fields.plan === null || fields.plan.trim() === '' ? null : fields.plan.slice(0, BacklogItems.maxBodyChars)
+    recordChange('plan')
+  }
+  // Only the user approves a plan; an agent asks for approval.
+  const approval = fields.planApproval === 'approved' && actor.kind !== 'user' ? undefined : fields.planApproval
+  if (approval !== undefined && approval !== (item.planApproval ?? null)) {
+    change.planApproval = approval
+    recordChange('planApproval')
+    if (approval === 'pending' && fields.attention === undefined && (item.attention ?? 'none') === 'none') {
+      change.attention = 'needs-input'
+      change.acknowledgedAt = null
+      changed.push('attention')
+    }
+    if (approval === 'approved' && fields.attention === undefined && item.attention === 'needs-input') {
+      change.attention = 'none'
+      changed.push('attention')
+    }
+  }
+  if (fields.summary !== undefined && !sameText(item.summary, fields.summary)) {
+    change.summary = fields.summary === null || fields.summary.trim() === '' ? null : fields.summary.slice(0, BacklogItems.maxBodyChars)
+    recordChange('summary')
+  }
   const closedChange = closedStateChange({ item, status: change.status ?? item.status, attention: change.attention })
   if (closedChange.attention !== undefined) {
     if (change.attention === undefined) changed.push('attention')
@@ -485,22 +556,52 @@ const resolveIn = (records: ReadonlyMap<number, BacklogItem>, key: number | stri
   return ref === undefined ? undefined : idOfRef(records, ref)
 }
 
-/** Sets `parent` or `delegate`, or removes it for null; undefined leaves it as it is. */
-const withOptional = (item: BacklogItem, field: 'parent' | 'delegate', value: string | null | undefined): BacklogItem => {
-  if (value === undefined) return item
-  const { parent, delegate, ...rest } = item
-  const kept: BacklogItem = {
-    ...rest,
-    ...(parent !== undefined && field !== 'parent' && { parent }),
-    ...(delegate !== undefined && field !== 'delegate' && { delegate }),
-  }
-  if (value === null) return kept
-  return field === 'parent' ? { ...kept, parent: value } : { ...kept, delegate: value }
+/** Removes an optional field for null, or sets it; undefined leaves it as it is. */
+const clearOrSet = <Value>(input: {
+  readonly item: BacklogItem
+  readonly value: Value | null | undefined
+  readonly set: (base: BacklogItem, value: Value) => BacklogItem
+  readonly remove: (base: BacklogItem) => BacklogItem
+}): BacklogItem => {
+  if (input.value === undefined) return input.item
+  return input.value === null ? input.remove(input.item) : input.set(input.item, input.value)
 }
+
+const withClearable = (item: BacklogItem, change: ClearableChange): BacklogItem =>
+  [
+    (base: BacklogItem) =>
+      clearOrSet({ item: base, value: change.parent, set: (next, parent) => ({ ...next, parent }), remove: ({ parent: _parent, ...rest }) => rest }),
+    (base: BacklogItem) =>
+      clearOrSet({
+        item: base,
+        value: change.delegate,
+        set: (next, delegate) => ({ ...next, delegate }),
+        remove: ({ delegate: _delegate, ...rest }) => rest,
+      }),
+    (base: BacklogItem) =>
+      clearOrSet({
+        item: base,
+        value: change.criteria,
+        set: (next, criteria) => ({ ...next, criteria }),
+        remove: ({ criteria: _criteria, ...rest }) => rest,
+      }),
+    (base: BacklogItem) => clearOrSet({ item: base, value: change.plan, set: (next, plan) => ({ ...next, plan }), remove: ({ plan: _plan, ...rest }) => rest }),
+    (base: BacklogItem) =>
+      clearOrSet({
+        item: base,
+        value: change.planApproval,
+        set: (next, planApproval) => ({ ...next, planApproval }),
+        remove: ({ planApproval: _planApproval, ...rest }) => rest,
+      }),
+    (base: BacklogItem) =>
+      clearOrSet({ item: base, value: change.summary, set: (next, summary) => ({ ...next, summary }), remove: ({ summary: _summary, ...rest }) => rest }),
+  ].reduce((next, apply) => apply(next), item)
+
+const isClearable = (field: string): field is ClearableField => clearableFields.some(candidate => candidate === field)
 
 /** What a revert writes for an optional field that had no value before the change. */
 const clearedValue = (field: BacklogHumanField): string | null | undefined => {
-  if (field === 'parent') return null
+  if (isClearable(field)) return null
   return field === 'attention' || field === 'priority' ? 'none' : undefined
 }
 
@@ -747,14 +848,11 @@ export class BacklogStore extends Context.Service<
             (field === 'priority' && after === 'none' && item.priority === undefined)
           )
             return []
-          const before = item[field]
-          const display = (value: typeof after | typeof before): string =>
-            value === null || value === undefined ? '' : Array.isArray(value) ? value.join(', ') : String(value)
-          const beforeText = display(before)
-          const afterText = display(after)
+          const beforeText = BacklogItems.displayValue(item[field]).slice(0, BacklogItems.maxBodyChars)
+          const afterText = BacklogItems.displayValue(after).slice(0, BacklogItems.maxBodyChars)
           return beforeText === afterText ? [] : [{ field, before: beforeText, after: afterText }]
         })
-        const { parent, delegate, ...fields } = change
+        const { parent, delegate, criteria, plan, planApproval, summary, ...fields } = change
         const merged: BacklogItem = {
           ...item,
           ...fields,
@@ -762,7 +860,7 @@ export class BacklogStore extends Context.Service<
           lastActivityAt: at,
           events: [...item.events, { at, actor: actorId, origin: actorId, ...event, ...(fieldChanges.length !== 0 && { fieldChanges }) }],
         }
-        const next = withOptional(withOptional(merged, 'parent', parent), 'delegate', delegate)
+        const next = withClearable(merged, { parent, delegate, criteria, plan, planApproval, summary })
         yield* persist(next, event.origin ?? actorId, leaseWrite)
         const stored = next.events.at(-1)
         if (stored !== undefined) yield* PubSub.publish(notices, { item: next, event: stored })
@@ -975,7 +1073,7 @@ export class BacklogStore extends Context.Service<
             const parent =
               requested.parent === undefined || requested.parent === null ? requested.parent : yield* checkedParent({ item, parentRef: requested.parent })
             const fields = { ...requested, parent }
-            const { change, changed, userChanged } = updateChange(item, fields)
+            const { change, changed, userChanged } = updateChange(item, fields, actor)
             const clearedSuggestion = change.proposal === null
             if (changed.length === 0 && change.snoozedUntil === undefined && !clearedSuggestion) return yield* unchanged(item)
             if (changed.length === 0) {

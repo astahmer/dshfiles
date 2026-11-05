@@ -10,7 +10,7 @@ type MatchField = 'id' | 'title' | 'tag' | 'body' | 'comment' | 'link' | 'projec
 const fieldWeights = { id: 12, title: 8, tag: 6, project: 3, link: 3, body: 2, capture: 1.5, comment: 1 } satisfies Record<MatchField, number>
 
 type ActorKind = 'user' | 'agent' | 'system'
-type SearchState = 'ready' | 'blocked-by-deps' | 'delegated' | 'claimed' | 'children' | 'parent'
+type SearchState = 'ready' | 'blocked-by-deps' | 'delegated' | 'claimed' | 'children' | 'parent' | 'criteria' | 'plan' | 'summary' | 'plan-pending'
 
 /** What an operator needs from the other items: readiness, blockers, sub-issues and claims are not on the item itself. */
 export interface SearchContext {
@@ -82,6 +82,15 @@ const stateWords = new Map<string, SearchState>([
   ['blocked-by-deps', 'blocked-by-deps'],
   ['delegated', 'delegated'],
   ['claimed', 'claimed'],
+  ['plan-pending', 'plan-pending'],
+])
+/** `has:` words about the item's own sections rather than its links. */
+const sectionWords = new Map<string, SearchState>([
+  ['children', 'children'],
+  ['parent', 'parent'],
+  ['criteria', 'criteria'],
+  ['plan', 'plan'],
+  ['summary', 'summary'],
 ])
 const actorWords = new Map<string, ActorKind>([
   ['me', 'user'],
@@ -122,7 +131,7 @@ const addToken = (filters: MutableFilters, token: string): void => {
   else if (key === 'project' && value !== '') filters.projects.push(value)
   else if (key === 'by' && actor !== undefined) filters.actors.push(actor)
   else if (key === 'created' && actor !== undefined) filters.creators.push(actor)
-  else if (key === 'has' && (value === 'children' || value === 'parent')) filters.states.push(value)
+  else if (key === 'has' && sectionWords.has(value)) filters.states.push(sectionWords.get(value) ?? 'children')
   else if (key === 'has' && hasWords.has(value)) filters.has.push(hasWords.get(value) ?? 'url')
   else if (key === 'is' && stateWords.has(value)) filters.states.push(stateWords.get(value) ?? 'ready')
   else if (key === 'priority' && priority !== undefined) filters.priorities.push(priority)
@@ -139,7 +148,7 @@ const addToken = (filters: MutableFilters, token: string): void => {
  * Free text plus operators, all optional and combinable: `kind:bug`, `status:doing`, `is:blocked` (kind, status or
  * attention), `#tag`, `project:welii`, `by:agent` (touched by), `created:me` (captured by), `has:thread`,
  * `updated:<7d`, `updated:>30d`, `priority:high`, `parent:b:k3f9`, `has:children`, `is:ready`, `is:blocked-by-deps`,
- * `is:delegated`, `is:claimed`, `delegate:agent`. Quoted text is one term. A leading `-` negates any of them, words included.
+ * `is:delegated`, `is:claimed`, `delegate:agent`, `has:criteria`, `has:plan`, `has:summary`, `is:plan-pending`. Quoted text is one term. A leading `-` negates any of them, words included.
  */
 const parse = (raw: string): SearchQuery => {
   const included = emptyFilters()
@@ -189,6 +198,14 @@ const inState = (item: BacklogItem, state: SearchState, context: SearchContext):
       return context.hasChildren(item)
     case 'parent':
       return item.parent !== undefined
+    case 'criteria':
+      return (item.criteria?.length ?? 0) > 0
+    case 'plan':
+      return item.plan !== undefined
+    case 'summary':
+      return item.summary !== undefined
+    case 'plan-pending':
+      return item.planApproval === 'pending'
   }
 }
 const updatedWithin = (item: BacklogItem, days: number, now: number): boolean => now - item.lastActivityAt <= days * DAY_MS
@@ -245,7 +262,7 @@ const sourcesOf = (item: BacklogItem): readonly (readonly [MatchField, readonly 
     ['tag', item.tags.map(tag => `#${tag}`)],
     ['project', [item.project ?? '']],
     ['link', item.links.map(link => link.target)],
-    ['body', [item.body]],
+    ['body', [item.body, item.plan ?? '', item.summary ?? '', ...(item.criteria ?? []).map(criterion => criterion.text)]],
     ['capture', [capture]],
     ['comment', comments],
   ]

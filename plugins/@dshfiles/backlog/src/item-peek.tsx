@@ -72,6 +72,7 @@ import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { submitReply } from './reply-submission.js'
 import type { AgentContinuationSelection, AgentContinuationThread } from './agent-dispatch.js'
 import { ItemPickers } from './item-pickers.js'
+import { PeekSections } from './peek-sections.js'
 import { PeekWork } from './peek-work.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { BacklogTextBox } from './text-box.js'
@@ -1374,6 +1375,7 @@ const PeekBody = (props: {
               </details>
             ) : null}
           </div>
+          {props.loading ? null : <PeekSections.Sections detail={props.detail} />}
           <PeekWork.SubIssues detail={props.detail} select={props.select} />
           <Section title="Relationships" action={<AddLink id={item.id} />}>
             {groups.length === 0 && props.detail.backlinks.length === 0 ? (
@@ -1462,12 +1464,24 @@ const PeekBody = (props: {
 
 /** The detail a list row already holds, shown while the full one loads; relations the row lacks start empty. */
 const placeholderDetail = (summary: BacklogSummaryView) => {
-  const { parent, delegate, children: _children, ready: _ready, blockedBy: _blockedBy, lease, owner: _owner, ...fields } = summary
+  const {
+    parent,
+    delegate,
+    children: _children,
+    ready: _ready,
+    blockedBy: _blockedBy,
+    lease,
+    owner: _owner,
+    criteriaProgress: _criteriaProgress,
+    planApproval,
+    ...fields
+  } = summary
   return {
     item: {
       ...fields,
       ...(parent !== null && { parent }),
       ...(delegate !== null && { delegate }),
+      ...(planApproval !== null && { planApproval }),
       body: summary.preview,
       tweetContextUrls: summary.tweetContextUrls ?? [],
       humanFields: [],

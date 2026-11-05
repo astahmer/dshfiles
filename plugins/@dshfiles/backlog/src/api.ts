@@ -71,6 +71,11 @@ const leaseSchema = Schema.Struct({
   acquiredAt: Schema.Number.check(Schema.isFinite()),
   expiresAt: Schema.Number.check(Schema.isFinite()),
 })
+const criterionInputSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isPattern(/^[a-z0-9-]{1,40}$/)).pipe(Schema.optional),
+  text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(500)),
+  done: Schema.Boolean.pipe(Schema.optional),
+})
 const nullDefault = <S extends Schema.Top>(schema: S) => Schema.NullOr(schema).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null)))
 const countSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 
@@ -132,6 +137,10 @@ const summarySchema = Schema.Struct({
   blockedBy: Schema.Array(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   /** The live claim on it, if any. */
   lease: nullDefault(leaseSchema),
+  /** Acceptance criteria checked out of all of them; a Host that predates criteria answers none. */
+  criteriaProgress: Schema.Struct({ total: countSchema, done: countSchema }).pipe(Schema.withDecodingDefaultKey(Effect.succeed({ total: 0, done: 0 }))),
+  /** `pending` while the plan waits for the user's approval. */
+  planApproval: nullDefault(BacklogItems.planApprovalSchema),
 })
 
 const detailSchema = Schema.Struct({
@@ -174,7 +183,7 @@ const actorFilterSchema = Schema.Union([Schema.Literal(''), BacklogItems.actorId
 const listInputSchema = Schema.Struct({
   query: Schema.String.check(Schema.isMaxLength(500)).pipe(Schema.optional).annotate({
     description:
-      'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent (touched by) created:me|agent|system (captured by) has:thread|revision|url|children|parent updated:<7d updated:>30d priority:urgent|high|medium|low|none parent:b:k3f9 is:ready is:blocked-by-deps is:delegated is:claimed delegate:agent. A leading - negates any operator or word (-created:agent, -kind:note, -#tag, -priority:none). Results rank by relevance and say which fields matched.',
+      'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent (touched by) created:me|agent|system (captured by) has:thread|revision|url|children|parent updated:<7d updated:>30d priority:urgent|high|medium|low|none parent:b:k3f9 is:ready is:blocked-by-deps is:delegated is:claimed delegate:agent has:criteria|plan|summary is:plan-pending. A leading - negates any operator or word (-created:agent, -kind:note, -#tag, -priority:none). Results rank by relevance and say which fields matched.',
   }),
   statuses: Schema.Array(BacklogItems.statusSchema).pipe(Schema.optional),
   kinds: Schema.Array(BacklogItems.kindSchema).pipe(Schema.optional),
@@ -218,7 +227,13 @@ const renderItemPreview = (item: (typeof detailSchema.Type)['item']): string => 
   const body = previewText(item.body)
   const status = `${item.kind} · ${item.status}${(item.priority ?? 'none') === 'none' ? '' : ` · ${item.priority ?? ''}`}${item.parent === undefined ? '' : ` · under b:${item.parent}`}`
   const project = item.project === null ? '' : ` · ${item.project}`
-  return [`${BacklogReference.labelOf(item)} — ${item.title}`, `${status}${project}`, ...(body === '' ? [] : [body])].join('\n')
+  const rollup = BacklogItems.criteriaRollup(item.criteria)
+  const sections = [
+    ...(rollup.total === 0 ? [] : [`Criteria ${String(rollup.done)}/${String(rollup.total)}: ${BacklogItems.displayValue(item.criteria)}`]),
+    ...(item.plan === undefined ? [] : [`Plan${item.planApproval === undefined ? '' : ` (${item.planApproval})`}: ${previewText(item.plan)}`]),
+    ...(item.summary === undefined ? [] : [`Summary: ${previewText(item.summary)}`]),
+  ]
+  return [`${BacklogReference.labelOf(item)} — ${item.title}`, `${status}${project}`, ...(body === '' ? [] : [body]), ...sections].join('\n')
 }
 
 const renderDetailPreview = (result: typeof detailResultSchema.Type): string => (result.ok ? renderItemPreview(result.value.item) : 'No backlog item found.')
@@ -464,6 +479,8 @@ const shippedItemSchema = Schema.Struct({
   byAgent: Schema.Boolean,
   revisions: Schema.Array(Schema.String),
   pullRequests: Schema.Array(Schema.String),
+  /** The final summary written when it closed; a Host that predates summaries answers without. */
+  summary: Schema.optionalKey(Schema.String),
 })
 const shippedOutputSchema = Schema.Struct({
   period: shippedPeriodSchema,
@@ -699,9 +716,31 @@ export const backlogApi = defineApi({
         parent: Schema.NullOr(refTextSchema).pipe(Schema.optional).annotate({
           description: 'Nest it under this item (`b:k3f9`) as a sub-issue, or null to make it top-level. Refused for itself, a loop, or a fourth level.',
         }),
+        criteria: Schema.NullOr(Schema.Array(criterionInputSchema).check(Schema.isMaxLength(BacklogItems.maxCriteria)))
+          .pipe(Schema.optional)
+          .annotate({
+            description:
+              'Acceptance criteria, replacing the whole list ({text, done?, id?}); a criterion with the same text keeps its id and check. null removes them.',
+          }),
+        criteriaChecks: Schema.Array(Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(40)), done: Schema.Boolean }))
+          .check(Schema.isMaxLength(BacklogItems.maxCriteria))
+          .pipe(Schema.optional)
+          .annotate({ description: 'Check (done: true) or uncheck criteria by their id, as backlog_get returns them, without rewriting the list.' }),
+        plan: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars)))
+          .pipe(Schema.optional)
+          .annotate({ description: 'How the work will be done (markdown); null or empty removes it.' }),
+        planApproval: Schema.NullOr(BacklogItems.planApprovalSchema)
+          .pipe(Schema.optional)
+          .annotate({
+            description:
+              '`pending` asks the user to approve the plan before you start: the item asks for input until they approve. Only the user can set `approved`; wait for it.',
+          }),
+        summary: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars)))
+          .pipe(Schema.optional)
+          .annotate({ description: 'Final summary of what was done, written when closing the item; Shipped shows it.' }),
       }),
       output: detailResultSchema,
-      description: `Edit or move one backlog item, or ask the user for input with \`attention\`. ${writeNote}`,
+      description: `Edit or move one backlog item, or ask the user for input with \`attention\`. Structured sections: \`criteria\` (acceptance checklist), \`plan\` (with \`planApproval: pending\` to wait for the user's go-ahead) and \`summary\` (when closing). ${writeNote}`,
       tool: { name: 'backlog_update', readOnly: false, render: renderDetailPreview },
     }),
     ready: method({
@@ -990,7 +1029,8 @@ export const backlogApi = defineApi({
           description: 'The `at` time of the item event whose `fieldChanges` lists the change to undo, as `backlog_get` returns it.',
         }),
         field: BacklogItems.humanFieldSchema.annotate({
-          description: 'The changed field to put back: title, body, kind, status, project, tags, pinned or attention.',
+          description:
+            'The changed field to put back: title, body, kind, status, project, tags, pinned, attention, priority, parent, criteria, plan, planApproval or summary.',
         }),
         confirm: confirmSchema,
       }),
