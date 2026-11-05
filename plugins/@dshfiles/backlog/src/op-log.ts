@@ -1,4 +1,5 @@
 import { Schema, Struct } from 'effect'
+import { BacklogGates } from './gates.js'
 import { BacklogItems, type BacklogEvent, type BacklogItem } from './item.js'
 
 /**
@@ -60,6 +61,7 @@ const setOpSchema = Schema.Union([
   setOf('summary', Schema.String),
   setOf('due', Schema.String),
   setOf('recurrence', Schema.String),
+  setOf('gates', BacklogGates.listSchema),
 ])
 
 const optionalFields = [
@@ -77,6 +79,7 @@ const optionalFields = [
   'summary',
   'due',
   'recurrence',
+  'gates',
 ] as const
 type OptionalField = (typeof optionalFields)[number]
 
@@ -232,6 +235,9 @@ const applySet = (item: MutableItem, op: typeof setOpSchema.Type): void => {
       return
     case 'recurrence':
       item.recurrence = op.value
+      return
+    case 'gates':
+      item.gates = op.value
   }
 }
 
@@ -278,6 +284,9 @@ const unsetField = (item: MutableItem, field: OptionalField): void => {
       return
     case 'recurrence':
       delete item.recurrence
+      return
+    case 'gates':
+      delete item.gates
   }
 }
 
@@ -395,6 +404,8 @@ const setOpFor = (
       return next.due === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.due }
     case 'recurrence':
       return next.recurrence === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.recurrence }
+    case 'gates':
+      return next.gates === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.gates }
   }
 }
 

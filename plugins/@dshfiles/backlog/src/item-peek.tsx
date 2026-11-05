@@ -1511,6 +1511,7 @@ const placeholderDetail = (summary: BacklogSummaryView) => {
     due,
     overdue: _overdue,
     recurrence,
+    gates: _gates,
     ...fields
   } = summary
   return {

@@ -290,6 +290,7 @@ const Row = (props: {
           <WorkGlyphs.CriteriaBadge progress={item.criteriaProgress} />
           <WorkGlyphs.PlanPendingBadge approval={item.planApproval} />
           <WorkGlyphs.DueChip due={item.due} overdue={item.overdue} compact />
+          <WorkGlyphs.GatesBadge gates={item.gates} />
           <WorkGlyphs.BlockedBadge blockedBy={item.blockedBy} />
           <WorkGlyphs.ClaimChip lease={item.lease} compact />
           <WorkGlyphs.RunStateChip run={run} compact />

@@ -11,7 +11,7 @@ type MatchField = 'id' | 'title' | 'tag' | 'body' | 'comment' | 'link' | 'projec
 const fieldWeights = { id: 12, title: 8, tag: 6, project: 3, link: 3, body: 2, capture: 1.5, comment: 1 } satisfies Record<MatchField, number>
 
 type ActorKind = 'user' | 'agent' | 'system'
-type SearchState = 'ready' | 'blocked-by-deps' | 'delegated' | 'claimed' | 'children' | 'parent' | 'criteria' | 'plan' | 'summary' | 'plan-pending' | 'overdue' | 'due'
+type SearchState = 'ready' | 'blocked-by-deps' | 'delegated' | 'claimed' | 'children' | 'parent' | 'criteria' | 'plan' | 'summary' | 'plan-pending' | 'overdue' | 'due' | 'gated' | 'gates'
 
 /** What an operator needs from the other items: readiness, blockers, sub-issues and claims are not on the item itself. */
 export interface SearchContext {
@@ -19,11 +19,13 @@ export interface SearchContext {
   readonly isBlockedByDeps: (item: BacklogItem) => boolean
   readonly hasChildren: (item: BacklogItem) => boolean
   readonly isClaimed: (item: BacklogItem) => boolean
+  /** An open gate (a PR not merged, a revision not on main, a check not passed, a date not reached) holds it back. */
+  readonly isGated: (item: BacklogItem) => boolean
   /** The calendar date the search reads at, for due-date operators. */
   readonly today: string
 }
 
-const noContext: SearchContext = { isReady: () => false, isBlockedByDeps: () => false, hasChildren: () => false, isClaimed: () => false, today: '' }
+const noContext: SearchContext = { isReady: () => false, isBlockedByDeps: () => false, hasChildren: () => false, isClaimed: () => false, isGated: () => false, today: '' }
 
 /** The operator part of a query: every list narrows on its own, and a negated copy excludes what it matches. */
 interface SearchFilters {
@@ -91,6 +93,7 @@ const stateWords = new Map<string, SearchState>([
   ['claimed', 'claimed'],
   ['plan-pending', 'plan-pending'],
   ['overdue', 'overdue'],
+  ['gated', 'gated'],
 ])
 /** `has:` words about the item's own sections rather than its links. */
 const sectionWords = new Map<string, SearchState>([
@@ -100,6 +103,8 @@ const sectionWords = new Map<string, SearchState>([
   ['plan', 'plan'],
   ['summary', 'summary'],
   ['due', 'due'],
+  ['gate', 'gates'],
+  ['gates', 'gates'],
 ])
 const actorWords = new Map<string, ActorKind>([
   ['me', 'user'],
@@ -163,7 +168,7 @@ const addToken = (filters: MutableFilters, token: string): void => {
  * Free text plus operators, all optional and combinable: `kind:bug`, `status:doing`, `is:blocked` (kind, status or
  * attention), `#tag`, `project:welii`, `by:agent` (touched by), `created:me` (captured by), `has:thread`,
  * `updated:<7d`, `updated:>30d`, `priority:high`, `parent:b:k3f9`, `has:children`, `is:ready`, `is:blocked-by-deps`,
- * `is:delegated`, `is:claimed`, `delegate:agent`, `has:criteria`, `has:plan`, `has:summary`, `is:plan-pending`, `has:due`, `is:overdue`, `due:<7d`, `due:>30d`. Quoted text is one term. A leading `-` negates any of them, words included.
+ * `is:delegated`, `is:claimed`, `delegate:agent`, `has:criteria`, `has:plan`, `has:summary`, `is:plan-pending`, `has:due`, `is:overdue`, `due:<7d`, `due:>30d`, `has:gate`, `is:gated`. Quoted text is one term. A leading `-` negates any of them, words included.
  */
 const parse = (raw: string): SearchQuery => {
   const included = emptyFilters()
@@ -225,6 +230,10 @@ const inState = (item: BacklogItem, state: SearchState, context: SearchContext):
       return item.due !== undefined
     case 'overdue':
       return DueDates.isOverdue({ due: item.due, status: item.status, today: context.today })
+    case 'gates':
+      return (item.gates?.length ?? 0) > 0
+    case 'gated':
+      return context.isGated(item)
   }
 }
 const updatedWithin = (item: BacklogItem, days: number, now: number): boolean => now - item.lastActivityAt <= days * DAY_MS

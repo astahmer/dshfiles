@@ -5,6 +5,7 @@ import { BacklogBackfill } from './backfill.js'
 import { BacklogReference } from './backlog-reference.js'
 import { DueDates } from './due-date.js'
 import { Recurrence } from './recurrence.js'
+import { BacklogGates } from './gates.js'
 import { BacklogItems } from './item.js'
 import { BacklogShipped } from './shipped.js'
 import { BacklogProviders } from './provider-port.js'
@@ -148,6 +149,10 @@ const summarySchema = Schema.Struct({
   overdue: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   /** How it repeats: finishing it creates the next occurrence. */
   recurrence: nullDefault(Schema.String),
+  /** Outside conditions it waits on, and whether each still holds it back. */
+  gates: Schema.Array(Schema.Struct({ id: Schema.String, kind: Schema.Literals(BacklogGates.kinds), target: Schema.String, open: Schema.Boolean })).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed([])),
+  ),
 })
 
 const detailSchema = Schema.Struct({
@@ -169,6 +174,26 @@ const mergeResultSchema = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(true), value: detailSchema, merged: Schema.Array(Schema.String) }),
   Schema.Struct({ ok: Schema.Literal(false), reason: Schema.Literal('not-found') }),
 ])
+
+const pullRequestViewSchema = Schema.Struct({
+  url: Schema.String,
+  repo: Schema.String,
+  number: countSchema,
+  state: Schema.Literals(['open', 'merged', 'closed', 'unknown']),
+  checks: Schema.Literals(['passing', 'failing', 'pending', 'none']),
+  watched: Schema.Boolean,
+})
+const pullRequestsOutputSchema = Schema.Struct({ available: Schema.Boolean, pullRequests: Schema.Array(pullRequestViewSchema) })
+const pullRequestUrlSchema = Schema.String.check(
+  Schema.isMaxLength(BacklogItems.maxTargetChars),
+  Schema.makeFilter(value => (BacklogGates.pullRequestOf(value) === null ? 'Expected a GitHub pull request or GitLab merge request URL.' : undefined)),
+)
+
+const renderPullRequests = (output: typeof pullRequestsOutputSchema.Type): string =>
+  !output.available
+    ? 'The pull-requests plugin is not loaded: PR links stay plain URLs.'
+    : output.pullRequests.map(pull => `${pull.repo}#${String(pull.number)} ${pull.state} · checks ${pull.checks}${pull.watched ? '' : ' · not watched'}`).join('\n') ||
+      'No pull requests linked.'
 
 const revertResultSchema = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(true), value: detailSchema }),
@@ -195,7 +220,7 @@ const actorFilterSchema = Schema.Union([Schema.Literal(''), BacklogItems.actorId
 const listInputSchema = Schema.Struct({
   query: Schema.String.check(Schema.isMaxLength(500)).pipe(Schema.optional).annotate({
     description:
-      'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent (touched by) created:me|agent|system (captured by) has:thread|revision|url|children|parent updated:<7d updated:>30d priority:urgent|high|medium|low|none parent:b:k3f9 is:ready is:blocked-by-deps is:delegated is:claimed delegate:agent has:criteria|plan|summary|due is:plan-pending is:overdue due:<7d due:>30d. A leading - negates any operator or word (-created:agent, -kind:note, -#tag, -priority:none). Results rank by relevance and say which fields matched.',
+      'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent (touched by) created:me|agent|system (captured by) has:thread|revision|url|children|parent updated:<7d updated:>30d priority:urgent|high|medium|low|none parent:b:k3f9 is:ready is:blocked-by-deps is:delegated is:claimed delegate:agent has:criteria|plan|summary|due|gate is:plan-pending is:overdue is:gated due:<7d due:>30d. A leading - negates any operator or word (-created:agent, -kind:note, -#tag, -priority:none). Results rank by relevance and say which fields matched.',
   }),
   statuses: Schema.Array(BacklogItems.statusSchema).pipe(Schema.optional),
   kinds: Schema.Array(BacklogItems.kindSchema).pipe(Schema.optional),
@@ -760,6 +785,16 @@ export const backlogApi = defineApi({
         due: Schema.NullOr(DueDates.schema)
           .pipe(Schema.optional)
           .annotate({ description: 'The date it is due, YYYY-MM-DD with no time, or null to clear it. Open items past it show as overdue in the Inbox.' }),
+        gates: Schema.NullOr(
+          Schema.Array(Schema.Struct({ kind: Schema.Literals(BacklogGates.kinds), target: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(500)) })).check(
+            Schema.isMaxLength(BacklogGates.max),
+          ),
+        )
+          .pipe(Schema.optional)
+          .annotate({
+            description:
+              'Outside conditions it waits on, replacing the list: `pr` (a pull request URL, open until merged), `revision` (a jj change or commit id, open until it is on main), `check` (a project-check action id, open until it passes in a thread linked to the item), `date` (YYYY-MM-DD, open until that day). The item is not ready while a gate is open; gates resolve on their own. null removes them.',
+          }),
         recurrence: Schema.NullOr(Recurrence.schema)
           .pipe(Schema.optional)
           .annotate({
@@ -1069,6 +1104,26 @@ export const backlogApi = defineApi({
       description:
         'Revert one recorded field change of a backlog item: writes the typed value the field held before that change, read from the op log, as a new change. Refused with `stale` when the field changed again since. Run only when the user asked to revert that change, and pass `confirm: true`; an agent call without it is refused.',
       tool: { name: 'backlog_revert', readOnly: false, render: renderRevertPreview },
+    }),
+    pullRequests: method({
+      input: Schema.Struct({ id: itemKeySchema }),
+      output: pullRequestsOutputSchema,
+      description:
+        "The pull requests an item links (URL links and PR gates) with their live state (open, merged, closed) and checks, read from the pull-requests plugin. A PR no thread watches shows `unknown`; `available: false` when that plugin is not loaded. Read-only.",
+      tool: { name: 'backlog_pull_requests', readOnly: true, render: renderPullRequests },
+    }),
+    linkPullRequest: method({
+      input: Schema.Struct({
+        id: itemKeySchema,
+        url: pullRequestUrlSchema.annotate({ description: 'A GitHub pull request or GitLab merge request URL.' }),
+        closes: Schema.Boolean.pipe(Schema.optional).annotate({
+          description: 'The PR resolves the item (default true): merging it moves the item to done, unless its status was set by hand.',
+        }),
+        gate: Schema.Boolean.pipe(Schema.optional).annotate({ description: 'Also wait on it: the item is not ready until the PR merges.' }),
+      }),
+      output: detailResultSchema,
+      description: `Link a pull request to an item as a first-class PR link: its state and checks show on the item (watched through the newest thread linked to the item), and merging it closes the item when \`closes\` is on. ${writeNote}`,
+      tool: { name: 'backlog_link_pr', readOnly: false, render: renderDetailPreview },
     }),
     merge: method({
       input: Schema.Struct({

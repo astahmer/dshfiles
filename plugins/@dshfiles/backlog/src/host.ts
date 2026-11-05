@@ -20,6 +20,8 @@ import { AttachmentExport } from './attachment-file.js'
 import { BacklogSettingsTag, backlogSettingsLayer, sharedJevSettingsLayer } from './backlog-settings.js'
 import { BacklogItemNotFound, BacklogTemplateNotFound } from './errors.js'
 import { BacklogTemplates } from './templates.js'
+import { BacklogGates } from './gates.js'
+import type { BacklogDetailView } from './api.js'
 import { BacklogExport } from './backlog-export.js'
 import { HostSpeech, hostEdgeLayer } from './host-edge-promise.js'
 import { BacklogDb, BacklogStorePaths } from './backlog-db.js'
@@ -27,6 +29,8 @@ import { BacklogRepo } from './backlog-repo.js'
 import { LegacyBacklogTables } from './legacy-tables.js'
 import { LeaseSweep } from './lease-sweep.js'
 import { LifecycleSignals } from './lifecycle-signals.js'
+import { GateWatch } from './gate-watch.js'
+import { PullRequestState } from './pull-request-state.js'
 import { CaptureProjects } from './project-target.js'
 import { ReplyGenerator } from './reply-generator.js'
 import { backlogSettings } from './settings.js'
@@ -72,7 +76,15 @@ const backlogServices = Layer.mergeAll(
   Layer.provideMerge(Triage.layer),
   Layer.provideMerge(BacklogSyncEngine.layer),
   Layer.provideMerge(
-    Layer.mergeAll(BacklogStore.layer, BacklogExport.layer, AiActivity.layer, CaptureProjects.layer, AttachmentExport.layer, SyncSources.layer),
+    Layer.mergeAll(
+      BacklogStore.layer,
+      BacklogExport.layer,
+      AiActivity.layer,
+      CaptureProjects.layer,
+      AttachmentExport.layer,
+      SyncSources.layer,
+      PullRequestState.layer,
+    ),
   ),
   Layer.provideMerge(builtInProviderRegistry),
   Layer.provideMerge(Layer.mergeAll(ProviderCredentials.layer, ExternalProviderEndpoints.layer)),
@@ -84,7 +96,7 @@ const backlogServices = Layer.mergeAll(
 )
 
 /** Every backlog service and background loop of one activation. */
-const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, LeaseSweep, BacklogAttention.layer, RemoteSyncLoop).pipe(
+const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, GateWatch, LeaseSweep, BacklogAttention.layer, RemoteSyncLoop).pipe(
   Layer.provideMerge(backlogServices),
   Layer.provideMerge(hostEdges),
 )
@@ -104,6 +116,15 @@ const itemIdsOf = (keys: readonly (number | string)[]) =>
       }),
     ),
   )
+
+/** Asks the pull-requests plugin to watch a PR through the newest thread linked to the item, so its state stays live. */
+const withWatch = <Result extends { readonly ok: boolean }>(result: Result & ({ readonly ok: false } | { readonly ok: true; readonly value: BacklogDetailView }), url: string) =>
+  Effect.gen(function* () {
+    if (!result.ok) return result
+    const thread = [...result.value.item.links].reverse().find(link => link.type === 'thread')
+    if (thread !== undefined) yield* PullRequestState.use(pulls => pulls.watch({ url, sessionId: thread.target }))
+    return result
+  })
 
 /**
  * A merged duplicate's remote links move to the survivor when it has none on that binding, so the remote item keeps
@@ -282,6 +303,26 @@ const backlogHandlers = Api.handlers(backlogApi, {
     AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_revert' } }).pipe(
       Effect.andThen(Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.revert({ ...resolved, actor: actorOf(call.caller) })))),
     ),
+  pullRequests: input =>
+    Effect.gen(function* () {
+      const found = yield* Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.get(id)))
+      if (!found.ok) return { available: yield* PullRequestState.use(pulls => pulls.available), pullRequests: [] }
+      const item = found.value.item
+      const urls = [...item.links.filter(link => link.type === 'url').map(link => link.target), ...(item.gates ?? []).filter(gate => gate.kind === 'pr').map(gate => gate.target)]
+      return yield* PullRequestState.use(pulls => pulls.of([...new Set(urls)]))
+    }),
+  linkPullRequest: (keyed, call) =>
+    Effect.gen(function* () {
+      const input = yield* withItemId(keyed)
+      const store = yield* BacklogStore
+      const pull = BacklogGates.pullRequestOf(input.url)
+      const url = pull?.url ?? input.url
+      const actor = actorOf(call.caller)
+      const linked = yield* store.link({ id: input.id, link: { type: 'url', target: url, relation: input.closes === false ? 'implements' : 'fixes' }, actor })
+      if (!linked.ok || input.gate !== true) return yield* withWatch(linked, url)
+      const gates = [...(linked.value.item.gates ?? []).map(gate => ({ kind: gate.kind, target: gate.target })), { kind: 'pr' as const, target: url }]
+      return yield* withWatch(yield* store.update({ id: input.id, gates, actor }), url)
+    }),
   merge: ({ confirm, ...input }, call) =>
     AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_merge' } }).pipe(
       Effect.andThen(

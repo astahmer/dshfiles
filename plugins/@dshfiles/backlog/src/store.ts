@@ -27,6 +27,7 @@ import { ItemRelations, type BacklogLease, type ItemRelationIndex } from './item
 import type { LeaseWrite } from './backlog-repo.js'
 import { DueDates } from './due-date.js'
 import { Recurrence } from './recurrence.js'
+import { BacklogGates, type BacklogGate, type BacklogGateKind } from './gates.js'
 import type { BacklogTemplate } from './templates.js'
 import { FieldRevert } from './field-revert.js'
 import { BacklogOps } from './op-log.js'
@@ -37,7 +38,7 @@ import { ThreadLifecycle } from './thread-lifecycle.js'
 import { BacklogTriage } from './triage.js'
 
 /** Optional fields an edit may remove: null clears them, undefined leaves them as they are. */
-const clearableFields = ['parent', 'delegate', 'criteria', 'plan', 'planApproval', 'summary', 'due', 'recurrence'] as const
+const clearableFields = ['parent', 'delegate', 'criteria', 'plan', 'planApproval', 'summary', 'due', 'recurrence', 'gates'] as const
 type ClearableField = (typeof clearableFields)[number]
 type ClearableChange = { -readonly [K in ClearableField]?: NonNullable<BacklogItem[K]> | null | undefined }
 
@@ -101,6 +102,13 @@ export interface BacklogUpdate {
   readonly due?: string | null | undefined
   /** `daily`, `weekly`, `monthly` or `cron:<expr>`; finishing the item creates the next occurrence. null stops it. */
   readonly recurrence?: string | null | undefined
+  /** Every gate, replacing the list; a gate with the same kind and target keeps its id and resolution. null removes them. */
+  readonly gates?: readonly GateInput[] | null | undefined
+}
+
+export interface GateInput {
+  readonly kind: BacklogGateKind
+  readonly target: string
 }
 
 /** What a new item is made from: free text plus the fields a caller already knows. */
@@ -242,6 +250,7 @@ const summarize = (
   planApproval: item.planApproval ?? null,
   due: item.due ?? null,
   recurrence: item.recurrence ?? null,
+  gates: (item.gates ?? []).map(gate => ({ id: gate.id, kind: gate.kind, target: gate.target, open: BacklogGates.isOpen(gate, DueDates.dateOf(now)) })),
   overdue: DueDates.isOverdue({ due: item.due, status: item.status, today: DueDates.dateOf(now) }),
 })
 
@@ -285,6 +294,7 @@ const searchContextOf = (relations: Relations, at: number) => ({
   isBlockedByDeps: relations.isBlockedByDeps,
   hasChildren: (item: BacklogItem) => relations.childrenOf(item).length > 0,
   isClaimed: (item: BacklogItem) => relations.leaseOf(item) !== null,
+  isGated: relations.isGated,
 })
 
 /** A project is where the work happens, so one recorded in a jj workspace reads as the checkout it was cut from. */
@@ -426,8 +436,21 @@ const criteriaOf = (input: readonly CriterionInput[], known: readonly BacklogCri
 
 const sameText = (left: string | undefined, right: string | null | undefined): boolean => (left ?? '') === (right ?? '')
 
+/** A gate list from a caller: one gate per kind and target, keeping the id and resolution of a gate it already had. */
+const gatesOf = (input: readonly GateInput[], known: readonly BacklogGate[], at: number): BacklogGate[] => {
+  const seen = new Set<string>()
+  return input.slice(0, BacklogGates.max).flatMap(gate => {
+    const target = gate.target.trim()
+    const key = `${gate.kind}\u0000${target}`
+    if (target === '' || seen.has(key)) return []
+    seen.add(key)
+    const existing = known.find(own => own.kind === gate.kind && own.target === target)
+    return [existing ?? { id: BacklogGates.idOf(gate.kind, target), kind: gate.kind, target, createdAt: at }]
+  })
+}
+
 /** What one `update` call changes, the fields it records, and the fields that become the user's. */
-const updateChange = (item: BacklogItem, fields: Omit<BacklogUpdate, 'id'>, actor: BacklogActor) => {
+const updateChange = (item: BacklogItem, fields: Omit<BacklogUpdate, 'id'>, actor: BacklogActor, at: number) => {
   const change: BacklogChange = {}
   const changed: BacklogHumanField[] = []
   const userChanged = new Set<BacklogHumanField>()
@@ -521,6 +544,13 @@ const updateChange = (item: BacklogItem, fields: Omit<BacklogUpdate, 'id'>, acto
     if (approval === 'approved' && fields.attention === undefined && item.attention === 'needs-input') {
       change.attention = 'none'
       changed.push('attention')
+    }
+  }
+  if (fields.gates !== undefined) {
+    const nextGates = fields.gates === null ? null : gatesOf(fields.gates, item.gates ?? [], at)
+    if (nextGates === null ? item.gates !== undefined : !BacklogOps.sameValue(nextGates, item.gates ?? [])) {
+      change.gates = nextGates === null || nextGates.length === 0 ? null : nextGates
+      recordChange('gates')
     }
   }
   if (fields.recurrence !== undefined && fields.recurrence !== (item.recurrence ?? null)) {
@@ -667,6 +697,7 @@ const withClearable = (item: BacklogItem, change: ClearableChange): BacklogItem 
         set: (next, recurrence) => ({ ...next, recurrence }),
         remove: ({ recurrence: _recurrence, ...rest }) => rest,
       }),
+    (base: BacklogItem) => clearOrSet({ item: base, value: change.gates, set: (next, gates) => ({ ...next, gates }), remove: ({ gates: _gates, ...rest }) => rest }),
   ].reduce((next, apply) => apply(next), item)
 
 const isClearable = (field: string): field is ClearableField => clearableFields.some(candidate => candidate === field)
@@ -800,6 +831,8 @@ export class BacklogStore extends Context.Service<
       readonly duplicateIds: readonly number[]
       readonly actor: BacklogActor
     }) => Effect.Effect<BacklogResult<BacklogDetail & { readonly merged: readonly string[] }>, BacklogWriteFailed | BacklogMergeInvalid>
+    /** Marks gates met, as the gate watch saw them: a system write with what resolved each, never over a resolved gate. */
+    readonly resolveGates: (input: { readonly id: number; readonly resolved: readonly { readonly gateId: string; readonly detail: string }[] }) => Detailed
     /** Every stored claim, live or lapsed, with the item it holds: what the lease sweep reads. */
     readonly leases: Effect.Effect<readonly { readonly id: number; readonly lease: BacklogLease }[]>
     /** Hands an item to the agent of a thread started for it, without a lease: it shows who works on it. */
@@ -922,7 +955,7 @@ export class BacklogStore extends Context.Service<
           const afterText = BacklogItems.displayValue(after).slice(0, BacklogItems.maxBodyChars)
           return beforeText === afterText ? [] : [{ field, before: beforeText, after: afterText }]
         })
-        const { parent, delegate, criteria, plan, planApproval, summary, due, recurrence, ...fields } = change
+        const { parent, delegate, criteria, plan, planApproval, summary, due, recurrence, gates, ...fields } = change
         const merged: BacklogItem = {
           ...item,
           ...fields,
@@ -930,7 +963,7 @@ export class BacklogStore extends Context.Service<
           lastActivityAt: at,
           events: [...item.events, { at, actor: actorId, origin: actorId, ...event, ...(fieldChanges.length !== 0 && { fieldChanges }) }],
         }
-        const next = withClearable(merged, { parent, delegate, criteria, plan, planApproval, summary, due, recurrence })
+        const next = withClearable(merged, { parent, delegate, criteria, plan, planApproval, summary, due, recurrence, gates })
         yield* persist(next, event.origin ?? actorId, leaseWrite)
         const stored = next.events.at(-1)
         if (stored !== undefined) yield* PubSub.publish(notices, { item: next, event: stored })
@@ -1194,7 +1227,7 @@ export class BacklogStore extends Context.Service<
             const parent =
               requested.parent === undefined || requested.parent === null ? requested.parent : yield* checkedParent({ item, parentRef: requested.parent })
             const fields = { ...requested, parent }
-            const { change, changed, userChanged } = updateChange(item, fields, actor)
+            const { change, changed, userChanged } = updateChange(item, fields, actor, yield* Clock.currentTimeMillis)
             const clearedSuggestion = change.proposal === null
             if (changed.length === 0 && change.snoozedUntil === undefined && !clearedSuggestion) return yield* unchanged(item)
             if (changed.length === 0) {
@@ -1491,6 +1524,25 @@ export class BacklogStore extends Context.Service<
         return found({ ...(yield* detailOf(merged)), merged: duplicates.map(duplicate => BacklogReference.refOf(duplicate)) })
       }, serialized)
 
+      const resolveGates = Effect.fn('backlog store resolve gates')(function* (input: {
+        readonly id: number
+        readonly resolved: readonly { readonly gateId: string; readonly detail: string }[]
+      }) {
+        return yield* withItem(input.id, item =>
+          Effect.gen(function* () {
+            const at = yield* Clock.currentTimeMillis
+            const resolving = (item.gates ?? []).filter(gate => gate.resolvedAt === undefined && input.resolved.some(entry => entry.gateId === gate.id))
+            if (resolving.length === 0) return yield* unchanged(item)
+            const gates = (item.gates ?? []).map(gate => {
+              const entry = input.resolved.find(candidate => candidate.gateId === gate.id)
+              return entry === undefined || gate.resolvedAt !== undefined ? gate : { ...gate, resolvedAt: at, detail: entry.detail.slice(0, 500) }
+            })
+            const detail = `gate met: ${resolving.map(gate => `${BacklogGates.label(gate)} (${input.resolved.find(entry => entry.gateId === gate.id)?.detail ?? ''})`).join('; ')}`
+            return found(yield* touch(item, { kind: 'system' }, { kind: 'edited', detail }, { gates }))
+          }),
+        )
+      })
+
       const markTriaged = Effect.fn('backlog store mark triaged')(function* (id: number) {
         const item = yield* find(id)
         if (item === undefined) return
@@ -1692,6 +1744,7 @@ export class BacklogStore extends Context.Service<
         claim,
         release,
         merge,
+        resolveGates,
         leases: Effect.map(Ref.get(state), current => [...current.leases].map(([id, lease]) => ({ id, lease }))),
         delegateTo,
         acknowledge,

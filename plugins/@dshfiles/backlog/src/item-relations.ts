@@ -1,4 +1,6 @@
 import { BacklogReference } from './backlog-reference.js'
+import { DueDates } from './due-date.js'
+import { BacklogGates } from './gates.js'
 import { BacklogItems, type BacklogItem } from './item.js'
 
 /** A claim on an item: who holds it, and until when it holds without another write from them. */
@@ -9,7 +11,7 @@ export interface BacklogLease {
   readonly heartbeat: number
 }
 
-type RelatedItem = Pick<BacklogItem, 'id' | 'ref' | 'status' | 'links' | 'snoozedUntil' | 'parent' | 'priority' | 'createdAt'>
+type RelatedItem = Pick<BacklogItem, 'id' | 'ref' | 'status' | 'links' | 'snoozedUntil' | 'parent' | 'priority' | 'createdAt' | 'gates'>
 
 const isOpen = (item: Pick<BacklogItem, 'status'>): boolean => item.status !== 'done' && item.status !== 'dropped'
 
@@ -62,10 +64,13 @@ const build = <Item extends RelatedItem>(input: {
     const counted = childrenOf(item).filter(child => child.status !== 'dropped')
     return { total: counted.length, done: counted.filter(child => child.status === 'done').length }
   }
-  /** Open and unsnoozed, nothing open in its way, no open sub-issue left, and nobody holding it. */
+  const today = DueDates.dateOf(input.now)
+  const isGated = (item: Item): boolean => BacklogGates.open(item.gates, today).length > 0
+  /** Open and unsnoozed, nothing open in its way, no open gate or sub-issue left, and nobody holding it. */
   const isReady = (item: Item): boolean =>
     (item.status === 'inbox' || item.status === 'todo') &&
     (item.snoozedUntil ?? 0) <= input.now &&
+    !isGated(item) &&
     openBlockersOf(item).length === 0 &&
     !childrenOf(item).some(isOpen) &&
     leaseOf(item) === null
@@ -76,6 +81,7 @@ const build = <Item extends RelatedItem>(input: {
     leaseOf,
     rollup,
     isReady,
+    isGated,
     isBlockedByDeps: (item: Item): boolean => isOpen(item) && openBlockersOf(item).length > 0,
   }
 }

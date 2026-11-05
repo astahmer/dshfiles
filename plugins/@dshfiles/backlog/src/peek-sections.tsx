@@ -1,11 +1,17 @@
+import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { useQuery } from '@dshfiles/plugin-ui/query'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
-import { CheckIcon, PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, CircleDotIcon, GitMergeIcon, GitPullRequestClosedIcon, GitPullRequestIcon, HourglassIcon, PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
 
-import type { BacklogDetailView } from './api.js'
+import { backlogApi, type BacklogDetailView } from './api.js'
+import { DueDates } from './due-date.js'
+import { BacklogGates, type BacklogGate, type BacklogGateKind } from './gates.js'
 import { BacklogItems, type BacklogCriterion } from './item.js'
 import { BacklogNotices } from './notices.js'
 import { useBacklogActions, type BacklogUpdateInput } from './use-backlog-actions.js'
@@ -182,11 +188,165 @@ const Summary = (props: { readonly detail: BacklogDetailView }): JSX.Element | n
   )
 }
 
+const gateKindLabels = { pr: 'Pull request merged', revision: 'Revision on main', check: 'Project check passes', date: 'Date reached' } satisfies Record<
+  BacklogGateKind,
+  string
+>
+const gatePlaceholders = { pr: 'https://github.com/owner/repo/pull/12', revision: 'jj change id', check: 'project-check action id', date: '2026-12-01' } satisfies Record<
+  BacklogGateKind,
+  string
+>
+
+/** What the item waits on outside the backlog; each gate resolves on its own, a date gate on the calendar. */
+const Gates = (props: { readonly id: number; readonly gates: readonly BacklogGate[] }): JSX.Element => {
+  const save = useSave()
+  const [kind, setKind] = useState<BacklogGateKind>('pr')
+  const [target, setTarget] = useState('')
+  const today = DueDates.dateOf(Date.now())
+  const replace = (gates: readonly { readonly kind: BacklogGateKind; readonly target: string }[]) =>
+    save({ id: props.id, gates: gates.length === 0 ? null : gates.map(gate => ({ kind: gate.kind, target: gate.target })) }, 'The gates were not saved.')
+  return (
+    <section aria-label="Gates" className="dshx:flex dshx:flex-col dshx:gap-1.5">
+      <Heading title="Waits on" />
+      {props.gates.length === 0 ? null : (
+        <ul className="dshx:flex dshx:flex-col dshx:gap-0.5">
+          {props.gates.map(gate => {
+            const open = BacklogGates.isOpen(gate, today)
+            return (
+              <li key={gate.id} className="dshx:group/gate dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1 dshx:text-[13px] dshx:hover:bg-accent/40">
+                {open ? (
+                  <HourglassIcon aria-label="Open" className="dshx:size-3.5 dshx:shrink-0 dshx:text-warning" />
+                ) : (
+                  <CheckIcon aria-label="Met" className="dshx:size-3.5 dshx:shrink-0 dshx:text-success" />
+                )}
+                <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', !open && 'dshx:text-muted-foreground')}>{BacklogGates.label(gate)}</span>
+                {gate.detail === undefined ? null : <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{gate.detail}</span>}
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  aria-label={`Remove gate ${BacklogGates.label(gate)}`}
+                  className="dshx:opacity-0 dshx:group-hover/gate:opacity-100 dshx:focus-visible:opacity-100"
+                  onClick={() => replace(props.gates.filter(other => other.id !== gate.id))}
+                >
+                  <XIcon />
+                </Button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <form
+        className="dshx:flex dshx:items-center dshx:gap-1.5"
+        onSubmit={event => {
+          event.preventDefault()
+          if (target.trim() === '') return
+          replace([...props.gates, { kind, target: target.trim() }])
+          setTarget('')
+        }}
+      >
+        <Select value={kind} onValueChange={value => setKind(BacklogGates.kinds.find(candidate => candidate === value) ?? 'pr')}>
+          <SelectTrigger aria-label="Gate kind" size="sm" className="dshx:h-8 dshx:w-44 dshx:text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="dshx-root">
+            {BacklogGates.kinds.map(candidate => (
+              <SelectItem key={candidate} value={candidate} className="dshx:text-xs">
+                {gateKindLabels[candidate]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <input
+          aria-label="Gate target"
+          type={kind === 'date' ? 'date' : 'text'}
+          placeholder={gatePlaceholders[kind]}
+          className={inputClass}
+          value={target}
+          onChange={event => setTarget(event.currentTarget.value)}
+        />
+        <Button type="submit" size="icon-xs" variant="ghost" aria-label="Add gate" disabled={target.trim() === ''}>
+          <PlusIcon />
+        </Button>
+      </form>
+    </section>
+  )
+}
+
+const pullStateIcons = { open: GitPullRequestIcon, merged: GitMergeIcon, closed: GitPullRequestClosedIcon, unknown: CircleDotIcon } as const
+const pullStateTones = {
+  open: 'dshx:text-success',
+  merged: 'dshx:text-violet',
+  closed: 'dshx:text-destructive',
+  unknown: 'dshx:text-muted-foreground',
+} as const
+const checkTones = { passing: 'dshx:text-success', failing: 'dshx:text-destructive', pending: 'dshx:text-warning', none: 'dshx:text-muted-foreground' } as const
+
+/** Linked pull requests with their live state and checks, and the action that links one. */
+const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Element => {
+  const api = useApi(backlogApi)
+  const actions = useBacklogActions()
+  const item = props.detail.item
+  const [draft, setDraft] = useState('')
+  const urls = [...item.links.filter(link => link.type === 'url' && BacklogGates.pullRequestOf(link.target) !== null).map(link => link.target)]
+  const states = useQuery({
+    queryKey: ['dshfiles-backlog', 'pull-requests', item.id, urls.join(' ')],
+    enabled: urls.length > 0,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    queryFn: ({ signal }) => api.pullRequests({ id: item.id }, { signal }),
+    retry: false,
+  })
+  const pulls = states.data?.pullRequests ?? urls.flatMap(url => {
+    const pull = BacklogGates.pullRequestOf(url)
+    return pull === null ? [] : [{ url: pull.url, repo: pull.repo, number: pull.number, state: 'unknown' as const, checks: 'none' as const, watched: false }]
+  })
+  return (
+    <section aria-label="Pull requests" className="dshx:flex dshx:flex-col dshx:gap-1.5">
+      <Heading title="Pull requests" />
+      {pulls.length === 0 ? null : (
+        <ul className="dshx:flex dshx:flex-col dshx:gap-0.5">
+          {pulls.map(pull => {
+            const Icon = pullStateIcons[pull.state]
+            return (
+              <li key={pull.url} className="dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-[13px]">
+                <Icon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0', pullStateTones[pull.state])} />
+                <a href={pull.url} target="_blank" rel="noreferrer" className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:hover:underline">
+                  {pull.repo}#{pull.number}
+                </a>
+                <span aria-label={`State ${pull.state}`} className={cn('dshx:text-[11px]', pullStateTones[pull.state])}>
+                  {pull.state === 'unknown' ? (states.data?.available === false ? 'plain link' : 'not watched') : pull.state}
+                </span>
+                {pull.checks === 'none' ? null : <span className={cn('dshx:text-[11px]', checkTones[pull.checks])}>checks {pull.checks}</span>}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <form
+        className="dshx:flex dshx:items-center dshx:gap-1.5"
+        onSubmit={event => {
+          event.preventDefault()
+          if (BacklogGates.pullRequestOf(draft) === null) return
+          actions.linkPullRequest.mutate({ id: item.id, url: draft.trim() }, { onError: BacklogNotices.failure('The pull request was not linked.') })
+          setDraft('')
+        }}
+      >
+        <input aria-label="Pull request URL" placeholder="Link PR… https://github.com/owner/repo/pull/12" className={inputClass} value={draft} onChange={event => setDraft(event.currentTarget.value)} />
+        <Button type="submit" size="icon-xs" variant="ghost" aria-label="Link pull request" disabled={BacklogGates.pullRequestOf(draft) === null}>
+          <PlusIcon />
+        </Button>
+      </form>
+    </section>
+  )
+}
+
 /** Acceptance criteria, plan and final summary: structured fields of their own, never parsed out of the body. */
 const Sections = (props: { readonly detail: BacklogDetailView }): JSX.Element => (
   <div className="dshx:flex dshx:flex-col dshx:gap-4">
     <Criteria id={props.detail.item.id} criteria={props.detail.item.criteria ?? []} />
     <Plan detail={props.detail} />
+    <Gates id={props.detail.item.id} gates={props.detail.item.gates ?? []} />
+    <PullRequests detail={props.detail} />
     <Summary detail={props.detail} />
   </div>
 )

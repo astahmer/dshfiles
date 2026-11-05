@@ -3,6 +3,7 @@ import { Effect, Schema } from 'effect'
 import { BacklogReference } from './backlog-reference.js'
 import { DueDates } from './due-date.js'
 import { Recurrence } from './recurrence.js'
+import { BacklogGates } from './gates.js'
 
 const DAY_MS = 86_400_000
 const MAX_TITLE_CHARS = 200
@@ -40,6 +41,7 @@ const humanFieldNames = [
   'summary',
   'due',
   'recurrence',
+  'gates',
 ] as const
 const MAX_CRITERIA = 50
 const MAX_CRITERION_CHARS = 500
@@ -183,6 +185,8 @@ const itemSchema = Schema.Struct({
   due: Schema.optionalKey(DueDates.schema),
   /** `daily`, `weekly`, `monthly` or `cron:<expr>`: finishing it creates the next occurrence. */
   recurrence: Schema.optionalKey(Recurrence.schema),
+  /** Outside conditions it waits on (a PR merged, a revision on main, a check passing, a date); not ready while one is open. */
+  gates: Schema.optionalKey(BacklogGates.listSchema),
 })
 
 export type BacklogPriority = typeof prioritySchema.Type

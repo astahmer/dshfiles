@@ -129,6 +129,9 @@ const CardFace = (props: {
       <div className="dshx:flex dshx:items-center dshx:gap-2">
         <StateLine item={item} />
         <WorkGlyphs.ProgressBadge progress={item.children} />
+        <WorkGlyphs.CriteriaBadge progress={item.criteriaProgress} />
+        <WorkGlyphs.DueChip due={item.due} overdue={item.overdue} compact />
+        <WorkGlyphs.GatesBadge gates={item.gates} />
         <WorkGlyphs.BlockedBadge blockedBy={item.blockedBy} />
         <WorkGlyphs.ClaimChip lease={item.lease} compact />
         <WorkGlyphs.RunStateChip run={run} compact />

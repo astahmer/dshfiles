@@ -2,6 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/com
 import {
   BotIcon,
   CalendarIcon,
+  HourglassIcon,
   CircleAlertIcon,
   HandIcon,
   ListChecksIcon,
@@ -20,6 +21,7 @@ import type { AgentRunState } from './agent-run-state.js'
 import type { BacklogPriority } from './item.js'
 import { actorName } from './actor-name.js'
 import { DueDates } from './due-date.js'
+import { BacklogGates } from './gates.js'
 
 const priorityLabels = { none: 'No priority', urgent: 'Urgent', high: 'High', medium: 'Medium', low: 'Low' } satisfies Record<BacklogPriority, string>
 
@@ -124,6 +126,20 @@ const DueChip = (props: { readonly due: string | null; readonly overdue: boolean
   )
 }
 
+/** Outside conditions still holding the item back. */
+const GatesBadge = (props: { readonly gates: BacklogSummaryView['gates'] }): JSX.Element | null => {
+  const open = props.gates.filter(gate => gate.open)
+  if (open.length === 0) return null
+  return (
+    <WithTooltip tip={`Waits on: ${open.map(gate => BacklogGates.label(gate)).join(', ')}`}>
+      <span aria-label={`Waits on ${String(open.length)} gate${open.length === 1 ? '' : 's'}`} className={cn(chip, 'dshx:bg-warning/12 dshx:text-warning')}>
+        <HourglassIcon aria-hidden className="dshx:size-3" />
+        {open.length}
+      </span>
+    </WithTooltip>
+  )
+}
+
 /** The agent holding a live claim on the item. */
 const ClaimChip = (props: { readonly lease: BacklogSummaryView['lease']; readonly compact?: boolean }): JSX.Element | null => {
   if (props.lease === null) return null
@@ -195,6 +211,7 @@ export class WorkGlyphs {
   static readonly CriteriaBadge = CriteriaBadge
   static readonly PlanPendingBadge = PlanPendingBadge
   static readonly DueChip = DueChip
+  static readonly GatesBadge = GatesBadge
   static readonly ClaimChip = ClaimChip
   static readonly BlockedBadge = BlockedBadge
   static readonly RunStateChip = RunStateChip
