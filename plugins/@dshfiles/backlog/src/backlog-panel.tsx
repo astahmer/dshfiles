@@ -69,6 +69,7 @@ import type { StartThreadAgentChoice, StartThreadCatalog, StartThreadItem, Start
 import { FeedStatus } from './status-filter.js'
 import { BACKLOG_TRIAGE_MUTATION_KEY, BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { usePanelRequests } from './use-panel-requests.js'
+import { BacklogExportSettings } from './export-settings.js'
 import { withViewTransition } from './view-transition.js'
 
 type OpenThread = (sessionId: string) => void
@@ -961,6 +962,7 @@ export const BacklogPanel = (props: {
             <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:overflow-y-auto">
               <BacklogSettingsPanel />
               <BacklogSyncControls.Settings projectPaths={projectPaths} />
+              <BacklogExportSettings />
             </div>
           ) : null}
           {!showSettings &&

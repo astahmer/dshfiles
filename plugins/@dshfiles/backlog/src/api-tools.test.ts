@@ -62,6 +62,7 @@ describe('backlog tool exposure', () => {
       'backlog_delete',
       'backlog_dismiss_proposal',
       'backlog_enrich_tweet',
+      'backlog_export',
       'backlog_get',
       'backlog_get_many',
       'backlog_import_remote',

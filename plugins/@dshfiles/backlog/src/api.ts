@@ -692,6 +692,32 @@ export const backlogApi = defineApi({
         'Revert one recorded field change of a backlog item: writes the typed value the field held before that change, read from the op log, as a new change. Refused with `stale` when the field changed again since. Run only when the user asked to revert that change.',
       tool: { name: 'backlog_revert', readOnly: false, render: renderRevertPreview },
     }),
+    export: method({
+      input: Schema.Struct({
+        path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(1_024)).annotate({
+          description: 'Absolute path of a new file on the Host, such as /Users/you/backlog.jsonl; an existing file is never overwritten.',
+        }),
+        format: Schema.Literals(['jsonl', 'sqlite']).annotate({
+          description: '`jsonl`: one folded item per line. `sqlite`: a consistent copy of the whole backlog database.',
+        }),
+        includeOps: Schema.Boolean.pipe(Schema.optional).annotate({ description: 'JSONL only: also write every op of the log, after the items.' }),
+      }),
+      output: Schema.Struct({
+        path: Schema.String,
+        format: Schema.Literals(['jsonl', 'sqlite']),
+        items: nonNegativeCountSchema,
+        ops: nonNegativeCountSchema,
+        bytes: nonNegativeCountSchema,
+      }),
+      description:
+        'Export the backlog to a new file on the Host: JSONL (one folded item per line, optionally followed by every op) or an SQLite copy. Changes no item; it writes the file the user asked for, so run it only when the user asked for an export.',
+      tool: {
+        name: 'backlog_export',
+        readOnly: false,
+        render: output =>
+          `Exported ${String(output.items)} items${output.format === 'jsonl' && output.ops > 0 ? ` and ${String(output.ops)} ops` : ''} to ${output.path} (${String(output.bytes)} bytes).`,
+      },
+    }),
     deleteComment: method({
       input: Schema.Struct({ id: itemKeySchema, commentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)) }),
       output: detailResultSchema,

@@ -108,6 +108,13 @@ export class BacklogRepo extends Context.Service<
     readonly mintRef: Effect.Effect<string>
     /** How many rows each table holds, and how many attachment byte files exist. */
     readonly counts: Effect.Effect<{ readonly ops: number; readonly items: number; readonly attachments: number; readonly mappings: number }, unknown>
+    /** Every live item with its canonical id, and the whole op log in log order: what a JSONL export writes. */
+    readonly exportRows: Effect.Effect<
+      { readonly items: readonly { readonly itemId: string; readonly item: BacklogItem }[]; readonly ops: readonly BacklogOpRecord[] },
+      unknown
+    >
+    /** A consistent copy of the whole SQLite file at `path` (`VACUUM INTO`), which must not exist yet. */
+    readonly vacuumInto: (path: string) => Effect.Effect<void, unknown>
     /** The receipt the one-time import left, if it ran. */
     readonly importReport: Effect.Effect<Option.Option<LegacyImportReport>, unknown>
     readonly mappings: StorageTable<string, SyncMapping>
@@ -476,6 +483,16 @@ export class BacklogRepo extends Context.Service<
             .pipe(Effect.catch(cause => Effect.fail(cause instanceof StorageDomainWriteFailed ? cause : writeFailed('update')(cause)))),
       }
 
+      const exportRows = Effect.gen(function* () {
+        const canonicalOf = yield* Ref.get(aliases)
+        const items = (yield* loadItems).flatMap(item => {
+          const itemId = canonicalOf.get(item.id)
+          return itemId === undefined ? [] : [{ itemId, item }]
+        })
+        const ops = [...(yield* readOps(null))].sort((left, right) => BacklogOps.compareHlc(left.hlc, right.hlc) || (left.opId < right.opId ? -1 : 1))
+        return { items, ops }
+      })
+
       return BacklogRepo.of({
         hostId,
         loadItems,
@@ -491,6 +508,8 @@ export class BacklogRepo extends Context.Service<
         canonicalId: canonicalIdNow,
         mintRef,
         counts: Effect.all({ ops: countOf('ops'), items: countOf('items'), attachments: countOf('attachments'), mappings: countOf('sync_mappings') }),
+        exportRows,
+        vacuumInto: path => Effect.asVoid(sql`VACUUM INTO ${path}`),
         importReport: Effect.flatMap(metaGet(META_LEGACY_IMPORT), row =>
           Option.isNone(row) ? Effect.succeedNone : Effect.map(Schema.decodeUnknownEffect(importMarkerJson)(row.value.value), Option.some),
         ),

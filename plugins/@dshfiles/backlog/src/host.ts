@@ -18,6 +18,7 @@ import { backlogApi } from './api.js'
 import { AttachmentExport } from './attachment-file.js'
 import { backlogSettingsLayer, sharedJevSettingsLayer } from './backlog-settings.js'
 import { BacklogItemNotFound } from './errors.js'
+import { BacklogExport } from './backlog-export.js'
 import { HostSpeech, hostEdgeLayer } from './host-edge-promise.js'
 import { BacklogDb, BacklogStorePaths } from './backlog-db.js'
 import { BacklogRepo } from './backlog-repo.js'
@@ -53,7 +54,7 @@ const hostEdges = Layer.mergeAll(
 
 const backlogServices = Layer.mergeAll(ThreadStart.layer, TriageBackfill.layer, TweetImport.layer, ReplyGenerator.layer, BacklogSync.layer).pipe(
   Layer.provideMerge(Triage.layer),
-  Layer.provideMerge(Layer.mergeAll(BacklogStore.layer, AiActivity.layer, CaptureProjects.layer, AttachmentExport.layer)),
+  Layer.provideMerge(Layer.mergeAll(BacklogStore.layer, BacklogExport.layer, AiActivity.layer, CaptureProjects.layer, AttachmentExport.layer)),
   Layer.provideMerge(Layer.mergeAll(BacklogSyncTables.layer, RemoteBackends.layer)),
   Layer.provideMerge(BacklogRepo.layer),
   Layer.provideMerge(Layer.mergeAll(BacklogDb.layer, LegacyBacklogTables.layer)),
@@ -179,6 +180,7 @@ const backlogHandlers = Api.handlers(backlogApi, {
   testSyncBackends: () => BacklogSync.use(sync => sync.testSaved),
   editComment: (input, call) =>
     Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.editComment({ ...resolved, actor: actorOf(call.caller) }))),
+  export: input => BacklogExport.use(exporter => exporter.run(input)),
   revert: (input, call) => Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.revert({ ...resolved, actor: actorOf(call.caller) }))),
   deleteComment: (input, call) =>
     Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.deleteComment({ ...resolved, actor: actorOf(call.caller) }))),

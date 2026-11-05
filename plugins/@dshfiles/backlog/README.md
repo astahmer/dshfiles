@@ -229,6 +229,17 @@ triage, and bind the TypeSafe key by its Secret Catalog reference. The same `dsh
 available in the usual DSH Settings screen. Only the reference is stored; leave it blank to use
 `TYPESAFE_API_KEY` from the Host environment.
 
+**Export…** writes the backlog to a new file on the Host, at an absolute path that must not exist yet (an export never
+overwrites a file):
+
+- **JSON Lines**: one line per live item, `{"type":"item","itemId":"<ULID>","ref":"k3f9","item":{…}}`, with the item as
+  the store folds it. **Include the op log** appends one `{"type":"op",…}` line per op, in log order.
+- **SQLite copy**: a consistent copy of `backlog.db` (`VACUUM INTO`), every table included, taken while the backlog keeps
+  running.
+
+Attachment bytes stay in the plugin's `files/` folder; both formats carry their metadata and SHA-256. Agents run the same
+verb as `backlog_export`, only when the user asked. Each export is one `backlog export` span with its format and counts.
+
 ## Automatic triage
 
 Off by default (Settings → `dshfiles-backlog`). With `autoTriage` on, every capture is triaged in the
@@ -338,6 +349,7 @@ dropping the rest of the draft.
 | `backlog_read_file`            | read: one image or file as a data URL; `save: true` also returns a temp file path                       |
 | `backlog_remove_file`          | write: remove one image or file                                                                         |
 | `backlog_revert`               | write: put back the value a field held before one recorded change; refused when it changed again since  |
+| `backlog_export`               | write a new file: JSONL (items, optionally the op log) or an SQLite copy; changes no item               |
 | `backlog_triage`               | write: run triage on one item now                                                                       |
 | `backlog_triage_backfill`      | write: triage items captured before triage was set up, oldest first                                     |
 | `backlog_start_thread`         | write: start one thread for items, in the item project's own jj workspace, linked                       |
@@ -401,7 +413,8 @@ team or repository, wait for a rate limit) and the chip shows it until the next 
 the mapping and the issue link only. Host work leaves `backlog sync` (one per item pass), `linear request` and
 `github request` spans with identities and counts only.
 
-Deferred: a plain JSON snapshot export to an S3-compatible bucket or a git repository. The mapping store and the
+Deferred: pushing a snapshot to an S3-compatible bucket or a git repository (a local file export exists: see Backlog
+settings). The mapping store and the
 `RemoteBackend` port (`src/sync-backend.ts`) are where such a one-way backend would plug in; it was left out
 because it needs its own credential and conflict story (an export has no remote edits to merge).
 
@@ -480,14 +493,14 @@ Board 208–269 ms, Feed 243–405 ms, search 82–550 ms, Projects 458–775 ms
 One SQLite file owned by the Host, `$DSH_HOME/plugins/backlog/backlog.db`, opened through `@dshfiles/sqlite-store`
 (WAL, migrations, `BEGIN IMMEDIATE`), so every browser and agent reads the same rows:
 
-| Table           | Holds                                                                                                                                                                        |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ops`           | The append-only op log, the source of truth: `op_id` (ULID), `item_id`, a hybrid logical clock (`hlc_wall` ms, `hlc_counter`, `hlc_host`), `origin` (the actor) and `op` JSON |
-| `items`         | Each item folded from its ops, a cache rebuilt from `ops` whenever the fold version changes; indexed by status, project, last activity and origin                             |
+| Table           | Holds                                                                                                                                                                                    |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ops`           | The append-only op log, the source of truth: `op_id` (ULID), `item_id`, a hybrid logical clock (`hlc_wall` ms, `hlc_counter`, `hlc_host`), `origin` (the actor) and `op` JSON            |
+| `items`         | Each item folded from its ops, a cache rebuilt from `ops` whenever the fold version changes; indexed by status, project, last activity and origin                                        |
 | `aliases`       | `alias → item_id` with its kind: `legacy` (the public `b:<n>` of an item created before short aliases), `short` (the `b:<ref>` of a newer one) and `key` (a newer item's private number) |
-| `attachments`   | Per item and attachment: the SHA-256, media type and size of the bytes                                                                                                       |
-| `sync_mappings` | One remote-sync mapping per linked item (remote id, last synced value of each side, carried-over comment ids, state, recent conflicts, last error), keyed by item id           |
-| `meta`          | The host id, the next item id, the fold version and the import receipt                                                                                                       |
+| `attachments`   | Per item and attachment: the SHA-256, media type and size of the bytes                                                                                                                   |
+| `sync_mappings` | One remote-sync mapping per linked item (remote id, last synced value of each side, carried-over comment ids, state, recent conflicts, last error), keyed by item id                     |
+| `meta`          | The host id, the next item id, the fold version and the import receipt                                                                                                                   |
 
 Op kinds: `create`, `set {field, value}`, `unset`, `add`/`remove {field: tags | links | actors, value}`, `attach`/`detach`,
 `event` (moved, linked, triaged, edited and the rest of the activity), `comment`, `comment-edit`, `comment-delete` and
