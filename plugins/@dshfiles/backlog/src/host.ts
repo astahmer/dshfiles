@@ -12,6 +12,7 @@ import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer } from 'effect'
 import { FetchHttpClient } from 'effect/http'
 import { ActivityPublisher } from './activity-publisher.js'
+import { AgentConfirmation } from './agent-confirmation.js'
 import { AiActivity } from './ai-activity.js'
 import { BacklogAttention } from './attention-provider.js'
 import { backlogApi } from './api.js'
@@ -112,7 +113,10 @@ const backlogHandlers = Api.handlers(backlogApi, {
       return detail
     }),
   triage: input => Effect.flatMap(itemIdOf(input.id), id => Triage.use(triage => AiActivity.use(activity => activity.track(triage.item(id))))),
-  backfillTriage: input => TriageBackfill.use(backfill => backfill.start(input)),
+  backfillTriage: ({ confirm, ...input }, call) =>
+    AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_triage_backfill', limit: input.limit } }).pipe(
+      Effect.andThen(TriageBackfill.use(backfill => backfill.start(input))),
+    ),
   backfillTriageStatus: input => TriageBackfill.use(backfill => backfill.status(input.jobId)),
   acknowledge: input => Effect.flatMap(itemIdsOf(input.ids), keys => BacklogStore.use(store => store.acknowledge({ ids: keys.ids }))),
   applyProposal: (input, call) => Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.applyProposal({ id, actor: actorOf(call.caller) }))),
@@ -169,10 +173,14 @@ const backlogHandlers = Api.handlers(backlogApi, {
     input.ids === undefined
       ? BacklogSync.use(sync => sync.status({}))
       : Effect.flatMap(itemIdsOf(input.ids), keys => BacklogSync.use(sync => sync.status({ ids: keys.ids }))),
-  syncNow: input =>
-    input.id === undefined
-      ? BacklogSync.use(sync => sync.syncNow({ project: input.project }))
-      : Effect.flatMap(itemIdOf(input.id), id => BacklogSync.use(sync => sync.syncNow({ ...input, id }))),
+  syncNow: ({ confirm, ...input }, call) =>
+    AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_sync_now', id: input.id } }).pipe(
+      Effect.andThen(
+        input.id === undefined
+          ? BacklogSync.use(sync => sync.syncNow({ project: input.project }))
+          : Effect.flatMap(itemIdOf(input.id), id => BacklogSync.use(sync => sync.syncNow({ ...input, id }))),
+      ),
+    ),
   linkRemote: (input, call) => Effect.flatMap(withItemId(input), resolved => BacklogSync.use(sync => sync.link({ ...resolved, actor: actorOf(call.caller) }))),
   importRemote: (input, call) => BacklogSync.use(sync => sync.importRemote({ ...input, actor: actorOf(call.caller) })),
   testSyncBackend: input =>
@@ -181,7 +189,10 @@ const backlogHandlers = Api.handlers(backlogApi, {
   editComment: (input, call) =>
     Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.editComment({ ...resolved, actor: actorOf(call.caller) }))),
   export: input => BacklogExport.use(exporter => exporter.run(input)),
-  revert: (input, call) => Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.revert({ ...resolved, actor: actorOf(call.caller) }))),
+  revert: ({ confirm, ...input }, call) =>
+    AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_revert' } }).pipe(
+      Effect.andThen(Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.revert({ ...resolved, actor: actorOf(call.caller) })))),
+    ),
   deleteComment: (input, call) =>
     Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.deleteComment({ ...resolved, actor: actorOf(call.caller) }))),
 })

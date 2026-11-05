@@ -1,5 +1,7 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { Effect, Schema, SchemaGetter } from 'effect'
+import { AgentConfirmation } from './agent-confirmation.js'
+import { BacklogBackfill } from './backfill.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogItems } from './item.js'
 import { BacklogSyncModel } from './sync-model.js'
@@ -294,6 +296,9 @@ const renderSyncResults = (output: { readonly results: readonly (typeof syncResu
 
 const writeNote = 'Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.'
 
+/** No default: a bare agent request cannot run a guarded write. */
+const confirmSchema = Schema.Boolean.pipe(Schema.optional).annotate({ description: AgentConfirmation.confirmDescription })
+
 /** One backlog every browser and agent shares, owned by the Host. */
 export const backlogApi = defineApi({
   id: 'backlog',
@@ -551,9 +556,10 @@ export const backlogApi = defineApi({
         project: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))
           .pipe(Schema.optional)
           .annotate({ description: 'Only linked items of this project; null selects items without a project.' }),
+        confirm: confirmSchema,
       }),
       output: Schema.Struct({ results: Schema.Array(syncResultSchema) }),
-      description: `Sync linked backlog items with their Linear or GitHub issues now: title, description, status and tags flow both ways (a field both sides changed goes to the side that changed last, with a conflict note on the item), and new comments are carried over once. Run only when the user asked. ${writeNote}`,
+      description: `Sync linked backlog items with their Linear or GitHub issues now: title, description, status and tags flow both ways (a field both sides changed goes to the side that changed last, with a conflict note on the item), and new comments are carried over once. Run only when the user asked. Without \`id\` it syncs every linked item, which an agent may run only with \`confirm: true\`. ${writeNote}`,
       tool: { name: 'backlog_sync_now', readOnly: false, render: renderSyncResults },
     }),
     linkRemote: method({
@@ -635,9 +641,10 @@ export const backlogApi = defineApi({
         retriage: Schema.Boolean.pipe(Schema.optional).annotate({
           description: 'Also re-triage inbox/todo tasks already looked at, e.g. after changing the prompt or model.',
         }),
+        confirm: confirmSchema,
       }),
       output: backfillOutputSchema,
-      description: `Start a background triage backfill for inbox/todo tasks only (Jev and the configured cheap model). Returns a job id immediately; check backlog_triage_backfill_status to follow progress. A confident answer applies; a hesitant one waits on the item as a suggestion. ${writeNote}`,
+      description: `Start a background triage backfill for inbox/todo tasks only (Jev and the configured cheap model). Returns a job id immediately; check backlog_triage_backfill_status to follow progress. A confident answer applies; a hesitant one waits on the item as a suggestion. Run only when the user asked: an agent run over more than ${String(AgentConfirmation.bulkLimit)} items (the default is ${String(BacklogBackfill.defaultLimit)}) needs \`confirm: true\`. ${writeNote}`,
       tool: { name: 'backlog_triage_backfill', readOnly: false },
     }),
     backfillTriageStatus: method({
@@ -686,10 +693,11 @@ export const backlogApi = defineApi({
         field: BacklogItems.humanFieldSchema.annotate({
           description: 'The changed field to put back: title, body, kind, status, project, tags, pinned or attention.',
         }),
+        confirm: confirmSchema,
       }),
       output: revertResultSchema,
       description:
-        'Revert one recorded field change of a backlog item: writes the typed value the field held before that change, read from the op log, as a new change. Refused with `stale` when the field changed again since. Run only when the user asked to revert that change.',
+        'Revert one recorded field change of a backlog item: writes the typed value the field held before that change, read from the op log, as a new change. Refused with `stale` when the field changed again since. Run only when the user asked to revert that change, and pass `confirm: true`; an agent call without it is refused.',
       tool: { name: 'backlog_revert', readOnly: false, render: renderRevertPreview },
     }),
     export: method({

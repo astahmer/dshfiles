@@ -24,6 +24,17 @@ export class BacklogWriteFailed extends Schema.TaggedError<BacklogWriteFailed>()
   }
 }
 
+/** An agent asked for a bulk or destructive write without the explicit `confirm: true` that says the user asked for it. */
+export class BacklogConfirmationRequired extends Schema.TaggedError<BacklogConfirmationRequired>()(
+  'BacklogConfirmationRequired',
+  { tool: Schema.String, effect: Schema.String },
+  { dshxWireCode: 'confirmation-required' },
+) {
+  override get message(): string {
+    return `${this.tool} ${this.effect}, so an agent must confirm it. Ask the user first; once they asked for it, call ${this.tool} again with confirm: true.`
+  }
+}
+
 export class BackfillAlreadyRunning extends Schema.TaggedError<BackfillAlreadyRunning>()(
   'BackfillAlreadyRunning',
   { jobId: Schema.String },
