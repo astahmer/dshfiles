@@ -60,6 +60,13 @@ never guessed.
 - Owned forms: add `data-secret-input="reference"` to a text input (or spread
   `SecretInputBinding.attributes` from the Catalog's client sources if you
   already depend on it). No plugin imports the picker.
+- To offer one-click creation (a "Create LINEAR_API_KEY" button beside a field
+  with no key), dispatch a bubbling `secret-input:create` event on the marked
+  field (`SecretInputBinding.createEvent`). The Catalog opens its
+  create-and-bind form for it, prefilled from the field's `data-secret-alias`,
+  `data-secret-environment`, `data-secret-scope` and `data-secret-cwd`, and
+  writes the stored reference into the field like a pick. Without the Catalog
+  the event does nothing, so keep the field usable on its own.
 - The picker appears on focus as a key button, lists the global aliases with
   search, and writes the reference through the field's own value setter plus an
   `input` event, so React-controlled state updates. It is portaled into the

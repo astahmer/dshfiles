@@ -121,14 +121,25 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
         setJevSetupOpen(false)
       }, 0)
     }
+    const onCreate = (event: Event): void => {
+      const element = event.target
+      if (jevSetupPending || !(element instanceof Element) || !element.matches(SecretInputBinding.selector) || !SecretInputBinding.accepts(element)) return
+      element.focus()
+      track(element)
+      setJevSetupOpen(false)
+      setCreating(true)
+      setOpen(true)
+    }
     const remeasure = (): void => {
       setAnchor(current => (current === null ? null : measure(current.element)))
     }
+    document.addEventListener(SecretInputBinding.createEvent, onCreate)
     document.addEventListener('focusin', onFocusIn)
     document.addEventListener('focusout', onFocusOut)
     document.addEventListener('scroll', remeasure, true)
     window.addEventListener('resize', remeasure)
     return () => {
+      document.removeEventListener(SecretInputBinding.createEvent, onCreate)
       document.removeEventListener('focusin', onFocusIn)
       document.removeEventListener('focusout', onFocusOut)
       document.removeEventListener('scroll', remeasure, true)

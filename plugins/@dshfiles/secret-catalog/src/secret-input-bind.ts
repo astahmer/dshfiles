@@ -17,6 +17,13 @@ export class SecretInputBinding {
   /** Attributes to spread on an owned input, e.g. `<Input {...SecretInputBinding.attributes} />`. */
   static readonly attributes = { 'data-secret-input': 'reference' } as const
 
+  /**
+   * Dispatched (bubbling) on a marked field to open the Catalog's create-and-bind form for it, prefilled from its
+   * `data-secret-alias`, `data-secret-environment`, `data-secret-scope` and `data-secret-cwd` attributes. The stored
+   * reference is written into the field like a pick.
+   */
+  static readonly createEvent = 'secret-input:create'
+
   /** A field the picker may write into: text-like, enabled and writable. */
   static accepts(element: Element): element is Field {
     if (element instanceof HTMLTextAreaElement) return !element.disabled && !element.readOnly
