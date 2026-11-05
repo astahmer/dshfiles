@@ -285,7 +285,7 @@
         "press Enter",
         "click text \"Preview the agent mention\"",
         "expect textbox \"Comment\"",
-        "fill textbox \"Comment\" \"Ping @{luna} about b:1\"",
+        "fill textbox \"Comment\" \"Ping @{luna} about b:#1\"",
         "click button \"Reply\"",
         "click text \"@{luna}\"",
         "expect button \"Open in Agents\""

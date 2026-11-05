@@ -7,6 +7,7 @@ import type { Browser, Page } from 'playwright'
 import { DshxFeatureCatalogSchema, parseReachStep, type ReachPosition } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
 import { StartupDialogs } from '../project/startup-dialogs.js'
+import { BacklogReachOrdinals } from './backlog-ordinals.js'
 import { ScratchSeedRuntime } from './seed.js'
 import { ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
 
@@ -147,9 +148,9 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
     // A key press right after fill goes to that field as a locator action, so a dialog that opened in between is dismissed first.
     let filled: ReturnType<typeof locate> | undefined
     for (const [index, step] of feature.reach.entries()) {
-      const parsed = parseReachStep(step)
       const startedAt = Date.now()
       try {
+        const parsed = parseReachStep(await BacklogReachOrdinals.resolve({ step, launchUrl: state.launchUrl }))
         if (parsed === undefined) throw new Error('step does not match the reach grammar')
         await StartupDialogs.dismissProviderSetupIfShown(page)
         if (parsed.action === 'seed') {

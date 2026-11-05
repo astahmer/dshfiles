@@ -210,6 +210,8 @@ export interface ReachPosition {
  * or `seed <seed>` (before every other step). Names match exactly; a trailing `*` (`"sample*"`) matches a case-insensitive substring.
  * A pointer step may end with `at <x>,<y>` to hit that point of the element's own box: an overlay a row reveals on hover
  * (its action strip) intercepts the element's centre, while the row's left half is what a reader clicks.
+ * `b:#<n>` in a name or value is the label of the n-th backlog item the scratch profile captured (`b:#1` → `b:k3f9`),
+ * read from the scratch backlog when the step runs; a plain `b:1` stays literal text.
  */
 const reachStepPattern = new RegExp(
   `^(?:(?:click|rightclick|hover) [a-z]+ "[^"]+"(?: at \\d+,\\d+)?|expect [a-z]+ "[^"]+"|fill [a-z]+ "[^"]+" "(?:[^"\\\\]|\\\\.)*"|press [A-Za-z0-9+]+|attach "(?!\\/)(?!.*\\.\\.)[^"]+"|seed (?:${REACH_SEEDS.join('|')}))$`,
