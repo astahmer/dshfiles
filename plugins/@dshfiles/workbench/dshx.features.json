@@ -650,6 +650,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "workbench.thread-facets-host-restart",
+          "featureFile": "tooling/dshx/e2e/features/workbench-thread-facets.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "workbench.thread-facets-closed-tab",
           "featureFile": "tooling/dshx/e2e/features/workbench-thread-facets.feature"
         },

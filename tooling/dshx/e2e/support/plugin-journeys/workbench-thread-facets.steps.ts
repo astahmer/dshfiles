@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
-import { recordAssertion } from '../steps.js'
+import { recordAssertion, restartScratchProfileInBrowser } from '../steps.js'
 
 const regions = ['main', 'right', 'left', 'bottom'] as const
 type Region = (typeof regions)[number]
@@ -32,10 +32,14 @@ When('the {string} pane opens the {string} thread facet from its view chooser', 
   await expect(chooser).toHaveCount(1)
   const facets = chooser.getByRole('group', { name: 'Thread panels', exact: true })
   const row = facets.getByRole('button', { name: new RegExp(`^${facet}`, 'u') })
-  await recordAssertion(page, facet === 'Cost' ? 'thread-facets-chooser-lists-cost' : 'thread-facets-chooser-lists-jobs', async () => {
+  const assertion = { Cost: 'thread-facets-chooser-lists-cost', Jobs: 'thread-facets-chooser-lists-jobs', Context: 'thread-facets-chooser-lists-context' }[
+    facet
+  ]
+  if (assertion === undefined) throw new Error(`No chooser assertion for the ${facet} facet`)
+  await recordAssertion(page, assertion, async () => {
     // Listed from the native guide entry: its title and its one-line description.
     await expect(row).toBeEnabled()
-    await expect(row).toContainText("This thread's")
+    if (facet !== 'Context') await expect(row).toContainText("This thread's")
   })
   const before = await facetBodies(target).count()
   await row.click()
@@ -92,3 +96,28 @@ When('another thread comes on screen', async ({ page }: { page: Page }) => {
   await expect.poll(() => threadOnScreen(page)).not.toBe(previous)
   await expect.poll(() => threadOnScreen(page)).not.toBeNull()
 })
+
+When('the scratch Host restarts with the facets open', async ({ page }: { page: Page }) => {
+  await restartScratchProfileInBrowser(page)
+})
+
+Then(
+  'the {string} pane restores the {string} and {string} facets with content',
+  async ({ page }: { page: Page }, regionName: string, first: string, second: string) => {
+    const target = pane(page, regionOf(regionName))
+    await recordAssertion(page, 'thread-facets-restored-after-host-restart', async () => {
+      await expect(target).toBeVisible()
+      for (const title of [first, second]) {
+        const tab = target.getByRole('tab', { name: title, exact: true })
+        await expect(tab).toHaveCount(1)
+        await tab.click()
+        // A restored facet shows its thread's body or the no-thread note, never an empty pane.
+        const body = facetBodies(target).filter({ visible: true })
+        const empty = target.getByRole('status').filter({ hasText: 'Open a thread' }).filter({ visible: true })
+        await expect(body.or(empty)).toHaveCount(1)
+        if ((await body.count()) === 1) await expect.poll(async () => (await body.innerText()).trim().length).toBeGreaterThan(0)
+      }
+      await expect(page.locator('[data-slot-error]')).toHaveCount(0)
+    })
+  },
+)
