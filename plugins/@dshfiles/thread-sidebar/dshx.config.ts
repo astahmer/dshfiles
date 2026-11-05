@@ -19,6 +19,8 @@ export default defineConfig({
     // The shell's rail destinations and the section registry plugins add their pages to (plans/ade-ux §4.2).
     destinations: 'src/destinations.ts',
     'thread-row-actions': 'src/thread-row-actions.ts',
+    // Updates other plugins know only a Host restart applies, shown in thread-sidebar's one restart status item.
+    'restart-sources': 'src/restart-sources.ts',
   },
   build: { sourcemap: true, declarations: true, minify: true },
 })

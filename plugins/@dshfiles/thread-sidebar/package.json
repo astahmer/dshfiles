@@ -52,6 +52,10 @@
     "./thread-row-actions": {
       "types": "./src/thread-row-actions.ts",
       "default": "./dist/thread-row-actions.js"
+    },
+    "./restart-sources": {
+      "types": "./src/restart-sources.ts",
+      "default": "./dist/restart-sources.js"
     }
   },
   "scripts": {

@@ -89,6 +89,7 @@ import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { threadSidebarRestartApi } from './restart-api.js'
+import { RestartBridge } from './restart-bridge.js'
 import { useRestartMachine } from './use-restart-machine.js'
 import type { sidebarChildren } from './sidebar-contract.js'
 import { NavigationIconRow, type NavigationItem } from './navigation-icon-row.js'
@@ -98,6 +99,8 @@ import { DESTINATIONS, DestinationSections, Destinations } from './destinations.
 import { MovedTo, MovedToDialog } from './moved-to-dialog.js'
 import { threadSidebarNavigationApi, type NavigationRecord } from './navigation-api.js'
 import { SidebarCustomizationFallback, SidebarCustomizationSeat } from './sidebar-customization.js'
+
+const NO_PENDING_PLUGINS: readonly string[] = []
 
 interface FooterRegistration {
   id: string
@@ -397,7 +400,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         sendRestart({ type: 'cancel' })
         void refetchRestartAvailability()
       })
-      .catch(() => setIdleRestartFailed(true))
+      .catch(() => {
+        setIdleRestartFailed(true)
+        sendRestart({ type: 'open' })
+      })
   }
   const cancelPendingRestart = (): void => {
     idleRestartCanceled.current = true
@@ -414,7 +420,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         : `${text(props.t, 'threadSidebarRestartWaiting')} (${String(restartPending.running)})`
   const launchUrl = useApiQuery(threadSidebarRestartApi, 'launchUrl').data?.url ?? null
   const pluginUpdates = useApiQuery(threadSidebarPluginUpdatesApi, 'pending')
-  const pendingPlugins = pluginUpdates.data?.plugins ?? []
+  const pendingPlugins = pluginUpdates.data?.plugins ?? NO_PENDING_PLUGINS
   const pluginUpdatesSupported = pluginUpdates.status !== 'error'
   const refetchPluginUpdates = pluginUpdates.refetch
   const clientRevisionKey = useSyncExternalStore(props.subscribeClientRevisions, props.readClientRevisionKey, props.readClientRevisionKey)
@@ -430,7 +436,6 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   // Entries the page never loaded count too: a plugin added after this page booted needs the reload as well.
   const staleClientPlugins = useMemo(() => [...(clientUpdates.data?.stale ?? []), ...(clientUpdates.data?.added ?? [])], [clientUpdates.data])
   const refetchClientUpdates = clientUpdates.refetch
-  const [updatesPopoverOpen, setUpdatesPopoverOpen] = useState(false)
   const [reloadPopoverOpen, setReloadPopoverOpen] = useState(false)
   const launchUrlCopy = useCopyFeedback()
   const [previewHeaderHeight, setPreviewHeaderHeight] = useState<number | null>(null)
@@ -841,9 +846,26 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
 
   const openRestartDialog = useCallback((): void => {
     if (!restartAvailable) return
-    setUpdatesPopoverOpen(false)
     sendRestart({ type: 'open' })
-  }, [restartAvailable, sendRestart, setUpdatesPopoverOpen])
+  }, [restartAvailable, sendRestart])
+  // The status strip's restart item shows what waits and asks for the verbs; the dialog and its guards stay here.
+  useEffect(() => {
+    RestartBridge.publish({ hostPlugins: pendingPlugins, available: restartAvailable, waitingLabel: restartPendingLabel })
+  }, [pendingPlugins, restartAvailable, restartPendingLabel])
+  useEffect(() => () => RestartBridge.publish(RestartBridge.empty), [])
+  const restartWhenIdleRef = useRef(restartWhenIdle)
+  restartWhenIdleRef.current = restartWhenIdle
+  useEffect(
+    () =>
+      RestartBridge.onRequest(request => {
+        if (request === 'restart') {
+          openRestartDialog()
+          return
+        }
+        if (restartAvailable && restartPending === null) restartWhenIdleRef.current()
+      }),
+    [openRestartDialog, restartAvailable, restartPending],
+  )
   const pendingUpdatesLabel =
     pendingPlugins.length === 0
       ? null
@@ -1626,37 +1648,6 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
 
         {wide ? (
           <div ref={footerAboveRef} className="dshx:flex dshx:w-full dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:empty:hidden">
-            {pendingUpdatesLabel === null ? null : (
-              <Popover open={updatesPopoverOpen} onOpenChange={setUpdatesPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="dshx:flex dshx:h-7 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:border-t dshx:px-3 dshx:text-left dshx:text-xs dshx:text-warning dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset"
-                    aria-label={pendingUpdatesLabel}
-                  >
-                    <RefreshCwIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
-                    <span className="dshx:truncate">{pendingUpdatesLabel}</span>
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent side="top" align="start" className="dshx-root dshx:flex dshx:w-72 dshx:max-w-[calc(100vw-16px)] dshx:flex-col dshx:gap-3">
-                  <div className="dshx:flex dshx:flex-col dshx:gap-1">
-                    <p className="dshx:text-sm dshx:font-medium">{text(props.t, 'threadSidebarUpdatesApplied')}</p>
-                    <ul className="dshx:max-h-40 dshx:overflow-y-auto dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
-                      {pendingPlugins.map(plugin => (
-                        <li key={plugin}>{plugin}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  {restartAvailable ? (
-                    <Button type="button" variant="destructive" size="sm" onClick={openRestartDialog}>
-                      {text(props.t, 'threadSidebarRestart')}
-                    </Button>
-                  ) : (
-                    <p className="dshx:text-xs dshx:text-muted-foreground">{text(props.t, 'threadSidebarUpdatesManual')}</p>
-                  )}
-                </PopoverContent>
-              </Popover>
-            )}
             {reloadPendingLabel === null ? null : (
               <Popover open={reloadPopoverOpen} onOpenChange={setReloadPopoverOpen}>
                 <PopoverTrigger asChild>
@@ -1694,33 +1685,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               : 'dshx:h-[52px] dshx:shrink-0 dshx:flex-nowrap dshx:items-center dshx:gap-2 dshx:overflow-hidden dshx:px-2',
           )}
         >
-          {props.collapsed && pendingUpdatesLabel !== null ? (
-            <Popover open={updatesPopoverOpen} onOpenChange={setUpdatesPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon-sm" className="dshx:shrink-0 dshx:text-warning" aria-label={pendingUpdatesLabel}>
-                  <RefreshCwIcon className="dshx:size-4" aria-hidden="true" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent side="right" align="start" className="dshx-root dshx:flex dshx:w-72 dshx:max-w-[calc(100vw-16px)] dshx:flex-col dshx:gap-3">
-                <div className="dshx:flex dshx:flex-col dshx:gap-1">
-                  <p className="dshx:text-sm dshx:font-medium">{text(props.t, 'threadSidebarUpdatesApplied')}</p>
-                  <ul className="dshx:max-h-40 dshx:overflow-y-auto dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
-                    {pendingPlugins.map(plugin => (
-                      <li key={plugin}>{plugin}</li>
-                    ))}
-                  </ul>
-                </div>
-                {restartAvailable ? (
-                  <Button type="button" variant="destructive" size="sm" onClick={openRestartDialog}>
-                    {text(props.t, 'threadSidebarRestart')}
-                  </Button>
-                ) : (
-                  <p className="dshx:text-xs dshx:text-muted-foreground">{text(props.t, 'threadSidebarUpdatesManual')}</p>
-                )}
-              </PopoverContent>
-            </Popover>
-          ) : null}
-          {restartAvailable && (pendingUpdatesLabel === null || restartPendingLabel !== null) ? (
+          {restartAvailable ? (
             <Button
               variant="ghost"
               size="icon-sm"

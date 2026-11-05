@@ -23,6 +23,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { createApiClient, defineClient, hasHostCommandRegistry, runHostCommand } from '@dshfiles/dshx/client'
 import { StatusItems, type StatusItemProps } from '@dshfiles/frame-layout/status-strip'
 import { WorkingStatusItem, WorkingStatusModel } from './working-status-item.js'
+import { RestartStatusItem } from './restart-status-item.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -280,6 +281,32 @@ export default defineClient({
             open: WorkingStatusModel.open,
           }),
         'thread-sidebar: working status item',
+      )
+      // The one restart notice (plans/ade-ux §4.1 R5): Host files changed on disk plus other plugins' pending updates,
+      // with the restart verbs the sidebar shell guards.
+      const RestartItem = (props: StatusItemProps): JSX.Element | null => (
+        <RestartStatusItem
+          {...props}
+          text={{
+            pending: count => (count === 1 ? translate('threadSidebarRestartPendingOne') : translate('threadSidebarRestartPendingCount', { count })),
+            applied: translate('threadSidebarUpdatesApplied'),
+            manual: translate('threadSidebarUpdatesManual'),
+            restart: translate('threadSidebarRestart'),
+            restartWhenIdle: translate('threadSidebarRestartWhenIdle'),
+          }}
+        />
+      )
+      ctx.effect(
+        () =>
+          plugin.add(StatusItems, {
+            id: '@dshfiles/thread-sidebar.restart',
+            side: 'global',
+            order: 90,
+            label: 'Restart',
+            controls: true,
+            component: plugin.bind(RestartItem),
+          }),
+        'thread-sidebar: restart status item',
       )
     }
     const skillMentions = createSkillMentionSource({

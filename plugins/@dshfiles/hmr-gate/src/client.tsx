@@ -1,6 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { defineClient } from '@dshfiles/dshx/client'
-import { StatusItems } from '@dshfiles/frame-layout/status-strip'
+import { PendingRestartSources } from '@dshfiles/thread-sidebar/restart-sources'
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
@@ -18,7 +18,6 @@ import { z } from 'zod'
 
 const EVENTS_ROUTE = 'plugins/events'
 const ROW_ID = 'dshfiles-hmr-gate'
-const PLUGINS_PANEL_ID = 'plugins'
 const RECOVERY_KEY = 'dshfiles.hmr-gate.slot-recovery-at'
 const RECOVERY_INTERVAL_MS = 30_000
 // Lets the rest of a rebuild burst arrive before the reload picks up the bundles.
@@ -35,11 +34,13 @@ const frameSchema = z.discriminatedUnion('type', [
 type DeferredPackage = z.infer<typeof deferredPackageSchema>
 
 let current: readonly DeferredPackage[] = []
+let currentIds: readonly string[] = []
 const listeners = new Set<() => void>()
 
 const publish = (next: readonly DeferredPackage[]): void => {
   if (next.length === current.length && next.every((entry, index) => entry.id === current[index]?.id)) return
   current = next
+  currentIds = next.map(entry => entry.id)
   for (const listener of listeners) listener()
 }
 
@@ -90,22 +91,6 @@ const HmrGateRow = (props: { readonly view: 'summary' | 'page' }): JSX.Element |
   )
 }
 
-/**
- * The status strip's one restart item (plan §4.1 R5, §6 "one status item + one inbox item from hmr-gate"): it names how
- * many plugins wait for a Host restart and stays hidden while none do. Restarting stays the user's decision, so the item
- * has no verb; the Plugins page row explains it.
- */
-const RestartStatusItem = (): JSX.Element | null => {
-  const packages = useSyncExternalStore(subscribe, snapshot, snapshot)
-  const summary = summaryText(packages)
-  if (summary === undefined) return null
-  return (
-    <span className="dshx-root" data-testid="status-item-restart" aria-label={summary}>
-      {packages.length === 1 ? 'Restart pending' : `Restart pending · ${String(packages.length)} plugins`}
-    </span>
-  )
-}
-
 export default defineClient({
   name: '@dshfiles/hmr-gate',
   // `modules` is the client module table the frames drive; `slots` seats the row.
@@ -113,20 +98,10 @@ export default defineClient({
   setup(ctx, _decorate, metadata) {
     const plugin = metadata?.plugin
     if (plugin !== undefined) {
+      // thread-sidebar's one restart status item lists these beside the Host files it watches and owns the restart verbs.
       ctx.effect(
-        () =>
-          plugin.add(StatusItems, {
-            id: '@dshfiles/hmr-gate',
-            side: 'global',
-            order: 90,
-            label: 'Restart',
-            component: plugin.bind(RestartStatusItem),
-            // The Plugins page carries this plugin's "HMR updates" row: which plugins wait and what a restart applies.
-            open: () => {
-              plugin.layout.openPanel(PLUGINS_PANEL_ID)
-            },
-          }),
-        'hmr-gate: restart status item',
+        () => plugin.add(PendingRestartSources, { id: '@dshfiles/hmr-gate', subscribe, packages: () => currentIds }),
+        'hmr-gate: pending restart source',
       )
     }
     const receive = (data: string): void => {

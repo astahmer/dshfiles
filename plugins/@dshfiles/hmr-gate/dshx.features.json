@@ -114,8 +114,8 @@
     },
     {
       "id": "restart-status-item",
-      "title": "See a pending Host restart in the status strip",
-      "summary": "While a rebuilt plugin waits for a Host restart, the status strip shows \"Restart pending\" (with the plugin count when several wait). It offers no restart verb: restarting stays the user's decision, and the Plugins page row explains what would apply.",
+      "title": "Held-back bundles join the one restart notice",
+      "summary": "While a rebuilt plugin waits for a Host restart, hmr-gate lists it in thread-sidebar's restart sources, so the status strip's one Restart pending item names it beside the Host files thread-sidebar watches. thread-sidebar owns that item and its Restart DSH / Restart when idle verbs; restarting stays the user's confirmed decision, and the Plugins page row explains what would apply.",
       "reach": ["expect region \"Threads\""],
       "surfaces": ["client"],
       "surface": "statusItem",
@@ -123,7 +123,7 @@
       "currentSurface": "status-strip: Restart pending",
       "configuration": [],
       "states": ["hidden", "pending-one", "pending-many"],
-      "failureModes": ["Without frame-layout the item is registered but not shown; the Plugins page row and the Inbox item still report the pending restart."],
+      "failureModes": ["Without thread-sidebar or frame-layout no strip item shows; the Plugins page row and the Inbox item still report the pending restart."],
       "externalDependencies": [],
       "verification": [
         {

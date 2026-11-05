@@ -1845,7 +1845,7 @@ Then('no restart action or confirmation appears without pending Host changes', a
   await recordAssertion(page, 'thread-sidebar-scratch-host-does-not-offer-restart-action', async () => {
     await expect(paletteDialog(page).getByRole('option', { name: /Restart DSH/ })).toHaveCount(0)
     await expect(page.getByRole('dialog', { name: 'Restart DSH?' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /Restart DSH to apply updates/ })).toHaveCount(0)
+    await expect(page.getByTestId('status-item-restart')).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

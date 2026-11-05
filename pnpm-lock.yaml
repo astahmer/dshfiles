@@ -3067,12 +3067,12 @@ importers:
       '@dshfiles/activity-timeline':
         specifier: workspace:*
         version: link:../activity-timeline
-      '@dshfiles/frame-layout':
-        specifier: workspace:*
-        version: link:../frame-layout
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
+      '@dshfiles/thread-sidebar':
+        specifier: workspace:*
+        version: link:../thread-sidebar
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.1.0(effect@4.1.0)(redis@6.3.1)

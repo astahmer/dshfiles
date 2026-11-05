@@ -1748,7 +1748,7 @@
     {
       "id": "client-reload-banner",
       "title": "Offer a page reload when the running client bundles are behind",
-      "summary": "The sidebar foot reports the client bundle revisions the page runs against the Host's served graph; a page that missed a rebuild, reconnected to another release or lacks a newly added entry gets a Restart the page to apply updates banner immediately below the Restart DSH to apply updates banner, naming the plugins a reload would load, with the button that does it.",
+      "summary": "The sidebar foot reports the client bundle revisions the page runs against the Host's served graph; a page that missed a rebuild, reconnected to another release or lacks a newly added entry gets a Restart the page to apply updates banner at the sidebar foot, naming the plugins a reload would load, with the button that does it.",
       "surfaces": ["client", "host"],
       "surface": "statusItem",
       "destination": "none",
@@ -2126,17 +2126,17 @@
     {
       "id": "pending-host-restart",
       "title": "Warn when a host restart is required",
-      "summary": "Detect pending host-side plugin updates, ask for explicit confirmation before handing off a restart when the supervisor supports it, then make sure the old Host exits and tell the page when the new one is back or did not come back.",
+      "summary": "Detect pending host-side plugin updates and show them, with the bundles hmr-gate held back, as one Restart pending item in the status strip whose Restart DSH and Restart when idle verbs open the same confirmation; ask for explicit confirmation before handing off a restart when the supervisor supports it, then make sure the old Host exits and tell the page when the new one is back or did not come back.",
       "reach": [
         "seed pending-restart",
-        "expect button \"Restart DSH to apply updates*\"",
-        "click button \"Restart DSH to apply updates*\"",
+        "expect button \"Restart pending*\"",
+        "click button \"Restart pending*\"",
         "expect text \"Restart DSH yourself to load them.\""
       ],
       "surfaces": ["client", "host", "integration"],
       "surface": "statusItem",
       "destination": "none",
-      "currentSurface": "sidebar-footer: Restart DSH to apply updates",
+      "currentSurface": "status-strip: Restart pending",
       "configuration": [],
       "states": [
         "unchanged",
