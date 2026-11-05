@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "plugin-guide",
+      "title": "Browse where a plugin can extend DSH",
+      "summary": "Settings › Plugin guide is a developer page over a static catalog generated at build time from public declarations: dshx SDK entry points (each checked against the dshx index it is imported from), the native Client slots of create-dshx's offline slot reference, every owned plugin's dshx modules with the registries, client contracts and Host APIs they export, and the presentation surfaces the feature catalogs use. Each entry shows its import, owner, scope, mode, registration shape, additive-or-replacement risk (shell-owned slots marked high risk), static or unavailable occupancy (never live), source file and docs. A banner names the catalog's DSH version and warns when the running DSH or the slot facts disagree. Draft for agent opens a new thread with the entry's guidance in the composer, unsent; Copy guidance and the inspect command go to the clipboard. The plugin_guide_search agent tool searches the same catalog read-only.",
+      "reach": ["click tab \"Settings\"", "click button \"Plugin guide\"", "expect heading \"Plugin guide\""],
+      "surfaces": ["client", "host", "api", "tool"],
+      "surface": "destinationSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: Settings › Plugin guide",
+      "configuration": [],
+      "states": ["loading", "current", "stale", "filtered", "no-match", "drafted"],
+      "failureModes": [
+        "A catalog generated for another DSH release, or slot facts checked against another release, shows a stale banner that says to rebuild the plugin or confirm a slot with dshx inspect slots.",
+        "Without the Host half the page says to restart DSH after adding the plugin to the profile.",
+        "A module, SDK export or docs link that disappears fails generation, and the catalog test fails with the regenerate command."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "plugin-guide.browse",
+          "featureFile": "tooling/dshx/e2e/features/plugin-guide.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-guide.fresh",
+          "file": "plugins/@dshfiles/plugin-guide/src/catalog.test.ts",
+          "testName": "is current with the public declarations it is generated from"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-guide.version",
+          "file": "plugins/@dshfiles/plugin-guide/src/catalog.test.ts",
+          "testName": "matches its schema and the DSH version this package builds against"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-guide.stale",
+          "file": "plugins/@dshfiles/plugin-guide/src/catalog.test.ts",
+          "testName": "reports a stale catalog when the running DSH or the slot facts disagree"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-guide.panel",
+          "file": "plugins/@dshfiles/plugin-guide/src/guide-panel.test.tsx",
+          "testName": "filters by kind and search, shows the replacement risk, and drafts without sending"
+        },
+        {
+          "kind": "host-test",
+          "id": "plugin-guide.agent-tool",
+          "file": "plugins/@dshfiles/plugin-guide/src/host.test.ts",
+          "testName": "serves the static catalog and a read-only search tool"
+        }
+      ]
+    }
+  ]
+}
