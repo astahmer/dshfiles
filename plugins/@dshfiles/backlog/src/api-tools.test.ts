@@ -65,6 +65,7 @@ describe('backlog tool exposure', () => {
       'backlog_start_thread',
       'backlog_sync_now',
       'backlog_sync_status',
+      'backlog_sync_test_all',
       'backlog_sync_test_connection',
       'backlog_triage',
       'backlog_triage_backfill',
@@ -86,6 +87,7 @@ describe('backlog tool exposure', () => {
       'backlog_read_file',
       'backlog_referencing',
       'backlog_sync_status',
+      'backlog_sync_test_all',
       'backlog_sync_test_connection',
       'backlog_triage_backfill_status',
     ])

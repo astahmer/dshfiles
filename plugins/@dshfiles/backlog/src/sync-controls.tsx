@@ -8,9 +8,22 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { CircleCheckIcon, CloudIcon, ExternalLinkIcon, LinkIcon, PlusIcon, RefreshCwIcon, Trash2Icon, UnlinkIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  ChevronUpIcon,
+  CircleCheckIcon,
+  CloudIcon,
+  ExternalLinkIcon,
+  KeyRoundIcon,
+  LinkIcon,
+  PencilIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  Trash2Icon,
+  Undo2Icon,
+  UnlinkIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useIsFetching, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 
 import { backlogApi, type BacklogSyncItemView, type BacklogSyncResultView, type BacklogSyncStatusView } from './api.js'
@@ -374,7 +387,28 @@ const useConnectionTest = (row: BackendRow) => {
 
 type ConnectionTestQuery = ReturnType<typeof useConnectionTest>
 
-const ConnectionLine = (props: { readonly row: BackendRow; readonly test: ConnectionTestQuery }): JSX.Element => {
+/** The vault alias a missing key is created under; the Secret Catalog writes the reference back into the field. */
+const suggestedAliases = { linear: 'LINEAR_API_KEY', github: 'GITHUB_TOKEN' } as const satisfies Record<SyncBackendKind, string>
+
+/**
+ * The Secret Catalog's plain-DOM contract (docs/secret-references.md): a bubbling event on a
+ * `data-secret-input="reference"` field opens its create-and-bind form. Backlog cannot import the Catalog, which
+ * depends on it.
+ */
+const SECRET_CREATE_EVENT = 'secret-input:create'
+
+const requestVaultKey = (field: HTMLInputElement | null): void => {
+  if (field === null) return
+  field.focus()
+  field.dispatchEvent(new CustomEvent(SECRET_CREATE_EVENT, { bubbles: true }))
+}
+
+const connectionTarget = (report: NonNullable<ConnectionTestQuery['data']>): string | null => {
+  if (report.target !== null) return `${report.target.key}${report.target.name === report.target.key ? '' : ` · ${report.target.name}`}`
+  return report.targetSource === 'per-project' ? "each project's git remote" : null
+}
+
+const ConnectionLine = (props: { readonly row: BackendRow; readonly test: ConnectionTestQuery; readonly onCreateKey: () => void }): JSX.Element => {
   const { test } = props
   const retest = (
     <Button type="button" variant="ghost" size="xs" disabled={test.isFetching} onClick={() => void test.refetch()}>
@@ -408,18 +442,17 @@ const ConnectionLine = (props: { readonly row: BackendRow; readonly test: Connec
     return (
       <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
         {props.row.backend === 'linear'
-          ? 'Needs a key: pick one from the vault, or set LINEAR_API_KEY on the Host.'
-          : 'Needs a key: pick one from the vault, set GITHUB_TOKEN, or run gh auth login on the Host.'}
+          ? 'Needs a key: create one in the vault, pick one, or set LINEAR_API_KEY on the Host.'
+          : 'Needs a key: create one in the vault, pick one, set GITHUB_TOKEN, or run gh auth login on the Host.'}
+        <Button type="button" variant="outline" size="xs" onClick={props.onCreateKey}>
+          <KeyRoundIcon aria-hidden className="dshx:size-3" />
+          Create {suggestedAliases[props.row.backend]}
+        </Button>
         {retest}
       </div>
     )
   }
-  const target =
-    report.target === null
-      ? report.targetSource === 'per-project'
-        ? "each project's git remote"
-        : null
-      : `${report.target.key}${report.target.name === report.target.key ? '' : ` · ${report.target.name}`}`
+  const target = connectionTarget(report)
   return (
     <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-xs">
       {report.account === null ? null : (
@@ -442,15 +475,76 @@ const ConnectionLine = (props: { readonly row: BackendRow; readonly test: Connec
   )
 }
 
+const rowProjectLabel = (row: BackendRow): string => (row.project === '' ? 'All other projects' : ItemGlyphs.projectName(row.project))
+
+/** A row whose connection works, on one line: tracker, project, account and target, interval and the switch. */
+const CollapsedRow = (props: {
+  readonly row: BackendRow
+  readonly position: number
+  readonly test: ConnectionTestQuery
+  readonly onChange: (change: Partial<BackendRow>) => void
+  readonly onExpand: () => void
+}): JSX.Element => {
+  const { row } = props
+  const report = props.test.data
+  const target = report === undefined ? null : connectionTarget(report)
+  return (
+    <fieldset
+      aria-label={`Sync backend ${String(props.position)}`}
+      data-collapsed=""
+      className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:px-3 dshx:py-1.5 dshx:text-xs"
+    >
+      <span className="dshx:shrink-0 dshx:text-sm dshx:font-medium">{label(row.backend)}</span>
+      <span className="dshx:min-w-0 dshx:shrink dshx:truncate dshx:text-muted-foreground">{rowProjectLabel(row)}</span>
+      {report === undefined ? (
+        <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">Testing connection…</span>
+      ) : (
+        <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1 dshx:text-success">
+          <CircleCheckIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
+          <span className="dshx:min-w-0 dshx:truncate">
+            {report.account}
+            {target === null ? '' : ` → ${target}`}
+          </span>
+        </span>
+      )}
+      <span className="dshx:ml-auto dshx:shrink-0 dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{autoSyncLabel(row.autoSyncMinutes)}</span>
+      <Switch
+        size="sm"
+        aria-label={`Enable sync backend ${String(props.position)}`}
+        checked={row.enabled}
+        onCheckedChange={checked => props.onChange({ enabled: checked })}
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        aria-label={`Edit sync backend ${String(props.position)}`}
+        aria-expanded={false}
+        onClick={props.onExpand}
+      >
+        <PencilIcon />
+      </Button>
+    </fieldset>
+  )
+}
+
 const BackendRowEditor = (props: {
   readonly row: BackendRow
   readonly position: number
+  readonly startEditing: boolean
   readonly projectOptions: readonly ComboboxOption[]
   readonly onChange: (change: Partial<BackendRow>) => void
   readonly onRemove: () => void
 }): JSX.Element => {
   const { row } = props
   const test = useConnectionTest(row)
+  const [editing, setEditing] = useState(props.startEditing)
+  const secretField = useRef<HTMLInputElement | null>(null)
+  const working = isReferenceOrEmpty(row.secret) && test.data?.ok === true
+  const pendingFirstTest = isReferenceOrEmpty(row.secret) && test.data === undefined && test.error === null
+  if (!editing && (working || pendingFirstTest)) {
+    return <CollapsedRow row={row} position={props.position} test={test} onChange={props.onChange} onExpand={() => setEditing(true)} />
+  }
   const teams = test.data?.teams ?? []
   const detectedTarget = test.data?.target?.key
   const teamOptions: ComboboxOption[] = [
@@ -507,12 +601,27 @@ const BackendRowEditor = (props: {
           <Button type="button" variant="ghost" size="icon-xs" aria-label={`Remove sync backend ${String(props.position)}`} onClick={props.onRemove}>
             <Trash2Icon />
           </Button>
+          {working ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`Collapse sync backend ${String(props.position)}`}
+              aria-expanded
+              onClick={() => setEditing(false)}
+            >
+              <ChevronUpIcon />
+            </Button>
+          ) : null}
         </div>
       </div>
       <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
         <input
+          ref={secretField}
           type="text"
           data-secret-input="reference"
+          data-secret-alias={suggestedAliases[row.backend]}
+          data-secret-scope="global"
           aria-label={row.backend === 'linear' ? 'Linear API key reference' : 'GitHub token reference'}
           placeholder={row.backend === 'linear' ? 'secret:LINEAR_API_KEY' : 'secret:GITHUB_TOKEN or gh login'}
           value={row.secret}
@@ -540,10 +649,26 @@ const BackendRowEditor = (props: {
           />
         )}
       </div>
-      <ConnectionLine row={row} test={test} />
+      <ConnectionLine row={row} test={test} onCreateKey={() => requestVaultKey(secretField.current)} />
     </fieldset>
   )
 }
+
+/** A row in the form, keyed so its editor keeps its own state when rows above it are removed or restored. */
+interface EditorRow {
+  readonly key: number
+  readonly row: BackendRow
+  readonly startEditing: boolean
+}
+
+const sameRows = (input: { readonly left: readonly BackendRow[]; readonly right: readonly BackendRow[] }): boolean =>
+  JSON.stringify(input.left) === JSON.stringify(input.right)
+
+const keyRows = (input: { readonly counter: { current: number }; readonly rows: readonly BackendRow[] }): EditorRow[] =>
+  input.rows.map(row => {
+    input.counter.current += 1
+    return { key: input.counter.current, row, startEditing: false }
+  })
 
 /** Backend rows (saved as you edit), Sync all now and Import issue, under Backlog settings. */
 const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] }): JSX.Element => {
@@ -551,24 +676,29 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
   const status = useSyncStatus()
   const actions = useSyncActions()
   const queryClient = useQueryClient()
-  const [rows, setRows] = useState<BackendRow[]>([...(settings.value?.syncBackends ?? [])])
+  const testsRunning = useIsFetching({ queryKey: SYNC_TEST_KEY }) > 0
+  const nextKey = useRef(0)
+  const [entries, setEntries] = useState<EditorRow[]>(() => keyRows({ counter: nextKey, rows: settings.value?.syncBackends ?? [] }))
+  const [removed, setRemoved] = useState<{ readonly entry: EditorRow; readonly index: number } | null>(null)
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [importReference, setImportReference] = useState('')
   const editRevision = useRef(0)
   const stored = settings.value?.syncBackends
-  const settledRows = useDebouncedValue({ value: rows, delayMs: 800 })
+  const settledEntries = useDebouncedValue({ value: entries, delayMs: 800 })
   const writable = settings.writable && settings.status === 'ready'
-  const savable = rows.every(row => isReferenceOrEmpty(row.secret))
+  const savable = entries.every(entry => isReferenceOrEmpty(entry.row.secret))
 
   useEffect(() => {
-    if (!dirty && settings.status === 'ready') setRows([...(stored ?? [])])
+    if (dirty || settings.status !== 'ready') return
+    const next = stored ?? []
+    setEntries(current => (sameRows({ left: current.map(entry => entry.row), right: next }) ? current : keyRows({ counter: nextKey, rows: next })))
   }, [dirty, settings.status, stored])
 
-  const change = (next: (current: BackendRow[]) => BackendRow[]): void => {
+  const change = (next: (current: EditorRow[]) => EditorRow[]): void => {
     editRevision.current += 1
-    setRows(next)
+    setEntries(next)
     setDirty(true)
     setSaved(false)
   }
@@ -577,7 +707,7 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
     setError(null)
     try {
       if (!writable) throw new Error('Backlog settings are not writable right now. Reload the page, then edit again.')
-      const clean = rows.map(row => ({ ...row, target: row.target.trim(), secret: row.secret.trim() }))
+      const clean = entries.map(entry => ({ ...entry.row, target: entry.row.target.trim(), secret: entry.row.secret.trim() }))
       if (!(await settings.set('syncBackends', clean))) throw new Error('Backlog could not save the remote sync backends. Retry.')
       if (editRevision.current === revision) {
         setDirty(false)
@@ -591,7 +721,7 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
 
   const saveLatest = useRef(save)
   saveLatest.current = save
-  const shouldSave = dirty && savable && writable && settledRows === rows
+  const shouldSave = dirty && savable && writable && settledEntries === entries
   useEffect(() => {
     if (shouldSave) void saveLatest.current()
   }, [shouldSave])
@@ -603,6 +733,24 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
     },
     [],
   )
+
+  const addRow = (backend: SyncBackendKind): void => {
+    nextKey.current += 1
+    const entry: EditorRow = { key: nextKey.current, row: emptyRow(backend), startEditing: true }
+    change(current => [...current, entry])
+  }
+  const removeRow = (index: number): void => {
+    const entry = entries[index]
+    if (entry === undefined) return
+    setRemoved({ entry, index })
+    change(current => current.filter((_entry, at) => at !== index))
+  }
+  const undoRemove = (): void => {
+    if (removed === null) return
+    setRemoved(null)
+    change(current => [...current.slice(0, removed.index), removed.entry, ...current.slice(removed.index)])
+  }
+  const testAll = (): void => void queryClient.refetchQueries({ queryKey: SYNC_TEST_KEY, type: 'active' })
 
   const importBackend = BacklogSyncModel.backendOfReference(importReference)
   const importIssue = async (): Promise<void> => {
@@ -636,16 +784,30 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
         Remote sync
       </h3>
       <div className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-3">
-        {rows.map((row, index) => (
+        {entries.map((entry, index) => (
           <BackendRowEditor
-            key={`${String(index)}-${row.backend}`}
-            row={row}
+            key={entry.key}
+            row={entry.row}
             position={index + 1}
+            startEditing={entry.startEditing}
             projectOptions={projectOptions}
-            onChange={edit => change(current => current.map((candidate, at) => (at === index ? { ...candidate, ...edit } : candidate)))}
-            onRemove={() => change(current => current.filter((_row, at) => at !== index))}
+            onChange={edit =>
+              change(current => current.map(candidate => (candidate.key === entry.key ? { ...candidate, row: { ...candidate.row, ...edit } } : candidate)))
+            }
+            onRemove={() => removeRow(index)}
           />
         ))}
+        {removed === null ? null : (
+          <div role="status" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
+            <span className="dshx:min-w-0 dshx:truncate">
+              Removed the {label(removed.entry.row.backend)} backend for {rowProjectLabel(removed.entry.row)}.
+            </span>
+            <Button type="button" size="xs" variant="outline" disabled={!writable} onClick={undoRemove}>
+              <Undo2Icon aria-hidden className="dshx:size-3" />
+              Undo
+            </Button>
+          </div>
+        )}
         {error === null ? null : (
           <div role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-destructive">
             {error}
@@ -663,12 +825,18 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
               variant="outline"
               aria-label={`Add ${label(backend)} backend`}
               disabled={!writable}
-              onClick={() => change(current => [...current, emptyRow(backend)])}
+              onClick={() => addRow(backend)}
             >
               <PlusIcon aria-hidden className="dshx:size-3.5" />
               {label(backend)}
             </Button>
           ))}
+          {entries.length === 0 ? null : (
+            <Button type="button" size="sm" variant="outline" disabled={testsRunning} onClick={testAll}>
+              <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', testsRunning && 'dshx:animate-spin')} />
+              Test all
+            </Button>
+          )}
           {linkedCount === 0 ? null : (
             <Button type="button" size="sm" variant="outline" disabled={actions.syncNow.isPending} onClick={() => actions.syncNow.mutate({})}>
               <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin')} />

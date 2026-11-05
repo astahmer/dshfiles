@@ -337,8 +337,13 @@ the local feed. **Backlog settings › Remote sync** holds one row per project a
 - an auto-sync interval (15 minutes for a new row; **Manual sync only** syncs on **Sync now**) and an on/off switch.
 
 A row with an empty project (**All other projects**) serves every project that has no row of its own. Each row tests
-its connection as you type and shows the account it signs in as and the team or repository it reaches. The key is
-resolved on the Host through `@dshfiles/credential-port` and never reaches a browser.
+its connection as you type and shows the account it signs in as and the team or repository it reaches; a row whose
+connection works folds to one line (tracker, project, account → target, interval and the switch) with **Edit** to
+open it again, and **Test all** re-tests every row (agent tool `backlog_sync_test_all` tests the saved rows). A row
+with no key offers **Create LINEAR_API_KEY** (or `GITHUB_TOKEN`): it opens the Secret Catalog's create-and-bind form on
+the key field through the Catalog's `secret-input:create` field event, and the stored `secret:ALIAS` reference fills
+the row. Removing a row shows **Undo**, which puts it back where it was. The key is resolved on the Host through
+`@dshfiles/credential-port` and never reaches a browser.
 
 Linking is always your action: an item's row menu and the cloud chip in its detail offer **Link to Linear
 issue…** (paste `ENG-12` or its URL) and **Create in Linear**, the GitHub equivalents once a GitHub row exists,

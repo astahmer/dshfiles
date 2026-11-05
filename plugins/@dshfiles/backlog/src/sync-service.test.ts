@@ -265,6 +265,29 @@ describe('Remote sync setup', () => {
     }).pipe(Effect.provide(syncLayer({ client: linear.client, rows: [{ ...linearRow, target: '' }] })))
   })
 
+  it.effect('tests every saved row in settings order, disabled rows included', () => {
+    const linear = fakeLinear()
+    return Effect.gen(function* () {
+      const tested = yield* (yield* BacklogSync).testSaved
+      expect(tested.results.map(result => ({ project: result.project, enabled: result.enabled, ok: result.report.ok }))).toEqual([
+        { project: '', enabled: true, ok: true },
+        { project: '/work/app', enabled: false, ok: false },
+      ])
+      expect(tested.results[1]?.report.error?.message).toContain('no team with key NOPE')
+      expect(JSON.stringify(tested)).not.toContain('lin_test_key')
+    }).pipe(
+      Effect.provide(
+        syncLayer({
+          client: linear.client,
+          rows: [
+            { ...linearRow, target: '' },
+            { ...linearRow, project: '/work/app', target: 'NOPE', enabled: false },
+          ],
+        }),
+      ),
+    )
+  })
+
   it.effect('asks for a team when the Linear key sees several, and reports an unknown team key', () => {
     const linear = fakeLinear()
     linear.state.teams = [

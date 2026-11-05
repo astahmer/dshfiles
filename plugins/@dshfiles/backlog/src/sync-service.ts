@@ -307,6 +307,10 @@ export class BacklogSync extends Context.Service<
       readonly actor: BacklogActor
     }) => Effect.Effect<{ readonly detail: BacklogDetailView; readonly created: boolean }, LinkError | SyncReferenceUnrecognized>
     readonly testConnection: (draft: SyncBackendDraft) => Effect.Effect<SyncConnectionTest>
+    /** Every saved row's connection, in settings order. */
+    readonly testSaved: Effect.Effect<{
+      readonly results: readonly (Pick<BackendRow, 'backend' | 'project' | 'target' | 'enabled'> & { readonly report: SyncConnectionTest })[]
+    }>
     /** One auto-sync round: every row with an interval that is due. */
     readonly autoSyncTick: Effect.Effect<void>
   }
@@ -643,7 +647,24 @@ export class BacklogSync extends Context.Service<
         )
       })
 
-      return BacklogSync.of({ status, syncNow, link, importRemote, autoSyncTick, testConnection: backends.test })
+      const testSaved = Effect.gen(function* () {
+        const rows = (yield* settings.get).syncBackends
+        const results = yield* Effect.forEach(
+          rows,
+          row =>
+            Effect.map(backends.test({ backend: row.backend, project: row.project, target: row.target, secret: row.secret }), report => ({
+              backend: row.backend,
+              project: row.project,
+              target: row.target,
+              enabled: row.enabled,
+              report,
+            })),
+          { concurrency: 4 },
+        )
+        return { results }
+      })
+
+      return BacklogSync.of({ status, syncNow, link, importRemote, autoSyncTick, testConnection: backends.test, testSaved })
     }),
   )
 }

@@ -2088,7 +2088,7 @@
     {
       "id": "remote-sync-settings",
       "title": "Configure remote sync backends and import issues",
-      "summary": "Backlog settings › Remote sync holds one row per project and tracker, saved as you edit: a secret:ALIAS key reference (empty falls back to the Host environment, and for GitHub to a signed-in gh CLI), a Linear team picked from the teams the key sees (or the key's only team) or a GitHub owner/repo (empty reads the project's github.com git remote), an auto-sync interval (15 minutes for a new row) and on/off. Each row tests its connection on the Host and shows the signed-in account and the target it reaches. Sync all now appears once items are linked, and Import an issue reads Linear or GitHub from the pasted id or URL. Agents test with backlog_sync_test_connection and import with backlog_import_remote when the user asked.",
+      "summary": "Backlog settings › Remote sync holds one row per project and tracker, saved as you edit: a secret:ALIAS key reference (empty falls back to the Host environment, and for GitHub to a signed-in gh CLI), a Linear team picked from the teams the key sees (or the key's only team) or a GitHub owner/repo (empty reads the project's github.com git remote), an auto-sync interval (15 minutes for a new row) and on/off. Each row tests its connection on the Host and shows the signed-in account and the target it reaches. A working row folds to one line with Edit to open it; a row with no key offers Create LINEAR_API_KEY (or GITHUB_TOKEN), which opens the Secret Catalog's create-and-bind form and fills the row's reference; removing a row offers Undo; Test all re-tests every row. Sync all now appears once items are linked, and Import an issue reads Linear or GitHub from the pasted id or URL. Agents test with backlog_sync_test_connection (one row) and backlog_sync_test_all (every saved row) and import with backlog_import_remote when the user asked.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2096,7 +2096,13 @@
         "expect textbox \"Issue to import\"",
         "click button \"Add Linear backend\"",
         "expect textbox \"Linear team key\"",
+        "expect button \"Create LINEAR_API_KEY\"",
         "click button \"Add GitHub backend\"",
+        "expect textbox \"GitHub repository\"",
+        "expect button \"Test all\"",
+        "click button \"Remove sync backend 2\"",
+        "expect button \"Undo\"",
+        "click button \"Undo\"",
         "expect textbox \"GitHub repository\"",
         "fill textbox \"Issue to import\" \"https://github.com/acme/app/issues/1\"",
         "expect button \"Import from GitHub\""
@@ -2113,7 +2119,19 @@
           "coveredBy": ["backlog.remote-sync-settings"]
         }
       ],
-      "states": ["no-backend", "configured", "auto-sync", "imported", "already-imported", "connection-ok", "connection-failed", "unsaved"],
+      "states": [
+        "no-backend",
+        "configured",
+        "auto-sync",
+        "imported",
+        "already-imported",
+        "connection-ok",
+        "connection-failed",
+        "unsaved",
+        "folded",
+        "removed-undoable",
+        "key-missing"
+      ],
       "failureModes": [
         "Settings stay read-only while the namespace is unavailable; the form says so instead of saving.",
         "The form stores a Secret Catalog reference, never a key value, and does not save a key field holding anything else; an empty reference falls back to LINEAR_API_KEY, or GITHUB_TOKEN, GH_TOKEN and then `gh auth token` on the Host.",
@@ -2181,6 +2199,12 @@
           "id": "backlog.remote-sync-remote-urls",
           "file": "plugins/@dshfiles/backlog/src/sync-local-probes.test.ts",
           "testName": "prefers origin, then upstream, then the first github.com remote"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-test-all",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "tests every saved row in settings order, disabled rows included"
         }
       ],
       "telemetry": [

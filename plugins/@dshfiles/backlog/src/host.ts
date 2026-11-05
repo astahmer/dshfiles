@@ -127,6 +127,7 @@ const backlogHandlers = Api.handlers(backlogApi, {
   importRemote: (input, call) => BacklogSync.use(sync => sync.importRemote({ ...input, actor: actorOf(call.caller) })),
   testSyncBackend: input =>
     BacklogSync.use(sync => sync.testConnection({ ...input, project: input.project ?? '', target: input.target ?? '', secret: input.secret ?? '' })),
+  testSyncBackends: () => BacklogSync.use(sync => sync.testSaved),
   editComment: (input, call) => BacklogStore.use(store => store.editComment({ ...input, actor: actorOf(call.caller) })),
   deleteComment: (input, call) => BacklogStore.use(store => store.deleteComment({ ...input, actor: actorOf(call.caller) })),
 })

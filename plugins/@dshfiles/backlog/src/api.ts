@@ -231,6 +231,22 @@ const renderSyncConnection = (output: typeof syncConnectionSchema.Type): string 
   const target = output.target === null ? (output.targetSource === 'per-project' ? "each project's git remote" : 'no target') : output.target.key
   return `Connected as ${output.account ?? '?'} → ${target} (key: ${output.credential}).`
 }
+const savedSyncConnectionSchema = Schema.Struct({
+  backend: BacklogSyncModel.backendSchema,
+  project: Schema.String,
+  target: Schema.String,
+  enabled: Schema.Boolean,
+  report: syncConnectionSchema,
+})
+const renderSavedSyncConnections = (output: { readonly results: readonly (typeof savedSyncConnectionSchema.Type)[] }): string =>
+  output.results.length === 0
+    ? 'No sync backends are saved. Add one under Backlog settings › Remote sync.'
+    : output.results
+        .map(
+          result =>
+            `${result.backend} · ${result.project === '' ? 'all other projects' : result.project}${result.enabled ? '' : ' (disabled)'}: ${renderSyncConnection(result.report)}`,
+        )
+        .join('\n')
 const remoteReferenceSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTargetChars)).annotate({
   description: 'The issue: a URL, a Linear identifier such as ENG-12, or a GitHub issue number such as 42.',
 })
@@ -546,6 +562,13 @@ export const backlogApi = defineApi({
       description:
         'Test a Linear or GitHub sync backend (saved or not) on the Host: where its key comes from, the account it signs in as, the team or repository it reaches and, for Linear, every team the key can see. The key never leaves the Host. Read-only.',
       tool: { name: 'backlog_sync_test_connection', readOnly: true, render: renderSyncConnection },
+    }),
+    testSyncBackends: method({
+      input: Schema.Struct({}),
+      output: Schema.Struct({ results: Schema.Array(savedSyncConnectionSchema) }),
+      description:
+        'Test every saved Linear and GitHub sync backend row on the Host (the Test all button): each row with its tracker, project, target and enabled state, and the same report as backlog_sync_test_connection. The keys never leave the Host. Read-only.',
+      tool: { name: 'backlog_sync_test_all', readOnly: true, render: renderSavedSyncConnections },
     }),
     importRemote: method({
       input: Schema.Struct({
