@@ -299,6 +299,7 @@ Deliberately untooled, pinned by a test:
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `runtimeCall`                          | Speaks native RPC on the remote Host; an Agent uses the specific verbs instead                       |
 | `runtimePluginCall`                    | Reaches arbitrary allowlisted remote plugin methods — the same escape hatch                          |
+| `runtimePeerRead`                      | Plugin-to-plugin transport for the backlog's peer reads; `backlog_peer_*` tools are the agent verbs |
 | `runtimePing`                          | `multi_host_status` already reports connection state; ping is the chip menu's latency probe          |
 | `runtimeOpenView` / `runtimeCloseView` | Client presentation: a launch URL and its lease                                                      |
 | `listDirectory` / `createDirectory`    | The local runtime's own folder verbs; `multi_host_browse` / `multi_host_mkdir` cover the remote case |

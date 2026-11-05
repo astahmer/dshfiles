@@ -32,6 +32,13 @@ Feature: Backlog item references and history
     And the backlog is exported as JSON Lines from the settings tab
     Then the export file holds the item "Export demo"
 
+  @scenario:backlog.peer-hosts
+  Scenario: Backlog settings list the Hosts that can share the backlog
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/multi-host" is booted
+    When the Backlog panel is opened
+    And the Backlog settings are opened
+    Then the Hosts section says no other Host shares the backlog yet
+
   @scenario:backlog.item-timeline-lanes
   Scenario: Agent progress folds into a work log beside the conversation, and agent items stay out of project counts
     Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted

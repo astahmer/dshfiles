@@ -78,6 +78,14 @@ Then('the export file holds the item {string}', async ({ page }: { page: Page },
   await finishJourneyAssertions(page)
 })
 
+Then('the Hosts section says no other Host shares the backlog yet', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-hosts-empty', async () => {
+    const hosts = page.getByRole('region', { name: 'Hosts', exact: true }).filter({ hasText: 'No other Host yet' })
+    await expect(hosts).toContainText('No other Host yet. Add one in the Hosts panel, then turn it on here.')
+  })
+  await finishJourneyAssertions(page)
+})
+
 const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
 const toolDirective = (tool: string, input: object): string => `[[call ${tool} ${JSON.stringify(input)}]]`
 const conversation = (page: Page) => peek(page).getByRole('list', { name: 'Conversation', exact: true })

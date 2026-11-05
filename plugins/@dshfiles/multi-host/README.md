@@ -204,7 +204,11 @@ title}` for threads started here, so the sidebar and view can list them.
   pieces). Remote plugin calls are allowlisted to jj-integration's
   `projects`, `destination`, `provision` and `noFolder`; native calls to the
   session list/search/create/prompt/page/cancel/rename/fork and archive
-  methods.
+  methods. `runtimePeerRead` lets another plugin of this Host read a remote
+  runtime through a closed list of read-only calls (`remotePeerReadCalls`:
+  the backlog's `peerInfo`, `peerOpsSince` and `peerFiles`, for its peer
+  replication); the remote failure code comes back as the result code. Add a
+  call there only when it reads and never writes on the remote runtime.
 
 ## Compared with bb and t3code
 

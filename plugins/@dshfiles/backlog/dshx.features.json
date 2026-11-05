@@ -3610,6 +3610,159 @@
           "testName": "returns the guidance of the item project with its detail"
         }
       ]
+    },
+    {
+      "id": "peer-hosts",
+      "title": "Share one backlog across Hosts",
+      "summary": "Every Host serves its op log read-only to peers (peerInfo, peerOpsSince after a cursor, peerFiles) and pulls each multi-host runtime turned on in Backlog settings › Hosts every peerPullSeconds, or now with Sync now or backlog_peer_sync. A Host serves every op it holds, so A ↔ B ↔ C converges; ingest skips ops it has and folds only the touched items in one total order; an offline Host is skipped and caught up from its cursor. Another Host's item gets a private local number; a ref two Hosts minted stays on the older item and the newer gets a derived ref with a note; another Host's legacy item shows under a derived ref that resolves on both; merge redirects travel as ops; a recurring item finished on two Hosts spawns one next occurrence. Attachment bytes come from a peer when an item is opened, or ahead after each pass, kept only when they match their SHA-256. Gate checks and main polling run only on the chosen automation Host. The section lists each runtime with a switch, last pull, ops to pull, its error and Sync now, and the automation Host picker; the work log names the Host that wrote an event. Agents read backlog_peer_status and, when the user asked, call backlog_peer_sync and backlog_peers_configure.",
+      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Backlog settings\"", "expect region \"Hosts\""],
+      "surfaces": ["client", "host", "settings", "storage", "tool", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: Backlog › Backlog settings › Hosts",
+      "configuration": [
+        {
+          "key": "dshfiles-backlog.peers",
+          "defaultValue": "[]",
+          "constraints": "Hidden; { runtimeId, enabled } per multi-host runtime, edited in Backlog settings › Hosts or with backlog_peers_configure. Off by default: nothing is pulled until a runtime is turned on.",
+          "coveredBy": ["backlog.peer-replication-toggle"]
+        },
+        {
+          "key": "dshfiles-backlog.peerPullSeconds",
+          "defaultValue": "60",
+          "constraints": "10 to 3600 seconds between pulls of every enabled peer.",
+          "coveredBy": ["backlog.peer-replication-pull"]
+        },
+        {
+          "key": "dshfiles-backlog.automationHost",
+          "defaultValue": "\"\"",
+          "constraints": "Hidden; the backlog Host id that runs gate checks and main polling. Empty: this Host (with a note asking to pick one once peers are on).",
+          "coveredBy": ["backlog.peer-replication-automation"]
+        }
+      ],
+      "states": [
+        "multi-host-absent",
+        "no-peer",
+        "peer-off",
+        "peer-on",
+        "pulled",
+        "lagging",
+        "offline",
+        "incompatible",
+        "automation-here",
+        "automation-elsewhere",
+        "automation-undecided"
+      ],
+      "failureModes": [
+        "Without @dshfiles/multi-host the section says the backlog stays on this Host and nothing pulls.",
+        "An offline or unreachable Host is skipped with its error and caught up from its saved cursor on a later pull.",
+        "A Host on another peer protocol or a newer op schema is refused before anything is stored, with what to update (Hosts panel › Update hosts, or multi_host_update) and a restart.",
+        "A Host without the backlog plugin answers api-not-served; the row asks to enable it there or turn the peer off.",
+        "An op that does not decode with this Host's op schema stops the pull and stores nothing of that page.",
+        "Attachment bytes that do not hash to their SHA-256 are refused and asked from the next peer.",
+        "With peers on and no automation Host picked, every Host still runs gate checks and main polling and the section asks to pick one.",
+        "A Host that predates backlog Hosts answers without the methods; the section asks for a DSH Host process restart."
+      ],
+      "externalDependencies": [
+        {
+          "id": "multi-host-runtime",
+          "boundary": "@dshfiles/multi-host runtimePeerRead: one allowlisted read-only backlog call (peerInfo, peerOpsSince, peerFiles) on a registered runtime over its pooled gateway; list for the runtimes.",
+          "deterministicFake": "PeerTransport.layerTest in src/peer-transport.ts wires in-process Hosts to each other by runtime id; tests never open a socket."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.peer-hosts",
+          "featureFile": "tooling/dshx/e2e/features/backlog-history.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.peer-replication-pull",
+          "file": "plugins/@dshfiles/backlog/src/peer-replication.test.ts",
+          "testName": "pulls the other Host’s items with their files, resumes where it stopped, and records one bounded span per pull"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.peer-replication-files",
+          "file": "plugins/@dshfiles/backlog/src/peer-replication.test.ts",
+          "testName": "fetches a missing attachment from a peer when it is opened, and refuses bytes that do not match their hash"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.peer-replication-refusal",
+          "file": "plugins/@dshfiles/backlog/src/peer-replication.test.ts",
+          "testName": "refuses a Host with a newer op schema, skips an offline one, and catches up once it answers"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.peer-replication-toggle",
+          "file": "plugins/@dshfiles/backlog/src/peer-replication.test.ts",
+          "testName": "pulls nothing until a peer is turned on, and turning it off keeps what was pulled"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.peer-replication-automation",
+          "file": "plugins/@dshfiles/backlog/src/peer-replication.test.ts",
+          "testName": "runs gate checks and main polling on one chosen Host, and says so on the others"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.peer-ingest-convergence",
+          "file": "plugins/@dshfiles/backlog/src/peer-ingest.test.ts",
+          "testName": "converges whatever order concurrent ops arrive in, across three hosts"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.peer-ingest-cursor",
+          "file": "plugins/@dshfiles/backlog/src/peer-ingest.test.ts",
+          "testName": "resumes from its cursor, serves ops it learned from another host, and reports the head"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.peer-ingest-ref-clash",
+          "file": "plugins/@dshfiles/backlog/src/peer-ingest.test.ts",
+          "testName": "keeps a clashing ref on the older item and gives the newer one the same new ref on every host"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.peer-ingest-redirect",
+          "file": "plugins/@dshfiles/backlog/src/peer-ingest.test.ts",
+          "testName": "replicates a merge redirect, so the duplicate ref opens the survivor on the other host"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.peer-ingest-legacy",
+          "file": "plugins/@dshfiles/backlog/src/peer-ingest.test.ts",
+          "testName": "shows another host’s legacy item under a derived ref that resolves on both hosts, never as a local b:<n>"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.peer-ingest-recurrence",
+          "file": "plugins/@dshfiles/backlog/src/peer-ingest.test.ts",
+          "testName": "spawns one next occurrence when two hosts finish the same recurring item"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "multi-host"
+        },
+        {
+          "kind": "custom",
+          "span": "backlog peer pull",
+          "file": "plugins/@dshfiles/backlog/src/peer-replication.test.ts",
+          "testName": "pulls the other Host’s items with their files, resumes where it stopped, and records one bounded span per pull"
+        }
+      ]
     }
   ],
   "kind": "bundle"

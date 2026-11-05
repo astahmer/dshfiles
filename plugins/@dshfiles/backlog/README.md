@@ -466,6 +466,9 @@ dropping the rest of the draft.
 | `backlog_ready`                  | read: the ready queue, urgent first then oldest; `project`, `limit` (20)                                                                 |
 | `backlog_claim`                  | write: claim an item for this thread (delegate, `doing`, thread link, lease); refused while another agent holds it                       |
 | `backlog_release`                | write: give up a claim; the item returns to `todo`                                                                                       |
+| `backlog_peer_status`            | read: the Hosts that can share the backlog, how far each was pulled, errors and the automation Host                                      |
+| `backlog_peer_sync`              | write: pull enabled peer Hosts now (or one `runtimeId`)                                                                                  |
+| `backlog_peers_configure`        | write: turn replication on or off per runtime, pick the automation Host                                                                  |
 | `backlog_link`                   | write: link or unlink                                                                                                                    |
 | `backlog_comment`                | write, optionally with images or files                                                                                                   |
 | `backlog_attach_file`            | write: keep one base64 image or file with an item                                                                                        |
@@ -718,25 +721,27 @@ Board 208–269 ms, Feed 243–405 ms, search 82–550 ms, Projects 458–775 ms
 One SQLite file owned by the Host, `$DSH_HOME/plugins/backlog/backlog.db`, opened through `@dshfiles/sqlite-store`
 (WAL, migrations, `BEGIN IMMEDIATE`), so every browser and agent reads the same rows:
 
-| Table               | Holds                                                                                                                                                                                    |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ops`               | The append-only op log, the source of truth: `op_id` (ULID), `item_id`, a hybrid logical clock (`hlc_wall` ms, `hlc_counter`, `hlc_host`), `origin` (the actor) and `op` JSON            |
-| `items`             | Each item folded from its ops, a cache rebuilt from `ops` whenever the fold version changes; indexed by status, project, last activity and origin                                        |
-| `aliases`           | `alias → item_id` with its kind: `legacy` (the public `b:<n>` of an item created before short aliases), `short` (the `b:<ref>` of a newer one) and `key` (a newer item's private number) |
-| `alias_redirects`   | `alias → target` for merged duplicates: a duplicate's `b:<ref>` resolves to the survivor's (migration `5_alias_redirects`)                                                               |
-| `attachments`       | Per item and attachment: the SHA-256, media type and size of the bytes                                                                                                                   |
-| `sync_mappings`     | The per-item remote mappings of the sync before bindings; read once by the migration to external refs, written no more                                                                   |
-| `sync_connections`  | Remote sync connections in panel order: provider kind, name, `secret:ALIAS` key reference, base URL and the last tested identity                                                         |
-| `sync_bindings`     | Sync flows of a connection: container, scope, direction, field map with value maps, conflict policy, interval, owner Host                                                                |
-| `external_refs`     | One row per item and binding: remote key, URL, both sides as the last sync left them, carried-over comment ids, state, conflicts, last error                                             |
-| `sync_state`        | Each binding's pull cursor and when its last pass ran                                                                                                                                    |
-| `meta`              | The host id, the next item id, the fold version, the import receipt and the sync migration receipt                                                                                       |
-| `shipped_summaries` | One AI summary of a shipped period per period, bucket start and project filter, with the hash of the items it summarized, the model and when it was written                              |
-| `leases`            | One live or lapsed claim per item: holder (`agent:<sessionId>`), acquired, last write and expiry; written in the same transaction as the item's ops, removed with the claim              |
+| Table               | Holds                                                                                                                                                                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ops`               | The append-only op log, the source of truth: `op_id` (ULID), `item_id`, a hybrid logical clock (`hlc_wall` ms, `hlc_counter`, `hlc_host`), `origin` (the actor), `op` JSON and `seq`, the order this Host stored it in (a peer's cursor; migration `6_op_sequence`) |
+| `items`             | Each item folded from its ops, a cache rebuilt from `ops` whenever the fold version changes; indexed by status, project, last activity and origin                                                                                                                   |
+| `aliases`           | `alias → item_id` with its kind: `legacy` (the public `b:<n>` of an item created before short aliases), `short` (the `b:<ref>` of a newer one) and `key` (a newer item's private number)                                                                            |
+| `alias_redirects`   | `alias → target` for merged duplicates: a duplicate's `b:<ref>` resolves to the survivor's (migration `5_alias_redirects`); derived from `redirect` ops, so peers fill it too                                                                                       |
+| `attachments`       | Per item and attachment: the SHA-256, media type and size of the bytes                                                                                                                                                                                              |
+| `sync_mappings`     | The per-item remote mappings of the sync before bindings; read once by the migration to external refs, written no more                                                                                                                                              |
+| `sync_connections`  | Remote sync connections in panel order: provider kind, name, `secret:ALIAS` key reference, base URL and the last tested identity                                                                                                                                    |
+| `sync_bindings`     | Sync flows of a connection: container, scope, direction, field map with value maps, conflict policy, interval, owner Host                                                                                                                                           |
+| `external_refs`     | One row per item and binding: remote key, URL, both sides as the last sync left them, carried-over comment ids, state, conflicts, last error                                                                                                                        |
+| `sync_state`        | Each binding's pull cursor and when its last pass ran                                                                                                                                                                                                               |
+| `meta`              | The host id, the next item id, the fold version, the import receipt and the sync migration receipt                                                                                                                                                                  |
+| `shipped_summaries` | One AI summary of a shipped period per period, bucket start and project filter, with the hash of the items it summarized, the model and when it was written                                                                                                         |
+| `leases`            | One live or lapsed claim per item: holder (`agent:<sessionId>`), acquired, last write and expiry; written in the same transaction as the item's ops, removed with the claim                                                                                         |
+| `peer_state`        | Per multi-host runtime: the backlog Host behind it, the cursor reached in its log, its head, ops pulled, last pull and last error (migration `7_peer_state`); never replicated                                                                                      |
 
 Op kinds: `create`, `set {field, value}`, `unset`, `add`/`remove {field: tags | links | actors, value}`, `attach`/`detach`,
-`event` (moved, linked, triaged, edited and the rest of the activity), `comment`, `comment-edit`, `comment-delete` and
-`delete` (a tombstone). Each write appends the ops that turn the stored item into the new one; the diff is folded back
+`event` (moved, linked, triaged, edited and the rest of the activity), `comment`, `comment-edit`, `comment-delete`,
+`delete` (a tombstone), `rename-ref` (a ref clash between Hosts, below) and `redirect` (a merged duplicate names its
+survivor's item id). Each write appends the ops that turn the stored item into the new one; the diff is folded back
 and compared before it is written, and falls back to whole-field `set`s for any change it cannot express, so the log
 always reproduces the item exactly. An item's events are every event since capture: nothing is trimmed.
 
@@ -750,6 +755,50 @@ and its sync mapping (the remote issue stays), so no later item inherits them.
 The next item number lives in `meta` and only moves forward: a restart takes the larger of that counter and the largest
 stored number plus one, so deleting the newest item never frees its number. A short alias is never reused either: the
 draw skips every alias in `aliases`, deleted items' included.
+
+## Hosts: one backlog across machines
+
+Several DSH Hosts registered in `@dshfiles/multi-host` can share one backlog. Each Host serves its op log read-only to
+peers and pulls the runtimes turned on in **Backlog settings › Hosts** (off by default) every `peerPullSeconds` (60), or
+now with **Sync now** or `backlog_peer_sync`. There is no leader: each Host keeps writing offline, and ops are a
+grow-only set folded in one total order (HLC stamp, then op id), so any topology converges.
+
+- **Pull, not push.** `peerOpsSince` answers the ops a Host stored after a cursor, in its own storing order (`seq`):
+  every op it holds, whoever wrote it, so A ↔ B ↔ C converges. An HLC stamp is no cursor, since ops from a third Host
+  arrive late with older stamps. A page is at most 500 ops and about 4 MB; a pull takes 40 pages, then waits for the
+  next one. The cursor is saved after each stored page, so an offline Host resumes where it stopped; a runtime that
+  now runs another backlog (another host id) starts over from 0.
+- **Ingest.** An op id already stored is skipped (a same-id op with an earlier stamp replaces it, so Hosts that derive
+  one op agree); every op is decoded with this Host's op schema first, and a page with one it cannot read stores
+  nothing. The clock moves past the newest stamp, and only the touched items are folded again, under the store's write
+  permit so a local edit never diffs against a stale item.
+- **What is derived the same way everywhere.** An item from another Host gets a private local number (`key`, never
+  shown as `b:<n>`). Two items holding one minted `b:<ref>` keep it on the older (then the smaller id); the newer gets a
+  5-character ref derived from its id and a note, through a `rename-ref` op every Host writes identically. Another
+  Host's legacy item shows under a ref derived from its id (its `b:<n>` means another item here), which its own Host
+  also resolves. A merge writes a `redirect` op naming the survivor's item id, so each Host maps the two items to its
+  own refs. A recurring item's next occurrence has an id and ref derived from the done item and date, so two Hosts
+  finishing it offline spawn one item.
+- **Attachments.** Ops carry attachment metadata; the bytes come from a peer (`peerFiles`, 16 files or about 16 MB per
+  call) when the item's file is first opened, or ahead after each pass (32 per pass), so a Host further down a chain
+  can serve them. Bytes that do not hash to the peer's SHA-256 are refused.
+- **Automation.** Gate checks and the `Closes b:<n>` main poll would write the same thing on every Host, so they run
+  only on the automation Host picked in the section (`automationHost`; empty: this Host, with a note asking to pick
+  one once peers are on). Thread signals, triage and recurrence are caused by a write on one Host and run there; claims
+  and their sweep are local (`leases` is not replicated: a claim on one Host is not seen by another).
+- **Versions.** `peerInfo` reports the peer protocol, the op schema and the storage schema; a Host on another protocol
+  or a newer op schema is refused before anything is stored, with what to update (Hosts panel › Update hosts, or
+  `multi_host_update`) and a restart.
+- **What never replicates.** Connections, bindings, external refs, sync state, leases, peer state and settings stay on
+  their Host. Connections hold only `secret:ALIAS` references anyway; a binding syncs from its `ownerHostId` alone.
+
+The calls go through `@dshfiles/multi-host`'s `runtimePeerRead`, which passes exactly `backlog/peerInfo`,
+`backlog/peerOpsSince` and `backlog/peerFiles` (the backlog depends on its published contract, never the reverse); a
+failed read is retried once. Without multi-host the section says the backlog stays on this Host and nothing runs. Each
+pull is one `backlog peer pull` span with counts only (ops, lag, outcome). The section lists each runtime with its
+switch, last pull, ops still to pull, last error and **Sync now**, and the automation Host picker; the item work log
+names the other Host that wrote an event. Agents read `backlog_peer_status` and, when the user asked, call
+`backlog_peer_sync` and `backlog_peers_configure`.
 
 ### Import from the JSON storage domains
 
