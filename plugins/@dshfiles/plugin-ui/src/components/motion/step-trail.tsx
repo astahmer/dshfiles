@@ -26,22 +26,26 @@ export interface TrailStep {
   readonly gateLabel?: React.ReactNode
   /** Substeps, shown under the step while it is active. */
   readonly substeps?: readonly TrailSubstep[]
+  /** The row's accessible name ("Step 2: Fix the bug, in progress"); defaults to its text. */
+  readonly accessibleLabel?: string
 }
 
 export interface StepTrailProps extends Omit<React.HTMLAttributes<HTMLOListElement>, 'children'> {
   readonly steps: readonly TrailStep[]
   readonly onStepClick?: (step: TrailStep) => void
+  /** `sm` fits a card or popover: smaller glyphs, 24 px rows, body-size text. */
+  readonly size?: 'sm' | 'default'
 }
 
 /**
  * An agent's plan as a vertical trail: finished steps get a check that pops in and the connector fills down to the
  * next one, the current step pulses and unfolds its substeps, and a gated step shows the approval it will ask for.
  */
-export function StepTrail({ steps, onStepClick, className, ...props }: StepTrailProps) {
+export function StepTrail({ steps, onStepClick, size = 'default', className, ...props }: StepTrailProps) {
   return (
     <ol aria-label="Plan" className={cn('dshx:@container dshx:flex dshx:flex-col', className)} {...props}>
       {steps.map((step, index) => (
-        <TrailRow key={step.id} step={step} last={index === steps.length - 1} onStepClick={onStepClick} />
+        <TrailRow key={step.id} step={step} last={index === steps.length - 1} onStepClick={onStepClick} size={size} />
       ))}
     </ol>
   )
@@ -51,11 +55,14 @@ function TrailRow({
   step,
   last,
   onStepClick,
+  size,
 }: {
   readonly step: TrailStep
   readonly last: boolean
   readonly onStepClick: ((step: TrailStep) => void) | undefined
+  readonly size: 'sm' | 'default'
 }) {
+  const small = size === 'sm'
   const fillRef = React.useRef<HTMLSpanElement>(null)
   const filled = step.status === 'done'
   const firstFill = React.useRef(true)
@@ -76,7 +83,8 @@ function TrailRow({
     <span
       className={cn(
         // Narrow panes wrap to two lines instead of cutting the step name next to a pill.
-        'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[15px] dshx:motion-safe:transition-colors dshx:@max-pane-narrow:line-clamp-2 dshx:@max-pane-narrow:text-sm dshx:@max-pane-narrow:leading-5 dshx:@max-pane-narrow:whitespace-normal',
+        'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:motion-safe:transition-colors dshx:@max-pane-narrow:line-clamp-2 dshx:@max-pane-narrow:text-sm dshx:@max-pane-narrow:leading-5 dshx:@max-pane-narrow:whitespace-normal',
+        small ? 'dshx:text-sm' : 'dshx:text-[15px]',
         step.status === 'done' && 'dshx:text-muted-foreground',
         step.status === 'active' && 'dshx:text-foreground',
         step.status === 'pending' && 'dshx:text-muted-foreground/70',
@@ -88,10 +96,18 @@ function TrailRow({
   )
 
   return (
-    <li className="dshx:relative dshx:flex dshx:gap-3.5" aria-current={step.status === 'active' ? 'step' : undefined}>
-      <div className="dshx:relative dshx:flex dshx:w-5 dshx:shrink-0 dshx:flex-col dshx:items-center">
-        <span className="dshx:flex dshx:h-8 dshx:items-center">
-          <StepGlyph status={step.status === 'gated' ? 'locked' : step.status} />
+    <li
+      className={cn('dshx:relative dshx:flex', small ? 'dshx:gap-2.5' : 'dshx:gap-3.5')}
+      aria-current={step.status === 'active' ? 'step' : undefined}
+      aria-label={step.accessibleLabel}
+    >
+      <div className={cn('dshx:relative dshx:flex dshx:shrink-0 dshx:flex-col dshx:items-center', small ? 'dshx:w-3.5' : 'dshx:w-5')}>
+        <span className={cn('dshx:flex dshx:items-center', small ? 'dshx:h-6' : 'dshx:h-8')}>
+          <StepGlyph
+            aria-hidden={step.accessibleLabel !== undefined || undefined}
+            size={small ? 'sm' : 'default'}
+            status={step.status === 'gated' ? 'locked' : step.status}
+          />
         </span>
         {!last ? (
           <span aria-hidden className="dshx:relative dshx:-my-1.5 dshx:w-[1.5px] dshx:flex-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-border">
@@ -100,7 +116,12 @@ function TrailRow({
         ) : null}
       </div>
       <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:pb-1">
-        <div className="dshx:flex dshx:min-h-8 dshx:items-center dshx:gap-3 dshx:@max-pane-narrow:gap-2 dshx:@max-pane-narrow:py-1.5">
+        <div
+          className={cn(
+            'dshx:flex dshx:items-center dshx:gap-3 dshx:@max-pane-narrow:gap-2',
+            small ? 'dshx:min-h-6' : 'dshx:min-h-8 dshx:@max-pane-narrow:py-1.5',
+          )}
+        >
           {onStepClick !== undefined ? (
             <button
               type="button"
@@ -112,7 +133,7 @@ function TrailRow({
           ) : (
             label
           )}
-          <StepMeta step={step} />
+          <StepMeta step={step} small={small} />
         </div>
         <AutoHeight>{substeps.length > 0 ? <Substeps substeps={substeps} /> : null}</AutoHeight>
       </div>
@@ -120,14 +141,14 @@ function TrailRow({
   )
 }
 
-function StepMeta({ step }: { readonly step: TrailStep }) {
+function StepMeta({ step, small }: { readonly step: TrailStep; readonly small: boolean }) {
   const ref = React.useRef<HTMLSpanElement>(null)
   useEnter(ref, 'blurIn', { duration: 0.3 }, step.status)
   let content: React.ReactNode = null
   if (step.status === 'done' && step.meta !== undefined)
-    content = <span className="dshx:text-sm dshx:text-muted-foreground dshx:tabular-nums">{step.meta}</span>
+    content = <span className={cn('dshx:text-muted-foreground dshx:tabular-nums', small ? 'dshx:text-xs' : 'dshx:text-sm')}>{step.meta}</span>
   else if (step.status === 'active' && step.activeLabel !== undefined)
-    content = <span className="dshx:text-sm dshx:font-medium dshx:text-info">{step.activeLabel}</span>
+    content = <span className={cn('dshx:font-medium dshx:text-info dshx:tabular-nums', small ? 'dshx:text-xs' : 'dshx:text-sm')}>{step.activeLabel}</span>
   else if (step.status === 'gated' && step.gateLabel !== undefined)
     content = (
       <span className="dshx:rounded-full dshx:bg-warning/15 dshx:px-2.5 dshx:py-0.5 dshx:text-[13px] dshx:font-medium dshx:whitespace-nowrap dshx:text-warning dshx:@max-pane-narrow:px-2 dshx:@max-pane-narrow:text-xs">
