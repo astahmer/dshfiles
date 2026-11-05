@@ -10,7 +10,6 @@ import {
   CodeIcon,
   DatabaseIcon,
   DiffIcon,
-  DollarSignIcon,
   ExternalLinkIcon,
   FlaskConicalIcon,
   FolderGit2Icon,
@@ -24,7 +23,6 @@ import {
   KeyIcon,
   LayersIcon,
   ListTodoIcon,
-  MessageCircleQuestionIcon,
   MessageSquareIcon,
   NetworkIcon,
   RefreshCwIcon,
@@ -40,7 +38,6 @@ import { ActivityFeed, type ActivityFeedEvent } from '@dshfiles/plugin-ui/compon
 import { CreditsUsage, type CreditCategory } from '@dshfiles/plugin-ui/components/motion/credits-usage'
 import { SpendMap, type SpendDimension } from '@dshfiles/plugin-ui/components/motion/spend-map'
 import { AccessMap, type AccessLevel, type AccessRule } from '@dshfiles/plugin-ui/components/motion/access-map'
-import { SessionRecap, type RecapMoment, type RecapStep } from '@dshfiles/plugin-ui/components/motion/session-recap'
 import { ShimmerText } from '@dshfiles/plugin-ui/components/motion/text'
 import type { GalleryDemo } from './types.js'
 
@@ -792,150 +789,6 @@ function AccessMapDemo() {
   )
 }
 
-// ─── SessionRecap ───────────────────────────────────────────────────────────
-
-const recapMoments: readonly RecapMoment[] = [
-  {
-    id: 'm1',
-    at: 312,
-    kind: 'cost',
-    participantId: 'luna',
-    role: 'Thread agent',
-    quote: 'Switching to the reasoner for the tax rules; this step will cost about four times more per turn.',
-    clipSeconds: 6,
-  },
-  {
-    id: 'm2',
-    at: 725,
-    kind: 'failure',
-    participantId: 'tester',
-    role: 'Subagent',
-    quote: 'totals.test.ts fails on 0.005 rounding: the line items are rounded after tax, not before.',
-    clipSeconds: 7,
-  },
-  {
-    id: 'm3',
-    at: 1102,
-    kind: 'question',
-    participantId: 'reviewer',
-    role: 'Review subagent',
-    quote: 'We already round in the invoice service, so you have to beat it on consistency per currency.',
-    clipSeconds: 7,
-  },
-  {
-    id: 'm4',
-    at: 1460,
-    kind: 'cost',
-    participantId: 'explorer',
-    role: 'Subagent',
-    quote: 'Scanning 1,900 files for other rounding sites; this is the most expensive search of the run.',
-    clipSeconds: 5,
-  },
-  {
-    id: 'm5',
-    at: 1830,
-    kind: 'decision',
-    participantId: 'you',
-    role: 'Owner',
-    quote: 'Round per line before tax, keep the invoice service as is, and land behind the new test.',
-    clipSeconds: 6,
-  },
-]
-
-function SessionRecapDemo() {
-  const [momentId, setMomentId] = React.useState<string>('m3')
-  const [playing, setPlaying] = React.useState(true)
-  const [progress, setProgress] = React.useState(0)
-  const [touched, setTouched] = React.useState(false)
-  const [steps, setSteps] = React.useState<RecapStep[]>([
-    { id: 's1', label: 'Round line items before tax in totals.ts', owner: 'Luna', ownerInitials: 'LU', due: 'Today', done: false },
-    { id: 's2', label: 'Add the 0.005 regression to totals.test.ts', owner: 'Tester', ownerInitials: 'TE', due: 'Today', done: false },
-    { id: 's3', label: 'Land behind a review of the invoice service', owner: 'You', ownerInitials: 'YO', due: 'Nov 6', done: false },
-  ])
-  const moment = recapMoments.find(entry => entry.id === momentId)
-  const clip = moment?.clipSeconds ?? 7
-
-  // The excerpt plays through; untouched, the tour then moves on to the next moment.
-  useInterval(
-    () => {
-      const next = progress + 0.1 / clip
-      if (next < 1) {
-        setProgress(next)
-        return
-      }
-      if (!touched) {
-        const index = recapMoments.findIndex(entry => entry.id === momentId)
-        const following = recapMoments[(index + 1) % recapMoments.length]
-        if (following) setMomentId(following.id)
-        setProgress(0)
-        return
-      }
-      setProgress(1)
-      setPlaying(false)
-    },
-    100,
-    playing,
-  )
-  // Tick a next step off now and then while nobody is clicking.
-  useInterval(
-    () =>
-      setSteps(list =>
-        list.every(step => step.done)
-          ? list.map(step => ({ ...step, done: false }))
-          : list.map((step, index) => (index === list.findIndex(entry => !entry.done) ? { ...step, done: true } : step)),
-      ),
-    4500,
-    !touched,
-  )
-
-  return (
-    <SessionRecap
-      heading="Fix checkout totals rounding"
-      meta={['deepseek-chat', 'Nov 4, 2026', '34 min']}
-      icon={<GitMergeIcon />}
-      status={{ label: 'Needs review', tone: 'destructive' }}
-      participants={[
-        { id: 'luna', name: 'Luna', initials: 'LU', tone: 'info', share: 0.38 },
-        { id: 'explorer', name: 'Explorer', initials: 'EX', tone: 'info-soft', share: 0.14 },
-        { id: 'tester', name: 'Tester', initials: 'TE', tone: 'violet', share: 0.31 },
-        { id: 'reviewer', name: 'Reviewer', initials: 'RV', tone: 'violet-soft', share: 0.12 },
-        { id: 'you', name: 'You', initials: 'YO', tone: 'teal', share: 0.05 },
-      ]}
-      shareLabel="Thread agent 52% · Subagents 48%"
-      durationSeconds={2052}
-      kinds={[
-        { id: 'cost', label: 'Cost spike', icon: <DollarSignIcon /> },
-        { id: 'failure', label: 'Failure', icon: <CircleXIcon /> },
-        { id: 'question', label: 'Objection', icon: <MessageCircleQuestionIcon /> },
-        { id: 'decision', label: 'Decision', icon: <GitBranchIcon /> },
-      ]}
-      moments={recapMoments}
-      momentId={momentId}
-      onMomentChange={id => {
-        setTouched(true)
-        setMomentId(id)
-        setProgress(0)
-        setPlaying(true)
-      }}
-      playing={playing}
-      progress={progress}
-      onPlayToggle={() => {
-        setTouched(true)
-        if (progress >= 1) setProgress(0)
-        setPlaying(value => !value)
-      }}
-      summary="Line items were rounded after tax, so totals drifted by a cent on mixed carts. The fix rounds per line before tax and leaves the invoice service alone; the reviewer wants the per-currency behaviour pinned by a test before it lands. Cost spiked twice, both on the reasoner and the repository-wide search."
-      summaryBy="deepseek-chat"
-      onCopySummary={() => undefined}
-      steps={steps}
-      onToggleStep={(id, done) => {
-        setTouched(true)
-        setSteps(list => list.map(step => (step.id === id ? { ...step, done } : step)))
-      }}
-    />
-  )
-}
-
 export const usageDemos: readonly GalleryDemo[] = [
   {
     id: 'usage-credits',
@@ -967,14 +820,6 @@ export const usageDemos: readonly GalleryDemo[] = [
     description: "A thread's corner dock: plan, changes, subagents and workspace as icons that spring open into a panel.",
     source: "import { ActivityDock, DockChecklist, DockChanges } from '@dshfiles/plugin-ui/components/motion/activity-dock'",
     render: () => <ActivityDockDemo />,
-  },
-  {
-    id: 'usage-session-recap',
-    title: 'SessionRecap',
-    description: 'A finished thread at a glance: turn share, flagged key moments with a replayable excerpt, the summary and next steps.',
-    source: "import { SessionRecap } from '@dshfiles/plugin-ui/components/motion/session-recap'",
-    wide: true,
-    render: () => <SessionRecapDemo />,
   },
   {
     id: 'usage-access-map',
