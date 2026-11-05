@@ -11,6 +11,7 @@ import { ConversationSessionHeader } from './native/skeleton/ConversationSession
 import type { InputState } from './native/contract/input.ts'
 import { EMPTY_CONVERSATION_SNAPSHOT } from './native/contract/snapshot.ts'
 import { ConversationContent } from './native/skeleton/ConversationContent.tsx'
+import { ConversationWidthControls } from './native/skeleton/ConversationWidthControls.tsx'
 import { DefaultConversationViews } from './native/skeleton/DefaultConversationViews.tsx'
 import { InputBar } from './native/skeleton/InputBar.tsx'
 
@@ -229,6 +230,40 @@ describe('fixed Conversation content factory composition', () => {
     expect(a.editor.getRootElement()).not.toBe(b.editor.getRootElement())
     expect(a.props.inputActions?.persistDraft).toHaveBeenCalledTimes(1)
     expect(b.props.inputActions?.persistDraft).toHaveBeenCalledTimes(1)
+  })
+
+  it('defaults a main occurrence, and only a main one, to the transcript width handles', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    )
+    Object.defineProperty(document, 'fonts', { configurable: true, value: new EventTarget() })
+    const main = fixture('width-main')
+    const embedded = fixture('width-embedded')
+    const widthFallbacks = new Map<string, unknown>()
+    const recording =
+      (session: string): ConversationContentProps['useFactorySlot'] =>
+      (name, fallback) => {
+        if (name === 'widthControls') widthFallbacks.set(session, fallback)
+        return main.props.useFactorySlot(name, fallback)
+      }
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() =>
+      root.render(
+        <>
+          <ConversationContent {...main.props} variant="main" useFactorySlot={recording('main')} />
+          <ConversationContent {...embedded.props} useFactorySlot={recording('embedded')} />
+        </>,
+      ),
+    )
+    expect(widthFallbacks.get('main')).toBe(ConversationWidthControls)
+    expect(widthFallbacks.get('embedded')).not.toBe(ConversationWidthControls)
   })
 
   it('selects native child views independently in two fixed Sessions without replacing either editor', () => {

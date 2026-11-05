@@ -35,7 +35,7 @@ class HeroPolicy {
     // A cold/loading/error snapshot alone cannot prove an empty Session. The
     // native list's authoritative blank summary is MainPanel's early proof.
     const hero = blank && (session.openState === 'open' || summaryBlank === true)
-    return { variant: 'embedded', phase: settling ? 'settling' : hero ? 'hero' : 'active', hero }
+    return { variant: 'main', phase: settling ? 'settling' : hero ? 'hero' : 'active', hero }
   }
 }
 
@@ -89,7 +89,7 @@ export const createWorkbenchThreadPanel = (sessions: Pick<ISessions, 'list' | 'r
       }
     }, [listedId])
     if (listedId === undefined || reference?.sessionId !== listedId) return null
-    // SessionProvider and Slot outlets use display:contents. The embedded body is
+    // SessionProvider and Slot outlets use display:contents. The content body is
     // flex:1, so it needs this real flex parent rather than the generic block panel:
     // otherwise a long transcript grows the body past Dockview and hides its input.
     return (

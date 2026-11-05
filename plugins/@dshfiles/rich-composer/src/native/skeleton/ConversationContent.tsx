@@ -5,6 +5,7 @@ import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { ConversationContentProps, ConversationViewsProps, InputZone } from '../contract/slots.ts'
 import { HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
+import { ConversationWidthControls } from './ConversationWidthControls.tsx'
 import { confirmedRemoteWorkspaceCwd } from '../../remote-workspace-context.ts'
 import css from './ConversationRoot.module.css'
 
@@ -29,7 +30,7 @@ export function ConversationContent(props: ConversationContentProps) {
   } = props
   const session = useSession(snapshot => snapshot)
   const Views = useFactorySlot('views', ConversationSessionView)
-  const WidthControls = useFactorySlot('widthControls', NoConversationWidthControls)
+  const WidthControls = useFactorySlot('widthControls', props.variant === 'main' ? ConversationWidthControls : NoConversationWidthControls)
   const [body, setBody] = useState<HTMLDivElement | null>(null)
   const pendingInteraction = useSessionStatus(snapshot =>
     sessionId === undefined ? undefined : snapshot.get(sessionId)?.pendingInteraction)

@@ -197,7 +197,7 @@ describe('fixed Conversation native hero policy', () => {
       conversationPhase(session, conversation) === 'blank' && (session.openState === 'open' || row.summaryBlank === true),
     )
     expect(native.calls).toHaveBeenCalledTimes(1)
-    expect(native.calls.mock.calls[0]?.slice(0, 2)).toEqual(['conversation.content', { variant: 'embedded', phase: row.phase, hero: row.hero }])
+    expect(native.calls.mock.calls[0]?.slice(0, 2)).toEqual(['conversation.content', { variant: 'main', phase: row.phase, hero: row.hero }])
     expect(screen.getAllByLabelText('Native content')).toHaveLength(1)
     expect(screen.getAllByLabelText('Native header')).toHaveLength(1)
     expect(native.headers).toHaveBeenCalledExactlyOnceWith({ reserveHostCorner: true }, undefined)
@@ -214,26 +214,26 @@ describe('fixed Conversation native hero policy', () => {
     const header = screen.getByLabelText('Native header')
     // An unsent draft does not alter either native Session phase source.
     view.rerender(<WorkbenchThreadConversation {...conversationSources(emptySession())} renderFactorySlot={native.renderFactorySlot} />)
-    expect(native.calls.mock.calls.at(-1)?.[1]).toEqual({ variant: 'embedded', phase: 'hero', hero: true })
+    expect(native.calls.mock.calls.at(-1)?.[1]).toEqual({ variant: 'main', phase: 'hero', hero: true })
     view.rerender(
       <WorkbenchThreadConversation
         {...conversationSources({ ...emptySession(), promptAttempted: true, running: true })}
         renderFactorySlot={native.renderFactorySlot}
       />,
     )
-    expect(native.calls.mock.calls.at(-1)?.[1]).toEqual({ variant: 'embedded', phase: 'active', hero: false })
+    expect(native.calls.mock.calls.at(-1)?.[1]).toEqual({ variant: 'main', phase: 'active', hero: false })
     view.rerender(
       <WorkbenchThreadConversation {...conversationSources({ ...emptySession(), sessionId: b, blank: false })} renderFactorySlot={native.renderFactorySlot} />,
     )
-    expect(native.calls.mock.calls.at(-1)?.[1]).toEqual({ variant: 'embedded', phase: 'active', hero: false })
+    expect(native.calls.mock.calls.at(-1)?.[1]).toEqual({ variant: 'main', phase: 'active', hero: false })
     view.rerender(<WorkbenchThreadConversation {...props} renderFactorySlot={native.renderFactorySlot} />)
-    expect(native.calls.mock.calls.at(-1)?.[1]).toEqual({ variant: 'embedded', phase: 'hero', hero: true })
+    expect(native.calls.mock.calls.at(-1)?.[1]).toEqual({ variant: 'main', phase: 'hero', hero: true })
     expect(screen.getByLabelText('Native content')).toBe(element)
     expect(screen.getByLabelText('Native header')).toBe(header)
     expect(native.calls.mock.calls.every(call => call[2] === undefined)).toBe(true)
     view.unmount()
     render(<WorkbenchThreadConversation {...props} renderFactorySlot={native.renderFactorySlot} />)
-    expect(native.calls.mock.calls.at(-1)?.[1]).toEqual({ variant: 'embedded', phase: 'hero', hero: true })
+    expect(native.calls.mock.calls.at(-1)?.[1]).toEqual({ variant: 'main', phase: 'hero', hero: true })
   })
 })
 

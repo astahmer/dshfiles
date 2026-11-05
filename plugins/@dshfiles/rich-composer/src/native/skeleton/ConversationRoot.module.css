@@ -364,7 +364,7 @@ button.crumbEditable {
 
 /* Views that elect a composer overlay (trajectory etc.) own their full-bleed
    scrollers; the strips would sit over their content and steal clicks. */
-.root:has([data-conversation-composer-overlay]) .widthHandle {
+.body:has([data-conversation-composer-overlay]) > .widthHandle {
   display: none;
 }
 
