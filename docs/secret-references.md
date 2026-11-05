@@ -15,16 +15,16 @@ secret:ALIAS@ENV          the same alias in another environment
 `secret:ALIAS` is ordinary text, which is the point: a settings string, a backlog
 body or an item link can carry it without becoming a secret.
 
-| Piece                       | Owner                       | Where                                                                          |
-| --------------------------- | --------------------------- | ------------------------------------------------------------------------------ |
-| Grammar and schemas         | `@dshfiles/credential-port` | `secret-reference.ts`                                                          |
-| Host resolver               | `@dshfiles/credential-port` | `SecretReferenceResolver.resolve({ referenceText, values, environmentValue })` |
-| Value port (CLI access)     | `@dshfiles/secret-catalog`  | `secretCatalogValues.resolve({ reference, cwd })`                              |
-| Reference → control mapping | `@dshfiles/settings-shell`  | `Schema.string().role('secret-ref')`                                           |
-| Vault picker                | `@dshfiles/secret-catalog`  | `shell.overlay` on `[data-secret-input="reference"]`                           |
-| Missing-key setup offer     | `@dshfiles/secret-catalog`  | `@dshfiles/secret-catalog/setup` (`SecretSetupOffer`)                          |
-| Why a reference fails       | `@dshfiles/secret-catalog`  | `secret-catalog-setup.referenceStatus`, agent tool `secret_reference_status`   |
-| Inline reveal of an item link | `@dshfiles/secret-catalog` | provides `@dshfiles/backlog/secret-link-reveal`; reveals through its `reveal` verb |
+| Piece                         | Owner                       | Where                                                                              |
+| ----------------------------- | --------------------------- | ---------------------------------------------------------------------------------- |
+| Grammar and schemas           | `@dshfiles/credential-port` | `secret-reference.ts`                                                              |
+| Host resolver                 | `@dshfiles/credential-port` | `SecretReferenceResolver.resolve({ referenceText, values, environmentValue })`     |
+| Value port (CLI access)       | `@dshfiles/secret-catalog`  | `secretCatalogValues.resolve({ reference, cwd })`                                  |
+| Reference → control mapping   | `@dshfiles/settings-shell`  | `Schema.string().role('secret-ref')`                                               |
+| Vault picker                  | `@dshfiles/secret-catalog`  | `shell.overlay` on `[data-secret-input="reference"]`                               |
+| Missing-key setup offer       | `@dshfiles/secret-catalog`  | `@dshfiles/secret-catalog/setup` (`SecretSetupOffer`)                              |
+| Why a reference fails         | `@dshfiles/secret-catalog`  | `secret-catalog-setup.referenceStatus`, agent tool `secret_reference_status`       |
+| Inline reveal of an item link | `@dshfiles/secret-catalog`  | provides `@dshfiles/backlog/secret-link-reveal`; reveals through its `reveal` verb |
 
 ## Consuming a reference on the Host
 
