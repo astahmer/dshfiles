@@ -94,7 +94,8 @@ Freshness is derived on read and never stored:
 items an agent captured that you never touched. It is on by default and each view remembers its own choice; its
 badge counts what the current view hides. Editing, moving, commenting on or pinning such an item makes it yours
 and it shows again; one asking for attention or waiting on a triage suggestion always shows. The Host does the
-filtering (`hideAgentItems` on `list`); `backlog_list` lists every item unless an agent passes it.
+filtering (`hideAgentItems` on `list` and `projects`, so the Projects cards count only what they show);
+`backlog_list` and `backlog_projects` count every item unless an agent passes it.
 
 Dormant and archived items stay in search, filters and backlinks. Any edit, move, link or comment makes
 an item fresh again. The list groups the feed like a chat history (Pinned, Today, Yesterday, This week,
@@ -141,7 +142,15 @@ An event that changed fields offers **Show changes**, and each changed field the
 the field held before that change back as a new change (a typed `set` read from the op log, never the displayed text),
 so the history keeps both and the revert itself can be reverted. When the field changed again since, Revert refuses
 and says who changed it when: revert that later change first, or edit the field directly. Agents call the same verb as
-`backlog_revert` (item, the event's `at`, the field), only when the user asked.
+`backlog_revert` (item, the event's `at`, the field), only when the user asked and with `confirm: true`.
+
+The activity reads in two lanes. **Conversation** holds everything you did and said, attention requests, reverts,
+comments carried over from Linear or GitHub, smart-reply answers and the agent comment that answers you: the one right
+after your comment, or the first one a thread you started or linked posts. Agent progress comments, moves, links,
+triage, system and sync events fold into one **Work log** line (`2 agents · 14 updates · last 2h`) that opens in place;
+Show changes and Revert work in both lanes. Every event and comment records its `origin` once (`user`,
+`agent:<sessionId>`, `system`, `remote:<backend>`); events written before origins derive it on read (a synced comment
+from its `Linear · author:` prefix), so no op is rewritten, and `backlog_get` serves it.
 
 The description box and the reply box are the capture composer's own text box: Markdown, `@` completion
 for agents, backlog items and threads, and images or files picked with the paperclip, pasted or dropped.
@@ -335,32 +344,37 @@ dropping the rest of the draft.
 
 ## Agent tools
 
-| Tool                           | Kind                                                                                                    |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `backlog_list`                 | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`, `hideAgentItems`) |
-| `backlog_get`                  | read: one item with history and backlinks                                                               |
-| `backlog_get_many`             | read: up to 50 items at once, unknown ids listed separately                                             |
-| `backlog_referencing`          | read: items linking to a thread, revision, branch, workspace, URL or item                               |
-| `backlog_capture`              | write                                                                                                   |
-| `backlog_update`               | write: edit or move                                                                                     |
-| `backlog_link`                 | write: link or unlink                                                                                   |
-| `backlog_comment`              | write, optionally with images or files                                                                  |
-| `backlog_attach_file`          | write: keep one base64 image or file with an item                                                       |
-| `backlog_read_file`            | read: one image or file as a data URL; `save: true` also returns a temp file path                       |
-| `backlog_remove_file`          | write: remove one image or file                                                                         |
-| `backlog_revert`               | write: put back the value a field held before one recorded change; refused when it changed again since  |
-| `backlog_export`               | write a new file: JSONL (items, optionally the op log) or an SQLite copy; changes no item               |
-| `backlog_triage`               | write: run triage on one item now                                                                       |
-| `backlog_triage_backfill`      | write: triage items captured before triage was set up, oldest first                                     |
-| `backlog_start_thread`         | write: start one thread for items, in the item project's own jj workspace, linked                       |
-| `backlog_projects`             | read: per-project counts, who needs you, people                                                         |
-| `backlog_accept_proposal`      | write                                                                                                   |
-| `backlog_dismiss_proposal`     | write                                                                                                   |
-| `backlog_sync_status`          | read: remote sync backends and each linked item's issue, state, last sync and errors                    |
-| `backlog_sync_now`             | write: sync one linked item, a project's, or every one now                                              |
-| `backlog_link_remote`          | write: link an item to a Linear/GitHub issue, create one from it, or unlink it                          |
-| `backlog_import_remote`        | write: import an existing Linear/GitHub issue as a linked item                                          |
-| `backlog_sync_test_connection` | read: a backend's key source, signed-in account, target and visible Linear teams                        |
+| Tool                           | Kind                                                                                                                          |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `backlog_list`                 | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`, `hideAgentItems`)                       |
+| `backlog_get`                  | read: one item with history and backlinks                                                                                     |
+| `backlog_get_many`             | read: up to 50 items at once, unknown ids listed separately                                                                   |
+| `backlog_referencing`          | read: items linking to a thread, revision, branch, workspace, URL or item                                                     |
+| `backlog_capture`              | write                                                                                                                         |
+| `backlog_update`               | write: edit or move                                                                                                           |
+| `backlog_link`                 | write: link or unlink                                                                                                         |
+| `backlog_comment`              | write, optionally with images or files                                                                                        |
+| `backlog_attach_file`          | write: keep one base64 image or file with an item                                                                             |
+| `backlog_read_file`            | read: one image or file as a data URL; `save: true` also returns a temp file path                                             |
+| `backlog_remove_file`          | write: remove one image or file                                                                                               |
+| `backlog_revert`               | write: put back the value a field held before one recorded change; refused when it changed again since; needs `confirm: true` |
+| `backlog_export`               | write a new file: JSONL (items, optionally the op log) or an SQLite copy; changes no item                                     |
+| `backlog_triage`               | write: run triage on one item now                                                                                             |
+| `backlog_triage_backfill`      | write: triage items captured before triage was set up, oldest first; over 5 items needs `confirm: true`                       |
+| `backlog_start_thread`         | write: start one thread for items, in the item project's own jj workspace, linked                                             |
+| `backlog_projects`             | read: per-project counts, who needs you, people; `hideAgentItems` counts like the views                                       |
+| `backlog_accept_proposal`      | write                                                                                                                         |
+| `backlog_dismiss_proposal`     | write                                                                                                                         |
+| `backlog_sync_status`          | read: remote sync backends and each linked item's issue, state, last sync and errors                                          |
+| `backlog_sync_now`             | write: sync one linked item, or (with `confirm: true`) a project's or every one now                                           |
+| `backlog_link_remote`          | write: link an item to a Linear/GitHub issue, create one from it, or unlink it                                                |
+| `backlog_import_remote`        | write: import an existing Linear/GitHub issue as a linked item                                                                |
+| `backlog_sync_test_connection` | read: a backend's key source, signed-in account, target and visible Linear teams                                              |
+
+Bulk or destructive agent writes take an explicit `confirm: true` with no default: `backlog_delete`, `backlog_revert`,
+`backlog_triage_backfill` over more than 5 items (the default run is 25) and `backlog_sync_now` without an `id`. An
+agent call without it is refused with `BacklogConfirmationRequired`, whose message says to ask the user and call again
+with `confirm: true`. The panel never passes it.
 
 ## Remote sync (Linear, GitHub Issues)
 
@@ -371,7 +385,9 @@ the local feed. **Backlog settings › Remote sync** holds one row per project a
   or to `GITHUB_TOKEN`, `GH_TOKEN` and then `gh auth token` on the Host;
 - a Linear team, picked from the teams the key sees (empty uses the key's only team), or a GitHub `owner/repo`
   (empty reads the project's github.com git remote: `origin`, then `upstream`, then the first one);
-- an auto-sync interval (15 minutes for a new row; **Manual sync only** syncs on **Sync now**) and an on/off switch.
+- an auto-sync interval (15 minutes for a new row; **Manual sync only** syncs on **Sync now**), an on/off switch, and
+  **Push agent comments** (off by default): with it off, comments agents write stay on the item and only yours go to
+  the issue.
 
 A row with an empty project (**All other projects**) serves every project that has no row of its own. Each row tests
 its connection as you type and shows the account it signs in as and the team or repository it reaches; a row whose
@@ -405,8 +421,10 @@ changed goes to the side that changed last (the item's field history against the
 item gets a conflict note naming the value that lost; edit the field again to choose it, and the next sync carries
 it over. Linking an existing issue adopts its title, description and status on the first pass (the old values stay
 in the item's history) and merges both sides' tags; creating an issue starts both sides equal. Comments imported
-from the tracker are system comments that say where they came from; only your and agents' comments made after the
-link (or every one, for an issue created from the item) go out.
+from the tracker are system comments with origin `remote:<backend>` that say where they came from; only your comments
+(and agents' ones when the row pushes them) made after the link (or every one, for an issue created from the item) go
+out. Agent comments skipped while Push agent comments is off are not marked as sent, so turning it on later posts the
+ones written since the link.
 
 A failing pass never touches the item: the mapping records the error with its recovery (bind the key, fix the
 team or repository, wait for a rate limit) and the chip shows it until the next pass succeeds. Unlinking removes

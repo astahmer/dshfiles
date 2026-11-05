@@ -1572,7 +1572,7 @@
     {
       "id": "hide-agent-items",
       "title": "Hide items agents captured",
-      "summary": "A toggle in the header of every view (Feed, Inbox, Items, Board, Projects and the search results), on by default and remembered per view, hides items an agent captured that the user never touched. An item the user edited, moved, commented on or pinned shows again, and so does one asking for attention or waiting on a triage suggestion. The toggle counts what the current view hides. The Host filters the list (`hideAgentItems`); `backlog_list` keeps listing every item unless an agent asks for the filter.",
+      "summary": "A toggle in the header of every view (Feed, Inbox, Items, Board, Projects and the search results), on by default and remembered per view, hides items an agent captured that the user never touched. An item the user edited, moved, commented on or pinned shows again, and so does one asking for attention or waiting on a triage suggestion. The toggle counts what the current view hides. The Host filters the list (`hideAgentItems`); `backlog_list` keeps listing every item unless an agent asks for the filter. The Projects cards count only what the view shows: `backlog_projects` takes the same optional `hideAgentItems`.",
       "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Hide agent items\"", "expect button \"Hide agent items\""],
       "surfaces": ["client", "host", "tool"],
       "surface": "destinationSection",
@@ -1580,7 +1580,10 @@
       "currentSurface": "left-nav: Backlog › header › Agent items",
       "configuration": [],
       "states": ["hiding", "showing"],
-      "failureModes": ["A Host that predates the filter ignores it: every item shows and the toggle counts none until the Host restarts."],
+      "failureModes": [
+        "A Host that predates the filter ignores it: every item shows and the toggle counts none until the Host restarts.",
+        "A Host that predates the project filter refuses its input; the Projects view retries without it and counts every item until the Host restarts."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -1599,6 +1602,12 @@
           "id": "backlog.hide-agent-items-legacy-host",
           "file": "plugins/@dshfiles/backlog/src/api.test.ts",
           "testName": "reads a list from a Host without the agent-item filter as hiding none"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.hide-agent-items-project-counts",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "leaves unclaimed agent items out of the project counts only when asked, like the lists"
         }
       ],
       "telemetry": [
@@ -2013,7 +2022,7 @@
     {
       "id": "remote-sync",
       "title": "Mirror backlog items in Linear or GitHub Issues",
-      "summary": "Link an item to an existing Linear or GitHub issue, create one from it, or unlink it again from its row menu or the sync chip in its detail. Title, description, status and tags sync both ways against the last synced base of each side; a field both sides changed goes to the side that changed last and leaves a conflict note on the item. New comments are carried over once in each direction. Agents read the same state with backlog_sync_status and act with backlog_sync_now and backlog_link_remote when the user asked.",
+      "summary": "Link an item to an existing Linear or GitHub issue, create one from it, or unlink it again from its row menu or the sync chip in its detail. Title, description, status and tags sync both ways against the last synced base of each side; a field both sides changed goes to the side that changed last and leaves a conflict note on the item. New comments are carried over once in each direction. Agents read the same state with backlog_sync_status and act with backlog_sync_now and backlog_link_remote when the user asked. Comments agents write stay local unless the backend row's Push agent comments is on; the user's own comments always sync.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2123,6 +2132,12 @@
           "id": "backlog.remote-sync-policy-first",
           "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
           "testName": "the first sync adopts the issue and merges both sides’ tags"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-agent-comments",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "keeps agent comments off the issue unless the row pushes them, and always posts the user comments"
         }
       ],
       "telemetry": [
@@ -2188,7 +2203,7 @@
         {
           "key": "dshfiles-backlog.syncBackends",
           "defaultValue": "[]",
-          "constraints": "Rows of { project, backend: linear|github, enabled, target, secret (secret:ALIAS reference only, resolved on the Host), autoSyncMinutes 0–1440 }; a row with an empty project serves every project without a row of its own. An empty Linear target uses the key's only team; an empty GitHub target reads the item project's github.com git remote.",
+          "constraints": "Rows of { project, backend: linear|github, enabled, target, secret (secret:ALIAS reference only, resolved on the Host), autoSyncMinutes 0–1440, pushAgentComments (default false: agent comments are not posted to the issue) }; a row with an empty project serves every project without a row of its own. An empty Linear target uses the key's only team; an empty GitHub target reads the item project's github.com git remote.",
           "coveredBy": ["backlog.remote-sync-settings"]
         }
       ],
@@ -2440,7 +2455,7 @@
     {
       "id": "revert-field-change",
       "title": "Revert a field change from the item history",
-      "summary": "Each field change under an event's Show changes has Revert: it writes the typed value the field held before, read from the op log, as a new change; a field that changed again since is refused with who changed it. Agents call backlog_revert.",
+      "summary": "Each field change under an event's Show changes has Revert: it writes the typed value the field held before, read from the op log, as a new change; a field that changed again since is refused with who changed it. Agents call backlog_revert only when the user asked, with `confirm: true`; without it the call is refused.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2471,6 +2486,108 @@
           "id": "backlog.revert-field-change-op-log",
           "file": "plugins/@dshfiles/backlog/src/backlog-repo.test.ts",
           "testName": "writes back the typed value a field held before the change, as a new set op, and refuses a stale one"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "item-timeline-lanes",
+      "title": "Conversation and work log in the item timeline",
+      "summary": "An item's activity reads in two lanes. The Conversation holds everything the user did and said, attention requests, reverts, comments carried over from Linear or GitHub, smart-reply answers and the agent comment that answers the user (the one right after their comment, or the first from a thread they started or linked). Agent progress comments, moves, links, triage, system and sync events fold into a Work log line such as \"2 agents · 14 updates · last 2h\" that opens in place; Show changes and Revert work in both lanes. Every event and comment records its origin once (user, agent:<sessionId>, system, remote:<backend>); older events derive it on read, and backlog_get serves it.",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Two lane demo\"",
+        "press Enter",
+        "click text \"Two lane demo\"",
+        "expect list \"Conversation\""
+      ],
+      "surfaces": ["client", "host", "storage", "tool"],
+      "surface": "detail",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › item detail › Activity › Conversation / Work log",
+      "configuration": [],
+      "states": ["conversation", "work-log-folded", "work-log-open"],
+      "failureModes": [
+        "A Host that predates origins serves events without one; the client derives it from the actor and the synced-comment prefix, so the lanes still split."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.item-timeline-lanes",
+          "featureFile": "tooling/dshx/e2e/features/backlog-history.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.item-timeline-lanes-classify",
+          "file": "plugins/@dshfiles/backlog/src/item-timeline.test.ts",
+          "testName": "treats the agent comment right after a user comment as its answer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.event-origin-legacy",
+          "file": "plugins/@dshfiles/backlog/src/event-origin.test.ts",
+          "testName": "reads a legacy synced comment as written on its tracker"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.event-origin-store",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "records each event origin once, keeps it across a restart, and derives it for events written before it"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "agent-write-confirmation",
+      "title": "Agents confirm bulk and destructive backlog writes",
+      "summary": "An agent call that reverts a field (backlog_revert), triages more than 5 items in one backfill (backlog_triage_backfill, 25 by default), or syncs every linked item (backlog_sync_now without an id) needs an explicit `confirm: true`, with no default; backlog_delete always needs it. Without it the tool is refused with a message telling the agent to ask the user and call again with confirm: true. The panel never passes it and is unchanged.",
+      "surfaces": ["host", "tool"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tools: backlog_revert, backlog_triage_backfill, backlog_sync_now, backlog_delete",
+      "configuration": [],
+      "states": ["refused", "confirmed"],
+      "failureModes": [
+        "An agent call without confirm: true fails with BacklogConfirmationRequired (wire code confirmation-required) and changes nothing; ask the user, then retry with confirm: true."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog.agent-write-confirmation",
+          "file": "plugins/@dshfiles/backlog/src/agent-confirmation.test.ts",
+          "testName": "refuses an agent revert without confirm and names the recovery"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.agent-write-confirmation-panel",
+          "file": "plugins/@dshfiles/backlog/src/agent-confirmation.test.ts",
+          "testName": "never asks the panel or the Host to confirm"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "backlog.agent-write-confirmation-browser",
+          "reason": "Agent-tool guard with no UI: the panel never passes confirm and is unchanged, and the refusal is a tool error the unit tests assert."
         }
       ],
       "telemetry": [

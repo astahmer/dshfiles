@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { createScratchDirectory, sendMessage, startThreadWithModel } from '../threads.js'
+import { backlogRef } from './backlog-refs.js'
 
 const feed = (page: Page) => page.getByRole('feed', { name: 'Backlog feed' })
 const peek = (page: Page) => page.getByRole('complementary', { name: 'Item detail' })
@@ -72,6 +74,54 @@ Then('the export file holds the item {string}', async ({ page }: { page: Page },
     const lines = readFileSync(target, 'utf8').trimEnd().split('\n')
     expect(lines).toHaveLength(1)
     expect(lines[0]).toContain(`"title":"${title}"`)
+  })
+  await finishJourneyAssertions(page)
+})
+
+const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
+const toolDirective = (tool: string, input: object): string => `[[call ${tool} ${JSON.stringify(input)}]]`
+const conversation = (page: Page) => peek(page).getByRole('list', { name: 'Conversation', exact: true })
+const workLogToggle = (page: Page) => peek(page).getByRole('button', { name: /^Work log/u })
+
+When('an agent thread comments {string} on b:{int}', async ({ page }: { page: Page }, text: string, ordinal: number) => {
+  await startThreadWithModel(page, { project: 'Default workspace', model: FAKE_MODEL })
+  await sendMessage(page, toolDirective('backlog_comment', { id: `b:${await backlogRef(page, ordinal)}`, text }))
+})
+
+When('the agent thread captures {string} in another project', async ({ page }: { page: Page }, text: string) => {
+  const project = await createScratchDirectory('dshfiles-backlog-agent-project-')
+  await sendMessage(page, toolDirective('backlog_capture', { text, project }))
+})
+
+Then('the conversation shows {string} but not {string}', async ({ page }: { page: Page }, shown: string, folded: string) => {
+  await recordAssertion(page, 'backlog-timeline-conversation-lane', async () => {
+    await expect(conversation(page)).toContainText(shown)
+    await expect(conversation(page)).not.toContainText(folded)
+    await expect(workLogToggle(page)).toContainText(/1 agent · \d+ updates? · last /u)
+  })
+})
+
+When('the work log is opened', async ({ page }: { page: Page }) => {
+  await workLogToggle(page).click()
+})
+
+Then('the work log shows {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'backlog-timeline-work-log-lane', async () => {
+    await expect(peek(page).getByRole('list', { name: 'Work log', exact: true })).toContainText(text)
+  })
+})
+
+const projectsTotal = (page: Page) => page.getByText(/^Grouped from the repositories items were captured in\./u)
+
+Then('the project cards count {int} project(s)', async ({ page }: { page: Page }, total: number) => {
+  await recordAssertion(page, `backlog-projects-count-${String(total)}`, async () => {
+    await expect(projectsTotal(page)).toContainText(`${String(total)} in total.`)
+  })
+})
+
+Then('the project cards count {int} project(s) once agent items show', async ({ page }: { page: Page }, total: number) => {
+  await recordAssertion(page, 'backlog-projects-count-agent-items-shown', async () => {
+    await expect(projectsTotal(page)).toContainText(`${String(total)} in total.`)
   })
   await finishJourneyAssertions(page)
 })

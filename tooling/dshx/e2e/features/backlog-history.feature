@@ -31,3 +31,22 @@ Feature: Backlog item references and history
     And "Export demo" is captured
     And the backlog is exported as JSON Lines from the settings tab
     Then the export file holds the item "Export demo"
+
+  @scenario:backlog.item-timeline-lanes
+  Scenario: Agent progress folds into a work log beside the conversation, and agent items stay out of project counts
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
+    And a Command Code account backed by a local fake provider is added
+    And the Backlog panel is opened
+    And "Two lane demo" is captured
+    When an agent thread comments "Agent progress note" on b:1
+    And the agent thread captures "Agent side item" in another project
+    And the Backlog panel is opened
+    And backlog item b:1 is opened
+    And a comment "User decision" is added
+    Then the conversation shows "User decision" but not "Agent progress note"
+    When the work log is opened
+    Then the work log shows "Agent progress note"
+    When the Projects view is opened
+    Then the project cards count 1 project
+    When agent items are shown in the Backlog
+    Then the project cards count 2 projects once agent items show
