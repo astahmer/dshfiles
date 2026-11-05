@@ -179,7 +179,7 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
   const notice = runMutation.isError
     ? 'The action did not start. Confirm the session directory and trusted project root.'
     : actionsQuery.isError || receiptsQuery.isError || hooksQuery.isError
-      ? 'Project checks could not load this session. Refresh and try again.'
+      ? 'Project checks could not load this thread. Refresh and try again.'
       : ''
 
   if (!open) return null
@@ -256,7 +256,7 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
         <h3 id="project-receipts-title" className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">
           Recent check receipts
         </h3>
-        {receipts.length === 0 ? <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No checks have run in this session.</p> : null}
+        {receipts.length === 0 ? <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No checks have run in this thread.</p> : null}
         <ItemGroup className="dshx:divide-y dshx:rounded-md dshx:border">
           {receipts.map(receipt => (
             <Item role="listitem" size="sm" className="dshx:gap-3 dshx:rounded-none dshx:px-3 dshx:py-2" key={receipt.id}>
@@ -296,7 +296,7 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
           The Host records hooks that ran. It has no durable skipped-hook event, so skipped and unsupported hooks cannot be attributed here.
         </p>
         {hooks.length === 0 ? (
-          <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No native hook records are available for this session.</p>
+          <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No native hook records are available for this thread.</p>
         ) : null}
         <ItemGroup className="dshx:divide-y dshx:rounded-md dshx:border dshx:empty:hidden">
           {hooks.map(event => (

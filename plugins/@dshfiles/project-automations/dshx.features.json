@@ -10,7 +10,7 @@
       "surfaces": ["client", "host", "api", "tool", "storage"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Work › Automations",
+      "currentSurface": "rail: Work › Automations (already on the rail)",
       "configuration": [],
       "states": ["empty", "scheduled", "paused", "resumed", "due", "caught-up", "run-started", "run-failed", "deleted"],
       "failureModes": [

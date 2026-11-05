@@ -62,7 +62,7 @@ export const NewViewChooser = (props: {
       <div className="dshx:mx-auto dshx:flex dshx:w-full dshx:max-w-xl dshx:flex-col dshx:gap-5 dshx:p-6 dshx:@max-pane-narrow:p-4">
         <div className="dshx:flex dshx:flex-col dshx:gap-1">
           <h2 className="dshx:text-lg dshx:font-semibold">Choose a view</h2>
-          <p className="dshx:text-muted-foreground">Choose a workspace view. Open conversations from the thread list.</p>
+          <p className="dshx:text-muted-foreground">Choose a workspace view. Open threads from the thread list.</p>
         </div>
         <SearchInput
           ref={searchInput}

@@ -29,7 +29,6 @@ export const FORMER_NAVIGATION: readonly FormerNavigationEntry[] = [
   { entry: 'Thread Sidebar: Board', destinations: ['threads'] },
   { entry: 'Traces: Explorer', destinations: ['inbox', 'observe'] },
   { entry: 'Usage: Analytics', destinations: ['observe'] },
-  { entry: 'Work', destinations: ['work'] },
   { entry: 'Worktree Memory: RAM', destinations: ['observe'] },
   { entry: 'Plugins', destinations: ['settings'] },
   { entry: 'Schedules', destinations: ['work'] },

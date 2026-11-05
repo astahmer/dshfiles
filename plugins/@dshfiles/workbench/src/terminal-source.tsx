@@ -21,7 +21,7 @@ export const createWorkbenchTerminalSource = (resources: Pick<SidebarResourcePan
     // selection creates an independent *native* resource occurrence instead.
     component: () => (
       <p className="dshx-root" role="status">
-        Choose a conversation with a workspace, then open Terminal again. The native terminal provider must be enabled.
+        Choose a thread with a workspace, then open Terminal again. The native terminal provider must be enabled.
       </p>
     ),
   }

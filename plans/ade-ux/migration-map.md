@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-381 features from 86 plugins.
+385 features from 87 plugins.
 
 ## Counts
 
@@ -19,10 +19,10 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  |  | 5 |
 | Observe |  |  |  |  | 21 | 1 |  |  | 2 |  |  |  |  |  | 24 |
 | Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  |  | 6 |
-| Settings |  |  |  |  |  |  |  |  | 1 |  | 40 |  |  |  | 41 |
+| Settings |  |  |  |  |  |  |  |  | 1 |  | 42 |  |  |  | 43 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 24 |  | 24 |
 | Composer |  |  |  | 54 |  |  |  |  |  |  |  |  |  |  | 54 |
-| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 19 | 19 |
+| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 21 | 21 |
 | No place of its own | 19 |  | 17 |  |  |  |  | 91 |  |  |  | 7 |  |  | 134 |
 
 ## By current left-nav entry
@@ -42,7 +42,7 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | Hosts | Observe | multi-host/fleet-update → Observe (destinationSection)<br>multi-host/host-management → Observe (destinationSection)<br>multi-host/host-settings → Observe (detail)<br>multi-host/isolated-runtime-views → Observe (rowAction) |
 | Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
 | Land | Land | jj-integration/thread-integration-attention-view → Land (destinationSection)<br>jj-integration/thread-integration-empty → Land (destinationSection)<br>jj-integration/thread-integration-row-details → Land (detail)<br>jj-integration/thread-workspaces-panel → Land (destinationSection) |
-| MCP Servers: Servers | Settings | mcp-servers/batch-server-actions → Settings (rowAction)<br>mcp-servers/oauth-authorization → Settings (settingsSection)<br>mcp-servers/registry-catalog → Settings (settingsSection)<br>mcp-servers/server-configuration → Settings (settingsSection) |
+| MCP Servers: Servers | Settings | mcp-servers/batch-server-actions → Settings (rowAction)<br>mcp-servers/oauth-authorization → Settings (settingsSection)<br>mcp-servers/registry-catalog → Settings (settingsSection)<br>mcp-servers/secret-catalog-credential-bindings → Settings (settingsSection)<br>mcp-servers/server-configuration → Settings (settingsSection) |
 | Memory | Knowledge | memory/batch-forget-notes → Knowledge (rowAction)<br>memory/memory-panel → Knowledge (destinationSection)<br>memory/usage-telemetry → Knowledge (destinationSection) |
 | Messages | Agents | agent-communication/agent-directory → Agents (destinationSection)<br>agent-communication/human-browser → Agents (destinationSection)<br>agent-communication/passive-messaging → Agents (destinationSection) |
 | Resource Packs: Resources | Knowledge | resource-packs/local-properties → Knowledge (destinationSection) |
@@ -53,7 +53,6 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | Thread Sidebar: Board | Threads | thread-sidebar/thread-classification → Threads (destinationSection) |
 | Traces: Explorer | Inbox, Observe | traces/alert-rules → Inbox (attentionProvider)<br>traces/boards-and-saved-views → Observe (destinationSection)<br>traces/log-explorer → Observe (destinationSection)<br>traces/metric-charts → Observe (destinationSection)<br>traces/service-map → Observe (destinationSection)<br>traces/trace-explorer → Observe (destinationSection)<br>traces/trace-insights → Observe (destinationSection) |
 | Usage: Analytics | Observe | usage/usage-activity-report → Observe (destinationSection)<br>usage/usage-charts → Observe (destinationSection)<br>usage/usage-jev-card → Observe (destinationSection)<br>usage/usage-request-log → Observe (destinationSection) |
-| Work | Work | project-automations/project-automations → Work (destinationSection) |
 | Worktree Memory: RAM | Observe | worktree-memory/memory-board → Observe (destinationSection) |
 | Plugins (native) | Settings | Settings › Plugins (native page, not in a catalog) |
 | Schedules (native) | Work | Work › schedules (native page, not in a catalog) |
@@ -75,13 +74,14 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | Host contract | 1 | Inbox 1 |
 | Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
 | keyboard | 3 | No place of its own 3 |
-| left-nav | 89 | Observe 21, Work 17, Land 13, Inbox 12, Settings 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
+| left-nav | 89 | Observe 21, Work 16, Land 13, Settings 13, Inbox 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 10 | No place of its own 7, Thread panel 2, Settings 1 |
 | observe | 2 | Observe 2 |
 | palette | 13 | No place of its own 13 |
 | plugins-page | 2 | No place of its own 1, Settings 1 |
+| rail | 1 | Work 1 |
 | right-pane | 7 | Thread panel 5, No place of its own 2 |
-| settings | 22 | Settings 20, No place of its own 2 |
+| settings | 23 | Settings 21, No place of its own 2 |
 | shell | 7 | No place of its own 5, Threads 2 |
 | sidebar | 2 | Settings 2 |
 | sidebar-footer | 3 | No place of its own 3 |
@@ -89,7 +89,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | thread-header | 7 | Thread panel 3, Threads 3, No place of its own 1 |
 | thread-list | 22 | Threads 16, Inbox 3, No place of its own 2, Settings 1 |
 | toast | 1 | No place of its own 1 |
-| transcript | 24 | Transcript 19, Inbox 1, Knowledge 1, Land 1, Thread panel 1, Work 1 |
+| transcript | 26 | Transcript 21, Inbox 1, Knowledge 1, Land 1, Thread panel 1, Work 1 |
 | url | 1 | No place of its own 1 |
 | workbench | 16 | No place of its own 12, Thread panel 3, Settings 1 |
 
@@ -186,7 +186,7 @@ rail destination; 18 features.
 | backlog/project-scope: File and scope items by project | destinationSection | left-nav: Backlog › project filter |
 | backlog/rich-capture: A chat-sized capture box with files, properties and references | destinationSection | left-nav: Backlog › capture box |
 | backlog/search-and-views: Search with reasons and saved views | destinationSection | left-nav: Backlog › search |
-| project-automations/project-automations: Start threads in a project on a schedule | destinationSection | left-nav: Work › Automations |
+| project-automations/project-automations: Start threads in a project on a schedule | destinationSection | rail: Work › Automations (already on the rail) |
 | backlog/board-links-and-history: Board, links, backlinks and history | detail | left-nav: Backlog › Board / item detail |
 | backlog/rich-item-text: Write descriptions and replies like a capture | detail | left-nav: Backlog › item detail |
 | backlog/secret-link-reveal: Reveal an item's secret link in place | detail | left-nav: Backlog › item detail › Relationships |
@@ -203,7 +203,7 @@ rail destination; 5 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| agent-communication/agent-directory: Discover Agents, history, and workspace channels | destinationSection | left-nav: Messages |
+| agent-communication/agent-directory: Discover Agents and workspace channels | destinationSection | left-nav: Messages |
 | agent-communication/human-browser: Post messages from the communication browser | destinationSection | left-nav: Messages › post |
 | agent-communication/passive-messaging: Store and browse passive messages | destinationSection | left-nav: Messages |
 | agents/agent-registry: Manage persistent agents | destinationSection | left-nav: Agents |
@@ -255,7 +255,7 @@ rail destination; 6 features.
 
 ### Settings
 
-rail destination (bottom); 41 features.
+rail destination (bottom); 43 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -272,6 +272,7 @@ rail destination (bottom); 41 features.
 | mcp-endpoint/mcp-endpoint-settings: Issue the MCP token and copy the Claude Code command | settingsSection | settings: MCP endpoint |
 | mcp-servers/oauth-authorization: Authorize remote OAuth servers | settingsSection | left-nav: MCP Servers: Servers › OAuth |
 | mcp-servers/registry-catalog: Search curated providers and the MCP Registry | settingsSection | left-nav: MCP Servers: Servers › registry |
+| mcp-servers/secret-catalog-credential-bindings: Bind server headers and environment to Secret Catalog references | settingsSection | left-nav: MCP Servers: Servers › Add MCP server › Advanced: request headers |
 | mcp-servers/server-configuration: Manage local and remote MCP server definitions | settingsSection | left-nav: MCP Servers: Servers |
 | multi-host/runtime-directory: Register and identify local DSH runtimes | settingsSection | composer: Run on Local › Add host |
 | policies/deny-policies: Deny tool calls outright, after permissions | settingsSection | agent tool: policies_list (no UI) |
@@ -298,6 +299,7 @@ rail destination (bottom); 41 features.
 | thread-sidebar/navigation-layout: Customize sidebar navigation and sections | settingsSection | thread-list: Sidebar settings › Customize sidebar |
 | thread-sidebar/notification-delivery: Configure per-category thread notifications | settingsSection | settings: Thread sidebar › notifications |
 | thread-sidebar/settled-auto-archive: Archive a settled thread once its delay passes | settingsSection | settings: Thread sidebar › settled archive delay |
+| web-fetch-readable/readable-web-fetch: Answer ctx.web fetches across redirects with the readable article | settingsSection | settings: dshfiles-web-fetch-readable |
 | web-search-brave/brave-web-search: Answer ctx.web searches with Brave Web Search | settingsSection | settings: Brave web search |
 | workbench/dockable-panel-layouts: Arrange plugin panels in independent layouts | settingsSection | workbench: Pane options › Layouts |
 
@@ -395,13 +397,14 @@ run row, chips, `/` and `@` sources; 54 features.
 
 ### Transcript
 
-cards inline in the active thread; 19 features.
+cards inline in the active thread; 21 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | agent-plan/failure-card: Retry and Ask to fix under failed turns | transcriptCard | transcript: turn error row |
 | agent-plan/plan-card: Plan card for todo_write | transcriptCard | transcript: todo_write tool card |
 | agent-questions/question-card-layout: Steady countdown and compact native question card | transcriptCard | transcript: native question card |
+| agent-questions/root-timed-questions: Root timed questions keep the Agent working | transcriptCard | transcript: native question card |
 | ai-accounts/credential-recovery: Open credential setup from failed turns | transcriptCard | transcript: failed turn › Open AI Accounts |
 | attachment-gallery/image-gallery-navigation: Navigate image previews | transcriptCard | transcript: image previews (and composer attachments) |
 | backlog/jev-secret-setup: Set up a missing Jev key from chat | transcriptCard | transcript: turn tail › Set up missing secrets |
@@ -412,6 +415,7 @@ cards inline in the active thread; 19 features.
 | html-render/html-page-card: Agent-published HTML page as a sandboxed card | transcriptCard | transcript: html_render card |
 | html-render/html-preview-card: Workspace HTML file shown as a sandboxed card | transcriptCard | transcript: html_preview card |
 | jj-integration/turn-end-integrate: Integrate from the end of a turn | transcriptCard | transcript: turn tail › Land on main |
+| secret-catalog/agent-secret-request: Let an agent ask the user to store a secret | transcriptCard | transcript: turn tail › Secret request |
 | secret-catalog/backlog-jev-chat-setup: Set up a Jev key from chat | transcriptCard | transcript: turn tail › Set up missing secrets |
 | test-runs/test-run-card: Vitest runs as a test-results card | transcriptCard | transcript: Vitest results card |
 | tool-meta/tool-call-timing: Start time and duration on every tool call | transcriptCard | transcript: tool call timing |
@@ -438,7 +442,7 @@ palette commands, status items, agent tools, infrastructure; 134 features.
 | memory/memory-tools: Search, read and note memory from any agent | agentToolOnly | agent tool: memory_search / memory_read / memory_note |
 | multi-host/remote-delegation: Delegate a task to another machine | agentToolOnly | agent tool: multi_host_delegate |
 | pull-requests/github-pull-request-links: Link and watch GitHub pull requests from DSH threads | agentToolOnly | agent tools: pull_request_link, pull_request_watch, pull_request_list |
-| secret-catalog/metadata-only-agent-tools: Expose safe secret catalog tools to agents | agentToolOnly | agent tool: secret_list / secret_get / secret_reference_status |
+| secret-catalog/metadata-only-agent-tools: Expose safe secret catalog tools to agents | agentToolOnly | agent tool: secret_list / secret_get / secret_reference_status / secret_remove_alias |
 | session-controller/thread-local-model: Guarded thread-local model selection | agentToolOnly | agent tool: thread_local_model_state / thread_select_local_model |
 | thread-sidebar/navigation-counter: Count destination and section opens | agentToolOnly | agent tool: shell_navigation_counts / shell_navigation_reset |
 | thread-sidebar/queued-message-tools: Remove, steer or edit a queued message as an Agent | agentToolOnly | agent tool: thread_queue_remove / thread_queue_steer / thread_queue_edit |
