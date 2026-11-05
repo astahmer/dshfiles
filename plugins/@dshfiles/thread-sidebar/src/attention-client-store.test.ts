@@ -76,6 +76,21 @@ describe('shared thread attention store', () => {
     assert.equal(calls.state, 2)
   })
 
+  it('reads at once when the Host announces a change, even one that removed a record without a new revision', async () => {
+    const { api, calls, setSnapshot } = fakeApi()
+    store().attach(api)
+    await vi.advanceTimersByTimeAsync(0)
+    assert.equal(calls.state, 1)
+    setSnapshot(snapshot(1, []))
+    store().changed?.(1)
+    await vi.advanceTimersByTimeAsync(0)
+    assert.equal(calls.state, 2)
+    assert.deepEqual(store().getSnapshot().snapshot?.sessions, [])
+    store().changed?.(0)
+    await vi.advanceTimersByTimeAsync(0)
+    assert.equal(calls.state, 2)
+  })
+
   it('adopts the snapshot a write returns without a follow-up read', async () => {
     const { api, calls } = fakeApi()
     store().attach(api)

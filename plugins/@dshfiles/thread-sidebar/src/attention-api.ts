@@ -1,4 +1,4 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
+import { defineApi, event, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import { SchemaHelpers } from './schema-helpers.js'
 
@@ -105,6 +105,12 @@ export const threadSidebarAttentionApi = defineApi({
       ),
       output: threadAttentionSnapshotSchema,
       description: 'Adopt browser-held attention records once, after this Host took ownership of them.',
+    }),
+  },
+  events: {
+    changed: event({
+      schema: Schema.Struct({ revision: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)) }),
+      description: 'Attention records changed (a turn finished, a thread was read or marked unread, an Inbox item was marked done); read the state again.',
     }),
   },
 })

@@ -1,8 +1,8 @@
 import { attentionApi, type AttentionDraft, type AttentionItem } from '@dshfiles/activity-timeline/attention-api'
-import { DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Effect, Layer, Stream } from 'effect'
-import type { ThreadAttentionView } from './attention-api.js'
+import { threadSidebarAttentionApi, type ThreadAttentionView } from './attention-api.js'
 import { ThreadAttention } from './attention-store.js'
 
 /** The inbox source of finished turns the user has not opened yet. */
@@ -81,19 +81,31 @@ const make = Effect.gen(function* () {
   })
 
   /**
-   * Done in the inbox is read here too (plan §4.8, both ways): the thread's finished turn is acknowledged, so its row
-   * loses the unread dot, and the next reconcile resolves the item. A hand unread mark is cleared the same way.
+   * Done in the inbox is read here too (plan §4.8, both ways): the thread's records clear, its row loses the unread dot,
+   * and the next reconcile resolves the item.
    */
   const acknowledgeDone = Effect.fn('thread-sidebar attention done')(function* (item: AttentionItem) {
     const view = viewForDoneItem(item, (yield* attention.snapshot).sessions)
     yield* Effect.annotateCurrentSpan({ 'attention.matched': view !== undefined })
     if (view === undefined) return
-    if (view.finishedAt !== null) yield* attention.acknowledge({ sessionId: view.sessionId, version: view.version })
-    else yield* attention.clearUnread({ sessionId: view.sessionId, version: view.version })
+    // Done means read: a hand unread mark on the same thread goes too, or it would come back as a new item at once.
+    yield* attention.clearUnread({ sessionId: view.sessionId, version: view.version })
   })
   yield* HostEvents.stream('dshfiles/attention/done').pipe(
     Stream.runForEach(([payload]) =>
       acknowledgeDone(payload.item).pipe(Effect.catchCause(cause => Effect.logWarning('thread-sidebar: inbox done not applied', cause))),
+    ),
+    DshxPlugin.detached,
+    Effect.forkScoped,
+  )
+
+  // Every page's row dots re-read at once, so a thread read in one place (an Inbox Done, another tab) clears everywhere.
+  yield* attention.changes.pipe(
+    Stream.runForEach(() =>
+      attention.snapshot.pipe(
+        Effect.flatMap(snapshot => Api.publish({ contract: threadSidebarAttentionApi, event: 'changed', payload: { revision: snapshot.revision } })),
+        Effect.catchTag('PublishEventError', error => Effect.logWarning('thread-sidebar: attention change event refused', error.message)),
+      ),
     ),
     DshxPlugin.detached,
     Effect.forkScoped,

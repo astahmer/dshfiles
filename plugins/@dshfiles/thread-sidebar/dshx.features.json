@@ -1315,7 +1315,7 @@
     {
       "id": "manual-unread",
       "title": "Keep selected threads manually unread",
-      "summary": "Mark a thread unread from the sidebar and clear that marker in every browser when the thread is opened.",
+      "summary": "Mark a thread unread from the sidebar and clear that marker in every browser when the thread is opened. The row dot and its Inbox item are one record: Done in the Inbox clears the dot at once (the attention API publishes a changed event every page re-reads on), and reading the thread resolves the item.",
       "reach": [
         "click button \"All threads\"",
         "click button \"New thread\"",
@@ -1343,6 +1343,11 @@
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.unread-inbox-agree",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
         {
           "kind": "gherkin",
           "id": "thread-sidebar.manual-unread",

@@ -1,4 +1,4 @@
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, useApiEvent } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { threadSidebarAttentionApi, type ThreadAttentionMigrationEntry, type ThreadAttentionView } from './attention-api.js'
 import { sharedThreadAttentionStore, threadAttentionViews } from './attention-client-store.js'
@@ -36,6 +36,12 @@ export const useThreadAttention = (options: { readonly enabled: boolean }): Thre
     if (!options.enabled) return
     return store.attach(api)
   }, [api, options.enabled, store])
+  // A read anywhere (an Inbox Done, another tab, an agent) clears the row dot at once instead of at the next poll.
+  useApiEvent(threadSidebarAttentionApi, 'changed', payload => {
+    if (!options.enabled) return
+    if (store.changed === undefined) void store.refresh()
+    else store.changed(payload.revision)
+  })
 
   const acknowledge = useCallback(
     (sessionId: string, version: number) => {

@@ -1835,6 +1835,109 @@ Then('the composer contains the native mention chip at the captured cursor', asy
   await finishJourneyAssertions(page)
 })
 
+const UNREAD_INBOX_PROMPT = 'thread sidebar unread inbox agreement target'
+let unreadInboxThreadId: string | null = null
+
+const unreadInboxRow = (page: Page): Locator => {
+  if (unreadInboxThreadId === null) throw new Error('No unread inbox thread was started on this page.')
+  return threadRow(page, unreadInboxThreadId)
+}
+
+const ATTENTION_REASON = /^(Marked unread\.|Turn failed\.|Turn finished; ready to review\.)/u
+
+/** The row's unread state, whatever glyph its status grouping draws. */
+const unreadMark = (page: Page): Locator => threadSidebar(page).locator(`article[data-thread-id="${unreadInboxThreadId ?? ''}"][data-unread]`)
+
+/** Opens the Inbox in the stage and counts this thread's open items in Needs you and Other, then goes back to Threads. */
+const inboxItemCount = async (page: Page): Promise<number> => {
+  await openGlobalPanel(page, 'Inbox')
+  let count = 0
+  for (const view of ['Needs you', 'Other']) {
+    await page
+      .getByRole('tab', { name: new RegExp(`^${view}`, 'u') })
+      .first()
+      .click()
+    const list = page.getByRole('list', { name: view, exact: true })
+    await list.waitFor({ state: 'visible', timeout: 3_000 }).catch(() => undefined)
+    count += await list
+      .getByRole('listitem')
+      .filter({ has: page.getByText(ATTENTION_REASON) })
+      .count()
+  }
+  await page.getByRole('tablist', { name: 'Destinations', exact: true }).getByRole('tab', { name: 'Threads', exact: true }).click()
+  await expect(threadSidebar(page)).toBeVisible()
+  return count
+}
+
+/** A failed turn may already have made the row unread, which disables Mark unread; either way it ends unread. */
+const markUnread = async (page: Page): Promise<void> => {
+  const item = page.getByRole('menuitem', { name: 'Mark unread', exact: true })
+  // The scratch provider prompt can swallow the first right-click; open the menu until it shows.
+  await expect(async () => {
+    await openThreadRowMenu(unreadInboxRow(page))
+    await expect(item).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 20_000 })
+  if (await item.isEnabled()) await item.click()
+  else await page.keyboard.press('Escape')
+  await expect(unreadMark(page)).toHaveCount(1)
+}
+
+When('a thread marked unread is marked done in the Inbox beside the thread list', async ({ page }: { page: Page }) => {
+  unreadInboxThreadId = await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill(UNREAD_INBOX_PROMPT)
+  await composer.press('Enter')
+  await expect(unreadInboxRow(page)).toHaveCount(1)
+  // The scratch Host has no provider: let the turn fail first, so its finish cannot land between the mark and Done.
+  await expect(page.getByText(/This turn failed/u).first()).toBeVisible({ timeout: 30_000 })
+  await startBlankThread(page)
+  await markUnread(page)
+  await expect.poll(() => inboxItemCount(page), { timeout: 20_000 }).toBe(1)
+  await openGlobalPanel(page, 'Inbox')
+  const item = page.locator('[data-attention-item]').filter({ has: page.getByText(ATTENTION_REASON) })
+  for (const view of ['Needs you', 'Other']) {
+    await page
+      .getByRole('tab', { name: new RegExp(`^${view}`, 'u') })
+      .first()
+      .click()
+    if ((await item.count()) > 0) break
+  }
+  await page.getByRole('tablist', { name: 'Destinations', exact: true }).getByRole('tab', { name: 'Threads', exact: true }).click()
+  await expect(unreadMark(page)).toHaveCount(1)
+  await openGlobalPanel(page, 'Inbox')
+  for (const view of ['Needs you', 'Other']) {
+    await page
+      .getByRole('tab', { name: new RegExp(`^${view}`, 'u') })
+      .first()
+      .click()
+    if ((await item.count()) > 0) break
+  }
+  await item.first().getByRole('button', { name: 'Done', exact: true }).click()
+  await page.getByRole('tablist', { name: 'Destinations', exact: true }).getByRole('tab', { name: 'Threads', exact: true }).click()
+})
+
+Then('the thread row loses its unread mark without waiting for the next poll', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-inbox-done-clears-the-row-dot', async () => {
+    // The page's own safety poll is 30 s; the Host's change event must clear it well before that.
+    await expect(unreadMark(page)).toHaveCount(0, { timeout: 8_000 })
+  })
+})
+
+When('the same thread is marked unread again and opened', async ({ page }: { page: Page }) => {
+  await markUnread(page)
+  await expect.poll(() => inboxItemCount(page), { timeout: 20_000 }).toBe(1)
+  await openThreadRow(unreadInboxRow(page))
+  await expect.poll(() => currentThreadId(page)).toBe(unreadInboxThreadId)
+})
+
+Then('its Inbox item leaves the Inbox', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-reading-a-thread-resolves-its-inbox-item', async () => {
+    await expect(unreadMark(page)).toHaveCount(0)
+    await expect.poll(() => inboxItemCount(page), { timeout: 20_000 }).toBe(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the thread-sidebar command palette is searched for restart', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Open command palette', exact: true }).click()
   await expect(paletteDialog(page)).toBeVisible()

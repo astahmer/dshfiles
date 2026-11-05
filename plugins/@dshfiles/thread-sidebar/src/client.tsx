@@ -1196,6 +1196,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         className={cn('dshx:group/row dshx:relative dshx:min-w-0', props.dragging && 'dshx:opacity-50')}
         data-thread-id={session.id}
         data-selected={props.selected}
+        data-unread={unread ? '' : undefined}
         data-thread-section-row={props.section === undefined ? undefined : ''}
         onContextMenu={captureThreadMentionInsertion}
       >

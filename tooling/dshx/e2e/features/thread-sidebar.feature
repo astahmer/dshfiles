@@ -207,6 +207,14 @@ Feature: Thread sidebar journeys
     When a visible Host thread is mentioned from its context menu at the captured cursor
     Then the composer contains the native mention chip at the captured cursor
 
+  @scenario:thread-sidebar.unread-inbox-agree
+  Scenario: An unread thread and its Inbox item clear together
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/activity-timeline" is booted
+    When a thread marked unread is marked done in the Inbox beside the thread list
+    Then the thread row loses its unread mark without waiting for the next poll
+    When the same thread is marked unread again and opened
+    Then its Inbox item leaves the Inbox
+
   @scenario:thread-sidebar.restart-confirmation
   Scenario: No restart action is offered without pending Host changes
     Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/command-palette" is booted

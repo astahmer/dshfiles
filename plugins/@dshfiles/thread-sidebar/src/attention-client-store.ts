@@ -45,6 +45,11 @@ export interface ThreadAttentionStore {
   /** Register one mounted consumer; returns its detach. */
   attach(api: AttentionApi): () => void
   refresh(): Promise<void>
+  /**
+   * The Host announced a change at this revision: read now, past the refresh gap, unless ours is newer. Absent on a
+   * store an older bundle created for the page, which callers then refresh instead.
+   */
+  changed?(revision: number): void
   acknowledge(sessionId: string, version: number): Promise<void>
   clearUnread(sessionId: string, version: number): Promise<void>
   clearUnreadMany(entries: readonly { readonly sessionId: string; readonly version: number }[]): Promise<void>
@@ -132,6 +137,26 @@ const createStore = (): ThreadAttentionStore => {
     document.addEventListener('visibilitychange', onVisible)
   }
 
+  // A cleared record leaves the Host revision where it was, so an announced revision equal to ours still means a read.
+  let rereadQueued = false
+  const changed = (next: number): void => {
+    if (next < revision) return
+    const force = (): void => {
+      lastAttemptAt = 0
+      void read()
+    }
+    if (inFlight === null) {
+      force()
+      return
+    }
+    if (rereadQueued) return
+    rereadQueued = true
+    void inFlight.then(() => {
+      rereadQueued = false
+      force()
+    })
+  }
+
   const mutate = async (call: () => Promise<ThreadAttentionSnapshot>): Promise<void> => {
     adopt(await call())
   }
@@ -161,6 +186,7 @@ const createStore = (): ThreadAttentionStore => {
       }
     },
     refresh: read,
+    changed,
     acknowledge: (sessionId, version) => mutate(() => requireApi().acknowledge({ sessionId, version })),
     clearUnread: (sessionId, version) => mutate(() => requireApi().clearUnread({ sessionId, version })),
     clearUnreadMany: entries => mutate(() => requireApi().clearUnreadMany({ entries: [...entries] })),
@@ -173,6 +199,7 @@ const createStore = (): ThreadAttentionStore => {
       api = null
       active = 0
       revision = 0
+      rereadQueued = false
       lastAttemptAt = 0
       stopped = false
       stopPolling()
