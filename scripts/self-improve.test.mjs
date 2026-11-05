@@ -585,3 +585,20 @@ test('harness validation reports every problem in one pass and passes a clean tr
   const cleanReport = await HarnessAudit.validate({ root: clean, skillRoots: [join(clean, '.agents/skills')], alwaysOnPaths: [] })
   assert.deepEqual(cleanReport.findings, [])
 })
+
+test('an owned skill body over the cap is flagged, a shared skill of the same size is not', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'self-improve-skill-cap-'))
+  const shared = mkdtempSync(join(tmpdir(), 'self-improve-skill-cap-shared-'))
+  const longBody = `${'Step detail that belongs in REFERENCE.md. '.repeat(250)}\n`
+  write(join(root, '.agents/skills/long/SKILL.md'), `---\nname: long\ndescription: Too long. Use when testing.\n---\n\n${longBody}`)
+  write(join(root, '.agents/skills/short/SKILL.md'), '---\nname: short\ndescription: Short. Use when testing.\n---\n\nBody\n')
+  write(join(shared, 'skills/shared-long/SKILL.md'), `---\nname: shared-long\ndescription: Shared. Use when testing.\n---\n\n${longBody}`)
+  const report = await HarnessAudit.validate({ root, skillRoots: [join(root, '.agents/skills'), join(shared, 'skills')], alwaysOnPaths: [] })
+  const over = report.findings.filter(finding => finding.code === 'skill.body-over-budget')
+  assert.deepEqual(
+    over.map(finding => finding.path),
+    [join(root, '.agents/skills/long/SKILL.md')],
+  )
+  assert.equal(over[0].severity, 'warning')
+  assert.match(over[0].message, /REFERENCE\.md/)
+})

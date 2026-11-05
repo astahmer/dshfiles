@@ -32,6 +32,14 @@ the file it would write.
 
 ## Signal catalogue
 
+Signal kinds: `tool-error`, `repeated-call`, `slow-tool`, `jj-failure`,
+`job-failure`, `provider-retry`, `turn-end`, `correction`,
+`compaction-pressure`, `redundant-skill-load`, `rework`. Each carries the
+Sessions, sequence numbers, timestamps and a redacted excerpt it came from.
+
+Signals with `sessions: 1` and few hits are incidents. `recurring: true` means
+at least three Sessions or ten hits — still a candidate, never a conclusion.
+
 A signal is a measurement over Session logs, not a verdict. Each kind lists what
 it counts and where it lies.
 
@@ -99,3 +107,64 @@ counterfactual. Adopt the discipline, refuse the verdict.
   only directory it writes (git-ignored).
 - The protected last-known-good runtime under `scripts/dsh-lkg/` is never an
   experiment target, and no experiment points at the live `web` profile.
+
+## Scheduling a weekly run
+
+When the user asks to run this weekly, create a `schedule_create` reminder in the
+current thread. A reminder inherits that thread's account and model, so the model
+chosen in the composer is what future runs use — a different model means a
+different thread. Use `weekly` timing and a prompt that restates: run
+`review --since=7d`, investigate at most three candidates, implement at most one
+change, record the ledger verdict, and say what next week's review should see
+move. Keep the thread alive; archiving it drops the schedule.
+
+## Ledger entries without a Session
+
+A finding that came from `validate` (or from reading code, rather than from a
+Session) is recorded with `--key=<stable dedup key> --title=… --category=harness
+--evidence-file=<json>` and an evidence array of `{time, excerpt, ref}` objects
+instead of Session ids. `ledger path` prints the file being written.
+
+An entry that is already `proposed` or `investigating` is a duplicate: work it
+instead of adding another. An entry that is `rejected` or `regressed` reopens
+only with `--reopen "<new evidence>"`; **no new evidence, no new attempt.**
+
+## Report template
+
+Short, and separate verified from hypothesized:
+
+```
+Reviewed: week of <from> → <to> vs <prev from> → <prev to>; Sessions 412 (prev 380)
+  tool errors 812 (prev 900) · corrections 24 (prev 31) · new 3 / worse 2 / better 1
+Recurring findings: 3 investigated, 1 discarded (provider outage), 1 deferred
+Changed: jj:<change> — <one line>   Evidence: <signal id>, <n> Sessions
+Before/after: <metric> <before> → <after> (<how it was measured>)
+Unverified: <what you believe but could not measure>
+Open: <ledger ids still investigating>
+```
+
+Say what the next review should watch move, so a later run can check it instead
+of trusting this one.
+
+If nothing measurable improved, say that plainly. A truthful "no improvement
+found" is a valid and useful outcome; a manufactured one is worse than nothing.
+
+## Arguments
+
+| Argument                                               | Meaning                                                          |
+| ------------------------------------------------------ | ---------------------------------------------------------------- |
+| `--scope=all\|tools\|memory\|skills\|ux\|infra\|agent` | only signals in that category reach step 1                       |
+| `--since=7d\|30d\|all\|<ISO date>`                     | current window; the previous window is the same length before it |
+| `--sessions=<n>`                                       | cap the number of Sessions read                                  |
+| `--analyze-only`                                       | stop after step 3: findings and ledger entries, no code change   |
+| `--max-cost=<usd>`                                     | spend ceiling; the run stops starting new experiments at it      |
+
+## Live surfaces
+
+Also reach for the live surfaces when they answer a question faster:
+`find_threads` and `memory_search` for "has this been tried before",
+`activity_timeline_attention` for failures the plugin layer already recorded,
+`usage_report` for cost and latency claims, `session_search_health` before
+blaming retrieval. A review covers Session logs only: cost, provider billing,
+live trace spans and Memory analytics need their own source, and a claim about
+one of them must not lean on the review.

@@ -14,6 +14,12 @@ import { dirname, join, resolve } from 'node:path'
 /** An always-on instructions file competes with the agent's own output budget. */
 const ALWAYS_ON_MAX_CHARS = 24_000
 export const DESCRIPTION_MAX_CHARS = 1_024
+/**
+ * A skill body is reloaded whole after every compaction: 64 % of skill loads in the 2026-10-15…22 mining window came
+ * after one (plans/self-improve, T19). Keep the procedure under this cap and move detail into a sibling REFERENCE.md,
+ * which the agent opens only when it needs it.
+ */
+export const SKILL_BODY_MAX_CHARS = 8_000
 const NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export interface HarnessFinding {
@@ -110,7 +116,8 @@ const missingLinks = async (filePath: string, body: string): Promise<string[]> =
   return missing
 }
 
-const validateSkill = async (file: SkillFile): Promise<{ readonly skill: SkillSummary | undefined; readonly findings: HarnessFinding[] }> => {
+/** `owned`: the skill lives in this repository, so its size is ours to fix (a shared skill's is not). */
+const validateSkill = async (file: SkillFile, owned: boolean): Promise<{ readonly skill: SkillSummary | undefined; readonly findings: HarnessFinding[] }> => {
   const findings: HarnessFinding[] = []
   const text = await readFile(file.path, 'utf8')
   const parsed = parseFrontmatter(text)
@@ -150,6 +157,13 @@ const validateSkill = async (file: SkillFile): Promise<{ readonly skill: SkillSu
       code: 'skill.description-too-long',
       path: file.path,
       message: `description is ${String(description.length)} chars, over the ${String(DESCRIPTION_MAX_CHARS)} cap DSH accepts`,
+    })
+  if (owned && parsed.body.length > SKILL_BODY_MAX_CHARS)
+    findings.push({
+      severity: 'warning',
+      code: 'skill.body-over-budget',
+      path: file.path,
+      message: `body is ${String(parsed.body.length)} chars, over the ${String(SKILL_BODY_MAX_CHARS)} cap; every reload after a compaction pays for it again, so move reference detail into a sibling REFERENCE.md and link it`,
     })
   for (const target of await missingLinks(file.path, parsed.body)) {
     findings.push({ severity: 'warning', code: 'skill.link-missing', path: file.path, message: `relative link target \`${target}\` does not exist` })
@@ -233,7 +247,7 @@ const validateHarness = async (input: ValidateHarnessInput): Promise<HarnessVali
   const skills: SkillSummary[] = []
   for (const root of input.skillRoots) {
     for (const file of await discoverSkillFiles(root)) {
-      const result = await validateSkill(file)
+      const result = await validateSkill(file, resolve(file.path).startsWith(`${resolve(input.root)}/`))
       findings.push(...result.findings)
       if (result.skill !== undefined) skills.push(result.skill)
     }

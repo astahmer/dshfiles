@@ -25,13 +25,7 @@ These arguments are interpreted by you, not by a parser: translate the ones the
 miner understands into its flags (see [step 1](#1-review-then-mine)) and honour
 the rest yourself.
 
-| Argument                                               | Meaning                                                          |
-| ------------------------------------------------------ | ---------------------------------------------------------------- |
-| `--scope=all\|tools\|memory\|skills\|ux\|infra\|agent` | only signals in that category reach step 1                       |
-| `--since=7d\|30d\|all\|<ISO date>`                     | current window; the previous window is the same length before it |
-| `--sessions=<n>`                                       | cap the number of Sessions read                                  |
-| `--analyze-only`                                       | stop after step 3: findings and ledger entries, no code change   |
-| `--max-cost=<usd>`                                     | spend ceiling; the run stops starting new experiments at it      |
+The supported arguments (`--scope`, `--since`, `--sessions`, `--analyze-only`, `--max-cost`) and what each means are in [Arguments](REFERENCE.md#arguments).
 
 Ignore an argument you do not understand, and say which ones you ignored.
 
@@ -39,15 +33,7 @@ Bound the run: **at most 3 opportunities investigated, at most 1 change
 implemented** unless the user asks for more. Time-box the whole run and say what
 was left unfinished rather than silently exceeding it.
 
-### Scheduling a run
-
-When the user asks to run this weekly, create a `schedule_create` reminder in the
-current thread. A reminder inherits that thread's account and model, so the model
-chosen in the composer is what future runs use — a different model means a
-different thread. Use `weekly` timing and a prompt that restates: run
-`review --since=7d`, investigate at most three candidates, implement at most one
-change, record the ledger verdict, and say what next week's review should see
-move. Keep the thread alive; archiving it drops the schedule.
+To run it weekly, see [Scheduling a weekly run](REFERENCE.md#scheduling-a-weekly-run).
 
 ## 1. Review, then mine
 
@@ -66,13 +52,7 @@ the repository. `validate` checks the parts of the harness this repository owns
 (skill frontmatter, dead relative links, the always-on instruction budget) with no
 model involved.
 
-Signal kinds: `tool-error`, `repeated-call`, `slow-tool`, `jj-failure`,
-`job-failure`, `provider-retry`, `turn-end`, `correction`,
-`compaction-pressure`, `redundant-skill-load`, `rework`. Each carries the
-Sessions, sequence numbers, timestamps and a redacted excerpt it came from.
-
-Signals with `sessions: 1` and few hits are incidents. `recurring: true` means
-at least three Sessions or ten hits — still a candidate, never a conclusion.
+Signal kinds, their meaning and when one counts as recurring: [Signal catalogue](REFERENCE.md#signal-catalogue). One Session and few hits is an incident; `recurring: true` is still a candidate, never a conclusion.
 
 ## 2. Investigate before believing
 
@@ -85,13 +65,7 @@ dshx sessions tail <session-id> --tail 60    # the events around the sequence
 node scripts/jj-state.mjs --read-only --repo <workspace>   # if a workspace is named
 ```
 
-Also reach for the live surfaces when they answer a question faster:
-`find_threads` and `memory_search` for "has this been tried before",
-`activity_timeline_attention` for failures the plugin layer already recorded,
-`usage_report` for cost and latency claims, `session_search_health` before
-blaming retrieval. A review covers Session logs only: cost, provider billing,
-live trace spans and Memory analytics need their own source, and a claim about
-one of them must not lean on the review.
+For questions a log cannot answer (prior attempts, cost, traces, retrieval health) use the live surfaces in [Live surfaces](REFERENCE.md#live-surfaces); a review covers Session logs only.
 
 Then write down, per candidate:
 
@@ -119,14 +93,7 @@ node scripts/self-improve.ts ledger list              # what is already known
 node scripts/self-improve.ts ledger update --id=<id> --status=investigating --note="…"
 ```
 
-A finding that came from `validate` (or from reading code, rather than from a
-Session) is recorded with `--key=<stable dedup key> --title=… --category=harness
---evidence-file=<json>` and an evidence array of `{time, excerpt, ref}` objects
-instead of Session ids. `ledger path` prints the file being written.
-
-An entry that is already `proposed` or `investigating` is a duplicate: work it
-instead of adding another. An entry that is `rejected` or `regressed` reopens
-only with `--reopen "<new evidence>"`; **no new evidence, no new attempt.**
+A finding from `validate` or from code reading, not a Session, takes `--key`/`--evidence-file` instead: [Ledger entries without a Session](REFERENCE.md#ledger-entries-without-a-session). An entry already `proposed` or `investigating` is a duplicate: work it instead of adding another. A `rejected` or `regressed` entry reopens only with `--reopen "<new evidence>"`; **no new evidence, no new attempt.**
 
 ## 4. Propose and implement in isolation
 
@@ -181,23 +148,7 @@ exactly what still needs a human decision.
 
 ## 7. Report
 
-Short, and separate verified from hypothesized:
-
-```
-Reviewed: week of <from> → <to> vs <prev from> → <prev to>; Sessions 412 (prev 380)
-  tool errors 812 (prev 900) · corrections 24 (prev 31) · new 3 / worse 2 / better 1
-Recurring findings: 3 investigated, 1 discarded (provider outage), 1 deferred
-Changed: jj:<change> — <one line>   Evidence: <signal id>, <n> Sessions
-Before/after: <metric> <before> → <after> (<how it was measured>)
-Unverified: <what you believe but could not measure>
-Open: <ledger ids still investigating>
-```
-
-Say what the next review should watch move, so a later run can check it instead
-of trusting this one.
-
-If nothing measurable improved, say that plainly. A truthful "no improvement
-found" is a valid and useful outcome; a manufactured one is worse than nothing.
+Short, and separate verified from hypothesized; use the [Report template](REFERENCE.md#report-template). Say what the next review should watch move. If nothing measurable improved, say that plainly: a truthful "no improvement found" is a valid outcome; a manufactured one is worse than nothing.
 
 ## Further reading
 
