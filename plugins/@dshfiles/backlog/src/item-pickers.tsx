@@ -7,7 +7,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { CheckIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
+import { CalendarIcon, CheckIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 
@@ -15,6 +15,7 @@ import { BacklogItems, type BacklogAttention, type BacklogKind, type BacklogPrio
 import { WorkGlyphs } from './work-glyphs.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogProjects, ProjectPicker } from './project-picker.js'
+import { DueDates } from './due-date.js'
 
 const triggerClass =
   'dshx:inline-flex dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
@@ -194,7 +195,73 @@ const PriorityPicker = (props: {
   />
 )
 
+/** The quick due dates a menu offers, from today on the reader's calendar. */
+const dueShortcuts = (today: string) =>
+  [
+    { label: 'Today', due: today },
+    { label: 'Tomorrow', due: DueDates.addDays(today, 1) },
+    { label: 'In a week', due: DueDates.addDays(today, 7) },
+    { label: 'In a month', due: DueDates.addMonths(today, 1) },
+  ] as const
+
+/** A date-only due date: quick picks, any calendar date, or none. */
+const DuePicker = (props: {
+  readonly itemLabel: string
+  readonly due: string | null
+  readonly overdue: boolean
+  readonly onPick: (due: string | null) => void
+}): JSX.Element => {
+  const [open, setOpen] = useState(false)
+  const today = DueDates.dateOf(Date.now())
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
+        aria-label={`Due date of ${props.itemLabel}`}
+        className={cn(triggerClass, 'dshx:h-7 dshx:px-1.5 dshx:text-xs', props.overdue ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}
+        onClick={event => event.stopPropagation()}
+      >
+        <CalendarIcon aria-hidden className="dshx:size-3.5" />
+        {props.due === null ? 'Due date' : DueDates.label({ due: props.due, today })}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="dshx-root dshx:min-w-52" onClick={event => event.stopPropagation()}>
+        <DropdownMenuLabel className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground">Due date</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {dueShortcuts(today).map(shortcut => (
+          <DropdownMenuItem key={shortcut.label} onSelect={() => props.onPick(shortcut.due)} className="dshx:gap-2 dshx:text-[13px]">
+            {shortcut.label}
+            <span className="dshx:ml-auto dshx:text-[11px] dshx:text-muted-foreground">{shortcut.due}</span>
+          </DropdownMenuItem>
+        ))}
+        <div className="dshx:px-2 dshx:py-1.5" onKeyDown={event => event.stopPropagation()}>
+          <input
+            type="date"
+            aria-label="Pick a due date"
+            value={props.due ?? ''}
+            className="dshx:h-8 dshx:w-full dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-xs"
+            onChange={event => {
+              const value = event.currentTarget.value
+              if (value === '') return
+              props.onPick(value)
+              setOpen(false)
+            }}
+          />
+        </div>
+        {props.due === null ? null : (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => props.onPick(null)} className="dshx:text-[13px]">
+              Clear due date
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export class ItemPickers {
+  static readonly Due = DuePicker
+  static readonly dueShortcuts = dueShortcuts
   static readonly Priority = PriorityPicker
   static readonly priorityShortcut = priorityShortcut
   static readonly Status = StatusPicker

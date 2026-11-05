@@ -12,4 +12,6 @@ export const summaryRelationDefaults = {
   lease: null,
   criteriaProgress: { total: 0, done: 0 },
   planApproval: null,
+  due: null,
+  overdue: false,
 } as const satisfies Partial<BacklogSummaryView>

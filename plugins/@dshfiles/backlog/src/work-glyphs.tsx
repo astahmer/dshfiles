@@ -1,5 +1,17 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { BotIcon, CircleAlertIcon, HandIcon, LoaderCircleIcon, LockIcon, MoonIcon, CheckIcon, LinkIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  BotIcon,
+  CalendarIcon,
+  CircleAlertIcon,
+  HandIcon,
+  ListChecksIcon,
+  LoaderCircleIcon,
+  LockIcon,
+  MoonIcon,
+  CheckIcon,
+  LinkIcon,
+  ScrollTextIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { createContext, useContext, type ReactNode } from 'react'
 
@@ -7,6 +19,7 @@ import type { BacklogSummaryView } from './api.js'
 import type { AgentRunState } from './agent-run-state.js'
 import type { BacklogPriority } from './item.js'
 import { actorName } from './actor-name.js'
+import { DueDates } from './due-date.js'
 
 const priorityLabels = { none: 'No priority', urgent: 'Urgent', high: 'High', medium: 'Medium', low: 'Low' } satisfies Record<BacklogPriority, string>
 
@@ -60,6 +73,52 @@ const ProgressBadge = (props: { readonly progress: BacklogSummaryView['children'
       >
         {complete ? <CheckIcon aria-hidden className="dshx:size-3" /> : null}
         {props.progress.done}/{props.progress.total}
+      </span>
+    </WithTooltip>
+  )
+}
+
+/** Acceptance criteria checked out of all of them. */
+const CriteriaBadge = (props: { readonly progress: { readonly total: number; readonly done: number } }): JSX.Element | null => {
+  if (props.progress.total === 0) return null
+  const complete = props.progress.done === props.progress.total
+  return (
+    <WithTooltip tip={`${String(props.progress.done)} of ${String(props.progress.total)} acceptance criteria met`}>
+      <span aria-label="Acceptance criteria" className={cn(chip, complete ? 'dshx:bg-success/12 dshx:text-success' : 'dshx:bg-muted dshx:text-muted-foreground')}>
+        <ListChecksIcon aria-hidden className="dshx:size-3" />
+        {props.progress.done}/{props.progress.total}
+      </span>
+    </WithTooltip>
+  )
+}
+
+/** A plan waiting for the user's approval. */
+const PlanPendingBadge = (props: { readonly approval: 'pending' | 'approved' | null }): JSX.Element | null =>
+  props.approval !== 'pending' ? null : (
+    <WithTooltip tip="The plan waits for your approval">
+      <span aria-label="Plan waiting for approval" className={cn(chip, 'dshx:bg-warning/12 dshx:text-warning')}>
+        <ScrollTextIcon aria-hidden className="dshx:size-3" />
+        Plan
+      </span>
+    </WithTooltip>
+  )
+
+/** The due date, relative to today: red once an open item is past it. */
+const DueChip = (props: { readonly due: string | null; readonly overdue: boolean; readonly compact?: boolean }): JSX.Element | null => {
+  if (props.due === null) return null
+  const today = DueDates.dateOf(Date.now())
+  const soon = !props.overdue && DueDates.daysBetween(today, props.due) <= 1
+  return (
+    <WithTooltip tip={`${props.overdue ? 'Overdue: was due' : 'Due'} ${props.due}`}>
+      <span
+        aria-label={`${props.overdue ? 'Overdue' : 'Due'} ${props.due}`}
+        className={cn(
+          chip,
+          props.overdue ? 'dshx:bg-destructive/12 dshx:text-destructive' : soon ? 'dshx:bg-warning/12 dshx:text-warning' : 'dshx:bg-muted dshx:text-muted-foreground',
+        )}
+      >
+        <CalendarIcon aria-hidden className="dshx:size-3" />
+        <span className={cn(props.compact === true && 'dshx:@max-pane-narrow:sr-only')}>{DueDates.label({ due: props.due, today })}</span>
       </span>
     </WithTooltip>
   )
@@ -133,6 +192,9 @@ export class WorkGlyphs {
   static readonly priorityLabels = priorityLabels
   static readonly PriorityIcon = PriorityIcon
   static readonly ProgressBadge = ProgressBadge
+  static readonly CriteriaBadge = CriteriaBadge
+  static readonly PlanPendingBadge = PlanPendingBadge
+  static readonly DueChip = DueChip
   static readonly ClaimChip = ClaimChip
   static readonly BlockedBadge = BlockedBadge
   static readonly RunStateChip = RunStateChip

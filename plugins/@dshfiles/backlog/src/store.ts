@@ -25,6 +25,7 @@ import {
 } from './item.js'
 import { ItemRelations, type BacklogLease, type ItemRelationIndex } from './item-relations.js'
 import type { LeaseWrite } from './backlog-repo.js'
+import { DueDates } from './due-date.js'
 import { FieldRevert } from './field-revert.js'
 import { BacklogOps } from './op-log.js'
 import { BacklogShipped, type ShippedDigest, type ShippedQuery } from './shipped.js'
@@ -34,7 +35,7 @@ import { ThreadLifecycle } from './thread-lifecycle.js'
 import { BacklogTriage } from './triage.js'
 
 /** Optional fields an edit may remove: null clears them, undefined leaves them as they are. */
-const clearableFields = ['parent', 'delegate', 'criteria', 'plan', 'planApproval', 'summary'] as const
+const clearableFields = ['parent', 'delegate', 'criteria', 'plan', 'planApproval', 'summary', 'due'] as const
 type ClearableField = (typeof clearableFields)[number]
 type ClearableChange = { -readonly [K in ClearableField]?: NonNullable<BacklogItem[K]> | null | undefined }
 
@@ -94,6 +95,8 @@ export interface BacklogUpdate {
   /** `pending` asks the user to approve the plan (attention needs-input); only the user sets `approved`. */
   readonly planApproval?: BacklogPlanApproval | null | undefined
   readonly summary?: string | null | undefined
+  /** The date it is due (`2026-11-05`), or null to clear it. */
+  readonly due?: string | null | undefined
 }
 
 export interface CriterionInput {
@@ -141,11 +144,14 @@ const activityOf = (item: BacklogItem): BacklogSummary['activity'] => {
   }
 }
 
+/** Open, awake, and asking: attention, a waiting suggestion, or a due date already past (derived, never stored). */
 const wantsUser = (item: BacklogItem, now: number): boolean =>
   item.status !== 'done' &&
   item.status !== 'dropped' &&
   (item.snoozedUntil ?? 0) <= now &&
-  ((item.attention ?? 'none') !== 'none' || (item.proposal !== undefined && item.proposal !== null))
+  ((item.attention ?? 'none') !== 'none' ||
+    (item.proposal !== undefined && item.proposal !== null) ||
+    DueDates.isOverdue({ due: item.due, status: item.status, today: DueDates.dateOf(now) }))
 
 const closedStateChange = (input: {
   readonly item: BacklogItem
@@ -206,6 +212,8 @@ const summarize = (
   lease: leaseView(relations.leaseOf(item)),
   criteriaProgress: BacklogItems.criteriaRollup(item.criteria),
   planApproval: item.planApproval ?? null,
+  due: item.due ?? null,
+  overdue: DueDates.isOverdue({ due: item.due, status: item.status, today: DueDates.dateOf(now) }),
 })
 
 /** Pinned first, then newest activity: the Discord order, where idle things sink on their own. */
@@ -240,7 +248,8 @@ interface StoreView {
   readonly relations: Relations
 }
 
-const searchContextOf = (relations: Relations) => ({
+const searchContextOf = (relations: Relations, at: number) => ({
+  today: DueDates.dateOf(at),
   isReady: relations.isReady,
   isBlockedByDeps: relations.isBlockedByDeps,
   hasChildren: (item: BacklogItem) => relations.childrenOf(item).length > 0,
@@ -310,7 +319,7 @@ const listIn = (view: StoreView, query: BacklogListQuery, index?: BacklogSearchI
       const state = BacklogItems.freshness(item, at, view.dormantDays)
       return freshnessFilter === 'active' ? state === 'fresh' || state === 'stale' : state === freshnessFilter
     })
-  const context = searchContextOf(view.relations)
+  const context = searchContextOf(view.relations, at)
   const matched = matching.flatMap(item => {
     const match = BacklogSearch.score(item, search, at, context)
     return match === null ? [] : [{ item, match }]
@@ -483,6 +492,10 @@ const updateChange = (item: BacklogItem, fields: Omit<BacklogUpdate, 'id'>, acto
       changed.push('attention')
     }
   }
+  if (fields.due !== undefined && fields.due !== (item.due ?? null)) {
+    change.due = fields.due
+    recordChange('due')
+  }
   if (fields.summary !== undefined && !sameText(item.summary, fields.summary)) {
     change.summary = fields.summary === null || fields.summary.trim() === '' ? null : fields.summary.slice(0, BacklogItems.maxBodyChars)
     recordChange('summary')
@@ -595,6 +608,7 @@ const withClearable = (item: BacklogItem, change: ClearableChange): BacklogItem 
       }),
     (base: BacklogItem) =>
       clearOrSet({ item: base, value: change.summary, set: (next, summary) => ({ ...next, summary }), remove: ({ summary: _summary, ...rest }) => rest }),
+    (base: BacklogItem) => clearOrSet({ item: base, value: change.due, set: (next, due) => ({ ...next, due }), remove: ({ due: _due, ...rest }) => rest }),
   ].reduce((next, apply) => apply(next), item)
 
 const isClearable = (field: string): field is ClearableField => clearableFields.some(candidate => candidate === field)
@@ -628,6 +642,7 @@ export class BacklogStore extends Context.Service<
       readonly priority?: BacklogPriority | undefined
       /** The ref of the item this one is a sub-issue of. */
       readonly parent?: string | undefined
+      readonly due?: string | undefined
       readonly files?: readonly BacklogFileInput[] | undefined
       /** Fields a remote source already knows, used as they are instead of being read from `text`. */
       readonly fields?: { readonly body?: string | undefined; readonly tags?: readonly string[] | undefined } | undefined
@@ -852,7 +867,7 @@ export class BacklogStore extends Context.Service<
           const afterText = BacklogItems.displayValue(after).slice(0, BacklogItems.maxBodyChars)
           return beforeText === afterText ? [] : [{ field, before: beforeText, after: afterText }]
         })
-        const { parent, delegate, criteria, plan, planApproval, summary, ...fields } = change
+        const { parent, delegate, criteria, plan, planApproval, summary, due, ...fields } = change
         const merged: BacklogItem = {
           ...item,
           ...fields,
@@ -860,7 +875,7 @@ export class BacklogStore extends Context.Service<
           lastActivityAt: at,
           events: [...item.events, { at, actor: actorId, origin: actorId, ...event, ...(fieldChanges.length !== 0 && { fieldChanges }) }],
         }
-        const next = withClearable(merged, { parent, delegate, criteria, plan, planApproval, summary })
+        const next = withClearable(merged, { parent, delegate, criteria, plan, planApproval, summary, due })
         yield* persist(next, event.origin ?? actorId, leaseWrite)
         const stored = next.events.at(-1)
         if (stored !== undefined) yield* PubSub.publish(notices, { item: next, event: stored })
@@ -927,6 +942,7 @@ export class BacklogStore extends Context.Service<
         readonly kind?: BacklogKind | undefined
         readonly priority?: BacklogPriority | undefined
         readonly parent?: string | undefined
+        readonly due?: string | undefined
         readonly files?: readonly BacklogFileInput[] | undefined
         readonly fields?: { readonly body?: string | undefined; readonly tags?: readonly string[] | undefined } | undefined
         readonly actor: BacklogActor
@@ -972,6 +988,7 @@ export class BacklogStore extends Context.Service<
           events: [createdEvent],
           ...(priority !== undefined && priority !== 'none' && { priority }),
           ...(parent !== undefined && { parent }),
+          ...(input.due !== undefined && { due: input.due }),
         }
         yield* repo.create({ item, origin, nextId: id + 1, files }).pipe(Effect.mapError(writeFailed(item, 'put')))
         yield* Ref.update(state, current => ({ ...current, nextId: id + 1 }))

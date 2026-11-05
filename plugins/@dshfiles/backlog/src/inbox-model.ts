@@ -2,7 +2,7 @@ import type { BacklogSummaryView } from './api.js'
 import { sortBacklogItems, type BacklogSort } from './backlog-sort.js'
 import type { InboxThread } from './inbox-threads.js'
 
-export type InboxFilter = 'all' | 'needs-input' | 'blocked' | 'suggestions'
+export type InboxFilter = 'all' | 'needs-input' | 'blocked' | 'suggestions' | 'overdue'
 
 export interface InboxRow {
   readonly item: BacklogSummaryView
@@ -10,12 +10,14 @@ export interface InboxRow {
   readonly hasItemReason: boolean
 }
 
-const hasInboxItemReason = (item: BacklogSummaryView): boolean => item.attention !== 'none' || item.proposal !== null
+/** An open item past its due date counts as a reason of its own, derived on read and never stored. */
+const hasInboxItemReason = (item: BacklogSummaryView): boolean => item.attention !== 'none' || item.proposal !== null || item.overdue
 
 const itemMatches = (item: BacklogSummaryView, filter: InboxFilter): boolean => {
   if (!hasInboxItemReason(item)) return false
   if (filter === 'all') return true
   if (filter === 'suggestions') return item.proposal !== null
+  if (filter === 'overdue') return item.overdue
   if (filter === 'blocked') return item.attention === 'blocked' || item.attention === 'waiting'
   return item.attention === 'needs-input'
 }

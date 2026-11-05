@@ -79,10 +79,11 @@ describe('item-centric inbox', () => {
     const waiting = item({ id: 3, attention: 'waiting' })
     const threadOnly = item({ id: 4 })
     const completedOnly = item({ id: 5 })
-    const sources = [needsInput, suggestion, waiting]
+    const overdue = item({ id: 6, due: '2026-01-01', overdue: true })
+    const sources = [needsInput, suggestion, waiting, overdue]
     const threads = [thread('complete', [needsInput, suggestion, completedOnly], 'completed'), thread('failed', [threadOnly, threadOnly])]
-    const expected = { all: [1, 2, 3, 4, 5], 'needs-input': [1], blocked: [3, 4], suggestions: [2] } satisfies Record<InboxFilter, number[]>
-    for (const filter of ['all', 'needs-input', 'blocked', 'suggestions'] satisfies InboxFilter[]) {
+    const expected = { all: [1, 2, 3, 4, 5, 6], 'needs-input': [1], blocked: [3, 4], suggestions: [2], overdue: [6] } satisfies Record<InboxFilter, number[]>
+    for (const filter of ['all', 'needs-input', 'blocked', 'suggestions', 'overdue'] satisfies InboxFilter[]) {
       const rows = inboxRows({ items: sources, threads, filter })
       expect(rows.map(row => row.item.id).sort()).toEqual(expected[filter])
       expect(rows).toHaveLength(new Set(rows.map(row => row.item.id)).size)

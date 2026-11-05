@@ -3,6 +3,7 @@ import { Effect, Schema, SchemaGetter } from 'effect'
 import { AgentConfirmation } from './agent-confirmation.js'
 import { BacklogBackfill } from './backfill.js'
 import { BacklogReference } from './backlog-reference.js'
+import { DueDates } from './due-date.js'
 import { BacklogItems } from './item.js'
 import { BacklogShipped } from './shipped.js'
 import { BacklogProviders } from './provider-port.js'
@@ -141,6 +142,9 @@ const summarySchema = Schema.Struct({
   criteriaProgress: Schema.Struct({ total: countSchema, done: countSchema }).pipe(Schema.withDecodingDefaultKey(Effect.succeed({ total: 0, done: 0 }))),
   /** `pending` while the plan waits for the user's approval. */
   planApproval: nullDefault(BacklogItems.planApprovalSchema),
+  /** The date it is due, and whether it is past while still open (from the Host's calendar). */
+  due: nullDefault(Schema.String),
+  overdue: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
 })
 
 const detailSchema = Schema.Struct({
@@ -183,7 +187,7 @@ const actorFilterSchema = Schema.Union([Schema.Literal(''), BacklogItems.actorId
 const listInputSchema = Schema.Struct({
   query: Schema.String.check(Schema.isMaxLength(500)).pipe(Schema.optional).annotate({
     description:
-      'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent (touched by) created:me|agent|system (captured by) has:thread|revision|url|children|parent updated:<7d updated:>30d priority:urgent|high|medium|low|none parent:b:k3f9 is:ready is:blocked-by-deps is:delegated is:claimed delegate:agent has:criteria|plan|summary is:plan-pending. A leading - negates any operator or word (-created:agent, -kind:note, -#tag, -priority:none). Results rank by relevance and say which fields matched.',
+      'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent (touched by) created:me|agent|system (captured by) has:thread|revision|url|children|parent updated:<7d updated:>30d priority:urgent|high|medium|low|none parent:b:k3f9 is:ready is:blocked-by-deps is:delegated is:claimed delegate:agent has:criteria|plan|summary|due is:plan-pending is:overdue due:<7d due:>30d. A leading - negates any operator or word (-created:agent, -kind:note, -#tag, -priority:none). Results rank by relevance and say which fields matched.',
   }),
   statuses: Schema.Array(BacklogItems.statusSchema).pipe(Schema.optional),
   kinds: Schema.Array(BacklogItems.kindSchema).pipe(Schema.optional),
@@ -610,6 +614,7 @@ export const backlogApi = defineApi({
           .pipe(Schema.optional)
           .annotate({ description: 'urgent, high, medium, low or none; overrides a `!1`…`!4` written in the text.' }),
         parent: refTextSchema.pipe(Schema.optional).annotate({ description: 'Capture it as a sub-issue of this item (`b:k3f9`); three levels deep at most.' }),
+        due: DueDates.schema.pipe(Schema.optional).annotate({ description: 'The date it is due, YYYY-MM-DD with no time.' }),
         files: Schema.Array(fileInputSchema)
           .check(Schema.isMaxLength(BacklogItems.maxAttachments))
           .pipe(Schema.optional)
@@ -735,6 +740,9 @@ export const backlogApi = defineApi({
             description:
               '`pending` asks the user to approve the plan before you start: the item asks for input until they approve. Only the user can set `approved`; wait for it.',
           }),
+        due: Schema.NullOr(DueDates.schema)
+          .pipe(Schema.optional)
+          .annotate({ description: 'The date it is due, YYYY-MM-DD with no time, or null to clear it. Open items past it show as overdue in the Inbox.' }),
         summary: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars)))
           .pipe(Schema.optional)
           .annotate({ description: 'Final summary of what was done, written when closing the item; Shipped shows it.' }),

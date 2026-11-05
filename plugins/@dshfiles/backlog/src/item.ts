@@ -1,6 +1,7 @@
 import { Effect, Schema } from 'effect'
 
 import { BacklogReference } from './backlog-reference.js'
+import { DueDates } from './due-date.js'
 
 const DAY_MS = 86_400_000
 const MAX_TITLE_CHARS = 200
@@ -36,6 +37,7 @@ const humanFieldNames = [
   'plan',
   'planApproval',
   'summary',
+  'due',
 ] as const
 const MAX_CRITERIA = 50
 const MAX_CRITERION_CHARS = 500
@@ -175,6 +177,8 @@ const itemSchema = Schema.Struct({
   planApproval: Schema.optionalKey(planApprovalSchema),
   /** What was done, written when the item closes; Shipped shows it. */
   summary: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(MAX_BODY_CHARS))),
+  /** The date it is due, without a time; overdue while open past it. */
+  due: Schema.optionalKey(DueDates.schema),
 })
 
 export type BacklogPriority = typeof prioritySchema.Type

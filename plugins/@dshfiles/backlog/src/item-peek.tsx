@@ -72,7 +72,9 @@ import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { submitReply } from './reply-submission.js'
 import type { AgentContinuationSelection, AgentContinuationThread } from './agent-dispatch.js'
 import { ItemPickers } from './item-pickers.js'
+import { DueDates } from './due-date.js'
 import { PeekSections } from './peek-sections.js'
+import { BacklogNotices } from './notices.js'
 import { PeekWork } from './peek-work.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { BacklogTextBox } from './text-box.js'
@@ -1311,6 +1313,12 @@ const PeekBody = (props: {
                   projects={props.projectPaths}
                   onPick={project => actions.update.mutate({ id: item.id, project })}
                 />
+                <ItemPickers.Due
+                  itemLabel={BacklogReference.labelOf(item)}
+                  due={item.due ?? null}
+                  overdue={DueDates.isOverdue({ due: item.due, status: item.status, today: DueDates.dateOf(Date.now()) })}
+                  onPick={due => actions.update.mutate({ id: item.id, due }, { onError: BacklogNotices.failure('The due date was not saved.') })}
+                />
                 <ItemPickers.Attention
                   itemLabel={BacklogReference.labelOf(item)}
                   attention={item.attention ?? 'none'}
@@ -1474,6 +1482,8 @@ const placeholderDetail = (summary: BacklogSummaryView) => {
     owner: _owner,
     criteriaProgress: _criteriaProgress,
     planApproval,
+    due,
+    overdue: _overdue,
     ...fields
   } = summary
   return {
@@ -1482,6 +1492,7 @@ const placeholderDetail = (summary: BacklogSummaryView) => {
       ...(parent !== null && { parent }),
       ...(delegate !== null && { delegate }),
       ...(planApproval !== null && { planApproval }),
+      ...(due !== null && { due }),
       body: summary.preview,
       tweetContextUrls: summary.tweetContextUrls ?? [],
       humanFields: [],

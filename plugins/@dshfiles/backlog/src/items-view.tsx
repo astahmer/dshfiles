@@ -38,8 +38,9 @@ import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { itemTransitionName } from './view-transition.js'
 import { BacklogReference } from './backlog-reference.js'
+import { DueDates } from './due-date.js'
 
-type GroupBy = 'status' | 'kind' | 'project' | 'attention' | 'priority' | 'parent'
+type GroupBy = 'status' | 'kind' | 'project' | 'attention' | 'priority' | 'parent' | 'due'
 type Entry =
   | { readonly kind: 'header'; readonly key: string; readonly group: Group }
   | { readonly kind: 'row'; readonly key: string; readonly item: BacklogSummaryView }
@@ -52,8 +53,22 @@ const groupLabels = {
   attention: 'Attention',
   priority: 'Priority',
   parent: 'Parent',
+  due: 'Due date',
 } satisfies Record<GroupBy, string>
-const groupByValues = ['status', 'priority', 'kind', 'project', 'attention', 'parent'] as const satisfies readonly GroupBy[]
+const groupByValues = ['status', 'priority', 'kind', 'project', 'attention', 'parent', 'due'] as const satisfies readonly GroupBy[]
+/** Due-date buckets, nearest first: what an overdue sweep reads top-down. */
+const dueBuckets = ['overdue', 'today', 'week', 'later', 'none'] as const
+const dueBucketLabels = { overdue: 'Overdue', today: 'Today', week: 'Next 7 days', later: 'Later', none: 'No due date' } satisfies Record<
+  (typeof dueBuckets)[number],
+  string
+>
+const dueBucketOf = (item: BacklogSummaryView, today: string): (typeof dueBuckets)[number] => {
+  if (item.due === null) return 'none'
+  if (item.overdue) return 'overdue'
+  const days = DueDates.daysBetween(today, item.due)
+  if (days <= 0) return 'today'
+  return days <= 7 ? 'week' : 'later'
+}
 const groupByOf = (value: string): GroupBy => groupByValues.find(candidate => candidate === value) ?? 'status'
 /** Ready items by priority, in the panel's Ready view. */
 const readyPriorities = ['urgent', 'high', 'medium', 'low', 'none'] as const satisfies readonly BacklogPriority[]
@@ -116,6 +131,15 @@ const groupsOf = (items: readonly BacklogSummaryView[], by: GroupBy): Group[] =>
           </>
         ),
       items: items.filter(item => (item.parent ?? '') === parent),
+    }))
+  }
+  if (by === 'due') {
+    const today = DueDates.dateOf(Date.now())
+    return dueBuckets.map(bucket => ({
+      key: bucket,
+      status: null,
+      label: <span className={bucket === 'overdue' ? 'dshx:text-destructive' : undefined}>{dueBucketLabels[bucket]}</span>,
+      items: items.filter(item => dueBucketOf(item, today) === bucket),
     }))
   }
   if (by === 'attention')
@@ -263,6 +287,9 @@ const Row = (props: {
           {item.pinned ? <PinIcon aria-label="Pinned" className="dshx:size-3 dshx:shrink-0 dshx:fill-current dshx:text-warning" /> : null}
           <ItemGlyphs.AttentionBadge attention={item.attention} compact />
           <WorkGlyphs.ProgressBadge progress={item.children} />
+          <WorkGlyphs.CriteriaBadge progress={item.criteriaProgress} />
+          <WorkGlyphs.PlanPendingBadge approval={item.planApproval} />
+          <WorkGlyphs.DueChip due={item.due} overdue={item.overdue} compact />
           <WorkGlyphs.BlockedBadge blockedBy={item.blockedBy} />
           <WorkGlyphs.ClaimChip lease={item.lease} compact />
           <WorkGlyphs.RunStateChip run={run} compact />

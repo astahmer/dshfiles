@@ -29,6 +29,7 @@ const filters: readonly { readonly value: InboxFilter; readonly label: string }[
   { value: 'needs-input', label: 'Needs you' },
   { value: 'blocked', label: 'Blocked' },
   { value: 'suggestions', label: 'Suggestions' },
+  { value: 'overdue', label: 'Overdue' },
 ]
 
 /** Read is not done: an acknowledged request stays here until its attention is cleared. */
@@ -45,6 +46,7 @@ const headline = (item: BacklogSummaryView): ReactNode => {
     )
   if (item.attention === 'blocked') return <>{title} is blocked</>
   if (item.attention === 'waiting') return <>{title} is waiting</>
+  if (item.proposal === null && item.overdue) return <>{title} is overdue (due {item.due})</>
   return <>Triage has a suggestion for {title}</>
 }
 
@@ -239,7 +241,7 @@ export const InboxView = (props: {
                     <span className="dshx:font-mono!">{BacklogReference.labelOf(item)}</span>· {ItemGlyphs.ago(item.lastActivityAt)}
                   </p>
                 </div>
-                {hasItemReason ? (
+                {hasItemReason && (item.attention !== 'none' || item.proposal !== null) ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button

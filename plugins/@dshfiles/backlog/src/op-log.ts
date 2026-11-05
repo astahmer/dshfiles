@@ -58,6 +58,7 @@ const setOpSchema = Schema.Union([
   setOf('plan', Schema.String),
   setOf('planApproval', BacklogItems.planApprovalSchema),
   setOf('summary', Schema.String),
+  setOf('due', Schema.String),
 ])
 
 const optionalFields = [
@@ -73,6 +74,7 @@ const optionalFields = [
   'plan',
   'planApproval',
   'summary',
+  'due',
 ] as const
 type OptionalField = (typeof optionalFields)[number]
 
@@ -222,6 +224,9 @@ const applySet = (item: MutableItem, op: typeof setOpSchema.Type): void => {
       return
     case 'summary':
       item.summary = op.value
+      return
+    case 'due':
+      item.due = op.value
   }
 }
 
@@ -262,6 +267,9 @@ const unsetField = (item: MutableItem, field: OptionalField): void => {
       return
     case 'summary':
       delete item.summary
+      return
+    case 'due':
+      delete item.due
   }
 }
 
@@ -375,6 +383,8 @@ const setOpFor = (
       return next.planApproval === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.planApproval }
     case 'summary':
       return next.summary === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.summary }
+    case 'due':
+      return next.due === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.due }
   }
 }
 

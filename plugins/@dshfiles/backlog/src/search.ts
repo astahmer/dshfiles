@@ -1,5 +1,6 @@
 import { BacklogItems, type BacklogItem, type BacklogLink, type BacklogPriority } from './item.js'
 import { BacklogReference } from './backlog-reference.js'
+import { DueDates } from './due-date.js'
 
 const DAY_MS = 86_400_000
 const SNIPPET_RADIUS = 60
@@ -10,7 +11,7 @@ type MatchField = 'id' | 'title' | 'tag' | 'body' | 'comment' | 'link' | 'projec
 const fieldWeights = { id: 12, title: 8, tag: 6, project: 3, link: 3, body: 2, capture: 1.5, comment: 1 } satisfies Record<MatchField, number>
 
 type ActorKind = 'user' | 'agent' | 'system'
-type SearchState = 'ready' | 'blocked-by-deps' | 'delegated' | 'claimed' | 'children' | 'parent' | 'criteria' | 'plan' | 'summary' | 'plan-pending'
+type SearchState = 'ready' | 'blocked-by-deps' | 'delegated' | 'claimed' | 'children' | 'parent' | 'criteria' | 'plan' | 'summary' | 'plan-pending' | 'overdue' | 'due'
 
 /** What an operator needs from the other items: readiness, blockers, sub-issues and claims are not on the item itself. */
 export interface SearchContext {
@@ -18,9 +19,11 @@ export interface SearchContext {
   readonly isBlockedByDeps: (item: BacklogItem) => boolean
   readonly hasChildren: (item: BacklogItem) => boolean
   readonly isClaimed: (item: BacklogItem) => boolean
+  /** The calendar date the search reads at, for due-date operators. */
+  readonly today: string
 }
 
-const noContext: SearchContext = { isReady: () => false, isBlockedByDeps: () => false, hasChildren: () => false, isClaimed: () => false }
+const noContext: SearchContext = { isReady: () => false, isBlockedByDeps: () => false, hasChildren: () => false, isClaimed: () => false, today: '' }
 
 /** The operator part of a query: every list narrows on its own, and a negated copy excludes what it matches. */
 interface SearchFilters {
@@ -44,6 +47,10 @@ interface SearchFilters {
   readonly delegates: readonly ActorKind[]
   readonly updatedWithinDays: number | null
   readonly olderThanDays: number | null
+  /** `due:<7d`: due within that many days from today, overdue included. */
+  readonly dueWithinDays: number | null
+  /** `due:>30d`: due later than that many days from today. */
+  readonly dueAfterDays: number | null
 }
 
 export interface SearchQuery extends SearchFilters {
@@ -83,6 +90,7 @@ const stateWords = new Map<string, SearchState>([
   ['delegated', 'delegated'],
   ['claimed', 'claimed'],
   ['plan-pending', 'plan-pending'],
+  ['overdue', 'overdue'],
 ])
 /** `has:` words about the item's own sections rather than its links. */
 const sectionWords = new Map<string, SearchState>([
@@ -91,6 +99,7 @@ const sectionWords = new Map<string, SearchState>([
   ['criteria', 'criteria'],
   ['plan', 'plan'],
   ['summary', 'summary'],
+  ['due', 'due'],
 ])
 const actorWords = new Map<string, ActorKind>([
   ['me', 'user'],
@@ -115,6 +124,8 @@ const emptyFilters = (): MutableFilters => ({
   delegates: [],
   updatedWithinDays: null,
   olderThanDays: null,
+  dueWithinDays: null,
+  dueAfterDays: null,
 })
 
 const addToken = (filters: MutableFilters, token: string): void => {
@@ -137,7 +148,11 @@ const addToken = (filters: MutableFilters, token: string): void => {
   else if (key === 'priority' && priority !== undefined) filters.priorities.push(priority)
   else if (key === 'parent' && BacklogReference.parse(value) !== undefined) filters.parents.push(BacklogReference.parse(value) ?? '')
   else if (key === 'delegate' && actor !== undefined) filters.delegates.push(actor)
-  else if (key === 'updated' && /^[<>]\d+d$/.test(value)) {
+  else if (key === 'due' && /^[<>]\d+d$/.test(value)) {
+    const days = Number(value.slice(1, -1))
+    if (value.startsWith('<')) filters.dueWithinDays = days
+    else filters.dueAfterDays = days
+  } else if (key === 'updated' && /^[<>]\d+d$/.test(value)) {
     const days = Number(value.slice(1, -1))
     if (value.startsWith('<')) filters.updatedWithinDays = days
     else filters.olderThanDays = days
@@ -148,7 +163,7 @@ const addToken = (filters: MutableFilters, token: string): void => {
  * Free text plus operators, all optional and combinable: `kind:bug`, `status:doing`, `is:blocked` (kind, status or
  * attention), `#tag`, `project:welii`, `by:agent` (touched by), `created:me` (captured by), `has:thread`,
  * `updated:<7d`, `updated:>30d`, `priority:high`, `parent:b:k3f9`, `has:children`, `is:ready`, `is:blocked-by-deps`,
- * `is:delegated`, `is:claimed`, `delegate:agent`, `has:criteria`, `has:plan`, `has:summary`, `is:plan-pending`. Quoted text is one term. A leading `-` negates any of them, words included.
+ * `is:delegated`, `is:claimed`, `delegate:agent`, `has:criteria`, `has:plan`, `has:summary`, `is:plan-pending`, `has:due`, `is:overdue`, `due:<7d`, `due:>30d`. Quoted text is one term. A leading `-` negates any of them, words included.
  */
 const parse = (raw: string): SearchQuery => {
   const included = emptyFilters()
@@ -206,10 +221,18 @@ const inState = (item: BacklogItem, state: SearchState, context: SearchContext):
       return item.summary !== undefined
     case 'plan-pending':
       return item.planApproval === 'pending'
+    case 'due':
+      return item.due !== undefined
+    case 'overdue':
+      return DueDates.isOverdue({ due: item.due, status: item.status, today: context.today })
   }
 }
 const updatedWithin = (item: BacklogItem, days: number, now: number): boolean => now - item.lastActivityAt <= days * DAY_MS
 const idleFor = (item: BacklogItem, days: number, now: number): boolean => now - item.lastActivityAt >= days * DAY_MS
+const dueWithin = (item: BacklogItem, days: number, today: string): boolean =>
+  item.due !== undefined && today !== '' && DueDates.daysBetween(today, item.due) <= days
+const dueAfter = (item: BacklogItem, days: number, today: string): boolean =>
+  item.due !== undefined && today !== '' && DueDates.daysBetween(today, item.due) > days
 const termHits = (item: BacklogItem, term: string): boolean =>
   sourcesOf(item).some(([field, texts]) => (field === 'id' ? texts.includes(term) : texts.some(text => text.toLowerCase().includes(term))))
 
@@ -229,6 +252,8 @@ const passesFilters = (item: BacklogItem, query: SearchQuery, now: number, conte
   if (query.delegates.some(kind => !delegatedTo(item, kind))) return false
   if (query.updatedWithinDays !== null && !updatedWithin(item, query.updatedWithinDays, now)) return false
   if (query.olderThanDays !== null && !idleFor(item, query.olderThanDays, now)) return false
+  if (query.dueWithinDays !== null && !dueWithin(item, query.dueWithinDays, context.today)) return false
+  if (query.dueAfterDays !== null && !dueAfter(item, query.dueAfterDays, context.today)) return false
   return !isExcluded(item, query.excluded, now, context)
 }
 
@@ -247,6 +272,8 @@ const isExcluded = (item: BacklogItem, excluded: SearchFilters, now: number, con
   excluded.delegates.some(kind => delegatedTo(item, kind)) ||
   (excluded.updatedWithinDays !== null && updatedWithin(item, excluded.updatedWithinDays, now)) ||
   (excluded.olderThanDays !== null && idleFor(item, excluded.olderThanDays, now)) ||
+  (excluded.dueWithinDays !== null && dueWithin(item, excluded.dueWithinDays, context.today)) ||
+  (excluded.dueAfterDays !== null && dueAfter(item, excluded.dueAfterDays, context.today)) ||
   excluded.terms.some(term => termHits(item, term))
 
 /**

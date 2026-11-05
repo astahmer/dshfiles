@@ -15,7 +15,7 @@ import {
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { CopyIcon, FolderIcon, LinkIcon, LockOpenIcon, MessagesSquareIcon, PinIcon, Trash2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { CalendarIcon, CopyIcon, FolderIcon, LinkIcon, LockOpenIcon, MessagesSquareIcon, PinIcon, Trash2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
 
@@ -32,6 +32,7 @@ import { BacklogTweetContext } from './backlog-tweet-context.js'
 import { BacklogNotices } from './notices.js'
 import { BacklogSyncControls } from './sync-controls.js'
 import { BacklogReference } from './backlog-reference.js'
+import { DueDates } from './due-date.js'
 
 const NO_PROJECT = 'no-project'
 type BacklogMenuItem = Pick<
@@ -193,6 +194,24 @@ export const BacklogItemMenu = (props: {
                   </ContextMenuRadioItem>
                 ))}
               </ContextMenuRadioGroup>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+              <CalendarIcon aria-hidden className="dshx:size-3.5" />
+              Due date
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="dshx-root dshx:min-w-52">
+              {ItemPickers.dueShortcuts(DueDates.dateOf(Date.now())).map(shortcut => (
+                <ContextMenuItem key={shortcut.label} className="dshx:gap-2 dshx:text-[13px]" onSelect={() => update({ due: shortcut.due })}>
+                  {shortcut.label}
+                  <ContextMenuShortcut>{shortcut.due}</ContextMenuShortcut>
+                </ContextMenuItem>
+              ))}
+              <ContextMenuSeparator />
+              <ContextMenuItem className="dshx:text-[13px]" onSelect={() => update({ due: null })}>
+                Clear due date
+              </ContextMenuItem>
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSub>

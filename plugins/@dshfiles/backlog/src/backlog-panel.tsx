@@ -105,7 +105,7 @@ const viewIcons = {
   shipped: RocketIcon,
 } as const
 
-const sortOrderSchema = Schema.Literals(['updated', 'created', 'priority'])
+const sortOrderSchema = Schema.Literals(['updated', 'created', 'priority', 'due'])
 const defaultSort = { feed: 'updated', inbox: 'updated', items: 'updated' } as const
 
 /** Each view, and the full search results, keeps its own "Hide agent items" choice; hiding is the default. */
@@ -113,13 +113,18 @@ type AgentItemsScope = View | 'search'
 const hideAgentItemsDefaults = { feed: true, inbox: true, ready: true, items: true, board: true, projects: true, shipped: true, search: true } as const
 const hiddenByDefault = Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(true)))
 
-const sortOrders = ['updated', 'created', 'priority'] as const
-const sortLabels = { updated: 'Last update', created: 'Created', priority: 'Priority' } satisfies Record<BacklogSort, string>
-const sortNames = { updated: 'last update', created: 'creation date', priority: 'priority, then oldest' } satisfies Record<BacklogSort, string>
+const sortOrders = ['updated', 'created', 'priority', 'due'] as const
+const sortLabels = { updated: 'Last update', created: 'Created', priority: 'Priority', due: 'Due date' } satisfies Record<BacklogSort, string>
+const sortNames = {
+  updated: 'last update',
+  created: 'creation date',
+  priority: 'priority, then oldest',
+  due: 'due date, soonest first',
+} satisfies Record<BacklogSort, string>
 
 const preferencesSchema = Schema.Struct({
   view: Schema.Literals(views),
-  groupBy: Schema.Literals(['status', 'kind', 'project', 'attention', 'priority', 'parent']),
+  groupBy: Schema.Literals(['status', 'kind', 'project', 'attention', 'priority', 'parent', 'due']),
   showDormant: Schema.Boolean,
   statuses: Schema.Array(Schema.Literals(BacklogItems.statuses)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   project: Schema.NullOr(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null))),
