@@ -1,8 +1,7 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
-import { EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
+import { ActivityFeed, type ActivityActor, type ActivityFeedEvent } from '@dshfiles/plugin-ui/components/motion/activity-feed'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
-import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
@@ -18,7 +17,7 @@ import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import type { ActivityEvent, ActivityLevel, ActivitySource, CondensedItem } from './types.js'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { activityTimelineApi } from './api.js'
 import { createFeedHistory, mergeFeedItems } from './feed-history.js'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -33,8 +32,14 @@ const NO_ITEMS: readonly CondensedItem[] = []
 /** Dark cockpit: only attention gets colour; the source stays a neutral chip. */
 const badgeVariant = (item: CondensedItem): 'outline' | 'destructive' => (item.level === 'attention' ? 'destructive' : 'outline')
 
-/** Attention events are agent errors and failed or blocked work, so they read as Failed; the rest are informational. */
-const itemStatus = (item: CondensedItem): WorkStatus => (item.level === 'attention' ? 'failed' : 'idle')
+const SOURCE_INITIALS = { session: 'AG', communication: 'CO', integration: 'JJ', workspace: 'WS', system: 'SY' } as const satisfies Record<
+  ActivitySource,
+  string
+>
+
+const formatDay = (at: number): string => new Date(at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+
+const formatClock = (at: number): string => new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
 /**
  * A clock alone is ambiguous the moment a timeline spans more than one day:
@@ -43,38 +48,46 @@ const itemStatus = (item: CondensedItem): WorkStatus => (item.level === 'attenti
  */
 const formatTime = (at: number, now: number = Date.now()): string => {
   const date = new Date(at)
-  const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const time = formatClock(at)
   if (date.toDateString() === new Date(now).toDateString()) return time
-  return `${date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })} ${time}`
+  return `${formatDay(at)} ${time}`
 }
 
 /** The unambiguous spelling, for a hover or an event detail. */
 const formatExact = (at: number): string => new Date(at).toLocaleString()
 
-const ActivityRow = (props: {
+/** Rows group under their day, so each row keeps only its clock; attention is the one actor tile with colour. */
+const feedEvent = (props: {
   readonly item: CondensedItem
   readonly selected: boolean
   readonly t: ActivityTimelineTranslate
   readonly sessionLabel: (sessionId: string) => string
-  readonly onSelect: (item: CondensedItem) => void
-}): JSX.Element => (
-  <EntityRow
-    status={itemStatus(props.item)}
-    statusDecorative
-    selected={props.selected}
-    onSelect={() => props.onSelect(props.item)}
-    heading={props.item.summary}
-    meta={
+  readonly today: string
+}): ActivityFeedEvent => {
+  const item = props.item
+  const actor: ActivityActor = {
+    name: props.t(item.source),
+    initials: SOURCE_INITIALS[item.source],
+    tone: item.level === 'attention' ? 'destructive' : 'muted',
+  }
+  const day = formatDay(item.at)
+  return {
+    id: item.id,
+    actor,
+    summary: item.summary,
+    time: formatClock(item.at),
+    dateTime: new Date(item.at).toISOString(),
+    group: day === props.today ? props.t('today') : day,
+    selected: props.selected,
+    meta: (
       <>
-        <Badge variant={badgeVariant(props.item)}>{props.t(props.item.source)}</Badge>
-        {props.item.count > 1 ? <Badge variant="outline">{props.item.count}×</Badge> : null}
-        <span title={formatExact(props.item.at)}>{formatTime(props.item.at)}</span>
-        {props.item.sessionId === null ? null : <span className="dshx:truncate">{props.sessionLabel(props.item.sessionId)}</span>}
-        {props.item.correlationId === null ? null : <span>correlation {props.item.correlationId}</span>}
+        <Badge variant={badgeVariant(item)}>{props.t(item.source)}</Badge> {item.count > 1 ? <Badge variant="outline">{item.count}×</Badge> : null}{' '}
+        {item.sessionId === null ? null : <span className="dshx:min-w-0 dshx:truncate">{props.sessionLabel(item.sessionId)}</span>}{' '}
+        {item.correlationId === null ? null : <span className="dshx:truncate">correlation {item.correlationId}</span>}
       </>
-    }
-  />
-)
+    ),
+  }
+}
 
 export const ActivityTimelinePanel = (props: {
   readonly sessions: ISessions
@@ -197,6 +210,13 @@ export const ActivityTimelinePanel = (props: {
     return merged
   }, [older, newestItems])
   const newestId = items.length === 0 ? null : (items[items.length - 1]?.id ?? null)
+  const today = formatDay(feedQuery.dataUpdatedAt)
+  const feedEvents = useMemo(
+    () => items.map(item => feedEvent({ item, selected: selected?.id === item.id, t, sessionLabel, today })),
+    [items, selected?.id, t, sessionLabel, today],
+  )
+  const itemsById = useMemo(() => new Map(items.map(item => [item.id, item])), [items])
+  const selectFeedEvent = useCallback((event: ActivityFeedEvent) => setSelected(itemsById.get(event.id) ?? null), [itemsById])
 
   useEffect(() => {
     setNavigationError('')
@@ -342,9 +362,7 @@ export const ActivityTimelinePanel = (props: {
                 <EmptyState>{debouncedSearch.length === 0 && sources.length === 0 && !attentionOnly ? t('noActivity') : t('noMatch')}</EmptyState>
               ) : null}
               <div key="activity-older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
-              {items.map(item => (
-                <ActivityRow key={item.id} item={item} selected={selected?.id === item.id} t={t} sessionLabel={sessionLabel} onSelect={setSelected} />
-              ))}
+              <ActivityFeed events={feedEvents} emptyLabel={null} onSelectEvent={selectFeedEvent} />
             </div>
             {olderMutation.isPending ? (
               <p className="dshx:p-1 dshx:text-xs dshx:text-muted-foreground" role="status">

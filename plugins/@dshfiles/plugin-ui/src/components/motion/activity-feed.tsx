@@ -16,18 +16,26 @@ export interface ActivityFeedEvent {
   readonly id: string
   readonly actor: ActivityActor
   /** "completed", "moved", "commented on". */
-  readonly verb: string
+  readonly verb?: string
   /** The thing acted on, shown bold. */
-  readonly target: string
+  readonly target?: string
   /** Optional second object: "to" + "Review". */
   readonly preposition?: string
   readonly destination?: string
   /** Where it happened ("Mobile App"), shown as "in …". */
   readonly scope?: string
+  /** A ready-made line ("Agent reported an error") shown instead of actor · verb · target. */
+  readonly summary?: string
   /** Relative time label ("5d ago"). */
   readonly time: string
+  /** Machine-readable instant for the `<time>` element. */
+  readonly dateTime?: string
   /** Section heading this event belongs to ("This week", "Earlier"); sections keep first-appearance order. */
   readonly group: string
+  /** Chips after the sentence (source, count, thread), before the time. */
+  readonly meta?: React.ReactNode
+  /** The row is the one an adjacent detail pane shows. */
+  readonly selected?: boolean
 }
 
 export interface ActivityFeedProps<F extends string> extends Omit<React.HTMLAttributes<HTMLElement>, 'onSelect'> {
@@ -40,7 +48,8 @@ export interface ActivityFeedProps<F extends string> extends Omit<React.HTMLAttr
   /** Groups whose rows read as older (dimmer times). */
   readonly quietGroups?: readonly string[]
   readonly onSelectEvent?: (event: ActivityFeedEvent) => void
-  readonly emptyLabel?: string
+  /** `null` renders nothing, for a caller that shows its own empty or loading state. */
+  readonly emptyLabel?: React.ReactNode
 }
 
 const noGroups: readonly string[] = []
@@ -114,7 +123,7 @@ export function ActivityFeed<F extends string>({
           {actions}
         </div>
       ) : null}
-      {events.length === 0 ? <p className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">{emptyLabel}</p> : null}
+      {events.length === 0 && emptyLabel !== null ? <p className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">{emptyLabel}</p> : null}
       <PresenceList as="div" role="feed" aria-label="Activity" className="dshx:flex dshx:flex-col" enter="dropIn" items={items} />
     </section>
   )
@@ -129,19 +138,22 @@ function FeedRow({
   readonly quiet: boolean
   readonly onSelect: ((event: ActivityFeedEvent) => void) | undefined
 }) {
-  const sentence = (
-    <>
-      <span className="dshx:font-medium dshx:text-foreground">{event.actor.name}</span> {event.verb}{' '}
-      <span className="dshx:font-medium dshx:text-foreground">{event.target}</span>
-      {event.preposition && event.destination ? (
-        <>
-          {' '}
-          {event.preposition} <span className="dshx:text-foreground">{event.destination}</span>
-        </>
-      ) : null}
-      {event.scope ? <> in {event.scope}</> : null}
-    </>
-  )
+  const sentence =
+    event.summary !== undefined ? (
+      <span className="dshx:text-foreground">{event.summary}</span>
+    ) : (
+      <>
+        <span className="dshx:font-medium dshx:text-foreground">{event.actor.name}</span> {event.verb}{' '}
+        <span className="dshx:font-medium dshx:text-foreground">{event.target}</span>
+        {event.preposition && event.destination ? (
+          <>
+            {' '}
+            {event.preposition} <span className="dshx:text-foreground">{event.destination}</span>
+          </>
+        ) : null}
+        {event.scope ? <> in {event.scope}</> : null}
+      </>
+    )
   const body = (
     <>
       <span
@@ -153,8 +165,18 @@ function FeedRow({
       >
         {event.actor.initials}
       </span>
-      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left dshx:text-muted-foreground">{sentence}</span>
+      <span data-slot="activity-feed-sentence" className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left dshx:text-muted-foreground">
+        {sentence}
+      </span>{' '}
+      {event.meta === undefined ? null : (
+        <>
+          <span className="dshx:flex dshx:min-w-0 dshx:shrink dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
+            {event.meta}
+          </span>{' '}
+        </>
+      )}
       <time
+        dateTime={event.dateTime}
         className={cn(
           'dshx:shrink-0 dshx:text-xs dshx:whitespace-nowrap dshx:tabular-nums',
           quiet ? 'dshx:text-muted-foreground/50' : 'dshx:text-muted-foreground',
@@ -164,11 +186,15 @@ function FeedRow({
       </time>
     </>
   )
-  const rowClass =
-    'dshx:flex dshx:w-full dshx:items-center dshx:gap-2.5 dshx:rounded-md dshx:px-1.5 dshx:py-1.5 dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/60'
+  const rowClass = cn(
+    'dshx:flex dshx:w-full dshx:items-center dshx:gap-2.5 dshx:rounded-md dshx:px-1.5 dshx:py-1.5 dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/60',
+    event.selected === true && 'dshx:bg-accent',
+  )
   return onSelect ? (
     <button
       type="button"
+      aria-current={event.selected === true ? 'true' : undefined}
+      data-selected={event.selected === true ? '' : undefined}
       onClick={() => onSelect(event)}
       className={cn(rowClass, 'dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50')}
     >
