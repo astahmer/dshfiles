@@ -157,10 +157,12 @@ describe('durable Agent communication', () => {
     ])
 
     const reopened = createCommunicationService({ statePath: path, now: () => now })
-    expect(await reopened.inbox({ principal: recipient, topic: 'inbox' })).toMatchObject([{ id: message.id }])
+    // A plain read returns only messages not shown yet; an earlier, un-acknowledged one comes back with includeSeen.
+    expect(await reopened.inbox({ principal: recipient, topic: 'inbox' })).toEqual([])
+    expect(await reopened.inbox({ principal: recipient, topic: 'inbox', includeSeen: true })).toMatchObject([{ id: message.id }])
     expect(await reopened.acknowledge(recipient, message.id)).toEqual({ acknowledged: true })
     expect(await reopened.acknowledge(recipient, message.id)).toEqual({ acknowledged: false })
-    expect(await reopened.inbox({ principal: recipient })).toEqual([])
+    expect(await reopened.inbox({ principal: recipient, includeSeen: true })).toEqual([])
     await expect(reopened.acknowledge(sender, message.id)).rejects.toThrow('Message is not present in this subscriber inbox.')
   })
 
