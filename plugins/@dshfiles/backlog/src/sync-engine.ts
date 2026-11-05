@@ -197,6 +197,9 @@ export class BacklogSyncEngine extends Context.Service<
           priority: item.priority ?? 'none',
           ...(parent !== undefined && { parent }),
           links: links.flat(),
+          due: item.due ?? null,
+          criteria: BacklogSyncModel.criteriaLines(item.criteria ?? []),
+          summary: item.summary ?? '',
         } satisfies SyncSnapshot
       })
 
@@ -302,6 +305,9 @@ export class BacklogSyncEngine extends Context.Service<
           ...(input.pull.status !== undefined && { status: input.pull.status }),
           ...(input.pull.tags !== undefined && { tags: input.pull.tags.slice(0, 20) }),
           ...(input.pull.priority !== undefined && { priority: input.pull.priority }),
+          ...(input.pull.due !== undefined && { due: input.pull.due }),
+          ...(input.pull.criteria !== undefined && { criteria: BacklogSyncModel.criteriaOfLines(input.pull.criteria) }),
+          ...(input.pull.summary !== undefined && { summary: input.pull.summary === '' ? null : input.pull.summary.slice(0, BacklogItems.maxBodyChars) }),
         }
         if (Object.keys(scalars).length > 0)
           yield* store.update({ id: input.item.id, ...scalars, actor: { kind: 'system' }, origin: input.origin }).pipe(Effect.orDie)
@@ -364,6 +370,9 @@ export class BacklogSyncEngine extends Context.Service<
           ...(push.tags !== undefined && { tags: push.tags.map(tag => BacklogSyncModel.remoteLabelOf(rules, 'tags', tag) ?? tag) }),
           ...(push.priority !== undefined && { priority: push.priority }),
           ...(push.parent !== undefined && { parentKey: push.parent }),
+          ...(push.due !== undefined && { due: push.due }),
+          ...(push.criteria !== undefined && { criteria: BacklogSyncModel.criteriaOfLines(push.criteria) }),
+          ...(push.summary !== undefined && { summary: push.summary }),
           ...(push.links !== undefined && {
             relations: push.links.flatMap((entry): RemoteRelation[] => {
               const separator = entry.indexOf(':')
@@ -566,6 +575,9 @@ export class BacklogSyncEngine extends Context.Service<
             ...(status !== null && { status }),
             ...(kind !== undefined && { kind }),
             ...(remote.priority !== undefined && remote.priority !== 'none' && { priority: remote.priority }),
+            ...(remote.due !== undefined && remote.due !== null && { due: remote.due }),
+            ...(remote.criteria !== undefined && remote.criteria.length > 0 && { criteria: BacklogSyncModel.criteriaOfLines(remote.criteria) }),
+            ...(remote.summary !== undefined && remote.summary !== '' && { summary: remote.summary.slice(0, BacklogItems.maxBodyChars) }),
             actor: { kind: 'system' },
             origin,
           })

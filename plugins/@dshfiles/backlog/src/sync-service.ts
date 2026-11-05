@@ -507,6 +507,15 @@ export class BacklogSync extends Context.Service<
               kind: item.kind,
               tags: item.tags,
               ...(item.priority !== undefined && item.priority !== 'none' && { priority: item.priority }),
+              ...(item.due !== undefined && BacklogSyncModel.supports(context.provider.descriptor.capabilities, 'due') && { due: item.due }),
+              ...(item.criteria !== undefined &&
+                item.criteria.length > 0 &&
+                BacklogSyncModel.supports(context.provider.descriptor.capabilities, 'criteria') && {
+                  criteria: item.criteria.map(criterion => ({ text: criterion.text, done: criterion.done })),
+                }),
+              ...(item.summary !== undefined &&
+                item.summary !== '' &&
+                BacklogSyncModel.supports(context.provider.descriptor.capabilities, 'summary') && { summary: item.summary }),
               localRef: BacklogReference.refOf(item),
             },
           }))

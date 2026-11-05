@@ -4,7 +4,7 @@ import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import { LinearMapping } from './provider-linear.js'
-import { BacklogProviderFailed, BacklogProviders, type ProviderDescriptor, type RemoteRecord } from './provider-port.js'
+import { BacklogProviderFailed, BacklogProviders, type ProviderDescriptor, type RemotePatch, type RemoteRecord } from './provider-port.js'
 import { BacklogProviderRegistry, type ExternalProviderClient } from './provider-registry.js'
 import { BacklogStore } from './store.js'
 import { fakeLinear } from './sync-fakes.js'
@@ -109,6 +109,70 @@ describe('the provider registry', () => {
       yield* sync.deleteItem({ id: imported.detail.item.id })
       expect(calls).toEqual(['resolve {"statusProperty":"Stage"}', 'remove page-1 {"statusProperty":"Stage"}'])
     }).pipe(Effect.provide(syncTestLayer({ client: fakeLinear().client, external: [{ owner: '@acme/notion', client: trashingClient(calls) }] })))
+  })
+
+  it.effect('imports and pushes the due date, acceptance criteria and summary a provider carries', () => {
+    const pushed: RemotePatch[] = []
+    const descriptor: ProviderDescriptor = {
+      ...trashingDescriptor,
+      kind: 'notion-extras',
+      capabilities: { ...trashingDescriptor.capabilities, extraFields: ['due', 'criteria', 'summary'] },
+    }
+    const remote: RemoteRecord = {
+      ...page,
+      due: '2026-12-01',
+      criteria: [
+        { text: 'Ships', done: true },
+        { text: 'Documented', done: false },
+      ],
+      summary: 'Done well',
+    }
+    const client: ExternalProviderClient = {
+      ...notionClient([]),
+      describe: () => Effect.succeed({ providers: [descriptor] }),
+      resolve: () => Effect.succeed(remote),
+      fetch: () => Effect.succeed(remote),
+      push: input => {
+        pushed.push(input.patch)
+        return Effect.succeed({
+          ...remote,
+          ...(input.patch.due !== undefined && { due: input.patch.due }),
+          ...(input.patch.criteria !== undefined && { criteria: input.patch.criteria }),
+        })
+      },
+    }
+    return Effect.gen(function* () {
+      const sync = yield* BacklogSync
+      yield* sync.saveConnection({ connection: { instanceId: 'notion', kind: 'notion-extras', label: 'Notion', credential: '', baseUrl: '' } })
+      const saved = yield* sync.saveBinding({ binding: { id: 'roadmap', connectionId: 'notion', container: 'db-1' } })
+      expect(saved.binding.fieldMap.map(rule => rule.field)).toEqual(expect.arrayContaining(['due', 'criteria', 'summary']))
+      const imported = yield* sync.importRemote({ reference: 'https://notion.so/page-1', actor: { kind: 'user' } })
+      expect(imported.detail.item).toMatchObject({
+        due: '2026-12-01',
+        criteria: [expect.objectContaining({ text: 'Ships', done: true }), expect.objectContaining({ text: 'Documented', done: false })],
+        summary: 'Done well',
+      })
+      const store = yield* BacklogStore
+      yield* store.update({
+        id: imported.detail.item.id,
+        due: '2026-12-24',
+        criteria: [
+          { text: 'Ships', done: true },
+          { text: 'Documented', done: true },
+        ],
+        actor: { kind: 'user' },
+      })
+      yield* sync.syncNow({ id: imported.detail.item.id })
+      expect(pushed).toEqual([
+        {
+          due: '2026-12-24',
+          criteria: [
+            { text: 'Ships', done: true },
+            { text: 'Documented', done: true },
+          ],
+        },
+      ])
+    }).pipe(Effect.provide(syncTestLayer({ client: fakeLinear().client, external: [{ owner: '@acme/notion', client }] })))
   })
 
   it.effect('keeps a provider plugin failure code, status and recovery across the Host API instead of a generic refusal', () => {

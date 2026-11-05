@@ -15,6 +15,9 @@ const priorities = ['none', 'urgent', 'high', 'medium', 'low'] as const
 /** The item-to-item relations a provider may express; `parent` is its own field. */
 const relations = ['related', 'depends-on', 'blocks', 'duplicates'] as const
 
+/** Fields beyond the core set a provider may carry; it lists them in `capabilities.extraFields`. */
+const extraFields = ['due', 'criteria', 'summary'] as const
+
 const kindSlug = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]{1,31}$/))
 const shortText = (max: number) => Schema.String.check(Schema.isMaxLength(max))
 const keyText = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(300))
@@ -41,6 +44,8 @@ const capabilitiesSchema = Schema.Struct({
   /** How a pull finds what changed: an `updatedAt` cursor, an ETag poll of a since-filtered list, or a full scan. */
   changeFeed: Schema.Literals(['since-cursor', 'etag-poll', 'full-scan']),
   rateLimit: Schema.NullOr(Schema.Struct({ requestsPerHour: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)) })),
+  /** The due date, acceptance criteria or summary, when the remote has a place for them (a Jira due date, a custom field). */
+  extraFields: Schema.optionalKey(Schema.Array(Schema.Literals(extraFields))),
 })
 
 const optionKey = Schema.String.check(Schema.isPattern(/^[a-z][a-zA-Z0-9]{0,39}$/))
@@ -94,6 +99,11 @@ const identitySchema = Schema.Struct({
 const remoteStatusSchema = Schema.Struct({ category: statusSchema, label: shortText(120), equivalents: Schema.Array(statusSchema) })
 const remoteCommentSchema = Schema.Struct({ id: keyText, body: shortText(40_000), author: shortText(200), createdAt: timestamp })
 const remoteRelationSchema = Schema.Struct({ relation: relationSchema, key: keyText })
+/** A date without a time, `2026-11-05`. */
+const dueSchema = Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/))
+/** One acceptance criterion as text and whether it is met. */
+const criterionSchema = Schema.Struct({ text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(500)), done: Schema.Boolean })
+const criteriaSchema = Schema.Array(criterionSchema).check(Schema.isMaxLength(50))
 
 /** One remote item, already in backlog vocabulary. Optional fields are absent when the provider cannot express them. */
 const recordSchema = Schema.Struct({
@@ -108,6 +118,9 @@ const recordSchema = Schema.Struct({
   priority: Schema.optionalKey(prioritySchema),
   parentKey: Schema.optionalKey(Schema.NullOr(keyText)),
   relations: Schema.optionalKey(Schema.Array(remoteRelationSchema)),
+  due: Schema.optionalKey(Schema.NullOr(dueSchema)),
+  criteria: Schema.optionalKey(criteriaSchema),
+  summary: Schema.optionalKey(shortText(80_000)),
   /** Absent when this read did not load comments; `fetch` loads them. */
   comments: Schema.optionalKey(Schema.Array(remoteCommentSchema)),
   updatedAt: timestamp,
@@ -118,7 +131,7 @@ const recordSchema = Schema.Struct({
 })
 
 /** The fields a sync may ask a provider to read or write. */
-const fields = ['title', 'body', 'status', 'tags', 'priority', 'parent', 'links'] as const
+const fields = ['title', 'body', 'status', 'tags', 'priority', 'parent', 'links', ...extraFields] as const
 const fieldSchema = Schema.Literals(fields)
 
 /** What to write; absent fields stay as they are. `relations` and `tags` replace the whole set. */
@@ -133,6 +146,11 @@ const patchSchema = Schema.Struct({
   priority: Schema.optionalKey(prioritySchema),
   parentKey: Schema.optionalKey(Schema.NullOr(keyText)),
   relations: Schema.optionalKey(Schema.Array(remoteRelationSchema)),
+  /** null clears the due date. */
+  due: Schema.optionalKey(Schema.NullOr(dueSchema)),
+  criteria: Schema.optionalKey(criteriaSchema),
+  /** An empty summary clears it. */
+  summary: Schema.optionalKey(shortText(80_000)),
   /** On create: the backlog ref of the item, for a provider that names what it creates after it (a file). */
   localRef: Schema.optionalKey(shortText(16)),
 })
@@ -229,6 +247,8 @@ export type RemoteRelation = typeof remoteRelationSchema.Type
 export type RemoteRecord = typeof recordSchema.Type
 export type RemotePatch = typeof patchSchema.Type
 export type ProviderField = (typeof fields)[number]
+export type ProviderExtraField = (typeof extraFields)[number]
+export type RemoteCriterion = typeof criterionSchema.Type
 export type PullInput = typeof pullInputSchema.Type
 export type PullPage = typeof pullPageSchema.Type
 export type ProviderScope = {
@@ -306,6 +326,7 @@ export class BacklogProviders {
   static readonly priorities = priorities
   static readonly relations = relations
   static readonly fields = fields
+  static readonly extraFields = extraFields
   static readonly failureCodes = failureCodes
   static readonly descriptorSchema = descriptorSchema
   static readonly bindingOptionSchema = bindingOptionSchema

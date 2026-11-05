@@ -541,6 +541,11 @@ What each built-in provider carries:
 | comments    | both ways, once each                                       | both ways, once each                                                         | not written to files                               |
 | change feed | `updatedAt` cursor, paged                                  | `since=` with the list's ETag (an unchanged repository costs a 304)          | full scan by mtime and content hash                |
 
+A provider that has a place for them also carries the **due date**, the **acceptance criteria** (as `[x]`/`[ ]` lines
+of text) and the **summary**: it lists them in its descriptor's `capabilities.extraFields`, and the binding form shows
+those rows only for such a provider (the Jira provider maps the due date, and the other two to custom fields the binding
+names). Bindings saved before keep them off until you turn them on.
+
 Delegate is not mapped: Linear's delegate is an app user, the backlog's an agent session. Bindings migrated from the
 earlier settings rows keep the four fields that sync owned then (title, description, status, labels); turn priority,
 parent and relations on in the binding when you want them.

@@ -49,7 +49,7 @@ import {
 import { BacklogItems } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogNotices } from './notices.js'
-import type { ProviderDescriptor } from './provider-port.js'
+import { BacklogProviders, type ProviderDescriptor } from './provider-port.js'
 import { BacklogSyncModel, type SyncBinding, type SyncConflictPolicy, type SyncFieldDirection, type SyncFieldRule, type SyncState } from './sync-model.js'
 import { BacklogQueries } from './use-backlog-actions.js'
 
@@ -81,6 +81,9 @@ const fieldLabels = {
   priority: 'Priority',
   parent: 'Parent',
   links: 'Relations',
+  due: 'Due date',
+  criteria: 'Acceptance criteria',
+  summary: 'Summary',
 } as const
 const fieldDirectionLabels = { 'two-way': 'Both ways', pull: 'Pull', push: 'Push', off: 'Off' } as const satisfies Record<SyncFieldDirection, string>
 const policyLabels = {
@@ -633,15 +636,14 @@ const ConnectionForm = (props: {
   )
 }
 
-const supportsField = (descriptor: ProviderDescriptor | undefined, field: SyncFieldRule['field']): boolean => {
-  const capabilities = descriptor?.capabilities
-  if (capabilities === undefined) return true
-  if (field === 'tags') return capabilities.labels
-  if (field === 'priority') return capabilities.priority
-  if (field === 'parent') return capabilities.parent
-  if (field === 'links') return capabilities.relations.length > 0
-  return true
-}
+const supportsField = (descriptor: ProviderDescriptor | undefined, field: SyncFieldRule['field']): boolean =>
+  descriptor === undefined || BacklogSyncModel.supports(descriptor.capabilities, field)
+
+/** The core fields, greyed out when the provider cannot carry them, and the extra fields only a provider that carries them shows. */
+const shownFields = (descriptor: ProviderDescriptor | undefined): readonly SyncFieldRule['field'][] =>
+  BacklogSyncModel.syncedFields.filter(
+    field => !BacklogProviders.extraFields.some(extra => extra === field) || (descriptor !== undefined && supportsField(descriptor, field)),
+  )
 
 const defaultContainerLabel = (descriptor: ProviderDescriptor | undefined): string => {
   if (descriptor?.kind === 'github') return 'From the project’s git remote'
@@ -781,7 +783,7 @@ const BindingForm = (props: {
         </ToggleGroup>
       </div>
       <fieldset className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-1.5 dshx:@max-pane-narrow:grid-cols-1" aria-label="Fields">
-        {BacklogSyncModel.syncedFields.map(field => (
+        {shownFields(props.descriptor).map(field => (
           <div key={field} className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
             <span className={cn(!supportsField(props.descriptor, field) && 'dshx:text-muted-foreground')}>{fieldLabels[field]}</span>
             <Combobox

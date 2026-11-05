@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { BacklogItems, type BacklogItem, type BacklogPriority, type BacklogStatus } from './item.js'
-import { BacklogProviders, type ProviderCapabilities, type ProviderField, type RemoteRecord } from './provider-port.js'
+import { BacklogProviders, type ProviderCapabilities, type ProviderField, type RemoteCriterion, type RemoteRecord } from './provider-port.js'
 
 const syncStates = ['synced', 'pending', 'conflict', 'error'] as const
 /** The item fields sync may own; kind, project, attention and pins stay local. */
@@ -31,6 +31,10 @@ const snapshotSchema = Schema.Struct({
   priority: Schema.optionalKey(BacklogItems.prioritySchema),
   parent: Schema.optionalKey(Schema.NullOr(remoteKeySchema)),
   links: Schema.optionalKey(Schema.Array(Schema.String.check(Schema.isMaxLength(340))).check(Schema.isMaxLength(200))),
+  due: Schema.optionalKey(Schema.NullOr(Schema.String.check(Schema.isMaxLength(10)))),
+  /** Each criterion as `[x] text` or `[ ] text`. */
+  criteria: Schema.optionalKey(Schema.Array(Schema.String.check(Schema.isMaxLength(510))).check(Schema.isMaxLength(50))),
+  summary: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars * 4))),
 })
 
 /** One field both sides changed since the last sync, and which side's value was kept (`none` when the policy flags it). */
@@ -142,6 +146,9 @@ export interface SyncFieldValues {
   priority?: BacklogPriority
   parent?: string | null
   links?: readonly string[]
+  due?: string | null
+  criteria?: readonly string[]
+  summary?: string
 }
 
 export interface SyncPlan {
@@ -153,8 +160,7 @@ export interface SyncPlan {
 }
 
 /** Every field two-way, title to links: the default of a new binding and of a migrated settings row. */
-const defaultFieldMap = (fields: readonly SyncField[] = ['title', 'body', 'status', 'tags', 'priority', 'parent', 'links']): SyncFieldRule[] =>
-  fields.map(field => ({ field, direction: 'two-way', values: [] }))
+const defaultFieldMap = (fields: readonly SyncField[] = syncedFields): SyncFieldRule[] => fields.map(field => ({ field, direction: 'two-way', values: [] }))
 
 /** Whether a direction lets a change flow one way. */
 const allows = (direction: SyncDirection | SyncFieldDirection, way: 'pull' | 'push'): boolean => direction === 'two-way' || direction === way
@@ -165,8 +171,18 @@ const supports = (capabilities: ProviderCapabilities, field: SyncField): boolean
   if (field === 'priority') return capabilities.priority
   if (field === 'parent') return capabilities.parent
   if (field === 'links') return capabilities.relations.length > 0
+  if (field === 'due' || field === 'criteria' || field === 'summary') return capabilities.extraFields?.includes(field) ?? false
   return true
 }
+
+/** Acceptance criteria as snapshot lines, `[x] text`, so two sides compare as plain strings. */
+const criteriaLines = (criteria: readonly RemoteCriterion[]): string[] => criteria.map(criterion => `[${criterion.done ? 'x' : ' '}] ${criterion.text}`)
+
+const criteriaOfLines = (lines: readonly string[]): RemoteCriterion[] =>
+  lines.flatMap(line => {
+    const text = line.slice(4).trim()
+    return text === '' ? [] : [{ text, done: line.startsWith('[x]') }]
+  })
 
 /**
  * Each field's effective flow for a binding: the binding's direction, the field's own rule (an unlisted field is off),
@@ -202,7 +218,11 @@ const take = (target: SyncFieldValues, field: SyncField, value: SyncSnapshot[Syn
   switch (field) {
     case 'title':
     case 'body':
+    case 'summary':
       if (typeof value === 'string') target[field] = value
+      return
+    case 'due':
+      if (value === null || typeof value === 'string') target.due = value
       return
     case 'status':
       if (isStatus(value)) target.status = value
@@ -215,6 +235,7 @@ const take = (target: SyncFieldValues, field: SyncField, value: SyncSnapshot[Syn
       return
     case 'tags':
     case 'links':
+    case 'criteria':
       if (Array.isArray(value)) target[field] = value
   }
 }
@@ -332,6 +353,9 @@ const remoteSnapshot = (input: { readonly record: RemoteRecord; readonly rules: 
     ...(record.priority !== undefined && { priority: record.priority }),
     ...(record.parentKey !== undefined && { parent: record.parentKey }),
     ...(record.relations !== undefined && { links: record.relations.map(relation => `${relation.relation}:${relation.key}`) }),
+    ...(record.due !== undefined && { due: record.due }),
+    ...(record.criteria !== undefined && { criteria: criteriaLines(record.criteria) }),
+    ...(record.summary !== undefined && { summary: record.summary }),
   }
 }
 
@@ -405,6 +429,9 @@ export class BacklogSyncModel {
   static readonly snapshotSchema = snapshotSchema
   static readonly defaultFieldMap = defaultFieldMap
   static readonly fieldFlows = fieldFlows
+  static readonly supports = supports
+  static readonly criteriaLines = criteriaLines
+  static readonly criteriaOfLines = criteriaOfLines
   static readonly localChangedAt = localChangedAt
   static readonly plan = plan
   static readonly remoteSnapshot = remoteSnapshot
