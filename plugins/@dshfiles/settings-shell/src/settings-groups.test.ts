@@ -84,6 +84,15 @@ describe('settings groups', () => {
     expect(accounts[0]?.pages.map(current => current.ns)).toEqual(['ai-accounts'])
   })
 
+  it('puts the frame layout status bar section in General', () => {
+    const withStatusBar = SettingsGroups.group({
+      sections: [...sections, { id: 'dshfiles-status-bar', order: 45, label: 'Status bar' }],
+      pages,
+      panels,
+    }).flatMap(group => group.entries.map(entry => ({ ...entry, groupId: group.group.id })))
+    expect(withStatusBar.find(entry => entry.sectionId === 'dshfiles-status-bar')).toMatchObject({ groupId: 'general', label: 'Status bar' })
+  })
+
   it('links stage pages owned by other plugins only while they are loaded', () => {
     expect(all.find(entry => entry.id === 'link:mcp-servers')).toMatchObject({ groupId: 'tools', label: 'MCP servers' })
     expect(all.find(entry => entry.id === 'plugin:secret-catalog')).toMatchObject({

@@ -43,6 +43,7 @@ interface Placement {
 const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
   general: { group: 'general', order: 0 },
   'thread-sidebar': { group: 'general', label: 'Thread list', order: 20 },
+  'dshfiles-status-bar': { group: 'general', label: 'Status bar', order: 25 },
   'archived-sessions': { group: 'general', label: 'Archived threads', order: 40 },
   'thread-notifications': { group: 'notifications', label: 'Thread notifications', order: 0 },
   account: { group: 'models', order: 0 },
@@ -60,6 +61,7 @@ const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
   // General
   'dshfiles-settings-shell': { group: 'general', label: 'Settings', order: 90 },
   'thread-sidebar': { group: 'general', entry: 'thread-sidebar' },
+  'dshfiles-frame-layout': { group: 'general', entry: 'dshfiles-status-bar' },
   'dshfiles-main-tabs': { group: 'general', label: 'Main tabs', order: 30 },
   'dshfiles-workbench': { group: 'general', label: 'Docked panes', order: 31 },
   'dshfiles-command-palette': { group: 'general', label: 'Command palette', order: 32 },
