@@ -33,6 +33,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [Typed chat drafts](typed-chat-drafts/README.md)                     | Activation only: the user picks a restart, then the New chat / typed-draft GUI check.                                                                                                    |
 | [Thread sharing](thread-share/README.md)                             | v1 shipped as `@dshfiles/thread-share` (opt-in, not seeded); open: v2 collaborative threads (design and risks only), opentunnel revisit.                                                  |
 | [xstate visualization](xstate-viz/README.md)                         | Static machine → Mermaid shipped in `@dshfiles/whiteboard`; open: opt-in live inspection (`@statelyai/inspect` behind a dev switch) when a debugging session needs it.                   |
+| [Component adoption](component-adoption/README.md)                  | Use the gallery components that no plugin imports yet: TraceWaterfall in traces, MergeChecks in the Land card, TestRunResults, FallbackChain, ActivityFeed, RoutineList; delete or keep the rest. |
 | [t3code parity](t3code-parity.md)                                    | Gaps against t3code nightly: create a PR from a thread (C1), scheduled tasks and webhooks (B5), rewind any turn (B3), request_secret (B7). A6, C2, B4 and C3 shipped.                    |
 
 ## Testing, research and housekeeping
