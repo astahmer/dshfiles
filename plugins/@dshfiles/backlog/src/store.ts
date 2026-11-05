@@ -19,6 +19,7 @@ import {
   type BacklogProposal,
   type BacklogStatus,
 } from './item.js'
+import { FieldRevert } from './field-revert.js'
 import { BacklogSearch, type SearchMatch } from './search.js'
 import { BacklogSearchIndex } from './search-index.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
@@ -70,6 +71,13 @@ export interface BacklogUpdate {
 }
 
 export type BacklogResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly reason: 'not-found' }
+
+/** A revert the log refuses: the field changed again after the change asked for, so its earlier value would undo that too. */
+export interface BacklogRevertStale {
+  readonly ok: false
+  readonly reason: 'stale'
+  readonly message: string
+}
 
 const DEFAULT_LIST_LIMIT = 100
 const MAX_LIST_LIMIT = 2_000
@@ -454,6 +462,16 @@ export class BacklogStore extends Context.Service<
       readonly actor: BacklogActor
     }) => Detailed
     readonly deleteComment: (input: { readonly id: number; readonly commentId: string; readonly actor: BacklogActor }) => Detailed
+    /**
+     * Puts one recorded field change back: a new `set` of the typed value the field held before it, read from the op log.
+     * Refused as `stale` when the field changed again since, and `not-found` when no event at `at` changed `field`.
+     */
+    readonly revert: (input: {
+      readonly id: number
+      readonly at: number
+      readonly field: BacklogHumanField
+      readonly actor: BacklogActor
+    }) => Effect.Effect<BacklogResult<BacklogDetail> | BacklogRevertStale, BacklogWriteFailed>
     /** The item and every other item, for a triage pass to read. */
     readonly triageInput: (id: number) => Effect.Effect<Option.Option<{ readonly item: BacklogItem; readonly others: readonly BacklogItem[] }>>
     /** What one backfill run should triage, oldest first, and how many eligible items it leaves for a later run. */
@@ -872,6 +890,33 @@ export class BacklogStore extends Context.Service<
         )
       })
 
+      const revert = Effect.fn('backlog store revert')(function* (input: {
+        readonly id: number
+        readonly at: number
+        readonly field: BacklogHumanField
+        readonly actor: BacklogActor
+      }) {
+        const item = yield* find(input.id)
+        if (item === undefined) return notFound
+        const records = yield* repo.opsOf(input.id).pipe(Effect.mapError(writeFailed(input.id, 'put')))
+        const planned = FieldRevert.plan({ records, id: input.id, at: input.at, field: input.field })
+        if (planned.kind === 'missing') return notFound
+        if (planned.kind === 'stale') {
+          const by = planned.by === 'user' ? 'you' : planned.by
+          return {
+            ok: false,
+            reason: 'stale',
+            message: `The ${input.field} of ${BacklogReference.labelOf(item)} changed again since (by ${by} at ${new Date(planned.changedAt).toISOString()}). Revert that later change first, or edit the ${input.field} directly.`,
+          } satisfies BacklogRevertStale
+        }
+        const before = planned.before
+        const change: BacklogChange = {}
+        Object.assign(change, { [input.field]: input.field === 'attention' && before === undefined ? 'none' : before })
+        if (input.actor.kind === 'user') change.humanFields = [...new Set([...item.humanFields, input.field])]
+        const kind = input.field === 'status' ? 'moved' : 'edited'
+        return found(yield* touch(item, input.actor, { kind, detail: `reverted ${input.field}` }, change))
+      }, serialized)
+
       const markTriaged = Effect.fn('backlog store mark triaged')(function* (id: number) {
         const item = yield* find(id)
         if (item === undefined) return
@@ -1055,6 +1100,7 @@ export class BacklogStore extends Context.Service<
         comment,
         editComment,
         deleteComment,
+        revert,
         triageInput: id =>
           Effect.map(Ref.get(state), current =>
             Option.map(Option.fromUndefinedOr(current.records.get(id)), item => ({ item, others: [...current.records.values()] })),

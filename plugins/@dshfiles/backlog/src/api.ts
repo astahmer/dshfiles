@@ -117,6 +117,15 @@ const detailResultSchema = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(false), reason: Schema.Literal('not-found') }),
 ])
 
+const revertResultSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), value: detailSchema }),
+  Schema.Struct({ ok: Schema.Literal(false), reason: Schema.Literal('not-found') }),
+  Schema.Struct({ ok: Schema.Literal(false), reason: Schema.Literal('stale'), message: Schema.String.check(Schema.isMaxLength(1_000)) }),
+])
+
+const renderRevertPreview = (result: typeof revertResultSchema.Type): string =>
+  result.ok ? renderItemPreview(result.value.item) : result.reason === 'stale' ? result.message : 'No such change on that backlog item.'
+
 const detailManySchema = Schema.Struct({
   items: Schema.Array(detailSchema),
   missing: Schema.Array(itemKeySchema),
@@ -337,12 +346,10 @@ export const backlogApi = defineApi({
     }),
     getMany: method({
       input: Schema.Struct({
-        ids: Schema.Array(itemKeySchema)
-          .check(Schema.isMinLength(1), Schema.isMaxLength(50))
-          .annotate({
-            description:
-              'Items as written (`b:k3f9`, `k3f9`, a legacy `b:12`) or their numbers. Duplicates are read once; unknown ones are reported, not failed.',
-          }),
+        ids: Schema.Array(itemKeySchema).check(Schema.isMinLength(1), Schema.isMaxLength(50)).annotate({
+          description:
+            'Items as written (`b:k3f9`, `k3f9`, a legacy `b:12`) or their numbers. Duplicates are read once; unknown ones are reported, not failed.',
+        }),
       }),
       output: detailManySchema,
       description:
@@ -670,6 +677,21 @@ export const backlogApi = defineApi({
       output: detailResultSchema,
       description: 'Edit one of the current user’s previous replies in the backlog panel.',
     }),
+    revert: method({
+      input: Schema.Struct({
+        id: itemKeySchema,
+        at: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)).annotate({
+          description: 'The `at` time of the item event whose `fieldChanges` lists the change to undo, as `backlog_get` returns it.',
+        }),
+        field: BacklogItems.humanFieldSchema.annotate({
+          description: 'The changed field to put back: title, body, kind, status, project, tags, pinned or attention.',
+        }),
+      }),
+      output: revertResultSchema,
+      description:
+        'Revert one recorded field change of a backlog item: writes the typed value the field held before that change, read from the op log, as a new change. Refused with `stale` when the field changed again since. Run only when the user asked to revert that change.',
+      tool: { name: 'backlog_revert', readOnly: false, render: renderRevertPreview },
+    }),
     deleteComment: method({
       input: Schema.Struct({ id: itemKeySchema, commentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)) }),
       output: detailResultSchema,
@@ -682,6 +704,7 @@ export type BacklogSummaryView = typeof summarySchema.Type
 export type BacklogDetailView = typeof detailSchema.Type
 export type BacklogListView = typeof listOutputSchema.Type
 export type BacklogDetailResult = typeof detailResultSchema.Type
+export type BacklogRevertResult = typeof revertResultSchema.Type
 export type BacklogBackfillResult = typeof backfillOutputSchema.Type
 export type BacklogSyncStatusView = typeof syncStatusSchema.Type
 export type BacklogSyncItemView = typeof syncItemSchema.Type

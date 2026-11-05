@@ -97,6 +97,7 @@ export const useBacklogActions = () => {
   const comment = useMutation(commentMutation({ client, send: input => api.comment(input) }))
   const editComment = useMutation({ mutationFn: (input: Parameters<typeof api.editComment>[0]) => api.editComment(input), onSuccess: invalidate })
   const deleteComment = useMutation({ mutationFn: (input: Parameters<typeof api.deleteComment>[0]) => api.deleteComment(input), onSuccess: invalidate })
+  const revert = useMutation({ mutationFn: (input: Parameters<typeof api.revert>[0]) => api.revert(input), onSuccess: invalidate })
   const attachFile = useMutation({ mutationFn: (input: Parameters<typeof api.attachFile>[0]) => api.attachFile(input), onSuccess: invalidate })
   const enrichTweet = useMutation({ mutationFn: (input: Parameters<typeof api.enrichTweet>[0]) => api.enrichTweet(input), onSuccess: invalidate })
   const removeFile = useMutation({ mutationFn: (input: Parameters<typeof api.removeFile>[0]) => api.removeFile(input), onSuccess: invalidate })
@@ -115,6 +116,7 @@ export const useBacklogActions = () => {
     comment,
     editComment,
     deleteComment,
+    revert,
     attachFile,
     enrichTweet,
     removeFile,

@@ -137,6 +137,12 @@ this one. Click a URL reference to open a popover with **Open in browser** and *
 the user changes by hand are recorded in `humanFields`, so later automatic moves can leave them alone.
 Nothing is deleted; `dropped` closes an item.
 
+An event that changed fields offers **Show changes**, and each changed field there has **Revert**: it writes the value
+the field held before that change back as a new change (a typed `set` read from the op log, never the displayed text),
+so the history keeps both and the revert itself can be reverted. When the field changed again since, Revert refuses
+and says who changed it when: revert that later change first, or edit the field directly. Agents call the same verb as
+`backlog_revert` (item, the event's `at`, the field), only when the user asked.
+
 The description box and the reply box are the capture composer's own text box: Markdown, `@` completion
 for agents, backlog items and threads, and images or files picked with the paperclip, pasted or dropped.
 A description's files are kept with the item; a reply's files belong to that comment and open in the
@@ -331,6 +337,7 @@ dropping the rest of the draft.
 | `backlog_attach_file`          | write: keep one base64 image or file with an item                                                       |
 | `backlog_read_file`            | read: one image or file as a data URL; `save: true` also returns a temp file path                       |
 | `backlog_remove_file`          | write: remove one image or file                                                                         |
+| `backlog_revert`               | write: put back the value a field held before one recorded change; refused when it changed again since  |
 | `backlog_triage`               | write: run triage on one item now                                                                       |
 | `backlog_triage_backfill`      | write: triage items captured before triage was set up, oldest first                                     |
 | `backlog_start_thread`         | write: start one thread for items, in the item project's own jj workspace, linked                       |

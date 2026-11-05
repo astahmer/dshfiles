@@ -72,6 +72,7 @@ describe('backlog tool exposure', () => {
       'backlog_read_file',
       'backlog_referencing',
       'backlog_remove_file',
+      'backlog_revert',
       'backlog_start_thread',
       'backlog_sync_now',
       'backlog_sync_status',

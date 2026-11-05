@@ -38,6 +38,7 @@ import {
   WandSparklesIcon,
   XIcon,
   type LucideIcon,
+  Undo2Icon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
@@ -539,6 +540,7 @@ const Conversation = (props: {
   const actions = useBacklogActions()
   const [editingComment, setEditingComment] = useState<string | null>(null)
   const [commentFailure, setCommentFailure] = useState<string | null>(null)
+  const [revertFailure, setRevertFailure] = useState<{ readonly key: string; readonly message: string } | null>(null)
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set())
   const [openDiffs, setOpenDiffs] = useState<ReadonlySet<string>>(new Set())
   const threadIdsByEvent = new Map<BacklogEvent, string>()
@@ -677,15 +679,47 @@ const Conversation = (props: {
                           {openDiffs.has(`${String(index)}:${String(position)}`) ? (
                             <div className="dshx:mt-1 dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:p-2 dshx:text-[11px]">
                               {event.fieldChanges.map(change => (
-                                <div key={change.field} className="dshx:grid dshx:grid-cols-[4rem_minmax(0,1fr)] dshx:gap-2">
+                                <div key={change.field} className="dshx:grid dshx:grid-cols-[4rem_minmax(0,1fr)_auto] dshx:items-start dshx:gap-2">
                                   <span className="dshx:font-medium dshx:text-foreground">{change.field}</span>
                                   <span className="dshx:min-w-0 dshx:break-words">
                                     <del className="dshx:text-destructive">{change.before || '∅'}</del>
                                     {' → '}
                                     <ins className="dshx:text-success dshx:no-underline">{change.after || '∅'}</ins>
                                   </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="xs"
+                                    aria-label={`Revert ${change.field} to ${change.before || 'empty'}`}
+                                    disabled={actions.revert.isPending}
+                                    onClick={() => {
+                                      const key = `${String(event.at)}:${change.field}`
+                                      const fail = (message: string): void => setRevertFailure({ key, message })
+                                      setRevertFailure(null)
+                                      void actions.revert
+                                        .mutateAsync({ id: props.itemId, at: event.at, field: change.field })
+                                        .then(result => {
+                                          if (result.ok) return
+                                          fail(
+                                            result.reason === 'stale'
+                                              ? result.message
+                                              : 'That change is no longer in this item’s history. Reopen the item to refresh it.',
+                                          )
+                                        })
+                                        .catch(error => fail(errorMessage(error, 'The change could not be reverted. Retry, or edit the field directly.')))
+                                    }}
+                                  >
+                                    <Undo2Icon aria-hidden className="dshx:size-3" />
+                                    Revert
+                                  </Button>
                                 </div>
                               ))}
+                              {event.fieldChanges
+                                .filter(change => revertFailure?.key === `${String(event.at)}:${change.field}`)
+                                .map(change => (
+                                  <p key={change.field} role="alert" className="dshx:text-destructive">
+                                    {revertFailure?.message}
+                                  </p>
+                                ))}
                             </div>
                           ) : null}
                         </>
@@ -1141,7 +1175,9 @@ const PeekBody = (props: {
                   variant="ghost"
                   size="icon-xs"
                   aria-label="Start thread"
-                  onClick={() => props.startThread([startThreadItemOf({ id: item.id, ref: item.ref, title: item.title, project: item.project, preview: item.body })])}
+                  onClick={() =>
+                    props.startThread([startThreadItemOf({ id: item.id, ref: item.ref, title: item.title, project: item.project, preview: item.body })])
+                  }
                 >
                   <MessagesSquareIcon />
                 </Button>

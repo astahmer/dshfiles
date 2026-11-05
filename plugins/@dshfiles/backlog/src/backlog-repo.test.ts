@@ -293,3 +293,59 @@ describe('short aliases', () => {
     }).pipe(Effect.scoped),
   )
 })
+
+describe('revert from history', () => {
+  const changeAt = (item: BacklogItem, field: string): number => {
+    const event = item.events.findLast(candidate => candidate.fieldChanges?.some(change => change.field === field) === true)
+    if (event === undefined) throw new Error(`No recorded ${field} change.`)
+    return event.at
+  }
+
+  it.effect('writes back the typed value a field held before the change, as a new set op, and refuses a stale one', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(1_000)
+      const { store, repo } = yield* open()
+      const created = yield* store.capture({ text: 'Original title', actor: user })
+      const id = created.item.id
+      yield* TestClock.adjust(10)
+      yield* store.update({ id, title: 'Renamed title', tags: ['infra', 'ux'], status: 'doing', actor: user })
+      yield* TestClock.adjust(10)
+      const edited = yield* store.update({ id, tags: ['infra'], actor: user })
+      if (!edited.ok) throw new Error('The item should exist.')
+      const renamedAt = changeAt(edited.value.item, 'title')
+      const tagsAt = changeAt(edited.value.item, 'tags')
+      const opsBefore = (yield* repo.opsOf(id)).length
+
+      yield* TestClock.adjust(10)
+      const reverted = yield* store.revert({ id, at: renamedAt, field: 'title', actor: user })
+      expect(reverted.ok && reverted.value.item.title).toBe('Original title')
+      expect(reverted.ok && reverted.value.item.events.at(-1)).toMatchObject({
+        kind: 'edited',
+        detail: 'reverted title',
+        fieldChanges: [{ field: 'title', before: 'Renamed title', after: 'Original title' }],
+      })
+      const appended = (yield* repo.opsOf(id)).slice(opsBefore).map(record => record.op)
+      expect(appended).toContainEqual({ kind: 'set', field: 'title', value: 'Original title' })
+
+      // Tags are a typed list, not the "infra, ux" the event displays.
+      const tags = yield* store.revert({ id, at: tagsAt, field: 'tags', actor: user })
+      expect(tags.ok && tags.value.item.tags).toEqual(['infra', 'ux'])
+
+      // The status went inbox → doing in the first update; it has not changed since.
+      const status = yield* store.revert({ id, at: renamedAt, field: 'status', actor: user })
+      expect(status.ok && status.value.item.status).toBe('inbox')
+
+      // The title change of the first update was reverted since, so reverting it again would undo that revert.
+      const stale = yield* store.revert({ id, at: renamedAt, field: 'title', actor: user })
+      expect(stale).toMatchObject({ ok: false, reason: 'stale' })
+      expect(!stale.ok && stale.reason === 'stale' && stale.message).toMatch(/changed again since .*Revert that later change first/u)
+
+      expect((yield* store.revert({ id, at: 1, field: 'title', actor: user })).ok).toBe(false)
+      expect(yield* store.revert({ id: 999, at: renamedAt, field: 'title', actor: user })).toEqual({ ok: false, reason: 'not-found' })
+
+      const folded = (yield* repo.foldAll).find(item => item.id === id)
+      const served = yield* store.get(id)
+      expect(served.ok && folded).toEqual(served.ok ? withoutFreshness(served.value.item) : undefined)
+    }).pipe(Effect.scoped),
+  )
+})

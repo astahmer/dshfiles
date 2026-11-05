@@ -179,6 +179,7 @@ const backlogHandlers = Api.handlers(backlogApi, {
   testSyncBackends: () => BacklogSync.use(sync => sync.testSaved),
   editComment: (input, call) =>
     Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.editComment({ ...resolved, actor: actorOf(call.caller) }))),
+  revert: (input, call) => Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.revert({ ...resolved, actor: actorOf(call.caller) }))),
   deleteComment: (input, call) =>
     Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.deleteComment({ ...resolved, actor: actorOf(call.caller) }))),
 })
