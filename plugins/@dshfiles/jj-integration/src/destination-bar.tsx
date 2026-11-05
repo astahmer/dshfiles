@@ -49,22 +49,6 @@ export const HostChipSlot = (props: { readonly localProjectPath?: string | undef
   </span>
 )
 
-/**
- * The workspace segment's copy. English only for now: the run row is one segment of the composer's run settings
- * (`plans/ade-ux` §4.5) and its jargon is explained in place rather than through a locale key per hint.
- */
-const segmentCopy = {
-  label: 'Workspace',
-  own: 'Own workspace',
-  ownHint: 'A separate copy of the project just for this thread (a Jujutsu workspace). Your checkout stays untouched until you land the work.',
-  inPlace: 'In place',
-  inPlaceHint: 'Edit the project checkout directly. Fine for quick changes when no other thread is working there.',
-  startFrom: 'Start from',
-  search: 'Search workspaces and bookmarks',
-  noVcs: 'This project is not a Jujutsu repository, so the thread edits its folder directly.',
-  tooltip: 'Where this thread edits files: its own workspace (a separate Jujutsu copy) or the project checkout.',
-} as const
-
 type WorkspaceChoice = 'own' | 'in-place'
 
 const noSpares: Readonly<Record<string, SpareWorkspace>> = {}
@@ -328,9 +312,12 @@ export const DestinationBar = (props: {
     const base = current === undefined ? null : WorkspaceToggle.startingBookmark({ destination: current, isolated: isolate, defaultBookmark })
     move(base === null ? { isolate } : { isolate, base })
   }
-  const segmentLabel = isolated ? segmentCopy.own : segmentCopy.inPlace
+  const segmentLabel = isolated ? t('workspaceSegmentOwn') : t('workspaceSegmentInPlace')
   const segmentDetail = isolated ? (bookmark ?? undefined) : undefined
-  const segmentName = `${segmentCopy.label}: ${segmentLabel}${segmentDetail === undefined ? '' : ` from ${segmentDetail}`}`
+  const segmentName =
+    segmentDetail === undefined
+      ? t('workspaceSegmentName', { label: t('workspaceSegmentLabel'), choice: segmentLabel })
+      : t('workspaceSegmentNameFrom', { label: t('workspaceSegmentLabel'), choice: segmentLabel, bookmark: segmentDetail })
 
   return (
     // display: contents makes each chip an item of the native row, so the host chip can lead it.
@@ -376,18 +363,18 @@ export const DestinationBar = (props: {
                   </Button>
                 </PopoverTrigger>
               </TooltipTrigger>
-              <TooltipContent className="dshx:max-w-72">{segmentCopy.tooltip}</TooltipContent>
+              <TooltipContent className="dshx:max-w-72">{t('workspaceSegmentTooltip')}</TooltipContent>
             </Tooltip>
             <PopoverContent align="start" className="dshx:w-80 dshx:max-w-[calc(100vw-1.5rem)] dshx:p-0">
               <Command>
-                <CommandInput placeholder={segmentCopy.search} />
+                <CommandInput placeholder={t('workspaceSegmentSearch')} />
                 <CommandList className="dshx:max-h-80">
                   <CommandEmpty>{t('noBookmarks')}</CommandEmpty>
-                  <CommandGroup heading={segmentCopy.label}>
+                  <CommandGroup heading={t('workspaceSegmentLabel')}>
                     {(
                       [
-                        ['own', segmentCopy.own, segmentCopy.ownHint],
-                        ['in-place', segmentCopy.inPlace, segmentCopy.inPlaceHint],
+                        ['own', t('workspaceSegmentOwn'), t('workspaceSegmentOwnHint')],
+                        ['in-place', t('workspaceSegmentInPlace'), t('workspaceSegmentInPlaceHint')],
                       ] as const
                     ).map(([choice, label, hint]) => {
                       const selected = (choice === 'own') === isolated
@@ -405,7 +392,7 @@ export const DestinationBar = (props: {
                   {(current?.bookmarks ?? []).length === 0 ? null : (
                     <>
                       <CommandSeparator />
-                      <CommandGroup heading={`${segmentCopy.startFrom} (${segmentCopy.own.toLowerCase()})`}>
+                      <CommandGroup heading={t('workspaceSegmentStartFrom')}>
                         {(current?.bookmarks ?? []).map(name => (
                           <CommandItem
                             key={name}
@@ -437,10 +424,10 @@ export const DestinationBar = (props: {
                 className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:text-muted-foreground"
               >
                 <FolderIcon className="dshx:size-3.5" />
-                {segmentCopy.inPlace}
+                {t('workspaceSegmentInPlace')}
               </span>
             </TooltipTrigger>
-            <TooltipContent className="dshx:max-w-72">{segmentCopy.noVcs}</TooltipContent>
+            <TooltipContent className="dshx:max-w-72">{t('workspaceSegmentNoVcs')}</TooltipContent>
           </Tooltip>
         ) : null}
         {newThreadId !== null && destination.isError ? (
