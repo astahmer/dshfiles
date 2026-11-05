@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "notion-provider",
+      "title": "Sync backlog items with a Notion data source",
+      "summary": "Serves the backlog's backlog-provider Host API as the notion kind: a connection names the integration's bot and discovers the data sources it can see; a binding to a data source (or a database with one data source) pulls pages changed since a last_edited_time checkpoint in pages of 50, reads the title property, the page markdown as the body, a status property's groups (To-do, In progress, Complete) or a Status select as backlog statuses, a Tags multi-select, a Priority select and a Parent item relation, and writes them back through the binding's property names and value maps. Bodies change through one targeted update_content edit that never touches blocks markdown cannot show; comments flow both ways; deleting a linked item moves its page to the trash. Every request pins Notion-Version 2026-03-11, stays under three requests a second per connection and waits for Retry-After on 429 and 529.",
+      "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "Backlog settings › Remote sync › Add Notion connection (rendered by @dshfiles/backlog)",
+      "configuration": [
+        {
+          "key": "connection.credential",
+          "defaultValue": "",
+          "constraints": "A secret:ALIAS reference resolved on the Host; empty falls back to NOTION_API_KEY.",
+          "coveredBy": ["backlog-notion.identity", "backlog-notion.refused-key"]
+        },
+        {
+          "key": "connection.baseUrl",
+          "defaultValue": "",
+          "constraints": "Empty uses https://api.notion.com; any other http(s) base receives the key.",
+          "coveredBy": ["backlog-notion.identity"]
+        },
+        {
+          "key": "binding.container",
+          "defaultValue": "",
+          "constraints": "A data source id, a database id or notion.so URL with one data source, or empty for the only data source the integration sees.",
+          "coveredBy": ["backlog-notion.binding-target"]
+        },
+        {
+          "key": "binding.options.statusProperty",
+          "defaultValue": "",
+          "constraints": "A status or select property; empty finds a property named Status, State or Stage, then the only status property.",
+          "coveredBy": ["backlog-notion.field-mapping"]
+        },
+        {
+          "key": "binding.options.tagsProperty",
+          "defaultValue": "",
+          "constraints": "A multi-select property; empty finds Tags or Labels, then the only multi-select.",
+          "coveredBy": ["backlog-notion.field-mapping", "backlog-notion.binding-target"]
+        },
+        {
+          "key": "binding.options.priorityProperty",
+          "defaultValue": "",
+          "constraints": "A select property; empty finds one named Priority.",
+          "coveredBy": ["backlog-notion.field-mapping"]
+        },
+        {
+          "key": "binding.options.priorityValues",
+          "defaultValue": "",
+          "constraints": "Comma-separated priority=Name pairs (urgent=P0, high=P1); unmapped priorities match P0–P3, Critical, High, Medium, Low.",
+          "coveredBy": ["backlog-notion.field-mapping"]
+        },
+        {
+          "key": "binding.options.parentProperty",
+          "defaultValue": "",
+          "constraints": "A relation property; empty finds Parent item or Parent.",
+          "coveredBy": ["backlog-notion.field-mapping"]
+        }
+      ],
+      "states": ["discovering", "pulling", "pushing", "creating", "trashing", "rate-limited", "failed"],
+      "failureModes": [
+        "A key Notion refuses (401/403) or a page or database not shared with the integration (404) fails the call with its recovery: check the key, share the page with the integration.",
+        "A binding option naming a missing property or one of the wrong type fails with target-missing, naming the property and the type it needs.",
+        "A page whose markdown holds blocks the integration cannot see or the read truncated refuses a body edit that would cover them (unsupported); other fields still sync.",
+        "Still rate-limited after three Retry-After waits fails the call with a 429; the next pass retries from the same checkpoint.",
+        "Status options cannot be created through the API: a status the data source lacks is not written; a select status or priority creates its option."
+      ],
+      "externalDependencies": [
+        {
+          "id": "notion-rest-api",
+          "boundary": "HTTPS requests to api.notion.com (or the connection's base URL) with the integration token as a bearer header and Notion-Version 2026-03-11: users/me, search, data_sources, databases, pages, pages/:id/markdown and comments.",
+          "deterministicFake": "src/notion-fake.ts answers the same paths in memory through an HttpClient stand-in: one data source with status groups, tags, priority and parent properties, markdown bodies with truncation, comments, minute-granular last_edited_time and 429s on demand; the provider, its rate limiter and its decoding run for real."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog-notion.identity",
+          "file": "plugins/@dshfiles/backlog-notion/src/notion-provider.test.ts",
+          "testName": "names the bot and discovers data sources, pinning the API version on every request"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-notion.binding-target",
+          "file": "plugins/@dshfiles/backlog-notion/src/notion-provider.test.ts",
+          "testName": "binds a database URL to its only data source and refuses a wrongly typed property"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-notion.pull-checkpoint",
+          "file": "plugins/@dshfiles/backlog-notion/src/notion-provider.test.ts",
+          "testName": "pulls in pages with a last_edited_time checkpoint and still sees an edit within the same minute"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-notion.field-mapping",
+          "file": "plugins/@dshfiles/backlog-notion/src/notion-provider.test.ts",
+          "testName": "reads status groups, tags, priority and parent, and writes them back through the same options"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-notion.markdown-body",
+          "file": "plugins/@dshfiles/backlog-notion/src/notion-provider.test.ts",
+          "testName": "round-trips the markdown body with a targeted edit, and refuses to rewrite a truncated page whole"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-notion.comments",
+          "file": "plugins/@dshfiles/backlog-notion/src/notion-provider.test.ts",
+          "testName": "reads and adds page comments"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-notion.rate-limit",
+          "file": "plugins/@dshfiles/backlog-notion/src/notion-provider.test.ts",
+          "testName": "waits for Retry-After on a 429, then gives up after three retries"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-notion.create-trash",
+          "file": "plugins/@dshfiles/backlog-notion/src/notion-provider.test.ts",
+          "testName": "creates a page in the data source with properties and markdown, then trashes it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-notion.refused-key",
+          "file": "plugins/@dshfiles/backlog-notion/src/notion-provider.test.ts",
+          "testName": "reports a refused key with its recovery and never echoes it"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "backlog-notion.browser-journey",
+          "reason": "Host-only provider: its user-visible flow is the backlog's Remote sync settings, walked by the backlog journeys; a Notion journey needs a loopback fake Notion server in tooling/dshx/e2e."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "notion request",
+          "file": "plugins/@dshfiles/backlog-notion/src/notion-provider.test.ts",
+          "testName": "records one notion request span per call, with the operation and status only"
+        }
+      ]
+    }
+  ]
+}

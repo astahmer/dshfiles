@@ -111,6 +111,7 @@
     "test:e2e": {
       "dependsOn": [],
       "inputs": [
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__activity-timeline.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-preset.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agents.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__ai-accounts.sha256",
@@ -150,6 +151,8 @@
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workbench.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workspace-folder-picker.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workspace-nav.sha256",
+        "$TURBO_ROOT$/plugins/@dshfiles/activity-timeline/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/activity-timeline/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-preset/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-preset/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agents/cordis.patch.yml",
@@ -259,6 +262,7 @@
     "test:e2e:smoke": {
       "dependsOn": [],
       "inputs": [
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__activity-timeline.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agent-preset.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agents.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__ai-accounts.sha256",
@@ -298,6 +302,8 @@
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workbench.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workspace-folder-picker.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workspace-nav.sha256",
+        "$TURBO_ROOT$/plugins/@dshfiles/activity-timeline/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/activity-timeline/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-preset/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/agent-preset/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agents/cordis.patch.yml",
