@@ -80,7 +80,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     },
     refetchInterval: query => {
       const current = query.state.data?.thread
-      return threadStatusPollMs({ hasThread: current !== null, queued: current?.integrationQueuedAt !== undefined })
+      return threadStatusPollMs({ hasThread: current !== null, queued: current?.integrationQueuedAt !== undefined, menuOpen: workspaceMenuOpen })
     },
   })
   const rebase = useMutation({
@@ -129,6 +129,11 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     },
     onError: error => toast.show({ text: errorMessage(error, props.t('loadFailed')), success: false }),
   })
+  /** Opening the menu reads the status again: work landed outside this browser has no mutation to invalidate it. */
+  const onWorkspaceMenuOpenChange = (open: boolean): void => {
+    setWorkspaceMenuOpen(open)
+    if (open && cwd !== null && cwd.length > 0) void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(cwd, props.sessionId), exact: true })
+  }
   const current = thread.data?.thread
   const sessionIds = useMemo(() => current?.sessionIds ?? [props.sessionId], [current?.sessionIds, props.sessionId])
   const readSessionRunning = useCallback(
@@ -242,7 +247,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   return (
     <TooltipProvider>
       <span className="dshx-root dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1">
-        <Popover open={workspaceMenuOpen} onOpenChange={setWorkspaceMenuOpen}>
+        <Popover open={workspaceMenuOpen} onOpenChange={onWorkspaceMenuOpenChange}>
           {current === null || current === undefined ? (
             <Tooltip>
               <TooltipTrigger asChild>
