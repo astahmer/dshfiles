@@ -20,6 +20,7 @@ import type { BacklogStatus } from './item.js'
 import { BacklogInlineTitle, useBacklogInlineRename } from './item-inline-title.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogText } from './item-text.js'
+import { WorkGlyphs } from './work-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { BoardScrollAnchors, type BoardColumnScrollAnchor } from './board-scroll-anchor.js'
@@ -83,9 +84,15 @@ const CardFace = (props: {
   readonly onRenameDone?: () => void
 }): JSX.Element => {
   const item = props.item
+  const run = WorkGlyphs.useRunState(item)
   return (
     <>
       <div className="dshx:flex dshx:items-start dshx:gap-2">
+        {item.priority === 'none' ? null : (
+          <span className="dshx:mt-0.5" aria-label={WorkGlyphs.priorityLabels[item.priority]}>
+            <WorkGlyphs.PriorityIcon priority={item.priority} />
+          </span>
+        )}
         {item.kind === 'task' ? null : (
           <span className="dshx:mt-0.5">
             <ItemGlyphs.KindIcon kind={item.kind} />
@@ -121,6 +128,10 @@ const CardFace = (props: {
       )}
       <div className="dshx:flex dshx:items-center dshx:gap-2">
         <StateLine item={item} />
+        <WorkGlyphs.ProgressBadge progress={item.children} />
+        <WorkGlyphs.BlockedBadge blockedBy={item.blockedBy} />
+        <WorkGlyphs.ClaimChip lease={item.lease} compact />
+        <WorkGlyphs.RunStateChip run={run} compact />
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
           {item.project === null ? null : <ItemGlyphs.ProjectLabel project={item.project} className="dshx:max-w-24" />}
           {item.links.length === 0 ? null : (

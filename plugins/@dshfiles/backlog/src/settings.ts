@@ -146,6 +146,7 @@ export const backlogSettings = defineSettings({
         view: Schema.union([
           Schema.const('feed'),
           Schema.const('inbox'),
+          Schema.const('ready'),
           Schema.const('items'),
           Schema.const('board'),
           Schema.const('projects'),

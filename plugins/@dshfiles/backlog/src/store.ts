@@ -241,6 +241,11 @@ const referencingIn = (view: StoreView, link: BacklogLink): BacklogSummary[] =>
     .sort(byActivity)
     .map(item => summarize(item, view.at, view.relations, null, view.dormantDays))
 
+const parentSummaryIn = (view: StoreView, item: BacklogItem): BacklogSummary | null => {
+  const parent = item.parent === undefined ? undefined : view.relations.byRef(item.parent)
+  return parent === undefined ? null : summarize(parent, view.at, view.relations, null, view.dormantDays)
+}
+
 const detailIn = (view: StoreView, item: BacklogItem): BacklogDetail => ({
   item: {
     ...item,
@@ -252,6 +257,7 @@ const detailIn = (view: StoreView, item: BacklogItem): BacklogDetail => ({
     freshness: BacklogItems.freshness(item, view.at, view.dormantDays),
   },
   backlinks: referencingIn(view, { type: 'item', target: BacklogReference.refOf(item) }),
+  parentItem: parentSummaryIn(view, item),
   children: view.relations
     .childrenOf(item)
     .sort(ItemRelations.byReadiness)

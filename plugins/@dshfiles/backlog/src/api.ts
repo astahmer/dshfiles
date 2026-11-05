@@ -136,6 +136,8 @@ const summarySchema = Schema.Struct({
 const detailSchema = Schema.Struct({
   item: Schema.Struct({ ...BacklogItems.itemSchema.fields, freshness: freshnessSchema }),
   backlinks: Schema.Array(summarySchema),
+  /** The item this one is a sub-issue of. */
+  parentItem: nullDefault(summarySchema),
   children: Schema.Array(summarySchema).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   blockedBy: Schema.Array(summarySchema).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   lease: nullDefault(leaseSchema),
@@ -365,6 +367,7 @@ const shippedItemSchema = Schema.Struct({
   project: Schema.NullOr(Schema.String),
   doneAt: epochMsSchema,
   doneBy: Schema.String,
+  owner: Schema.String.pipe(Schema.withDecodingDefaultKey(Effect.succeed('user'))),
   byAgent: Schema.Boolean,
   revisions: Schema.Array(Schema.String),
   pullRequests: Schema.Array(Schema.String),

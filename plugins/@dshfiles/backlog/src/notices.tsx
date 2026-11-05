@@ -1,5 +1,7 @@
 import { Toast } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { isApiError } from '@dshfiles/dshx/api'
+import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useSyncExternalStore } from 'react'
 
 import { BACKLOG_NOTICE_HOLD_MS, type BacklogNoticeKind } from './notice-policy.js'
@@ -45,8 +47,20 @@ const subscribeNotice = (listener: () => void): (() => void) => {
   return () => listeners.delete(listener)
 }
 
+/** A failed write, with its recovery: a Host older than the method answers with a contract error, which only a Host restart fixes. */
+const showFailure = (fallback: string) => (error: unknown) =>
+  showNotice({
+    text:
+      isApiError(error) && error.kind === 'contract'
+        ? 'The running DSH Host predates this backlog action. Restart the DSH Host process to load it.'
+        : errorMessage(error, `${fallback} Try again; if it keeps failing, check the Host log.`),
+    kind: 'failure',
+    sessionId: null,
+  })
+
 export class BacklogNotices {
   static readonly show = showNotice
+  static readonly failure = showFailure
   static readonly clear = clearNotice
   static readonly read = readNotice
   static readonly subscribe = subscribeNotice

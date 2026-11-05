@@ -72,6 +72,7 @@ import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { submitReply } from './reply-submission.js'
 import type { AgentContinuationSelection, AgentContinuationThread } from './agent-dispatch.js'
 import { ItemPickers } from './item-pickers.js'
+import { PeekWork } from './peek-work.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { BacklogTextBox } from './text-box.js'
 import { actorThreadFor } from './actor-thread.js'
@@ -1296,6 +1297,12 @@ const PeekBody = (props: {
                   withLabel
                   onPick={status => actions.update.mutate({ id: item.id, status })}
                 />
+                <ItemPickers.Priority
+                  itemLabel={BacklogReference.labelOf(item)}
+                  priority={item.priority ?? 'none'}
+                  withLabel
+                  onPick={priority => actions.update.mutate({ id: item.id, priority })}
+                />
                 <ItemPickers.Kind itemLabel={BacklogReference.labelOf(item)} kind={item.kind} onPick={kind => actions.update.mutate({ id: item.id, kind })} />
                 <ItemPickers.Project
                   itemLabel={BacklogReference.labelOf(item)}
@@ -1324,6 +1331,7 @@ const PeekBody = (props: {
               <TagsField id={item.id} tags={item.tags} />
             </div>
           </BacklogItemMenu>
+          <PeekWork.WorkLine detail={props.detail} select={props.select} />
           {running.length === 0 ? null : (
             <section
               aria-label="Execution"
@@ -1366,6 +1374,7 @@ const PeekBody = (props: {
               </details>
             ) : null}
           </div>
+          <PeekWork.SubIssues detail={props.detail} select={props.select} />
           <Section title="Relationships" action={<AddLink id={item.id} />}>
             {groups.length === 0 && props.detail.backlinks.length === 0 ? (
               <p className="dshx:text-xs dshx:text-muted-foreground">
@@ -1465,6 +1474,7 @@ const placeholderDetail = (summary: BacklogSummaryView) => {
       events: [],
     },
     backlinks: [],
+    parentItem: null,
     children: [],
     blockedBy: [],
     lease,

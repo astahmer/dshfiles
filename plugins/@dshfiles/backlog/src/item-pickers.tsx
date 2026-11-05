@@ -11,7 +11,8 @@ import { CheckIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 
-import { BacklogItems, type BacklogAttention, type BacklogKind, type BacklogStatus } from './item.js'
+import { BacklogItems, type BacklogAttention, type BacklogKind, type BacklogPriority, type BacklogStatus } from './item.js'
+import { WorkGlyphs } from './work-glyphs.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogProjects, ProjectPicker } from './project-picker.js'
 
@@ -27,8 +28,11 @@ const Picker = <Value extends string>(props: {
   readonly onPick: (value: Value) => void
   readonly trigger: ReactNode
   readonly triggerClassName?: string
+  /** The key that picks a value while the menu is open; the position from 1 by default. */
+  readonly shortcutOf?: (value: Value, index: number) => string
 }): JSX.Element => {
   const [open, setOpen] = useState(false)
+  const shortcutOf = props.shortcutOf ?? ((_value: Value, index: number) => String(index + 1))
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger aria-label={props.label} className={cn(triggerClass, props.triggerClassName)} onClick={event => event.stopPropagation()}>
@@ -39,7 +43,7 @@ const Picker = <Value extends string>(props: {
         className="dshx-root dshx:min-w-44"
         onClick={event => event.stopPropagation()}
         onKeyDown={event => {
-          const picked = props.values[Number(event.key) - 1]
+          const picked = props.values.find((value, index) => shortcutOf(value, index) === event.key)
           if (picked === undefined) return
           event.preventDefault()
           props.onPick(picked)
@@ -52,7 +56,7 @@ const Picker = <Value extends string>(props: {
           <DropdownMenuItem key={value} onSelect={() => props.onPick(value)} className="dshx:gap-2 dshx:text-[13px]">
             {props.render(value)}
             {value === props.value ? <CheckIcon aria-hidden className="dshx:ml-auto dshx:size-3.5" /> : null}
-            {value === props.value ? null : <DropdownMenuShortcut>{index + 1}</DropdownMenuShortcut>}
+            {value === props.value ? null : <DropdownMenuShortcut>{shortcutOf(value, index)}</DropdownMenuShortcut>}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -157,7 +161,42 @@ const AttentionPicker = (props: {
   />
 )
 
+/** Linear's keys: 0 clears, 1 urgent to 4 low. */
+const priorityShortcut = (priority: BacklogPriority): string => String(BacklogItems.priorities.indexOf(priority))
+
+const PriorityPicker = (props: {
+  readonly itemLabel: string
+  readonly priority: BacklogPriority
+  readonly onPick: (priority: BacklogPriority) => void
+  readonly withLabel?: boolean
+}): JSX.Element => (
+  <Picker
+    label={`Priority of ${props.itemLabel}`}
+    value={props.priority}
+    values={BacklogItems.priorities}
+    onPick={props.onPick}
+    shortcutOf={priorityShortcut}
+    triggerClassName={props.withLabel === true ? 'dshx:h-7 dshx:px-2 dshx:text-[13px]' : 'dshx:size-6 dshx:justify-center'}
+    trigger={
+      <>
+        <WorkGlyphs.PriorityIcon priority={props.priority} />
+        {props.withLabel === true ? (
+          <span className={props.priority === 'none' ? 'dshx:text-muted-foreground' : undefined}>{WorkGlyphs.priorityLabels[props.priority]}</span>
+        ) : null}
+      </>
+    }
+    render={priority => (
+      <>
+        <WorkGlyphs.PriorityIcon priority={priority} />
+        {WorkGlyphs.priorityLabels[priority]}
+      </>
+    )}
+  />
+)
+
 export class ItemPickers {
+  static readonly Priority = PriorityPicker
+  static readonly priorityShortcut = priorityShortcut
   static readonly Status = StatusPicker
   static readonly Kind = KindPicker
   static readonly Attention = AttentionPicker

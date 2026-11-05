@@ -6,6 +6,7 @@ import {
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
   ContextMenuSeparator,
+  ContextMenuShortcut,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
@@ -14,13 +15,15 @@ import {
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { CopyIcon, FolderIcon, LinkIcon, MessagesSquareIcon, PinIcon, Trash2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { CopyIcon, FolderIcon, LinkIcon, LockOpenIcon, MessagesSquareIcon, PinIcon, Trash2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
 import { BacklogItems } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { ItemPickers } from './item-pickers.js'
+import { WorkGlyphs } from './work-glyphs.js'
 import { deleteSelection as deleteSelectedItems } from './delete-selection.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { backlogItemMarkdown } from './item-markdown.js'
@@ -39,6 +42,8 @@ type BacklogMenuItem = Pick<
   readonly attention?: BacklogSummaryView['attention'] | undefined
   readonly preview?: BacklogSummaryView['preview'] | undefined
   readonly body?: string | undefined
+  readonly priority?: BacklogSummaryView['priority'] | undefined
+  readonly lease?: BacklogSummaryView['lease'] | undefined
 }
 
 /** One consistent right-click menu for every backlog item presentation. */
@@ -169,6 +174,30 @@ export const BacklogItemMenu = (props: {
           </ContextMenuSub>
           <ContextMenuSub>
             <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+              <WorkGlyphs.PriorityIcon priority={item.priority ?? 'none'} />
+              Priority
+              {countSuffix}
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+              <ContextMenuRadioGroup
+                value={item.priority ?? 'none'}
+                onValueChange={value => {
+                  const priority = BacklogItems.priorities.find(candidate => candidate === value)
+                  if (priority !== undefined) update({ priority })
+                }}
+              >
+                {BacklogItems.priorities.map(priority => (
+                  <ContextMenuRadioItem key={priority} value={priority} className="dshx:text-[13px]">
+                    <WorkGlyphs.PriorityIcon priority={priority} />
+                    {WorkGlyphs.priorityLabels[priority]}
+                    <ContextMenuShortcut>{ItemPickers.priorityShortcut(priority)}</ContextMenuShortcut>
+                  </ContextMenuRadioItem>
+                ))}
+              </ContextMenuRadioGroup>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
               <ItemGlyphs.KindIcon kind={item.kind} />
               Kind
               {countSuffix}
@@ -234,6 +263,15 @@ export const BacklogItemMenu = (props: {
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSeparator />
+          {many || (item.lease ?? null) === null ? null : (
+            <ContextMenuItem
+              className="dshx:gap-2 dshx:text-[13px]"
+              onSelect={() => actions.release.mutate(item.id, { onError: BacklogNotices.failure('The claim was not released.') })}
+            >
+              <LockOpenIcon aria-hidden className="dshx:size-3.5" />
+              Release claim
+            </ContextMenuItem>
+          )}
           <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => update({ pinned: !item.pinned })}>
             <PinIcon aria-hidden className="dshx:size-3.5" />
             {item.pinned ? 'Unpin' : 'Pin'} {many ? 'items' : 'item'}

@@ -25,7 +25,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
 import { backlogSortTime, sortBacklogItems, type BacklogSort } from './backlog-sort.js'
-import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
+import { BacklogItems, type BacklogKind, type BacklogPriority, type BacklogStatus } from './item.js'
+import { WorkGlyphs } from './work-glyphs.js'
 import { BacklogInlineTitle, useBacklogInlineRename } from './item-inline-title.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogText } from './item-text.js'
@@ -38,14 +39,24 @@ import { useBacklogActions } from './use-backlog-actions.js'
 import { itemTransitionName } from './view-transition.js'
 import { BacklogReference } from './backlog-reference.js'
 
-type GroupBy = 'status' | 'kind' | 'project' | 'attention'
+type GroupBy = 'status' | 'kind' | 'project' | 'attention' | 'priority' | 'parent'
 type Entry =
   | { readonly kind: 'header'; readonly key: string; readonly group: Group }
   | { readonly kind: 'row'; readonly key: string; readonly item: BacklogSummaryView }
 type Group = { readonly key: string; readonly label: ReactNode; readonly status: BacklogStatus | null; readonly items: BacklogSummaryView[] }
 
-const groupLabels = { status: 'Status', kind: 'Kind', project: 'Project', attention: 'Attention' } satisfies Record<GroupBy, string>
-const groupByOf = (value: string): GroupBy => (value === 'kind' || value === 'project' || value === 'attention' ? value : 'status')
+const groupLabels = {
+  status: 'Status',
+  kind: 'Kind',
+  project: 'Project',
+  attention: 'Attention',
+  priority: 'Priority',
+  parent: 'Parent',
+} satisfies Record<GroupBy, string>
+const groupByValues = ['status', 'priority', 'kind', 'project', 'attention', 'parent'] as const satisfies readonly GroupBy[]
+const groupByOf = (value: string): GroupBy => groupByValues.find(candidate => candidate === value) ?? 'status'
+/** Ready items by priority, in the panel's Ready view. */
+const readyPriorities = ['urgent', 'high', 'medium', 'low', 'none'] as const satisfies readonly BacklogPriority[]
 const columns =
   'dshx:grid dshx:grid-cols-[28px_minmax(0,1fr)_128px_96px_160px_64px_52px] dshx:@max-[56rem]:grid-cols-[28px_minmax(0,1fr)_120px_140px_52px] dshx:@max-pane-compact:grid-cols-[28px_minmax(0,1fr)_40px_52px]'
 /** Kind and People go first when the table narrows (an open inspector), then Project. */
@@ -77,6 +88,36 @@ const groupsOf = (items: readonly BacklogSummaryView[], by: GroupBy): Group[] =>
       ),
       items: items.filter(item => item.kind === kind),
     }))
+  if (by === 'priority')
+    return readyPriorities.map(priority => ({
+      key: priority,
+      status: null,
+      label: (
+        <>
+          <WorkGlyphs.PriorityIcon priority={priority} />
+          {WorkGlyphs.priorityLabels[priority]}
+        </>
+      ),
+      items: items.filter(item => item.priority === priority),
+    }))
+  if (by === 'parent') {
+    const titles = new Map(items.map(item => [BacklogReference.refOf(item), item.title]))
+    const parents = [...new Set(items.map(item => item.parent ?? ''))].sort()
+    return parents.map(parent => ({
+      key: parent,
+      status: null,
+      label:
+        parent === '' ? (
+          <span className="dshx:text-muted-foreground">No parent</span>
+        ) : (
+          <>
+            <span className="dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">{BacklogReference.label(parent)}</span>
+            <span className="dshx:max-w-80 dshx:truncate">{titles.get(parent) ?? ''}</span>
+          </>
+        ),
+      items: items.filter(item => (item.parent ?? '') === parent),
+    }))
+  }
   if (by === 'attention')
     return BacklogItems.attentions.map(attention => ({
       key: attention,
@@ -127,6 +168,7 @@ const Row = (props: {
   const actions = useBacklogActions()
   const modifiedCheckboxClick = useRef(false)
   const item = props.item
+  const run = WorkGlyphs.useRunState(item)
   const closed = item.status === 'done' || item.status === 'dropped'
   const rename = useBacklogInlineRename(() => props.select(item.id))
   const background = (() => {
@@ -194,6 +236,13 @@ const Row = (props: {
           />
         </span>
         <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+          <span onClick={event => event.stopPropagation()} className="dshx:-ml-1 dshx:flex dshx:shrink-0">
+            <ItemPickers.Priority
+              itemLabel={BacklogReference.labelOf(item)}
+              priority={item.priority}
+              onPick={priority => actions.update.mutate({ id: item.id, priority })}
+            />
+          </span>
           <span className="dshx:w-12 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">{BacklogReference.labelOf(item)}</span>
           {rename.renaming ? (
             <BacklogInlineTitle
@@ -213,6 +262,10 @@ const Row = (props: {
           )}
           {item.pinned ? <PinIcon aria-label="Pinned" className="dshx:size-3 dshx:shrink-0 dshx:fill-current dshx:text-warning" /> : null}
           <ItemGlyphs.AttentionBadge attention={item.attention} compact />
+          <WorkGlyphs.ProgressBadge progress={item.children} />
+          <WorkGlyphs.BlockedBadge blockedBy={item.blockedBy} />
+          <WorkGlyphs.ClaimChip lease={item.lease} compact />
+          <WorkGlyphs.RunStateChip run={run} compact />
           {item.proposal === null ? null : <WandSparklesIcon aria-label="Suggestion waiting" className="dshx:size-3 dshx:shrink-0 dshx:text-violet" />}
           {item.tags.slice(0, 2).map(tag => (
             <span key={tag} className="dshx:hidden dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground dshx:@min-[52rem]:inline">
@@ -287,6 +340,8 @@ export const ItemsView = (props: {
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
   readonly triageOff: boolean
+  /** The Ready view: grouped by priority with no grouping menu, and an empty state that explains readiness. */
+  readonly ready?: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
@@ -378,21 +433,23 @@ export const ItemsView = (props: {
         clear={props.clearStatuses}
         trailing={
           <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground">
-                <LayersIcon className="dshx:size-3.5" /> Group: <span className="dshx:text-foreground">{groupLabels[props.groupBy]}</span>
-                <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="dshx-root">
-                <DropdownMenuRadioGroup value={props.groupBy} onValueChange={value => props.setGroupBy(groupByOf(value))}>
-                  {(['status', 'kind', 'project', 'attention'] as const).map(value => (
-                    <DropdownMenuRadioItem key={value} value={value} className="dshx:text-[13px]">
-                      {groupLabels[value]}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {props.ready === true ? null : (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground">
+                  <LayersIcon className="dshx:size-3.5" /> Group: <span className="dshx:text-foreground">{groupLabels[props.groupBy]}</span>
+                  <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="dshx-root">
+                  <DropdownMenuRadioGroup value={props.groupBy} onValueChange={value => props.setGroupBy(groupByOf(value))}>
+                    {groupByValues.map(value => (
+                      <DropdownMenuRadioItem key={value} value={value} className="dshx:text-[13px]">
+                        {groupLabels[value]}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <span className="dshx:ml-1 dshx:whitespace-nowrap dshx:text-xs dshx:text-muted-foreground">{props.items.length} items</span>
           </div>
         }
@@ -419,8 +476,14 @@ export const ItemsView = (props: {
           <span className={roomyOnly}>Kind</span>
           <span className={wideOnly}>Project</span>
           <span className={roomyOnly}>People</span>
-          <span className="dshx:text-right">{props.sort === 'created' ? 'Created' : 'Updated'}</span>
+          <span className="dshx:text-right">{props.sort === 'updated' ? 'Updated' : 'Created'}</span>
         </div>
+        {entries.length === 0 && props.ready === true && !filtering ? (
+          <EmptyState className="dshx:py-20">
+            Nothing is ready. Ready items are in the Inbox or Todo, not snoozed, wait on no open item, have no open sub-issue and nobody has claimed them. If
+            open work should be here, the running DSH Host may predate the ready queue: restart the DSH Host process.
+          </EmptyState>
+        ) : null}
         {entries.length === 0 && filtering ? (
           <EmptyState className="dshx:py-20" action={{ label: 'Show all statuses', onSelect: props.clearStatuses }}>
             No items match this status filter. Pick another status above, or clear the filter to see everything.

@@ -33,8 +33,10 @@ export interface ShippedItem {
   readonly kind: BacklogKind
   readonly project: string | null
   readonly doneAt: number
-  /** Who moved it to done: an actor id. */
+  /** Who did it: the agent it was delegated to when a signal closed it, else whoever moved it to done. An actor id. */
   readonly doneBy: string
+  /** Who it was done for: the actor who captured it. */
+  readonly owner: string
   /** Captured by an agent: it counts, and the view marks it. */
   readonly byAgent: boolean
   readonly revisions: readonly string[]
@@ -138,7 +140,8 @@ const shippedItemOf = (item: BacklogItem, done: DoneEvent): ShippedItem => {
     kind: item.kind,
     project: item.project,
     doneAt: done.at,
-    doneBy: done.actor,
+    doneBy: done.actor === 'system' && item.delegate !== undefined ? item.delegate : done.actor,
+    owner: BacklogItems.creatorOf(item) ?? 'user',
     byAgent: BacklogItems.creatorOf(item)?.startsWith('agent:') ?? false,
     revisions: item.links.filter(link => link.type === 'revision').map(link => link.target),
     pullRequests: item.links.filter(link => link.type === 'url' && pullRequestPattern.test(link.target)).map(link => link.target),

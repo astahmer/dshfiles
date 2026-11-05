@@ -37,11 +37,12 @@ import {
   SearchIcon,
   Settings2Icon,
   WandSparklesIcon,
+  PlayIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useIsMutating, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Effect, Schema } from 'effect'
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 
 import { backlogApi, BacklogViews, type BacklogBackfillResult, type BacklogSummaryView } from './api.js'
 import { BackfillDialog } from './backfill-dialog.js'
@@ -61,6 +62,8 @@ import { panelDraftKey } from './panel-draft.js'
 import { BacklogProjectPaths } from './project-paths.js'
 import { ProjectsView } from './projects-view.js'
 import { BacklogShipped } from './shipped.js'
+import { AgentRunStates } from './agent-run-state.js'
+import { WorkGlyphs } from './work-glyphs.js'
 import { ShippedView } from './shipped-view.js'
 import { ProjectFilterPicker } from './project-picker.js'
 import { SearchResults } from './search-results.js'
@@ -81,21 +84,42 @@ type View = BacklogView
 /** Agents write from other threads; a short poll keeps the open panel current without a push channel. */
 const REFRESH_MS = 5_000
 const MAX_ANIMATED_ITEMS = 150
-const views = ['feed', 'inbox', 'items', 'board', 'projects', 'shipped'] as const
-const viewLabels = { feed: 'Feed', inbox: 'Inbox', items: 'Items', board: 'Board', projects: 'Projects', shipped: 'Shipped' } satisfies Record<View, string>
-const viewIcons = { feed: MessagesSquareIcon, inbox: InboxIcon, items: Rows3Icon, board: KanbanIcon, projects: FolderKanbanIcon, shipped: RocketIcon } as const
+// Ready came last so the number keys of the older views stay as they were.
+const views = ['feed', 'inbox', 'items', 'board', 'projects', 'shipped', 'ready'] as const
+const viewLabels = {
+  feed: 'Feed',
+  inbox: 'Inbox',
+  ready: 'Ready',
+  items: 'Items',
+  board: 'Board',
+  projects: 'Projects',
+  shipped: 'Shipped',
+} satisfies Record<View, string>
+const viewIcons = {
+  feed: MessagesSquareIcon,
+  inbox: InboxIcon,
+  ready: PlayIcon,
+  items: Rows3Icon,
+  board: KanbanIcon,
+  projects: FolderKanbanIcon,
+  shipped: RocketIcon,
+} as const
 
-const sortOrderSchema = Schema.Literals(['updated', 'created'])
+const sortOrderSchema = Schema.Literals(['updated', 'created', 'priority'])
 const defaultSort = { feed: 'updated', inbox: 'updated', items: 'updated' } as const
 
 /** Each view, and the full search results, keeps its own "Hide agent items" choice; hiding is the default. */
 type AgentItemsScope = View | 'search'
-const hideAgentItemsDefaults = { feed: true, inbox: true, items: true, board: true, projects: true, shipped: true, search: true } as const
+const hideAgentItemsDefaults = { feed: true, inbox: true, ready: true, items: true, board: true, projects: true, shipped: true, search: true } as const
 const hiddenByDefault = Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(true)))
+
+const sortOrders = ['updated', 'created', 'priority'] as const
+const sortLabels = { updated: 'Last update', created: 'Created', priority: 'Priority' } satisfies Record<BacklogSort, string>
+const sortNames = { updated: 'last update', created: 'creation date', priority: 'priority, then oldest' } satisfies Record<BacklogSort, string>
 
 const preferencesSchema = Schema.Struct({
   view: Schema.Literals(views),
-  groupBy: Schema.Literals(['status', 'kind', 'project', 'attention']),
+  groupBy: Schema.Literals(['status', 'kind', 'project', 'attention', 'priority', 'parent']),
   showDormant: Schema.Boolean,
   statuses: Schema.Array(Schema.Literals(BacklogItems.statuses)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   project: Schema.NullOr(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null))),
@@ -108,6 +132,7 @@ const preferencesSchema = Schema.Struct({
   hideAgentItems: Schema.Struct({
     feed: hiddenByDefault,
     inbox: hiddenByDefault,
+    ready: hiddenByDefault,
     items: hiddenByDefault,
     board: hiddenByDefault,
     projects: hiddenByDefault,
@@ -132,6 +157,13 @@ const preferences = createStoredValue({
     shippedPeriod: 'week' as const,
   },
 })
+
+/** The panel's tooltip timing and the run-state lookup its rows, cards and inspector read. */
+const PanelProviders = (props: { readonly runStateOf: Parameters<typeof WorkGlyphs.RunStateProvider>[0]['value']; readonly children: ReactNode }) => (
+  <TooltipProvider delayDuration={500}>
+    <WorkGlyphs.RunStateProvider value={props.runStateOf}>{props.children}</WorkGlyphs.RunStateProvider>
+  </TooltipProvider>
+)
 
 const isTyping = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
@@ -508,8 +540,24 @@ export const BacklogPanel = (props: {
   const [search, setSearch] = useState<SearchScope>(SearchScopes.idle)
   const query = search.query
   const [kinds, setKinds] = useState<BacklogKind[]>([])
-  const [openIds, setOpenIds] = useState<BacklogViewSelection>({ feed: null, inbox: null, items: null, board: null, projects: null, shipped: null })
-  const [cursorIds, setCursorIds] = useState<BacklogViewSelection>({ feed: null, inbox: null, items: null, board: null, projects: null, shipped: null })
+  const [openIds, setOpenIds] = useState<BacklogViewSelection>({
+    feed: null,
+    inbox: null,
+    ready: null,
+    items: null,
+    board: null,
+    projects: null,
+    shipped: null,
+  })
+  const [cursorIds, setCursorIds] = useState<BacklogViewSelection>({
+    feed: null,
+    inbox: null,
+    ready: null,
+    items: null,
+    board: null,
+    projects: null,
+    shipped: null,
+  })
   const openId = openIds[view]
   const cursorId = cursorIds[view]
   const setOpenId = useCallback((id: number | null): void => setOpenIds(selection => setBacklogViewSelection(selection, view, id)), [view])
@@ -642,7 +690,6 @@ export const BacklogPanel = (props: {
     queryFn: async ({ signal }) => (await attentionApi.state(undefined, { signal })).sessions,
     refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : 10_000),
     retry: false,
-    enabled: inboxThreadsMode !== 'off',
   })
   const attentionOwnerMissing = isApiOwnerMissing(attention.error)
   const now = list.dataUpdatedAt
@@ -652,6 +699,10 @@ export const BacklogPanel = (props: {
     [all, stored.showDormant, showsResults, now],
   )
   const filteredItems = useMemo(() => FeedStatus.filter(items, stored.statuses), [items, stored.statuses])
+  // Readiness is the Host's call over the whole store, so a dormant item that is ready still shows.
+  const readyAll = useMemo(() => all.filter(item => item.ready), [all])
+  const readyItems = useMemo(() => FeedStatus.filter(readyAll, stored.statuses), [readyAll, stored.statuses])
+  const readyTotals = useMemo(() => FeedStatus.counts(readyAll), [readyAll])
   const statusTotals = useMemo(() => FeedStatus.counts(items), [items])
   const inboxItems = inbox.data?.items ?? []
   const inboxThreads = useMemo(
@@ -666,6 +717,11 @@ export const BacklogPanel = (props: {
   )
   const tags = useMemo(() => [...new Set(all.flatMap(item => item.tags))].sort(), [all])
   const threads = props.listThreads()
+  const runStateOf = useMemo(() => {
+    const byId = new Map(threads.map(thread => [thread.id, thread]))
+    const finished = new Map((attentionOwnerMissing ? [] : (attention.data ?? [])).map(record => [record.sessionId, record.finishedReason]))
+    return (item: Pick<BacklogSummaryView, 'status' | 'delegate' | 'links'>) => AgentRunStates.of({ item, threads: byId, finished, now })
+  }, [threads, attention.data, attentionOwnerMissing, now])
   const projectPaths = useMemo(() => {
     const backlogProjects = (projectCatalog.data ?? []).flatMap(project => (project.project === null ? [] : [project.project]))
     const workspaceProjects = props.startThread.listProjects().map(project => project.path)
@@ -776,7 +832,7 @@ export const BacklogPanel = (props: {
     )
 
   return (
-    <TooltipProvider delayDuration={500}>
+    <PanelProviders runStateOf={runStateOf}>
       <main
         ref={panelRoot}
         tabIndex={-1}
@@ -868,22 +924,23 @@ export const BacklogPanel = (props: {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DropdownMenuTrigger
-                      aria-label={`Sort by ${sort === 'updated' ? 'last update' : 'creation date'}`}
+                      aria-label={`Sort by ${sortNames[sort]}`}
                       className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground"
                     >
                       <ArrowDownWideNarrowIcon className="dshx:size-3.5" />
-                      <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">{sort === 'updated' ? 'Last update' : 'Created'}</span>
+                      <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">{sortLabels[sort]}</span>
                     </DropdownMenuTrigger>
                   </TooltipTrigger>
-                  <TooltipContent>{`Sort by ${sort === 'updated' ? 'last update' : 'creation date'}`}</TooltipContent>
+                  <TooltipContent>{`Sort by ${sortNames[sort]}`}</TooltipContent>
                 </Tooltip>
                 <DropdownMenuContent align="end" className="dshx-root">
                   <DropdownMenuLabel>Sort by</DropdownMenuLabel>
                   <DropdownMenuRadioGroup
                     value={sort}
                     onValueChange={value => {
-                      if (value !== 'updated' && value !== 'created') return
-                      setPreference({ sort: { ...stored.sort, [view]: value } })
+                      const next = sortOrders.find(candidate => candidate === value)
+                      if (next === undefined || (next === 'priority' && view !== 'items')) return
+                      setPreference({ sort: { ...stored.sort, [view]: next } })
                     }}
                   >
                     <DropdownMenuRadioItem value="updated" className="dshx:text-[13px]">
@@ -892,6 +949,11 @@ export const BacklogPanel = (props: {
                     <DropdownMenuRadioItem value="created" className="dshx:text-[13px]">
                       Creation date
                     </DropdownMenuRadioItem>
+                    {view === 'items' ? (
+                      <DropdownMenuRadioItem value="priority" className="dshx:text-[13px]">
+                        Priority
+                      </DropdownMenuRadioItem>
+                    ) : null}
                   </DropdownMenuRadioGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1040,6 +1102,29 @@ export const BacklogPanel = (props: {
                       openThread={props.openThread}
                     />
                   )}
+                  {view === 'ready' && (
+                    <ItemsView
+                      ready
+                      items={readyItems}
+                      sort="priority"
+                      counts={readyTotals}
+                      statuses={stored.statuses}
+                      toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                      clearStatuses={() => setPreference({ statuses: [] })}
+                      openId={openId}
+                      cursorId={cursorId}
+                      select={select}
+                      hover={setCursorId}
+                      groupBy="priority"
+                      triageOff={triageOff}
+                      setGroupBy={() => undefined}
+                      collapsed={collapsed}
+                      setCollapsed={next => withViewTransition(() => setCollapsed(next))}
+                      captureInto={startCapture}
+                      projectPaths={projectPaths}
+                      startThread={openStartThread}
+                    />
+                  )}
                   {view === 'items' && (
                     <ItemsView
                       items={filteredItems}
@@ -1173,6 +1258,6 @@ export const BacklogPanel = (props: {
           </div>
         )}
       </main>
-    </TooltipProvider>
+    </PanelProviders>
   )
 }

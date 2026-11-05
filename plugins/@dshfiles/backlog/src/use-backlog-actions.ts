@@ -92,6 +92,7 @@ export const useBacklogActions = () => {
     },
     onSettled: invalidate,
   })
+  const release = useMutation({ mutationFn: (id: number) => api.release({ id }), onSuccess: invalidate })
   const capture = useMutation({ mutationFn: (input: Parameters<typeof api.capture>[0]) => api.capture(input), onSuccess: invalidate })
   const link = useMutation({ mutationFn: (input: Parameters<typeof api.link>[0]) => api.link(input), onSuccess: invalidate })
   const comment = useMutation(commentMutation({ client, send: input => api.comment(input) }))
@@ -125,6 +126,7 @@ export const useBacklogActions = () => {
     applyProposal,
     dismissProposal,
     delete: deleteItem,
+    release,
   }
 }
 

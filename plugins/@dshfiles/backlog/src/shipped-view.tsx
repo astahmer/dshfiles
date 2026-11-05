@@ -62,6 +62,11 @@ const ItemRow = (props: {
           <span className="dshx:@max-pane-compact:sr-only">Agent</span>
         </span>
       ) : null}
+      {entry.doneBy.startsWith('agent:') ? (
+        <span className="dshx:shrink-0 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground dshx:@max-pane-compact:hidden">
+          done by {ItemGlyphs.actorName(entry.doneBy)} for {ItemGlyphs.actorName(entry.owner)}
+        </span>
+      ) : null}
       {entry.revisions.slice(0, 2).map(revision => (
         <span
           key={revision}

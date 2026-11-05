@@ -55,6 +55,8 @@ export interface ComposerThread {
   readonly title: string
   readonly running: boolean
   readonly cwd?: string
+  /** When the thread last changed, for the agent run state of the items it works on. */
+  readonly updatedAt?: number
 }
 
 type Suggestion = { readonly key: string; readonly insert: string; readonly label: ReactNode; readonly hint: string; readonly project?: string }

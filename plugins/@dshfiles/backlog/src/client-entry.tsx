@@ -268,7 +268,7 @@ export default defineClient({
               return state.ids.flatMap(id => {
                 const session = state.byId[id]
                 if (session === undefined || session.blank || session.parentId !== undefined) return []
-                const thread = { id: session.id, title: session.displayTitle, running: session.running }
+                const thread = { id: session.id, title: session.displayTitle, running: session.running, updatedAt: session.updatedAt }
                 return [session.cwd === undefined ? thread : { ...thread, cwd: session.cwd }]
               })
             }}
