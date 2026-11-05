@@ -4,7 +4,19 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useApi } from '@dshfiles/dshx/client'
 import { useSyncExternalStore } from 'react'
 import { projectChecksApi, type ProjectActionView, type ProjectCheckReceipt } from './api.js'
-import { PlayIcon, RefreshCwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  ClockIcon,
+  GitCommitHorizontalIcon,
+  ListChecksIcon,
+  PlayIcon,
+  RefreshCwIcon,
+  ServerIcon,
+  SettingsIcon,
+  TriangleAlertIcon,
+  WorkflowIcon,
+  XIcon,
+} from '@dshfiles/plugin-ui/icons'
+import { PipelineRun, type PipelineRunStatus, type PipelineSummaryRow } from '@dshfiles/plugin-ui/components/motion/pipeline-run'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
@@ -92,12 +104,19 @@ export default defineClient({
   },
 })
 
-const receiptBadgeVariant = (status: ProjectCheckReceipt['status']): 'success' | 'destructive' | 'warning' | 'muted' => {
-  if (status === 'passed') return 'success'
-  if (status === 'failed') return 'destructive'
-  if (status === 'timed-out') return 'warning'
-  return 'muted'
-}
+const receiptRunStatus = {
+  passed: 'done',
+  failed: 'failed',
+  'timed-out': 'failed',
+  cancelled: 'cancelled',
+} as const satisfies Record<ProjectCheckReceipt['status'], PipelineRunStatus>
+
+const receiptTitles = {
+  passed: 'Check passed',
+  failed: 'Check failed',
+  'timed-out': 'Check timed out',
+  cancelled: 'Check cancelled',
+} satisfies Record<ProjectCheckReceipt['status'], string>
 
 const formatTime = (timestamp: number): string => new Date(timestamp).toLocaleTimeString()
 
@@ -112,7 +131,7 @@ const revisionEvidenceLabel = (receipt: ProjectCheckReceipt): string => {
   const before = receipt.sourceRevisionBefore?.slice(0, 12) ?? 'not recorded'
   const afterRevision = receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter
   const after = afterRevision?.slice(0, 12) ?? 'not recorded'
-  return `Recorded revisions · before ${before} · after ${after}`
+  return `before ${before} · after ${after}`
 }
 
 const executorLabel = (receipt: ProjectCheckReceipt): string => {
@@ -140,6 +159,25 @@ const remoteFallbackLabel = (receipt: ProjectCheckReceipt): string => {
     ? `Remote execution failed — ${detail}`
     : `Ran locally after — ${detail}`
 }
+
+/** The receipt's recorded evidence, one line each, in the order a reviewer checks them. */
+const receiptRows = (receipt: ProjectCheckReceipt): PipelineSummaryRow[] => [
+  { id: 'run', label: 'Run', value: executionModeLabel(receipt), icon: <WorkflowIcon /> },
+  { id: 'revisions', label: 'Revisions', value: revisionEvidenceLabel(receipt), icon: <GitCommitHorizontalIcon /> },
+  { id: 'configuration', label: 'Configuration', value: receipt.configurationFreshness ?? 'unknown', icon: <SettingsIcon /> },
+  {
+    id: 'freshness',
+    label: 'Freshness',
+    value: <span className={receipt.freshness === 'stale' ? 'dshx:text-warning' : undefined}>{freshnessLabel(receipt)}</span>,
+    icon: <ClockIcon />,
+  },
+  ...(receipt.remoteFailure == null
+    ? []
+    : [{ id: 'remote', label: 'Remote', value: <span className="dshx:text-warning">{remoteFallbackLabel(receipt)}</span>, icon: <ServerIcon /> }]),
+  ...(receipt.failure === null
+    ? []
+    : [{ id: 'runner', label: 'Runner', value: <span className="dshx:text-destructive">{receipt.failure}</span>, icon: <TriangleAlertIcon /> }]),
+]
 
 function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel: SessionPanel }): JSX.Element | null {
   const api = useApi(projectChecksApi)
@@ -257,35 +295,22 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
           Recent check receipts
         </h3>
         {receipts.length === 0 ? <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No checks have run in this thread.</p> : null}
-        <ItemGroup className="dshx:divide-y dshx:rounded-md dshx:border">
+        <ul className="dshx:flex dshx:flex-col dshx:gap-2 dshx:empty:hidden">
           {receipts.map(receipt => (
-            <Item role="listitem" size="sm" className="dshx:gap-3 dshx:rounded-none dshx:px-3 dshx:py-2" key={receipt.id}>
-              <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
-                <ItemTitle>{receipt.label}</ItemTitle>
-                <ItemDescription className="dshx:line-clamp-none dshx:font-mono dshx:text-xs">
-                  {formatTime(receipt.finishedAt)} · {receipt.durationMs} ms{receipt.exitCode === null ? '' : ` · exit ${receipt.exitCode}`}
-                </ItemDescription>
-                <ItemDescription className="dshx:text-xs">{executionModeLabel(receipt)}</ItemDescription>
-                <ItemDescription className="dshx:text-xs">{revisionEvidenceLabel(receipt)}</ItemDescription>
-                <ItemDescription className="dshx:text-xs">Action configuration equivalence: {receipt.configurationFreshness ?? 'unknown'}</ItemDescription>
-                <ItemDescription className={receipt.freshness === 'stale' ? 'dshx:text-xs dshx:text-warning' : 'dshx:text-xs'}>
-                  {freshnessLabel(receipt)}
-                </ItemDescription>
-                {receipt.remoteFailure != null ? (
-                  <ItemDescription className="dshx:text-xs dshx:text-warning">{remoteFallbackLabel(receipt)}</ItemDescription>
-                ) : null}
-                {receipt.failure !== null ? (
-                  <ItemDescription className="dshx:text-xs dshx:text-destructive">Runner state: {receipt.failure}</ItemDescription>
-                ) : null}
-              </ItemContent>
-              <ItemActions className="dshx:self-start">
-                <Badge variant={receiptBadgeVariant(receipt.status)} data-status={receipt.status}>
-                  {receipt.status}
-                </Badge>
-              </ItemActions>
-            </Item>
+            <li data-status={receipt.status} key={receipt.id}>
+              <PipelineRun
+                failedLabel={receipt.status === 'timed-out' ? 'Timed out' : 'Failed'}
+                doneLabel="Passed"
+                heading={receipt.label}
+                icon={<ListChecksIcon />}
+                status={receiptRunStatus[receipt.status]}
+                steps={[]}
+                subtitle={`${formatTime(receipt.finishedAt)} · ${receipt.durationMs} ms${receipt.exitCode === null ? '' : ` · exit ${receipt.exitCode}`}`}
+                summary={{ title: receiptTitles[receipt.status], rows: receiptRows(receipt) }}
+              />
+            </li>
           ))}
-        </ItemGroup>
+        </ul>
       </section>
 
       <section className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:px-4 dshx:pt-4 dshx:pb-4" aria-labelledby="project-hooks-title">

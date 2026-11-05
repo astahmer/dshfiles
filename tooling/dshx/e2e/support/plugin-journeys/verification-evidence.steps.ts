@@ -146,7 +146,7 @@ Then('the receipt is backfilled once after restarting the scratch Host', async (
   })
   const stalePass = receiptRows(page).filter({ hasText: 'Manual pass' }).first()
   await expect(stalePass).toContainText('Stale: working copy changed after this check.')
-  await expect(stalePass).toContainText('Action configuration equivalence: unknown')
+  await expect(stalePass).toContainText(/Configuration\s*unknown/)
 
   await recordAssertion(page, 'activity-timeline-archived-session-unavailable', async () => {
     await projectChecksPanel(page).getByRole('button', { name: 'Close project checks', exact: true }).click()

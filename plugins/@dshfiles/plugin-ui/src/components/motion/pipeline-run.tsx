@@ -2,7 +2,7 @@ import * as React from 'react'
 import { animate, everyFrame, motionSafe, springs, durations, easings } from '../../motion/index.js'
 import { useEnter, usePrefersReducedMotion } from '../../motion/react.js'
 import { cn } from '../../lib/utils.js'
-import { CheckIcon, XIcon, PackageIcon } from '../../icons.js'
+import { CheckIcon, MinusIcon, XIcon, PackageIcon } from '../../icons.js'
 import { Button } from '../ui/button.js'
 import { PresenceList } from './presence-list.js'
 import { ShimmerText } from './text.js'
@@ -32,13 +32,15 @@ export interface PipelineSummaryRow {
   readonly icon?: React.ReactNode
 }
 
-export type PipelineRunStatus = 'idle' | 'running' | 'done' | 'failed'
+/** `cancelled` settled without passing or failing. */
+export type PipelineRunStatus = 'idle' | 'running' | 'done' | 'failed' | 'cancelled'
 
 export interface PipelineRunProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
   readonly heading: string
   readonly subtitle?: string
   readonly icon?: React.ReactNode
   readonly status: PipelineRunStatus
+  /** Empty for a run recorded as one result: the stepper is left out. */
   readonly steps: readonly PipelineStep[]
   /** The running step's live detail: its title, start time (epoch ms) and log lines. */
   readonly activity?: { readonly title: string; readonly startedAt: number; readonly lines: readonly PipelineLogLine[] } | undefined
@@ -54,6 +56,8 @@ export interface PipelineRunProps extends Omit<React.HTMLAttributes<HTMLElement>
   readonly onReset?: () => void
   /** Status chip label when done, e.g. "Released", "Landed". */
   readonly doneLabel?: string
+  /** Status chip label when failed, e.g. "Timed out". */
+  readonly failedLabel?: string
 }
 
 /**
@@ -77,12 +81,15 @@ export function PipelineRun({
   onCancel,
   onReset,
   doneLabel = 'Done',
+  failedLabel = 'Failed',
   className,
   ...props
 }: PipelineRunProps) {
   const runningIndex = steps.findIndex(step => step.state === 'running')
   const settled = steps.filter(step => step.state === 'done').length
   const panelMode = status === 'running' ? 'activity' : status === 'idle' ? 'idle' : 'summary'
+  const primaryAction = primaryActionFor({ status, onStart, onCancel, onReset })
+  const hasFooter = (targets !== undefined && target !== undefined) || extraAction !== undefined || primaryAction !== undefined
   const panelRef = React.useRef<HTMLDivElement>(null)
   useEnter(panelRef, 'blurIn', { duration: durations.base, ease: easings.out }, panelMode)
 
@@ -103,20 +110,32 @@ export function PipelineRun({
           <span className="dshx:truncate dshx:text-sm dshx:font-semibold dshx:text-foreground">{heading}</span>
           {subtitle ? <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{subtitle}</span> : null}
         </div>
-        <StatusChip status={status} step={runningIndex === -1 ? settled : runningIndex + 1} total={steps.length} doneLabel={doneLabel} />
+        <StatusChip
+          status={status}
+          step={runningIndex === -1 ? settled : runningIndex + 1}
+          total={steps.length}
+          doneLabel={doneLabel}
+          failedLabel={failedLabel}
+        />
       </header>
 
-      <ol
-        aria-label="Steps"
-        className="dshx:flex dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:pt-4 dshx:pb-2 dshx:@max-pane-narrow:px-1"
-      >
-        {steps.map((step, index) => (
-          <StepNode key={step.id} step={step} index={index} next={steps[index + 1]} />
-        ))}
-      </ol>
+      {steps.length === 0 ? null : (
+        <ol
+          aria-label="Steps"
+          className="dshx:flex dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:pt-4 dshx:pb-2 dshx:@max-pane-narrow:px-1"
+        >
+          {steps.map((step, index) => (
+            <StepNode key={step.id} step={step} index={index} next={steps[index + 1]} />
+          ))}
+        </ol>
+      )}
 
       <div
-        className="dshx:flex dshx:min-h-[156px] dshx:flex-col dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-4 dshx:@max-pane-narrow:min-h-[132px] dshx:@max-pane-narrow:p-3"
+        className={cn(
+          'dshx:flex dshx:flex-col dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-4 dshx:@max-pane-narrow:p-3',
+          // The fixed height keeps a live run from jumping as the log cross-fades into the summary.
+          steps.length > 0 && 'dshx:min-h-[156px] dshx:@max-pane-narrow:min-h-[132px]',
+        )}
         aria-live="polite"
       >
         <div ref={panelRef} key={panelMode} className="dshx:flex dshx:flex-1 dshx:flex-col">
@@ -130,33 +149,39 @@ export function PipelineRun({
         </div>
       </div>
 
-      <footer className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        {targets && target !== undefined ? (
-          <SlidingSegments
-            aria-label="Target"
-            options={targets}
-            value={target}
-            onValueChange={value => onTargetChange?.(value)}
-            className="dshx:rounded-full dshx:p-1 dshx:[&>span]:rounded-full dshx:[&>button]:rounded-full"
-          />
-        ) : null}
-        {extraAction}
-        {status === 'running' ? (
-          <Button className={primaryActionClass} onClick={onCancel}>
-            Cancel
-          </Button>
-        ) : status === 'idle' ? (
-          <Button className={primaryActionClass} onClick={onStart}>
-            Start
-          </Button>
-        ) : (
-          <Button className={primaryActionClass} onClick={onReset}>
-            Reset
-          </Button>
-        )}
-      </footer>
+      {hasFooter ? (
+        <footer className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+          {targets && target !== undefined ? (
+            <SlidingSegments
+              aria-label="Target"
+              options={targets}
+              value={target}
+              onValueChange={value => onTargetChange?.(value)}
+              className="dshx:rounded-full dshx:p-1 dshx:[&>span]:rounded-full dshx:[&>button]:rounded-full"
+            />
+          ) : null}
+          {extraAction}
+          {primaryAction ? (
+            <Button className={primaryActionClass} onClick={primaryAction.onClick}>
+              {primaryAction.label}
+            </Button>
+          ) : null}
+        </footer>
+      ) : null}
     </section>
   )
+}
+
+/** The footer's one action for the run's state; left out when the screen gave no handler for it. */
+function primaryActionFor(input: {
+  readonly status: PipelineRunStatus
+  readonly onStart: (() => void) | undefined
+  readonly onCancel: (() => void) | undefined
+  readonly onReset: (() => void) | undefined
+}): { readonly label: string; readonly onClick: () => void } | undefined {
+  if (input.status === 'running') return input.onCancel && { label: 'Cancel', onClick: input.onCancel }
+  if (input.status === 'idle') return input.onStart && { label: 'Start', onClick: input.onStart }
+  return input.onReset && { label: 'Reset', onClick: input.onReset }
 }
 
 /** `ml-auto` instead of a spacer so the action stays right-aligned when the footer wraps. */
@@ -172,7 +197,7 @@ function IdlePanel({ steps }: { readonly steps: readonly PipelineStep[] }) {
   )
 }
 
-function statusChipContent(status: PipelineRunStatus, step: number, total: number, doneLabel: string): React.ReactNode {
+function statusChipContent(status: PipelineRunStatus, step: number, total: number, doneLabel: string, failedLabel: string): React.ReactNode {
   switch (status) {
     case 'running':
       return (
@@ -191,7 +216,13 @@ function statusChipContent(status: PipelineRunStatus, step: number, total: numbe
     case 'failed':
       return (
         <>
-          <XIcon aria-hidden /> Failed
+          <XIcon aria-hidden /> {failedLabel}
+        </>
+      )
+    case 'cancelled':
+      return (
+        <>
+          <MinusIcon aria-hidden /> Cancelled
         </>
       )
     case 'idle':
@@ -204,11 +235,13 @@ function StatusChip({
   step,
   total,
   doneLabel,
+  failedLabel,
 }: {
   readonly status: PipelineRunStatus
   readonly step: number
   readonly total: number
   readonly doneLabel: string
+  readonly failedLabel: string
 }) {
   const ref = React.useRef<HTMLSpanElement>(null)
   useEnter(ref, 'popIn', springs.bouncy, status)
@@ -220,10 +253,10 @@ function StatusChip({
         status === 'running' && 'dshx:border-info/30 dshx:bg-info/10 dshx:text-info',
         status === 'done' && 'dshx:border-success/30 dshx:bg-success/10 dshx:text-success',
         status === 'failed' && 'dshx:border-destructive/30 dshx:bg-destructive/10 dshx:text-destructive',
-        status === 'idle' && 'dshx:border-border dshx:bg-background dshx:text-muted-foreground',
+        (status === 'idle' || status === 'cancelled') && 'dshx:border-border dshx:bg-background dshx:text-muted-foreground',
       )}
     >
-      {statusChipContent(status, step, total, doneLabel)}
+      {statusChipContent(status, step, total, doneLabel, failedLabel)}
     </span>
   )
 }
@@ -411,7 +444,7 @@ function SummaryPanel({ summary, failed }: { readonly summary: NonNullable<Pipel
             ) : null}
             <span className="dshx:grid dshx:size-4 dshx:shrink-0 dshx:place-items-center dshx:text-muted-foreground dshx:[&_svg]:size-3.5">{row.icon}</span>
             <dt className="dshx:shrink-0 dshx:text-muted-foreground">{row.label}</dt>
-            <dd className="dshx:min-w-0 dshx:truncate dshx:font-medium dshx:text-foreground">{row.value}</dd>
+            <dd className="dshx:min-w-0 dshx:font-medium dshx:break-words dshx:text-foreground">{row.value}</dd>
           </div>
         ))}
       </dl>
