@@ -29,6 +29,12 @@ export interface CallStackTreeProps extends Omit<React.HTMLAttributes<HTMLElemen
   readonly defaultCollapsed?: readonly string[]
   readonly selectedId?: string
   readonly onSelectFrame?: (id: string) => void
+  /** The line under the heading; defaults to the new-frame and changed-file counts of a change. */
+  readonly summary?: React.ReactNode
+  /** Space between root frames (separate call paths); off for one flat stack of frames. */
+  readonly spacedRoots?: boolean
+  /** The accessible name of the frame list. */
+  readonly listLabel?: string
 }
 
 /** Indent per depth level, as a CSS length so narrow panes can tighten it (see `--dshx-call-indent` on the root). */
@@ -58,7 +64,19 @@ const squareTone = {
  * existing code. Frames cascade in depth-first — the elbow draws down, the square pops, the call slides in — and
  * frames with callees fold and unfold with the same choreography.
  */
-export function CallStackTree({ heading, reference, roots, defaultCollapsed = [], selectedId, onSelectFrame, className, ...props }: CallStackTreeProps) {
+export function CallStackTree({
+  heading,
+  reference,
+  roots,
+  defaultCollapsed = [],
+  selectedId,
+  onSelectFrame,
+  summary,
+  spacedRoots = true,
+  listLabel = 'Call path',
+  className,
+  ...props
+}: CallStackTreeProps) {
   const [collapsed, setCollapsed] = React.useState<ReadonlySet<string>>(() => new Set(defaultCollapsed))
   const [hovered, setHovered] = React.useState<string | null>(null)
   const seen = React.useRef<ReadonlySet<string>>(new Set())
@@ -137,20 +155,24 @@ export function CallStackTree({ heading, reference, roots, defaultCollapsed = []
           </h3>
         </div>
         <div className="dshx:flex dshx:items-center dshx:gap-4 dshx:text-sm dshx:text-muted-foreground">
-          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-            <span className="dshx:size-2.5 dshx:rounded-[2px] dshx:bg-success" />
-            <span className="dshx:text-foreground/80">
-              <RollingNumber value={counts.new} /> new
-            </span>
-          </span>
-          <span>
-            <RollingNumber value={counts.files.size} /> {counts.files.size === 1 ? 'file' : 'files'}
-          </span>
+          {summary ?? (
+            <>
+              <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+                <span className="dshx:size-2.5 dshx:rounded-[2px] dshx:bg-success" />
+                <span className="dshx:text-foreground/80">
+                  <RollingNumber value={counts.new} /> new
+                </span>
+              </span>
+              <span>
+                <RollingNumber value={counts.files.size} /> {counts.files.size === 1 ? 'file' : 'files'}
+              </span>
+            </>
+          )}
         </div>
       </header>
       <PresenceList
         as="ul"
-        aria-label="Call path"
+        aria-label={listLabel}
         enter={null}
         exit="fadeOut"
         className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:p-0 dshx:font-mono dshx:text-[12.5px]"
@@ -161,7 +183,7 @@ export function CallStackTree({ heading, reference, roots, defaultCollapsed = []
             <FrameRow
               row={row}
               delay={delays.get(row.frame.id) ?? null}
-              gap={index > 0 && row.depth === 0}
+              gap={spacedRoots && index > 0 && row.depth === 0}
               expanded={!collapsed.has(row.frame.id)}
               onToggle={toggle}
               onHover={setHovered}
