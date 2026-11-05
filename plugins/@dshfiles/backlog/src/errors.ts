@@ -277,3 +277,14 @@ export class BacklogMergeInvalid extends Schema.TaggedError<BacklogMergeInvalid>
     return this.reason
   }
 }
+
+/** A scheduled rule could not be created through project-automations. */
+export class BacklogAutomationsUnavailable extends Schema.TaggedError<BacklogAutomationsUnavailable>()(
+  'BacklogAutomationsUnavailable',
+  { reason: Schema.String },
+  { dshxWireCode: 'automations-unavailable' },
+) {
+  override get message(): string {
+    return `The rule was not scheduled: ${this.reason}. Enable Project automations in Settings › Plugins, or create the automation with automation_save.`
+  }
+}

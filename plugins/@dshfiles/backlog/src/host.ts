@@ -32,6 +32,7 @@ import { LegacyBacklogTables } from './legacy-tables.js'
 import { LeaseSweep } from './lease-sweep.js'
 import { LifecycleSignals } from './lifecycle-signals.js'
 import { GateWatch } from './gate-watch.js'
+import { ScheduledRules } from './scheduled-rules.js'
 import { PullRequestState } from './pull-request-state.js'
 import { CaptureProjects } from './project-target.js'
 import { ReplyGenerator } from './reply-generator.js'
@@ -68,6 +69,7 @@ const hostEdges = Layer.mergeAll(
 )
 
 const backlogServices = Layer.mergeAll(
+  ScheduledRules.layer,
   ThreadStart.layer,
   TriageBackfill.layer,
   TweetImport.layer,
@@ -318,6 +320,11 @@ const backlogHandlers = Api.handlers(backlogApi, {
     AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_revert' } }).pipe(
       Effect.andThen(Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.revert({ ...resolved, actor: actorOf(call.caller) })))),
     ),
+  scheduleRule: ({ id, ...input }) =>
+    Effect.gen(function* () {
+      const itemId = id === undefined ? undefined : yield* itemIdOf(id)
+      return yield* ScheduledRules.use(rules => rules.schedule({ ...input, id: itemId }))
+    }),
   pullRequests: input =>
     Effect.gen(function* () {
       const found = yield* Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.get(id)))

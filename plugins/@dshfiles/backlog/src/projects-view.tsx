@@ -1,9 +1,10 @@
 import { useBacklogSelection } from './use-backlog-selection.js'
-import { ArrowLeftIcon, FolderGit2Icon, GitCommitHorizontalIcon, MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftIcon, CalendarClockIcon, FolderGit2Icon, GitCommitHorizontalIcon, MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo, useState, type ReactNode } from 'react'
 
 import { useApi, useSettings } from '@dshfiles/dshx/client'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 
@@ -17,6 +18,7 @@ import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogNotices } from './notices.js'
 import { ProjectGuidance } from './project-guidance.js'
+import { nightlyTiming } from './scheduled-rule-timing.js'
 import { backlogSettings } from './settings.js'
 
 const DAY_MS = 86_400_000
@@ -139,8 +141,29 @@ const GuidanceCard = (props: { readonly project: string }): JSX.Element => {
     onSuccess: () => client.invalidateQueries({ queryKey: [BacklogQueries.key] }),
     onError: BacklogNotices.failure('The agent guidance was not saved.'),
   })
+  const actions = useBacklogActions()
   return (
-    <Card heading="Agent guidance">
+    <Card
+      heading="Agent guidance"
+      action={
+        <Button
+          size="xs"
+          variant="ghost"
+          disabled={actions.scheduleRule.isPending}
+          onClick={() =>
+            actions.scheduleRule.mutate(
+              { rule: 'triage', project: props.project, timing: nightlyTiming() },
+              {
+                onSuccess: output => BacklogNotices.show({ text: `Scheduled “${output.title}” nightly. Manage it in Automations.`, kind: 'success', sessionId: null }),
+                onError: BacklogNotices.failure('The triage rule was not scheduled.'),
+              },
+            )
+          }
+        >
+          <CalendarClockIcon /> Schedule nightly triage
+        </Button>
+      }
+    >
       <Textarea
         aria-label="Agent guidance"
         placeholder="Conventions, commands and limits agents should follow on this project's items"

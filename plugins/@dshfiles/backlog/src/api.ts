@@ -6,6 +6,7 @@ import { BacklogReference } from './backlog-reference.js'
 import { DueDates } from './due-date.js'
 import { Recurrence } from './recurrence.js'
 import { BacklogGates } from './gates.js'
+import { timingSchema } from '@dshfiles/project-automations/api'
 import { BacklogItems } from './item.js'
 import { BacklogShipped } from './shipped.js'
 import { BacklogProviders } from './provider-port.js'
@@ -1128,6 +1129,28 @@ export const backlogApi = defineApi({
       description:
         'Set one project’s standing guidance for agents: it opens the first message of threads started from its items and comes back with backlog_get and backlog_ready. Run only when the user asked for this change.',
       tool: { name: 'backlog_set_project_guidance', readOnly: false },
+    }),
+    scheduleRule: method({
+      input: Schema.Struct({
+        rule: Schema.Literals(['triage', 'recreate']).annotate({
+          description: '`triage`: triage the project inbox on each run. `recreate`: capture a fresh copy of the item `id` on each run.',
+        }),
+        project: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTargetChars))
+          .pipe(Schema.optional)
+          .annotate({ description: 'Absolute project path; defaults to the project of `id`.' }),
+        id: itemKeySchema.pipe(Schema.optional).annotate({ description: 'The item a `recreate` rule copies.' }),
+        timing: timingSchema.annotate({
+          description: 'When it runs: { kind: daily, time, timeZone }, weekly with weekdays, cron with an expression, or every N seconds.',
+        }),
+      }),
+      output: Schema.Struct({ automationId: Schema.String, title: Schema.String, schedule: Schema.NullOr(Schema.String), projectTitle: Schema.NullOr(Schema.String) }),
+      description:
+        'Schedule a backlog rule as a project automation (via @dshfiles/project-automations): each run starts a thread in the project whose prompt calls backlog tools. For an item that simply repeats, prefer its `recurrence` field. Run only when the user asked; manage or delete the automation with automation_list / automation_delete.',
+      tool: {
+        name: 'backlog_schedule_rule',
+        readOnly: false,
+        render: output => `Scheduled "${output.title}"${output.schedule === null ? '' : ` (${output.schedule})`} as automation ${output.automationId}.`,
+      },
     }),
     pullRequests: method({
       input: Schema.Struct({ id: itemKeySchema }),

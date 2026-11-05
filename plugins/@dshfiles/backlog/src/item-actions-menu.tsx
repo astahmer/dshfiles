@@ -15,7 +15,7 @@ import {
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { CalendarIcon, CopyIcon, FolderIcon, MergeIcon, LinkIcon, LockOpenIcon, MessagesSquareIcon, PinIcon, Trash2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { CalendarClockIcon, CalendarIcon, CopyIcon, FolderIcon, MergeIcon, RepeatIcon, LinkIcon, LockOpenIcon, MessagesSquareIcon, PinIcon, Trash2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
 
@@ -33,6 +33,8 @@ import { BacklogNotices } from './notices.js'
 import { BacklogSyncControls } from './sync-controls.js'
 import { BacklogReference } from './backlog-reference.js'
 import { DueDates } from './due-date.js'
+import { Recurrence } from './recurrence.js'
+import { nightlyTiming } from './scheduled-rule-timing.js'
 
 const NO_PROJECT = 'no-project'
 type BacklogMenuItem = Pick<
@@ -302,6 +304,41 @@ export const BacklogItemMenu = (props: {
               <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
               Run triage
               {countSuffix}
+            </ContextMenuItem>
+          )}
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+              <RepeatIcon aria-hidden className="dshx:size-3.5" />
+              Make recurring
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+              {(['daily', 'weekly', 'monthly'] as const).map(recurrence => (
+                <ContextMenuItem key={recurrence} className="dshx:text-[13px]" onSelect={() => update({ recurrence })}>
+                  {Recurrence.label(recurrence)}
+                </ContextMenuItem>
+              ))}
+              <ContextMenuSeparator />
+              <ContextMenuItem className="dshx:text-[13px]" onSelect={() => update({ recurrence: null })}>
+                Stop repeating
+              </ContextMenuItem>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          {item.project === null || many ? null : (
+            <ContextMenuItem
+              className="dshx:gap-2 dshx:text-[13px]"
+              onSelect={() =>
+                actions.scheduleRule.mutate(
+                  { rule: 'triage', project: item.project ?? '', timing: nightlyTiming() },
+                  {
+                    onSuccess: output =>
+                      BacklogNotices.show({ text: `Scheduled “${output.title}” nightly. Manage it in Automations.`, kind: 'success', sessionId: null }),
+                    onError: BacklogNotices.failure('The triage rule was not scheduled.'),
+                  },
+                )
+              }
+            >
+              <CalendarClockIcon aria-hidden className="dshx:size-3.5" />
+              Schedule nightly triage
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />
