@@ -491,7 +491,8 @@ the provider reads or writes them.
 Removal: a remote item that disappears from a full scan (a deleted file) drops its item (when status flows in), says so
 in a note, and loses the ref. Deleting a backlog item keeps its refs as tombstones, so a pull never imports its remote
 item again; a provider whose delete mode is `close` (files) also writes it `status: dropped`, so the file stays in the
-repository's history. Linear and GitHub items are left alone.
+repository's history. A provider whose delete mode is `archive` or `delete` (Notion moves the page to the trash) gets
+`remove` instead, unless the binding only pulls. Linear and GitHub items are left alone.
 
 A failing pass never touches the item: the ref records the error with its recovery and the chip shows it until the next
 pass succeeds. Host work leaves a `backlog sync` span per binding pass (records, created, removed, items, errors), a
@@ -521,8 +522,12 @@ recording a receipt in `meta`. The settings field stays hidden as that migration
 A provider is a plugin serving the `backlog-provider` Host API, the `vcs-provider-port` way: import the contract from
 `@dshfiles/backlog/backlog-provider` and bind `BacklogProviders.contract('<your package>')` with handlers for `describe`
 (kinds, capabilities, reference patterns), `identity`, `pull` (paged, with a checkpoint), `fetch`, `resolve`, `push`,
-`create` and `comment`, all in the canonical record shape. The backlog lists served providers once a minute; a built-in
-kind wins over one of the same name. The built-ins implement the same in-process `BacklogProvider` interface.
+`create`, `comment` and `remove` (called only when the descriptor's `delete` is `archive` or `delete`), all in the
+canonical record shape. A descriptor may list `bindingOptions` (key, label, placeholder): the binding form shows one
+text field per option, the binding stores them as `options`, and every call scoped to that binding carries them
+(Notion's property names). The backlog lists served providers once a minute; a built-in kind wins over one of the same
+name. The built-ins implement the same in-process `BacklogProvider` interface. `@dshfiles/backlog-notion` is the
+reference external provider.
 
 ## Search and saved views
 

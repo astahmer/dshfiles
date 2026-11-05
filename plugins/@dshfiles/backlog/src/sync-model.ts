@@ -94,6 +94,8 @@ const bindingSchema = Schema.Struct({
   enabled: Schema.Boolean,
   /** The Host that runs this binding's sync; other Hosts leave it alone. */
   ownerHostId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+  /** Provider-specific settings the provider's descriptor names in `bindingOptions` (Notion's property names). */
+  options: Schema.optionalKey(BacklogProviders.bindingOptionsSchema),
 })
 
 /** How one item is tied to one remote item through one binding. An item may have several, one per binding. */

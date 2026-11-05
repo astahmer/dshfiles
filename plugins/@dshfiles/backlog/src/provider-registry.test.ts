@@ -49,6 +49,26 @@ const notionClient = (calls: string[]): EffectApiClient<BacklogProviderMethods> 
   },
   create: () => Effect.succeed(page),
   comment: () => Effect.succeed({ id: 'c', body: '', author: '', createdAt: 0 }),
+  remove: input => {
+    calls.push(`remove ${input.key} ${JSON.stringify(input.options ?? {})}`)
+    return Effect.succeed({})
+  },
+})
+
+const trashingDescriptor: ProviderDescriptor = {
+  ...notionDescriptor,
+  kind: 'notion-trash',
+  capabilities: { ...notionDescriptor.capabilities, write: true, delete: 'archive' },
+  bindingOptions: [{ key: 'statusProperty', label: 'Status property', placeholder: 'Status' }],
+}
+
+const trashingClient = (calls: string[]): EffectApiClient<BacklogProviderMethods> => ({
+  ...notionClient(calls),
+  describe: () => Effect.succeed({ providers: [trashingDescriptor] }),
+  resolve: input => {
+    calls.push(`resolve ${JSON.stringify(input.options ?? {})}`)
+    return Effect.succeed(page)
+  },
 })
 
 describe('the provider registry', () => {
@@ -74,5 +94,18 @@ describe('the provider registry', () => {
       expect(pass.results[0]?.pushed).toEqual([])
       expect(calls).toEqual(['resolve https://notion.so/page-1'])
     }).pipe(Effect.provide(syncTestLayer({ client: fakeLinear().client, external: [{ owner: '@acme/notion', client: notionClient(calls) }] })))
+  })
+
+  it.effect('hands a binding its provider options and removes the remote item on delete when the provider archives', () => {
+    const calls: string[] = []
+    return Effect.gen(function* () {
+      const sync = yield* BacklogSync
+      yield* sync.saveConnection({ connection: { instanceId: 'notion', kind: 'notion-trash', label: 'Notion', credential: '', baseUrl: '' } })
+      const saved = yield* sync.saveBinding({ binding: { id: 'roadmap', connectionId: 'notion', container: 'db-1', options: { statusProperty: 'Stage' } } })
+      expect(saved.binding.options).toEqual({ statusProperty: 'Stage' })
+      const imported = yield* sync.importRemote({ reference: 'https://notion.so/page-1', actor: { kind: 'user' } })
+      yield* sync.deleteItem({ id: imported.detail.item.id })
+      expect(calls).toEqual(['resolve {"statusProperty":"Stage"}', 'remove page-1 {"statusProperty":"Stage"}'])
+    }).pipe(Effect.provide(syncTestLayer({ client: fakeLinear().client, external: [{ owner: '@acme/notion', client: trashingClient(calls) }] })))
   })
 })

@@ -360,6 +360,10 @@ const bindingInputSchema = Schema.Struct({
   pushAgentComments: Schema.Boolean.pipe(Schema.optional),
   importNew: Schema.Boolean.pipe(Schema.optional),
   enabled: Schema.Boolean.pipe(Schema.optional),
+  options: BacklogProviders.bindingOptionsSchema.pipe(Schema.optional).annotate({
+    description:
+      'Provider-specific settings the provider lists as binding options (Notion: statusProperty, tagsProperty, priorityProperty, parentProperty). Replaces the saved set.',
+  }),
 })
 
 const renderSyncConnection = (output: typeof syncConnectionSchema.Type): string => {

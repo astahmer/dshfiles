@@ -781,10 +781,22 @@ export class BacklogSync extends Context.Service<
           if (binding === undefined || item === undefined || binding.ownerHostId !== sources.hostId) continue
           const context = yield* Effect.option(contextOf(binding))
           if (Option.isNone(context)) continue
-          const flows = BacklogSyncModel.fieldFlows({ binding, capabilities: context.value.provider.descriptor.capabilities })
-          if (context.value.provider.descriptor.capabilities.delete !== 'close' || flows.get('status')?.push !== true) continue
-          yield* context.value.provider
-            .push({ ...SyncEngineModel.scopeOf(context.value, item.project), key: ref.key, patch: { status: 'dropped' } })
+          const provider = context.value.provider
+          const capabilities = provider.descriptor.capabilities
+          const scope = SyncEngineModel.scopeOf(context.value, item.project)
+          const removing = capabilities.delete === 'archive' || capabilities.delete === 'delete'
+          if (removing && provider.remove !== undefined && capabilities.write && binding.direction !== 'pull') {
+            yield* provider
+              .remove({ ...scope, key: ref.key })
+              .pipe(
+                Effect.catch(error => Effect.logWarning('backlog sync: the remote item could not be removed', { binding: binding.id, error: error.message })),
+              )
+            continue
+          }
+          const flows = BacklogSyncModel.fieldFlows({ binding, capabilities })
+          if (capabilities.delete !== 'close' || flows.get('status')?.push !== true) continue
+          yield* provider
+            .push({ ...scope, key: ref.key, patch: { status: 'dropped' } })
             .pipe(Effect.catch(error => Effect.logWarning('backlog sync: the remote item could not be closed', { binding: binding.id, error: error.message })))
         }
         return yield* store.delete(input)

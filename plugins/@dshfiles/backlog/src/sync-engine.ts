@@ -77,6 +77,7 @@ const scopeOf = (context: BindingContext, project: string | null): ProviderScope
   connection: providerConnection(context.connection),
   container: context.binding.container,
   project: context.binding.scope ?? project,
+  ...(context.binding.options !== undefined && { options: context.binding.options }),
 })
 
 const flowsOf = (context: BindingContext) => BacklogSyncModel.fieldFlows({ binding: context.binding, capabilities: context.provider.descriptor.capabilities })

@@ -668,6 +668,8 @@ const BindingForm = (props: {
   const [poll, setPoll] = useState(initial?.pollEverySec ?? 0)
   const [pushAgentComments, setPushAgentComments] = useState(initial?.pushAgentComments ?? false)
   const [importNew, setImportNew] = useState(initial?.importNew ?? false)
+  const [options, setOptions] = useState<Readonly<Record<string, string>>>(initial?.options ?? {})
+  const optionFields = props.descriptor?.bindingOptions ?? []
   const discovered = useQuery({
     queryKey: [BacklogQueries.key, 'sync-discover', props.connection.connection.instanceId],
     queryFn: ({ signal }) => api.discoverSync({ connection: props.connection.connection.instanceId }, { signal }),
@@ -717,6 +719,14 @@ const BindingForm = (props: {
           pushAgentComments,
           importNew,
           enabled: initial?.enabled ?? true,
+          ...(optionFields.length > 0 && {
+            options: Object.fromEntries(
+              optionFields.flatMap(option => {
+                const value = (options[option.key] ?? '').trim()
+                return value === '' ? [] : [[option.key, value] as const]
+              }),
+            ),
+          }),
         },
       },
       { onSuccess: props.onDone },
@@ -785,6 +795,25 @@ const BindingForm = (props: {
           </div>
         ))}
       </fieldset>
+      {optionFields.length === 0 ? null : (
+        <fieldset className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-1.5 dshx:@max-pane-narrow:grid-cols-1" aria-label="Provider settings">
+          {optionFields.map(option => (
+            <label key={option.key} className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
+              {option.label}
+              <input
+                aria-label={option.label}
+                placeholder={option.placeholder}
+                value={options[option.key] ?? ''}
+                onChange={event => {
+                  const value = event.currentTarget.value
+                  setOptions(current => ({ ...current, [option.key]: value }))
+                }}
+                className={cn(inputClass, 'dshx:h-7 dshx:w-40 dshx:text-xs')}
+              />
+            </label>
+          ))}
+        </fieldset>
+      )}
       {directionOf('status') === 'off' ? null : (
         <fieldset className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2" aria-label="Remote status names">
           {BacklogItems.statuses.map(status => (

@@ -56,6 +56,7 @@ const adapt = (descriptor: ProviderDescriptor, client: EffectApiClient<BacklogPr
     push: input => client.push(input).pipe(Effect.mapError(fail)),
     create: input => client.create(input).pipe(Effect.mapError(fail)),
     comment: input => client.comment(input).pipe(Effect.mapError(fail)),
+    remove: input => client.remove(input).pipe(Effect.asVoid, Effect.mapError(fail)),
   }
 }
 

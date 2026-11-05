@@ -43,6 +43,13 @@ const capabilitiesSchema = Schema.Struct({
   rateLimit: Schema.NullOr(Schema.Struct({ requestsPerHour: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)) })),
 })
 
+const optionKey = Schema.String.check(Schema.isPattern(/^[a-z][a-zA-Z0-9]{0,39}$/))
+/** Provider-specific binding settings (`{ statusProperty: 'Status' }`), keyed by the descriptor's `bindingOptions`. */
+const bindingOptionsSchema = Schema.Record(optionKey, shortText(200))
+
+/** One provider-specific setting a binding form offers as a text field. */
+const bindingOptionSchema = Schema.Struct({ key: optionKey, label: shortText(60), placeholder: shortText(120) })
+
 const descriptorSchema = Schema.Struct({
   kind: kindSlug,
   label: shortText(60),
@@ -57,6 +64,8 @@ const descriptorSchema = Schema.Struct({
   referencePatterns: Schema.Array(shortText(300)),
   /** An example reference, for placeholders and recovery messages. */
   referenceExample: shortText(120),
+  /** Settings a binding of this kind may carry beyond its container: Notion's property names. */
+  bindingOptions: Schema.optionalKey(Schema.Array(bindingOptionSchema).check(Schema.isMaxLength(12))),
 })
 
 /** An account as the provider receives it: the credential stays a `secret:ALIAS` reference the provider resolves. */
@@ -133,6 +142,8 @@ const scopeFields = {
   connection: connectionSchema,
   container: shortText(500),
   project: Schema.NullOr(shortText(500)),
+  /** The binding's provider-specific settings; absent when it has none. */
+  options: Schema.optionalKey(bindingOptionsSchema),
 } satisfies Schema.Struct.Fields
 
 const pullInputSchema = Schema.Struct({
@@ -197,11 +208,18 @@ const methods = {
     output: remoteCommentSchema,
     description: 'Add one comment to an item.',
   }),
+  remove: method({
+    input: Schema.Struct({ ...scopeFields, key: keyText }),
+    output: Schema.Struct({}),
+    description: "Archive or delete one item, as the descriptor's `delete` capability says. Called only when that is `archive` or `delete`.",
+  }),
 }
 
 export type BacklogProviderMethods = typeof methods
 export type ProviderCapabilities = typeof capabilitiesSchema.Type
 export type ProviderDescriptor = typeof descriptorSchema.Type
+export type ProviderBindingOption = typeof bindingOptionSchema.Type
+export type ProviderBindingOptions = typeof bindingOptionsSchema.Type
 export type ProviderConnection = typeof connectionSchema.Type
 export type ProviderContainer = typeof containerSchema.Type
 export type ProviderIdentity = typeof identitySchema.Type
@@ -213,7 +231,12 @@ export type RemotePatch = typeof patchSchema.Type
 export type ProviderField = (typeof fields)[number]
 export type PullInput = typeof pullInputSchema.Type
 export type PullPage = typeof pullPageSchema.Type
-export type ProviderScope = { readonly connection: ProviderConnection; readonly container: string; readonly project: string | null }
+export type ProviderScope = {
+  readonly connection: ProviderConnection
+  readonly container: string
+  readonly project: string | null
+  readonly options?: ProviderBindingOptions
+}
 
 /** Why a provider call failed, in terms the sync engine records and the user can act on. */
 const failureCodes = ['not-found', 'rejected', 'transport', 'invalid-response', 'credential-missing', 'target-missing', 'unsupported'] as const
@@ -272,6 +295,8 @@ export interface BacklogProvider {
   readonly push: (input: ProviderScope & { readonly key: string; readonly patch: RemotePatch }) => Effect.Effect<RemoteRecord, BacklogProviderFailed>
   readonly create: (input: ProviderScope & { readonly patch: RemotePatch }) => Effect.Effect<RemoteRecord, BacklogProviderFailed>
   readonly comment: (input: ProviderScope & { readonly key: string; readonly body: string }) => Effect.Effect<RemoteComment, BacklogProviderFailed>
+  /** Present when `capabilities.delete` is `archive` or `delete`. */
+  readonly remove?: (input: ProviderScope & { readonly key: string }) => Effect.Effect<void, BacklogProviderFailed>
 }
 
 /** Every provider kind shares one Host API id and method set, and differs by owner. */
@@ -283,6 +308,8 @@ export class BacklogProviders {
   static readonly fields = fields
   static readonly failureCodes = failureCodes
   static readonly descriptorSchema = descriptorSchema
+  static readonly bindingOptionSchema = bindingOptionSchema
+  static readonly bindingOptionsSchema = bindingOptionsSchema
   static readonly capabilitiesSchema = capabilitiesSchema
   static readonly connectionSchema = connectionSchema
   static readonly containerSchema = containerSchema
