@@ -148,16 +148,16 @@ const openAsideFromMenu = async (): Promise<void> => {
 describe('TabStrip layout', () => {
   it('places the close button on either side of the title and preserves close behavior', () => {
     const send = vi.fn()
-    mount(send)
-    const defaultTab = screen.getByRole('tab', { name: 'Thread, Working' })
-    const defaultClose = within(defaultTab).getByRole('button', { name: 'Close tab' })
-    const defaultTitle = within(defaultTab).getByText('Thread')
-    expect(defaultClose.compareDocumentPosition(defaultTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    fireEvent.click(defaultClose)
+    mount(send, async () => {}, tabs, 'left')
+    const leftTab = screen.getByRole('tab', { name: 'Thread, Working' })
+    const leftClose = within(leftTab).getByRole('button', { name: 'Close tab' })
+    const leftTitle = within(leftTab).getByText('Thread')
+    expect(leftClose.compareDocumentPosition(leftTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(leftClose)
     expect(send).toHaveBeenNthCalledWith(1, { type: 'tab.close', tabId: 'thread:thread-1' })
 
     cleanup()
-    mount(send, async () => {}, tabs, 'right')
+    mount(send)
     const rightTab = screen.getByRole('tab', { name: 'Thread, Working' })
     const rightClose = within(rightTab).getByRole('button', { name: 'Close tab' })
     const rightTitle = within(rightTab).getByText('Thread')

@@ -453,6 +453,11 @@ export default defineClient({
             return workspaceId === undefined ? threadTab : { ...threadTab, workspaceId }
           })
 
+          const busyTabIds = tabs.flatMap(tab => (tab.status === 'running' || tab.status === 'needsYou' ? [tab.id] : [])).join('\n')
+          useEffect(() => {
+            actor.send({ type: 'tabs.busy', tabIds: busyTabIds === '' ? [] : busyTabIds.split('\n') })
+          }, [busyTabIds])
+
           const showStrip = host !== null && snapshot.matches('on')
           const startShown = showStrip && set?.activeTabId === START_TAB_ID
           usePlacementCheck(host, showStrip && !startShown)

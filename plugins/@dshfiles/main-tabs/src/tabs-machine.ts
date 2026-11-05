@@ -24,6 +24,7 @@ export type TabPersistence = 'project' | 'global'
 
 export interface TabPreferences {
   readonly enabled: boolean
+  /** 0 keeps every tab. */
   readonly maxTabs: number
   readonly openMode: OpenMode
   readonly persistence: TabPersistence
@@ -79,6 +80,8 @@ export type TabsEvent =
   | { readonly type: 'tab.cycle'; readonly direction: 1 | -1 }
   | { readonly type: 'preferences.changed'; readonly preferences: TabPreferences }
   | { readonly type: 'threads.missing'; readonly sessionIds: readonly string[] }
+  /** Tabs whose work is in flight (a running turn, a pending question); eviction past the limit skips them. */
+  | { readonly type: 'tabs.busy'; readonly tabIds: readonly string[] }
 
 interface TabsContext {
   readonly ports: TabsPorts
@@ -105,6 +108,7 @@ interface TabsContext {
   readonly shownTabId: string | null
   /** Tabs the user closed on this page, oldest first, for reopening; eviction past the limit is not a close. */
   readonly closed: readonly ClosedTab[]
+  readonly busyTabIds: readonly string[]
 }
 
 interface ClosedTab {
@@ -118,7 +122,7 @@ interface TabsInput {
   readonly persisted: PersistedTabs | null
 }
 
-export const DEFAULT_TAB_PREFERENCES: TabPreferences = { enabled: true, maxTabs: 12, openMode: 'preview', persistence: 'project' }
+export const DEFAULT_TAB_PREFERENCES: TabPreferences = { enabled: true, maxTabs: 10, openMode: 'preview', persistence: 'project' }
 
 const GLOBAL_KEY = 'global'
 const NO_PROJECT_KEY = 'project:none'
@@ -147,10 +151,11 @@ const currentSet = (context: TabsContext): TabSet => context.sets[context.scopeK
 /** Pinned tabs stay a contiguous group at the start; the sort is stable, so each group keeps its order. */
 const pinnedFirst = (tabs: readonly Tab[]): Tab[] => [...tabs.filter(tab => tab.pinned), ...tabs.filter(tab => !tab.pinned)]
 
-const evictPastLimit = (set: TabSet, maxTabs: number): TabSet => {
+const evictPastLimit = (set: TabSet, maxTabs: number, busyTabIds: readonly string[]): TabSet => {
+  if (maxTabs <= 0) return set
   let tabs = [...set.tabs]
   while (tabs.length > maxTabs) {
-    const candidates = tabs.filter(tab => !tab.pinned && tab.id !== set.activeTabId)
+    const candidates = tabs.filter(tab => !tab.pinned && tab.id !== set.activeTabId && !busyTabIds.includes(tab.id))
     const oldest = candidates.reduce<Tab | undefined>((found, tab) => (found === undefined || tab.usedAt < found.usedAt ? tab : found), undefined)
     if (oldest === undefined) break
     tabs = tabs.filter(tab => tab.id !== oldest.id)
@@ -163,7 +168,15 @@ const keepThreadTab = (set: TabSet, sessionId: string): TabSet => {
   return { ...set, tabs: set.tabs.map(tab => (tab.id === id ? { ...tab, preview: false } : tab)) }
 }
 
-const openTarget = (set: TabSet, target: TabTarget, preferences: TabPreferences, usedAt: number, title?: string): TabSet => {
+const openTarget = (input: {
+  readonly set: TabSet
+  readonly target: TabTarget
+  readonly preferences: TabPreferences
+  readonly usedAt: number
+  readonly busyTabIds: readonly string[]
+  readonly title?: string | undefined
+}): TabSet => {
+  const { set, target, preferences, usedAt, title } = input
   const id = tabIdOf(target)
   if (set.tabs.some(tab => tab.id === id)) {
     return { tabs: set.tabs.map(tab => (tab.id === id ? (title === undefined ? { ...tab, usedAt } : { ...tab, usedAt, title }) : tab)), activeTabId: id }
@@ -179,13 +192,13 @@ const openTarget = (set: TabSet, target: TabTarget, preferences: TabPreferences,
         ? set.tabs.find(tab => tab.id === set.activeTabId && canReplace(tab))
         : undefined
   if (replaced !== undefined) {
-    return evictPastLimit({ tabs: set.tabs.map(tab => (tab.id === replaced.id ? opened : tab)), activeTabId: id }, preferences.maxTabs)
+    return evictPastLimit({ tabs: set.tabs.map(tab => (tab.id === replaced.id ? opened : tab)), activeTabId: id }, preferences.maxTabs, input.busyTabIds)
   }
   const activeIndex = set.tabs.findIndex(tab => tab.id === set.activeTabId)
   const pinnedCount = set.tabs.filter(tab => tab.pinned).length
   const insertAt = activeIndex === -1 ? set.tabs.length : Math.max(activeIndex + 1, pinnedCount)
   const tabs = [...set.tabs.slice(0, insertAt), opened, ...set.tabs.slice(insertAt)]
-  return evictPastLimit({ tabs, activeTabId: id }, preferences.maxTabs)
+  return evictPastLimit({ tabs, activeTabId: id }, preferences.maxTabs, input.busyTabIds)
 }
 
 /** Remove tabs; when the active one goes, its right neighbour (else the left one) takes over, as in a browser. */
@@ -239,12 +252,12 @@ const replaceThread = (set: TabSet, sourceSessionId: string, sessionId: string, 
 }
 
 /** Open the new-tab page at the end of the strip, or focus it when it is already open. */
-const openStart = (set: TabSet, usedAt: number, maxTabs: number): TabSet => {
+const openStart = (set: TabSet, usedAt: number, maxTabs: number, busyTabIds: readonly string[]): TabSet => {
   if (set.tabs.some(tab => tab.id === START_TAB_ID)) {
     return { tabs: set.tabs.map(tab => (tab.id === START_TAB_ID ? { ...tab, usedAt } : tab)), activeTabId: START_TAB_ID }
   }
   const opened: Tab = { id: START_TAB_ID, target: { kind: 'start' }, pinned: false, preview: false, usedAt }
-  return evictPastLimit({ tabs: [...set.tabs, opened], activeTabId: START_TAB_ID }, maxTabs)
+  return evictPastLimit({ tabs: [...set.tabs, opened], activeTabId: START_TAB_ID }, maxTabs, busyTabIds)
 }
 
 const moveTab = (set: TabSet, tabId: string, toIndex: number): TabSet => {
@@ -358,7 +371,9 @@ export const tabsMachine = setup({
         }
       }
       const clock = context.clock + 1
-      const opened = startShown ? replaceStart(set, event.target, clock) : openTarget(set, event.target, context.preferences, clock)
+      const opened = startShown
+        ? replaceStart(set, event.target, clock)
+        : openTarget({ set, target: event.target, preferences: context.preferences, usedAt: clock, busyTabIds: context.busyTabIds })
       const keptSessionId = event.target.kind === 'thread' && context.pendingKeptSessionId === event.target.sessionId ? event.target.sessionId : null
       return {
         ...scoped,
@@ -368,6 +383,7 @@ export const tabsMachine = setup({
         ...withSet(scoped, keptSessionId === null ? opened : keepThreadTab(opened, keptSessionId)),
       }
     }),
+    recordBusy: assign(({ event }) => (event.type === 'tabs.busy' ? { busyTabIds: event.tabIds } : {})),
     recordHost: assign(({ event }) => (event.type === 'host.navigated' ? { hostTarget: event.target, hostProjectId: event.projectId, hostSeen: true } : {})),
     applyPreferences: assign(({ context, event }) => {
       if (event.type !== 'preferences.changed') return {}
@@ -377,7 +393,7 @@ export const tabsMachine = setup({
         preferences: event.preferences,
         scopeKey,
         pendingKeptSessionId: event.preferences.enabled ? context.pendingKeptSessionId : null,
-        ...withSet(scoped, evictPastLimit(currentSet(scoped), event.preferences.maxTabs)),
+        ...withSet(scoped, evictPastLimit(currentSet(scoped), event.preferences.maxTabs, context.busyTabIds)),
       }
     }),
     // Adopt what the Host shows right now, as if it had just navigated there.
@@ -418,6 +434,7 @@ export const tabsMachine = setup({
       restored: false,
       shownTabId: null,
       closed: [],
+      busyTabIds: [],
     }
   },
   // Settings are read by a component after boot; until the first read the machine only records what the Host shows.
@@ -428,6 +445,7 @@ export const tabsMachine = setup({
         'host.navigated': { actions: 'recordHost' },
         'tab.title': { actions: assign(({ context, event }) => ({ sets: withTitle(context.sets, event.tabId, event.title) })) },
         'thread.keep': { actions: assign(({ event }) => ({ pendingKeptSessionId: event.sessionId })) },
+        'tabs.busy': { actions: 'recordBusy' },
         'preferences.changed': [
           { guard: and(['enabled', 'hostSeen']), target: 'on', actions: ['applyPreferences', 'adoptHost'] },
           { guard: 'enabled', target: 'on', actions: 'applyPreferences' },
@@ -438,6 +456,7 @@ export const tabsMachine = setup({
     off: {
       on: {
         'host.navigated': { actions: 'recordHost' },
+        'tabs.busy': { actions: 'recordBusy' },
         'tab.title': { actions: assign(({ context, event }) => ({ sets: withTitle(context.sets, event.tabId, event.title) })) },
         'preferences.changed': [
           { guard: and(['enabled', 'hostSeen']), target: 'on', actions: ['applyPreferences', assign({ restored: true }), 'adoptHost'] },
@@ -480,7 +499,7 @@ export const tabsMachine = setup({
           actions: [
             assign(({ context }) => {
               const clock = context.clock + 1
-              return { clock, ...withSet(context, openStart(currentSet(context), clock, context.preferences.maxTabs)) }
+              return { clock, ...withSet(context, openStart(currentSet(context), clock, context.preferences.maxTabs, context.busyTabIds)) }
             }),
             'persist',
           ],
@@ -508,7 +527,13 @@ export const tabsMachine = setup({
             assign(({ context, event }) => {
               const clock = context.clock + 1
               const preferences: TabPreferences = event.newTab ? { ...context.preferences, openMode: 'new' } : context.preferences
-              return { clock, ...withSet(context, openTarget(currentSet(context), event.target, preferences, clock, event.title)) }
+              return {
+                clock,
+                ...withSet(
+                  context,
+                  openTarget({ set: currentSet(context), target: event.target, preferences, usedAt: clock, busyTabIds: context.busyTabIds, title: event.title }),
+                ),
+              }
             }),
             'navigateToActive',
             'persist',
@@ -591,6 +616,7 @@ export const tabsMachine = setup({
         'tab.title': {
           actions: [assign(({ context, event }) => ({ sets: withTitle(context.sets, event.tabId, event.title) })), 'persist'],
         },
+        'tabs.busy': { actions: 'recordBusy' },
         'tab.reopenClosed': {
           guard: ({ context }) => lastClosed(context) !== undefined,
           actions: [

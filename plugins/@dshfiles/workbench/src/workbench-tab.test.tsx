@@ -109,19 +109,19 @@ const fixture = (
 }
 
 describe('workbench semantic tab chrome', () => {
-  it('defaults missing close-button metadata to the left of the Workbench tab title', () => {
+  it('defaults missing close-button metadata to the right of the Workbench tab title, VS Code style', () => {
     const tab = fixture()
     const closeButton = screen.getByRole('button', { name: 'Close Thread A' })
     const title = screen.getByText('Thread A')
-    expect(closeButton.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(title.compareDocumentPosition(closeButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(tab.actions.close).not.toHaveBeenCalled()
   })
 
-  it('places the Workbench close button after the title when configured right', () => {
-    fixture({ closeButtonPosition: 'right' })
+  it('places the Workbench close button before the title when configured left', () => {
+    fixture({ closeButtonPosition: 'left' })
     const closeButton = screen.getByRole('button', { name: 'Close Thread A' })
     const title = screen.getByText('Thread A')
-    expect(title.compareDocumentPosition(closeButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(closeButton.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('closes through the semantic owner without closing its already-retired Dockview presentation again', () => {

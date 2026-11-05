@@ -32,7 +32,7 @@ export type WorkbenchTab = TabView & { readonly target: TabTarget }
 
 export interface WorkbenchTabsSnapshot {
   readonly enabled: boolean
-  /** Missing on older providers; Workbench treats it as left. */
+  /** Missing on older providers; Workbench treats it as right. */
   readonly closeButtonPosition?: CloseButtonPosition
   /** The actor's current project/global set, not a second Dockview-owned tab set. */
   readonly scopeKey: string

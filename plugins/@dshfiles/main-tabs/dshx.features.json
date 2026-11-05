@@ -160,15 +160,15 @@
         },
         {
           "key": "closeButtonPosition",
-          "defaultValue": "left",
-          "constraints": "Places tab close buttons on the selected side of titles in the main strip and Workbench headers.",
+          "defaultValue": "right",
+          "constraints": "Places tab close buttons on the selected side of titles in the main strip and Workbench headers; Workbench shows them on the active tab and on hover.",
           "choices": ["left", "right"],
           "coveredBy": ["main-tabs.close-button-position-strip", "main-tabs.close-button-position-workbench", "main-tabs.close-button-position-publication"]
         },
         {
           "key": "maxTabs",
-          "defaultValue": "12",
-          "constraints": "Integer 2\u201350; past it the least recently used unpinned tab closes.",
+          "defaultValue": "10",
+          "constraints": "Integer 0\u201350; past it the least recently used tab closes, skipping pinned, active and still-working (running or waiting for you) tabs. 0 keeps every tab.",
           "coveredBy": ["main-tabs.machine-unit-tab-limit"]
         },
         {
@@ -210,13 +210,13 @@
           "kind": "unit-test",
           "id": "main-tabs.close-button-position-workbench",
           "file": "plugins/@dshfiles/workbench/src/workbench-tab.test.tsx",
-          "testName": "defaults missing close-button metadata to the left of the Workbench tab title"
+          "testName": "defaults missing close-button metadata to the right of the Workbench tab title, VS Code style"
         },
         {
           "kind": "unit-test",
           "id": "main-tabs.close-button-position-workbench-right",
           "file": "plugins/@dshfiles/workbench/src/workbench-tab.test.tsx",
-          "testName": "places the Workbench close button after the title when configured right"
+          "testName": "places the Workbench close button before the title when configured left"
         },
         {
           "kind": "unit-test",

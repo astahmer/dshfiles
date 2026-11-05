@@ -9,8 +9,11 @@ export const mainTabsSettings = defineSettings({
     focusThreadInSidebar: Schema.boolean().default(true).description('Scroll the matching thread into view in the sidebar when selecting a thread tab.'),
     closeButtonPosition: Schema.union(CLOSE_BUTTON_POSITIONS)
       .default(DEFAULT_CLOSE_BUTTON_POSITION)
-      .description('Place tab close buttons to the left or right of titles in the main strip and Workbench headers.'),
-    maxTabs: Schema.natural().min(2).max(50).default(12).description('Most tabs kept open; past it the least recently used unpinned tab closes.'),
+      .description('Place tab close buttons to the left or right of titles. They show on the active tab and on hover.'),
+    maxTabs: Schema.natural()
+      .max(50)
+      .default(10)
+      .description('Most tabs kept open; past it the least recently used tab closes, unless it is pinned or still working. 0 keeps every tab.'),
     openMode: Schema.union([
       Schema.const('preview').description('Preview: what you open from the sidebar replaces the preview tab until you keep it (double-click).'),
       Schema.const('new').description('New tab: everything you open gets its own tab.'),

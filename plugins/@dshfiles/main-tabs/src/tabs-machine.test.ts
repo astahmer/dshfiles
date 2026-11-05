@@ -185,6 +185,35 @@ describe('tabsMachine', () => {
     expect(tabs.ids()).toEqual(['thread:a', 'thread:b', 'thread:d'])
   })
 
+  it('skips still-working tabs when closing past the limit, and evicts them once they settle', () => {
+    const tabs = start({ preferences: { openMode: 'new', maxTabs: 2 } })
+    tabs.enable()
+    tabs.host(thread('a'))
+    tabs.host(thread('b'))
+    tabs.actor.send({ type: 'tabs.busy', tabIds: ['thread:a'] })
+    tabs.host(thread('c'))
+    expect(tabs.ids()).toEqual(['thread:a', 'thread:c'])
+    tabs.actor.send({ type: 'tabs.busy', tabIds: [] })
+    tabs.host(thread('d'))
+    expect(tabs.ids()).toEqual(['thread:c', 'thread:d'])
+  })
+
+  it('keeps every tab when the limit is 0', () => {
+    const tabs = start({ preferences: { openMode: 'new', maxTabs: 0 } })
+    tabs.enable()
+    for (const sessionId of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']) tabs.host(thread(sessionId))
+    expect(tabs.ids()).toHaveLength(12)
+  })
+
+  it('applies a lowered limit to the open set without closing busy tabs', () => {
+    const tabs = start({ preferences: { openMode: 'new', maxTabs: 0 } })
+    tabs.enable()
+    for (const sessionId of ['a', 'b', 'c', 'd']) tabs.host(thread(sessionId))
+    tabs.actor.send({ type: 'tabs.busy', tabIds: ['thread:a'] })
+    tabs.actor.send({ type: 'preferences.changed', preferences: { ...tabs.preferences, maxTabs: 2 } })
+    expect(tabs.ids()).toEqual(['thread:a', 'thread:d'])
+  })
+
   it('navigates to a picked tab and ignores the Host passing through other views on the way', () => {
     const tabs = start({ preferences: { openMode: 'new' } })
     tabs.enable()
