@@ -13,13 +13,14 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
+import { MergeChecks, type MergeCheck, type MergeCheckStatus } from '@dshfiles/plugin-ui/components/motion/merge-checks'
+import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { ClockIcon, GitMergeIcon, History, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useState, type ReactNode } from 'react'
-import { LandCardModel, type LandReadiness } from './land-readiness.js'
+import { useState } from 'react'
+import { LandCardModel, type LandReadiness, type LandThread } from './land-readiness.js'
 
 export interface LandCardProps {
   readonly sessionId: string
@@ -35,14 +36,58 @@ const HINT = 'dshx:text-xs dshx:text-muted-foreground'
 
 const landStatusQueryKey = (cwd: string) => ['pulls-review', 'land', cwd] as const
 
-const Row = (props: { readonly status: WorkStatus | undefined; readonly children: ReactNode; readonly testId: string }): JSX.Element => (
-  <li className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-2 dshx:text-xs" data-land-row={props.testId}>
-    <span className="dshx:mt-0.5 dshx:inline-flex dshx:size-3.5 dshx:shrink-0 dshx:items-center dshx:justify-center">
-      {props.status === undefined ? null : <StatusGlyph decorative status={props.status} />}
-    </span>
-    <span className="dshx:min-w-0">{props.children}</span>
-  </li>
-)
+const plural = (count: number, noun: string): string => `${String(count)} ${noun}${count === 1 ? '' : 's'}`
+
+const checkStatus = (status: WorkStatus): MergeCheckStatus => {
+  if (status === 'done') return 'passed'
+  if (status === 'failed') return 'failed'
+  return 'warning'
+}
+
+/** One chip per land precondition, in the order the card explains them. */
+const landChecks = (input: {
+  readonly thread: LandThread
+  readonly bookmark: string
+  readonly readiness: LandReadiness
+  readonly checkSummary: ReturnType<typeof LandCardModel.checks>
+}): MergeCheck[] => {
+  const revisions = input.thread.unlanded
+  const behind = (input.thread.behindCount ?? (input.thread.behind ? 1 : 0)) > 0
+  const rows: MergeCheck[] = [
+    revisions.length === 0
+      ? { id: 'revisions', label: 'Nothing to land', status: 'passed', summary: `${input.bookmark} has all of this work.` }
+      : { id: 'revisions', label: `${plural(revisions.length, 'revision')} to land`, status: 'passed' },
+    {
+      id: 'behind',
+      label: LandCardModel.behindText(input.thread, input.bookmark),
+      status: behind ? 'warning' : 'passed',
+      summary: behind ? 'Land moves this work onto its tip' : undefined,
+    },
+  ]
+  if (input.readiness.conflicts > 0)
+    rows.push({
+      id: 'conflicts',
+      label: `Conflicts in ${plural(input.readiness.conflicts, 'revision')}`,
+      status: 'failed',
+      summary: 'Resolve them in this workspace, or open History.',
+    })
+  if (input.readiness.undescribed > 0)
+    rows.push({
+      id: 'undescribed',
+      label: `${String(input.readiness.undescribed)} revision${input.readiness.undescribed === 1 ? ' needs' : 's need'} a description`,
+      status: 'warning',
+      summary: 'Ask the thread to describe its work, or describe it in History.',
+    })
+  else if (revisions.length > 0) rows.push({ id: 'described', label: 'Every revision is described', status: 'passed' })
+  if (input.checkSummary !== undefined)
+    rows.push({
+      id: 'checks',
+      label: input.checkSummary.text,
+      status: checkStatus(input.checkSummary.status),
+      summary: input.checkSummary.hint,
+    })
+  return rows
+}
 
 const describeResult = (result: LandResult): string => {
   if (result.status === 'landed') return `Landed ${String(result.revisions.length)} revision${result.revisions.length === 1 ? '' : 's'} on ${result.bookmark}.`
@@ -145,36 +190,7 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
           This thread edits the project checkout directly, so there is nothing to land. Start the next thread in its own workspace to land its work here.
         </p>
       ) : (
-        <ul className="dshx:flex dshx:flex-col dshx:gap-1">
-          <Row status={revisions.length === 0 ? 'done' : 'ready'} testId="revisions">
-            {revisions.length === 0
-              ? `Nothing to land: ${bookmark} has all of this work.`
-              : `${String(revisions.length)} revision${revisions.length === 1 ? '' : 's'} to land`}
-          </Row>
-          <Row status={(thread.behindCount ?? (thread.behind ? 1 : 0)) === 0 ? 'done' : 'idle'} testId="behind">
-            {LandCardModel.behindText(thread, bookmark)}
-          </Row>
-          {readiness.conflicts > 0 ? (
-            <Row status="failed" testId="conflicts">
-              Conflicts in {readiness.conflicts} revision{readiness.conflicts === 1 ? '' : 's'}. Resolve them in this workspace, or open History.
-            </Row>
-          ) : null}
-          {readiness.undescribed > 0 ? (
-            <Row status="needs-you" testId="undescribed">
-              {readiness.undescribed} revision{readiness.undescribed === 1 ? ' needs' : 's need'} a description. Ask the thread to describe its work, or
-              describe it in History.
-            </Row>
-          ) : revisions.length > 0 ? (
-            <Row status="done" testId="described">
-              Every revision is described
-            </Row>
-          ) : null}
-          {checkSummary === undefined ? null : (
-            <Row status={checkSummary.status} testId="checks">
-              {checkSummary.text}
-            </Row>
-          )}
-        </ul>
+        <MergeChecks checks={landChecks({ thread, bookmark, readiness, checkSummary })} />
       )}
       {thread !== null && thread.integrationQueuedAt !== undefined ? (
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:py-1 dshx:pr-1 dshx:pl-2">

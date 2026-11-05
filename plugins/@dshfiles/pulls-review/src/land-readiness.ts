@@ -56,8 +56,8 @@ const readiness = (input: { readonly thread: LandThread | null; readonly threadB
 const behindText = (thread: LandThread, bookmark: string): string => {
   const count = thread.behindCount ?? (thread.behind ? 1 : 0)
   if (count === 0) return `Up to date with ${bookmark}`
-  if (thread.behindCount === undefined) return `Behind ${bookmark}; Land moves this work onto its tip`
-  return `Behind ${bookmark} by ${String(count)}; Land moves this work onto its tip`
+  if (thread.behindCount === undefined) return `Behind ${bookmark}`
+  return `Behind ${bookmark} by ${String(count)}`
 }
 
 interface CheckReceipt {
@@ -67,7 +67,7 @@ interface CheckReceipt {
 }
 
 /** The thread's latest project-check result per check, or undefined when none ran. */
-const checks = (receipts: readonly CheckReceipt[] | undefined): { readonly status: WorkStatus; readonly text: string } | undefined => {
+const checks = (receipts: readonly CheckReceipt[] | undefined): { readonly status: WorkStatus; readonly text: string; readonly hint?: string } | undefined => {
   if (receipts === undefined || receipts.length === 0) return undefined
   const latest = new Map<string, CheckReceipt>()
   for (const receipt of receipts) if (!latest.has(receipt.label)) latest.set(receipt.label, receipt)
@@ -75,7 +75,8 @@ const checks = (receipts: readonly CheckReceipt[] | undefined): { readonly statu
   const failed = all.filter(receipt => receipt.status !== 'passed')
   const stale = all.filter(receipt => receipt.freshness === 'stale')
   if (failed.length > 0) return { status: 'failed', text: `Checks: ${failed.map(receipt => receipt.label).join(', ')} did not pass` }
-  if (stale.length > 0) return { status: 'idle', text: `Checks passed, but ${String(stale.length)} ran on older files; run them again before landing` }
+  if (stale.length > 0)
+    return { status: 'idle', text: 'Checks passed on older files', hint: `${String(stale.length)} ran on older files; run them again before landing` }
   return { status: 'done', text: `Checks passed (${all.map(receipt => receipt.label).join(', ')})` }
 }
 

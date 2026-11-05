@@ -2,29 +2,31 @@ import * as React from 'react'
 import { animate, enter, motionSafe, presets, springs, staggers, easings, type AnimationPlaybackControls } from '../../motion/index.js'
 import { Button } from '../ui/button.js'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip.js'
-import { CheckIcon, CircleDashedIcon, GitMergeIcon, LoaderCircleIcon, XIcon } from '../../icons.js'
+import { CheckIcon, CircleDashedIcon, GitMergeIcon, LoaderCircleIcon, TriangleAlertIcon, XIcon } from '../../icons.js'
 import { cn } from '../../lib/utils.js'
 import { ShimmerText } from './text.js'
 
-export type MergeCheckStatus = 'queued' | 'running' | 'passed' | 'failed'
+/** `warning` does not block on its own but asks for attention (behind the target, stale results). */
+export type MergeCheckStatus = 'queued' | 'running' | 'passed' | 'warning' | 'failed'
 
 export interface MergeCheck {
   readonly id: string
   readonly label: string
   readonly status: MergeCheckStatus
   /** Short result beside the label ("42 passed", "ready"). */
-  readonly detail?: string
+  readonly detail?: string | undefined
   /** Tooltip line ("vitest · 42 passed, 0 failed"). */
-  readonly summary?: string
+  readonly summary?: string | undefined
   /** Tooltip duration ("38s"). */
-  readonly duration?: string
+  readonly duration?: string | undefined
 }
 
 export type MergeState = 'blocked' | 'ready' | 'merging' | 'merged'
 
 export interface MergeChecksProps extends React.HTMLAttributes<HTMLDivElement> {
   readonly checks: readonly MergeCheck[]
-  readonly state: MergeState
+  /** Omit to render the chips alone, when the screen owns its own merge action. */
+  readonly state?: MergeState
   /** Bookmark the change lands on, for the merged line. Default "main". */
   readonly into?: string
   readonly onMerge?: () => void
@@ -54,7 +56,7 @@ export function MergeChecks({ checks, state, into = 'main', onMerge, className, 
             <CheckChip key={check.id} check={check} />
           ))}
         </div>
-        <MergeFooter state={state} failed={failed} pending={pending} into={into} onMerge={onMerge} />
+        {state === undefined ? null : <MergeFooter state={state} failed={failed} pending={pending} into={into} onMerge={onMerge} />}
       </div>
     </TooltipProvider>
   )
@@ -67,10 +69,15 @@ const CheckChip = React.forwardRef<HTMLDivElement, { readonly check: MergeCheck 
       ref={ref}
       role="listitem"
       tabIndex={tooltip ? 0 : undefined}
-      aria-label={`${check.label}: ${check.detail ?? check.status}`}
+      aria-label={`${check.label}: ${check.detail ?? check.status}${check.summary ? `. ${check.summary}` : ''}`}
+      data-merge-check={check.id}
       className={cn(
         'dshx:flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-full dshx:border dshx:px-2.5 dshx:text-xs dshx:transition-colors dshx:duration-300 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
-        check.status === 'failed' ? 'dshx:border-destructive/40 dshx:bg-destructive/8' : 'dshx:border-border dshx:bg-muted/40 dshx:hover:bg-muted',
+        check.status === 'failed'
+          ? 'dshx:border-destructive/40 dshx:bg-destructive/8'
+          : check.status === 'warning'
+            ? 'dshx:border-warning/40 dshx:bg-warning/8'
+            : 'dshx:border-border dshx:bg-muted/40 dshx:hover:bg-muted',
       )}
     >
       <StatusGlyph status={check.status} />
@@ -98,6 +105,8 @@ function statusIcon(status: MergeCheckStatus): React.ReactNode {
   switch (status) {
     case 'passed':
       return <CheckIcon className="dshx:size-3.5 dshx:text-success" strokeWidth={2.5} />
+    case 'warning':
+      return <TriangleAlertIcon className="dshx:size-3.5 dshx:text-warning" strokeWidth={2.5} />
     case 'failed':
       return <XIcon className="dshx:size-3.5 dshx:text-destructive" strokeWidth={2.5} />
     case 'running':

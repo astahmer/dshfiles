@@ -78,7 +78,7 @@ describe('LandCardModel', () => {
     const thread = { canRebase: true, behind: true, behindCount: 2, unlanded: [revision('feat: a'), revision('fix: b')] }
     expect(LandCardModel.readiness({ thread, threadBusy: false, pending: false })).toMatchObject({ canLand: true, canQueue: false, reason: undefined })
     expect(LandCardModel.readiness({ thread, threadBusy: false, pending: true }).canLand).toBe(false)
-    expect(LandCardModel.behindText(thread, 'main')).toBe('Behind main by 2; Land moves this work onto its tip')
+    expect(LandCardModel.behindText(thread, 'main')).toBe('Behind main by 2')
   })
 
   it('names the reason Land is disabled and offers queueing for a busy thread', () => {
@@ -107,6 +107,11 @@ describe('LandCardModel', () => {
       ]),
     ).toEqual({ status: 'failed', text: 'Checks: typecheck did not pass' })
     expect(LandCardModel.checks([{ label: 'test', status: 'passed', freshness: 'current' }])).toEqual({ status: 'done', text: 'Checks passed (test)' })
+    expect(LandCardModel.checks([{ label: 'test', status: 'passed', freshness: 'stale' }])).toEqual({
+      status: 'idle',
+      text: 'Checks passed on older files',
+      hint: '1 ran on older files; run them again before landing',
+    })
   })
 })
 
