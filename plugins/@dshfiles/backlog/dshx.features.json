@@ -2021,38 +2021,57 @@
     },
     {
       "id": "remote-sync",
-      "title": "Mirror backlog items in Linear or GitHub Issues",
-      "summary": "Link an item to an existing Linear or GitHub issue, create one from it, or unlink it again from its row menu or the sync chip in its detail. Title, description, status and tags sync both ways against the last synced base of each side; a field both sides changed goes to the side that changed last and leaves a conflict note on the item. New comments are carried over once in each direction. Agents read the same state with backlog_sync_status and act with backlog_sync_now and backlog_link_remote when the user asked. Comments agents write stay local unless the backend row's Push agent comments is on; the user's own comments always sync.",
+      "title": "Mirror backlog items in Linear, GitHub Issues, markdown files or a plugin provider",
+      "summary": "Link an item to a remote item through any binding that serves its project, create one from it, or unlink it from its row menu or its sync chips in the item detail; an item may be linked through several bindings, one chip each. Each binding's field map decides which of title, description, status, labels, priority, parent and relations flow which way, with remote status names mapped per status; a field both sides changed is settled by the binding's conflict policy (last change wins, backlog wins, remote wins, or flag) with a conflict note on the item. Statuses compare by equivalence so an item in progress stays in progress against an open GitHub issue. A binding pass pulls what changed since its cursor (Linear updatedAt pages, GitHub since= with ETags, a full scan of a markdown folder), writes remote changes as remote:<bindingId> ops, pushes local changes, carries new comments once each way when the provider supports them, drops items whose remote file is gone, and can import every open remote item. Agents read the same state with backlog_sync_status and act with backlog_sync_now, backlog_link_remote and backlog_sync_import_all when the user asked. Comments agents write stay local unless the binding pushes them.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Mirror this item in Linear\"",
+        "click button \"Backlog settings\"",
+        "click button \"Add Markdown files connection\"",
+        "click button \"Save connection\"",
+        "click button \"Add binding\"",
+        "fill textbox \"Folder\" \"/tmp/dshx-backlog-reach\"",
+        "click button \"Save binding\"",
+        "click button \"Backlog views\"",
+        "fill textbox \"Capture\" \"Mirror this item in files\"",
         "press Enter",
         "rightclick article \"Item b:#1\"",
-        "expect menuitem \"Link to Linear issue…\""
+        "expect menuitem \"Create in Markdown files · /tmp/dshx-backlog-reach\""
       ],
       "surfaces": ["client", "host", "storage", "tool", "integration"],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › row menu › Link to Linear issue… / item detail › sync chip",
+      "currentSurface": "left-nav: Backlog: Items › row menu › Link to … / Create in … / item detail › sync chips",
       "configuration": [],
-      "states": ["not-linked", "synced", "pending", "conflict", "error", "unlinked"],
+      "states": ["not-linked", "synced", "pending", "conflict", "flagged", "error", "removed-remotely", "tombstoned", "unlinked", "imported"],
       "failureModes": [
-        "No enabled backend row for the item's project answers with the Backlog settings › Remote sync row to add, before any network call.",
-        "A key that does not resolve names the secret reference or environment variable to set; a refused key, rate limit or unreachable tracker is recorded on the item's sync state with its recovery, local edits are kept and the next Sync now retries.",
-        "A lossy mapping (GitHub has no in-progress state, Linear labels the team lacks) never reads as a change: each side is compared with its own last synced value.",
-        "Unlinking removes the mapping and the issue link only; neither the item nor the issue is deleted, and the item can be linked again."
+        "No enabled binding for the item's project answers with the Backlog settings › Remote sync binding to add, before any network call.",
+        "A key that does not resolve names the secret reference or environment variable to set; a refused key, rate limit or unreachable source is recorded on the item's external ref with its recovery, local edits are kept and the next Sync now retries.",
+        "A parent the store refuses (a cycle, too deep) is recorded as the ref's sync error; the other pulled fields still apply.",
+        "A lossy mapping never reads as a change: statuses compare by equivalence and each side is compared with its own last synced value; a field the provider cannot carry, or the binding leaves out, never flows.",
+        "A read-only provider or a pull binding never pushes; a binding owned by another Host is refused with the Host to run it on.",
+        "Unlinking removes the external ref and the URL link only. Deleting an item keeps its refs as tombstones so a pull never re-imports it; a files binding writes the file status: dropped, Linear and GitHub items are left alone."
       ],
       "externalDependencies": [
         {
           "id": "linear-graphql",
-          "boundary": "POST https://api.linear.app/graphql with the personal API key a backend row's secret:ALIAS (or LINEAR_API_KEY) resolves to on the Host; reads the team's workflow states and labels, reads, creates and updates issues and creates comments.",
+          "boundary": "POST https://api.linear.app/graphql (or a connection's base URL) with the personal API key a connection's secret:ALIAS (or LINEAR_API_KEY) resolves to on the Host; reads accounts, teams, workflow states, labels and issues (paged by updatedAt), and creates and updates issues, relations and comments.",
           "deterministicFake": "fakeLinear in src/sync-fakes.ts is an in-memory GraphQL endpoint for team ENG injected as the HttpClient; tests never reach the network."
         },
         {
           "id": "github-rest",
-          "boundary": "GitHub REST v2022-11-28 issues and issue-comments endpoints of the configured owner/repo with the token a backend row's secret:ALIAS (or GITHUB_TOKEN) resolves to on the Host.",
-          "deterministicFake": "fakeGithub in src/sync-fakes.ts is an in-memory REST API for acme/app injected as the HttpClient; tests never reach the network."
+          "boundary": "GitHub REST v2022-11-28 issues (listed with since= and If-None-Match), comments, sub-issues and issue dependencies of a binding's owner/repo (or the project's github.com git remote) with the token a connection's secret:ALIAS (or GITHUB_TOKEN, GH_TOKEN, gh auth token) resolves to on the Host.",
+          "deterministicFake": "fakeGithub in src/sync-fakes.ts is an in-memory REST API for acme/app with ETags, sub-issues and dependencies, injected as the HttpClient; tests never reach the network."
+        },
+        {
+          "id": "markdown-folder",
+          "boundary": "The Host file system: one .md file per item in a binding's folder (<project>/backlog by default), read in full each pass and written atomically (temp file and rename).",
+          "deterministicFake": "provider-files.test.ts and the remote-sync-link journey use a fresh temporary folder."
+        },
+        {
+          "id": "backlog-provider-api",
+          "boundary": "Plugins serving the backlog-provider Host API, listed with listApis and called in-process through the dshx Host API client.",
+          "deterministicFake": "provider-registry.test.ts injects a fake provider endpoint through ExternalProviderEndpoints.layerTest."
         }
       ],
       "verification": [
@@ -2065,7 +2084,7 @@
           "kind": "host-test",
           "id": "backlog.remote-sync-linear-create",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "creates a Linear issue from an item, maps status and labels, and records its spans"
+          "testName": "creates a Linear issue from an item, maps status, labels and priority, and records its spans"
         },
         {
           "kind": "host-test",
@@ -2081,6 +2100,24 @@
         },
         {
           "kind": "host-test",
+          "id": "backlog.remote-sync-flag",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "flags a conflict without writing either side under the flag policy, until both sides agree"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-import-all",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "imports every open issue of a binding once, with priority, parents and relations, and pulls later changes since its cursor"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-value-map",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "writes a mapped workflow state through the binding status value map"
+        },
+        {
+          "kind": "host-test",
           "id": "backlog.remote-sync-error-recovery",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
           "testName": "records a refused key on the item with a recovery path, and recovers on the next pass"
@@ -2089,7 +2126,7 @@
           "kind": "host-test",
           "id": "backlog.remote-sync-unconfigured",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "names the setting to fix when no backend serves the project or no key resolves"
+          "testName": "names the setting to fix when no binding serves the project"
         },
         {
           "kind": "host-test",
@@ -2099,15 +2136,45 @@
         },
         {
           "kind": "host-test",
+          "id": "backlog.remote-sync-tombstone",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "keeps a deleted item’s link as a tombstone, so a pull never imports its issue again; an explicit import still can"
+        },
+        {
+          "kind": "host-test",
           "id": "backlog.remote-sync-restart",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "keeps items and mappings across a Host restart"
+          "testName": "keeps items, connections and links across a Host restart"
         },
         {
           "kind": "host-test",
           "id": "backlog.remote-sync-github",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "creates, closes and comments on a GitHub issue through the REST API and records its spans"
+          "testName": "creates, closes and comments on a GitHub issue, keeps doing against an open issue, and records its spans"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-github-structure",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "syncs sub-issues as parents and dependencies as depends-on links both ways"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-multi-account",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "keeps two GitHub accounts apart: each binding uses its own key, and a duplicate link is refused per binding"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-files",
+          "file": "plugins/@dshfiles/backlog/src/provider-files.test.ts",
+          "testName": "round-trips items through markdown files: create, an editor change, a local change, a new file, a removed file and a delete"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-plugin-provider",
+          "file": "plugins/@dshfiles/backlog/src/provider-registry.test.ts",
+          "testName": "serves built-ins first, adds providers other plugins serve, and refuses an unknown kind"
         },
         {
           "kind": "unit-test",
@@ -2119,7 +2186,7 @@
           "kind": "unit-test",
           "id": "backlog.remote-sync-policy-lww",
           "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
-          "testName": "a field both sides changed goes to the side that changed last, with the other value kept as a conflict"
+          "testName": "last writer wins keeps the side that changed last, with the other value kept as a conflict"
         },
         {
           "kind": "unit-test",
@@ -2129,15 +2196,27 @@
         },
         {
           "kind": "unit-test",
+          "id": "backlog.remote-sync-policy-equivalence",
+          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
+          "testName": "linking keeps a local status the remote status stands for: doing survives GitHub open"
+        },
+        {
+          "kind": "unit-test",
           "id": "backlog.remote-sync-policy-first",
           "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
-          "testName": "the first sync adopts the issue and merges both sides’ tags"
+          "testName": "the first sync adopts the remote side and merges both sides’ tags"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.remote-sync-flows",
+          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
+          "testName": "a read-only provider never pushes, and a pull binding never pushes"
         },
         {
           "kind": "host-test",
           "id": "backlog.remote-sync-agent-comments",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "keeps agent comments off the issue unless the row pushes them, and always posts the user comments"
+          "testName": "keeps agent comments off the issue unless the binding pushes them, and always posts the user comments"
         }
       ],
       "telemetry": [
@@ -2156,44 +2235,55 @@
         {
           "kind": "custom",
           "span": "backlog sync",
+          "file": "plugins/@dshfiles/backlog/src/provider-files.test.ts",
+          "testName": "round-trips items through markdown files: create, an editor change, a local change, a new file, a removed file and a delete"
+        },
+        {
+          "kind": "custom",
+          "span": "backlog files scan",
+          "file": "plugins/@dshfiles/backlog/src/provider-files.test.ts",
+          "testName": "round-trips items through markdown files: create, an editor change, a local change, a new file, a removed file and a delete"
+        },
+        {
+          "kind": "custom",
+          "span": "backlog sync item",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "creates a Linear issue from an item, maps status and labels, and records its spans"
+          "testName": "creates a Linear issue from an item, maps status, labels and priority, and records its spans"
         },
         {
           "kind": "custom",
           "span": "linear request",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "creates a Linear issue from an item, maps status and labels, and records its spans"
+          "testName": "creates a Linear issue from an item, maps status, labels and priority, and records its spans"
         },
         {
           "kind": "custom",
           "span": "github request",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "creates, closes and comments on a GitHub issue through the REST API and records its spans"
+          "testName": "creates, closes and comments on a GitHub issue, keeps doing against an open issue, and records its spans"
         }
       ]
     },
     {
       "id": "remote-sync-settings",
-      "title": "Configure remote sync backends and import issues",
-      "summary": "Backlog settings › Remote sync holds one row per project and tracker, saved as you edit: a secret:ALIAS key reference (empty falls back to the Host environment, and for GitHub to a signed-in gh CLI), a Linear team picked from the teams the key sees (or the key's only team) or a GitHub owner/repo (empty reads the project's github.com git remote), an auto-sync interval (15 minutes for a new row) and on/off. Each row tests its connection on the Host and shows the signed-in account and the target it reaches. A working row folds to one line with Edit to open it; a row with no key offers Create LINEAR_API_KEY (or GITHUB_TOKEN), which opens the Secret Catalog's create-and-bind form and fills the row's reference; removing a row offers Undo; Test all re-tests every row. Sync all now appears once items are linked, and Import an issue reads Linear or GitHub from the pasted id or URL. Agents test with backlog_sync_test_connection (one row) and backlog_sync_test_all (every saved row) and import with backlog_import_remote when the user asked.",
+      "title": "Configure remote sync connections and bindings, and import remote items",
+      "summary": "Backlog settings › Remote sync lists connections (one account of one provider each: a name, a secret:ALIAS key reference with the provider's Host-variable fallback, an optional API base URL) with Test, reorder, edit and remove, and under each its bindings: a container picked from what the connection discovers (or derived from the project), a project scope, a direction, a per-field flow with remote status names, a conflict policy, an interval, Push agent comments and Import new remote items, with Sync now, Import all open, an on/off switch, edit and remove. Removing a connection or binding asks first and drops its item links. Import reads the provider from the pasted id or URL. Rows saved in the earlier syncBackends setting move into connections and bindings on the first start, keeping every item link. Agents list with backlog_sync_connections, change with backlog_sync_connection_save/move/remove and backlog_sync_binding_save/remove, discover with backlog_sync_discover, test with backlog_sync_test_connection and backlog_sync_test_all, and import with backlog_import_remote and backlog_sync_import_all when the user asked; removals and import-all take confirm: true.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
         "click button \"Backlog settings\"",
-        "expect textbox \"Issue to import\"",
-        "click button \"Add Linear backend\"",
-        "expect textbox \"Linear team key\"",
-        "expect button \"Create LINEAR_API_KEY\"",
-        "click button \"Add GitHub backend\"",
-        "expect textbox \"GitHub repository\"",
-        "expect button \"Test all\"",
-        "click button \"Remove sync backend 2\"",
-        "expect button \"Undo\"",
-        "click button \"Undo\"",
-        "expect textbox \"GitHub repository\"",
-        "fill textbox \"Issue to import\" \"https://github.com/acme/app/issues/1\"",
-        "expect button \"Import from GitHub\""
+        "expect textbox \"Remote item to import\"",
+        "click button \"Add Linear connection\"",
+        "expect textbox \"Linear key reference\"",
+        "expect button \"Test connection\"",
+        "click button \"Save connection\"",
+        "click button \"Add binding\"",
+        "fill textbox \"Team\" \"ENG\"",
+        "click button \"Save binding\"",
+        "expect button \"Import all open\"",
+        "click button \"Add Markdown files connection\"",
+        "click button \"Save connection\"",
+        "expect button \"Remove Markdown files\""
       ],
       "surfaces": ["client", "host", "settings", "storage", "tool", "integration"],
       "surface": "settingsSection",
@@ -2203,41 +2293,47 @@
         {
           "key": "dshfiles-backlog.syncBackends",
           "defaultValue": "[]",
-          "constraints": "Rows of { project, backend: linear|github, enabled, target, secret (secret:ALIAS reference only, resolved on the Host), autoSyncMinutes 0–1440, pushAgentComments (default false: agent comments are not posted to the issue) }; a row with an empty project serves every project without a row of its own. An empty Linear target uses the key's only team; an empty GitHub target reads the item project's github.com git remote.",
+          "constraints": "Hidden; the input of the one-time migration only. Rows of { project, backend: linear|github, enabled, target, secret (secret:ALIAS), autoSyncMinutes, pushAgentComments } become connections (one per tracker and key) and two-way bindings of title, description, status and labels; later edits are not read. Connections and bindings live in the backlog's SQLite file.",
           "coveredBy": ["backlog.remote-sync-settings"]
         }
       ],
       "states": [
-        "no-backend",
-        "configured",
-        "auto-sync",
-        "imported",
-        "already-imported",
+        "no-connection",
         "connection-ok",
         "connection-failed",
-        "unsaved",
-        "folded",
-        "removed-undoable",
-        "key-missing"
+        "key-missing",
+        "provider-missing",
+        "binding-saved",
+        "binding-disabled",
+        "not-owner",
+        "migrated",
+        "imported",
+        "already-imported"
       ],
       "failureModes": [
-        "Settings stay read-only while the namespace is unavailable; the form says so instead of saving.",
-        "The form stores a Secret Catalog reference, never a key value, and does not save a key field holding anything else; an empty reference falls back to LINEAR_API_KEY, or GITHUB_TOKEN, GH_TOKEN and then `gh auth token` on the Host.",
-        "Importing an issue already linked returns its item instead of a duplicate; a reference outside the configured team or repository is refused with an example of what to paste.",
-        "A failing auto-sync tick is logged and retried on the next minute; each item's error stays visible on its sync chip.",
-        "Test connection names the missing key, a Linear key that sees several teams, an unknown team key, or a project without a github.com remote, each with the setting to change; the key never reaches the browser.",
-        "Import refuses text that is neither a Linear nor a GitHub issue reference with examples of what to paste."
+        "The form stores a Secret Catalog reference, never a key value, and does not save a key field holding anything else; an empty reference falls back to the provider's Host variable (and for GitHub to `gh auth token`).",
+        "A connection whose provider no loaded plugin serves stays listed as Provider not loaded, with its bindings kept, until the plugin is enabled or the connection removed.",
+        "Saving a connection of an unknown provider kind, a duplicate connection id or a binding of a missing connection is refused with what to fix.",
+        "A Host that predates connections and bindings answers without them; the section asks for a DSH Host process restart instead of showing an empty list.",
+        "Importing a remote item already linked through that binding returns its item; a reference no provider recognizes is refused with examples of what to paste.",
+        "A failing scheduled pass is logged and retried at the binding's next interval; each item's error stays visible on its sync chip.",
+        "Test connection names a missing key, a refused key or an unreachable API with its fix; the key never reaches the browser."
       ],
       "externalDependencies": [
         {
           "id": "linear-graphql",
-          "boundary": "POST https://api.linear.app/graphql with the personal API key a backend row's secret:ALIAS (or LINEAR_API_KEY) resolves to on the Host; reads the team's workflow states and labels, reads, creates and updates issues and creates comments.",
+          "boundary": "POST https://api.linear.app/graphql (or a connection's base URL) with the personal API key a connection's secret:ALIAS (or LINEAR_API_KEY) resolves to on the Host; reads accounts, teams, workflow states, labels and issues (paged by updatedAt), and creates and updates issues, relations and comments.",
           "deterministicFake": "fakeLinear in src/sync-fakes.ts is an in-memory GraphQL endpoint for team ENG injected as the HttpClient; tests never reach the network."
         },
         {
           "id": "github-rest",
-          "boundary": "GitHub REST v2022-11-28 issues and issue-comments endpoints of the configured owner/repo with the token a backend row's secret:ALIAS (or GITHUB_TOKEN) resolves to on the Host.",
-          "deterministicFake": "fakeGithub in src/sync-fakes.ts is an in-memory REST API for acme/app injected as the HttpClient; tests never reach the network."
+          "boundary": "GitHub REST v2022-11-28 issues (listed with since= and If-None-Match), comments, sub-issues and issue dependencies of a binding's owner/repo (or the project's github.com git remote) with the token a connection's secret:ALIAS (or GITHUB_TOKEN, GH_TOKEN, gh auth token) resolves to on the Host.",
+          "deterministicFake": "fakeGithub in src/sync-fakes.ts is an in-memory REST API for acme/app with ETags, sub-issues and dependencies, injected as the HttpClient; tests never reach the network."
+        },
+        {
+          "id": "markdown-folder",
+          "boundary": "The Host file system: one .md file per item in a binding's folder (<project>/backlog by default), read in full each pass and written atomically (temp file and rename).",
+          "deterministicFake": "provider-files.test.ts and the remote-sync-link journey use a fresh temporary folder."
         }
       ],
       "verification": [
@@ -2248,9 +2344,15 @@
         },
         {
           "kind": "host-test",
+          "id": "backlog.remote-sync-migration",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "migrates settings rows and per-item mappings to connections, bindings and refs once, keeping every link"
+        },
+        {
+          "kind": "host-test",
           "id": "backlog.remote-sync-import-linear",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "imports a Linear issue as a linked item with its status, labels and comments, once"
+          "testName": "imports a Linear issue as a linked item with its status, labels, priority and comments, once"
         },
         {
           "kind": "host-test",
@@ -2259,22 +2361,22 @@
           "testName": "imports an issue by URL and refuses one from another repository"
         },
         {
-          "kind": "unit-test",
-          "id": "backlog.remote-sync-references",
-          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
-          "testName": "reads Linear workflow-state types and identifiers"
-        },
-        {
-          "kind": "unit-test",
-          "id": "backlog.remote-sync-github-references",
-          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
-          "testName": "reads GitHub issue references only within the configured repository"
+          "kind": "host-test",
+          "id": "backlog.remote-sync-import-sniff",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "imports by URL or identifier without naming the provider, and refuses text no provider recognizes"
         },
         {
           "kind": "host-test",
           "id": "backlog.remote-sync-test-linear",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "tests a Linear key without a team: names the account, lists the teams and uses the only one"
+          "testName": "tests a connection without sending its key back: account, containers and where the key came from"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-connection-edit",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "refuses an unknown provider kind and renames a connection with its bindings"
         },
         {
           "kind": "host-test",
@@ -2283,16 +2385,28 @@
           "testName": "takes the GitHub repository from the project's git remote and the token from the gh CLI"
         },
         {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-missing-key",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "names the missing key with its fix"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.remote-sync-references",
+          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
+          "testName": "reads Linear workflow-state types, priorities and identifiers"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.remote-sync-github-references",
+          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
+          "testName": "reads GitHub issue references only within the configured repository, and keys name the repository"
+        },
+        {
           "kind": "unit-test",
           "id": "backlog.remote-sync-remote-urls",
           "file": "plugins/@dshfiles/backlog/src/sync-local-probes.test.ts",
           "testName": "prefers origin, then upstream, then the first github.com remote"
-        },
-        {
-          "kind": "host-test",
-          "id": "backlog.remote-sync-test-all",
-          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "tests every saved row in settings order, disabled rows included"
         }
       ],
       "telemetry": [
@@ -2309,26 +2423,20 @@
           "source": "secret"
         },
         {
-          "kind": "custom",
-          "span": "backlog sync",
-          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "creates a Linear issue from an item, maps status and labels, and records its spans"
-        },
-        {
-          "kind": "custom",
-          "span": "linear request",
-          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "creates a Linear issue from an item, maps status and labels, and records its spans"
-        },
-        {
           "kind": "automatic",
           "source": "jj"
         },
         {
           "kind": "custom",
-          "span": "backlog sync test connection",
+          "span": "linear request",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "takes the GitHub repository from the project's git remote and the token from the gh CLI"
+          "testName": "creates a Linear issue from an item, maps status, labels and priority, and records its spans"
+        },
+        {
+          "kind": "custom",
+          "span": "backlog sync",
+          "file": "plugins/@dshfiles/backlog/src/provider-files.test.ts",
+          "testName": "round-trips items through markdown files: create, an editor change, a local change, a new file, a removed file and a delete"
         }
       ]
     },
@@ -2774,7 +2882,11 @@
         }
       ],
       "verification": [
-        { "kind": "gherkin", "id": "backlog.shipped-summary", "featureFile": "tooling/dshx/e2e/features/backlog-history.feature" },
+        {
+          "kind": "gherkin",
+          "id": "backlog.shipped-summary",
+          "featureFile": "tooling/dshx/e2e/features/backlog-history.feature"
+        },
         {
           "kind": "host-test",
           "id": "backlog.shipped-summary-cache",

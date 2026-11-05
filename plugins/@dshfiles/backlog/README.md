@@ -1,6 +1,6 @@
 # @dshfiles/backlog
 
-![Configure remote sync backends and import issues](docs/screenshots/remote-sync-settings.png)
+![Configure remote sync connections and bindings](docs/screenshots/remote-sync-settings.png)
 
 ![Retrieve public tweet context into a backlog item](docs/screenshots/tweet-context-enrichment.png)
 
@@ -387,103 +387,142 @@ dropping the rest of the draft.
 
 ## Agent tools
 
-| Tool                           | Kind                                                                                                                          |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `backlog_list`                 | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`, `hideAgentItems`)                       |
-| `backlog_get`                  | read: one item with history and backlinks                                                                                     |
-| `backlog_get_many`             | read: up to 50 items at once, unknown ids listed separately                                                                   |
-| `backlog_referencing`          | read: items linking to a thread, revision, branch, workspace, URL or item                                                     |
-| `backlog_capture`              | write; `priority` and `parent` (a sub-issue) besides the text                                                                 |
-| `backlog_update`               | write: edit or move; `priority`, `parent` (null makes it top-level)                                                           |
-| `backlog_ready`                | read: the ready queue, urgent first then oldest; `project`, `limit` (20)                                                      |
-| `backlog_claim`                | write: claim an item for this thread (delegate, `doing`, thread link, lease); refused while another agent holds it            |
-| `backlog_release`              | write: give up a claim; the item returns to `todo`                                                                            |
-| `backlog_link`                 | write: link or unlink                                                                                                         |
-| `backlog_comment`              | write, optionally with images or files                                                                                        |
-| `backlog_attach_file`          | write: keep one base64 image or file with an item                                                                             |
-| `backlog_read_file`            | read: one image or file as a data URL; `save: true` also returns a temp file path                                             |
-| `backlog_remove_file`          | write: remove one image or file                                                                                               |
-| `backlog_revert`               | write: put back the value a field held before one recorded change; refused when it changed again since; needs `confirm: true` |
-| `backlog_export`               | write a new file: JSONL (items, optionally the op log) or an SQLite copy; changes no item                                     |
-| `backlog_triage`               | write: run triage on one item now                                                                                             |
-| `backlog_triage_backfill`      | write: triage items captured before triage was set up, oldest first; over 5 items needs `confirm: true`                       |
-| `backlog_start_thread`         | write: start one thread for items, in the item project's own jj workspace, linked                                             |
-| `backlog_projects`             | read: per-project counts, who needs you, people; `hideAgentItems` counts like the views                                       |
-| `backlog_shipped`              | read: items that reached done per hour/day/week/month/year or a custom range, by project, with the previous count             |
-| `backlog_summarize_shipped`    | write (model call): a cached short summary of one shipped period by the triage model; `regenerate` writes a new one           |
-| `backlog_accept_proposal`      | write                                                                                                                         |
-| `backlog_dismiss_proposal`     | write                                                                                                                         |
-| `backlog_sync_status`          | read: remote sync backends and each linked item's issue, state, last sync and errors                                          |
-| `backlog_sync_now`             | write: sync one linked item, or (with `confirm: true`) a project's or every one now                                           |
-| `backlog_link_remote`          | write: link an item to a Linear/GitHub issue, create one from it, or unlink it                                                |
-| `backlog_import_remote`        | write: import an existing Linear/GitHub issue as a linked item                                                                |
-| `backlog_sync_test_connection` | read: a backend's key source, signed-in account, target and visible Linear teams                                              |
+| Tool                             | Kind                                                                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `backlog_list`                   | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`, `hideAgentItems`)                       |
+| `backlog_get`                    | read: one item with history and backlinks                                                                                     |
+| `backlog_get_many`               | read: up to 50 items at once, unknown ids listed separately                                                                   |
+| `backlog_referencing`            | read: items linking to a thread, revision, branch, workspace, URL or item                                                     |
+| `backlog_capture`                | write; `priority` and `parent` (a sub-issue) besides the text                                                                 |
+| `backlog_update`                 | write: edit or move; `priority`, `parent` (null makes it top-level)                                                           |
+| `backlog_ready`                  | read: the ready queue, urgent first then oldest; `project`, `limit` (20)                                                      |
+| `backlog_claim`                  | write: claim an item for this thread (delegate, `doing`, thread link, lease); refused while another agent holds it            |
+| `backlog_release`                | write: give up a claim; the item returns to `todo`                                                                            |
+| `backlog_link`                   | write: link or unlink                                                                                                         |
+| `backlog_comment`                | write, optionally with images or files                                                                                        |
+| `backlog_attach_file`            | write: keep one base64 image or file with an item                                                                             |
+| `backlog_read_file`              | read: one image or file as a data URL; `save: true` also returns a temp file path                                             |
+| `backlog_remove_file`            | write: remove one image or file                                                                                               |
+| `backlog_revert`                 | write: put back the value a field held before one recorded change; refused when it changed again since; needs `confirm: true` |
+| `backlog_export`                 | write a new file: JSONL (items, optionally the op log) or an SQLite copy; changes no item                                     |
+| `backlog_triage`                 | write: run triage on one item now                                                                                             |
+| `backlog_triage_backfill`        | write: triage items captured before triage was set up, oldest first; over 5 items needs `confirm: true`                       |
+| `backlog_start_thread`           | write: start one thread for items, in the item project's own jj workspace, linked                                             |
+| `backlog_projects`               | read: per-project counts, who needs you, people; `hideAgentItems` counts like the views                                       |
+| `backlog_shipped`                | read: items that reached done per hour/day/week/month/year or a custom range, by project, with the previous count             |
+| `backlog_summarize_shipped`      | write (model call): a cached short summary of one shipped period by the triage model; `regenerate` writes a new one           |
+| `backlog_accept_proposal`        | write                                                                                                                         |
+| `backlog_dismiss_proposal`       | write                                                                                                                         |
+| `backlog_sync_status`            | read: providers, connections, bindings and each linked item's binding, remote key, state, last sync and errors                |
+| `backlog_sync_now`               | write: sync one linked item, or (with `confirm: true`) a binding, a project's or every linked item now                        |
+| `backlog_link_remote`            | write: link an item through a binding (several per item), create a remote item from it, or unlink it                          |
+| `backlog_import_remote`          | write: import one remote item as a linked item, through the binding serving the project                                       |
+| `backlog_sync_import_all`        | write (`confirm: true`): import every open remote item of a binding nobody linked yet                                         |
+| `backlog_sync_connections`       | read: providers, connections (key source, never the key) and bindings                                                         |
+| `backlog_sync_connection_save`   | write: add, rename or change a connection (key as `secret:ALIAS` only)                                                        |
+| `backlog_sync_connection_move`   | write: move a connection earlier or later                                                                                     |
+| `backlog_sync_connection_remove` | write (`confirm: true`): remove a connection with its bindings and their links                                                |
+| `backlog_sync_binding_save`      | write: add or change a binding; fields left out keep their value                                                              |
+| `backlog_sync_binding_remove`    | write (`confirm: true`): remove a binding and its links                                                                       |
+| `backlog_sync_discover`          | read: the containers (teams, repositories) a connection can bind                                                              |
+| `backlog_sync_test_connection`   | read: a connection's key source, signed-in account and containers                                                             |
+| `backlog_sync_test_all`          | read: the same report for every saved connection                                                                              |
 
 Bulk or destructive agent writes take an explicit `confirm: true` with no default: `backlog_delete`, `backlog_revert`,
-`backlog_triage_backfill` over more than 5 items (the default run is 25) and `backlog_sync_now` without an `id`. An
+`backlog_triage_backfill` over more than 5 items (the default run is 25), `backlog_sync_now` without an `id`,
+`backlog_sync_import_all`, `backlog_sync_connection_remove` and `backlog_sync_binding_remove`. An
 agent call without it is refused with `BacklogConfirmationRequired`, whose message says to ask the user and call again
 with `confirm: true`. The panel never passes it.
 
-## Remote sync (Linear, GitHub Issues)
+## Remote sync: connections, bindings and providers
 
-Items can mirror an issue in Linear or GitHub Issues, so the backlog lives somewhere shared without giving up
-the local feed. Priority, parent, delegate and claims are not mapped to either tracker yet; the provider port of
-backlog v2 P5 maps them. **Backlog settings › Remote sync** holds one row per project and tracker, saved as you edit:
+Items can mirror remote items in Linear, GitHub Issues, a folder of markdown files in the repository, or any source a
+plugin provides, so the backlog lives somewhere shared without giving up the local feed. **Backlog settings › Remote
+sync** lists **connections**, each with its **bindings**:
 
-- a `secret:ALIAS` reference to a Linear personal API key or a GitHub token. Empty falls back to `LINEAR_API_KEY`,
-  or to `GITHUB_TOKEN`, `GH_TOKEN` and then `gh auth token` on the Host;
-- a Linear team, picked from the teams the key sees (empty uses the key's only team), or a GitHub `owner/repo`
-  (empty reads the project's github.com git remote: `origin`, then `upstream`, then the first one);
-- an auto-sync interval (15 minutes for a new row; **Manual sync only** syncs on **Sync now**), an on/off switch, and
-  **Push agent comments** (off by default): with it off, comments agents write stay on the item and only yours go to
-  the issue.
+- A **connection** is one account of one provider (“GitHub – work”, “GitHub – perso”): a name, a `secret:ALIAS`
+  reference to its key (empty falls back to the provider's Host variable — `LINEAR_API_KEY`, `GITHUB_TOKEN`/`GH_TOKEN`,
+  then `gh auth token` — and a folder needs none) and an optional API base URL. **Test** names the account it signs in
+  as and how many containers it sees, never the key; the arrows reorder connections; removing one asks first and drops
+  its bindings and their item links (items and remote items stay).
+- A **binding** is one sync flow of a connection: a container (Linear team, `owner/repo`, folder; empty derives it — the
+  key's only team, the project's github.com git remote, `<project>/backlog/`), picked from what the connection
+  discovers; a scope (every project, or one); a direction (two-way, pull only, push only); which fields flow which way
+  (title, description, status, labels, priority, parent, relations — a field the provider cannot carry is greyed out);
+  remote status names per backlog status (`doing` → `In Review`); a conflict policy; an interval (**Sync now only** by
+  default); **Push agent comments** (off: only your comments go out); and **Import new remote items**. Each binding row
+  has **Sync now**, **Import all open**, an on/off switch, edit and remove.
 
-A row with an empty project (**All other projects**) serves every project that has no row of its own. Each row tests
-its connection as you type and shows the account it signs in as and the team or repository it reaches; a row whose
-connection works folds to one line (tracker, project, account → target, interval and the switch) with **Edit** to
-open it again, and **Test all** re-tests every row (agent tool `backlog_sync_test_all` tests the saved rows). A row
-with no key offers **Create LINEAR_API_KEY** (or `GITHUB_TOKEN`): it opens the Secret Catalog's create-and-bind form on
-the key field through the Catalog's `secret-input:create` field event, and the stored `secret:ALIAS` reference fills
-the row. Removing a row shows **Undo**, which puts it back where it was. The key is resolved on the Host through
-`@dshfiles/credential-port` and never reaches a browser.
+Linking is always your action: an item's row menu and its detail offer **Link to …** and **Create in …** for every
+binding that serves its project, and **Sync now** / **Unlink** per linked source. An item may be linked through several
+bindings, one chip each. **Import** in the settings turns one remote item into a linked item (one already linked
+returns its item), reading the provider from what you paste; **Import all open** imports every open remote item of a
+binding nobody linked yet, idempotently, with parents and relations resolved once all of them are in (comments arrive
+on each item's next sync).
 
-Linking is always your action: an item's row menu and the cloud chip in its detail offer **Link to Linear
-issue…** (paste `ENG-12` or its URL) and **Create in Linear**, the GitHub equivalents once a GitHub row exists,
-and **Sync now** / **Unlink** for a linked item. The settings section also has **Sync all now** and **Import an
-issue**, which turns an existing issue into a linked item (an issue already linked returns its item); it reads the
-tracker from what you paste (`ENG-12` or a linear.app URL is Linear, `#42`, `owner/repo#42` or a github.com URL is
-GitHub).
+What each built-in provider carries:
 
-What syncs, and how conflicts settle:
+| Item        | Linear                                                     | GitHub                                                                       | Markdown files                                     |
+| ----------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| title, body | title, description                                         | title, body                                                                  | `title:` frontmatter, the markdown body            |
+| status      | workflow state (by type, or by name through the value map) | open stands for inbox, todo and doing; closed → done / not planned → dropped | `status:` (any name, mapped through the value map) |
+| tags        | the team's or workspace's labels of the same name          | labels (GitHub creates missing ones)                                         | `tags:`                                            |
+| priority    | 0–4 ↔ none, urgent, high, medium, low                      | —                                                                            | `priority:`                                        |
+| parent      | parent issue                                               | sub-issues                                                                   | `parent:` (a ref)                                  |
+| relations   | blocks, related, duplicate (from either side)              | dependencies: blocked by ↔ depends-on, blocking ↔ blocks                     | `links: [blocks:k3f9, …]`                          |
+| comments    | both ways, once each                                       | both ways, once each                                                         | not written to files                               |
+| change feed | `updatedAt` cursor, paged                                  | `since=` with the list's ETag (an unchanged repository costs a 304)          | full scan by mtime and content hash                |
 
-| Item        | Linear                                                                    | GitHub                                                            |
-| ----------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| title, body | title, description                                                        | title, body                                                       |
-| status      | workflow state type (triage/backlog/unstarted/started/completed/canceled) | open → `todo`; closed completed → `done`, not planned → `dropped` |
-| tags        | the team's or workspace's labels of the same name                         | labels (GitHub creates missing ones)                              |
-| kind        | a label named after it on create/import (`Bug`, `Feature` for ideas)      | a label on create; `bug` / `idea` labels set the kind on import   |
-| comments    | new comments both ways, once each                                         | new comments both ways, once each                                 |
+Delegate is not mapped: Linear's delegate is an app user, the backlog's an agent session. Bindings migrated from the
+earlier settings rows keep the four fields that sync owned then (title, description, status, labels); turn priority,
+parent and relations on in the binding when you want them.
 
-Each mapping keeps both sides as the last sync left them, so a field only one side changed flows to the other and
-a lossy mapping (an in-progress item against an open GitHub issue) never reads as a change. A field both sides
-changed goes to the side that changed last (the item's field history against the issue's `updatedAt`) and the
-item gets a conflict note naming the value that lost; edit the field again to choose it, and the next sync carries
-it over. Linking an existing issue adopts its title, description and status on the first pass (the old values stay
-in the item's history) and merges both sides' tags; creating an issue starts both sides equal. Comments imported
-from the tracker are system comments with origin `remote:<backend>` that say where they came from; only your comments
-(and agents' ones when the row pushes them) made after the link (or every one, for an issue created from the item) go
-out. Agent comments skipped while Push agent comments is off are not marked as sent, so turning it on later posts the
-ones written since the link.
+How a pass works: one binding at a time, each behind its own permit, and only on its **owner Host** (the Host that saved
+it; others show “Runs on another Host”). It pulls the pages changed since the binding's cursor, then compares each
+field with the last synced base of both sides: a field only one side changed flows to the other (when the field's flow
+allows it), and a field both sides changed is settled by the policy — **Last change wins** (the item's field history
+against the remote `updatedAt`), **Backlog wins**, **Remote wins**, or **Flag, change nothing** (the conflict stays until
+both sides agree). The item gets a conflict note either way. Statuses compare by equivalence, so an item in progress
+against an open GitHub issue is in sync. Remote changes land as ops with origin `remote:<bindingId>`; a parent the
+store refuses (a cycle, too deep) is recorded as the ref's sync error, the rest still applies. Local items whose synced
+fields changed are pushed afterwards; a read-only provider or a pull binding never pushes, and comments flow only when
+the provider reads or writes them.
 
-A failing pass never touches the item: the mapping records the error with its recovery (bind the key, fix the
-team or repository, wait for a rate limit) and the chip shows it until the next pass succeeds. Unlinking removes
-the mapping and the issue link only. Host work leaves `backlog sync` (one per item pass), `linear request` and
-`github request` spans with identities and counts only.
+Removal: a remote item that disappears from a full scan (a deleted file) drops its item (when status flows in), says so
+in a note, and loses the ref. Deleting a backlog item keeps its refs as tombstones, so a pull never imports its remote
+item again; a provider whose delete mode is `close` (files) also writes it `status: dropped`, so the file stays in the
+repository's history. Linear and GitHub items are left alone.
 
-Deferred: pushing a snapshot to an S3-compatible bucket or a git repository (a local file export exists: see Backlog
-settings). The mapping store and the
-`RemoteBackend` port (`src/sync-backend.ts`) are where such a one-way backend would plug in; it was left out
-because it needs its own credential and conflict story (an export has no remote edits to merge).
+A failing pass never touches the item: the ref records the error with its recovery and the chip shows it until the next
+pass succeeds. Host work leaves a `backlog sync` span per binding pass (records, created, removed, items, errors), a
+`backlog sync item` span per item, and `linear request`, `github request` and `backlog files scan` spans, with
+identities and counts only.
+
+### The markdown files provider
+
+One `<ref>-<slug>.md` per item in the bound folder (`<project>/backlog/` by default), with YAML frontmatter (`ref`,
+`title`, `kind`, `status`, `priority`, `tags`, `parent`, `links`, `created`, `updated`) and the item body below it.
+Keys you add stay as they are. A file's key is its name without `.md`, chosen once: renaming a file reads as removing
+one item and adding another. A file you write by hand without a `ref` is imported when the binding imports new items.
+Comments are not written to files. Edits from an editor or a `git pull` come in on the next pass.
+
+### Where the configuration lives
+
+Connections, bindings, external refs and each binding's cursor live in the backlog's SQLite file (migration
+`4_sync_sources`), not in settings: refs and `remote:<bindingId>` origins point at bindings, a binding belongs to one
+Host, and a rename or removal must move or drop refs in the same transaction. Credentials are only `secret:ALIAS`
+references, resolved on the Host. The first start after this change moves the old `syncBackends` settings rows into
+connections and bindings (rows sharing a tracker and key share a connection) and every per-item mapping into an external
+ref of the binding that served its project — or of a disabled `<tracker>-migrated` binding when none does — once,
+recording a receipt in `meta`. The settings field stays hidden as that migration's input.
+
+### Adding a provider from another plugin
+
+A provider is a plugin serving the `backlog-provider` Host API, the `vcs-provider-port` way: import the contract from
+`@dshfiles/backlog/backlog-provider` and bind `BacklogProviders.contract('<your package>')` with handlers for `describe`
+(kinds, capabilities, reference patterns), `identity`, `pull` (paged, with a checkpoint), `fetch`, `resolve`, `push`,
+`create` and `comment`, all in the canonical record shape. The backlog lists served providers once a minute; a built-in
+kind wins over one of the same name. The built-ins implement the same in-process `BacklogProvider` interface.
 
 ## Search and saved views
 
@@ -598,8 +637,12 @@ One SQLite file owned by the Host, `$DSH_HOME/plugins/backlog/backlog.db`, opene
 | `items`             | Each item folded from its ops, a cache rebuilt from `ops` whenever the fold version changes; indexed by status, project, last activity and origin                                        |
 | `aliases`           | `alias → item_id` with its kind: `legacy` (the public `b:<n>` of an item created before short aliases), `short` (the `b:<ref>` of a newer one) and `key` (a newer item's private number) |
 | `attachments`       | Per item and attachment: the SHA-256, media type and size of the bytes                                                                                                                   |
-| `sync_mappings`     | One remote-sync mapping per linked item (remote id, last synced value of each side, carried-over comment ids, state, recent conflicts, last error), keyed by item id                     |
-| `meta`              | The host id, the next item id, the fold version and the import receipt                                                                                                                   |
+| `sync_mappings`     | The per-item remote mappings of the sync before bindings; read once by the migration to external refs, written no more                                                                   |
+| `sync_connections`  | Remote sync connections in panel order: provider kind, name, `secret:ALIAS` key reference, base URL and the last tested identity                                                         |
+| `sync_bindings`     | Sync flows of a connection: container, scope, direction, field map with value maps, conflict policy, interval, owner Host                                                                |
+| `external_refs`     | One row per item and binding: remote key, URL, both sides as the last sync left them, carried-over comment ids, state, conflicts, last error                                             |
+| `sync_state`        | Each binding's pull cursor and when its last pass ran                                                                                                                                    |
+| `meta`              | The host id, the next item id, the fold version, the import receipt and the sync migration receipt                                                                                       |
 | `shipped_summaries` | One AI summary of a shipped period per period, bucket start and project filter, with the hash of the items it summarized, the model and when it was written                              |
 | `leases`            | One live or lapsed claim per item: holder (`agent:<sessionId>`), acquired, last write and expiry; written in the same transaction as the item's ops, removed with the claim              |
 
