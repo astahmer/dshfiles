@@ -1001,7 +1001,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "StatusItems",
       "importFrom": "@dshfiles/frame-layout/status-strip",
       "owner": "@dshfiles/frame-layout",
-      "source": "plugins/@dshfiles/frame-layout/src/status-strip.ts:39",
+      "source": "plugins/@dshfiles/frame-layout/src/status-strip.ts:43",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/frame-layout.status-item",
@@ -2116,6 +2116,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/workbench/thread-on-screen",
+      "kind": "module",
+      "title": "@dshfiles/workbench/thread-on-screen",
+      "summary": "Public module of @dshfiles/workbench.",
+      "publicSymbol": "ThreadOnScreenObservable, SessionDraftsOwner, threadOnScreen",
+      "importFrom": "@dshfiles/workbench/thread-on-screen",
+      "owner": "@dshfiles/workbench",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workbench/src/thread-on-screen.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "workspaceFolderBrowserApi",
       "importFrom": "@dshfiles/workspace-folder-picker/directory-browser-api",
       "owner": "@dshfiles/workspace-folder-picker",
@@ -2258,7 +2278,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/background-jobs › thread-jobs-facet"
       ],
       "details": [
-        "Used by 26 catalog feature(s)",
+        "Used by 27 catalog feature(s)",
         "Destinations in use: thread-panel"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2419,11 +2439,11 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [
         "@dshfiles/ai-accounts › disabled-account-preview",
         "@dshfiles/ai-accounts › active-chat-account",
-        "@dshfiles/hmr-gate › plugins-row",
-        "@dshfiles/hmr-gate › restart-status-item"
+        "@dshfiles/frame-layout › status-item-open",
+        "@dshfiles/hmr-gate › plugins-row"
       ],
       "details": [
-        "Used by 7 catalog feature(s)",
+        "Used by 8 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2451,7 +2471,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 47 catalog feature(s)",
+        "Used by 48 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
