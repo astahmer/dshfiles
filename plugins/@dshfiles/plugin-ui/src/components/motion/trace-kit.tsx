@@ -94,6 +94,8 @@ export const hatchStyle: React.CSSProperties = { backgroundImage: hatchImage }
 
 export const formatDuration = (seconds: number): string => {
   const s = Math.max(0, seconds)
+  if (s < 0.001) return `${Math.round(s * 1_000_000)}µs`
+  if (s < 0.01) return `${Number((s * 1000).toFixed(1))}ms`
   if (s < 1) return `${Math.round(s * 1000)}ms`
   if (s < 10) return `${s.toFixed(1)}s`
   if (s < 60) return `${Math.round(s)}s`
@@ -644,9 +646,14 @@ export function GrowRow({ className, children, leaving = false, onLeft, ...props
     void controls.finished.then(() => {
       if (current) onLeftRef.current?.()
     })
+    // A row that comes back before it finished folding (expanded again) is live again: give it back its size and input.
     return () => {
       current = false
       controls.stop()
+      element.inert = false
+      element.style.removeProperty('height')
+      element.style.removeProperty('overflow')
+      element.style.removeProperty('opacity')
     }
   }, [leaving])
   React.useLayoutEffect(() => {
@@ -748,6 +755,11 @@ export interface TreeLabelProps {
   readonly strong?: boolean
   /** Extra chip after the name (TOP, SLOWEST). */
   readonly badge?: React.ReactNode
+  /** Accessible name prefixes of the chevron, for a translated surface. */
+  readonly expandLabel?: string
+  readonly collapseLabel?: string
+  /** Keep the chevron out of the Tab order when the row itself takes focus (a tree's roving tab index). */
+  readonly toggleFocusable?: boolean
   readonly className?: string
 }
 
@@ -765,6 +777,9 @@ export function TreeLabel({
   failed,
   strong,
   badge,
+  expandLabel = 'Expand',
+  collapseLabel = 'Collapse',
+  toggleFocusable = true,
   className,
 }: TreeLabelProps) {
   return (
@@ -786,7 +801,8 @@ export function TreeLabel({
         <button
           type="button"
           aria-expanded={!collapsed}
-          aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${name}`}
+          aria-label={`${collapsed ? expandLabel : collapseLabel} ${name}`}
+          tabIndex={toggleFocusable ? undefined : -1}
           onClick={event => {
             event.stopPropagation()
             onToggle?.()
