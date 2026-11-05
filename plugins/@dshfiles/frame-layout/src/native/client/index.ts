@@ -28,6 +28,7 @@ import { FrameWidthsModel } from '../../frame-widths.ts'
 import { PanelRetentionModel } from '../../panel-retention.ts'
 import { createMainSurfaceSeat } from '../../main-surface.ts'
 import { createRightPanelSeat } from '../../right-panel.ts'
+import { registerRootAcrossReloads } from '../../root-handoff.ts'
 
 // Contract exports only (export-convergence rule: cross-package consumers
 // keep a symbol exported; test-only/package-internal symbols live off /src).
@@ -154,6 +155,10 @@ export interface RightbarOwnerProps {
   canShow: boolean
 }
 
+/** Renders last among `root` entries, so the reloaded frame wins the moment it registers. */
+const ROOT_PLACEHOLDER_PRIORITY = 1_000
+const RootPlaceholder = (): null => null
+
 /** Required services (cordis fiber inject — the loader passes all module exports as an object plugin). */
 export const inject = ['slots', 'theme', 'locale', 'shortcuts']
 
@@ -219,7 +224,11 @@ export function apply(ctx: ClientContext, statusStrip: ComponentType<StatusStrip
     }))
     const disposeFrameBottom = ctx.reflect.provide('frameBottom', frameBottom)
     const disposeFrameSidebar = ctx.reflect.provide('frameSidebar', frameSidebar)
-    const disposeRegistration = ctx.slots.register({
+    // Local delta (dshfiles): a client hot reload of this bundle never leaves 'root' without a registration (the
+    // renderer would throw and blank the page); see root-handoff.ts.
+    const disposeRegistration = registerRootAcrossReloads({
+      placeholder: () => ctx.root.slots.register({ name: 'root', priority: ROOT_PLACEHOLDER_PRIORITY }, RootPlaceholder),
+      register: () => ctx.slots.register({
       name: 'root',
       locale: 'common',
       children: {
@@ -233,7 +242,8 @@ export function apply(ctx: ClientContext, statusStrip: ComponentType<StatusStrip
         'shell.leading': { kind: 'single', scope: 'root' },
       },
       store,
-    }, Frame)
+    }, Frame),
+    })
     const disposeShortcut = ctx.shortcuts.register({
       id: 'sidebar.left.toggle' as ShortcutCommandId, label: () => t('toggle'), aliases: ['sidebar', 'toggle left sidebar'],
       defaults: {

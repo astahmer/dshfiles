@@ -70,6 +70,18 @@
         },
         {
           "kind": "unit-test",
+          "id": "frame-layout.root-hot-reload-handoff",
+          "file": "plugins/@dshfiles/frame-layout/src/root-handoff.test.ts",
+          "testName": "keeps root registered between the old frame leaving and the reloaded frame registering"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.root-hot-reload-placeholder-grace",
+          "file": "plugins/@dshfiles/frame-layout/src/root-handoff.test.ts",
+          "testName": "removes the placeholder when no frame follows once the grace ends"
+        },
+        {
+          "kind": "unit-test",
           "id": "frame-layout.panel-seats-unit-mode",
           "file": "plugins/@dshfiles/frame-layout/src/regions.test.ts",
           "testName": "starts on the native surface and follows the reported mode"
