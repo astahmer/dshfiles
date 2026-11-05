@@ -4,7 +4,6 @@ import * as Schema from 'effect/Schema'
 import type { AddressInfo } from 'node:net'
 import { Hono } from 'hono'
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming'
-import { decodeJson } from '../json.js'
 
 /**
  * A loopback stand-in for Command Code, the one provider whose account base URL accepts a loopback address, so a
@@ -21,7 +20,13 @@ import { decodeJson } from '../json.js'
  * the turn after a tool result answers `Tool finished.`.
  *
  * E2E journeys start it per page; `dshx dev`'s `tool-call-thread` seed runs it as its own process.
+ *
+ * Keep this module free of relative imports: `e2e/support/http-fakes.test.ts` loads it as source under
+ * `node --experimental-strip-types`, which does not map a `.js` specifier to its `.ts` file.
  */
+
+/** A directive's escaped JSON arguments, decoded as one JSON string literal. */
+const decodeEscapedArguments = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.String))
 
 /** The fake provider's model id; journeys and scratch use separate account route slugs. */
 export const FAKE_COMMAND_CODE_MODEL_ID = 'gpt-6-luna'
@@ -184,7 +189,7 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
       input.state.oneShotCalls.add(directive)
     }
     const rawArguments = match[3] ?? '{}'
-    const argumentsJson = rawArguments.startsWith(String.raw`{\"`) ? decodeJson(Schema.String, `"${rawArguments}"`) : rawArguments
+    const argumentsJson = rawArguments.startsWith(String.raw`{\"`) ? decodeEscapedArguments(`"${rawArguments}"`) : rawArguments
     return [{ name: match[2] ?? '', argumentsJson }]
   })
   if (calls.length > 0) return streamAnswer(toolCalls(calls))
