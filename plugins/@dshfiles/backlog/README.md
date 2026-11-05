@@ -454,7 +454,13 @@ data URL for the UI, and `save: true` writes a copy under `$TMPDIR/dsh-backlog-a
 and returns that absolute path so an agent can read an image instead of a base64 string.
 Remote sync keeps its mappings (remote id, the last synced value of each side, carried-over comment ids, state,
 recent conflicts and the last error) in a third domain, `backlog_sync` v1, keyed by item id, so the `items`
-rows stay at v1 and turning sync on or off never rewrites or loses an item.
+rows stay at v1 and turning sync on or off never rewrites or loses an item. Deleting an item removes its files and
+its sync mapping (the remote issue stays), so no later item inherits them.
+
+The next item id lives in `backlog_meta` v1 (`counters` row `items`) and only moves forward: a restart takes the
+larger of that counter and the largest stored id plus one, so deleting the newest item never frees its `b:<n>`.
+
+An item keeps its newest 200 events; trimming always keeps the first `created` event, which names who captured it.
 
 ## Secret references
 
