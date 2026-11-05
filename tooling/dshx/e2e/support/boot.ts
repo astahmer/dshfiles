@@ -11,6 +11,7 @@ import { recordScratchProcess, scratchLedgerPath } from '../../scripts/reap-scra
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
 import { createScratchHostLifecycle, type ScratchHostInstance } from './scratch-host-lifecycle.js'
 import { AI_ACCOUNTS_WORKSPACE_SEED_KEY, seedAiAccountsWorkspace } from './ai-accounts-workspace.js'
+import { startHostEgressGuard } from './host-egress-guard.js'
 
 // Registry dependencies come from the checked-in seed, not the live ~/.dsh profile, so a journey (and its cached
 // Turbo result) depends only on the repository.
@@ -93,6 +94,8 @@ export interface BootedProfile {
   readonly host: ChildProcess
   /** Startup output with tokenized URLs removed. */
   output(): string
+  /** `host:port` targets this Host tried to reach beyond loopback; each was refused (see host-egress-guard.ts). */
+  egressAttempts(): readonly string[]
   /** Restart only this fixture-owned process and return its fresh tokenized URL. */
   restart(): Promise<string>
   close(): Promise<void>
@@ -152,6 +155,8 @@ export const startScratchProfile = async (
   await compositionValidations.get(compositionKey)
   traceBootPhase('composition-validated', validatedAt, profileLabel)
 
+  // One guard per profile, kept across restarts, so its record covers everything this scenario's Host did.
+  const egressGuard = await startHostEgressGuard()
   const start = async (port: number): Promise<ScratchHostInstance> => {
     const scratchEnvironment = isolatedHostEnvironment(prepared.homeRoot, prepared.profileRoot)
     const hostPath = pathPrefix === undefined ? scratchEnvironment.PATH : [pathPrefix, scratchEnvironment.PATH].filter(Boolean).join(delimiter)
@@ -160,7 +165,7 @@ export const startScratchProfile = async (
       cwd: DSHFILES_ROOT,
       // directory-picker-auto mounts the OS chooser on a darwin/win32 loopback Host, which a browser cannot drive; an SSH
       // launch is its documented signal for the in-app browse picker, so folder journeys behave the same on every platform.
-      env: { ...hostEnvironment, ...hostEnv, SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0' },
+      env: { ...hostEnvironment, ...egressGuard.environment, ...hostEnv, SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0' },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     let output = ''
@@ -194,7 +199,14 @@ export const startScratchProfile = async (
 
   try {
     const initial = await start(await findFreePort())
-    const lifecycle = createScratchHostLifecycle({ initial, start, dispose: () => prepared.dispose() })
+    const lifecycle = createScratchHostLifecycle({
+      initial,
+      start,
+      dispose: async () => {
+        await egressGuard.close()
+        await prepared.dispose()
+      },
+    })
     return {
       get url() {
         return lifecycle.url
@@ -209,10 +221,12 @@ export const startScratchProfile = async (
         return lifecycle.host
       },
       output: () => lifecycle.output(),
+      egressAttempts: () => egressGuard.attempts(),
       restart: () => lifecycle.restart(),
       close: () => lifecycle.close(),
     }
   } catch (error) {
+    await egressGuard.close()
     await prepared.dispose()
     const message = error instanceof Error ? error.message : String(error)
     throw new Error(redactHostOutput(message))
