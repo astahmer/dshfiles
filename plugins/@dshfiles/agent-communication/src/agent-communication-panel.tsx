@@ -9,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
+import { AgentRoster, type RosterAgent } from '@dshfiles/plugin-ui/components/motion/agent-roster'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -189,6 +190,60 @@ const AgentStatus = (props: { readonly agent: CommunicationDiagnosticAgent; read
   <Badge variant={props.agent.status === 'running' ? 'default' : 'secondary'}>{props.agent.status === 'running' ? props.t('running') : props.t('idle')}</Badge>
 )
 
+/** One live agent as a roster row: the status pill and its workspace channel subscription, with the matching action. */
+const rosterAgent = (props: {
+  readonly agent: CommunicationDiagnosticAgent
+  readonly labels: Labels
+  readonly t: AgentCommunicationTranslate
+  readonly busy: boolean
+  readonly onAction: (action: ManagementAction) => void
+}): RosterAgent => {
+  const { agent, t } = props
+  const topic = agent.workspaceTopic
+  const canRejoin = topic !== null && (agent.workspaceOptedOut || agent.workspaceSubscribed === false)
+  const canUnsubscribe = topic !== null && !agent.workspaceOptedOut && agent.workspaceSubscribed === true
+  const actionKind = canRejoin ? 'rejoin' : canUnsubscribe ? 'unsubscribe' : undefined
+  const action =
+    topic === null || actionKind === undefined ? undefined : (
+      <Button size="sm" variant="outline" disabled={props.busy} onClick={() => props.onAction({ kind: actionKind, agentId: agent.id, topic })}>
+        {t(actionKind)}
+      </Button>
+    )
+  return {
+    id: agent.id,
+    status: agent.status === 'running' ? 'running' : 'idle',
+    statusLabel: agent.status === 'running' ? t('running') : t('idle'),
+    activityKey: `${agent.status}:${String(agent.workspaceSubscribed)}:${String(agent.workspaceOptedOut)}`,
+    title: (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="dshx:font-medium">{props.labels.agent(agent.id)}</span>
+        </TooltipTrigger>
+        <TooltipContent>{agent.id}</TooltipContent>
+      </Tooltip>
+    ),
+    activity: (
+      <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:pt-1">
+        <AgentStatus agent={agent} t={t} />
+        {topic === null ? null : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="dshx:text-xs dshx:text-muted-foreground">{props.labels.topic(topic)}</span>
+            </TooltipTrigger>
+            <TooltipContent>{topic}</TooltipContent>
+          </Tooltip>
+        )}
+        {agent.workspaceOptedOut ? <Badge variant="outline">{t('optedOut')}</Badge> : null}
+        {agent.workspaceSubscribed === true ? <Badge variant="secondary">{t('subscribed')}</Badge> : null}
+        {topic !== null && agent.workspaceSubscribed === undefined && !agent.workspaceOptedOut ? (
+          <Badge variant="outline">{t('unknownSubscription')}</Badge>
+        ) : null}
+      </span>
+    ),
+    ...(action !== undefined && { action }),
+  }
+}
+
 const DiagnosticPanel = (props: {
   readonly data: CommunicationDiagnostics
   readonly labels: Labels
@@ -251,59 +306,15 @@ const DiagnosticPanel = (props: {
             <CardTitle>{t('agents')}</CardTitle>
             <CardDescription>{t('offlineUnknown')}</CardDescription>
           </CardHeader>
-          <CardContent className="dshx:p-0">
-            {diagnostics.agents.length === 0 ? <EmptyState>{t('noLiveAgents')}</EmptyState> : null}
-            {diagnostics.agents.map(agent => (
-              <div
-                key={agent.id}
-                className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:p-4"
-              >
-                <div className="dshx:min-w-0">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <p className="dshx:break-words dshx:font-medium">{props.labels.agent(agent.id)}</p>
-                    </TooltipTrigger>
-                    <TooltipContent>{agent.id}</TooltipContent>
-                  </Tooltip>
-                  <div className="dshx:mt-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-                    <AgentStatus agent={agent} t={t} />
-                    {agent.workspaceTopic === null ? null : (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="dshx:text-xs dshx:text-muted-foreground">{props.labels.topic(agent.workspaceTopic)}</span>
-                        </TooltipTrigger>
-                        <TooltipContent>{agent.workspaceTopic}</TooltipContent>
-                      </Tooltip>
-                    )}
-                    {agent.workspaceOptedOut ? <Badge variant="outline">{t('optedOut')}</Badge> : null}
-                    {agent.workspaceSubscribed === true ? <Badge variant="secondary">{t('subscribed')}</Badge> : null}
-                    {agent.workspaceTopic !== null && agent.workspaceSubscribed === undefined && !agent.workspaceOptedOut ? (
-                      <Badge variant="outline">{t('unknownSubscription')}</Badge>
-                    ) : null}
-                  </div>
-                </div>
-                {agent.workspaceTopic !== null && (agent.workspaceOptedOut || agent.workspaceSubscribed === false) ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={props.busy}
-                    onClick={() => props.onAction({ kind: 'rejoin', agentId: agent.id, topic: agent.workspaceTopic ?? '' })}
-                  >
-                    {t('rejoin')}
-                  </Button>
-                ) : null}
-                {agent.workspaceTopic !== null && !agent.workspaceOptedOut && agent.workspaceSubscribed === true ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={props.busy}
-                    onClick={() => props.onAction({ kind: 'unsubscribe', agentId: agent.id, topic: agent.workspaceTopic ?? '' })}
-                  >
-                    {t('unsubscribe')}
-                  </Button>
-                ) : null}
-              </div>
-            ))}
+          <CardContent className="dshx:border-t dshx:border-border dshx:p-4">
+            {diagnostics.agents.length === 0 ? (
+              <EmptyState>{t('noLiveAgents')}</EmptyState>
+            ) : (
+              <AgentRoster
+                aria-label={t('agents')}
+                agents={diagnostics.agents.map(agent => rosterAgent({ agent, labels: props.labels, t, busy: props.busy, onAction: props.onAction }))}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

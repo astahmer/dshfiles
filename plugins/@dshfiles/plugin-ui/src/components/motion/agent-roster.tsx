@@ -5,7 +5,7 @@ import { PresenceList } from './presence-list.js'
 import { StepGlyph } from './step-glyph.js'
 import { RollingNumber } from './text.js'
 
-export type RosterAgentStatus = 'running' | 'done' | 'failed'
+export type RosterAgentStatus = 'running' | 'idle' | 'done' | 'failed'
 
 export interface RosterAgent {
   readonly id: string
@@ -17,6 +17,10 @@ export interface RosterAgent {
   readonly status: RosterAgentStatus
   /** Estimate while running ("~1 min"). */
   readonly eta?: React.ReactNode
+  /** Accessible name of the status glyph; defaults to the status. */
+  readonly statusLabel?: string
+  /** Row control on the right (Unsubscribe, Rejoin); takes the place of the ETA and the Review pill. */
+  readonly action?: React.ReactNode
 }
 
 export interface AgentRosterProps extends Omit<React.HTMLAttributes<HTMLElement>, 'children'> {
@@ -32,13 +36,14 @@ export interface AgentRosterProps extends Omit<React.HTMLAttributes<HTMLElement>
  */
 export function AgentRoster({ agents, onStopAll, onReview, reviewLabel = 'Review', className, ...props }: AgentRosterProps) {
   const running = agents.filter(agent => agent.status === 'running').length
+  const shown = running > 0 ? running : agents.length
   return (
     <section aria-label="Subagents" className={cn('dshx:@container dshx:flex dshx:flex-col dshx:gap-3', className)} {...props}>
       <header className="dshx:flex dshx:items-baseline dshx:gap-2">
         <h3 className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1.5 dshx:text-[15px] dshx:font-medium" aria-live="polite">
           <span className="dshx:inline-flex dshx:items-baseline dshx:gap-1">
-            <RollingNumber value={running} />
-            <span>{running === 1 ? 'agent' : 'agents'}</span>
+            <RollingNumber value={shown} />
+            <span>{shown === 1 ? 'agent' : 'agents'}</span>
           </span>
           <span className="dshx:text-muted-foreground">{running > 0 ? 'running' : 'idle'}</span>
         </h3>
@@ -74,7 +79,7 @@ function RosterRow({
   return (
     <div className="dshx:flex dshx:items-start dshx:gap-3">
       <span className="dshx:flex dshx:h-6 dshx:items-center">
-        <StepGlyph status={agent.status} />
+        <StepGlyph status={agent.status === 'idle' ? 'waiting' : agent.status} {...(agent.statusLabel === undefined ? {} : { label: agent.statusLabel })} />
       </span>
       <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
         <span className="dshx:truncate dshx:text-[15px] dshx:leading-6 dshx:text-foreground">{agent.title}</span>
@@ -90,14 +95,26 @@ function RosterRow({
         </SwapLine>
       </div>
       <div className="dshx:flex dshx:shrink-0 dshx:self-stretch dshx:items-start">
-        {agent.status === 'done' && onReview !== undefined ? (
-          <ReviewPill label={reviewLabel} onClick={() => onReview(agent)} />
-        ) : agent.status === 'running' && agent.eta !== undefined ? (
-          <span className="dshx:text-sm dshx:leading-6 dshx:text-muted-foreground dshx:tabular-nums">{agent.eta}</span>
-        ) : null}
+        <RosterTrailing agent={agent} onReview={onReview} reviewLabel={reviewLabel} />
       </div>
     </div>
   )
+}
+
+function RosterTrailing({
+  agent,
+  onReview,
+  reviewLabel,
+}: {
+  readonly agent: RosterAgent
+  readonly onReview: ((agent: RosterAgent) => void) | undefined
+  readonly reviewLabel: string
+}) {
+  if (agent.action !== undefined) return agent.action
+  if (agent.status === 'done' && onReview !== undefined) return <ReviewPill label={reviewLabel} onClick={() => onReview(agent)} />
+  if (agent.status === 'running' && agent.eta !== undefined)
+    return <span className="dshx:text-sm dshx:leading-6 dshx:text-muted-foreground dshx:tabular-nums">{agent.eta}</span>
+  return null
 }
 
 function ReviewPill({ label, onClick }: { readonly label: string; readonly onClick: () => void }) {
