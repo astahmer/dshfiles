@@ -21,7 +21,7 @@
           "key": "connection.baseUrl",
           "defaultValue": "",
           "constraints": "Empty uses https://api.notion.com; any other http(s) base receives the key.",
-          "coveredBy": ["backlog-notion.identity"]
+          "coveredBy": ["backlog-notion.identity", "backlog-notion.connect-bind-import"]
         },
         {
           "key": "binding.container",
@@ -33,7 +33,7 @@
           "key": "binding.options.statusProperty",
           "defaultValue": "",
           "constraints": "A status or select property; empty finds a property named Status, State or Stage, then the only status property.",
-          "coveredBy": ["backlog-notion.field-mapping"]
+          "coveredBy": ["backlog-notion.field-mapping", "backlog-notion.connect-bind-import"]
         },
         {
           "key": "binding.options.tagsProperty",
@@ -131,9 +131,9 @@
           "testName": "reports a refused key with its recovery and never echoes it"
         },
         {
-          "kind": "not-applicable",
-          "id": "backlog-notion.browser-journey",
-          "reason": "Host-only provider: its user-visible flow is the backlog's Remote sync settings, walked by the backlog journeys; a Notion journey needs a loopback fake Notion server in tooling/dshx/e2e."
+          "kind": "gherkin",
+          "id": "backlog-notion.connect-bind-import",
+          "featureFile": "tooling/dshx/e2e/features/backlog-notion.feature"
         }
       ],
       "telemetry": [
@@ -147,7 +147,8 @@
           "file": "plugins/@dshfiles/backlog-notion/src/notion-provider.test.ts",
           "testName": "records one notion request span per call, with the operation and status only"
         }
-      ]
+      ],
+      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Backlog settings\"", "expect button \"Add Notion connection\""]
     }
   ]
 }
