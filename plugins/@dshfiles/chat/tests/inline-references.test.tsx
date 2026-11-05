@@ -48,12 +48,18 @@ afterEach(cleanup)
 const prose: InlineReferenceContext = { sessionId: undefined, cwd: undefined, surface: 'prose', before: '' }
 
 /** A provider over one regular expression, rendering a marked span that carries its id. */
-const pattern = (id: string, expression: RegExp, options: { readonly priority?: number; readonly surfaces?: InlineReference['surfaces'] } = {}): InlineReference =>
+const pattern = (
+  id: string,
+  expression: RegExp,
+  options: { readonly priority?: number; readonly surfaces?: InlineReference['surfaces'] } = {},
+): InlineReference =>
   InlineReferenceModel.define({
     id,
-    ...(options.priority === undefined ? {} : { priority: options.priority }),
-    ...(options.surfaces === undefined ? {} : { surfaces: options.surfaces }),
-    match: text => [...text.matchAll(new RegExp(expression.source, 'gu'))].map(match => ({ start: match.index, end: match.index + match[0].length, value: match[0] })),
+    // The same defaults define() applies to an omitted priority and surface list.
+    priority: options.priority ?? 0,
+    surfaces: options.surfaces ?? ['prose'],
+    match: text =>
+      [...text.matchAll(new RegExp(expression.source, 'gu'))].map(match => ({ start: match.index, end: match.index + match[0].length, value: match[0] })),
     render: input => (
       <span data-reference={id} data-value={input.value}>
         {input.text}
@@ -61,7 +67,8 @@ const pattern = (id: string, expression: RegExp, options: { readonly priority?: 
     ),
   })
 
-const shape = (pieces: readonly InlineReferencePiece[]): readonly string[] => pieces.map(piece => (piece.kind === 'text' ? piece.text : `[${piece.id}:${piece.text}]`))
+const shape = (pieces: readonly InlineReferencePiece[]): readonly string[] =>
+  pieces.map(piece => (piece.kind === 'text' ? piece.text : `[${piece.id}:${piece.text}]`))
 
 describe('inline reference segmentation', () => {
   it('splits text around every provider match and keeps plain text untouched', () => {
@@ -109,7 +116,12 @@ const labels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 'Copied
 const renderMarkdownText = MarkdownText.type
 
 /** The same composition InlineReferenceMarkdown uses, over explicit providers instead of the registry. */
-const Referenced = (props: { readonly text: string; readonly streaming?: boolean; readonly items: readonly InlineReference[]; readonly onBlock?: (node: ReactNode) => void }): ReactNode => {
+const Referenced = (props: {
+  readonly text: string
+  readonly streaming?: boolean
+  readonly items: readonly InlineReference[]
+  readonly onBlock?: (node: ReactNode) => void
+}): ReactNode => {
   const state = useRef(InlineReferenceModel.state(props.items))
   const output = renderMarkdownText({ text: props.text, streaming: props.streaming ?? false, labels })
   return InlineReferenceModel.transform(output, state.current)

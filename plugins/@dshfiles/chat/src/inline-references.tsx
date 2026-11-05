@@ -17,7 +17,6 @@ import {
   useMemo,
   useSyncExternalStore,
   type ErrorInfo,
-  type ReactElement,
   type ReactNode,
 } from 'react'
 
@@ -94,18 +93,20 @@ export interface InlineReference {
 /** Add one with `plugin.add(InlineReferences, InlineReferenceModel.define({ … }))`. */
 export const InlineReferences = defineRegistry<InlineReference>('@dshfiles/chat.inline-reference')
 
-const define = <Value,>(definition: InlineReferenceDefinition<Value>): InlineReference => ({
-  id: definition.id,
-  priority: definition.priority ?? 0,
-  surfaces: definition.surfaces ?? ['prose'],
-  find: (text, context) =>
-    definition.match(text, context).map(match => ({
-      start: match.start,
-      end: match.end,
-      render: () => definition.render({ value: match.value, text: text.slice(match.start, match.end), context }),
-    })),
-  ...(definition.vocabulary === undefined ? {} : { vocabulary: definition.vocabulary }),
-})
+const define = <Value,>(definition: InlineReferenceDefinition<Value>): InlineReference => {
+  const reference: InlineReference = {
+    id: definition.id,
+    priority: definition.priority ?? 0,
+    surfaces: definition.surfaces ?? ['prose'],
+    find: (text, context) =>
+      definition.match(text, context).map(match => ({
+        start: match.start,
+        end: match.end,
+        render: () => definition.render({ value: match.value, text: text.slice(match.start, match.end), context }),
+      })),
+  }
+  return definition.vocabulary === undefined ? reference : { ...reference, vocabulary: definition.vocabulary }
+}
 
 /** A mutable version counter for {@link InlineReferenceDefinition.vocabulary}. */
 const createVocabulary = (): Subscribable<number> & { readonly bump: () => void } => {
@@ -183,9 +184,13 @@ const segment = (text: string, items: readonly InlineReference[], context: Inlin
 }
 
 /** A provider's renderer that throws shows the text as written instead of taking the message down. */
-class ReferenceBoundary extends Component<{ readonly id: string; readonly text: string; readonly children: ReactNode }, { readonly failed: boolean }> {
+interface ReferenceBoundaryState {
+  readonly failed: boolean
+}
+
+class ReferenceBoundary extends Component<{ readonly id: string; readonly text: string; readonly children: ReactNode }, ReferenceBoundaryState> {
   override state = { failed: false }
-  static getDerivedStateFromError(): { readonly failed: boolean } {
+  static getDerivedStateFromError(): ReferenceBoundaryState {
     return { failed: true }
   }
   override componentDidCatch(error: unknown, _info: ErrorInfo): void {
@@ -221,6 +226,8 @@ const BLOCKS = new Set(['p', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'td', 'th
 export interface TransformState {
   readonly items: readonly InlineReference[]
   readonly scope: InlineReferenceScopeValue
+  /** The providers' vocabulary versions the cache was built for; a change starts a new state and cache. */
+  readonly vocabulary: string
   /** Transformed block elements by identity: a streaming message's frozen blocks keep theirs, so React skips them. */
   readonly cache: WeakMap<object, ReactNode>
 }
@@ -238,7 +245,7 @@ const textOf = (node: ReactNode): string => {
 }
 
 const transformChildren = (children: ReactNode, surface: InlineReferenceSurface, state: TransformState): ReactNode => {
-  const list = Array.isArray(children) ? (children as readonly ReactNode[]) : [children]
+  const list: readonly ReactNode[] = Array.isArray(children) ? children : [children]
   let before = ''
   let changed = false
   const next = list.map((child, index) => {
@@ -260,24 +267,23 @@ const transformChildren = (children: ReactNode, surface: InlineReferenceSurface,
 
 const transformNode = (node: ReactNode, surface: InlineReferenceSurface, before: string, state: TransformState): ReactNode => {
   if (!isValidElement<ElementProps>(node)) return node
-  const element: ReactElement<ElementProps> = node
-  const type = element.type
-  if (type !== Fragment && typeof type !== 'string') return element
-  if (typeof type === 'string' && SKIPPED.has(type)) return element
-  if (element.props.dangerouslySetInnerHTML !== undefined || element.props.children === undefined) return element
+  const type = node.type
+  if (type !== Fragment && typeof type !== 'string') return node
+  if (typeof type === 'string' && SKIPPED.has(type)) return node
+  if (node.props.dangerouslySetInnerHTML !== undefined || node.props.children === undefined) return node
   const block = typeof type === 'string' && BLOCKS.has(type)
   if (block) {
-    const cached = state.cache.get(element)
+    const cached = state.cache.get(node)
     if (cached !== undefined) return cached
   }
   const childSurface: InlineReferenceSurface = type === 'code' ? 'code' : surface
   // Inline code is offered its own text with the block text before it; everything else restarts at a block.
   const children =
-    type === 'code' && typeof element.props.children === 'string'
-      ? transformCode(element.props.children, before, state)
-      : transformChildren(element.props.children, childSurface, state)
-  const result = children === element.props.children ? element : cloneElement(element, undefined, ...(Array.isArray(children) ? children : [children]))
-  if (block) state.cache.set(element, result)
+    type === 'code' && typeof node.props.children === 'string'
+      ? transformCode(node.props.children, before, state)
+      : transformChildren(node.props.children, childSurface, state)
+  const result = children === node.props.children ? node : cloneElement(node, undefined, ...(Array.isArray(children) ? children : [children]))
+  if (block) state.cache.set(node, result)
   return result
 }
 
@@ -303,6 +309,8 @@ export const InlineReferenceScope = (props: { readonly sessionId: string; readon
 
 const NO_VOCABULARY = (): (() => void) => () => {}
 
+const vocabularyOf = (items: readonly InlineReference[]): string => items.map(item => String(item.vocabulary?.get() ?? 0)).join(',')
+
 /** One string that changes whenever any provider's vocabulary does, so the external-store snapshot stays stable. */
 const useVocabularyVersion = (items: readonly InlineReference[]): string => {
   const subscribe = useMemo(() => {
@@ -315,7 +323,7 @@ const useVocabularyVersion = (items: readonly InlineReference[]): string => {
       }
     }
   }, [items])
-  const snapshot = (): string => items.map(item => String(item.vocabulary?.get() ?? 0)).join(',')
+  const snapshot = (): string => vocabularyOf(items)
   return useSyncExternalStore(subscribe, snapshot, snapshot)
 }
 
@@ -324,15 +332,15 @@ const useTransformState = (): TransformState => {
   const scope = useContext(ScopeContext)
   const items = useRegistry(InlineReferences)
   const version = useVocabularyVersion(items)
-  // A new cache whenever any input of a match changes; otherwise a re-render reuses every transformed block.
-  const cache = useMemo(() => new WeakMap<object, ReactNode>(), [items, version, scope])
-  return useMemo(() => ({ items, scope, cache }), [items, scope, cache])
+  // A new state and cache whenever any input of a match changes; otherwise a re-render reuses every transformed block.
+  return useMemo(() => ({ items, scope, vocabulary: version, cache: new WeakMap<object, ReactNode>() }), [items, scope, version])
 }
 
 /** Fresh transform state over explicit providers; a caller keeps it while its inputs stay the same. */
 const createState = (items: readonly InlineReference[], scope: InlineReferenceScopeValue = OUTSIDE_SESSION): TransformState => ({
   items,
   scope,
+  vocabulary: vocabularyOf(items),
   cache: new WeakMap(),
 })
 
