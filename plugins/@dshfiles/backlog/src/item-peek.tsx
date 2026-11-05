@@ -27,6 +27,7 @@ import {
   LinkIcon,
   Maximize2Icon,
   MessageSquareIcon,
+  MergeIcon,
   MessagesSquareIcon,
   Minimize2Icon,
   PencilIcon,
@@ -415,6 +416,24 @@ const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogPr
         <Button size="xs" onClick={() => actions.applyProposal.mutate(props.id)} disabled={actions.applyProposal.isPending}>
           Accept
         </Button>
+        {duplicateOf === undefined || duplicateRef === undefined ? null : (
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={actions.merge.isPending}
+            onClick={() =>
+              actions.merge.mutate(
+                { survivor: duplicateOf, duplicates: [props.id] },
+                {
+                  onSuccess: () => BacklogNotices.show({ text: `Merged into ${BacklogReference.label(duplicateRef)}.`, kind: 'success', sessionId: null }),
+                  onError: BacklogNotices.failure('The duplicate was not merged.'),
+                },
+              )
+            }
+          >
+            <MergeIcon /> Merge into {BacklogReference.label(duplicateRef)}
+          </Button>
+        )}
         <Button size="xs" variant="ghost" onClick={() => actions.dismissProposal.mutate(props.id)} disabled={actions.dismissProposal.isPending}>
           Dismiss
         </Button>

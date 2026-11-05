@@ -4,7 +4,7 @@ import { BacklogBackfill, type BackfillScope, type BackfillSelection } from './b
 import { BacklogSettingsTag } from './backlog-settings.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogRepo } from './backlog-repo.js'
-import { BacklogClaimRefused, BacklogItemClaimed, BacklogParentInvalid, BacklogWriteFailed } from './errors.js'
+import { BacklogClaimRefused, BacklogItemClaimed, BacklogMergeInvalid, BacklogParentInvalid, BacklogWriteFailed } from './errors.js'
 import { BacklogOrigins } from './event-origin.js'
 import {
   BacklogItems,
@@ -264,6 +264,8 @@ export interface BacklogChangeNotice {
 interface StoreState {
   readonly records: ReadonlyMap<number, BacklogItem>
   readonly leases: ReadonlyMap<number, BacklogLease>
+  /** A merged duplicate's ref → the ref of the item it was merged into. */
+  readonly redirects: ReadonlyMap<string, string>
   readonly nextId: number
   readonly revision: number
 }
@@ -595,11 +597,27 @@ const idOfRef = (records: ReadonlyMap<number, BacklogItem>, ref: string): number
   return undefined
 }
 
-/** An item id from a caller: a number is the item's own id, a string a `b:<ref>` with or without its prefix. */
-const resolveIn = (records: ReadonlyMap<number, BacklogItem>, key: number | string): number | undefined => {
-  if (typeof key === 'number') return records.has(key) ? key : undefined
+const MAX_REDIRECT_HOPS = 8
+
+/** The ref a written `b:<ref>` names now: a merged duplicate's ref follows its merges to the surviving item. */
+const redirectedRef = (redirects: ReadonlyMap<string, string>, ref: string): string => {
+  let current = ref
+  for (let hop = 0; hop < MAX_REDIRECT_HOPS; hop += 1) {
+    const next = redirects.get(current)
+    if (next === undefined) return current
+    current = next
+  }
+  return current
+}
+
+/**
+ * An item id from a caller: a number is the item's own id, a string a `b:<ref>` with or without its prefix. A merged
+ * duplicate's ref resolves to the item it was merged into; its number still opens the duplicate itself.
+ */
+const resolveIn = (current: Pick<StoreState, 'records' | 'redirects'>, key: number | string): number | undefined => {
+  if (typeof key === 'number') return current.records.has(key) ? key : undefined
   const ref = BacklogReference.parse(key)
-  return ref === undefined ? undefined : idOfRef(records, ref)
+  return ref === undefined ? undefined : idOfRef(current.records, redirectedRef(current.redirects, ref))
 }
 
 /** Removes an optional field for null, or sets it; undefined leaves it as it is. */
@@ -772,6 +790,16 @@ export class BacklogStore extends Context.Service<
       readonly actor: BacklogActor
       readonly reason?: string | undefined
     }) => Effect.Effect<BacklogResult<BacklogDetail>, BacklogWriteFailed | BacklogItemClaimed>
+    /**
+     * Merges duplicates into one survivor in one write: their comments (quoted, with who wrote them), links, tags,
+     * attachments and sub-issues move to it, links to them from other items point at it, and each duplicate is dropped
+     * with a `duplicates` link while its `b:<ref>` keeps resolving to the survivor.
+     */
+    readonly merge: (input: {
+      readonly survivorId: number
+      readonly duplicateIds: readonly number[]
+      readonly actor: BacklogActor
+    }) => Effect.Effect<BacklogResult<BacklogDetail & { readonly merged: readonly string[] }>, BacklogWriteFailed | BacklogMergeInvalid>
     /** Every stored claim, live or lapsed, with the item it holds: what the lease sweep reads. */
     readonly leases: Effect.Effect<readonly { readonly id: number; readonly lease: BacklogLease }[]>
     /** Hands an item to the agent of a thread started for it, without a lease: it shows who works on it. */
@@ -803,9 +831,11 @@ export class BacklogStore extends Context.Service<
       const records = new Map(loaded.map(item => [item.id, withProject(item)]))
       const storedNextId = yield* repo.nextId.pipe(Effect.orDie)
       const leases = yield* repo.loadLeases.pipe(Effect.orDie)
+      const redirects = yield* repo.loadRedirects.pipe(Effect.orDie)
       const state = yield* Ref.make<StoreState>({
         records,
         leases,
+        redirects,
         nextId: Math.max(storedNextId, Math.max(0, ...records.keys()) + 1),
         revision: yield* Clock.currentTimeMillis,
       })
@@ -1378,6 +1408,89 @@ export class BacklogStore extends Context.Service<
         })
       })
 
+      /** One duplicate's file copied onto the survivor, under the same attachment id. */
+      const copyFile = Effect.fnUntraced(function* (input: { readonly from: BacklogItem; readonly to: BacklogItem; readonly attachment: BacklogAttachment }) {
+        const stored = yield* repo.readFile({ itemId: input.from.id, attachmentId: input.attachment.id }).pipe(Effect.mapError(writeFailed(input.from, 'put')))
+        if (Option.isNone(stored)) return false
+        yield* putFile(input.to, { attachment: input.attachment, data: stored.value.data })
+        return true
+      })
+
+      const mergeOne = Effect.fnUntraced(function* (input: { readonly survivorId: number; readonly duplicate: BacklogItem; readonly actor: BacklogActor }) {
+        const survivor = yield* find(input.survivorId)
+        if (survivor === undefined) return
+        const duplicate = input.duplicate
+        const survivorRef = BacklogReference.refOf(survivor)
+        const duplicateRef = BacklogReference.refOf(duplicate)
+        const duplicateLabel = BacklogReference.label(duplicateRef)
+        const survivorLabel = BacklogReference.label(survivorRef)
+        const isEither = (link: BacklogLink) => link.type === 'item' && (link.target === survivorRef || link.target === duplicateRef)
+        const room = Math.max(0, BacklogItems.maxAttachments - survivor.attachments.length)
+        const candidates = duplicate.attachments.filter(attachment => !survivor.attachments.some(own => own.id === attachment.id)).slice(0, room)
+        const copied: BacklogAttachment[] = []
+        for (const attachment of candidates) if (yield* copyFile({ from: duplicate, to: survivor, attachment })) copied.push(attachment)
+        const comments = duplicate.events.filter(event => event.kind === 'commented')
+        for (const attachment of comments.flatMap(event => event.attachments ?? [])) yield* copyFile({ from: duplicate, to: survivor, attachment })
+        const moved = comments.map(event => ({
+          ...BacklogOrigins.stamped(event),
+          detail: `Moved from ${duplicateLabel}:\n\n${event.detail}`.slice(0, BacklogItems.maxBodyChars),
+        }))
+        const links = BacklogItems.uniqueLinks([...survivor.links.filter(link => !isEither(link)), ...duplicate.links.filter(link => !isEither(link))])
+        const tags = [...new Set([...survivor.tags, ...duplicate.tags])].slice(0, 20)
+        yield* touch(
+          { ...survivor, events: [...survivor.events, ...moved] },
+          input.actor,
+          { kind: 'edited', detail: `merged ${duplicateLabel} (${String(moved.length)} comments, ${String(copied.length)} files)` },
+          { links, tags, attachments: [...survivor.attachments, ...copied] },
+        )
+        const closing: BacklogChange = {
+          status: 'dropped',
+          links: BacklogItems.uniqueLinks([
+            ...duplicate.links.filter(link => !isEither(link)),
+            { type: 'item', target: survivorRef, relation: 'duplicates', provenance: input.actor.kind === 'agent' ? 'agent' : 'user' },
+          ]),
+          ...closedStateChange({ item: duplicate, status: 'dropped' }),
+        }
+        yield* touch(duplicate, input.actor, { kind: 'moved', detail: `${duplicate.status} → dropped (merged into ${survivorLabel})` }, closing)
+        const others = [...(yield* Ref.get(state)).records.values()].filter(item => item.id !== duplicate.id)
+        for (const child of others.filter(item => item.parent === duplicateRef)) {
+          const parent = child.id === survivor.id ? (duplicate.parent ?? null) : survivorRef
+          yield* touch(child, { kind: 'system' }, { kind: 'edited', detail: `parent ${duplicateLabel} → ${parent === null ? 'none' : BacklogReference.label(parent)} (merged)` }, { parent })
+        }
+        for (const other of others.filter(item => item.id !== survivor.id && item.links.some(link => link.type === 'item' && link.target === duplicateRef))) {
+          const rewritten = BacklogItems.uniqueLinks(other.links.map(link => (link.type === 'item' && link.target === duplicateRef ? { ...link, target: survivorRef } : link)))
+          yield* touch(other, { kind: 'system' }, { kind: 'linked', detail: `${duplicateLabel} → ${survivorLabel} (merged)` }, { links: rewritten })
+        }
+        const at = yield* Clock.currentTimeMillis
+        yield* repo.addRedirect({ alias: duplicateRef, target: survivorRef, at }).pipe(Effect.mapError(writeFailed(duplicate, 'put')))
+        yield* Ref.update(state, current => ({ ...current, redirects: new Map(current.redirects).set(duplicateRef, survivorRef) }))
+      })
+
+      const merge = Effect.fn('backlog store merge')(function* (input: {
+        readonly survivorId: number
+        readonly duplicateIds: readonly number[]
+        readonly actor: BacklogActor
+      }) {
+        const survivor = yield* find(input.survivorId)
+        if (survivor === undefined) return notFound
+        const label = BacklogReference.labelOf(survivor)
+        const ids = [...new Set(input.duplicateIds)]
+        if (ids.includes(survivor.id)) return yield* new BacklogMergeInvalid({ reason: `${label} cannot be merged into itself. Name the duplicates apart from the item that stays.` })
+        const current = yield* Ref.get(state)
+        const duplicates = ids.flatMap(id => current.records.get(id) ?? [])
+        if (duplicates.length !== ids.length) return notFound
+        const alreadyMerged = duplicates.filter(duplicate => current.redirects.has(BacklogReference.refOf(duplicate)))
+        if (alreadyMerged.length > 0)
+          return yield* new BacklogMergeInvalid({
+            reason: `${alreadyMerged.map(BacklogReference.labelOf).join(', ')} was already merged; its reference opens the item it was merged into.`,
+          })
+        yield* Effect.annotateCurrentSpan({ 'dshx.backlog.items': duplicates.length })
+        for (const duplicate of duplicates) yield* mergeOne({ survivorId: survivor.id, duplicate, actor: input.actor })
+        const merged = yield* find(survivor.id)
+        if (merged === undefined) return notFound
+        return found({ ...(yield* detailOf(merged)), merged: duplicates.map(duplicate => BacklogReference.refOf(duplicate)) })
+      }, serialized)
+
       const markTriaged = Effect.fn('backlog store mark triaged')(function* (id: number) {
         const item = yield* find(id)
         if (item === undefined) return
@@ -1578,6 +1691,7 @@ export class BacklogStore extends Context.Service<
         settleAnsweredQuestion,
         claim,
         release,
+        merge,
         leases: Effect.map(Ref.get(state), current => [...current.leases].map(([id, lease]) => ({ id, lease }))),
         delegateTo,
         acknowledge,
@@ -1586,7 +1700,7 @@ export class BacklogStore extends Context.Service<
         shipped: query => Effect.map(view, current => BacklogShipped.digest({ items: current.records.values(), query, now: current.at })),
         list: query => Effect.map(view, current => listIn(current, query, searchIndex)),
         get,
-        resolve: key => Effect.map(Ref.get(state), current => resolveIn(current.records, key)),
+        resolve: key => Effect.map(Ref.get(state), current => resolveIn(current, key)),
         labelOf: id => Effect.map(find(id), item => BacklogReference.labelOf(item ?? { id })),
         getMany,
         referencing: link => Effect.map(view, current => referencingIn(current, link)),

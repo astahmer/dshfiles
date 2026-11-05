@@ -108,6 +108,7 @@ export const useBacklogActions = () => {
   })
   const applyProposal = useMutation({ mutationFn: (id: number) => api.applyProposal({ id }), onSuccess: invalidate })
   const dismissProposal = useMutation({ mutationFn: (id: number) => api.dismissProposal({ id }), onSuccess: invalidate })
+  const merge = useMutation({ mutationFn: (input: Parameters<typeof api.merge>[0]) => api.merge(input), onSuccess: invalidate })
   const deleteItem = useMutation({ mutationFn: (input: Parameters<typeof api.delete>[0]) => api.delete(input), onSuccess: invalidate })
   return {
     patch,
@@ -127,6 +128,7 @@ export const useBacklogActions = () => {
     dismissProposal,
     delete: deleteItem,
     release,
+    merge,
   }
 }
 

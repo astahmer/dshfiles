@@ -70,6 +70,7 @@ describe('backlog tool exposure', () => {
       'backlog_link',
       'backlog_link_remote',
       'backlog_list',
+      'backlog_merge',
       'backlog_projects',
       'backlog_read_file',
       'backlog_ready',

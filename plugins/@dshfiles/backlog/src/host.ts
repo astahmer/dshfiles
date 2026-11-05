@@ -36,6 +36,7 @@ import { ExternalProviderEndpoints } from './provider-registry.js'
 import { BacklogSyncEngine } from './sync-engine.js'
 import { BacklogSync, RemoteSyncLoop } from './sync-service.js'
 import { SyncSources } from './sync-sources.js'
+import type { ExternalRef } from './sync-model.js'
 import { ShippedSummaries } from './shipped-summaries.js'
 import { SyncLocalProbes } from './sync-local-probes.js'
 import { BacklogStore } from './store.js'
@@ -103,6 +104,22 @@ const itemIdsOf = (keys: readonly (number | string)[]) =>
       }),
     ),
   )
+
+/**
+ * A merged duplicate's remote links move to the survivor when it has none on that binding, so the remote item keeps
+ * syncing; one the survivor already covers stays on the dropped duplicate, whose remote then closes with it.
+ */
+const moveExternalRefs = (input: { readonly survivorId: number; readonly refs: readonly ExternalRef[] }) =>
+  SyncSources.use(sources =>
+    Effect.gen(function* () {
+      const taken = new Set((yield* sources.refsOf(input.survivorId)).map(ref => ref.bindingId))
+      for (const ref of input.refs) {
+        if (taken.has(ref.bindingId)) continue
+        taken.add(ref.bindingId)
+        yield* sources.putRef({ itemId: input.survivorId, ref })
+      }
+    }),
+  ).pipe(Effect.catch(error => Effect.logWarning('backlog: a merged duplicate kept its remote links', error)))
 
 const backlogHandlers = Api.handlers(backlogApi, {
   list: input => BacklogStore.use(store => store.list(input)),
@@ -264,6 +281,22 @@ const backlogHandlers = Api.handlers(backlogApi, {
   revert: ({ confirm, ...input }, call) =>
     AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_revert' } }).pipe(
       Effect.andThen(Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.revert({ ...resolved, actor: actorOf(call.caller) })))),
+    ),
+  merge: ({ confirm, ...input }, call) =>
+    AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_merge' } }).pipe(
+      Effect.andThen(
+        Effect.gen(function* () {
+          const survivorId = yield* itemIdOf(input.survivor)
+          const keys = yield* itemIdsOf(input.duplicates)
+          if (keys.unknown.length > 0) return yield* new BacklogItemNotFound({ ids: keys.unknown })
+          const refsBefore = yield* SyncSources.use(sources => Effect.forEach(keys.ids, id => sources.refsOf(id))).pipe(Effect.orDie)
+          const result = yield* BacklogStore.use(store => store.merge({ survivorId, duplicateIds: keys.ids, actor: actorOf(call.caller) }))
+          if (!result.ok) return result
+          yield* moveExternalRefs({ survivorId, refs: refsBefore.flat() })
+          const { merged, ...detail } = result.value
+          return { ok: true as const, value: detail, merged }
+        }),
+      ),
     ),
   shipped: input => ShippedSummaries.use(summaries => summaries.digest(input)),
   summarizeShipped: input => ShippedSummaries.use(summaries => AiActivity.use(activity => activity.track(summaries.summarize(input)))),

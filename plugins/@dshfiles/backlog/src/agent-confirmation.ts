@@ -13,6 +13,7 @@ type GuardedCall =
   | { readonly tool: 'backlog_sync_import_all' }
   | { readonly tool: 'backlog_sync_connection_remove' }
   | { readonly tool: 'backlog_sync_binding_remove' }
+  | { readonly tool: 'backlog_merge' }
 
 /** What the call would do without confirmation, or `undefined` when it is small enough to run as asked. */
 const guardedEffect = (call: GuardedCall): string | undefined => {
@@ -31,6 +32,8 @@ const guardedEffect = (call: GuardedCall): string | undefined => {
       return 'removes the connection, its bindings and every item link they hold'
     case 'backlog_sync_binding_remove':
       return 'removes the binding and every item link it holds'
+    case 'backlog_merge':
+      return 'drops the duplicates and moves their comments, links, files and sub-issues into another item'
   }
 }
 

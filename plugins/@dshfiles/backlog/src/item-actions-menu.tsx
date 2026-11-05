@@ -15,7 +15,7 @@ import {
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { CalendarIcon, CopyIcon, FolderIcon, LinkIcon, LockOpenIcon, MessagesSquareIcon, PinIcon, Trash2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { CalendarIcon, CopyIcon, FolderIcon, MergeIcon, LinkIcon, LockOpenIcon, MessagesSquareIcon, PinIcon, Trash2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
 
@@ -62,6 +62,8 @@ export const BacklogItemMenu = (props: {
 }): JSX.Element => {
   const item = props.item
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [survivorRef, setSurvivorRef] = useState('')
   const [linkBinding, setLinkBinding] = useState<string | null>(null)
   const actions = useBacklogActions()
   const attention = item.attention ?? 'none'
@@ -303,6 +305,10 @@ export const BacklogItemMenu = (props: {
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => setMergeOpen(true)}>
+            <MergeIcon aria-hidden className="dshx:size-3.5" />
+            Merge into…{countSuffix}
+          </ContextMenuItem>
           <ContextMenuItem className="dshx:gap-2 dshx:text-[13px] dshx:text-destructive" onSelect={() => setDeleteOpen(true)}>
             <Trash2Icon aria-hidden className="dshx:size-3.5" />
             Delete permanently{countSuffix}…
@@ -331,6 +337,55 @@ export const BacklogItemMenu = (props: {
             <Button variant="destructive" disabled={actions.delete.isPending} onClick={() => void deleteSelection().catch(() => undefined)}>
               <Trash2Icon aria-hidden className="dshx:size-3.5" />
               Delete permanently{countSuffix}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={mergeOpen} onOpenChange={open => (actions.merge.isPending ? undefined : setMergeOpen(open))}>
+        <DialogContent className="dshx-root">
+          <DialogHeader>
+            <DialogTitle>{many ? `Merge ${String(selection.length)} items into another` : `Merge ${BacklogReference.labelOf(item)} into another item`}</DialogTitle>
+            <DialogDescription>
+              Comments, links, tags, files and sub-issues move to the item you name; {many ? 'these items are' : 'this item is'} dropped as a duplicate and{' '}
+              {many ? 'their references open' : 'its reference opens'} that item from now on.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            id="backlog-merge-form"
+            onSubmit={event => {
+              event.preventDefault()
+              const survivor = BacklogReference.parse(survivorRef)
+              if (survivor === undefined) return
+              actions.merge.mutate(
+                { survivor, duplicates: selection.filter(entry => BacklogReference.refOf(entry) !== survivor).map(entry => entry.id) },
+                {
+                  onSuccess: () => {
+                    setMergeOpen(false)
+                    setSurvivorRef('')
+                    if (many) props.clearSelection?.()
+                    BacklogNotices.show({ text: `Merged into ${BacklogReference.label(survivor)}.`, kind: 'success', sessionId: null })
+                  },
+                },
+              )
+            }}
+          >
+            <input
+              aria-label="Item to merge into"
+              autoFocus
+              placeholder="b:k3f9"
+              value={survivorRef}
+              onChange={event => setSurvivorRef(event.currentTarget.value)}
+              className="dshx:h-9 dshx:w-full dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:font-mono! dshx:text-sm"
+            />
+          </form>
+          {actions.merge.error === null ? null : <p className="dshx:text-xs dshx:text-destructive">{errorMessage(actions.merge.error, 'The items were not merged.')}</p>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMergeOpen(false)} disabled={actions.merge.isPending}>
+              Cancel
+            </Button>
+            <Button type="submit" form="backlog-merge-form" disabled={actions.merge.isPending || BacklogReference.parse(survivorRef) === undefined}>
+              <MergeIcon aria-hidden className="dshx:size-3.5" />
+              Merge
             </Button>
           </DialogFooter>
         </DialogContent>

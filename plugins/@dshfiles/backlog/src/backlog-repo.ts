@@ -59,6 +59,7 @@ const HlcRow = Schema.Struct({ hlc_wall: Schema.Number, hlc_counter: Schema.Numb
 const AttachmentRow = Schema.Struct({ sha256: Schema.String, media_type: Schema.String })
 const CountRow = Schema.Struct({ count: Schema.Number })
 const MappingRow = Schema.Struct({ key: Schema.String, mapping: Schema.String })
+const RedirectRow = Schema.Struct({ alias: Schema.String, target: Schema.String })
 const LeaseRow = Schema.Struct({ alias: Schema.String, holder: Schema.String, acquired_at: Schema.Number, expires_at: Schema.Number, heartbeat: Schema.Number })
 
 /** What a write does to the item's claim, in the same transaction as its ops. */
@@ -102,6 +103,10 @@ export class BacklogRepo extends Context.Service<
     }) => Effect.Effect<void, unknown>
     /** Every stored claim by the item's numeric id, live or expired; the sweep removes expired ones. */
     readonly loadLeases: Effect.Effect<ReadonlyMap<number, BacklogLease>, unknown>
+    /** Every merged duplicate's ref and the ref of the item it was merged into. */
+    readonly loadRedirects: Effect.Effect<ReadonlyMap<string, string>, unknown>
+    /** Records that `alias` (a merged duplicate's ref) now names the item `target` names. */
+    readonly addRedirect: (input: { readonly alias: string; readonly target: string; readonly at: number }) => Effect.Effect<void, unknown>
     /** A `delete` tombstone, then the item's attachment rows and any bytes no other attachment shares. */
     readonly remove: (input: { readonly item: BacklogItem; readonly origin: string }) => Effect.Effect<void, unknown>
     readonly putFile: (input: { readonly itemId: number; readonly attachment: BacklogAttachment; readonly data: string }) => Effect.Effect<void, unknown>
@@ -536,8 +541,16 @@ export class BacklogRepo extends Context.Service<
         return { items, ops }
       })
 
+      const loadRedirects = Effect.map(
+        SqlSchema.findAll({ Request: Schema.Void, Result: RedirectRow, execute: () => sql`SELECT alias, target FROM alias_redirects` })(undefined),
+        rows => new Map(rows.map(row => [row.alias, row.target] as const)),
+      )
       return BacklogRepo.of({
         hostId,
+        loadRedirects,
+        addRedirect: input =>
+          Effect.asVoid(sql`INSERT INTO alias_redirects (alias, target, created_at) VALUES (${input.alias}, ${input.target}, ${input.at})
+            ON CONFLICT (alias) DO UPDATE SET target = excluded.target, created_at = excluded.created_at`),
         loadItems,
         nextId: Effect.map(metaGet(META_NEXT_ID), row => Option.match(row, { onNone: () => 1, onSome: value => Number(value.value) })),
         create,

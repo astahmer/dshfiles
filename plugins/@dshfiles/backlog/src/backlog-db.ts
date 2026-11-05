@@ -91,6 +91,11 @@ export const backlogMigrations = {
     yield* sql`CREATE UNIQUE INDEX external_refs_item_binding ON external_refs (item_id, binding_id)`
     yield* sql`CREATE TABLE sync_state (binding_id TEXT PRIMARY KEY, cursor TEXT, last_pass_at INTEGER, last_error TEXT)`
   }),
+  /** A merged duplicate's `b:<ref>` names the item it was merged into, so references written before the merge still resolve. */
+  '5_alias_redirects': Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`CREATE TABLE alias_redirects (alias TEXT PRIMARY KEY, target TEXT NOT NULL, created_at INTEGER NOT NULL)`
+  }),
 }
 
 /** The backlog's SQLite file, through the shared store layer (WAL, migrations, `BEGIN IMMEDIATE`). */

@@ -270,3 +270,10 @@ export class BacklogTemplateNotFound extends Schema.TaggedError<BacklogTemplateN
       : `No backlog template "${this.name}". Use one of: ${this.available.join(', ')}; or add it in Settings › Backlog › templates.`
   }
 }
+
+/** A merge that cannot run as asked: the same item twice, or nothing left to merge. */
+export class BacklogMergeInvalid extends Schema.TaggedError<BacklogMergeInvalid>()('BacklogMergeInvalid', { reason: Schema.String }, { dshxWireCode: 'merge-invalid' }) {
+  override get message(): string {
+    return this.reason
+  }
+}

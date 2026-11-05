@@ -165,6 +165,11 @@ const detailResultSchema = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(false), reason: Schema.Literal('not-found') }),
 ])
 
+const mergeResultSchema = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), value: detailSchema, merged: Schema.Array(Schema.String) }),
+  Schema.Struct({ ok: Schema.Literal(false), reason: Schema.Literal('not-found') }),
+])
+
 const revertResultSchema = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(true), value: detailSchema }),
   Schema.Struct({ ok: Schema.Literal(false), reason: Schema.Literal('not-found') }),
@@ -1065,6 +1070,23 @@ export const backlogApi = defineApi({
         'Revert one recorded field change of a backlog item: writes the typed value the field held before that change, read from the op log, as a new change. Refused with `stale` when the field changed again since. Run only when the user asked to revert that change, and pass `confirm: true`; an agent call without it is refused.',
       tool: { name: 'backlog_revert', readOnly: false, render: renderRevertPreview },
     }),
+    merge: method({
+      input: Schema.Struct({
+        survivor: itemKeySchema.annotate({ description: 'The item that stays (`b:k3f9`).' }),
+        duplicates: Schema.Array(itemKeySchema)
+          .check(Schema.isMinLength(1), Schema.isMaxLength(10))
+          .annotate({ description: 'The duplicates to merge into it; each is dropped with a `duplicates` link and its `b:<ref>` then opens the survivor.' }),
+        confirm: confirmSchema,
+      }),
+      output: mergeResultSchema,
+      description:
+        'Merge duplicate items into one: their comments (quoted, keeping who wrote them), links, tags, files, sub-issues and remote links where the survivor has none for that binding move to the survivor, links from other items are rewritten to it, and each duplicate is dropped with a `duplicates` link. `b:<duplicate>` references keep working and open the survivor. Every step is in both items\' history. Run only when the user asked; an agent must pass `confirm: true`.',
+      tool: {
+        name: 'backlog_merge',
+        readOnly: false,
+        render: result => (result.ok ? `${renderItemPreview(result.value.item)}\nMerged ${result.merged.map(ref => `b:${ref}`).join(', ')} into it.` : 'No backlog item found.'),
+      },
+    }),
     export: method({
       input: Schema.Struct({
         path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(1_024)).annotate({
@@ -1124,6 +1146,7 @@ export type BacklogDetailView = typeof detailSchema.Type
 export type BacklogListView = typeof listOutputSchema.Type
 export type BacklogDetailResult = typeof detailResultSchema.Type
 export type BacklogRevertResult = typeof revertResultSchema.Type
+export type BacklogMergeResult = typeof mergeResultSchema.Type
 export type BacklogBackfillResult = typeof backfillOutputSchema.Type
 export type BacklogSyncStatusView = typeof syncStatusSchema.Type
 export type BacklogSyncSourcesView = typeof syncSourcesSchema.Type
