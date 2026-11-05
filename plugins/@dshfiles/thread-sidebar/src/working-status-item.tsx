@@ -1,4 +1,14 @@
 import type { StatusItemProps } from '@dshfiles/frame-layout/status-strip'
+import { SHOW_DESTINATION_EVENT } from './destination-shell.js'
+
+/** Selects the Working view of the thread list (client.tsx listens). */
+export const SHOW_WORKING_THREADS_EVENT = 'dshfiles:thread-sidebar-show-working'
+
+/** The item's full page: the Threads destination on its Working view. */
+const openWorkingThreads = (): void => {
+  window.dispatchEvent(new CustomEvent(SHOW_DESTINATION_EVENT, { detail: 'threads' }))
+  window.dispatchEvent(new CustomEvent(SHOW_WORKING_THREADS_EVENT))
+}
 
 /** Top-level threads with a running turn; subagents roll up into their parent, as in the list. */
 const workingCount = (state: {
@@ -29,4 +39,5 @@ export const WorkingStatusItem = (props: StatusItemProps & { readonly label: (co
 
 export class WorkingStatusModel {
   static readonly workingCount = workingCount
+  static readonly open = openWorkingThreads
 }

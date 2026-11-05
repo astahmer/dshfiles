@@ -22,7 +22,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { createApiClient, defineClient, hasHostCommandRegistry, runHostCommand } from '@dshfiles/dshx/client'
 import { StatusItems, type StatusItemProps } from '@dshfiles/frame-layout/status-strip'
-import { WorkingStatusItem } from './working-status-item.js'
+import { WorkingStatusItem, WorkingStatusModel } from './working-status-item.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -270,7 +270,15 @@ export default defineClient({
         <WorkingStatusItem {...props} label={count => translate('threadSidebarWorkingCount', { count })} />
       )
       ctx.effect(
-        () => plugin.add(StatusItems, { id: '@dshfiles/thread-sidebar', side: 'global', order: 10, label: 'Working', component: plugin.bind(WorkingItem) }),
+        () =>
+          plugin.add(StatusItems, {
+            id: '@dshfiles/thread-sidebar',
+            side: 'global',
+            order: 10,
+            label: 'Working',
+            component: plugin.bind(WorkingItem),
+            open: WorkingStatusModel.open,
+          }),
         'thread-sidebar: working status item',
       )
     }

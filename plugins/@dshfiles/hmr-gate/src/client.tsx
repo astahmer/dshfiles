@@ -18,6 +18,7 @@ import { z } from 'zod'
 
 const EVENTS_ROUTE = 'plugins/events'
 const ROW_ID = 'dshfiles-hmr-gate'
+const PLUGINS_PANEL_ID = 'plugins'
 const RECOVERY_KEY = 'dshfiles.hmr-gate.slot-recovery-at'
 const RECOVERY_INTERVAL_MS = 30_000
 // Lets the rest of a rebuild burst arrive before the reload picks up the bundles.
@@ -113,7 +114,18 @@ export default defineClient({
     const plugin = metadata?.plugin
     if (plugin !== undefined) {
       ctx.effect(
-        () => plugin.add(StatusItems, { id: '@dshfiles/hmr-gate', side: 'global', order: 90, label: 'Restart', component: plugin.bind(RestartStatusItem) }),
+        () =>
+          plugin.add(StatusItems, {
+            id: '@dshfiles/hmr-gate',
+            side: 'global',
+            order: 90,
+            label: 'Restart',
+            component: plugin.bind(RestartStatusItem),
+            // The Plugins page carries this plugin's "HMR updates" row: which plugins wait and what a restart applies.
+            open: () => {
+              plugin.layout.openPanel(PLUGINS_PANEL_ID)
+            },
+          }),
         'hmr-gate: restart status item',
       )
     }

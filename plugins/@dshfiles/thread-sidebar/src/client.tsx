@@ -192,7 +192,9 @@ import {
   ThreadViewPreferencesModel,
   threadViewPreferences,
   type ThreadViewSettings,
+  WORKING_VIEW_ID,
 } from './thread-view-preferences.js'
+import { SHOW_WORKING_THREADS_EVENT } from './working-status-item.js'
 import {
   ThreadViewManager,
   threadStatusFilterGroupLabelKeys,
@@ -3997,6 +3999,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (viewId === threadViewSettings.activeViewId) return
     saveThreadViewSettings(ThreadViewPreferencesModel.selectThreadView(threadViewSettings, viewId))
   }
+  // The status strip's Working item opens the list on its Working view.
+  useEffect(() => {
+    if (!isPrimarySurface) return
+    const onShowWorking = (): void => selectThreadViewPreset(WORKING_VIEW_ID)
+    window.addEventListener(SHOW_WORKING_THREADS_EVENT, onShowWorking)
+    return () => window.removeEventListener(SHOW_WORKING_THREADS_EVENT, onShowWorking)
+  })
   const selectThreadGroupBy = (value: string): void => {
     const decoded = ThreadViewPreferencesModel.decodeThreadViewPreferences({
       groupBy: value,

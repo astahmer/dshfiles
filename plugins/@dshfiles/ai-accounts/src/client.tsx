@@ -230,7 +230,13 @@ export default defineClientPlugin({
     api.ui.register({ name: 'settings.models.footer', id: 'ai-accounts-models', order: 0, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, ModelsPageAccountsView)
     // Quota lives in the frame's status strip now (plans/ade-ux §4.1 R5), as one item instead of the sidebar footer's
     // menu and preview strip; frame-layout renders nothing for it when another frame owns the layout.
-    ctx.effect(() => QuotaStatusItem.register(api, props => <QuotaStripView useSessions={props.useSessions} />))
+    ctx.effect(() =>
+      QuotaStatusItem.register({
+        plugin: api,
+        View: props => <QuotaStripView useSessions={props.useSessions} />,
+        open: () => openQuota({ view: 'accounts' }, USAGE_PANEL_ID),
+      }),
+    )
     // The same strip stays a movable Workbench view in free docking, where the thread sidebar still seats it above its foot.
     api.ui.register(
       { name: 'sidebar.footer.above', id: USAGE_STRIP_ID, order: 0, label: 'AI Accounts: Preview', locale: AI_ACCOUNTS_LOCALE_NAMESPACE },

@@ -21,14 +21,30 @@ const QuotaStatusFrame = (props: { readonly compact: boolean; readonly children:
   </span>
 )
 
-/** Add the one ai-accounts item; `View` renders the usage strip for the frame's current thread. */
-const register = (plugin: Pick<PluginContext, 'add' | 'bind'>, View: (props: StatusItemProps) => JSX.Element): (() => void) => {
+/**
+ * Add the one ai-accounts item; `View` renders the usage strip for the frame's current thread. Its meters are buttons of
+ * their own (the usage popover), so `open` (Usage › Quota) is offered from the item's context menu.
+ */
+const register = (input: {
+  readonly plugin: Pick<PluginContext, 'add' | 'bind'>
+  readonly View: (props: StatusItemProps) => JSX.Element
+  readonly open: () => void
+}): (() => void) => {
+  const { plugin, View } = input
   const Item = (props: StatusItemProps): JSX.Element => (
     <QuotaStatusFrame compact={props.compact}>
       <View {...props} />
     </QuotaStatusFrame>
   )
-  return plugin.add(StatusItems, { id: '@dshfiles/ai-accounts', side: 'global', order: 20, label: 'Quota', component: plugin.bind(Item) })
+  return plugin.add(StatusItems, {
+    id: '@dshfiles/ai-accounts',
+    side: 'global',
+    order: 20,
+    label: 'Quota',
+    component: plugin.bind(Item),
+    open: input.open,
+    controls: true,
+  })
 }
 
 export class QuotaStatusItem {
