@@ -148,22 +148,42 @@ const measure = (anchorId: number, viewportHeight: number): EntityAnchorMeasurem
   return { kind: 'rect', rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height } }
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+/** A page event's fields as sent; each stays unparsed until checked below. */
+interface PreviewRequestData {
+  readonly kind?: unknown
+  readonly id?: unknown
+  readonly range?: unknown
+  readonly anchorId?: unknown
+  readonly anchor?: unknown
+}
+
+/** The anchor box a page event carries. */
+interface AnchorData {
+  readonly left?: unknown
+  readonly top?: unknown
+  readonly width?: unknown
+  readonly height?: unknown
+}
+
+/** A plain object (not an array): a page event and its anchor box. */
+const isFields = (value: unknown): value is object => typeof value === 'object' && value !== null && !Array.isArray(value)
 const boundedText = (value: unknown, max: number): value is string => typeof value === 'string' && value.length > 0 && value.length <= max
 const coordinate = (value: unknown, min: number): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= min && value <= COORDINATE_LIMIT
 
 /** Decodes one page event; anything malformed or out of range discards it. */
-// oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the page event carries unknown data
 const decodeRequest = (value: unknown): EntityPreviewRequest | null => {
-  if (!isRecord(value) || !isRecord(value.anchor)) return null
-  const { kind, id, range, anchorId, anchor } = value
+  const fields: PreviewRequestData | null = isFields(value) ? value : null
+  if (fields === null || !isFields(fields.anchor)) return null
+  const { kind, id, range, anchorId } = fields
+  const anchor: AnchorData = fields.anchor
   if (!boundedText(kind, MAX_KIND_CHARS) || !boundedText(id, MAX_ID_CHARS)) return null
   if (range !== undefined && !boundedText(range, MAX_ID_CHARS)) return null
   if (typeof anchorId !== 'number' || !Number.isSafeInteger(anchorId) || anchorId <= 0) return null
   const { left, top, width, height } = anchor
   if (!coordinate(left, -COORDINATE_LIMIT) || !coordinate(top, -COORDINATE_LIMIT) || !coordinate(width, 0) || !coordinate(height, 0)) return null
-  return { kind, id, ...(range === undefined ? {} : { range }), anchorId, anchor: { left, top, width, height } }
+  const box = { left, top, width, height }
+  return range === undefined ? { kind, id, anchorId, anchor: box } : { kind, id, range, anchorId, anchor: box }
 }
 
 /** Ask the shared card to show one entity under an element the caller rendered. False when the request is malformed. */
@@ -172,7 +192,8 @@ const request = (input: { readonly kind: string; readonly id: string; readonly r
   const detail = decodeRequest({
     kind: input.kind,
     id: input.id,
-    ...(input.range === undefined ? {} : { range: input.range }),
+    // decodeRequest treats an undefined range as absent.
+    range: input.range,
     anchorId: anchorIdOf(element),
     anchor: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
   })
