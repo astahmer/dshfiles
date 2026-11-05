@@ -1024,7 +1024,7 @@
           "kind": "unit-test",
           "id": "backlog.reference-preview-syntax",
           "file": "plugins/@dshfiles/backlog/src/backlog-reference.test.ts",
-          "testName": "finds an item id wherever prose, inline code or punctuation puts it"
+          "testName": "finds a legacy number wherever prose, inline code or punctuation puts it"
         },
         {
           "kind": "unit-test",
@@ -2364,6 +2364,181 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "short-item-references",
+      "title": "Name new items with a short alias",
+      "summary": "A new item is b:k3f9: four random Crockford characters with a letter, fixed for life and five once a fifth of the space is used. Legacy b:12 numbers keep resolving, digit-only means legacy, and every reference surface, search, signal and agent tool takes either form.",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Short alias demo\"",
+        "press Enter",
+        "expect text \"Short alias demo\""
+      ],
+      "surfaces": ["client", "host", "storage", "tool"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog (every item label, reference card, mention chip and agent tool)",
+      "configuration": [],
+      "states": ["legacy-number", "short-alias"],
+      "failureModes": [
+        "A reference that names no item (a new item's private number, an unknown alias) resolves to nothing: the card says so and agent tools answer not-found.",
+        "A word with letters Crockford leaves out (b:todo) or a token glued to more text (b:12ties) stays plain text."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.short-item-references",
+          "featureFile": "tooling/dshx/e2e/features/backlog-history.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.short-item-references-parse",
+          "file": "plugins/@dshfiles/backlog/src/backlog-reference.test.ts",
+          "testName": "finds short aliases of four and five characters next to legacy numbers"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.short-item-references-boundaries",
+          "file": "plugins/@dshfiles/backlog/src/backlog-reference.test.ts",
+          "testName": "keeps text that merely contains the token from becoming a link"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.short-item-references-mint",
+          "file": "plugins/@dshfiles/backlog/src/short-alias.test.ts",
+          "testName": "redraws an all-digit alias, which would read as a legacy number"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.short-item-references-tool-input",
+          "file": "plugins/@dshfiles/backlog/src/api-tools.test.ts",
+          "testName": "item ids take a number from an older caller or a written reference, and reject anything else"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.short-item-references-resolve",
+          "file": "plugins/@dshfiles/backlog/src/backlog-repo.test.ts",
+          "testName": "gives a new item a fixed short alias while legacy numbers keep resolving, across a restart"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "revert-field-change",
+      "title": "Revert a field change from the item history",
+      "summary": "Each field change under an event's Show changes has Revert: it writes the typed value the field held before, read from the op log, as a new change; a field that changed again since is refused with who changed it. Agents call backlog_revert.",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Revert demo\"",
+        "press Enter",
+        "click text \"Revert demo\"",
+        "expect complementary \"Item detail\""
+      ],
+      "surfaces": ["client", "host", "storage", "tool"],
+      "surface": "detail",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › item detail › activity › Show changes › Revert",
+      "configuration": [],
+      "states": ["reverted", "stale"],
+      "failureModes": [
+        "A field changed again after the change asked for is refused as stale, with who changed it when: revert that later change first, or edit the field directly.",
+        "A change no longer in the item's history answers not-found."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.revert-field-change",
+          "featureFile": "tooling/dshx/e2e/features/backlog-history.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.revert-field-change-op-log",
+          "file": "plugins/@dshfiles/backlog/src/backlog-repo.test.ts",
+          "testName": "writes back the typed value a field held before the change, as a new set op, and refuses a stale one"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "export-backlog",
+      "title": "Export the backlog to JSONL or an SQLite copy",
+      "summary": "Backlog settings › Export… writes a new file on the Host: JSON Lines with one folded item per line (optionally the op log after it) or a consistent SQLite copy. A relative, existing or folderless path is refused, so nothing is overwritten. Agents call backlog_export.",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "click button \"Backlog settings\"",
+        "click button \"Export…\"",
+        "expect textbox \"Export file\""
+      ],
+      "surfaces": ["client", "host", "storage", "tool", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "left-nav: Backlog › Backlog settings › Export",
+      "configuration": [],
+      "states": ["jsonl", "jsonl-with-ops", "sqlite"],
+      "failureModes": [
+        "A relative path, an existing file or a missing folder is refused with what to change.",
+        "A write that fails (permissions, disk full) reports the path and asks to check the folder."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.export-backlog",
+          "featureFile": "tooling/dshx/e2e/features/backlog-history.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.export-backlog-jsonl",
+          "file": "plugins/@dshfiles/backlog/src/backlog-export.test.ts",
+          "testName": "writes JSONL with one folded item per line, then the op log on request, and one bounded span"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.export-backlog-sqlite",
+          "file": "plugins/@dshfiles/backlog/src/backlog-export.test.ts",
+          "testName": "copies the SQLite file, and refuses relative, existing or folderless targets"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "backlog export",
+          "file": "plugins/@dshfiles/backlog/src/backlog-export.test.ts",
+          "testName": "writes JSONL with one folded item per line, then the op log on request, and one bounded span"
         }
       ]
     }
