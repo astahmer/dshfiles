@@ -69,19 +69,22 @@ describe('backlog panel drafts', () => {
   })
 
   it('puts a refused capture back over the blank lines a send leaves, never over new text', async () => {
-    let handle: ReturnType<typeof useComposerDraft> | undefined
+    // The latest render's draft handle, recorded the way the test above records its panels.
+    const rendered = new Map<'restore-test', ReturnType<typeof useComposerDraft>>()
     const Panel = () => {
-      handle = useComposerDraft('restore-test')
-      return <div>{handle.text}</div>
+      const draft = useComposerDraft('restore-test')
+      rendered.set('restore-test', draft)
+      return <div>{draft.text}</div>
     }
+    const handle = () => rendered.get('restore-test')
     const root = createRoot(document.createElement('div'))
     await act(async () => root.render(<Panel />))
-    await act(async () => handle?.setText('\n\n'))
-    await act(async () => handle?.restoreText('Retry this capture'))
-    expect(handle?.text).toBe('Retry this capture')
-    await act(async () => handle?.setText('typed since'))
-    await act(async () => handle?.restoreText('Retry this capture'))
-    expect(handle?.text).toBe('typed since')
+    await act(async () => handle()?.setText('\n\n'))
+    await act(async () => handle()?.restoreText('Retry this capture'))
+    expect(handle()?.text).toBe('Retry this capture')
+    await act(async () => handle()?.setText('typed since'))
+    await act(async () => handle()?.restoreText('Retry this capture'))
+    expect(handle()?.text).toBe('typed since')
     await act(async () => root.unmount())
   })
 })

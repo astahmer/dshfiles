@@ -7,7 +7,7 @@ describe('backlog tool exposure', () => {
   test('empty actor filters mean no filter without weakening actor ID validation', async () => {
     const schema = backlogApi.methods.list.input
     if (schema === undefined) throw new Error('List input schema is missing')
-    const validate = (value: unknown) => Schema.decodeUnknownResult(schema)(value)
+    const validate = Schema.decodeUnknownResult(schema)
 
     expect(Schema.is(BacklogItems.actorIdSchema)('')).toBe(false)
     const emptyActor = validate({ actor: '' })
@@ -35,7 +35,7 @@ describe('backlog tool exposure', () => {
       data: 'iVBORw==',
     }
 
-    const validate = (value: unknown) => Schema.decodeUnknownResult(schema)(value)
+    const validate = Schema.decodeUnknownResult(schema)
 
     expect(Result.isSuccess(validate({ id: 1, text: '', files: [image] }))).toBe(true)
     expect(Result.isSuccess(validate({ id: 1, text: 'Progress update' }))).toBe(true)
@@ -126,15 +126,17 @@ describe('backlog tool exposure', () => {
   test('comments accept an attachment-only reply, but reject an empty comment', () => {
     const input = backlogApi.methods.comment.input
     if (input === undefined) throw new Error('Comment input schema is missing.')
-    const validate = (value: unknown): boolean => Result.isSuccess(Schema.decodeUnknownResult(input)(value))
+    const decode = Schema.decodeUnknownResult(input)
     expect(
-      validate({
-        id: 1,
-        text: '',
-        files: [{ id: 'reply-image-1', kind: 'image', name: 'reply.png', mediaType: 'image/png', bytes: 3, data: 'aGk=' }],
-      }),
+      Result.isSuccess(
+        decode({
+          id: 1,
+          text: '',
+          files: [{ id: 'reply-image-1', kind: 'image', name: 'reply.png', mediaType: 'image/png', bytes: 3, data: 'aGk=' }],
+        }),
+      ),
     ).toBe(true)
-    expect(validate({ id: 1, text: '' })).toBe(false)
+    expect(Result.isSuccess(decode({ id: 1, text: '' }))).toBe(false)
   })
 
   test('item writes name the bar for acting on their own', () => {
