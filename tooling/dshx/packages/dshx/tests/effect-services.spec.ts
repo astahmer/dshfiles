@@ -254,6 +254,55 @@ describe('HostApis', () => {
       expect((yield* apis.list).some(api => api.id === 'status' && api.owner === '@test/status')).toBe(true)
     }).pipe(Effect.scoped),
   )
+
+  it.effect('keeps a declared failure with its code, status and detail across a typed call, and drops its cause', () =>
+    Effect.gen(function* () {
+      class LookupFailed extends Schema.TaggedError<LookupFailed>()(
+        'LookupFailed',
+        {
+          code: Schema.Literals(['not-found', 'rejected']),
+          status: Schema.optional(Schema.Number),
+          detail: Schema.String,
+          cause: Schema.optional(Schema.Defect()),
+        },
+        { dshxWireCode: 'lookup-failed' },
+      ) {}
+      const host = yield* Effect.acquireRelease(
+        Effect.promise(() => createTestHost()),
+        testHost => Effect.promise(() => testHost.dispose()),
+      )
+      const lookupApi = defineApi({ id: 'lookup', version: 1, owner: '@test/lookup', methods: { find: method<{ readonly key: string }, string>() } })
+      yield* Effect.promise(() =>
+        host.mount(
+          defineHost({
+            apis: [
+              DshxEffect.host(lookupApi, {
+                find: ({ input }) =>
+                  Effect.fail(
+                    new LookupFailed({ code: input.key === 'gone' ? 'not-found' : 'rejected', status: 404, detail: 'share it', cause: new Error('secret') }),
+                  ),
+              }),
+            ],
+          }),
+          { packageId: '@test/lookup' },
+        ),
+      )
+      const apis = yield* Effect.provide(
+        HostApis,
+        HostApis.layer.pipe(Layer.provide(Layer.succeed(HostContext, HostContext.of({ ctx: host.ctx, packageId: '@test/caller' })))),
+      )
+      const failure = yield* Effect.flip(apis.typed(lookupApi, { errors: [LookupFailed] }).find({ key: 'gone' }))
+      expect(failure).toBeInstanceOf(LookupFailed)
+      expect(failure).toMatchObject({ code: 'not-found', status: 404, detail: 'share it' })
+      expect(failure).not.toHaveProperty('cause.message', 'secret')
+      expect(yield* Effect.flip(apis.typed(lookupApi).find({ key: 'other' }))).toMatchObject({
+        _tag: 'ApiRemoteError',
+        code: 'lookup-failed',
+        details: { code: 'rejected', status: 404 },
+      })
+      expect(yield* Effect.flip(apis.client(lookupApi).find({ key: 'gone' }))).not.toHaveProperty('status')
+    }).pipe(Effect.scoped),
+  )
 })
 
 describe('Communication', () => {

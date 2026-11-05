@@ -233,6 +233,11 @@ owner is not loaded), `ApiContractError` or `ApiRemoteError` (`code`, message, `
 details decode into one of `errors` fails with that class instead. Interrupting the fiber aborts the call, an aborted
 call interrupts the fiber, and a non-ApiError throw is a defect.
 
+From an Effect Host layer, `HostApis.typed(contract, { errors? })` (`@dshfiles/dshx/effect/host-apis`) is the same
+client over the owner's in-process dispatch. Prefer it to `HostApis.client`, whose `ApiCallError` keeps only the remote
+code and message: a declared error keeps every field it was failed with (a failure code, an HTTP status), so a caller
+can decide on them instead of parsing a message. The wrapped `cause` never crosses.
+
 ## Schemas
 
 An Effect Schema passed to `method` or `event` becomes a strict Standard Schema without any import: decoding rejects
