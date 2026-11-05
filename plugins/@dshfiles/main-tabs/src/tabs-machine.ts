@@ -47,6 +47,11 @@ export interface TabsPorts {
   /** Show the target in the main view; false when the Host cannot (an unregistered panel). */
   readonly navigate: (target: HostTarget) => boolean
   readonly save: (tabs: PersistedTabs) => void
+  /**
+   * Take the panel the main view shows off the stage, showing what lies under it. Closing a tab only navigates to the
+   * tab that becomes active; with none left, the Host would keep drawing the closed panel under an empty strip.
+   */
+  readonly leavePanel?: () => void
 }
 
 export type TabsEvent =
@@ -310,6 +315,14 @@ export const tabsMachine = setup({
       if (tabId === context.shownTabId && sameTarget(context.hostTarget, target)) return { pendingTarget: null }
       return context.ports.navigate(target) ? { pendingTarget: target, shownTabId: tabId } : { pendingTarget: null }
     }),
+    // A close that left no active tab cannot navigate anywhere: a panel the Host still shows, with no tab of its own any
+    // more, is left so the stage matches the strip. A thread stays, as the Host has no "no thread" to show instead.
+    leaveClosedPanel: ({ context }) => {
+      const shown = context.hostTarget
+      if (shown?.kind !== 'panel' || activeTarget(context) !== null) return
+      if (currentSet(context).tabs.some(tab => tab.id === tabIdOf(shown))) return
+      context.ports.leavePanel?.()
+    },
     followHost: assign(({ context, event }) => {
       if (event.type !== 'host.navigated') return {}
       // Session ownership describes the selected subject, not an explicit scene
@@ -527,6 +540,7 @@ export const tabsMachine = setup({
               ),
             ),
             'navigateToActive',
+            'leaveClosedPanel',
             'persist',
           ],
         },
@@ -542,6 +556,7 @@ export const tabsMachine = setup({
               )
             }),
             'navigateToActive',
+            'leaveClosedPanel',
             'persist',
           ],
         },
@@ -554,6 +569,7 @@ export const tabsMachine = setup({
               return withClosedSet(context, { tabs: set.tabs.filter(tab => tab.pinned || tab.id === event.tabId), activeTabId: event.tabId })
             }),
             'navigateToActive',
+            'leaveClosedPanel',
             'persist',
           ],
         },
@@ -568,6 +584,7 @@ export const tabsMachine = setup({
               return withClosedSet(context, next.tabs.some(tab => tab.id === set.activeTabId) ? next : { ...next, activeTabId: event.tabId })
             }),
             'navigateToActive',
+            'leaveClosedPanel',
             'persist',
           ],
         },

@@ -195,7 +195,8 @@
         "A thread dropped where the aside owner declined the request keeps its main tab and announces the unavailable side panel; dragging where the right sidebar is not mounted highlights nothing.",
         "If DSH stops rendering the main slot outlet (`[data-slot=\"main\"]`) the strip stays hidden, tabs keep following the main view, and the console warns once at startup; if the strip lands anywhere but directly above the main panel, the console warns too.",
         "A thread tab dropped outside the active composer leaves the strip alone; a drop on the composer inserts a mention chip and never the tab title as plain text.",
-        "A same-origin thread link whose thread the strip cannot open (unlisted, archived, or main-tabs switched off) keeps the link's own navigation instead of opening a tab."
+        "A same-origin thread link whose thread the strip cannot open (unlisted, archived, or main-tabs switched off) keeps the link's own navigation instead of opening a tab.",
+        "Closing the last tab while the main view shows its panel (Settings opened from the rail, for one) leaves that panel, so the stage never draws a page no tab claims; whatever the Host shows underneath then gets its tab, or the New thread screen shows with an empty strip."
       ],
       "externalDependencies": [],
       "verification": [
@@ -296,6 +297,17 @@
           "id": "main-tabs.tab-title-rename",
           "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
           "testName": "renames a thread from its tab menu"
+        },
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.close-settings-tab",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-close-last-panel",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "leaves the panel the main view shows when its tab closes and no tab is left"
         },
         {
           "kind": "gherkin",

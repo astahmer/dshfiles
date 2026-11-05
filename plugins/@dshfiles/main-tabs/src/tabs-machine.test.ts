@@ -9,6 +9,7 @@ const panel = (panelId: string, scope?: string): HostTarget => (scope === undefi
 const start = (options: { readonly preferences?: Partial<TabPreferences>; readonly persisted?: PersistedTabs | null; readonly navigates?: boolean } = {}) => {
   const navigated: HostTarget[] = []
   const saved: PersistedTabs[] = []
+  const left: true[] = []
   const actor = createActor(tabsMachine, {
     input: {
       ports: {
@@ -17,6 +18,7 @@ const start = (options: { readonly preferences?: Partial<TabPreferences>; readon
           return options.navigates ?? true
         },
         save: tabs => saved.push(tabs),
+        leavePanel: () => left.push(true),
       },
       persisted: options.persisted ?? null,
     },
@@ -28,7 +30,7 @@ const start = (options: { readonly preferences?: Partial<TabPreferences>; readon
     return context.sets[context.scopeKey] ?? { tabs: [], activeTabId: null }
   }
   const ids = (): string[] => set().tabs.map(tab => tab.id)
-  return { actor, navigated, saved, preferences, host, set, ids, enable: () => actor.send({ type: 'preferences.changed', preferences }) }
+  return { actor, navigated, saved, left, preferences, host, set, ids, enable: () => actor.send({ type: 'preferences.changed', preferences }) }
 }
 
 afterEach(() => {
@@ -246,6 +248,32 @@ describe('tabsMachine', () => {
     expect(tabs.ids()).toEqual(['thread:a', 'thread:c'])
     expect(tabs.set().activeTabId).toBe('thread:c')
     expect(tabs.navigated.at(-1)).toEqual(thread('c'))
+  })
+
+  it('leaves the panel the main view shows when its tab closes and no tab is left', () => {
+    const tabs = start()
+    tabs.enable()
+    tabs.host(panel('dshfiles-settings'))
+    expect(tabs.ids()).toEqual(['panel:dshfiles-settings'])
+    tabs.actor.send({ type: 'tab.close', tabId: 'panel:dshfiles-settings' })
+    expect(tabs.ids()).toEqual([])
+    expect(tabs.left).toHaveLength(1)
+    // The Host then shows what was under the panel: nothing here, so the strip stays empty.
+    tabs.host(null)
+    expect(tabs.ids()).toEqual([])
+    expect(tabs.set().activeTabId).toBeNull()
+
+    // A neighbour to show, or a last thread tab, is not a panel left on the stage: nothing to leave.
+    const others = start({ preferences: { openMode: 'new' } })
+    others.enable()
+    others.host(thread('a'))
+    others.host(panel('dshfiles-settings'))
+    others.actor.send({ type: 'tab.closeActive' })
+    expect(others.navigated.at(-1)).toEqual(thread('a'))
+    others.host(thread('a'))
+    others.actor.send({ type: 'tab.close', tabId: 'thread:a' })
+    expect(others.ids()).toEqual([])
+    expect(others.left).toHaveLength(0)
   })
 
   it('closes the active tab and navigates to its right neighbour', () => {

@@ -22,6 +22,14 @@ Feature: Main view tabs
     When the Jujutsu tab is closed with a middle click and other tabs are closed from the thread tab
     Then only the pinned Plugins and the thread remain
 
+  @scenario:main-tabs.close-settings-tab
+  Scenario: Closing the Settings tab opened from the rail takes Settings off the stage
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/main-tabs, @dshfiles/settings-shell, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When Settings is opened from the navigation rail
+    Then Settings fills the stage under its own selected tab
+    When the Settings tab is closed with its close button
+    Then the stage no longer shows Settings and no tab claims it
+
   @scenario:main-tabs.strip-mount
   Scenario: The strip mounts right above whatever the main view shows
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/main-tabs, @dshfiles/jujutsu, @dshfiles/workspace-folder-picker" is booted

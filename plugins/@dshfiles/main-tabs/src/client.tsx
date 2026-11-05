@@ -152,7 +152,9 @@ export default defineClient({
       if (!result.ok) throw new Error(result.error.message)
     }
 
-    const actor = createActor(tabsMachine, { input: { ports: { navigate, save: saveTabs }, persisted: storedTabs.get() } })
+    const actor = createActor(tabsMachine, {
+      input: { ports: { navigate, save: saveTabs, leavePanel: () => ctx.layout.selectPanel(null) }, persisted: storedTabs.get() },
+    })
     ctx.effect(() => {
       actor.start()
       return () => actor.stop()

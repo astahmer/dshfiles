@@ -12,7 +12,8 @@ const STORAGE_KEY = 'dshfiles.main-tabs.v1'
 const strip = (page: Page) => page.getByRole('tablist', { name: 'Open views', exact: true })
 // Tab titles name the page, never its plugin (plans/ade-ux Phase 3b): the rail section label ("History"), else the
 // navigation label without its "Plugin: " prefix. Native core page titles stay as they are.
-const nativeTabName = (name: string): string | RegExp => (name === 'Plugins' || name === 'Automation tasks' || name === 'Settings' ? name : viewNamePattern(name))
+const nativeTabName = (name: string): string | RegExp =>
+  name === 'Plugins' || name === 'Automation tasks' || name === 'Settings' ? name : viewNamePattern(name)
 const tab = (page: Page, name: string) => strip(page).getByRole('tab', { name: nativeTabName(name), exact: true })
 /** Each tab as "<name>" plus "*" when active, "(preview)" and "(pinned)" markers, in strip order. */
 const tabSummary = (page: Page): Promise<readonly string[]> =>
@@ -148,6 +149,35 @@ After(async ({ page }: { page: Page }) => {
   await rm(root, { recursive: true, force: true })
 })
 
+const settingsStage = (page: Page) => page.locator('[data-slot="main"] [data-settings-panel-host] [data-settings-view]')
+
+When('Settings is opened from the navigation rail', async ({ page }: { page: Page }) => {
+  await page.getByRole('tablist', { name: 'Destinations', exact: true }).getByRole('tab', { name: 'Settings', exact: true }).click()
+})
+
+Then('Settings fills the stage under its own selected tab', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-rail-settings-opens-a-tab', async () => {
+    await expect(tab(page, 'Settings')).toHaveAttribute('aria-selected', 'true')
+    await expect(settingsStage(page)).toBeVisible()
+  })
+})
+
+When('the Settings tab is closed with its close button', async ({ page }: { page: Page }) => {
+  await tab(page, 'Settings').hover()
+  await strip(page).getByRole('button', { name: 'Close Settings', exact: true }).click()
+  await expect(tab(page, 'Settings')).toHaveCount(0)
+})
+
+Then('the stage no longer shows Settings and no tab claims it', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-closed-settings-tab-leaves-the-stage', async () => {
+    // The stage shows what the strip selects now: another tab, or (with none left) the New thread screen. Settings is
+    // neither, so it must be gone from the stage, not drawn under an empty strip.
+    await expect(page.locator('[data-settings-view]')).toHaveCount(0)
+    await expect(strip(page).locator('[aria-selected="true"][data-tab-id="panel:dshfiles-settings"]')).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the Plugins and then Jujutsu are opened from the sidebar', async ({ page }: { page: Page }) => {
   await openGlobalPanel(page, 'Plugins')
   await expect(tab(page, 'Plugins')).toBeVisible()
@@ -217,9 +247,7 @@ When('the Plugins tab is pinned and the thread tab is dragged before Jujutsu', a
 })
 
 Then('the pinned tab leads and the thread tab moved', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'main-tabs-pin-and-reorder', () =>
-    expect.poll(() => tabSummary(page)).toEqual(['Plugins (pinned)', 'tabs thread*', 'History']),
-  )
+  await recordAssertion(page, 'main-tabs-pin-and-reorder', () => expect.poll(() => tabSummary(page)).toEqual(['Plugins (pinned)', 'tabs thread*', 'History']))
 })
 
 When('the Jujutsu tab is closed with a middle click and other tabs are closed from the thread tab', async ({ page }: { page: Page }) => {
