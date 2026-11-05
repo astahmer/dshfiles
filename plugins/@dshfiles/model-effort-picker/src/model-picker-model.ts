@@ -179,13 +179,13 @@ export class ModelPickerModel {
 
   static withoutFallback = (chain: readonly FallbackRoute[], index: number): readonly FallbackRoute[] => chain.filter((_, position) => position !== index)
 
-  /** Swap one rung with its neighbour; a move past either end leaves the chain as it is. */
-  static movedFallback = (chain: readonly FallbackRoute[], index: number, offset: -1 | 1): readonly FallbackRoute[] => {
-    const target = index + offset
-    const moving = chain[index]
-    const displaced = chain[target]
-    if (moving === undefined || displaced === undefined) return chain
-    return chain.map((entry, position) => (position === index ? displaced : position === target ? moving : entry))
+  /** Move one rung to another position, shifting the rungs between; an index outside the chain leaves it as it is. */
+  static reorderedFallback = (chain: readonly FallbackRoute[], from: number, to: number): readonly FallbackRoute[] => {
+    const moving = chain[from]
+    if (moving === undefined || to < 0 || to >= chain.length || from === to) return chain
+    const next = chain.filter((_, position) => position !== from)
+    next.splice(to, 0, moving)
+    return next
   }
 
   static fallbackLabel = (groups: readonly ModelGroup[], route: FallbackRoute): FallbackLabel => {

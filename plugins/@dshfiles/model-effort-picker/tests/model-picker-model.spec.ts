@@ -193,8 +193,11 @@ describe('model picker fallback chain', () => {
   })
 
   it('reorders and removes rungs without leaving the chain', () => {
-    expect(ModelPickerModel.movedFallback([deep, claude], 1, -1)).toEqual([claude, deep])
-    expect(ModelPickerModel.movedFallback([deep, claude], 0, -1)).toEqual([deep, claude])
+    const third = { provider: 'redwood', model: 'r3' }
+    expect(ModelPickerModel.reorderedFallback([deep, claude], 1, 0)).toEqual([claude, deep])
+    expect(ModelPickerModel.reorderedFallback([deep, claude], 0, -1)).toEqual([deep, claude])
+    expect(ModelPickerModel.reorderedFallback([deep, claude, third], 0, 2)).toEqual([claude, third, deep])
+    expect(ModelPickerModel.reorderedFallback([deep, claude, third], 2, 0)).toEqual([third, deep, claude])
     expect(ModelPickerModel.withoutFallback([deep, claude], 0)).toEqual([claude])
   })
 
