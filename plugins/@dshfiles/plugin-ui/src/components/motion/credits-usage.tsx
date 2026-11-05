@@ -3,6 +3,7 @@ import { animate, drawStroke, motionSafe, springs, staggers, durations, easings 
 import { useEnter, type ReplayKey } from '../../motion/react.js'
 import { cn } from '../../lib/utils.js'
 import { Button } from '../ui/button.js'
+import { Progress } from '../ui/progress.js'
 import { RollingNumber } from './text.js'
 
 export type CreditTone = 'violet' | 'info' | 'warning' | 'teal' | 'success' | 'destructive'
@@ -14,13 +15,17 @@ export interface CreditCategory {
   readonly icon?: React.ReactNode
   readonly tone: CreditTone
   readonly total: number
-  /** Unit after the total; defaults to "credits". */
+  /** Unit after the total; defaults to "credits", an empty string shows none. */
   readonly unit?: string
+  /** Formats the total, e.g. `75% left`; defaults to a rounded integer. */
+  readonly formatTotal?: (value: number) => string
   readonly caption: string
   readonly chart: CreditChart
-  /** One value per x label (a week, a sprint). */
+  /** One value per x label (a week, a sprint). Empty: the card has no chart. */
   readonly series: readonly number[]
   readonly axisLabels?: readonly string[]
+  /** A tone-coloured bar under the total; `label` names the progressbar. */
+  readonly meter?: { readonly percent: number; readonly label: string }
 }
 
 export interface CreditOption {
@@ -30,11 +35,7 @@ export interface CreditOption {
   readonly price: string
 }
 
-export interface CreditsUsageProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
-  readonly categories: readonly CreditCategory[]
-  readonly heading?: string
-  /** One or two sentences about the pace ("This week your agents used 84 credits a day…"). */
-  readonly summary?: React.ReactNode
+interface CreditsTopUpProps {
   readonly budgetLabel: string
   readonly limit: number
   readonly options: readonly CreditOption[]
@@ -44,6 +45,16 @@ export interface CreditsUsageProps extends Omit<React.HTMLAttributes<HTMLElement
   readonly onConfirm?: () => void
   readonly onCancel?: () => void
 }
+
+type WithoutTopUp = { readonly [Key in keyof CreditsTopUpProps]?: undefined }
+
+/** Without the top-up fields (`options` and the rest) it shows only the category cards, then `children`. */
+export type CreditsUsageProps = Omit<React.HTMLAttributes<HTMLElement>, 'title'> & {
+  readonly categories: readonly CreditCategory[]
+  readonly heading?: string
+  /** One or two sentences about the pace ("This week your agents used 84 credits a day…"). */
+  readonly summary?: React.ReactNode
+} & (CreditsTopUpProps | WithoutTopUp)
 
 const toneText = {
   violet: 'dshx:text-violet',
@@ -61,6 +72,14 @@ const toneBg = {
   success: 'dshx:bg-success',
   destructive: 'dshx:bg-destructive',
 } as const satisfies Record<CreditTone, string>
+const toneProgress = {
+  violet: 'dshx:*:data-[slot=progress-indicator]:bg-violet',
+  info: 'dshx:*:data-[slot=progress-indicator]:bg-info',
+  warning: 'dshx:*:data-[slot=progress-indicator]:bg-warning',
+  teal: 'dshx:*:data-[slot=progress-indicator]:bg-teal',
+  success: 'dshx:*:data-[slot=progress-indicator]:bg-success',
+  destructive: 'dshx:*:data-[slot=progress-indicator]:bg-destructive',
+} as const satisfies Record<CreditTone, string>
 const toneStem = {
   violet: 'dshx:bg-violet/35',
   info: 'dshx:bg-info/35',
@@ -77,24 +96,38 @@ const formatInt = (value: number) => Math.round(value).toLocaleString('en-US')
  * top-up panel: the month's credits split in a stacked bar whose segments sweep in, and plan options whose selection
  * ring glides between cards. Agent and subagent spend against a monthly budget.
  */
-export function CreditsUsage({
-  categories,
-  heading = 'Add credits',
-  summary,
-  budgetLabel,
-  limit,
-  options,
-  selectedOptionId,
-  onSelectOption,
-  confirmLabel,
-  onConfirm,
-  onCancel,
-  className,
-  ...props
-}: CreditsUsageProps) {
+export function CreditsUsage(allProps: CreditsUsageProps) {
+  const {
+    categories,
+    heading = 'Add credits',
+    summary,
+    budgetLabel,
+    limit,
+    options,
+    selectedOptionId,
+    onSelectOption,
+    confirmLabel,
+    onConfirm,
+    onCancel,
+    className,
+    children,
+    ...props
+  } = allProps
   const used = categories.reduce((sum, category) => sum + category.total, 0)
   const cardsRef = React.useRef<HTMLDivElement>(null)
   useEnter(cardsRef, 'riseIn', { children: true, stagger: staggers.loose })
+
+  if (options === undefined || onSelectOption === undefined || budgetLabel === undefined || limit === undefined)
+    return (
+      <section aria-label={heading} className={cn('dshx:@container dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:gap-2', className)} {...props}>
+        <div ref={cardsRef} className="dshx:grid dshx:grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] dshx:gap-2">
+          {categories.map((category, index) => (
+            <CategoryCard key={category.id} category={category} delay={0.15 + index * staggers.loose} />
+          ))}
+        </div>
+        {children}
+      </section>
+    )
 
   return (
     <section
@@ -118,17 +151,18 @@ export function CreditsUsage({
             ) : null}
           </div>
           <BudgetBar categories={categories} used={used} limit={limit} label={budgetLabel} />
-          <OptionCards options={options} selectedId={selectedOptionId} onSelect={onSelectOption} />
+          <OptionCards options={options} selectedId={selectedOptionId ?? null} onSelect={onSelectOption} />
           <div className="dshx:mt-auto dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:pt-2">
             <Button variant="outline" className="dshx:h-9" onClick={onCancel}>
               Cancel
             </Button>
-            <ConfirmButton onClick={onConfirm} disabled={selectedOptionId === null} replayKey={selectedOptionId}>
+            <ConfirmButton onClick={onConfirm} disabled={selectedOptionId === null} replayKey={selectedOptionId ?? null}>
               {confirmLabel}
             </ConfirmButton>
           </div>
         </div>
       </div>
+      {children}
     </section>
   )
 }
@@ -147,10 +181,18 @@ function ConfirmButton({ children, replayKey, ...props }: React.ComponentProps<t
 
 function CategoryCard({ category, delay }: { readonly category: CreditCategory; readonly delay: number }) {
   const max = niceMax(Math.max(1, ...category.series))
+  const unit = category.unit ?? 'credits'
+  const formatTotal = category.formatTotal ?? formatInt
+  const charted = category.series.length > 0
   return (
     <article
-      aria-label={`${category.label}: ${formatInt(category.total)} ${category.unit ?? 'credits'}`}
-      className="dshx:grid dshx:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] dshx:gap-3 dshx:rounded-xl dshx:bg-muted/60 dshx:p-3 dshx:@max-pane-narrow:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] dshx:@max-pane-narrow:gap-2"
+      aria-label={`${category.label}: ${[formatTotal(category.total), unit].filter(Boolean).join(' ')}`}
+      className={cn(
+        'dshx:grid dshx:gap-3 dshx:rounded-xl dshx:bg-muted/60 dshx:p-3',
+        charted
+          ? 'dshx:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] dshx:@max-pane-narrow:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] dshx:@max-pane-narrow:gap-2'
+          : 'dshx:grid-cols-1',
+      )}
     >
       <div className="dshx:flex dshx:min-w-0 dshx:flex-col">
         <span className={cn('dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:font-medium dshx:[&_svg]:size-3.5', toneText[category.tone])}>
@@ -158,12 +200,19 @@ function CategoryCard({ category, delay }: { readonly category: CreditCategory; 
           <span className="dshx:min-w-0 dshx:truncate">{category.label}</span>
         </span>
         <span className="dshx:mt-auto dshx:flex dshx:items-baseline dshx:gap-1 dshx:pt-4">
-          <RollingNumber value={category.total} format={formatInt} className="dshx:text-2xl dshx:font-medium dshx:tracking-tight dshx:text-foreground" />
-          <span className="dshx:text-xs dshx:text-muted-foreground">{category.unit ?? 'credits'}</span>
+          <RollingNumber value={category.total} format={formatTotal} className="dshx:text-2xl dshx:font-medium dshx:tracking-tight dshx:text-foreground" />
+          {unit === '' ? null : <span className="dshx:text-xs dshx:text-muted-foreground">{unit}</span>}
         </span>
+        {category.meter === undefined ? null : (
+          <Progress
+            aria-label={category.meter.label}
+            className={cn('dshx:my-1.5 dshx:h-1.5 dshx:bg-muted', toneProgress[category.tone])}
+            value={Math.max(0, Math.min(100, category.meter.percent))}
+          />
+        )}
         <span className="dshx:line-clamp-2 dshx:text-[11px] dshx:leading-snug dshx:text-muted-foreground">{category.caption}</span>
       </div>
-      <MiniChart category={category} max={max} delay={delay} />
+      {charted ? <MiniChart category={category} max={max} delay={delay} /> : null}
     </article>
   )
 }

@@ -4,6 +4,7 @@ import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { CreditsUsage } from '@dshfiles/plugin-ui/components/motion/credits-usage'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
@@ -16,10 +17,9 @@ import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi, type AccountsUsage, type UsageHistoryMeta } from './api.js'
 import { MAX_USAGE_HISTORY_POINTS } from './usage-history-model.js'
 import { QuotaHistoryAnalysis } from './usage-history-analysis.js'
-import { QuotaMeter } from './panel-primitives.js'
 import { QuotaHistoryChart } from './quota-history-chart.js'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
-import { UsageOverviewModel } from './usage-overview-model.js'
+import { quotaWindowCategories } from './usage-card-view.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
 import { QuotaViewFrame } from './quota-view-frame.js'
@@ -31,8 +31,6 @@ const BANK_EVENT_LIMIT = 100
 
 const formatTimestamp = (value: number | null | undefined): string =>
   value === null || value === undefined || !Number.isFinite(value) ? 'Not reported' : new Date(value).toLocaleString()
-
-const formatReset = (value: number | null): string => UsageOverviewModel.formatResetIn(value, Date.now())
 
 const formatForecast = (forecast: ReturnType<typeof QuotaHistoryAnalysis.forecastQuotaWindow>): string => {
   switch (forecast.status) {
@@ -63,16 +61,7 @@ export const CurrentQuota = (props: { accountId: string; usage: AccountsUsage | 
   }
 
   return (
-    <div className="dshx:grid dshx:grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] dshx:gap-2.5">
-      {card.windows.map(window => (
-        <QuotaMeter
-          className="dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3"
-          detail={formatReset(window.resetsAt)}
-          key={window.label}
-          label={window.label}
-          percent={window.percentRemaining}
-        />
-      ))}
+    <CreditsUsage categories={quotaWindowCategories({ windows: card.windows, now: props.usage?.readAt ?? 0, history: [] })} heading="Current limits">
       {card.bankedResets > 0 ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-info/30 dshx:bg-info/5 dshx:p-3">
           <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2">
@@ -90,7 +79,7 @@ export const CurrentQuota = (props: { accountId: string; usage: AccountsUsage | 
           )}
         </div>
       ) : null}
-    </div>
+    </CreditsUsage>
   )
 }
 

@@ -1,12 +1,10 @@
 import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
-import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ProviderGlyph as ProviderLogo } from './provider-glyph.js'
 import { KIND_ACCENT } from './account-labels.js'
 import type { AccountProfile } from './api.js'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useId, type ReactNode } from 'react'
-import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 
 /** Kit `Field` drops its vertical layout (unprefixed classes), so the column is restated here. */
 export const LabelledControl = (props: { readonly label: string; readonly hint?: string; readonly children: (id: string) => JSX.Element }): JSX.Element => {
@@ -74,25 +72,3 @@ export const NumberedSection = (props: {
 )
 
 /** One quota window: label, percent left in its tone, and the bar. */
-export const QuotaMeter = (props: {
-  readonly label: string
-  readonly percent: number
-  readonly detail?: string | null
-  readonly className?: string
-}): JSX.Element => {
-  const tone = quotaTone(props.percent)
-  return (
-    <div className={cn('dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1.5', props.className)}>
-      <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2">
-        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{props.label}</span>
-        <span className={cn('dshx:text-sm dshx:font-semibold dshx:tabular-nums', QUOTA_TONE_TEXT[tone])}>{props.percent}% left</span>
-      </div>
-      <Progress
-        aria-label={`${props.label} remaining`}
-        className={cn('dshx:h-1.5 dshx:bg-muted', QUOTA_TONE_PROGRESS[tone])}
-        value={Math.max(0, Math.min(100, props.percent))}
-      />
-      {props.detail === undefined || props.detail === null ? null : <span className="dshx:text-xs dshx:text-muted-foreground">{props.detail}</span>}
-    </div>
-  )
-}
