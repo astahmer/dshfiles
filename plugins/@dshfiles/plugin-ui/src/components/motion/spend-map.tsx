@@ -37,7 +37,8 @@ export interface SpendMapProps extends Omit<React.HTMLAttributes<HTMLElement>, '
   readonly heading: string
   readonly subtitle?: string
   readonly total: number
-  readonly cap: number
+  /** Without a cap the gauge draws a full ring around the total and the entries show no cap bar. */
+  readonly cap?: number | undefined
   /** Under the gauge: the account or project name and the period position ("Day 18 / 30"). */
   readonly owner: string
   readonly period?: string
@@ -51,6 +52,8 @@ export interface SpendMapProps extends Omit<React.HTMLAttributes<HTMLElement>, '
   readonly metric?: string
   readonly onMetricChange?: (metric: string) => void
   readonly format?: (value: number) => string
+  /** The selected entry's period, after its name; defaults to "month to date". */
+  readonly detailPeriod?: string
   readonly footer?: React.ReactNode
 }
 
@@ -81,6 +84,7 @@ export function SpendMap({
   metric,
   onMetricChange,
   format = formatMoney,
+  detailPeriod = 'month to date',
   footer,
   className,
   ...props
@@ -225,7 +229,7 @@ export function SpendMap({
         </div>
       </div>
 
-      {leaf ? <LeafDetail leaf={leaf} format={format} /> : null}
+      {leaf ? <LeafDetail leaf={leaf} format={format} period={detailPeriod} capped={cap !== undefined} /> : null}
 
       {footer ? (
         <footer className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:px-4 dshx:pb-3 dshx:text-[11px] dshx:text-muted-foreground">
@@ -241,12 +245,12 @@ const SWEEP = 300
 const START = -150
 
 /** The month-to-date arc against the cap: ticks light up as the arc sweeps, a knob rides its end. */
-function CapGauge({ value, cap, format }: { readonly value: number; readonly cap: number; readonly format: (value: number) => string }) {
+function CapGauge({ value, cap, format }: { readonly value: number; readonly cap: number | undefined; readonly format: (value: number) => string }) {
   const arcRef = React.useRef<SVGPathElement>(null)
   const knobRef = React.useRef<SVGCircleElement>(null)
   const ticksRef = React.useRef<SVGGElement>(null)
   const shown = React.useRef(0)
-  const fraction = cap > 0 ? Math.min(1, value / cap) : 0
+  const fraction = cap === undefined ? (value > 0 ? 1 : 0) : cap > 0 ? Math.min(1, value / cap) : 0
   const radius = 38
   const arcLength = (SWEEP / 360) * 2 * Math.PI * radius
 
@@ -269,7 +273,10 @@ function CapGauge({ value, cap, format }: { readonly value: number; readonly cap
   }, [fraction, arcLength])
 
   return (
-    <div role="meter" aria-label="Spend against cap" aria-valuemin={0} aria-valuemax={cap} aria-valuenow={value} className="dshx:relative dshx:size-[118px]">
+    <div
+      {...(cap === undefined ? {} : { role: 'meter', 'aria-label': 'Spend against cap', 'aria-valuemin': 0, 'aria-valuemax': cap, 'aria-valuenow': value })}
+      className="dshx:relative dshx:size-[118px]"
+    >
       <svg viewBox="0 0 120 120" className="dshx:size-full" aria-hidden>
         <g ref={ticksRef}>
           {Array.from({ length: TICKS }, (_, index) => {
@@ -305,7 +312,7 @@ function CapGauge({ value, cap, format }: { readonly value: number; readonly cap
       </svg>
       <div className="dshx:absolute dshx:inset-0 dshx:flex dshx:flex-col dshx:items-center dshx:justify-center">
         <RollingNumber value={value} format={format} className="dshx:text-lg dshx:leading-none dshx:font-semibold dshx:tracking-tight dshx:text-foreground" />
-        <span className="dshx:mt-1 dshx:text-[10px] dshx:text-muted-foreground">of {format(cap)}</span>
+        {cap === undefined ? null : <span className="dshx:mt-1 dshx:text-[10px] dshx:text-muted-foreground">of {format(cap)}</span>}
       </div>
     </div>
   )
@@ -438,7 +445,17 @@ function TrendChip({ trend, suffix, className }: { readonly trend: number; reado
 }
 
 /** The selected entry: rolling month-to-date amount, a sparkline that draws itself, and the cap bar. */
-function LeafDetail({ leaf, format }: { readonly leaf: SpendLeaf; readonly format: (value: number) => string }) {
+function LeafDetail({
+  leaf,
+  format,
+  period,
+  capped,
+}: {
+  readonly leaf: SpendLeaf
+  readonly format: (value: number) => string
+  readonly period: string
+  readonly capped: boolean
+}) {
   const lineRef = React.useRef<SVGPolylineElement>(null)
   const fillRef = React.useRef<SVGPolygonElement>(null)
   const capRef = React.useRef<HTMLSpanElement>(null)
@@ -476,9 +493,16 @@ function LeafDetail({ leaf, format }: { readonly leaf: SpendLeaf; readonly forma
   }, [capRatio])
 
   return (
-    <div className="dshx:grid dshx:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] dshx:items-end dshx:gap-4 dshx:px-4 dshx:pt-3 dshx:pb-3 dshx:@max-pane-narrow:grid-cols-1">
+    <div
+      className={cn(
+        'dshx:grid dshx:items-end dshx:gap-4 dshx:px-4 dshx:pt-3 dshx:pb-3',
+        series.length > 1 ? 'dshx:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] dshx:@max-pane-narrow:grid-cols-1' : 'dshx:grid-cols-1',
+      )}
+    >
       <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-        <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{leaf.label} · month to date</span>
+        <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
+          {leaf.label} · {period}
+        </span>
         <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
           <RollingNumber value={leaf.amount} format={format} className="dshx:text-2xl dshx:font-semibold dshx:tracking-tight dshx:text-foreground" />
           {leaf.trend !== undefined ? <TrendChip trend={leaf.trend} suffix=" vs last" /> : null}
@@ -497,26 +521,28 @@ function LeafDetail({ leaf, format }: { readonly leaf: SpendLeaf; readonly forma
               <span className="dshx:text-muted-foreground">{format(leaf.cap)}</span>
             </span>
           </div>
-        ) : (
+        ) : capped ? (
           <span className="dshx:text-[10px] dshx:text-muted-foreground">No monthly cap set</span>
-        )}
+        ) : null}
       </div>
-      <svg
-        viewBox={`-4 0 ${width + 8} ${height}`}
-        preserveAspectRatio="none"
-        className="dshx:h-12 dshx:w-full dshx:overflow-visible dshx:text-foreground"
-        aria-hidden
-      >
-        <defs>
-          <linearGradient id={`spend-fill-${leaf.id}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="currentColor" stopOpacity={0.14} />
-            <stop offset="100%" stopColor="currentColor" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <polygon ref={fillRef} points={series.length > 1 ? `0,${height} ${line} ${width},${height}` : ''} fill={`url(#spend-fill-${leaf.id})`} />
-        <polyline ref={lineRef} points={line} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
-        {lastPoint ? <circle cx={lastPoint[0]} cy={lastPoint[1]} r={2.5} fill="currentColor" /> : null}
-      </svg>
+      {series.length > 1 ? (
+        <svg
+          viewBox={`-4 0 ${width + 8} ${height}`}
+          preserveAspectRatio="none"
+          className="dshx:h-12 dshx:w-full dshx:overflow-visible dshx:text-foreground"
+          aria-hidden
+        >
+          <defs>
+            <linearGradient id={`spend-fill-${leaf.id}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="currentColor" stopOpacity={0.14} />
+              <stop offset="100%" stopColor="currentColor" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <polygon ref={fillRef} points={series.length > 1 ? `0,${height} ${line} ${width},${height}` : ''} fill={`url(#spend-fill-${leaf.id})`} />
+          <polyline ref={lineRef} points={line} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+          {lastPoint ? <circle cx={lastPoint[0]} cy={lastPoint[1]} r={2.5} fill="currentColor" /> : null}
+        </svg>
+      ) : null}
     </div>
   )
 }

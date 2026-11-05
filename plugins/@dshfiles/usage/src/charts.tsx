@@ -13,6 +13,7 @@ import { JevUsageCard } from './jev-usage-card.js'
 import type { RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 import { UsageBreakdownTable, UsageCalendar } from './usage-history.js'
+import { UsageSpendMap } from './usage-spend-map.js'
 
 const DAY_MS = UsageBucketsModel.DAY_MS
 const CHART_HEIGHT = 220
@@ -399,6 +400,7 @@ export const UsageCharts = (props: {
         />
       </Panel>
 
+      <UsageSpendMap view={view} range={props.range} groupBy={props.groupBy} onGroupBy={props.onGroupBy} onShowRequests={props.onShowRequests} />
       <UsageBreakdownTable view={view} groupBy={props.groupBy} onShowRequests={props.onShowRequests} />
       <UsageCalendar view={view} range={props.range} />
 
