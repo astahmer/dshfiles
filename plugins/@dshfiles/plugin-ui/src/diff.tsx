@@ -1,6 +1,6 @@
 import { getFiletypeFromFileName, parsePatchFiles, type FileDiffMetadata } from '@pierre/diffs'
 import { FileDiff, Virtualizer } from '@pierre/diffs/react'
-import { useEffect, useMemo, useRef, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useSyncExternalStore, type ComponentProps, type CSSProperties, type ReactNode } from 'react'
 import { cn } from './lib/utils.js'
 import { bundledLanguages } from './shiki-slim.js'
 
@@ -47,6 +47,8 @@ const withHighlightableLanguage = (file: FileDiffMetadata): FileDiffMetadata => 
   return language === 'text' || language in bundledLanguages ? file : { ...file, lang: 'text' }
 }
 
+type DiffOptions = NonNullable<ComponentProps<typeof FileDiff>['options']>
+
 const isDarkTheme = (): boolean => document.body.hasAttribute('data-ds-dark-theme')
 
 /** Follows the DSH theme switch (`body[data-ds-dark-theme]`), which is not a `prefers-color-scheme` signal. */
@@ -79,6 +81,29 @@ export const PatchView = (props: PatchViewProps): JSX.Element => {
     root.current?.querySelector(`[data-diff-path="${CSS.escape(props.focusPath)}"]`)?.scrollIntoView({ block: 'start' })
   }, [files, props.focusPath])
 
+  /** Line selection is offered only when the caller handles it. */
+  const diffOptions = (file: FileDiffMetadata): DiffOptions => {
+    const base: DiffOptions = {
+      diffStyle: layout,
+      themeType: dark ? 'dark' : 'light',
+      theme: { dark: 'pierre-dark', light: 'pierre-light' },
+      stickyHeader: true,
+      hunkSeparators: 'line-info',
+      overflow: 'scroll',
+    }
+    if (props.onLineSelection === undefined) return base
+    return {
+      ...base,
+      enableLineSelection: true,
+      onLineSelectionEnd: range => {
+        if (range === null) return
+        const start = Math.min(range.start, range.end)
+        const end = Math.max(range.start, range.end)
+        props.onLineSelection?.({ file, start, end, side: (range.endSide ?? range.side) === 'deletions' ? 'deletions' : 'additions' })
+      },
+    }
+  }
+
   if (files.length === 0) return <>{props.empty ?? null}</>
 
   return (
@@ -88,25 +113,7 @@ export const PatchView = (props: PatchViewProps): JSX.Element => {
           <div data-diff-path={file.name} key={`${file.prevName ?? ''}\u0000${file.name}`}>
             <FileDiff
               fileDiff={file}
-              options={{
-                diffStyle: layout,
-                themeType: dark ? 'dark' : 'light',
-                theme: { dark: 'pierre-dark', light: 'pierre-light' },
-                stickyHeader: true,
-                hunkSeparators: 'line-info',
-                overflow: 'scroll',
-                ...(props.onLineSelection === undefined
-                  ? {}
-                  : {
-                      enableLineSelection: true,
-                      onLineSelectionEnd: range => {
-                        if (range === null) return
-                        const start = Math.min(range.start, range.end)
-                        const end = Math.max(range.start, range.end)
-                        props.onLineSelection?.({ file, start, end, side: (range.endSide ?? range.side) === 'deletions' ? 'deletions' : 'additions' })
-                      },
-                    }),
-              }}
+              options={diffOptions(file)}
               renderHeaderMetadata={file => props.renderHeaderMetadata?.(file)}
               renderHeaderPrefix={file => props.renderHeaderPrefix?.(file)}
             />
