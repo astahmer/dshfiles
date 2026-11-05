@@ -5,6 +5,7 @@ import { createEditor } from 'lexical'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
 import type { ComposerBarProps } from './native/contract/slots.ts'
 import type { InputState } from './native/contract/input.ts'
@@ -57,6 +58,8 @@ const barProps = (overrides: Partial<ComposerBarProps>, queue: InputState['queue
     awaitingFirstTurn: false,
   }
   const input: InputState = { draft: '', attachmentIds: [], draftRev: 0, phase: 'plain', occurrences: [], queue }
+  // SAFETY: the bar renders only the paths these tests exercise, which read the props listed here; the global
+  // standard props the composition root also supplies (sessions, remote access, …) are never read by InputBar's run row.
   return {
     sessionId,
     useSession: selected(session),
@@ -100,8 +103,10 @@ const barProps = (overrides: Partial<ComposerBarProps>, queue: InputState['queue
     useMenuLauncher: selected(null),
     useStopShortcut: selected([]),
     // Each seat renders a marker so the test can see where the bar placed it.
-    renderSlot: ((name: string) => <i data-seat={name} />) as unknown as ComposerBarProps['renderSlot'],
+    // SAFETY: InputBar only calls renderSlot(key, owner) and renders the node it returns; a marker per key needs no owner props.
+    renderSlot: ((name: string) => <i data-seat={name} />) as ComposerBarProps['renderSlot'],
     SessionProvider: props => props.children,
+    // SAFETY: the bar only translates the keys it renders here; this stub echoes the key or the queued count.
     t: ((key: string, params?: Record<string, string>) => (params?.count === undefined ? key : `${params.count} queued`)) as ComposerBarProps['t'],
     ...overrides,
   } as ComposerBarProps
@@ -138,7 +143,13 @@ describe('composer run row', () => {
   })
 
   it('collapses to a summary chip on the meter line once the thread has started', () => {
-    const queue = [{ id: 'q1' }, { id: 'q2' }] as unknown as InputState['queue']
+    const queued = (id: string): InputState['queue'][number] => ({
+      id: MessageId(id),
+      role: 'user',
+      source: { kind: 'user' },
+      content: [{ type: 'text', text: id }],
+    })
+    const queue: InputState['queue'] = [queued('q1'), queued('q2')]
     const element = mount(barProps({ variant: 'composer', runSummary: <span data-run-summary="">sample · Local</span> }, queue))
     expect(element.querySelector('[data-run-row]')).toBeNull()
     const meter = element.querySelector('[data-meter-line]')
