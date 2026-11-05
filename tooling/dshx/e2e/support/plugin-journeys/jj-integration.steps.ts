@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsNavEntry } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsNavEntry, settingsPage } from '../steps.js'
 import { selectModelForNewThread } from '../threads.js'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
@@ -200,6 +200,44 @@ const chooseWorkspace = async (page: Page, choice: 'Own workspace' | 'In place')
     await page.getByRole('option', { name: new RegExp(`^${choice}`) }).click({ timeout: 3_000 })
   }).toPass({ timeout: 20_000 })
 }
+/**
+ * The sidebar's thread list. The rail shows it under its Threads destination only, and a step that set up an account
+ * leaves the rail on Settings, so a user (and this journey) picks Threads first.
+ */
+const threadList = async (page: Page) => {
+  const railThreads = page.getByRole('navigation', { name: 'Destinations', exact: true }).getByRole('tab', { name: 'Threads', exact: true })
+  if ((await railThreads.count()) > 0 && (await railThreads.getAttribute('aria-selected')) !== 'true') await railThreads.click()
+  return page.getByRole('region', { name: 'Threads', exact: true })
+}
+
+/**
+ * Settings › Thread workspaces is the page settings-shell generates from jj-integration's settings; its
+ * `isolateByDefault` switch decides whether a New thread starts in its own jj workspace. Closing Settings returns to
+ * the screen it was opened from.
+ */
+const setIsolateByDefault = async (page: Page, isolate: boolean): Promise<void> => {
+  await openSettingsDialog(page)
+  await settingsNavEntry(page, 'Thread workspaces').click()
+  const isolateByDefault = page.locator('[data-settings-namespace="jj-integration"] [data-setting-path="isolateByDefault"]').getByRole('switch')
+  if ((await isolateByDefault.getAttribute('aria-checked')) !== String(isolate)) await isolateByDefault.click()
+  await expect(isolateByDefault).toHaveAttribute('aria-checked', String(isolate))
+  await closeSettings(page)
+}
+
+const closeSettings = async (page: Page): Promise<void> => {
+  // Beside main-tabs, Settings is a tab like any other: the next step leaves it by opening a thread.
+  if ((await page.getByRole('tablist', { name: 'Open views', exact: true }).count()) > 0) return
+  const settings = settingsPage(page)
+  await page.keyboard.press('Escape')
+  // settings-shell draws its own close button in the stage.
+  if (await settings.isVisible())
+    await settings
+      .getByRole('button', { name: /^Close/u })
+      .first()
+      .click()
+  await expect(settings).toBeHidden()
+}
+
 const rebaseButton = (page: Page) => page.getByRole('button', { name: 'Land this thread on main', exact: true })
 /** The same land action, one click from the answer: the row the newest completed turn renders. */
 const turnEndIntegrateOffer = (page: Page) => page.getByTestId('jj-inline-integrate-offer')
@@ -322,11 +360,14 @@ When('a disposable git-only repository is chosen as the New thread project', asy
 
 Then('the destination bar offers the main branch in the shared git checkout', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
-  await recordAssertion(page, 'jj-integration-git-destination-starts-on-main', () =>
-    expect(page.getByRole('button', { name: 'main', exact: true })).toBeVisible(),
-  )
+  // The run row's Workspace segment lists the branches a thread can start from, as it lists jj bookmarks.
+  await recordAssertion(page, 'jj-integration-git-destination-starts-on-main', async () => {
+    await workspaceToggle(page).click()
+    await expect(page.getByRole('option', { name: 'main', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+  })
   await recordAssertion(page, 'jj-integration-git-destination-defaults-to-the-shared-checkout', async () => {
-    await expect(workspaceToggle(page)).not.toBeChecked()
+    await expectOwnWorkspace(page, false)
     expect(gitWorktreePaths(repository)).toEqual([repository.repositoryPath])
     expect(existsSync(join(repository.repositoryPath, '.jj'))).toBe(false)
   })
@@ -337,8 +378,7 @@ Then('the New thread runs in its own git worktree on main', async ({ page }: { p
   const threadName = await currentThreadName(page)
   const worktree = join(repository.threadsPath, threadName)
   await recordAssertion(page, 'jj-integration-git-thread-is-a-worktree-on-main', async () => {
-    await expect(workspaceToggle(page)).toBeChecked()
-    await expect(page.getByRole('button', { name: 'main', exact: true })).toBeVisible()
+    await expectOwnWorkspace(page, true, 'main')
     await expect.poll(() => gitWorktreePaths(repository)).toContain(worktree)
     expect(gitAt(worktree, repository.temporaryRoot, ['rev-parse', '--abbrev-ref', 'HEAD']).trim()).toBe(`dsh/${threadName}`)
     expect(gitAt(worktree, repository.temporaryRoot, ['rev-parse', 'HEAD']).trim()).toBe(repository.baseCommitId)
@@ -400,7 +440,9 @@ Then('the untouched New chat offers configured main with workspace checked', asy
     await expect(projectButton(page)).toHaveText('repo')
     await expectOwnWorkspace(page, true, 'main')
     await expect(workspaceToggle(page)).toBeEnabled()
-    expect(workspaceNames(repositoryFor(page))).toEqual(['default'])
+    // Turning isolation on prewarms a spare for the next thread; it is listed by jj before the Host records it as a
+    // spare, so wait for that record instead of mistaking the spare for a workspace this untouched draft claimed.
+    await expect.poll(() => workspaceNames(repositoryFor(page))).toEqual(['default'])
   })
 })
 
@@ -441,14 +483,13 @@ Then('existing threads and the feature checkout are unchanged', async ({ page }:
     expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
     expect(commitIdOf(repository, `${configured.name}@`)).toBe(configured.commitId)
     // The row's hover actions cover its centre; activate the title at the unobstructed left edge.
-    await page
-      .getByRole('region', { name: 'Threads' })
-      .getByRole('button', { name: /background new thread e2e/u })
-      .click({ position: { x: 24, y: 16 } })
+    await (await threadList(page)).getByRole('button', { name: /background new thread e2e/u }).click({ position: { x: 24, y: 16 } })
     await expect.poll(() => new URL(page.url()).searchParams.get('thread')).toBe(sessionId)
     const header = page.getByRole('button', { name: /^Workspace actions for / })
     await expect(header).toBeVisible()
-    await expect(header).toHaveAttribute('title', repository.repositoryPath)
+    // The shared-checkout header names its folder; the full path is its tooltip.
+    await header.hover()
+    await expect(page.getByRole('tooltip')).toHaveText(repository.repositoryPath)
   })
   await finishJourneyAssertions(page)
 })
@@ -568,6 +609,12 @@ Then('the thread header names the shared project checkout', async ({ page }: { p
 })
 
 When('the current thread workspace chip is hovered', async ({ page }: { page: Page }) => {
+  // The menu stays open after a step read it, and an open menu suppresses the hover preview: close it first. Escape
+  // dismisses the topmost layer, which can be the tooltip of the menu row that holds focus, so repeat it.
+  await expect(async () => {
+    if (await workspaceMenu(page).isVisible()) await page.keyboard.press('Escape')
+    await expect(workspaceMenu(page)).toBeHidden({ timeout: 1_000 })
+  }).toPass({ timeout: 10_000 })
   await page.getByRole('button', { name: `Current thread workspace: ${provisionedThreadName(page)}`, exact: true }).hover()
   await expect(page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true })).toBeHidden()
 })
@@ -658,21 +705,11 @@ Then('the project opens with its saved draft {string}', async ({ page }: { page:
 })
 
 When('new threads start in the shared checkout by default', async ({ page }: { page: Page }) => {
-  await openSettingsDialog(page)
-  await settingsNavEntry(page, 'New thread').click()
-  const isolateByDefault = page.getByRole('switch', { name: 'Own jj workspace by default', exact: true })
-  if (await isolateByDefault.isChecked()) await isolateByDefault.click()
-  await expect(isolateByDefault).not.toBeChecked()
-  await page.keyboard.press('Escape')
+  await setIsolateByDefault(page, false)
 })
 
 When('new threads start in their own jj workspace by default', async ({ page }: { page: Page }) => {
-  await openSettingsDialog(page)
-  await settingsNavEntry(page, 'New thread').click()
-  const isolateByDefault = page.getByRole('switch', { name: 'Own jj workspace by default', exact: true })
-  await isolateByDefault.click()
-  await expect(isolateByDefault).toBeChecked()
-  await page.keyboard.press('Escape')
+  await setIsolateByDefault(page, true)
 })
 
 When('a first message is sent from the shared checkout', async ({ page }: { page: Page }) => {
@@ -682,12 +719,12 @@ When('a first message is sent from the shared checkout', async ({ page }: { page
   await composer.fill('background new thread e2e\n\n[[title background new thread e2e]]')
   await composer.press('Enter')
   // The first send also creates the session and its workspace; on a loaded machine that outlasts the 15s default.
-  await expect(page.getByRole('region', { name: 'Threads' }).getByRole('button', { name: /background new thread e2e/u })).toBeVisible({ timeout: 45_000 })
+  await expect((await threadList(page)).getByRole('button', { name: /background new thread e2e/u })).toBeVisible({ timeout: 45_000 })
 })
 
 When('New thread is clicked in the sidebar', async ({ page }: { page: Page }) => {
-  await page.getByRole('region', { name: 'Threads' }).waitFor()
-  await page.getByRole('button', { name: 'New thread', exact: true }).first().click()
+  await (await threadList(page)).waitFor()
+  await ThreadSidebarJourney.newThreadButton(page).click()
 })
 
 When('New thread is opened from the main-tabs plus page', async ({ page }: { page: Page }) => {
@@ -819,7 +856,8 @@ When('the New thread destination lookup is held', async ({ page }: { page: Page 
 
 When('Backlog is selected while the destination lookup is held', async ({ page }: { page: Page }) => {
   await expect.poll(heldDestinationLookupFor(page).wasRequested).toBe(true)
-  await page.getByRole('navigation', { name: 'Sidebar navigation', exact: true }).getByRole('button', { name: 'Backlog', exact: true }).click()
+  // The rail keeps Backlog under Work; openGlobalPanel picks it wherever the layout seats it.
+  await openGlobalPanel(page, 'Backlog')
   await expect(page.getByRole('tab', { name: 'Backlog', exact: true })).toHaveAttribute('aria-selected', 'true')
 })
 
@@ -1143,9 +1181,9 @@ When('the thread is settled from the rebase notice', async ({ page }: { page: Pa
 })
 
 Then('the thread appears in the Settled sidebar section', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'All threads', exact: true }).click()
+  await (await threadList(page)).getByRole('button', { name: 'All threads', exact: true }).click()
   await ThreadSidebarJourney.arrangeManually(page)
-  const settledSection = page.getByRole('region', { name: 'Threads', exact: true }).getByRole('button', { name: 'Settled (1)', exact: true })
+  const settledSection = (await threadList(page)).getByRole('button', { name: 'Settled (1)', exact: true })
   await recordAssertion(page, 'jj-integration-rebased-thread-can-be-settled-from-notice', () => expect(settledSection).toBeVisible())
   await finishJourneyAssertions(page)
 })
@@ -1266,7 +1304,7 @@ When('the integration is queued from the workspace menu', async ({ page }: { pag
 
 Then('the thread shows the queued integration notice with Undo', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
-  await page.getByRole('button', { name: 'All threads', exact: true }).click()
+  await (await threadList(page)).getByRole('button', { name: 'All threads', exact: true }).click()
   await recordAssertion(page, 'jj-integration-queued-integration-shows-undo', async () => {
     const notice = page.getByTestId('jj-thread-integration-queued-notice')
     await expect(notice).toContainText('Landing on main queued')
