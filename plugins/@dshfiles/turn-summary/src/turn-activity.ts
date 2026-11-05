@@ -34,6 +34,31 @@ export interface CommandRun {
   readonly outcome: string | undefined
 }
 
+/** Lines added and removed, by one edit or across a turn. */
+export interface LineCounts {
+  readonly added: number
+  readonly removed: number
+}
+
+/** The edit-tool argument fields line counting reads; the model wrote them, so each stays unparsed until read. */
+interface EditArgumentsData {
+  readonly content?: unknown
+  readonly edits?: unknown
+  readonly old_string?: unknown
+  readonly old_str?: unknown
+  readonly new_string?: unknown
+  readonly new_str?: unknown
+}
+
+/** One `apply_patch` edit's replaced and replacing text. */
+interface PatchEditData {
+  readonly old?: unknown
+  readonly new?: unknown
+}
+
+const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null
+const readString = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined)
+
 /** Test counts from the last test-runner summary a command printed this turn (Vitest, Jest or pytest). */
 export interface TestCounts {
   readonly passed: number
@@ -154,7 +179,7 @@ export class TurnActivity {
   }
 
   /** Lines added and removed across a turn's edits. */
-  static lineTotals(summary: TurnActivitySummary): { readonly added: number; readonly removed: number } {
+  static lineTotals(summary: TurnActivitySummary): LineCounts {
     return summary.editedFileStats.reduce((sum, file) => ({ added: sum.added + file.added, removed: sum.removed + file.removed }), { added: 0, removed: 0 })
   }
 
@@ -163,22 +188,22 @@ export class TurnActivity {
    * `str_replace_editor` / each `apply_patch` edit with their shared leading and trailing lines dropped, or the whole
    * content of a `write` (counted as added; the file it replaced is not in the call).
    */
-  static editLines(tool: string, argumentsText: string): { readonly added: number; readonly removed: number } {
+  static editLines(tool: string, argumentsText: string): LineCounts {
     let parsed: unknown
     try {
       parsed = JSON.parse(argumentsText)
     } catch {
       return { added: 0, removed: 0 }
     }
-    const text = (value: unknown, key: string): string | undefined => {
-      const found: unknown = typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined
-      return typeof found === 'string' ? found : undefined
-    }
-    if (tool === 'write') return { added: TurnActivity.lineCount(text(parsed, 'content') ?? ''), removed: 0 }
+    const args: EditArgumentsData = isObject(parsed) ? parsed : {}
+    if (tool === 'write') return { added: TurnActivity.lineCount(readString(args.content) ?? ''), removed: 0 }
     const pairs: (readonly [string, string])[] = []
-    const edits: unknown = typeof parsed === 'object' && parsed !== null ? Reflect.get(parsed, 'edits') : undefined
-    if (Array.isArray(edits)) for (const edit of edits) pairs.push([text(edit, 'old') ?? '', text(edit, 'new') ?? ''])
-    else pairs.push([text(parsed, 'old_string') ?? text(parsed, 'old_str') ?? '', text(parsed, 'new_string') ?? text(parsed, 'new_str') ?? ''])
+    if (Array.isArray(args.edits)) {
+      for (const candidate of args.edits) {
+        const edit: PatchEditData = isObject(candidate) ? candidate : {}
+        pairs.push([readString(edit.old) ?? '', readString(edit.new) ?? ''])
+      }
+    } else pairs.push([readString(args.old_string) ?? readString(args.old_str) ?? '', readString(args.new_string) ?? readString(args.new_str) ?? ''])
     return pairs.reduce(
       (sum, [before, after]) => {
         const lines = TurnActivity.diffLines(before, after)
@@ -206,7 +231,7 @@ export class TurnActivity {
     return text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
   }
 
-  private static diffLines(before: string, after: string): { readonly added: number; readonly removed: number } {
+  private static diffLines(before: string, after: string): LineCounts {
     const old = before === '' ? [] : before.split('\n')
     const next = after === '' ? [] : after.split('\n')
     let start = 0
