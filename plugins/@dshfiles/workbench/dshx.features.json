@@ -649,6 +649,17 @@
           "featureFile": "tooling/dshx/e2e/features/workbench-thread-facets.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "workbench.thread-facets-closed-tab",
+          "featureFile": "tooling/dshx/e2e/features/workbench-thread-facets.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.thread-facets-closed-tab-body",
+          "file": "plugins/@dshfiles/workbench/src/resource-panel-host.test.tsx",
+          "testName": "shows a facet page as no thread once its thread tab closes, and its body again when the tab reopens"
+        },
+        {
           "kind": "unit-test",
           "id": "workbench.thread-facets-launchers",
           "file": "plugins/@dshfiles/workbench/src/thread-facets.test.tsx",

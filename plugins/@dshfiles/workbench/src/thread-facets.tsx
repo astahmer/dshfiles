@@ -64,9 +64,14 @@ export class ThreadFacets {
       getSnapshot: () => {
         const mounted = input.mounted.getSnapshot()
         const open = input.open.getSnapshot()
-        return mounted === undefined || open === undefined || open.includes(mounted) ? mounted : undefined
+        return mounted === undefined || ThreadFacets.hasOpenTab(mounted, open) ? mounted : undefined
       },
     }
+  }
+
+  /** Whether a thread still has an open thread tab; always true while the Workbench tabs do not own the main region. */
+  static hasOpenTab(sessionId: string, open: readonly string[] | undefined): boolean {
+    return open === undefined || open.includes(sessionId)
   }
 
   /** Whether a projected native record is a facet page that should follow the on-screen thread. */

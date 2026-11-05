@@ -23,7 +23,14 @@ import { demoPanels } from './demo-panels.js'
 import { workbenchRegions, type WorkbenchRegionId } from './dock-regions.js'
 import { createLayoutStore, WorkbenchLayout, WORKBENCH_COMPONENT } from './layout-store.js'
 import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
-import { workbenchPanels, NativeAsideOwners, panelTabTitle, type WORKBENCH_MAIN_PANEL_ID, type WorkbenchPanelDefinition } from './registry.js'
+import {
+  workbenchPanels,
+  NativeAsideOwners,
+  panelTabTitle,
+  type WORKBENCH_MAIN_PANEL_ID,
+  type ThreadFacetObservable,
+  type WorkbenchPanelDefinition,
+} from './registry.js'
 import { PanelTitles } from './panel-titles.js'
 import { createDockPaneActions, migrateDockVisibility, rightPaneVisibility } from './right-panel-mode.js'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
@@ -39,7 +46,7 @@ import { WorkbenchTabDocking, workbenchTabs } from './tabs.js'
 import { canMovePanelToRegion, createNestedSurfaceRegistry, type NestedSurfaceProps } from './nested-surfaces.js'
 import { decodeNestedSurfacePath, nestedLayoutStores } from './layout-store.js'
 import { sidebarResourcePanels, type SidebarResourcePanel } from '@dshfiles/sidebar-right/resource-panels'
-import { ResourcePanelHost } from './resource-panel-host.js'
+import { createResourcePanelHost } from './resource-panel-host.js'
 import { createWorkbenchTerminalSource } from './terminal-source.js'
 import { createNativePageAdmission } from './native-page-admission.js'
 import { ThreadFacets } from './thread-facets.js'
@@ -99,26 +106,24 @@ export default defineClient({
     }, 'workbench: native terminal launcher')
     const facetAdmission = createNativePageAdmission(sidebarResourcePanels(), registry)
     const facetThread = threadOnScreen({ mounted: ctx.sidebarRight.mounted, sessionDrafts: () => ctx.get('sessionDrafts') })
+    const openThreadTabs: ThreadFacetObservable<readonly string[] | undefined> = {
+      subscribe: listener => {
+        const offTabs = workbenchTabs().subscribe(listener)
+        const offMode = ctx.get('mainSurface')?.subscribe(listener)
+        return () => {
+          offTabs()
+          offMode?.()
+        }
+      },
+      getSnapshot: () => {
+        const tabs = workbenchTabs().getSnapshot()
+        if (ctx.get('mainSurface')?.mode() !== 'workbench' || !tabs.enabled) return undefined
+        return tabs.tabs.flatMap(tab => (tab.target.kind === 'thread' ? [tab.target.sessionId] : []))
+      },
+    }
     const threadFacets = ThreadFacets.create({
       guide: { subscribe: listener => ctx.sidebarRightTabs.subscribe(listener), getSnapshot: () => ctx.sidebarRightTabs.guide() },
-      onScreen: ThreadFacets.threadOnScreen({
-        mounted: facetThread,
-        open: {
-          subscribe: listener => {
-            const offTabs = workbenchTabs().subscribe(listener)
-            const offMode = ctx.get('mainSurface')?.subscribe(listener)
-            return () => {
-              offTabs()
-              offMode?.()
-            }
-          },
-          getSnapshot: () => {
-            const tabs = workbenchTabs().getSnapshot()
-            if (ctx.get('mainSurface')?.mode() !== 'workbench' || !tabs.enabled) return undefined
-            return tabs.tabs.flatMap(tab => (tab.target.kind === 'thread' ? [tab.target.sessionId] : []))
-          },
-        },
-      }),
+      onScreen: ThreadFacets.threadOnScreen({ mounted: facetThread, open: openThreadTabs }),
       registry,
       admission: facetAdmission,
     })
@@ -672,6 +677,15 @@ export default defineClient({
 
     /** Native resource records the Workbench presents, by panel id; the resource effect below owns their lifetime. */
     const resourceRegistrations = new Map<string, { dispose: () => void; revision: number; record: SidebarResourcePanel }>()
+    /** An open facet page whose thread tab closed reads as no thread, by the same rule as Choose a view. */
+    const FacetAwareResourcePanel = createResourcePanelHost({
+      subscribe: openThreadTabs.subscribe,
+      shows: panelId => {
+        const record = resourceRegistrations.get(panelId)?.record
+        if (record === undefined || !threadFacets.follows(record)) return true
+        return ThreadFacets.hasOpenTab(record.sessionId, openThreadTabs.getSnapshot())
+      },
+    })
     /**
      * A facet the on-screen thread already shows (one page per kind) moves into the chooser's group instead of opening
      * a second copy; the native owner would only reveal its existing page and leave the chooser in place.
@@ -856,7 +870,7 @@ export default defineClient({
           const dispose = registry.register({
             id: resource.id,
             title: resource.title,
-            component: ResourcePanelHost,
+            component: FacetAwareResourcePanel,
             hiddenFromAdd: true,
             beforeClose: () => resources.close(resource.id),
           })

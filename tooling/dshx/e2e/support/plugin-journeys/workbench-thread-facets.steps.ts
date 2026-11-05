@@ -43,22 +43,48 @@ When('the {string} pane opens the {string} thread facet from its view chooser', 
   await expect(facetBodies(target)).toHaveCount(before + 1)
 })
 
-Then('the {string} pane shows the {string} and {string} facets for the thread on screen', async ({ page }: { page: Page }, regionName: string, first: string, second: string) => {
-  const region = regionOf(regionName)
-  const target = pane(page, region)
-  const sessionId = threadOnScreen(page)
-  if (sessionId === null) throw new Error('No thread is on screen')
-  const check = (boundChecks.get(page) ?? 0) + 1
-  boundChecks.set(page, check)
-  await recordAssertion(page, check === 1 ? 'thread-facets-bound-to-first-thread' : 'thread-facets-follow-the-next-thread', async () => {
-    await expect(target).toBeVisible()
-    for (const title of [first, second]) await expect(target.getByRole('tab', { name: title, exact: true })).toHaveCount(1)
-    // Every facet body in the pane renders for the thread on screen, through its sessionId.
-    await expect
-      .poll(async () => (await facetBodies(target).evaluateAll(bodies => bodies.map(body => body.getAttribute('data-sidebar-right-session')))).join(','))
-      .toBe([sessionId, sessionId].join(','))
-  })
+Then(
+  'the {string} pane shows the {string} and {string} facets for the thread on screen',
+  async ({ page }: { page: Page }, regionName: string, first: string, second: string) => {
+    const region = regionOf(regionName)
+    const target = pane(page, region)
+    const sessionId = threadOnScreen(page)
+    if (sessionId === null) throw new Error('No thread is on screen')
+    const check = (boundChecks.get(page) ?? 0) + 1
+    boundChecks.set(page, check)
+    await recordAssertion(page, check === 1 ? 'thread-facets-bound-to-first-thread' : 'thread-facets-follow-the-next-thread', async () => {
+      await expect(target).toBeVisible()
+      for (const title of [first, second]) await expect(target.getByRole('tab', { name: title, exact: true })).toHaveCount(1)
+      // Every facet body in the pane renders for the thread on screen, through its sessionId.
+      await expect
+        .poll(async () => (await facetBodies(target).evaluateAll(bodies => bodies.map(body => body.getAttribute('data-sidebar-right-session')))).join(','))
+        .toBe([sessionId, sessionId].join(','))
+    })
+  },
+)
+
+When('the tab of the thread on screen is closed', async ({ page }: { page: Page }) => {
+  const main = pane(page, 'main')
+  const active = main.locator('[role="tab"][aria-selected="true"]').filter({ visible: true }).first()
+  const close = active.getByRole('button', { name: /^Close /u })
+  const label = await close.getAttribute('aria-label')
+  if (label === null) throw new Error('The thread tab has no close button')
+  await active.hover()
+  await close.click()
+  await expect(main.getByRole('button', { name: label, exact: true })).toHaveCount(0)
 })
+
+Then(
+  'the {string} pane shows the {string} and {string} facets without a thread',
+  async ({ page }: { page: Page }, regionName: string, first: string, second: string) => {
+    const target = pane(page, regionOf(regionName))
+    await recordAssertion(page, 'thread-facets-empty-after-thread-tab-closed', async () => {
+      for (const title of [first, second]) await expect(target.getByRole('tab', { name: title, exact: true })).toHaveCount(1)
+      await expect(target.getByRole('status').filter({ hasText: 'Open a thread' }).filter({ visible: true })).toHaveCount(1)
+      await expect(facetBodies(target).filter({ visible: true })).toHaveCount(0)
+    })
+  },
+)
 
 When('another thread comes on screen', async ({ page }: { page: Page }) => {
   const previous = threadOnScreen(page)
