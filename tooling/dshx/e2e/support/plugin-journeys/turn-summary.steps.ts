@@ -6,18 +6,37 @@ import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 
 const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const WRITE_FILE = `[[call write ${JSON.stringify({ file_path: 'notes/walkthrough.md', content: 'one two' })}]]`
 const FAILING_COMMAND = `[[call bash ${JSON.stringify({ command: 'printf "turn-summary-e2e"; exit 7', description: 'Run the failing summary fixture' })}]]`
 
-When('the fake model runs a failing bash command in a fresh workspace', async ({ page }: { page: Page }) => {
+const runInFreshWorkspace = async (page: Page, message: string): Promise<void> => {
   const root = await createScratchDirectory('dshx-turn-summary-e2e-')
   const workspace = join(root, 'turn-summary-project')
   await mkdir(workspace)
   await registerWorkspaceFolder(page, workspace)
   await startThreadWithModel(page, { project: 'turn-summary-project', model: 'commandcode_work/gpt-6-luna' })
   const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
-  await composer.fill(FAILING_COMMAND)
+  await composer.fill(message)
   await composer.press('Enter')
   await expect(page.getByText('Tool finished.', { exact: true })).toBeVisible({ timeout: 60_000 })
+}
+
+When('the fake model runs a failing bash command in a fresh workspace', async ({ page }: { page: Page }) => {
+  await runInFreshWorkspace(page, FAILING_COMMAND)
+})
+
+When('the fake model writes a file in a fresh workspace', async ({ page }: { page: Page }) => {
+  await runInFreshWorkspace(page, WRITE_FILE)
+})
+
+Then('the finished turn shows a walkthrough card naming the written file', async ({ page }: { page: Page }) => {
+  const card = page.locator('[data-dshfiles-turn-walkthrough]')
+  await recordAssertion(page, 'turn-summary-walkthrough-names-written-file', async () => {
+    await expect(card).toBeVisible({ timeout: 60_000 })
+    await expect(card).toContainText('Changed 1 file')
+    await expect(card).toContainText('walkthrough.md')
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the finished turn names the failed command and its outcome', async ({ page }: { page: Page }) => {

@@ -9,3 +9,10 @@ Feature: Tool activity appears under a finished turn
     When a Command Code account backed by a local fake provider is added
     And the fake model runs a failing bash command in a fresh workspace
     Then the finished turn names the failed command and its outcome
+
+  @scenario:turn-summary.walkthrough
+  Scenario: A turn that writes a file shows its walkthrough card
+    Given the isolated plugin composition of "@dshfiles/turn-summary, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the fake model writes a file in a fresh workspace
+    Then the finished turn shows a walkthrough card naming the written file

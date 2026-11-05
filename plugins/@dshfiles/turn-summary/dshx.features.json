@@ -109,7 +109,7 @@
       "reach": [
         "seed tool-call-thread",
         "expect text \"Tool finished.\"",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]]\"",
+        "fill textbox \"Message or run a task*\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]]\"",
         "press Enter",
         "expect text \"Changed 1 file\""
       ],
@@ -133,6 +133,11 @@
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "turn-summary.walkthrough",
+          "featureFile": "tooling/dshx/e2e/features/turn-summary.feature"
+        },
         {
           "kind": "unit-test",
           "id": "turn-summary.walkthrough-groups",
