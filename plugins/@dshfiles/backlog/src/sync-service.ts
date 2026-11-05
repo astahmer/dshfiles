@@ -5,6 +5,7 @@ import { HttpClient } from 'effect/http'
 import type { BacklogDetailView } from './api.js'
 import { BacklogSettingsTag } from './backlog-settings.js'
 import { BacklogItemNotFound, type BacklogWriteFailed } from './errors.js'
+import { BacklogOrigins } from './event-origin.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogItems, type BacklogItem, type BacklogKind } from './item.js'
 import type { BacklogSettings } from './settings.js'
@@ -383,10 +384,12 @@ export class BacklogSync extends Context.Service<
         )
         const knownLocal = new Set([...mapping.comments, ...pulledPairs].map(pair => pair.local))
         const item = yield* itemOf(mapping.itemId)
+        const pushAgentComments = rowFor((yield* settings.get).syncBackends, mapping.backend, item?.project ?? null)?.pushAgentComments === true
         const outgoing = (item?.events ?? []).flatMap(event =>
           event.kind === 'commented' &&
           event.commentId !== undefined &&
           event.actor !== 'system' &&
+          (pushAgentComments || !BacklogOrigins.isAgent(BacklogOrigins.of(event))) &&
           !knownLocal.has(event.commentId) &&
           event.at >= mapping.pushCommentsSince &&
           event.detail.trim() !== ''

@@ -370,6 +370,7 @@ const emptyRow = (backend: SyncBackendKind): BackendRow => ({
   target: '',
   secret: '',
   autoSyncMinutes: AUTO_SYNC_DEFAULT_MINUTES,
+  pushAgentComments: false,
 })
 
 const isReferenceOrEmpty = (text: string): boolean => text.trim() === '' || parseSecretReference(text.trim()) !== null
@@ -602,6 +603,10 @@ const BackendRowEditor = (props: {
           triggerClassName="dshx:w-auto dshx:min-w-0"
         />
         <div className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2">
+          <label className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs">
+            <Switch size="sm" checked={row.pushAgentComments === true} onCheckedChange={checked => props.onChange({ pushAgentComments: checked })} />
+            Push agent comments
+          </label>
           <label className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs">
             <Switch size="sm" checked={row.enabled} onCheckedChange={checked => props.onChange({ enabled: checked })} />
             Enabled

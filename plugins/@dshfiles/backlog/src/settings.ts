@@ -124,6 +124,9 @@ export const backlogSettings = defineSettings({
           .max(1_440)
           .default(0)
           .description('Sync every linked item of this project on this interval. 0 syncs only when you press Sync now.'),
+        pushAgentComments: Schema.boolean()
+          .default(false)
+          .description('Also post comments agents write on linked items to the remote issue. Off: only your own comments are posted.'),
       }),
     )
       .default([])

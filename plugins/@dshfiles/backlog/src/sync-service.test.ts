@@ -16,8 +16,24 @@ import { backlogRows, backlogStoreLayer, type BacklogTestRows } from './test-sup
 
 type Row = BacklogSettings['syncBackends'][number]
 
-const linearRow: Row = { project: '', backend: 'linear', enabled: true, target: 'ENG', secret: 'secret:LINEAR_KEY', autoSyncMinutes: 0 }
-const githubRow: Row = { project: '', backend: 'github', enabled: true, target: 'acme/app', secret: 'secret:GITHUB_KEY', autoSyncMinutes: 0 }
+const linearRow: Row = {
+  project: '',
+  backend: 'linear',
+  enabled: true,
+  target: 'ENG',
+  secret: 'secret:LINEAR_KEY',
+  autoSyncMinutes: 0,
+  pushAgentComments: false,
+}
+const githubRow: Row = {
+  project: '',
+  backend: 'github',
+  enabled: true,
+  target: 'acme/app',
+  secret: 'secret:GITHUB_KEY',
+  autoSyncMinutes: 0,
+  pushAgentComments: false,
+}
 
 const syncLayer = (input: {
   readonly client: HttpClient.HttpClient
@@ -110,6 +126,34 @@ describe('BacklogSync with Linear', () => {
       const again = yield* sync.syncNow({ id: created.item.id })
       expect(again.results[0]).toMatchObject({ state: 'synced', pulled: [], pushed: [], commentsPulled: 0, commentsPushed: 0 })
     }).pipe(Effect.provide(syncLayer({ client: linear.client })))
+  })
+
+  it.effect('keeps agent comments off the issue unless the row pushes them, and always posts the user comments', () => {
+    const agent = { kind: 'agent', sessionId: 'session-agent1' } as const
+    const pushedBodies = (rows: readonly Row[]) => {
+      const linear = fakeLinear()
+      return Effect.gen(function* () {
+        const store = yield* BacklogStore
+        const sync = yield* BacklogSync
+        linear.seed({ title: 'Remote title', description: '', type: 'unstarted', labels: [] })
+        const created = yield* store.capture({ text: 'Local title', actor: { kind: 'user' } })
+        yield* sync.link({ id: created.item.id, backend: 'linear', reference: 'ENG-1', actor: { kind: 'user' } })
+        yield* TestClock.adjust('1 minute')
+        yield* store.comment({ id: created.item.id, text: 'Agent progress note', actor: agent })
+        yield* store.comment({ id: created.item.id, text: 'User decision', actor: { kind: 'user' } })
+        const pass = yield* sync.syncNow({ id: created.item.id })
+        return { pushed: pass.results[0]?.commentsPushed, bodies: linear.find('ENG-1')?.comments.map(comment => comment.body) ?? [] }
+      }).pipe(Effect.provide(syncLayer({ client: linear.client, rows })))
+    }
+    return Effect.gen(function* () {
+      const byDefault = yield* pushedBodies([linearRow])
+      expect(byDefault.pushed).toBe(1)
+      expect(byDefault.bodies).toEqual([expect.stringContaining('User decision')])
+
+      const pushing = yield* pushedBodies([{ ...linearRow, pushAgentComments: true }])
+      expect(pushing.pushed).toBe(2)
+      expect(pushing.bodies).toEqual([expect.stringContaining('Agent progress note'), expect.stringContaining('User decision')])
+    })
   })
 
   it.effect('settles a field both sides changed by last writer wins and leaves a conflict note', () => {
