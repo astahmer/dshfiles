@@ -35,7 +35,7 @@ export default defineClient({
       }
     }
     ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 5, label: () => 'Resource Packs: Resources' }, () => (
+      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 5, label: () => 'Resources' }, () => (
         <PluginQueryProvider>
           <LayersIcon aria-hidden size={18} />
         </PluginQueryProvider>

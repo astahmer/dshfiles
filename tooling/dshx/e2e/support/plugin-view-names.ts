@@ -104,6 +104,10 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   ['Land', { destination: 'Land', section: 'Workspaces' }],
   ['Revision graph', { destination: 'Land', section: 'History' }],
   ['Source control', { destination: 'Land', section: 'Source control' }],
+  ['Board', { destination: 'Threads', section: 'Board' }],
+  ['Usage', { destination: 'Observe', section: 'Usage' }],
+  ['Hosts', { destination: 'Observe', section: 'Hosts' }],
+  ['Resources', { destination: 'Knowledge', section: 'Resources' }],
 ])
 
 /**

@@ -89,7 +89,7 @@ When('recorded session logs and a price catalog are seeded', async ({ page }: { 
 })
 
 When('the Usage analytics panel is opened on the range since {string}', async ({ page }: { page: Page }, from: string) => {
-  await openGlobalPanel(page, 'Usage: Analytics')
+  await openGlobalPanel(page, 'Usage')
   await expect(page.getByRole('heading', { name: 'Usage', exact: true, level: 1 })).toBeVisible()
   // Cost is the first tab (Phase 5: Cost · Quota · Requests · Tools); the log is Requests.
   await page.getByRole('tab', { name: 'Requests', exact: true }).click()
@@ -259,7 +259,9 @@ const openThreadFacet = async (page: Page, title: string): Promise<void> => {
 
 When('the thread of a failed request is opened from the log', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: /^Failed \d+$/ }).click()
-  await requestButton(page, /deepseek.*: open /).first().click()
+  await requestButton(page, /deepseek.*: open /)
+    .first()
+    .click()
   await expect(page.getByText('activity timeline journey turn', { exact: true }).first()).toBeVisible()
 })
 
@@ -283,7 +285,7 @@ Then("its Cost facet lists the thread's turns and links to its requests", async 
 })
 
 When('the Usage page is opened on its Quota tab', async ({ page }: { page: Page }) => {
-  await openGlobalPanel(page, 'Usage: Analytics')
+  await openGlobalPanel(page, 'Usage')
   await expect(page.getByRole('heading', { name: 'Usage', exact: true, level: 1 })).toBeVisible()
   await page.getByRole('tab', { name: 'Quota', exact: true }).click()
 })

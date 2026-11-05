@@ -383,7 +383,7 @@ export default defineClient({
         offLocale()
         unpublish()
       }
-    }, 'settings-shell: General search entries')
+    }, 'dshfiles-settings-shell: General search entries')
 
     const onboardingSteps = ledgerProjection<readonly OnboardingStep[]>(
       () =>
@@ -635,7 +635,7 @@ export default defineClient({
         </div>
       )
     }
-    ctx.effect(() => provideSettingsPageRenderer(PluginsPageSettings), 'settings-shell: Plugins page settings')
+    ctx.effect(() => provideSettingsPageRenderer(PluginsPageSettings), 'dshfiles-settings-shell: Plugins page settings')
 
     // A request that still names the retired dialog surface opens the page: there is no other place left.
     const openRequest = (request: OpenSettingsRequest): void => {

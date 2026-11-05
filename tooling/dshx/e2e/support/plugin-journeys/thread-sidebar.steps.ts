@@ -64,7 +64,7 @@ const threadBoard = (page: Page) => page.getByRole('region', { name: 'Thread boa
 /** The board is a page of its own, opened from the sidebar's panel list; a reload comes back to the thread view. */
 const openThreadBoard = async (page: Page): Promise<void> => {
   if (await threadBoard(page).isVisible()) return
-  await openGlobalPanel(page, 'Thread Sidebar: Board')
+  await openGlobalPanel(page, 'Board')
   await expect(threadBoard(page)).toBeVisible()
 }
 const sidebarNavigation = (page: Page) => page.getByRole('navigation', { name: 'Sidebar navigation' })

@@ -233,7 +233,8 @@
       "externalDependencies": [],
       "reach": [
         "seed multi-host-hosts",
-        "click button \"Multi-host: Hosts\"",
+        "click tab \"Observe\"",
+        "click button \"Hosts\"",
         "expect heading \"Hosts\"",
         "click button \"Update hosts\"",
         "expect heading \"Update hosts\"",
@@ -288,7 +289,8 @@
       "externalDependencies": [],
       "reach": [
         "seed multi-host-hosts",
-        "click button \"Multi-host: Hosts\"",
+        "click tab \"Observe\"",
+        "click button \"Hosts\"",
         "expect heading \"Hosts\"",
         "click button \"Edit Build box\"",
         "expect heading \"Edit host\"",

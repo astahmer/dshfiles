@@ -652,7 +652,7 @@ export default defineClient({
         unregister?.()
         newThreadSource.clear()
       }
-    }, 'workbench: New thread launcher')
+    }, 'dshfiles-workbench: New thread launcher')
 
     const newSemanticPanelOpener = () =>
       createSemanticPanelOpener({

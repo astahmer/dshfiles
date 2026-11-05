@@ -124,7 +124,7 @@
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "observe",
-      "currentSurface": "left-nav: Usage: Analytics › Requests",
+      "currentSurface": "left-nav: Usage › Requests",
       "configuration": [],
       "states": ["empty", "loading", "filtered", "searched", "sorted", "thread-missing"],
       "failureModes": [
@@ -169,7 +169,7 @@
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "observe",
-      "currentSurface": "left-nav: Usage: Analytics › Charts",
+      "currentSurface": "left-nav: Usage › Charts",
       "configuration": [],
       "states": [
         "empty",
@@ -229,7 +229,7 @@
       "surfaces": ["host", "storage", "integration", "client"],
       "surface": "destinationSection",
       "destination": "observe",
-      "currentSurface": "left-nav: Usage: Analytics › Charts › Jev",
+      "currentSurface": "left-nav: Usage › Charts › Jev",
       "configuration": [],
       "states": ["empty", "recorded", "failed", "missing-token-usage"],
       "failureModes": [
@@ -306,7 +306,7 @@
       "surfaces": ["client", "storage", "integration"],
       "surface": "destinationSection",
       "destination": "observe",
-      "currentSurface": "left-nav: Usage: Analytics › Tools & Jev",
+      "currentSurface": "left-nav: Usage › Tools & Jev",
       "configuration": [],
       "states": ["empty", "loading", "populated", "filtered-range", "measured-output", "unmeasured-output", "hourly-timeline", "daily-timeline"],
       "failureModes": [
