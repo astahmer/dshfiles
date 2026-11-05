@@ -23,6 +23,18 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
+  "@dshfiles/agent-plan": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
   "@dshfiles/agent-preset": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
@@ -72,6 +84,18 @@
     "syncDecodeInEffect": 0
   },
   "@dshfiles/agents": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
+  "@dshfiles/agentsview": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
     "moduleState": 0,
@@ -155,6 +179,18 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
+  "@dshfiles/capabilities-hub": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
   "@dshfiles/context-compaction": {
     "layerEmpty": 0,
     "promiseAdapters": 2,
@@ -215,6 +251,18 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
+  "@dshfiles/git-cli": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
   "@dshfiles/git-worktrees": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
@@ -231,7 +279,7 @@
     "layerEmpty": 0,
     "promiseAdapters": 0,
     "moduleState": 1,
-    "timers": 1,
+    "timers": 0,
     "childProcess": 0,
     "nodeFs": 2,
     "globalFetch": 0,
@@ -407,6 +455,18 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
+  "@dshfiles/plugin-guide": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
   "@dshfiles/policies": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
@@ -431,6 +491,18 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
+  "@dshfiles/project-automations": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
   "@dshfiles/project-checks": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
@@ -444,6 +516,18 @@
     "syncDecodeInEffect": 0
   },
   "@dshfiles/prompt-stash": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
+  "@dshfiles/pull-requests": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
     "moduleState": 0,
@@ -635,7 +719,43 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
+  "@dshfiles/thread-share": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
   "@dshfiles/thread-sidebar": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
+  "@dshfiles/thread-transfer": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
+  "@dshfiles/tool-ask-user": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
     "moduleState": 0,
@@ -743,7 +863,31 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
+  "@dshfiles/web-fetch-readable": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
   "@dshfiles/web-search-brave": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
+  "@dshfiles/whiteboard": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
     "moduleState": 0,
