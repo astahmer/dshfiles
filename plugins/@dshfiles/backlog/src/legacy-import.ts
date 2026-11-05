@@ -2,7 +2,7 @@ import { Struct } from 'effect'
 import { BacklogItems, type BacklogAttachment, type BacklogItem } from './item.js'
 import type { LegacySnapshot } from './legacy-tables.js'
 import { BacklogOps, type BacklogOp, type BacklogOpRecord, type Hlc } from './op-log.js'
-import type { SyncMapping } from './sync-model.js'
+import type { SyncMapping } from './sync-legacy-mapping.js'
 import { ulid } from './ulid.js'
 
 /** The store reads every item under its project, so the importer files it there too. */

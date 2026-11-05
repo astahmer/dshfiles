@@ -10,6 +10,9 @@ type GuardedCall =
   | { readonly tool: 'backlog_revert' }
   | { readonly tool: 'backlog_triage_backfill'; readonly limit?: number | undefined }
   | { readonly tool: 'backlog_sync_now'; readonly id?: unknown }
+  | { readonly tool: 'backlog_sync_import_all' }
+  | { readonly tool: 'backlog_sync_connection_remove' }
+  | { readonly tool: 'backlog_sync_binding_remove' }
 
 /** What the call would do without confirmation, or `undefined` when it is small enough to run as asked. */
 const guardedEffect = (call: GuardedCall): string | undefined => {
@@ -22,6 +25,12 @@ const guardedEffect = (call: GuardedCall): string | undefined => {
     }
     case 'backlog_sync_now':
       return call.id === undefined ? 'pulls status and field changes into every linked item' : undefined
+    case 'backlog_sync_import_all':
+      return 'creates a backlog item for every open remote item of the binding'
+    case 'backlog_sync_connection_remove':
+      return 'removes the connection, its bindings and every item link they hold'
+    case 'backlog_sync_binding_remove':
+      return 'removes the binding and every item link it holds'
   }
 }
 

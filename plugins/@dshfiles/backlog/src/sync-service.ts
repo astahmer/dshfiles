@@ -1,292 +1,123 @@
-import { SecretReferenceResolver, type SecretReferenceResolverError } from '@dshfiles/credential-port/effect'
 import { DshxPlugin } from '@dshfiles/dshx/effect'
-import { Cause, Clock, Context, Effect, Layer, Option, Redacted, Ref, Schedule, Semaphore } from 'effect'
-import { HttpClient } from 'effect/http'
+import { Cause, Clock, Context, Effect, Layer, Option, Ref, Schedule, Schema } from 'effect'
 import type { BacklogDetailView } from './api.js'
+import { BacklogRepo } from './backlog-repo.js'
 import { BacklogSettingsTag } from './backlog-settings.js'
-import { BacklogItemNotFound, type BacklogWriteFailed } from './errors.js'
-import { BacklogOrigins } from './event-origin.js'
 import { BacklogReference } from './backlog-reference.js'
-import { BacklogItems, type BacklogItem, type BacklogKind } from './item.js'
-import type { BacklogSettings } from './settings.js'
+import { BacklogItemNotFound, type BacklogWriteFailed } from './errors.js'
+import { BacklogItems, type BacklogItem } from './item.js'
+import { BacklogProviderFailed, type BacklogProvider, type ProviderContainer, type ProviderDescriptor, type RemoteRecord } from './provider-port.js'
+import { BacklogProviderRegistry } from './provider-registry.js'
 import { BacklogStore, type BacklogActor, type BacklogResult } from './store.js'
-import type { RemoteBackend, RemoteConnection } from './sync-backend.js'
+import { BacklogSyncEngine, SyncEngineModel, type BindingContext, type BindingPassResult, type SyncItemResult } from './sync-engine.js'
 import {
   SyncAlreadyLinked,
-  SyncBackendUnconfigured,
-  SyncCredentialMissing,
+  SyncBindingMissing,
+  SyncBindingUnknown,
+  SyncConfigInvalid,
+  SyncConfigWriteFailed,
+  SyncConnectionMissing,
   SyncItemNotLinked,
+  SyncNotOwner,
+  SyncProviderUnknown,
   SyncReferenceUnrecognized,
-  SyncRemoteRejected,
-  SyncTargetMissing,
   SyncWriteFailed,
-  type RemoteBackendError,
 } from './sync-errors.js'
-import { GithubMapping, makeGithubBackend } from './sync-github.js'
-import { makeLinearBackend } from './sync-linear.js'
-import { SyncLocalProbes } from './sync-local-probes.js'
-import { BacklogSyncModel, type RemoteIssue, type SyncBackendKind, type SyncConflict, type SyncField, type SyncMapping, type SyncState } from './sync-model.js'
-import { BacklogSyncTables } from './sync-tables.js'
+import { SyncMigration } from './sync-migration.js'
+import { BacklogSyncModel, type ExternalRef, type SyncBinding, type SyncConflict, type SyncConnection, type SyncState } from './sync-model.js'
+import { SyncSources, type StoredRef } from './sync-sources.js'
 
-type BackendRow = BacklogSettings['syncBackends'][number]
+/** Where a connection's key comes from, read without a network call. */
+export type CredentialView = 'reference' | 'environment' | 'fallback' | 'none' | 'missing'
 
-/** Host environment variables read when a row binds no key, first set wins. */
-const environmentVariables = { linear: ['LINEAR_API_KEY'], github: ['GITHUB_TOKEN', 'GH_TOKEN'] } as const satisfies Record<SyncBackendKind, readonly string[]>
+export interface ConnectionView {
+  readonly connection: SyncConnection
+  readonly providerLabel: string
+  readonly available: boolean
+  readonly credential: CredentialView
+}
 
-type CredentialSource = 'reference' | 'environment' | 'github-cli'
+export interface BindingView {
+  readonly binding: SyncBinding
+  readonly providerKind: string
+  readonly connectionLabel: string
+  readonly owned: boolean
+  readonly linked: number
+  readonly lastPassAt: number | null
+}
 
-/** A row as the settings form holds it, before it is saved. */
-export interface SyncBackendDraft {
-  readonly backend: SyncBackendKind
-  readonly project: string
-  readonly target: string
-  readonly secret: string
+/** What the agent tools and the panel read about one item's tie to one remote item. */
+export interface SyncItemView {
+  readonly itemId: number
+  readonly ref?: string
+  readonly bindingId: string
+  readonly backend: string
+  readonly connectionLabel: string
+  readonly remoteKey: string
+  readonly url: string
+  readonly state: SyncState
+  readonly lastSyncedAt: number | null
+  readonly lastError: ExternalRef['lastError']
+  readonly conflicts: readonly SyncConflict[]
+}
+
+export interface SyncStatusView {
+  readonly providers: readonly ProviderDescriptor[]
+  readonly connections: readonly ConnectionView[]
+  readonly bindings: readonly BindingView[]
+  readonly items: readonly SyncItemView[]
 }
 
 /** What Test connection answers: never the key, only where it came from and what it reaches. */
 export interface SyncConnectionTest {
   readonly ok: boolean
-  readonly credential: CredentialSource | 'missing'
+  readonly credential: 'reference' | 'environment' | 'cli' | 'none' | 'missing'
   readonly account: string | null
-  readonly target: { readonly key: string; readonly name: string } | null
-  readonly targetSource: 'setting' | 'git-remote' | 'only-team' | 'per-project' | null
-  readonly teams: readonly { readonly key: string; readonly name: string }[]
+  readonly containers: readonly ProviderContainer[]
   readonly error: { readonly code: string; readonly message: string } | null
 }
 
-/** One row's identity for the auto-sync schedule. */
-const rowKey = (row: BackendRow): string => `${row.backend}:${row.project}`
+/** A binding as a form or an agent sends it: every field but the connection of a new binding may be left out. */
+export type BindingDraft = { readonly [K in keyof Omit<SyncBinding, 'ownerHostId'>]?: SyncBinding[K] | undefined }
 
-/** The enabled row that serves a project: its own row first, then a row with an empty project. */
-const rowFor = (rows: readonly BackendRow[], backend: SyncBackendKind, project: string | null): BackendRow | undefined => {
-  const candidates = rows.filter(row => row.enabled && row.backend === backend)
-  const own = project === null ? undefined : candidates.find(row => row.project !== '' && BacklogItems.projectPath(row.project) === project)
-  return own ?? candidates.find(row => row.project === '')
+/** A new binding's defaults: two-way, every field, last writer wins, Sync now only. */
+const bindingDefaults = {
+  container: '',
+  scope: null,
+  direction: 'two-way',
+  fieldMap: BacklogSyncModel.defaultFieldMap(),
+  conflictPolicy: 'lww',
+  pollEverySec: 0,
+  pushAgentComments: false,
+  importNew: false,
+  enabled: true,
+} as const satisfies Omit<SyncBinding, 'id' | 'connectionId' | 'ownerHostId'>
+
+/** A connection as a form holds it before it is saved. */
+export interface SyncConnectionDraft {
+  readonly kind: string
+  readonly credential: string
+  readonly baseUrl: string
 }
-
-/** What the agent tools and the panel read about one linked item. */
-export interface SyncItemView {
-  readonly itemId: number
-  readonly ref?: string
-  readonly backend: SyncBackendKind
-  readonly remoteKey: string
-  readonly url: string
-  readonly state: SyncState
-  readonly lastSyncedAt: number | null
-  readonly lastError: SyncMapping['lastError']
-  readonly conflicts: readonly SyncConflict[]
-}
-
-/** What one sync pass did for one item. */
-export interface SyncItemResult {
-  readonly itemId: number
-  readonly ref?: string
-  readonly remoteKey: string | null
-  readonly state: SyncState
-  readonly pulled: readonly SyncField[]
-  readonly pushed: readonly SyncField[]
-  readonly conflicts: readonly SyncConflict[]
-  readonly commentsPulled: number
-  readonly commentsPushed: number
-  readonly error: { readonly code: string; readonly message: string } | null
-}
-
-export interface SyncBackendView {
-  readonly project: string | null
-  readonly backend: SyncBackendKind
-  readonly target: string
-  readonly enabled: boolean
-  readonly autoSyncMinutes: number
-  readonly credential: CredentialSource | 'missing'
-}
-
-export interface SyncStatusView {
-  readonly backends: readonly SyncBackendView[]
-  readonly items: readonly SyncItemView[]
-}
-
-type ConfigError = SyncBackendUnconfigured | SyncCredentialMissing | SyncTargetMissing
-type LinkError = ConfigError | RemoteBackendError | SyncAlreadyLinked | SyncWriteFailed | BacklogWriteFailed | BacklogItemNotFound
-
-const projectOfRow = (project: string): string | null => (project.trim() === '' ? null : BacklogItems.projectPath(project))
 
 const errorView = (error: { readonly _tag: string; readonly message: string }) => ({ code: error._tag.slice(0, 64), message: error.message.slice(0, 1_000) })
 
-/**
- * Opens the backend a settings row names, with its credential resolved on the Host: the bound reference, then the Host
- * environment, then (GitHub) a signed-in `gh` CLI. A GitHub row without a repository takes it from the project's git
- * remote; a Linear row without a team uses the key's only team.
- */
-export class RemoteBackends extends Context.Service<
-  RemoteBackends,
-  {
-    readonly open: (input: {
-      readonly row: BackendRow
-      readonly project: string | null
-      readonly repositoryHint?: string | undefined
-    }) => Effect.Effect<RemoteBackend, ConfigError>
-    readonly credentialSource: (row: Pick<BackendRow, 'backend' | 'secret'>) => Effect.Effect<CredentialSource | 'missing'>
-    readonly test: (draft: SyncBackendDraft) => Effect.Effect<SyncConnectionTest>
-  }
->()('@dshfiles/backlog/RemoteBackends') {
-  static readonly layer = Layer.effect(
-    RemoteBackends,
-    Effect.gen(function* () {
-      const secrets = yield* SecretReferenceResolver
-      const http = yield* HttpClient.HttpClient
-      const probes = yield* SyncLocalProbes
+type ConfigError = SyncConnectionMissing | SyncBindingUnknown | SyncBindingMissing | SyncProviderUnknown | SyncNotOwner
+type LinkError =
+  | ConfigError
+  | BacklogProviderFailed
+  | SyncAlreadyLinked
+  | SyncWriteFailed
+  | BacklogWriteFailed
+  | BacklogItemNotFound
+  | SyncReferenceUnrecognized
 
-      const environmentOf = (backend: SyncBackendKind) =>
-        environmentVariables[backend].map(name => ({ name, value: process.env[name] ?? '' })).find(variable => variable.value !== '')
-
-      const resolveCredential = Effect.fnUntraced(function* (
-        row: Pick<BackendRow, 'backend' | 'secret'>,
-      ): Effect.fn.Return<Option.Option<{ readonly key: Redacted.Redacted; readonly source: CredentialSource }>, SecretReferenceResolverError> {
-        const environment = environmentOf(row.backend)
-        const resolved = yield* secrets.resolveWithLabel({
-          referenceText: row.secret,
-          environmentValue: environment?.value,
-          environmentVariableName: environment?.name ?? environmentVariables[row.backend][0],
-        })
-        if (Option.isSome(resolved)) {
-          return Option.some({ key: Redacted.make(resolved.value.value), source: row.secret.trim() === '' ? 'environment' : 'reference' })
-        }
-        if (row.backend !== 'github' || row.secret.trim() !== '') return Option.none()
-        return Option.map(yield* probes.githubCliToken, key => ({ key, source: 'github-cli' as const }))
-      })
-
-      const credentialOrMissing = (row: BackendRow) =>
-        resolveCredential(row).pipe(
-          Effect.catch(error => Effect.as(Effect.logWarning('backlog sync: the credential could not be resolved', error), Option.none())),
-          Effect.flatMap(credential =>
-            Option.isSome(credential)
-              ? Effect.succeed(credential.value)
-              : Effect.fail(new SyncCredentialMissing({ backend: row.backend, environmentVariable: environmentVariables[row.backend][0] })),
-          ),
-        )
-
-      /** The repository a GitHub row serves for `project`: its own, the issue reference's, then the project's git remote. */
-      const repositoryOf = Effect.fnUntraced(function* (input: {
-        readonly target: string
-        readonly project: string | null
-        readonly hint?: string | undefined
-      }): Effect.fn.Return<Option.Option<{ readonly key: string; readonly source: 'setting' | 'git-remote' }>> {
-        const configured = input.target.trim()
-        if (configured !== '') return Option.some({ key: configured, source: 'setting' })
-        if (input.hint !== undefined) return Option.some({ key: input.hint, source: 'setting' })
-        if (input.project === null) return Option.none()
-        return Option.map(yield* probes.githubRepository(input.project), key => ({ key, source: 'git-remote' as const }))
-      })
-
-      const open = Effect.fn('backlog sync open backend')(
-        function* (input: { readonly row: BackendRow; readonly project: string | null; readonly repositoryHint?: string | undefined }) {
-          const credential = yield* credentialOrMissing(input.row)
-          if (input.row.backend === 'linear') return yield* makeLinearBackend({ teamKey: input.row.target.trim(), apiKey: credential.key })
-          const project = projectOfRow(input.row.project) ?? input.project
-          const repository = yield* repositoryOf({ target: input.row.target, project, hint: input.repositoryHint })
-          if (Option.isNone(repository)) return yield* new SyncTargetMissing({ backend: 'github', project })
-          return yield* makeGithubBackend({ repository: repository.value.key, token: credential.key })
-        },
-        Effect.provideService(HttpClient.HttpClient, http),
-      )
-
-      const credentialSource = (row: Pick<BackendRow, 'backend' | 'secret'>): Effect.Effect<CredentialSource | 'missing'> => {
-        if (row.secret.trim() !== '') return Effect.succeed('reference')
-        if (environmentOf(row.backend) !== undefined) return Effect.succeed('environment')
-        if (row.backend === 'linear') return Effect.succeed('missing')
-        return Effect.map(probes.githubCliToken, token => (Option.isSome(token) ? 'github-cli' : 'missing'))
-      }
-
-      const failedTest = (input: {
-        readonly credential: SyncConnectionTest['credential']
-        readonly error: { readonly _tag: string; readonly message: string }
-      }) =>
-        ({
-          ok: false,
-          credential: input.credential,
-          account: null,
-          target: null,
-          targetSource: null,
-          teams: [],
-          error: errorView(input.error),
-        }) satisfies SyncConnectionTest
-
-      const test = Effect.fn('backlog sync test connection')(
-        function* (draft: SyncBackendDraft) {
-          yield* Effect.annotateCurrentSpan({ 'dshx.plugin.package': '@dshfiles/backlog', 'dshx.backlog.sync.backend': draft.backend })
-          const resolved = yield* Effect.result(resolveCredential(draft))
-          if (resolved._tag === 'Failure') return failedTest({ credential: 'reference', error: resolved.failure })
-          if (Option.isNone(resolved.success)) {
-            return failedTest({
-              credential: 'missing',
-              error: new SyncCredentialMissing({ backend: draft.backend, environmentVariable: environmentVariables[draft.backend][0] }),
-            })
-          }
-          const credential = resolved.success.value
-          const project = projectOfRow(draft.project)
-          const repository = draft.backend === 'github' ? yield* repositoryOf({ target: draft.target, project }) : Option.none()
-          const backend =
-            draft.backend === 'linear'
-              ? yield* makeLinearBackend({ teamKey: draft.target.trim(), apiKey: credential.key })
-              : yield* makeGithubBackend({ repository: Option.match(repository, { onNone: () => '', onSome: found => found.key }), token: credential.key })
-          const connection = yield* Effect.result(backend.connection)
-          if (connection._tag === 'Failure') return failedTest({ credential: credential.source, error: connection.failure })
-          return connectionReport({
-            draft,
-            project,
-            credential: credential.source,
-            connection: connection.success,
-            repositorySource: Option.getOrUndefined(repository)?.source,
-          })
-        },
-        Effect.provideService(HttpClient.HttpClient, http),
-      )
-
-      return RemoteBackends.of({ open, credentialSource, test })
-    }),
-  )
-}
-
-const connectionReport = (input: {
-  readonly draft: SyncBackendDraft
-  readonly project: string | null
-  readonly credential: CredentialSource
-  readonly connection: RemoteConnection
-  readonly repositorySource: 'setting' | 'git-remote' | undefined
-}): SyncConnectionTest => {
-  const base = { credential: input.credential, account: input.connection.account, target: input.connection.target, teams: input.connection.teams }
-  if (input.connection.target !== null) {
-    const targetSource = input.draft.backend === 'github' ? (input.repositorySource ?? 'setting') : input.draft.target.trim() === '' ? 'only-team' : 'setting'
-    return { ...base, ok: true, targetSource, error: null }
-  }
-  if (input.draft.backend === 'github' && input.project === null) return { ...base, ok: true, targetSource: 'per-project', error: null }
-  if (input.draft.backend === 'linear' && input.draft.target.trim() !== '') {
-    const missing = new SyncRemoteRejected({ backend: 'linear', status: 404, detail: `no team with key ${input.draft.target.trim()} visible to this key` })
-    return { ...base, ok: false, targetSource: null, error: errorView(missing) }
-  }
-  return { ...base, ok: false, targetSource: null, error: errorView(new SyncTargetMissing({ backend: input.draft.backend, project: input.project })) }
-}
-
-const errorRecord = (error: { readonly _tag: string; readonly message: string }, at: number) => ({
-  code: error._tag.slice(0, 64),
-  message: error.message.slice(0, 1_000),
-  at,
-})
-
-/** The kind an imported issue's labels name, first match wins. */
-const kindLabels: readonly (readonly [string, BacklogKind])[] = [
-  ['bug', 'bug'],
-  ['idea', 'idea'],
-  ['feature', 'idea'],
-  ['question', 'question'],
-]
-
-const kindOfTags = (tags: readonly string[]): BacklogKind | undefined => kindLabels.find(([label]) => tags.includes(label))?.[1]
+const MIGRATION_RECEIPT = Schema.fromJsonString(Schema.Struct({ at: Schema.Number, connections: Schema.Number, bindings: Schema.Number, refs: Schema.Number }))
 
 /**
- * Two-way sync of backlog items with remote trackers. Every mapping is plugin-owned state in the `backlog_sync` domain;
- * one item syncs at a time, and a failing remote never touches the item: the mapping records the error and the next
- * pass retries.
+ * Remote sync: connections (accounts), bindings (sync flows) and external refs in the backlog's SQLite file, run by
+ * the engine one binding at a time. Linking, creating and importing is always an explicit action; a binding's poll
+ * interval only syncs what is already linked, plus new remote items when the binding imports them.
  */
 export class BacklogSync extends Context.Service<
   BacklogSync,
@@ -295,31 +126,60 @@ export class BacklogSync extends Context.Service<
     readonly syncNow: (input: {
       readonly id?: number | undefined
       readonly project?: string | null | undefined
-    }) => Effect.Effect<{ readonly results: readonly SyncItemResult[] }, SyncItemNotLinked>
+      readonly binding?: string | undefined
+    }) => Effect.Effect<
+      { readonly results: readonly SyncItemResult[]; readonly passes: readonly BindingPassResult[] },
+      SyncItemNotLinked | ConfigError | BacklogWriteFailed
+    >
     readonly link: (input: {
       readonly id: number
-      readonly backend: SyncBackendKind
+      readonly binding?: string | undefined
+      readonly provider?: string | undefined
       readonly reference?: string | undefined
       readonly create?: boolean | undefined
       readonly remove?: boolean | undefined
       readonly actor: BacklogActor
     }) => Effect.Effect<{ readonly item: SyncItemView | null; readonly result: SyncItemResult | null }, LinkError>
     readonly importRemote: (input: {
-      readonly backend?: SyncBackendKind | undefined
+      readonly provider?: string | undefined
+      readonly binding?: string | undefined
       readonly reference: string
       readonly project?: string | null | undefined
       readonly actor: BacklogActor
-    }) => Effect.Effect<{ readonly detail: BacklogDetailView; readonly created: boolean }, LinkError | SyncReferenceUnrecognized>
-    readonly testConnection: (draft: SyncBackendDraft) => Effect.Effect<SyncConnectionTest>
-    /** Every saved row's connection, in settings order. */
-    readonly testSaved: Effect.Effect<{
-      readonly results: readonly (Pick<BackendRow, 'backend' | 'project' | 'target' | 'enabled'> & { readonly report: SyncConnectionTest })[]
-    }>
-    /** One auto-sync round: every row with an interval that is due. */
+    }) => Effect.Effect<{ readonly detail: BacklogDetailView; readonly created: boolean }, LinkError>
+    /** Imports every open remote item of a binding no backlog item mirrors yet; already linked ones are left as they are. */
+    readonly importAll: (input: {
+      readonly binding: string
+      readonly actor: BacklogActor
+    }) => Effect.Effect<BindingPassResult, ConfigError | BacklogWriteFailed>
+    readonly discover: (input: {
+      readonly connection?: string | undefined
+      readonly draft?: SyncConnectionDraft | undefined
+    }) => Effect.Effect<SyncConnectionTest, ConfigError>
+    readonly testConnection: (input: {
+      readonly connection?: string | undefined
+      readonly draft?: SyncConnectionDraft | undefined
+    }) => Effect.Effect<SyncConnectionTest, ConfigError>
+    readonly testSaved: Effect.Effect<{ readonly results: readonly { readonly connection: SyncConnection; readonly report: SyncConnectionTest }[] }>
+    readonly saveConnection: (input: {
+      readonly connection: Omit<SyncConnection, 'identity'>
+      readonly previousInstanceId?: string | undefined
+    }) => Effect.Effect<ConnectionView, SyncConfigInvalid | SyncProviderUnknown | SyncConfigWriteFailed>
+    readonly removeConnection: (input: { readonly instanceId: string }) => Effect.Effect<void, SyncConnectionMissing | SyncConfigWriteFailed>
+    readonly moveConnection: (input: {
+      readonly instanceId: string
+      readonly direction: 'earlier' | 'later'
+    }) => Effect.Effect<void, SyncConnectionMissing | SyncConfigWriteFailed>
+    /** Adds a binding (`connectionId` required) or changes one by `id`; fields left out keep their saved value or take the default. */
+    readonly saveBinding: (input: {
+      readonly binding: BindingDraft
+    }) => Effect.Effect<BindingView, SyncConfigInvalid | SyncConnectionMissing | SyncConfigWriteFailed>
+    readonly removeBinding: (input: { readonly binding: string }) => Effect.Effect<void, SyncBindingUnknown | SyncConfigWriteFailed>
+    /** One auto-sync round: every owned binding whose interval is due, each behind its own permit. */
     readonly autoSyncTick: Effect.Effect<void>
     /**
-     * Deletes an item, its attachments and its remote mapping, so a later item can never inherit the deleted one's
-     * issue. The remote issue itself is left alone.
+     * Deletes an item. Its refs stay as tombstones, so a pull never imports its remote items again; a binding whose
+     * provider closes on delete (files) also writes the remote item as dropped. Other remote items are left alone.
      */
     readonly deleteItem: (input: { readonly id: number }) => Effect.Effect<BacklogResult<void>, BacklogWriteFailed | SyncWriteFailed>
   }
@@ -329,388 +189,629 @@ export class BacklogSync extends Context.Service<
     Effect.gen(function* () {
       const store = yield* BacklogStore
       const settings = yield* BacklogSettingsTag
-      const tables = yield* BacklogSyncTables
-      const backends = yield* RemoteBackends
-      const lock = yield* Semaphore.make(1)
-      const lastRun = yield* Ref.make<ReadonlyMap<string, number>>(new Map())
+      const sources = yield* SyncSources
+      const registry = yield* BacklogProviderRegistry
+      const engine = yield* BacklogSyncEngine
+      const repo = yield* BacklogRepo
 
-      const mappings = tables.mappings.entries.pipe(
-        Effect.map(rows => rows.map(([, mapping]) => mapping)),
-        Effect.orDie,
-      )
-      const mappingOf = (id: number) => Effect.map(tables.mappings.get(String(id)).pipe(Effect.orDie), Option.getOrUndefined)
       const itemOf = (id: number) => Effect.map(store.get(id), found => (found.ok ? found.value.item : undefined))
-      /** The `b:<ref>` an error names the item by, or nothing once the item is gone. */
       const refFor = (id: number) => Effect.map(itemOf(id), item => (item === undefined ? undefined : BacklogReference.refOf(item)))
-      const writeFailed = (itemId: number) => (cause: unknown) =>
-        Effect.flatMap(refFor(itemId), ref => Effect.fail(new SyncWriteFailed({ itemId, ref, cause })))
-      const save = (mapping: SyncMapping) => tables.mappings.put(String(mapping.itemId), mapping).pipe(Effect.catch(writeFailed(mapping.itemId)))
+      const configWrite = <A, E, R>(effect: Effect.Effect<A, E, R>) => effect.pipe(Effect.mapError(cause => new SyncConfigWriteFailed({ cause })))
+      const snapshot = sources.snapshot.pipe(Effect.orDie)
 
-      const backendFor = (input: { readonly backend: SyncBackendKind; readonly project: string | null; readonly reference?: string | undefined }) =>
-        Effect.gen(function* () {
-          const row = rowFor((yield* settings.get).syncBackends, input.backend, input.project)
-          if (row === undefined) return yield* new SyncBackendUnconfigured({ backend: input.backend, project: input.project })
-          const repositoryHint = input.backend === 'github' && input.reference !== undefined ? GithubMapping.repositoryOfReference(input.reference) : undefined
-          return yield* backends.open({ row, project: input.project, repositoryHint })
-        })
-
-      const viewOf = (mapping: SyncMapping, item: BacklogItem | undefined): SyncItemView => ({
-        itemId: mapping.itemId,
-        ...(item !== undefined && { ref: BacklogReference.refOf(item) }),
-        backend: mapping.backend,
-        remoteKey: mapping.remoteKey,
-        url: mapping.url,
-        state: BacklogSyncModel.stateOf(mapping, item),
-        lastSyncedAt: mapping.lastSyncedAt,
-        lastError: mapping.lastError,
-        conflicts: mapping.conflicts.slice(-5),
-      })
-
-      /** Carries remote comments over to the item and local replies over to the issue, once each. */
-      const syncComments = Effect.fnUntraced(function* (mapping: SyncMapping, backend: RemoteBackend, remote: RemoteIssue) {
-        const knownRemote = new Set(mapping.comments.map(pair => pair.remote))
-        const incoming = [...remote.comments].filter(comment => !knownRemote.has(comment.id)).sort((left, right) => left.createdAt - right.createdAt)
-        // Sequential on purpose (forEach's default): comments land in the order they were written.
-        const pulledPairs = yield* Effect.forEach(incoming, comment =>
-          Effect.map(
-            store.comment({
-              id: mapping.itemId,
-              text: BacklogSyncModel.importedCommentText(mapping.backend, comment),
-              actor: { kind: 'system' },
-              origin: `remote:${mapping.backend}`,
-            }),
-            result => ({
-              local: result.ok ? (result.value.item.events.findLast(event => event.kind === 'commented')?.commentId ?? '') : '',
-              remote: comment.id,
-            }),
-          ),
-        )
-        const knownLocal = new Set([...mapping.comments, ...pulledPairs].map(pair => pair.local))
-        const item = yield* itemOf(mapping.itemId)
-        const pushAgentComments = rowFor((yield* settings.get).syncBackends, mapping.backend, item?.project ?? null)?.pushAgentComments === true
-        const outgoing = (item?.events ?? []).flatMap(event =>
-          event.kind === 'commented' &&
-          event.commentId !== undefined &&
-          event.actor !== 'system' &&
-          (pushAgentComments || !BacklogOrigins.isAgent(BacklogOrigins.of(event))) &&
-          !knownLocal.has(event.commentId) &&
-          event.at >= mapping.pushCommentsSince &&
-          event.detail.trim() !== ''
-            ? [{ commentId: event.commentId, actor: event.actor, detail: event.detail }]
-            : [],
-        )
-        const pushedPairs = yield* Effect.forEach(outgoing, event =>
-          Effect.map(
-            backend.comment(
-              mapping.remoteId,
-              BacklogSyncModel.exportedCommentText(BacklogReference.labelOf(item ?? { id: mapping.itemId }), event.actor, event.detail),
-            ),
-            created => ({
-              local: event.commentId,
-              remote: created.id,
-            }),
-          ),
-        )
-        const pairs = [...mapping.comments, ...pulledPairs, ...pushedPairs]
-        const pulled = pulledPairs.length
-        const pushed = pushedPairs.length
-        return { pairs: pairs.slice(-BacklogSyncModel.maxCommentPairs), pulled, pushed }
-      })
-
-      const passOf = Effect.fnUntraced(function* (mapping: SyncMapping) {
-        const item = yield* itemOf(mapping.itemId)
-        if (item === undefined) return yield* new BacklogItemNotFound({ ids: [mapping.itemId] })
-        const backend = yield* backendFor({ backend: mapping.backend, project: item.project, reference: mapping.url })
-        const remote = yield* backend.fetch(mapping.remoteId)
+      /** Settings rows and per-item mappings become connections, bindings and refs, once. */
+      const migrate = Effect.fn('backlog sync migrate')(function* () {
+        if (Option.isSome(yield* sources.marker(SyncMigration.marker).pipe(Effect.orDie))) return
+        const rows = (yield* settings.get).syncBackends
+        const mappings = (yield* repo.mappings.entries.pipe(Effect.orDie)).map(([, mapping]) => mapping)
+        const items = new Map((yield* repo.loadItems.pipe(Effect.orDie)).map(item => [item.id, item.project] as const))
+        const plan = SyncMigration.plan({ rows, mappings, projectOf: id => items.get(id), hostId: sources.hostId })
+        const current = yield* snapshot
+        yield* sources
+          .replace({ connections: [...current.connections, ...plan.connections], bindings: [...current.bindings, ...plan.bindings] })
+          .pipe(Effect.orDie)
+        yield* Effect.forEach(plan.refs, entry => sources.putRef(entry).pipe(Effect.orDie), { discard: true })
         const at = yield* Clock.currentTimeMillis
-        const plan = BacklogSyncModel.plan({ item, remote, base: mapping.base, at })
-        const pulled = Object.keys(plan.pull).filter((field): field is SyncField => BacklogSyncModel.syncedFields.some(known => known === field))
-        const pushed = Object.keys(plan.push).filter((field): field is SyncField => BacklogSyncModel.syncedFields.some(known => known === field))
-        if (pulled.length > 0)
-          yield* store
-            .update({ id: item.id, ...plan.pull, actor: { kind: 'system' } })
-            .pipe(Effect.catchTag('BacklogParentInvalid', error => Effect.die(error)))
-        const remoteAfter = pushed.length > 0 ? yield* backend.update(mapping.remoteId, plan.push) : remote
-        const comments = yield* syncComments(mapping, backend, remoteAfter)
-        if (plan.conflicts.length > 0) {
-          yield* store.comment({
-            id: item.id,
-            text: BacklogSyncModel.conflictNote(mapping.backend, remoteAfter.key, plan.conflicts),
-            actor: { kind: 'system' },
-          })
-        }
-        const final = (yield* itemOf(item.id)) ?? item
-        const next: SyncMapping = {
-          ...mapping,
-          remoteKey: remoteAfter.key,
-          url: remoteAfter.url.slice(0, BacklogItems.maxTargetChars),
-          lastSyncedAt: at,
-          remoteUpdatedAt: remoteAfter.updatedAt,
-          localSyncedAt: final.lastActivityAt,
-          base: { local: BacklogSyncModel.localSnapshot(final), remote: BacklogSyncModel.remoteSnapshot(remoteAfter) },
-          comments: comments.pairs,
-          state: plan.conflicts.length > 0 ? 'conflict' : 'synced',
-          conflicts: [...mapping.conflicts, ...plan.conflicts].slice(-BacklogSyncModel.maxConflicts),
-          lastError: null,
-        }
-        yield* save(next)
-        return {
-          itemId: item.id,
-          ref: BacklogReference.refOf(item),
-          remoteKey: next.remoteKey,
-          state: next.state,
-          pulled,
-          pushed,
-          conflicts: plan.conflicts,
-          commentsPulled: comments.pulled,
-          commentsPushed: comments.pushed,
-          error: null,
-        } satisfies SyncItemResult
-      })
-
-      /** One item's sync pass; a failure is recorded on the mapping and answered, never thrown. */
-      const syncMapping = Effect.fn('backlog sync')(function* (mapping: SyncMapping) {
+        const receipt = yield* Schema.encodeEffect(MIGRATION_RECEIPT)({
+          at,
+          connections: plan.connections.length,
+          bindings: plan.bindings.length,
+          refs: plan.refs.length,
+        }).pipe(Effect.orDie)
+        yield* sources.setMarker({ key: SyncMigration.marker, value: receipt }).pipe(Effect.orDie)
         yield* Effect.annotateCurrentSpan({
-          'dshx.plugin.package': '@dshfiles/backlog',
-          'dshx.backlog.item_id': mapping.itemId,
-          'dshx.backlog.sync.backend': mapping.backend,
+          'dshx.backlog.sync.migrated_connections': plan.connections.length,
+          'dshx.backlog.sync.migrated_bindings': plan.bindings.length,
+          'dshx.backlog.sync.migrated_refs': plan.refs.length,
         })
-        const outcome = yield* Effect.result(passOf(mapping))
-        if (outcome._tag === 'Success') {
-          yield* Effect.annotateCurrentSpan({
-            'dshx.backlog.sync.outcome': outcome.success.state,
-            'dshx.backlog.sync.pulled': outcome.success.pulled.length,
-            'dshx.backlog.sync.pushed': outcome.success.pushed.length,
-            'dshx.backlog.sync.conflicts': outcome.success.conflicts.length,
-          })
-          return outcome.success
-        }
-        const at = yield* Clock.currentTimeMillis
-        const error = errorRecord(outcome.failure, at)
-        yield* Effect.annotateCurrentSpan({ 'dshx.backlog.sync.outcome': 'error', 'error.type': error.code })
-        yield* save({ ...mapping, state: 'error', lastError: error }).pipe(
-          Effect.catch(failure => Effect.logWarning('backlog sync: the error could not be recorded', failure)),
-        )
-        return {
-          itemId: mapping.itemId,
-          remoteKey: mapping.remoteKey,
-          state: 'error',
-          pulled: [],
-          pushed: [],
-          conflicts: [],
-          commentsPulled: 0,
-          commentsPushed: 0,
-          error: { code: error.code, message: error.message },
-        } satisfies SyncItemResult
+      })
+      yield* migrate()
+
+      const contextOf = Effect.fnUntraced(function* (binding: SyncBinding) {
+        const current = yield* snapshot
+        const connection = current.connections.find(candidate => candidate.instanceId === binding.connectionId)
+        if (connection === undefined) return yield* new SyncConnectionMissing({ connection: binding.connectionId })
+        const provider = yield* registry.get(connection.kind)
+        return { binding, connection, provider } satisfies BindingContext
       })
 
-      const syncLocked = (mapping: SyncMapping) => lock.withPermit(Effect.flatMap(mappingOf(mapping.itemId), current => syncMapping(current ?? mapping)))
+      const bindingById = Effect.fnUntraced(function* (id: string) {
+        const found = (yield* snapshot).bindings.find(binding => binding.id === id)
+        if (found === undefined) return yield* new SyncBindingUnknown({ binding: id })
+        return found
+      })
+
+      /** The enabled binding of a provider kind that serves a project: its own scope first, then a binding for every project. */
+      const bindingFor = Effect.fnUntraced(function* (input: { readonly kind?: string | undefined; readonly project: string | null }) {
+        const current = yield* snapshot
+        const kindOf = (binding: SyncBinding) => current.connections.find(connection => connection.instanceId === binding.connectionId)?.kind
+        const candidates = current.bindings.filter(binding => binding.enabled && (input.kind === undefined || kindOf(binding) === input.kind))
+        const own =
+          input.project === null ? undefined : candidates.find(binding => binding.scope !== null && BacklogItems.projectPath(binding.scope) === input.project)
+        const found = own ?? candidates.find(binding => binding.scope === null)
+        if (found === undefined) {
+          const label =
+            input.kind === undefined
+              ? 'sync'
+              : yield* Effect.map(Effect.result(registry.get(input.kind)), result =>
+                  result._tag === 'Success' ? result.success.descriptor.label : (input.kind ?? 'sync'),
+                )
+          return yield* new SyncBindingMissing({ provider: label, project: input.project })
+        }
+        return found
+      })
+
+      const viewOf = Effect.fnUntraced(function* (
+        entry: StoredRef,
+        item: BacklogItem | undefined,
+        current: { readonly connections: readonly SyncConnection[]; readonly bindings: readonly SyncBinding[] },
+      ) {
+        const binding = current.bindings.find(candidate => candidate.id === entry.ref.bindingId)
+        const connection = current.connections.find(candidate => candidate.instanceId === binding?.connectionId)
+        const context = binding === undefined || connection === undefined ? undefined : yield* Effect.option(contextOf(binding))
+        const local =
+          item === undefined || context === undefined || Option.isNone(context) ? undefined : yield* engine.localSnapshot({ context: context.value, item })
+        return {
+          itemId: entry.itemId,
+          ...(item !== undefined && { ref: BacklogReference.refOf(item) }),
+          bindingId: entry.ref.bindingId,
+          backend: connection?.kind ?? 'unknown',
+          connectionLabel: connection?.label ?? entry.ref.bindingId,
+          remoteKey: entry.ref.displayKey,
+          url: entry.ref.url,
+          state: BacklogSyncModel.stateOf(entry.ref, local),
+          lastSyncedAt: entry.ref.lastSyncedAt,
+          lastError: entry.ref.lastError,
+          conflicts: entry.ref.conflicts.slice(-5),
+        } satisfies SyncItemView
+      })
+
+      const credentialView = (connection: SyncConnection, descriptor: ProviderDescriptor | undefined): CredentialView => {
+        if (connection.credential.trim() !== '') return 'reference'
+        if (descriptor?.credential === 'none') return 'none'
+        if ((descriptor?.environmentVariables ?? []).some(name => (process.env[name] ?? '') !== '')) return 'environment'
+        return descriptor?.credential === 'optional' ? 'fallback' : 'missing'
+      }
+
+      const connectionView = (connection: SyncConnection, providers: readonly BacklogProvider[]): ConnectionView => {
+        const provider = providers.find(candidate => candidate.descriptor.kind === connection.kind)
+        return {
+          connection,
+          providerLabel: provider?.descriptor.label ?? connection.kind,
+          available: provider !== undefined,
+          credential: credentialView(connection, provider?.descriptor),
+        }
+      }
+
+      const bindingView = Effect.fnUntraced(function* (
+        binding: SyncBinding,
+        current: { readonly connections: readonly SyncConnection[] },
+        refs: readonly StoredRef[],
+      ) {
+        const connection = current.connections.find(candidate => candidate.instanceId === binding.connectionId)
+        const state = yield* sources.state(binding.id).pipe(Effect.orDie)
+        return {
+          binding,
+          providerKind: connection?.kind ?? 'unknown',
+          connectionLabel: connection?.label ?? binding.connectionId,
+          owned: binding.ownerHostId === sources.hostId,
+          linked: refs.filter(entry => entry.ref.bindingId === binding.id).length,
+          lastPassAt: state.lastPassAt,
+        } satisfies BindingView
+      })
 
       const status = Effect.fn('backlog sync status')(function* (input: { readonly ids?: readonly number[] | undefined }) {
-        const rows = (yield* settings.get).syncBackends
+        const current = yield* snapshot
+        const providers = yield* registry.all
         const wanted = input.ids === undefined ? undefined : new Set(input.ids)
-        const all = (yield* mappings).filter(mapping => wanted === undefined || wanted.has(mapping.itemId))
-        const items = yield* Effect.forEach(all, mapping => Effect.map(itemOf(mapping.itemId), item => viewOf(mapping, item)))
-        const views = yield* Effect.forEach(rows, row =>
-          Effect.map(backends.credentialSource(row), (credential): SyncBackendView => ({
-            project: row.project === '' ? null : row.project,
-            backend: row.backend,
-            target: row.target,
-            enabled: row.enabled,
-            autoSyncMinutes: row.autoSyncMinutes,
-            credential,
-          })),
+        const refs = yield* sources.refs.pipe(Effect.orDie)
+        const live = yield* Effect.filter(refs, entry => Effect.map(itemOf(entry.itemId), item => item !== undefined))
+        const items = yield* Effect.forEach(
+          live.filter(entry => wanted === undefined || wanted.has(entry.itemId)),
+          entry => Effect.flatMap(itemOf(entry.itemId), item => viewOf(entry, item, current)),
         )
-        return { backends: views, items }
+        return {
+          providers: providers.map(provider => provider.descriptor),
+          connections: current.connections.map(connection => connectionView(connection, providers)),
+          bindings: yield* Effect.forEach(current.bindings, binding => bindingView(binding, current, live)),
+          items,
+        } satisfies SyncStatusView
       })
 
-      const syncNow = Effect.fn('backlog sync now')(function* (input: { readonly id?: number | undefined; readonly project?: string | null | undefined }) {
+      const syncStored = (entry: StoredRef) =>
+        Effect.gen(function* () {
+          const binding = yield* bindingById(entry.ref.bindingId)
+          if (binding.ownerHostId !== sources.hostId) return yield* new SyncNotOwner({ binding: binding.id, ownerHostId: binding.ownerHostId })
+          const context = yield* contextOf(binding)
+          return yield* engine.withBinding(
+            binding.id,
+            Effect.flatMap(sources.refByKey({ bindingId: binding.id, key: entry.ref.key }).pipe(Effect.orDie), stored =>
+              engine.syncRef({
+                context,
+                itemId: entry.itemId,
+                ref: Option.getOrElse(
+                  Option.map(stored, value => value.ref),
+                  () => entry.ref,
+                ),
+              }),
+            ),
+          )
+        })
+
+      const passOf = (binding: SyncBinding, options: { readonly importNew?: boolean; readonly openOnly?: boolean; readonly restart?: boolean } = {}) =>
+        Effect.flatMap(contextOf(binding), context => engine.withBinding(binding.id, engine.pass({ context, ...options })))
+
+      const syncNow = Effect.fn('backlog sync now')(function* (input: {
+        readonly id?: number | undefined
+        readonly project?: string | null | undefined
+        readonly binding?: string | undefined
+      }) {
         if (input.id !== undefined) {
-          const mapping = yield* mappingOf(input.id)
-          if (mapping === undefined) return yield* new SyncItemNotLinked({ itemId: input.id, ref: yield* refFor(input.id) })
-          return { results: [yield* syncLocked(mapping)] }
+          const refs = (yield* sources.refsOf(input.id).pipe(Effect.orDie)).filter(ref => input.binding === undefined || ref.bindingId === input.binding)
+          if (refs.length === 0) return yield* new SyncItemNotLinked({ itemId: input.id, ref: yield* refFor(input.id) })
+          const id = input.id
+          return { results: yield* Effect.forEach(refs, ref => syncStored({ itemId: id, ref })), passes: [] }
+        }
+        if (input.binding !== undefined) {
+          const pass = yield* passOf(yield* bindingById(input.binding))
+          return { results: pass.results, passes: [pass] }
         }
         const project = input.project === undefined ? undefined : BacklogItems.projectOf(input.project)
-        const all = yield* mappings
-        const selected = yield* Effect.filter(all, mapping =>
-          project === undefined ? Effect.succeed(true) : Effect.map(itemOf(mapping.itemId), item => item !== undefined && item.project === project),
+        const refs = yield* sources.refs.pipe(Effect.orDie)
+        const selected = yield* Effect.filter(refs, entry =>
+          Effect.map(itemOf(entry.itemId), item => item !== undefined && (project === undefined || item.project === project)),
         )
-        return { results: yield* Effect.forEach(selected, syncLocked) }
+        const current = yield* snapshot
+        const owned = selected.filter(entry => current.bindings.some(binding => binding.id === entry.ref.bindingId && binding.ownerHostId === sources.hostId))
+        const results = yield* Effect.forEach(owned, entry => Effect.catch(syncStored(entry), () => Effect.succeed(undefined)), { concurrency: 4 })
+        return { results: results.filter(result => result !== undefined), passes: [] }
       })
 
-      const unlink = Effect.fnUntraced(function* (id: number, actor: BacklogActor) {
-        const mapping = yield* mappingOf(id)
-        if (mapping === undefined) return { item: null, result: null }
-        yield* tables.mappings.delete(String(id)).pipe(Effect.catch(writeFailed(id)))
-        yield* store.link({ id, link: { type: 'url', target: mapping.url }, remove: true, actor })
+      /** The binding a link or import goes through: the one named, else the one serving the project for the provider the reference names. */
+      const bindingOfRequest = Effect.fnUntraced(function* (input: {
+        readonly binding?: string | undefined
+        readonly provider?: string | undefined
+        readonly reference?: string | undefined
+        readonly project: string | null
+      }) {
+        if (input.binding !== undefined) return yield* bindingById(input.binding)
+        if (input.provider !== undefined) return yield* bindingFor({ kind: input.provider, project: input.project })
+        const recognizing = input.reference === undefined ? [] : yield* registry.recognizing(input.reference)
+        if (input.reference !== undefined && recognizing.length === 0) {
+          const providers = yield* registry.all
+          return yield* new SyncReferenceUnrecognized({ reference: input.reference, examples: providers.map(provider => provider.descriptor.referenceExample) })
+        }
+        const kinds = recognizing.map(provider => provider.descriptor.kind)
+        const outcomes = yield* Effect.forEach(kinds.length === 0 ? [undefined] : kinds, kind => Effect.result(bindingFor({ kind, project: input.project })))
+        const found = outcomes.find(outcome => outcome._tag === 'Success')
+        if (found !== undefined && found._tag === 'Success') return found.success
+        const first = outcomes[0]
+        return yield* first !== undefined && first._tag === 'Failure'
+          ? Effect.fail(first.failure)
+          : Effect.fail(new SyncBindingMissing({ provider: 'sync', project: input.project }))
+      })
+
+      const unlink = Effect.fnUntraced(function* (input: {
+        readonly id: number
+        readonly binding?: string | undefined
+        readonly provider?: string | undefined
+        readonly actor: BacklogActor
+      }) {
+        const current = yield* snapshot
+        const kindOf = (bindingId: string) =>
+          current.connections.find(connection => connection.instanceId === current.bindings.find(binding => binding.id === bindingId)?.connectionId)?.kind
+        const refs = (yield* sources.refsOf(input.id).pipe(Effect.orDie)).filter(
+          ref => (input.binding === undefined || ref.bindingId === input.binding) && (input.provider === undefined || kindOf(ref.bindingId) === input.provider),
+        )
+        for (const ref of refs) {
+          yield* engine.withBinding(
+            ref.bindingId,
+            sources
+              .deleteRef({ bindingId: ref.bindingId, key: ref.key })
+              .pipe(Effect.catch(cause => Effect.fail(new SyncWriteFailed({ itemId: input.id, cause })))),
+          )
+          if (ref.url !== '') yield* store.link({ id: input.id, link: { type: 'url', target: ref.url }, remove: true, actor: input.actor })
+        }
         return { item: null, result: null }
+      })
+
+      const newRef = (input: {
+        readonly binding: SyncBinding
+        readonly record: RemoteRecord
+        readonly at: number
+        readonly base: ExternalRef['base']
+        readonly pushCommentsSince: number
+      }): ExternalRef => ({
+        bindingId: input.binding.id,
+        key: input.record.key,
+        displayKey: input.record.displayKey.slice(0, 200),
+        url: input.record.url.slice(0, BacklogItems.maxTargetChars),
+        linkedAt: input.at,
+        lastSyncedAt: null,
+        remoteUpdatedAt: null,
+        lastRemoteVersion: null,
+        localSyncedAt: null,
+        base: input.base,
+        comments: [],
+        pushCommentsSince: input.pushCommentsSince,
+        state: 'synced',
+        conflicts: [],
+        lastError: null,
       })
 
       const link = Effect.fn('backlog sync link')(function* (input: {
         readonly id: number
-        readonly backend: SyncBackendKind
+        readonly binding?: string | undefined
+        readonly provider?: string | undefined
         readonly reference?: string | undefined
         readonly create?: boolean | undefined
         readonly remove?: boolean | undefined
         readonly actor: BacklogActor
       }) {
-        if (input.remove === true) return yield* lock.withPermit(unlink(input.id, input.actor))
+        if (input.remove === true) return yield* unlink(input)
         const item = yield* itemOf(input.id)
         if (item === undefined) return yield* new BacklogItemNotFound({ ids: [input.id] })
-        const existing = yield* mappingOf(input.id)
-        const backend = yield* backendFor({ backend: input.backend, project: item.project, reference: input.reference })
+        const binding = yield* bindingOfRequest({
+          binding: input.binding,
+          provider: input.provider,
+          reference: input.create === true ? undefined : input.reference,
+          project: item.project,
+        })
+        if (binding.ownerHostId !== sources.hostId) return yield* new SyncNotOwner({ binding: binding.id, ownerHostId: binding.ownerHostId })
+        const context = yield* contextOf(binding)
+        const scope = SyncEngineModel.scopeOf(context, item.project)
+        const existing = (yield* sources.refsOf(item.id).pipe(Effect.orDie)).find(ref => ref.bindingId === binding.id)
         const at = yield* Clock.currentTimeMillis
-        const remote = input.create === true ? undefined : yield* backend.resolve(input.reference ?? '')
-        if (existing !== undefined && (remote === undefined || existing.remoteId !== remote.id || existing.backend !== input.backend)) {
-          return yield* new SyncAlreadyLinked({ itemId: input.id, ref: BacklogReference.refOf(item), remoteKey: existing.remoteKey })
-        }
+        const remote = input.create === true ? undefined : yield* context.provider.resolve({ ...scope, reference: input.reference ?? '' })
+        if (existing !== undefined && (remote === undefined || existing.key !== remote.key))
+          return yield* new SyncAlreadyLinked({ itemId: item.id, ref: BacklogReference.refOf(item), remoteKey: existing.displayKey })
         if (remote !== undefined && existing === undefined) {
-          const other = (yield* mappings).find(mapping => mapping.backend === input.backend && mapping.remoteId === remote.id)
-          if (other !== undefined) return yield* new SyncAlreadyLinked({ itemId: other.itemId, ref: yield* refFor(other.itemId), remoteKey: other.remoteKey })
+          const other = yield* sources.refByKey({ bindingId: binding.id, key: remote.key }).pipe(Effect.orDie)
+          if (Option.isSome(other) && other.value.itemId !== item.id && (yield* itemOf(other.value.itemId)) !== undefined)
+            return yield* new SyncAlreadyLinked({ itemId: other.value.itemId, ref: yield* refFor(other.value.itemId), remoteKey: other.value.ref.displayKey })
         }
-        const issue = remote ?? (yield* backend.create({ title: item.title, body: item.body, status: item.status, kind: item.kind, tags: item.tags }))
+        if (input.create === true && !context.provider.descriptor.capabilities.create)
+          return yield* new BacklogProviderFailed({ provider: context.provider.descriptor.label, code: 'unsupported', detail: 'it cannot create items' })
+        const issue =
+          remote ??
+          (yield* context.provider.create({
+            ...scope,
+            patch: {
+              title: item.title,
+              body: item.body,
+              status: item.status,
+              ...Option.match(Option.fromUndefinedOr(BacklogSyncModel.remoteLabelOf(binding.fieldMap, 'status', item.status)), {
+                onNone: () => ({}),
+                onSome: statusLabel => ({ statusLabel }),
+              }),
+              kind: item.kind,
+              tags: item.tags,
+              ...(item.priority !== undefined && item.priority !== 'none' && { priority: item.priority }),
+              localRef: BacklogReference.refOf(item),
+            },
+          }))
         const created = remote === undefined
-        const mapping: SyncMapping = existing ?? {
-          itemId: item.id,
-          backend: input.backend,
-          remoteId: issue.id,
-          remoteKey: issue.key,
-          url: issue.url.slice(0, BacklogItems.maxTargetChars),
-          linkedAt: at,
-          lastSyncedAt: null,
-          remoteUpdatedAt: null,
-          localSyncedAt: null,
-          // A created issue starts equal to the item; a linked one is adopted on its first pass.
-          base: created ? { local: BacklogSyncModel.localSnapshot(item), remote: BacklogSyncModel.remoteSnapshot(issue) } : null,
-          comments: [],
-          pushCommentsSince: created ? 0 : at,
-          state: 'synced',
-          conflicts: [],
-          lastError: null,
-        }
-        yield* save(mapping)
-        yield* store.link({ id: item.id, link: { type: 'url', target: mapping.url, relation: 'related' }, actor: input.actor })
-        const result = yield* syncLocked(mapping)
-        const stored = (yield* mappingOf(item.id)) ?? mapping
-        return { item: viewOf(stored, yield* itemOf(item.id)), result }
+        const ref =
+          existing ??
+          newRef({
+            binding,
+            record: issue,
+            at,
+            // A created item starts equal to the remote item; a linked one is adopted on its first pass.
+            base: created
+              ? {
+                  local: BacklogSyncModel.remoteSnapshot({ record: issue, rules: binding.fieldMap }),
+                  remote: BacklogSyncModel.remoteSnapshot({ record: issue, rules: binding.fieldMap }),
+                }
+              : null,
+            pushCommentsSince: created ? 0 : at,
+          })
+        const base = created && ref.base !== null ? { local: yield* engine.localSnapshot({ context, item }), remote: ref.base.remote } : ref.base
+        yield* sources
+          .putRef({ itemId: item.id, ref: { ...ref, base } })
+          .pipe(Effect.catch(cause => Effect.fail(new SyncWriteFailed({ itemId: item.id, ref: BacklogReference.refOf(item), cause }))))
+        if (/^https?:\/\//u.test(ref.url)) yield* store.link({ id: item.id, link: { type: 'url', target: ref.url, relation: 'related' }, actor: input.actor })
+        const stored = Option.getOrElse(
+          Option.map(yield* sources.refByKey({ bindingId: binding.id, key: ref.key }).pipe(Effect.orDie), value => value.ref),
+          () => ref,
+        )
+        const result = yield* engine.withBinding(binding.id, engine.syncRef({ context, itemId: item.id, ref: stored }))
+        const after = yield* sources.refByKey({ bindingId: binding.id, key: ref.key }).pipe(Effect.orDie)
+        const view = Option.isNone(after) ? null : yield* viewOf(after.value, yield* itemOf(item.id), yield* snapshot)
+        return { item: view, result }
       })
 
       const importRemote = Effect.fn('backlog sync import')(function* (input: {
-        readonly backend?: SyncBackendKind | undefined
+        readonly provider?: string | undefined
+        readonly binding?: string | undefined
         readonly reference: string
         readonly project?: string | null | undefined
         readonly actor: BacklogActor
       }) {
-        const tracker = input.backend ?? BacklogSyncModel.backendOfReference(input.reference)
-        if (tracker === undefined) return yield* new SyncReferenceUnrecognized({ reference: input.reference })
-        const rows = (yield* settings.get).syncBackends
-        const project =
-          input.project === undefined
-            ? (() => {
-                const row = rows.find(candidate => candidate.enabled && candidate.backend === tracker)
-                return row === undefined || row.project === '' ? null : BacklogItems.projectPath(row.project)
-              })()
-            : BacklogItems.projectOf(input.project)
-        const backend = yield* backendFor({ backend: tracker, project, reference: input.reference })
-        const remote = yield* backend.resolve(input.reference)
-        const known = (yield* mappings).find(mapping => mapping.backend === tracker && mapping.remoteId === remote.id)
-        if (known !== undefined) {
-          const found = yield* store.get(known.itemId)
+        const project = input.project === undefined ? undefined : BacklogItems.projectOf(input.project)
+        const binding = yield* bindingOfRequest({ binding: input.binding, provider: input.provider, reference: input.reference, project: project ?? null })
+        if (binding.ownerHostId !== sources.hostId) return yield* new SyncNotOwner({ binding: binding.id, ownerHostId: binding.ownerHostId })
+        const context = yield* contextOf(binding)
+        const itemProject = project === undefined ? (binding.scope === null ? null : BacklogItems.projectPath(binding.scope)) : project
+        const remote = yield* context.provider.resolve({ ...SyncEngineModel.scopeOf(context, itemProject), reference: input.reference })
+        const known = yield* sources.refByKey({ bindingId: binding.id, key: remote.key }).pipe(Effect.orDie)
+        if (Option.isSome(known)) {
+          const found = yield* store.get(known.value.itemId)
           if (found.ok) return { detail: found.value, created: false }
         }
-        const captured = yield* store
-          .capture({ text: remote.title.replace(/\s+/gu, ' ').trim() || remote.key, project, actor: input.actor })
-          .pipe(Effect.catchTag('BacklogParentInvalid', error => Effect.die(error)))
-        const id = captured.item.id
-        const kind = kindOfTags(remote.tags)
-        yield* store
-          .update({
-            id,
-            body: remote.body.slice(0, BacklogItems.maxBodyChars),
-            tags: remote.tags.slice(0, 20),
-            ...(remote.status !== null && { status: remote.status }),
-            ...(kind !== undefined && { kind }),
-            actor: { kind: 'system' },
-          })
-          .pipe(Effect.catchTag('BacklogParentInvalid', error => Effect.die(error)))
-        const item = (yield* itemOf(id)) ?? captured.item
-        const at = yield* Clock.currentTimeMillis
-        const mapping: SyncMapping = {
-          itemId: id,
-          backend: tracker,
-          remoteId: remote.id,
-          remoteKey: remote.key,
-          url: remote.url.slice(0, BacklogItems.maxTargetChars),
-          linkedAt: at,
-          lastSyncedAt: null,
-          remoteUpdatedAt: null,
-          localSyncedAt: null,
-          base: { local: BacklogSyncModel.localSnapshot(item), remote: BacklogSyncModel.remoteSnapshot(remote) },
-          comments: [],
-          pushCommentsSince: at,
-          state: 'synced',
-          conflicts: [],
-          lastError: null,
-        }
-        yield* save(mapping)
-        yield* store.link({ id, link: { type: 'url', target: mapping.url, relation: 'related' }, actor: input.actor })
-        yield* syncLocked(mapping)
+        const id = yield* engine.withBinding(binding.id, engine.importRecord({ context, record: remote, project: itemProject, actor: input.actor }))
+        const stored = yield* sources.refByKey({ bindingId: binding.id, key: remote.key }).pipe(Effect.orDie)
+        if (Option.isSome(stored)) yield* engine.withBinding(binding.id, engine.syncRef({ context, itemId: id, ref: stored.value.ref, record: remote }))
         const found = yield* store.get(id)
         if (!found.ok) return yield* new BacklogItemNotFound({ ids: [id] })
         return { detail: found.value, created: true }
       })
 
-      const autoSyncTick = Effect.gen(function* () {
-        const rows = (yield* settings.get).syncBackends.filter(row => row.enabled && row.autoSyncMinutes > 0)
-        if (rows.length === 0) return
-        const at = yield* Clock.currentTimeMillis
-        const ran = yield* Ref.get(lastRun)
-        const due = rows.filter(row => at - (ran.get(rowKey(row)) ?? 0) >= row.autoSyncMinutes * 60_000)
-        if (due.length === 0) return
-        yield* Ref.update(lastRun, current => new Map([...current, ...due.map(row => [rowKey(row), at] as const)]))
-        const all = yield* mappings
-        const allRows = (yield* settings.get).syncBackends
-        yield* Effect.forEach(
-          all,
-          mapping =>
-            Effect.flatMap(itemOf(mapping.itemId), item => {
-              const serving = item === undefined ? undefined : rowFor(allRows, mapping.backend, item.project)
-              return serving !== undefined && due.some(row => rowKey(row) === rowKey(serving)) ? syncLocked(mapping) : Effect.void
-            }),
-          { discard: true },
-        )
+      const importAll = Effect.fn('backlog sync import all')(function* (input: { readonly binding: string; readonly actor: BacklogActor }) {
+        const binding = yield* bindingById(input.binding)
+        return yield* passOf(binding, { importNew: true, openOnly: true, restart: true })
+      })
+
+      const connectionOf = Effect.fnUntraced(function* (input: { readonly connection?: string | undefined; readonly draft?: SyncConnectionDraft | undefined }) {
+        if (input.draft !== undefined)
+          return {
+            instanceId: 'draft',
+            kind: input.draft.kind,
+            label: input.draft.kind,
+            credential: input.draft.credential,
+            baseUrl: input.draft.baseUrl,
+            identity: null,
+          } satisfies SyncConnection
+        const found = (yield* snapshot).connections.find(connection => connection.instanceId === input.connection)
+        if (found === undefined) return yield* new SyncConnectionMissing({ connection: input.connection ?? '' })
+        return found
+      })
+
+      const failedTest = (error: { readonly _tag: string; readonly message: string; readonly code?: string }): SyncConnectionTest => ({
+        ok: false,
+        credential: 'code' in error && error.code === 'credential-missing' ? 'missing' : 'reference',
+        account: null,
+        containers: [],
+        error: errorView(error),
+      })
+
+      const testConnection = Effect.fn('backlog sync test connection')(function* (input: {
+        readonly connection?: string | undefined
+        readonly draft?: SyncConnectionDraft | undefined
+      }) {
+        const connection = yield* connectionOf(input)
+        yield* Effect.annotateCurrentSpan({ 'dshx.plugin.package': '@dshfiles/backlog', 'dshx.backlog.sync.provider': connection.kind })
+        const provider = yield* registry.get(connection.kind)
+        const identity = yield* Effect.result(provider.identity(SyncEngineModel.providerConnection(connection)))
+        if (identity._tag === 'Failure') return failedTest(identity.failure)
+        if (input.draft === undefined) {
+          const at = yield* Clock.currentTimeMillis
+          const current = yield* snapshot
+          yield* sources
+            .replace({
+              ...current,
+              connections: current.connections.map(candidate =>
+                candidate.instanceId === connection.instanceId
+                  ? {
+                      ...candidate,
+                      identity: { account: identity.success.account.slice(0, 200), checkedAt: at, containers: identity.success.containers.slice(0, 500) },
+                    }
+                  : candidate,
+              ),
+            })
+            .pipe(Effect.catch(error => Effect.logWarning('backlog sync: the identity could not be cached', error)))
+        }
+        return {
+          ok: true,
+          credential: identity.success.credentialSource,
+          account: identity.success.account,
+          containers: identity.success.containers,
+          error: null,
+        } satisfies SyncConnectionTest
       })
 
       const testSaved = Effect.gen(function* () {
-        const rows = (yield* settings.get).syncBackends
+        const current = yield* snapshot
         const results = yield* Effect.forEach(
-          rows,
-          row =>
-            Effect.map(backends.test({ backend: row.backend, project: row.project, target: row.target, secret: row.secret }), report => ({
-              backend: row.backend,
-              project: row.project,
-              target: row.target,
-              enabled: row.enabled,
+          current.connections,
+          connection =>
+            Effect.map(testConnection({ connection: connection.instanceId }).pipe(Effect.catch(error => Effect.succeed(failedTest(error)))), report => ({
+              connection,
               report,
             })),
           { concurrency: 4 },
         )
-        return { results }
+        const saved = (yield* snapshot).connections
+        return {
+          results: results.map(result => ({
+            ...result,
+            connection: saved.find(connection => connection.instanceId === result.connection.instanceId) ?? result.connection,
+          })),
+        }
+      })
+
+      const saveConnection = Effect.fn('backlog sync save connection')(function* (input: {
+        readonly connection: Omit<SyncConnection, 'identity'>
+        readonly previousInstanceId?: string | undefined
+      }) {
+        yield* registry.get(input.connection.kind)
+        const current = yield* snapshot
+        const previousId = input.previousInstanceId ?? input.connection.instanceId
+        const previous = current.connections.find(connection => connection.instanceId === previousId)
+        if (input.connection.instanceId !== previousId && current.connections.some(connection => connection.instanceId === input.connection.instanceId))
+          return yield* new SyncConfigInvalid({ detail: `A connection named “${input.connection.instanceId}” already exists.` })
+        if (previous !== undefined && previous.kind !== input.connection.kind)
+          return yield* new SyncConfigInvalid({ detail: 'A connection keeps its provider; add a new connection for another provider.' })
+        const saved: SyncConnection = {
+          ...input.connection,
+          identity: previous?.credential === input.connection.credential ? (previous.identity ?? null) : null,
+        }
+        const connections =
+          previous === undefined
+            ? [...current.connections, saved]
+            : current.connections.map(connection => (connection.instanceId === previousId ? saved : connection))
+        const bindings = current.bindings.map(binding => (binding.connectionId === previousId ? { ...binding, connectionId: saved.instanceId } : binding))
+        yield* configWrite(sources.replace({ connections, bindings }))
+        return connectionView(saved, yield* registry.all)
+      })
+
+      const removeConnection = Effect.fn('backlog sync remove connection')(function* (input: { readonly instanceId: string }) {
+        const current = yield* snapshot
+        if (!current.connections.some(connection => connection.instanceId === input.instanceId))
+          return yield* new SyncConnectionMissing({ connection: input.instanceId })
+        yield* configWrite(
+          sources.replace({
+            connections: current.connections.filter(connection => connection.instanceId !== input.instanceId),
+            bindings: current.bindings.filter(binding => binding.connectionId !== input.instanceId),
+          }),
+        )
+      })
+
+      const moveConnection = Effect.fn('backlog sync move connection')(function* (input: {
+        readonly instanceId: string
+        readonly direction: 'earlier' | 'later'
+      }) {
+        const current = yield* snapshot
+        const index = current.connections.findIndex(connection => connection.instanceId === input.instanceId)
+        if (index < 0) return yield* new SyncConnectionMissing({ connection: input.instanceId })
+        const target = input.direction === 'earlier' ? index - 1 : index + 1
+        if (target < 0 || target >= current.connections.length) return
+        const connections = [...current.connections]
+        const [moved] = connections.splice(index, 1)
+        if (moved !== undefined) connections.splice(target, 0, moved)
+        yield* configWrite(sources.replace({ connections, bindings: current.bindings }))
+      })
+
+      const saveBinding = Effect.fn('backlog sync save binding')(function* (input: { readonly binding: BindingDraft }) {
+        const current = yield* snapshot
+        const previous = input.binding.id === undefined ? undefined : current.bindings.find(binding => binding.id === input.binding.id)
+        const defined = Object.fromEntries(Object.entries(input.binding).filter(([, value]) => value !== undefined))
+        const merged = { ...bindingDefaults, ...previous, ...defined }
+        const connectionId = merged.connectionId ?? ''
+        const connection = current.connections.find(candidate => candidate.instanceId === connectionId)
+        if (connection === undefined) return yield* new SyncConnectionMissing({ connection: connectionId })
+        const scope = typeof merged.scope === 'string' && merged.scope.trim() !== '' ? BacklogItems.projectPath(merged.scope) : null
+        const container = typeof merged.container === 'string' ? merged.container.trim() : ''
+        const id =
+          previous?.id ??
+          input.binding.id ??
+          BacklogSyncModel.uniqueSlug(
+            BacklogSyncModel.slugOf(
+              `${connection.instanceId}-${container || (scope === null ? 'all' : (scope.split('/').filter(Boolean).pop() ?? 'project'))}`,
+            ),
+            new Set(current.bindings.map(binding => binding.id)),
+          )
+        const decoded = Schema.decodeUnknownResult(BacklogSyncModel.bindingSchema)({
+          ...merged,
+          id,
+          connectionId,
+          container,
+          scope,
+          ownerHostId: previous?.ownerHostId ?? sources.hostId,
+        })
+        if (decoded._tag === 'Failure') return yield* new SyncConfigInvalid({ detail: `The binding is not valid: ${String(decoded.failure).slice(0, 300)}` })
+        const saved = decoded.success
+        const bindings = previous === undefined ? [...current.bindings, saved] : current.bindings.map(binding => (binding.id === saved.id ? saved : binding))
+        yield* configWrite(sources.replace({ connections: current.connections, bindings }))
+        return yield* bindingView(saved, current, yield* sources.refs.pipe(Effect.orDie))
+      })
+
+      const removeBinding = Effect.fn('backlog sync remove binding')(function* (input: { readonly binding: string }) {
+        const current = yield* snapshot
+        if (!current.bindings.some(binding => binding.id === input.binding)) return yield* new SyncBindingUnknown({ binding: input.binding })
+        yield* configWrite(
+          engine.withBinding(
+            input.binding,
+            sources.replace({ connections: current.connections, bindings: current.bindings.filter(binding => binding.id !== input.binding) }),
+          ),
+        )
+      })
+
+      const lastRun = yield* Ref.make<ReadonlyMap<string, number>>(new Map())
+      const autoSyncTick = Effect.gen(function* () {
+        const current = yield* snapshot
+        const at = yield* Clock.currentTimeMillis
+        const ran = yield* Ref.get(lastRun)
+        const due = yield* Effect.filter(
+          current.bindings.filter(binding => binding.enabled && binding.pollEverySec > 0 && binding.ownerHostId === sources.hostId),
+          binding =>
+            Effect.map(
+              sources.state(binding.id).pipe(Effect.orDie),
+              state => at - Math.max(ran.get(binding.id) ?? 0, state.lastPassAt ?? 0) >= binding.pollEverySec * 1_000,
+            ),
+        )
+        if (due.length === 0) return
+        yield* Ref.update(lastRun, previous => new Map([...previous, ...due.map(binding => [binding.id, at] as const)]))
+        yield* Effect.forEach(
+          due,
+          binding =>
+            passOf(binding).pipe(
+              Effect.catch(error => Effect.logWarning('backlog sync: a binding pass failed', { binding: binding.id, error: error.message })),
+            ),
+          { concurrency: 4, discard: true },
+        )
       })
 
       const deleteItem = Effect.fn('backlog sync delete item')(function* (input: { readonly id: number }) {
-        const ref = yield* refFor(input.id)
-        const deleted = yield* store.delete(input)
-        yield* tables.mappings.delete(String(input.id)).pipe(Effect.mapError(cause => new SyncWriteFailed({ itemId: input.id, ref, cause })))
-        return deleted
-      }, lock.withPermit)
+        const item = yield* itemOf(input.id)
+        const refs = item === undefined ? [] : yield* sources.refsOf(input.id).pipe(Effect.orDie)
+        // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- an item has a ref or two; each close is best-effort and logged.
+        for (const ref of refs) {
+          const binding = (yield* snapshot).bindings.find(candidate => candidate.id === ref.bindingId)
+          if (binding === undefined || item === undefined || binding.ownerHostId !== sources.hostId) continue
+          const context = yield* Effect.option(contextOf(binding))
+          if (Option.isNone(context)) continue
+          const flows = BacklogSyncModel.fieldFlows({ binding, capabilities: context.value.provider.descriptor.capabilities })
+          if (context.value.provider.descriptor.capabilities.delete !== 'close' || flows.get('status')?.push !== true) continue
+          yield* context.value.provider
+            .push({ ...SyncEngineModel.scopeOf(context.value, item.project), key: ref.key, patch: { status: 'dropped' } })
+            .pipe(Effect.catch(error => Effect.logWarning('backlog sync: the remote item could not be closed', { binding: binding.id, error: error.message })))
+        }
+        return yield* store.delete(input)
+      })
 
-      return BacklogSync.of({ status, syncNow, link, importRemote, autoSyncTick, testConnection: backends.test, testSaved, deleteItem })
+      return BacklogSync.of({
+        status,
+        syncNow,
+        link,
+        importRemote,
+        importAll,
+        discover: testConnection,
+        testConnection,
+        testSaved,
+        saveConnection,
+        removeConnection,
+        moveConnection,
+        saveBinding,
+        removeBinding,
+        autoSyncTick,
+        deleteItem,
+      })
     }),
   )
 }
 
-/** Auto-sync: a minute tick runs every backend row whose interval is due; a failing tick is logged and retried. */
+/** Auto-sync: a minute tick runs every binding whose interval is due; a failing tick is logged and retried. */
 export const RemoteSyncLoop = Layer.effectDiscard(
   Effect.gen(function* () {
     const sync = yield* BacklogSync
@@ -720,8 +821,3 @@ export const RemoteSyncLoop = Layer.effectDiscard(
     yield* DshxPlugin.worker(Effect.sleep('1 minute').pipe(Effect.andThen(Effect.repeat(tick, Schedule.spaced('1 minute')))))
   }),
 )
-
-export class BacklogSyncConfig {
-  static readonly rowFor = rowFor
-  static readonly environmentVariables = environmentVariables
-}

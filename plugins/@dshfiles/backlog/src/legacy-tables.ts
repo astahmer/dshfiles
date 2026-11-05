@@ -3,7 +3,7 @@ import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { Context, Effect, Layer, Option, Schema } from 'effect'
 import { BacklogItems, type BacklogItem } from './item.js'
-import { BacklogSyncModel, type SyncMapping } from './sync-model.js'
+import { LegacySyncMappings, type SyncMapping } from './sync-legacy-mapping.js'
 
 /**
  * The storage-domain JSON tables the backlog kept before its SQLite op log. They are read once, by the importer, and
@@ -47,7 +47,7 @@ const backlogSyncDomain = defineDomain({
   name: 'backlog_sync',
   version: 1,
   tables: {
-    mappings: { valueSchema: zodSchemaFromEffect(BacklogSyncModel.mappingSchema), __key: 'mappings' },
+    mappings: { valueSchema: zodSchemaFromEffect(LegacySyncMappings.schema), __key: 'mappings' },
   },
 })
 

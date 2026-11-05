@@ -1,32 +1,43 @@
 import { Schema } from 'effect'
-import { BacklogItems, type BacklogItem, type BacklogStatus } from './item.js'
+import { BacklogItems, type BacklogItem, type BacklogPriority, type BacklogStatus } from './item.js'
+import { BacklogProviders, type ProviderCapabilities, type ProviderField, type RemoteRecord } from './provider-port.js'
 
-/** The remote trackers a backlog item can mirror. */
-const backends = ['linear', 'github'] as const
 const syncStates = ['synced', 'pending', 'conflict', 'error'] as const
-/** The item fields two-way sync owns; kind, project, attention and pins stay local. */
-const syncedFields = ['title', 'body', 'status', 'tags'] as const
+/** The item fields sync may own; kind, project, attention and pins stay local. */
+const syncedFields = BacklogProviders.fields
+const directions = ['pull', 'push', 'two-way'] as const
+const fieldDirections = ['two-way', 'pull', 'push', 'off'] as const
+const conflictPolicies = ['lww', 'local-wins', 'remote-wins', 'flag'] as const
 
 const MAX_CONFLICTS = 20
 const MAX_COMMENT_PAIRS = 400
+const MAX_POLL_SECONDS = 86_400
 
-const backendSchema = Schema.Literals(backends)
+const slugSchema = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,63}$/))
 const fieldSchema = Schema.Literals(syncedFields)
 const timestamp = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const remoteKeySchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(300))
 
-/** The synced fields as one side last saw them; a remote side may not express a status (null). */
+/**
+ * One side of an item as the last sync left it. `parent` and `links` hold remote keys on both sides (a local parent
+ * ref reads as its item's key in the same binding), so the two sides compare. A field absent from a snapshot was not
+ * synced then.
+ */
 const snapshotSchema = Schema.Struct({
-  title: Schema.String.check(Schema.isMaxLength(BacklogItems.maxTitleChars * 2)),
+  title: Schema.String.check(Schema.isMaxLength(BacklogItems.maxTitleChars * 5)),
   body: Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars * 4)),
   status: Schema.NullOr(BacklogItems.statusSchema),
-  tags: Schema.Array(Schema.String.check(Schema.isMaxLength(60))).check(Schema.isMaxLength(50)),
+  tags: Schema.Array(Schema.String.check(Schema.isMaxLength(120))).check(Schema.isMaxLength(100)),
+  priority: Schema.optionalKey(BacklogItems.prioritySchema),
+  parent: Schema.optionalKey(Schema.NullOr(remoteKeySchema)),
+  links: Schema.optionalKey(Schema.Array(Schema.String.check(Schema.isMaxLength(340))).check(Schema.isMaxLength(200))),
 })
 
-/** One field both sides changed since the last sync, and which side's value was kept. */
+/** One field both sides changed since the last sync, and which side's value was kept (`none` when the policy flags it). */
 const conflictSchema = Schema.Struct({
   field: fieldSchema,
   at: timestamp,
-  kept: Schema.Literals(['local', 'remote']),
+  kept: Schema.Literals(['local', 'remote', 'none']),
   local: Schema.String.check(Schema.isMaxLength(2_000)),
   remote: Schema.String.check(Schema.isMaxLength(2_000)),
 })
@@ -37,25 +48,67 @@ const syncErrorSchema = Schema.Struct({
   at: timestamp,
 })
 
-/**
- * How one item is tied to one remote issue. `base` keeps both sides as the last sync left them, so a lossy mapping (a
- * GitHub issue has no "in progress") never reads as a change on the next pass.
- */
-const mappingSchema = Schema.Struct({
-  itemId: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
-  backend: backendSchema,
-  remoteId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
-  remoteKey: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
-  url: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTargetChars)),
+/** An account: several per provider ("GitHub – work", "GitHub – perso"). The key is a reference, never a value. */
+const connectionSchema = Schema.Struct({
+  instanceId: slugSchema,
+  kind: Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]{1,31}$/)),
+  label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+  credential: Schema.String.check(Schema.isMaxLength(400)),
+  baseUrl: Schema.String.check(Schema.isMaxLength(500)),
+  /** What the last Test connection saw; never the key. */
+  identity: Schema.NullOr(
+    Schema.Struct({
+      account: Schema.String.check(Schema.isMaxLength(200)),
+      checkedAt: timestamp,
+      containers: Schema.Array(BacklogProviders.containerSchema).check(Schema.isMaxLength(500)),
+    }),
+  ),
+})
+
+const valueMapSchema = Schema.Array(
+  Schema.Struct({
+    local: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+    remote: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  }),
+).check(Schema.isMaxLength(100))
+
+/** One field's flow, and how its values translate (status → a remote state name, tag → a remote label). */
+const fieldRuleSchema = Schema.Struct({ field: fieldSchema, direction: Schema.Literals(fieldDirections), values: valueMapSchema })
+
+/** A sync flow: one container of one connection, serving every project or one project. */
+const bindingSchema = Schema.Struct({
+  id: slugSchema,
+  connectionId: slugSchema,
+  /** Team key, `owner/repo`, folder… Empty lets the provider derive it from the project (a git remote, `<project>/backlog`). */
+  container: Schema.String.check(Schema.isMaxLength(500)),
+  /** null serves every project that has no binding of its own on that connection kind. */
+  scope: Schema.NullOr(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTargetChars))),
+  direction: Schema.Literals(directions),
+  fieldMap: Schema.Array(fieldRuleSchema).check(Schema.isMaxLength(syncedFields.length)),
+  conflictPolicy: Schema.Literals(conflictPolicies),
+  /** 0 syncs only on Sync now. */
+  pollEverySec: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(MAX_POLL_SECONDS)),
+  pushAgentComments: Schema.Boolean,
+  /** A pull also creates items for remote items no backlog item mirrors yet. */
+  importNew: Schema.Boolean,
+  enabled: Schema.Boolean,
+  /** The Host that runs this binding's sync; other Hosts leave it alone. */
+  ownerHostId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+})
+
+/** How one item is tied to one remote item through one binding. An item may have several, one per binding. */
+const externalRefSchema = Schema.Struct({
+  bindingId: slugSchema,
+  key: remoteKeySchema,
+  displayKey: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
+  url: Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)),
   linkedAt: timestamp,
   lastSyncedAt: Schema.NullOr(timestamp),
-  /** Remote `updatedAt` seen at the last sync. */
   remoteUpdatedAt: Schema.NullOr(timestamp),
-  /** Item revision (`lastActivityAt`) right after the last sync. */
+  lastRemoteVersion: Schema.NullOr(Schema.String.check(Schema.isMaxLength(200))),
   localSyncedAt: Schema.NullOr(timestamp),
   base: Schema.NullOr(Schema.Struct({ local: snapshotSchema, remote: snapshotSchema })),
-  /** Local comment id ↔ remote comment id, for comments either side already carried over. */
-  comments: Schema.Array(Schema.Struct({ local: Schema.String.check(Schema.isMaxLength(128)), remote: Schema.String.check(Schema.isMaxLength(200)) })).check(
+  comments: Schema.Array(Schema.Struct({ local: Schema.String.check(Schema.isMaxLength(128)), remote: Schema.String.check(Schema.isMaxLength(300)) })).check(
     Schema.isMaxLength(MAX_COMMENT_PAIRS),
   ),
   /** Local comments older than the link are not pushed unless the item was created remotely from here. */
@@ -65,193 +118,300 @@ const mappingSchema = Schema.Struct({
   lastError: Schema.NullOr(syncErrorSchema),
 })
 
-export type SyncBackendKind = (typeof backends)[number]
 export type SyncState = (typeof syncStates)[number]
-export type SyncField = (typeof syncedFields)[number]
+export type SyncField = ProviderField
+export type SyncDirection = (typeof directions)[number]
+export type SyncFieldDirection = (typeof fieldDirections)[number]
+export type SyncConflictPolicy = (typeof conflictPolicies)[number]
 export type SyncSnapshot = typeof snapshotSchema.Type
 export type SyncConflict = typeof conflictSchema.Type
-export type SyncMapping = typeof mappingSchema.Type
 export type SyncErrorRecord = typeof syncErrorSchema.Type
+export type SyncConnection = typeof connectionSchema.Type
+export type SyncBinding = typeof bindingSchema.Type
+export type SyncFieldRule = typeof fieldRuleSchema.Type
+export type ExternalRef = typeof externalRefSchema.Type
 
-/** A remote issue as a backend reports it, already normalized to backlog vocabulary. */
-export interface RemoteComment {
-  readonly id: string
-  readonly body: string
-  readonly author: string
-  readonly createdAt: number
-}
-
-export interface RemoteIssue {
-  readonly id: string
-  readonly key: string
-  readonly url: string
-  readonly title: string
-  readonly body: string
-  readonly status: BacklogStatus | null
-  readonly tags: readonly string[]
-  readonly updatedAt: number
-  readonly comments: readonly RemoteComment[]
-}
-
-/** What the merge decided for one item: fields to write locally, fields to write remotely, and conflicts it settled. */
+/** What the merge wants written to one side; `parent` and `links` are in remote-key space. */
 export interface SyncFieldValues {
   title?: string
   body?: string
   status?: BacklogStatus
   tags?: readonly string[]
+  priority?: BacklogPriority
+  parent?: string | null
+  links?: readonly string[]
 }
 
 export interface SyncPlan {
   readonly pull: Readonly<SyncFieldValues>
   readonly push: Readonly<SyncFieldValues>
   readonly conflicts: readonly SyncConflict[]
+  /** Fields the policy flagged: their base stays put, so the next pass sees the conflict until both sides agree. */
+  readonly flagged: readonly SyncField[]
 }
 
-/** Copies one field of a snapshot into a change; a status the side cannot express is left out. */
-const take = (target: SyncFieldValues, field: SyncField, from: SyncSnapshot): void => {
-  if (field === 'status') {
-    if (from.status !== null) target.status = from.status
-  } else if (field === 'tags') target.tags = from.tags
-  else target[field] = from[field]
+/** Every field two-way, title to links: the default of a new binding and of a migrated settings row. */
+const defaultFieldMap = (fields: readonly SyncField[] = ['title', 'body', 'status', 'tags', 'priority', 'parent', 'links']): SyncFieldRule[] =>
+  fields.map(field => ({ field, direction: 'two-way', values: [] }))
+
+/** Whether a direction lets a change flow one way. */
+const allows = (direction: SyncDirection | SyncFieldDirection, way: 'pull' | 'push'): boolean => direction === 'two-way' || direction === way
+
+/** What the provider can carry for one field. */
+const supports = (capabilities: ProviderCapabilities, field: SyncField): boolean => {
+  if (field === 'tags') return capabilities.labels
+  if (field === 'priority') return capabilities.priority
+  if (field === 'parent') return capabilities.parent
+  if (field === 'links') return capabilities.relations.length > 0
+  return true
 }
-
-const sameValue = (left: SyncSnapshot[SyncField], right: SyncSnapshot[SyncField]): boolean =>
-  Array.isArray(left) && Array.isArray(right) ? [...left].sort().join('\n') === [...right].sort().join('\n') : left === right
-
-const display = (value: SyncSnapshot[SyncField]): string => (value === null ? '' : Array.isArray(value) ? value.join(', ') : String(value)).slice(0, 2_000)
-
-const localSnapshot = (item: Pick<BacklogItem, 'title' | 'body' | 'status' | 'tags'>): SyncSnapshot => ({
-  title: item.title,
-  body: item.body,
-  status: item.status,
-  tags: [...item.tags],
-})
-
-const remoteSnapshot = (issue: Pick<RemoteIssue, 'title' | 'body' | 'status' | 'tags'>): SyncSnapshot => ({
-  title: issue.title,
-  body: issue.body,
-  status: issue.status,
-  tags: issue.tags.map(tag => tag.toLowerCase()),
-})
-
-/** When the item last changed one field, from its event history; an item without a recorded change uses its creation. */
-const localChangedAt = (item: Pick<BacklogItem, 'events' | 'createdAt'>, field: SyncField): number =>
-  // `api.ts` reaches this module from plugins that compile against ES2022, so no `findLast` here.
-  [...item.events].reverse().find(event => event.fieldChanges?.some(change => change.field === field) === true)?.at ?? item.createdAt
 
 /**
- * The conflict policy, field by field against the last synced base: a field only one side changed flows to the other;
- * a field both sides changed to different values goes to the side that changed last (last writer wins), and the loser's
- * value is kept in a conflict note. A first sync without a base takes the remote side for every field it can express.
+ * Each field's effective flow for a binding: the binding's direction, the field's own rule (an unlisted field is off),
+ * and what the provider can do (a read-only provider never pushes).
+ */
+const fieldFlows = (input: { readonly binding: Pick<SyncBinding, 'direction' | 'fieldMap'>; readonly capabilities: ProviderCapabilities }) =>
+  new Map(
+    syncedFields.map(field => {
+      const rule = input.binding.fieldMap.find(candidate => candidate.field === field)
+      const supported = supports(input.capabilities, field) && input.capabilities.read
+      const pull = supported && rule !== undefined && allows(input.binding.direction, 'pull') && allows(rule.direction, 'pull')
+      const push = supported && rule !== undefined && input.capabilities.write && allows(input.binding.direction, 'push') && allows(rule.direction, 'push')
+      return [field, { pull, push }] as const
+    }),
+  )
+
+const sorted = (values: readonly string[]): string => [...values].sort().join('\n')
+
+const sameValue = (left: SyncSnapshot[SyncField] | undefined, right: SyncSnapshot[SyncField] | undefined): boolean =>
+  Array.isArray(left) && Array.isArray(right) ? sorted(left) === sorted(right) : (left ?? null) === (right ?? null)
+
+const display = (value: SyncSnapshot[SyncField] | undefined): string =>
+  (value === null || value === undefined ? '' : Array.isArray(value) ? value.join(', ') : String(value)).slice(0, 2_000)
+
+/** The value one snapshot holds for a field, `undefined` when that side does not carry it. */
+const valueOf = (snapshot: SyncSnapshot, field: SyncField): SyncSnapshot[SyncField] | undefined => snapshot[field]
+
+const isStatus = (value: unknown): value is BacklogStatus => BacklogItems.statuses.some(status => status === value)
+const isPriority = (value: unknown): value is BacklogPriority => BacklogItems.priorities.some(priority => priority === value)
+
+const take = (target: SyncFieldValues, field: SyncField, value: SyncSnapshot[SyncField] | undefined): void => {
+  if (value === undefined) return
+  switch (field) {
+    case 'title':
+    case 'body':
+      if (typeof value === 'string') target[field] = value
+      return
+    case 'status':
+      if (isStatus(value)) target.status = value
+      return
+    case 'priority':
+      if (isPriority(value)) target.priority = value
+      return
+    case 'parent':
+      if (value === null || typeof value === 'string') target.parent = value
+      return
+    case 'tags':
+    case 'links':
+      if (Array.isArray(value)) target[field] = value
+  }
+}
+
+/** When the item last changed one field, from its history; an item without a recorded change uses its creation. */
+const localChangedAt = (item: Pick<BacklogItem, 'events' | 'createdAt'>, field: SyncField): number =>
+  // `api.ts` reaches this module from plugins that compile against ES2022, so no `findLast` here.
+  [...item.events]
+    .reverse()
+    .find(event =>
+      field === 'links' ? event.kind === 'linked' || event.kind === 'unlinked' : event.fieldChanges?.some(change => change.field === field) === true,
+    )?.at ?? item.createdAt
+
+/** Which side a two-sided change keeps under a policy; `none` writes neither. */
+const keptSide = (input: { readonly policy: SyncConflictPolicy; readonly remoteNewer: boolean }): SyncConflict['kept'] => {
+  switch (input.policy) {
+    case 'flag':
+      return 'none'
+    case 'local-wins':
+      return 'local'
+    case 'remote-wins':
+      return 'remote'
+    case 'lww':
+      return input.remoteNewer ? 'remote' : 'local'
+  }
+}
+
+/**
+ * The merge, field by field against the last synced base. A field only one side changed flows to the other, when the
+ * field's flow allows it; a field both sides changed to different values is settled by the binding's policy: `lww`
+ * keeps the side that changed last, `local-wins`/`remote-wins` keep that side, `flag` writes neither side and keeps the
+ * conflict until both agree. A first sync (no base) adopts the remote side, except tags (their union) and a status the
+ * remote's status already stands for (`doing` survives GitHub's open).
  */
 const plan = (input: {
-  readonly item: Pick<BacklogItem, 'title' | 'body' | 'status' | 'tags' | 'events' | 'createdAt'>
-  readonly remote: RemoteIssue
-  readonly base: SyncMapping['base']
+  readonly item: Pick<BacklogItem, 'events' | 'createdAt'>
+  readonly local: SyncSnapshot
+  readonly remote: SyncSnapshot
+  /** The backlog statuses the remote status stands for; empty compares the category alone. */
+  readonly remoteStatusEquivalents: readonly BacklogStatus[]
+  readonly remoteUpdatedAt: number
+  readonly base: { readonly local: SyncSnapshot; readonly remote: SyncSnapshot } | null
+  readonly flows: ReadonlyMap<SyncField, { readonly pull: boolean; readonly push: boolean }>
+  readonly policy: SyncConflictPolicy
   readonly at: number
 }): SyncPlan => {
-  const local = localSnapshot(input.item)
-  const remote = remoteSnapshot(input.remote)
   const pull: SyncFieldValues = {}
   const push: SyncFieldValues = {}
   const conflicts: SyncConflict[] = []
+  const flagged: SyncField[] = []
+  const agrees = (field: SyncField, localValue: SyncSnapshot[SyncField] | undefined, remoteValue: SyncSnapshot[SyncField] | undefined): boolean =>
+    field === 'status' && typeof localValue === 'string' && input.remoteStatusEquivalents.some(status => status === localValue)
+      ? true
+      : sameValue(localValue, remoteValue)
   for (const field of syncedFields) {
-    const localValue = local[field]
-    const remoteValue = remote[field]
+    const flow = input.flows.get(field) ?? { pull: false, push: false }
+    if (!flow.pull && !flow.push) continue
+    const localValue = valueOf(input.local, field)
+    const remoteValue = valueOf(input.remote, field)
+    if (localValue === undefined || remoteValue === undefined) continue
     if (field === 'status' && remoteValue === null) continue
-    if (input.base === null) {
-      // Linking adopts the issue, except tags: neither side's labels are dropped, both end up with the union.
-      if (field === 'tags') {
-        const union = [...new Set([...local.tags, ...remote.tags])]
-        if (!sameValue(union, local.tags)) pull.tags = union
-        if (!sameValue(union, remote.tags)) push.tags = union
-      } else if (!sameValue(localValue, remoteValue)) take(pull, field, remote)
+    const baseLocal = input.base === null ? undefined : valueOf(input.base.local, field)
+    const baseRemote = input.base === null ? undefined : valueOf(input.base.remote, field)
+    if (baseLocal === undefined || baseRemote === undefined) {
+      if (field === 'tags' && Array.isArray(localValue) && Array.isArray(remoteValue)) {
+        const union = [...new Set([...localValue, ...remoteValue])]
+        if (flow.pull && !sameValue(union, localValue)) pull.tags = union
+        if (flow.push && !sameValue(union, remoteValue)) push.tags = union
+        continue
+      }
+      if (agrees(field, localValue, remoteValue)) continue
+      if (flow.pull) take(pull, field, remoteValue)
+      else if (flow.push) take(push, field, localValue)
       continue
     }
-    const localChanged = !sameValue(localValue, input.base.local[field])
-    const remoteChanged = !sameValue(remoteValue, input.base.remote[field])
+    const localChanged = !sameValue(localValue, baseLocal)
+    const remoteChanged = !sameValue(remoteValue, baseRemote)
     if (!localChanged && !remoteChanged) continue
     if (localChanged && !remoteChanged) {
-      take(push, field, local)
+      if (flow.push && !agrees(field, localValue, remoteValue)) take(push, field, localValue)
       continue
     }
     if (!localChanged) {
-      take(pull, field, remote)
+      if (flow.pull && !agrees(field, localValue, remoteValue)) take(pull, field, remoteValue)
       continue
     }
-    if (sameValue(localValue, remoteValue)) continue
-    const remoteWins = input.remote.updatedAt > localChangedAt(input.item, field)
-    take(remoteWins ? pull : push, field, remoteWins ? remote : local)
-    conflicts.push({ field, at: input.at, kept: remoteWins ? 'remote' : 'local', local: display(localValue), remote: display(remoteValue) })
+    if (agrees(field, localValue, remoteValue)) continue
+    const keep = keptSide({ policy: input.policy, remoteNewer: input.remoteUpdatedAt > localChangedAt(input.item, field) })
+    const kept = keep === 'remote' && !flow.pull ? 'local' : keep === 'local' && !flow.push ? 'remote' : keep
+    if (kept === 'remote') take(pull, field, remoteValue)
+    if (kept === 'local') take(push, field, localValue)
+    if (kept === 'none') flagged.push(field)
+    conflicts.push({ field, at: input.at, kept, local: display(localValue), remote: display(remoteValue) })
   }
-  return { pull, push, conflicts }
+  return { pull, push, conflicts, flagged }
+}
+
+/** A local status translated through a binding's value map: `doing` → `In Review` when the map says so. */
+const remoteLabelOf = (rules: readonly SyncFieldRule[], field: 'status' | 'tags', local: string): string | undefined =>
+  rules.find(rule => rule.field === field)?.values.find(pair => pair.local === local)?.remote
+
+const localValueOf = (rules: readonly SyncFieldRule[], field: 'status' | 'tags', remote: string): string | undefined =>
+  rules.find(rule => rule.field === field)?.values.find(pair => pair.remote.toLowerCase() === remote.toLowerCase())?.local
+
+/** The remote side of a record as a snapshot, in local vocabulary: value maps applied, tags lowercased. */
+const remoteSnapshot = (input: { readonly record: RemoteRecord; readonly rules: readonly SyncFieldRule[] }): SyncSnapshot => {
+  const record = input.record
+  const mappedStatus = record.status === null ? undefined : localValueOf(input.rules, 'status', record.status.label)
+  const status = isStatus(mappedStatus) ? mappedStatus : record.status?.category
+  return {
+    title: record.title,
+    body: record.body,
+    status: status ?? null,
+    tags: record.tags.map(tag => (localValueOf(input.rules, 'tags', tag) ?? tag).toLowerCase()),
+    ...(record.priority !== undefined && { priority: record.priority }),
+    ...(record.parentKey !== undefined && { parent: record.parentKey }),
+    ...(record.relations !== undefined && { links: record.relations.map(relation => `${relation.relation}:${relation.key}`) }),
+  }
 }
 
 /** `synced` turns `pending` once the item changed a synced field after the last pass. */
-const stateOf = (mapping: SyncMapping, item: Pick<BacklogItem, 'title' | 'body' | 'status' | 'tags'> | undefined): SyncState => {
-  if (mapping.state !== 'synced') return mapping.state
-  const base = mapping.base
-  if (base === null || item === undefined) return 'pending'
-  const local = localSnapshot(item)
-  return syncedFields.some(field => !sameValue(local[field], base.local[field])) ? 'pending' : 'synced'
+const stateOf = (ref: Pick<ExternalRef, 'state' | 'base'>, local: SyncSnapshot | undefined): SyncState => {
+  if (ref.state !== 'synced') return ref.state
+  const base = ref.base
+  if (base === null || local === undefined) return 'pending'
+  return syncedFields.some(field => valueOf(base.local, field) !== undefined && !sameValue(valueOf(local, field), valueOf(base.local, field)))
+    ? 'pending'
+    : 'synced'
 }
 
-const conflictNote = (backend: SyncBackendKind, key: string, conflicts: readonly SyncConflict[]): string =>
+const conflictNote = (input: { readonly source: string; readonly key: string; readonly conflicts: readonly SyncConflict[] }): string =>
   [
-    `Sync conflict with ${backendLabel(backend)} ${key}: both sides changed ${conflicts.map(conflict => conflict.field).join(', ')} since the last sync.`,
-    ...conflicts.map(conflict =>
+    `Sync conflict with ${input.source} ${input.key}: both sides changed ${input.conflicts.map(conflict => conflict.field).join(', ')} since the last sync.`,
+    ...input.conflicts.map(conflict =>
       conflict.kept === 'remote'
-        ? `- ${conflict.field}: kept the ${backendLabel(backend)} value (changed last). The local value was: ${conflict.local || '(empty)'}`
-        : `- ${conflict.field}: kept the local value (changed last). The ${backendLabel(backend)} value was: ${conflict.remote || '(empty)'}`,
+        ? `- ${conflict.field}: kept the ${input.source} value. The local value was: ${conflict.local || '(empty)'}`
+        : conflict.kept === 'local'
+          ? `- ${conflict.field}: kept the local value. The ${input.source} value is: ${conflict.remote || '(empty)'}`
+          : `- ${conflict.field}: left both sides as they are. Local: ${conflict.local || '(empty)'} · ${input.source}: ${conflict.remote || '(empty)'}`,
     ),
-    'Edit the field again to choose the other value; the next sync carries it over.',
+    input.conflicts.some(conflict => conflict.kept === 'none')
+      ? 'Make both sides agree (edit either one) to clear the conflict; the next sync carries the rest over.'
+      : 'Edit the field again to choose the other value; the next sync carries it over.',
   ].join('\n')
 
-const backendLabel = (backend: SyncBackendKind): string => (backend === 'linear' ? 'Linear' : 'GitHub')
-
 /** A remote comment as it lands on the item, so the reader sees where it came from. */
-const importedCommentText = (backend: SyncBackendKind, comment: RemoteComment): string =>
-  `${backendLabel(backend)} · ${comment.author}: ${comment.body}`.slice(0, BacklogItems.maxBodyChars)
+const importedCommentText = (input: { readonly source: string; readonly author: string; readonly body: string }): string =>
+  `${input.source} · ${input.author}: ${input.body}`.slice(0, BacklogItems.maxBodyChars)
 
-/** The tracker a comment carried over by `importedCommentText` came from, read back from its prefix. */
-const importedCommentBackend = (text: string): SyncBackendKind | undefined => backends.find(backend => text.startsWith(`${backendLabel(backend)} · `))
-
-/** A local comment as it lands on the remote issue. */
+/** A local comment as it lands on the remote item. */
 const exportedCommentText = (itemLabel: string, actor: string, text: string): string =>
   `${text}\n\n— ${actor === 'user' ? 'you' : actor} on backlog ${itemLabel}`
 
-/** The tracker an issue reference names: `ENG-12` or a linear.app URL is Linear; `42`, `owner/repo#42` or a github.com URL is GitHub. */
-const backendOfReference = (reference: string): SyncBackendKind | undefined => {
-  const trimmed = reference.trim()
-  if (/^[A-Za-z][A-Za-z0-9]{0,9}-\d+$/u.test(trimmed)) return 'linear'
-  if (/^(?:[\w.-]+\/[\w.-]+)?#?\d+$/u.test(trimmed)) return 'github'
-  if (!URL.canParse(trimmed)) return undefined
-  const hostname = new URL(trimmed).hostname
-  if (hostname === 'linear.app') return 'linear'
-  if (hostname === 'github.com') return 'github'
-  return undefined
+/** A binding id from free text: lowercase, dashes, at most 64 characters. */
+const slugOf = (text: string): string =>
+  text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '')
+    .slice(0, 48) || 'default'
+
+/** A slug not in `taken`: `base`, then `base-2`, `base-3`… */
+const uniqueSlug = (base: string, taken: ReadonlySet<string>): string => {
+  if (!taken.has(base)) return base
+  for (let index = 2; ; index += 1) {
+    const candidate = `${base}-${String(index)}`
+    if (!taken.has(candidate)) return candidate
+  }
 }
 
 export class BacklogSyncModel {
-  static readonly backendOfReference = backendOfReference
-  static readonly backends = backends
   static readonly syncStates = syncStates
   static readonly syncedFields = syncedFields
+  static readonly directions = directions
+  static readonly fieldDirections = fieldDirections
+  static readonly conflictPolicies = conflictPolicies
   static readonly maxConflicts = MAX_CONFLICTS
   static readonly maxCommentPairs = MAX_COMMENT_PAIRS
-  static readonly backendSchema = backendSchema
-  static readonly mappingSchema = mappingSchema
+  static readonly maxPollSeconds = MAX_POLL_SECONDS
+  static readonly slugSchema = slugSchema
+  static readonly fieldSchema = fieldSchema
+  static readonly connectionSchema = connectionSchema
+  static readonly bindingSchema = bindingSchema
+  static readonly fieldRuleSchema = fieldRuleSchema
+  static readonly externalRefSchema = externalRefSchema
   static readonly conflictSchema = conflictSchema
   static readonly syncErrorSchema = syncErrorSchema
   static readonly snapshotSchema = snapshotSchema
-  static readonly localSnapshot = localSnapshot
-  static readonly remoteSnapshot = remoteSnapshot
+  static readonly defaultFieldMap = defaultFieldMap
+  static readonly fieldFlows = fieldFlows
   static readonly localChangedAt = localChangedAt
   static readonly plan = plan
+  static readonly remoteSnapshot = remoteSnapshot
+  static readonly remoteLabelOf = remoteLabelOf
   static readonly stateOf = stateOf
   static readonly conflictNote = conflictNote
-  static readonly backendLabel = backendLabel
   static readonly importedCommentText = importedCommentText
-  static readonly importedCommentBackend = importedCommentBackend
   static readonly exportedCommentText = exportedCommentText
+  static readonly slugOf = slugOf
+  static readonly uniqueSlug = uniqueSlug
+  static readonly sameValue = sameValue
 }

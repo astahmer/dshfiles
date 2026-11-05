@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { GithubMapping } from './sync-github.js'
+import { FilesMapping } from './provider-files.js'
+import { GithubMapping } from './provider-github.js'
+import { LinearMapping } from './provider-linear.js'
+import { BacklogProviders } from './provider-port.js'
 import { GithubRemotes } from './sync-local-probes.js'
-import { BacklogSyncModel } from './sync-model.js'
+
+const descriptors = [LinearMapping.descriptor, GithubMapping.descriptor, FilesMapping.descriptor]
+const kindsOf = (reference: string) => descriptors.filter(descriptor => BacklogProviders.recognizes(descriptor, reference)).map(descriptor => descriptor.kind)
 
 describe('GithubRemotes.repositoryOfUrl', () => {
   it.each([
@@ -43,11 +48,15 @@ describe('BacklogSyncModel.backendOfReference', () => {
     ['https://github.com/acme/app/issues/42', 'github'],
     ['  ENG-12  ', 'linear'],
   ])('reads %s as %s', (reference, backend) => {
-    expect(BacklogSyncModel.backendOfReference(reference)).toBe(backend)
+    expect(kindsOf(reference)).toEqual([backend])
   })
 
   it.each(['', 'fix the bug', 'https://example.com/issue/1'])('names no tracker for %j', reference => {
-    expect(BacklogSyncModel.backendOfReference(reference)).toBeUndefined()
+    expect(kindsOf(reference)).toEqual([])
+  })
+
+  it('recognizes a markdown file name as the files provider', () => {
+    expect(kindsOf('k3f9-fix-login.md')).toEqual(['files'])
   })
 })
 

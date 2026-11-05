@@ -7,7 +7,7 @@ import { BacklogRepo } from './backlog-repo.js'
 import { BacklogItems, type BacklogItem } from './item.js'
 import { BacklogOps } from './op-log.js'
 import { BacklogStore } from './store.js'
-import { BacklogSyncModel } from './sync-model.js'
+import { LegacySyncMappings } from './sync-legacy-mapping.js'
 import { backlogStoreLayer } from './test-support.js'
 
 /**
@@ -23,7 +23,7 @@ const fileSchema = Schema.Struct({ itemId: Schema.Number, attachment: BacklogIte
 const domainFile = <Table extends Schema.Top>(table: Table) => Schema.fromJsonString(Schema.Struct({ tables: table }))
 const itemsFile = domainFile(Schema.Struct({ items: Schema.Record(Schema.String, BacklogItems.itemSchema) }))
 const filesFile = domainFile(Schema.Struct({ files: Schema.Record(Schema.String, fileSchema) }))
-const mappingsFile = domainFile(Schema.Struct({ mappings: Schema.Record(Schema.String, BacklogSyncModel.mappingSchema) }))
+const mappingsFile = domainFile(Schema.Struct({ mappings: Schema.Record(Schema.String, LegacySyncMappings.schema) }))
 const countersFile = domainFile(Schema.Struct({ counters: Schema.Record(Schema.String, Schema.Struct({ nextId: Schema.Number })) }))
 
 /** The copy's text of one domain file, or `null` when the live store never wrote it. */

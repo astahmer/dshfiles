@@ -10,7 +10,7 @@ import { BacklogOrigins } from './event-origin.js'
 import type { BacklogItem } from './item.js'
 import { BacklogOps } from './op-log.js'
 import { BacklogStore } from './store.js'
-import type { SyncMapping } from './sync-model.js'
+import type { SyncMapping } from './sync-legacy-mapping.js'
 import { backlogRows, backlogStoreLayer } from './test-support.js'
 import { ulidPattern } from './ulid.js'
 

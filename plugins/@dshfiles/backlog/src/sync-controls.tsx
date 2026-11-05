@@ -1,5 +1,16 @@
 import { parseSecretReference } from '@dshfiles/credential-port'
-import { useApi, useSettings } from '@dshfiles/dshx/client'
+import { isApiError } from '@dshfiles/dshx/api'
+import { useApi } from '@dshfiles/dshx/client'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { ContextMenuItem } from '@dshfiles/plugin-ui/components/ui/context-menu'
@@ -7,73 +18,121 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import {
-  ChevronUpIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
   CircleCheckIcon,
   CloudIcon,
+  DownloadIcon,
   ExternalLinkIcon,
-  KeyRoundIcon,
   LinkIcon,
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
   Trash2Icon,
-  Undo2Icon,
   UnlinkIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { errorMessage, useIsFetching, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { Fragment, useState } from 'react'
 
 import { BacklogReference } from './backlog-reference.js'
-import { backlogApi, type BacklogSyncItemView, type BacklogSyncResultView, type BacklogSyncStatusView } from './api.js'
+import {
+  backlogApi,
+  type BacklogSyncBindingView,
+  type BacklogSyncConnectionView,
+  type BacklogSyncItemView,
+  type BacklogSyncResultView,
+  type BacklogSyncStatusView,
+  type BacklogSyncTestView,
+} from './api.js'
+import { BacklogItems } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogNotices } from './notices.js'
-import { backlogSettings, type BacklogSettings } from './settings.js'
-import { BacklogSyncModel, type SyncBackendKind, type SyncState } from './sync-model.js'
+import type { ProviderDescriptor } from './provider-port.js'
+import { BacklogSyncModel, type SyncBinding, type SyncConflictPolicy, type SyncFieldDirection, type SyncFieldRule, type SyncState } from './sync-model.js'
 import { BacklogQueries } from './use-backlog-actions.js'
-
-type BackendRow = BacklogSettings['syncBackends'][number]
 
 const SYNC_STATUS_KEY = [BacklogQueries.key, 'sync-status'] as const
 const ALL_PROJECTS = 'all-projects'
+const HOST_RESTART = 'This DSH Host predates connections and bindings. Restart the DSH Host process to load them.'
 
-const stateLabels = { synced: 'Synced', pending: 'Changes to sync', conflict: 'Conflict resolved', error: 'Sync error' } as const satisfies Record<
-  SyncState,
-  string
->
+const stateLabels = { synced: 'Synced', pending: 'Changes to sync', conflict: 'Conflict', error: 'Sync error' } as const satisfies Record<SyncState, string>
 const stateTones = {
   synced: 'dshx:text-success',
   pending: 'dshx:text-info',
   conflict: 'dshx:text-warning',
   error: 'dshx:text-destructive',
 } as const satisfies Record<SyncState, string>
+const credentialLabels = {
+  reference: 'vault key',
+  environment: 'Host environment',
+  fallback: 'Host environment or CLI login',
+  none: 'no key needed',
+  missing: 'no key',
+  cli: 'CLI login',
+} as const
+const directionLabels = { 'two-way': 'Two-way', pull: 'Pull only', push: 'Push only' } as const
+const fieldLabels = {
+  title: 'Title',
+  body: 'Description',
+  status: 'Status',
+  tags: 'Labels',
+  priority: 'Priority',
+  parent: 'Parent',
+  links: 'Relations',
+} as const
+const fieldDirectionLabels = { 'two-way': 'Both ways', pull: 'Pull', push: 'Push', off: 'Off' } as const satisfies Record<SyncFieldDirection, string>
+const policyLabels = {
+  lww: 'Last change wins',
+  'local-wins': 'Backlog wins',
+  'remote-wins': 'Remote wins',
+  flag: 'Flag, change nothing',
+} as const satisfies Record<SyncConflictPolicy, string>
+const pollPresets = [0, 300, 900, 1_800, 3_600, 86_400] as const
 
-const label = BacklogSyncModel.backendLabel
+const isFieldDirection = (value: string): value is SyncFieldDirection => BacklogSyncModel.fieldDirections.some(known => known === value)
+const isPolicy = (value: string): value is SyncConflictPolicy => BacklogSyncModel.conflictPolicies.some(known => known === value)
 
-/** "just now" or "5m ago", read at the moment the popover renders its text. */
+const pollLabel = (seconds: number): string => {
+  if (seconds === 0) return 'Sync now only'
+  if (seconds === 3_600) return 'Every hour'
+  if (seconds === 86_400) return 'Every day'
+  if (seconds % 60 === 0) return `Every ${String(seconds / 60)} min`
+  return `Every ${String(seconds)} s`
+}
+
+/** A Host that predates a method answers with a contract error; every other failure keeps its own message. */
+const failureText = (error: unknown, fallback: string): string =>
+  isApiError(error) && error.kind === 'contract' ? HOST_RESTART : errorMessage(error, fallback)
+
 const syncedAgo = (at: number): string => {
   const age = ItemGlyphs.ago(at)
   return age === 'now' ? 'just now' : `${age} ago`
 }
 
-/** Remote sync state for every linked item, refreshed with the rest of the backlog. */
+/** Remote sync state, refreshed with the rest of the backlog. */
 const useSyncStatus = () => {
   const api = useApi(backlogApi)
   return useQuery({ queryKey: SYNC_STATUS_KEY, queryFn: () => api.syncStatus({}), staleTime: 10_000 })
 }
 
+/** A Host older than connections answers `backends` and no `connections`. */
+const hostLacksSources = (status: BacklogSyncStatusView | undefined): boolean => status !== undefined && status.connections === undefined
+
 const resultNotice = (result: BacklogSyncResultView): string => {
-  if (result.error !== null) return `${BacklogReference.labelOf({ id: result.itemId, ref: result.ref })}: ${result.error.message}`
+  const label = BacklogReference.labelOf({ id: result.itemId, ref: result.ref })
+  if (result.error !== null) return `${label}: ${result.error.message}`
   const moved = [
     ...(result.pulled.length > 0 ? [`pulled ${result.pulled.join(', ')}`] : []),
     ...(result.pushed.length > 0 ? [`pushed ${result.pushed.join(', ')}`] : []),
     ...(result.commentsPulled + result.commentsPushed > 0 ? [`${String(result.commentsPulled + result.commentsPushed)} comments`] : []),
   ]
-  const conflict = result.conflicts.length > 0 ? ` · conflict on ${result.conflicts.map(conflict => conflict.field).join(', ')} (note added)` : ''
-  return `${BacklogReference.labelOf({ id: result.itemId, ref: result.ref })} ↔ ${result.remoteKey ?? 'issue'}: ${moved.length === 0 ? 'already in sync' : moved.join(' · ')}${conflict}`
+  const conflict = result.conflicts.length > 0 ? ` · conflict on ${result.conflicts.map(entry => entry.field).join(', ')} (note added)` : ''
+  return `${label} ↔ ${result.remoteKey ?? 'remote item'}: ${moved.length === 0 ? 'already in sync' : moved.join(' · ')}${conflict}`
 }
+
+const failed = (fallback: string) => (error: unknown) => BacklogNotices.show({ text: failureText(error, fallback), kind: 'failure', sessionId: null })
 
 /** Every sync write the panel makes; each settles by refreshing the backlog and the sync state. */
 const useSyncActions = () => {
@@ -83,44 +142,88 @@ const useSyncActions = () => {
   const syncNow = useMutation({
     mutationFn: (input: Parameters<typeof api.syncNow>[0]) => api.syncNow(input),
     onSuccess: output => {
-      const failed = output.results.filter(result => result.error !== null)
+      const errors = output.results.filter(result => result.error !== null)
       const first = output.results[0]
-      BacklogNotices.show({
-        text:
-          output.results.length === 0
-            ? 'No linked items to sync. Link an item from its menu first.'
-            : output.results.length === 1 && first !== undefined
-              ? resultNotice(first)
-              : `Synced ${String(output.results.length - failed.length)} of ${String(output.results.length)} linked items${failed[0] === undefined ? '' : `. ${resultNotice(failed[0])}`}`,
-        kind: failed.length > 0 ? 'failure' : 'success',
-        sessionId: null,
-      })
+      const pass = output.passes?.[0]
+      const firstError = errors[0] === undefined ? '' : `. ${resultNotice(errors[0])}`
+      const text = (() => {
+        if (pass !== undefined)
+          return `${pass.bindingId}: read ${String(pass.records)}, created ${String(pass.created)}, synced ${String(pass.results.length)}${firstError}`
+        if (output.results.length === 0) return 'No linked items to sync. Link an item from its menu first.'
+        if (output.results.length === 1 && first !== undefined) return resultNotice(first)
+        return `Synced ${String(output.results.length - errors.length)} of ${String(output.results.length)} linked items${firstError}`
+      })()
+      BacklogNotices.show({ text, kind: errors.length > 0 ? 'failure' : 'success', sessionId: null })
     },
-    onError: error => BacklogNotices.show({ text: errorMessage(error, 'Sync failed. Retry with Sync now.'), kind: 'failure', sessionId: null }),
+    onError: failed('Sync failed. Retry with Sync now.'),
     onSettled: invalidate,
   })
   const linkRemote = useMutation({ mutationFn: (input: Parameters<typeof api.linkRemote>[0]) => api.linkRemote(input), onSettled: invalidate })
   const importRemote = useMutation({ mutationFn: (input: Parameters<typeof api.importRemote>[0]) => api.importRemote(input), onSettled: invalidate })
-  return { syncNow, linkRemote, importRemote }
+  const importAll = useMutation({
+    mutationFn: (binding: string) => api.importAllRemote({ binding }),
+    onSuccess: pass =>
+      BacklogNotices.show({
+        text: `Imported ${String(pass.created)} new items through ${pass.bindingId} (${String(pass.records)} read).`,
+        kind: 'success',
+        sessionId: null,
+      }),
+    onError: failed('The import failed. Retry.'),
+    onSettled: invalidate,
+  })
+  const saveConnection = useMutation({
+    mutationFn: (input: Parameters<typeof api.saveSyncConnection>[0]) => api.saveSyncConnection(input),
+    onSettled: invalidate,
+  })
+  const removeConnection = useMutation({
+    mutationFn: (instanceId: string) => api.removeSyncConnection({ instanceId }),
+    onError: failed('The connection could not be removed. Retry.'),
+    onSettled: invalidate,
+  })
+  const moveConnection = useMutation({
+    mutationFn: (input: Parameters<typeof api.moveSyncConnection>[0]) => api.moveSyncConnection(input),
+    onError: failed('The connection could not be moved. Retry.'),
+    onSettled: invalidate,
+  })
+  const saveBinding = useMutation({ mutationFn: (input: Parameters<typeof api.saveSyncBinding>[0]) => api.saveSyncBinding(input), onSettled: invalidate })
+  const removeBinding = useMutation({
+    mutationFn: (binding: string) => api.removeSyncBinding({ binding }),
+    onError: failed('The binding could not be removed. Retry.'),
+    onSettled: invalidate,
+  })
+  return { syncNow, linkRemote, importRemote, importAll, saveConnection, removeConnection, moveConnection, saveBinding, removeBinding }
 }
 
-const configuredBackends = (status: BacklogSyncStatusView | undefined): SyncBackendKind[] => [
-  ...new Set((status?.backends ?? []).filter(backend => backend.enabled).map(backend => backend.backend)),
-]
+const bindingLabel = (view: BacklogSyncBindingView): string =>
+  `${view.connectionLabel} · ${view.binding.container === '' ? 'from project' : view.binding.container}`
 
-/** Links one item to an issue the user names, or creates one from it. */
+/** The bindings an item can link through: enabled, run here, and scoped to its project or to every project. */
+const bindingsFor = (status: BacklogSyncStatusView | undefined, project: string | null | undefined): readonly BacklogSyncBindingView[] =>
+  (status?.bindings ?? []).filter(
+    view =>
+      view.binding.enabled &&
+      view.owned &&
+      (view.binding.scope === null || project === undefined || (project !== null && view.binding.scope === BacklogItems.projectPath(project))),
+  )
+
+const descriptorOf = (status: BacklogSyncStatusView | undefined, kind: string): ProviderDescriptor | undefined =>
+  status?.providers?.find(provider => provider.kind === kind)
+
+/** Links one item to a remote item the user names, through one binding. */
 const LinkRemoteDialog = (props: {
   readonly itemId: number
   readonly itemLabel: string
-  readonly backend: SyncBackendKind
+  readonly bindingId: string
   readonly open: boolean
   readonly onOpenChange: (open: boolean) => void
 }): JSX.Element => {
+  const status = useSyncStatus()
   const actions = useSyncActions()
   const [reference, setReference] = useState('')
-  const placeholder = props.backend === 'linear' ? 'ENG-12 or https://linear.app/…/issue/ENG-12' : '42 or https://github.com/owner/repo/issues/42'
+  const view = status.data?.bindings?.find(candidate => candidate.binding.id === props.bindingId)
+  const descriptor = view === undefined ? undefined : descriptorOf(status.data, view.providerKind)
   const submit = async (): Promise<void> => {
-    const linked = await actions.linkRemote.mutateAsync({ id: props.itemId, backend: props.backend, reference: reference.trim() })
+    const linked = await actions.linkRemote.mutateAsync({ id: props.itemId, binding: props.bindingId, reference: reference.trim() })
     BacklogNotices.show({
       text: linked.result === null ? `${props.itemLabel} linked.` : resultNotice(linked.result),
       kind: linked.result?.error === null || linked.result === null ? 'success' : 'failure',
@@ -134,12 +237,9 @@ const LinkRemoteDialog = (props: {
       <DialogContent className="dshx-root">
         <DialogHeader>
           <DialogTitle>
-            Link {props.itemLabel} to a {label(props.backend)} issue
+            Link {props.itemLabel} through {view === undefined ? props.bindingId : bindingLabel(view)}
           </DialogTitle>
-          <DialogDescription>
-            The issue’s title, description and status replace the item’s on the first sync (the old values stay in its history); tags from both sides are kept.
-            After that, edits and new comments sync both ways.
-          </DialogDescription>
+          <DialogDescription>The remote item’s fields replace the item’s on the first sync; labels from both sides are kept.</DialogDescription>
         </DialogHeader>
         <form
           className="dshx:flex dshx:flex-col dshx:gap-2"
@@ -150,15 +250,15 @@ const LinkRemoteDialog = (props: {
         >
           <input
             type="text"
-            aria-label={`${label(props.backend)} issue`}
-            placeholder={placeholder}
+            aria-label="Remote item"
+            placeholder={descriptor?.referenceExample ?? 'Identifier or URL'}
             value={reference}
             onChange={event => setReference(event.currentTarget.value)}
             className="dshx:font-mono! dshx:h-9 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-3 dshx:text-sm dshx:outline-none dshx:focus-visible:border-ring"
           />
           {actions.linkRemote.error === null ? null : (
             <p role="alert" className="dshx:text-xs dshx:text-destructive">
-              {errorMessage(actions.linkRemote.error, 'The issue could not be linked. Check the reference and retry.')}
+              {failureText(actions.linkRemote.error, 'The remote item could not be linked. Check the reference and retry.')}
             </p>
           )}
           <DialogFooter>
@@ -167,7 +267,7 @@ const LinkRemoteDialog = (props: {
             </Button>
             <Button type="submit" disabled={actions.linkRemote.isPending || reference.trim() === ''}>
               <LinkIcon aria-hidden className="dshx:size-3.5" />
-              Link issue
+              Link
             </Button>
           </DialogFooter>
         </form>
@@ -176,26 +276,33 @@ const LinkRemoteDialog = (props: {
   )
 }
 
-/** What the chip popover shows for a linked item: where it syncs, how it went, and the controls to act on it. */
+/** The binding or tracker an unlink names, whichever the Host that answered knows. */
+const refTarget = (entry: BacklogSyncItemView) => (entry.bindingId === undefined ? { backend: entry.backend } : { binding: entry.bindingId })
+
+/** What one external ref's popover shows: where it syncs, how it went, and the controls to act on it. */
 const LinkedDetails = (props: { readonly linked: BacklogSyncItemView }): JSX.Element => {
   const actions = useSyncActions()
   const { linked } = props
+  const source = linked.connectionLabel ?? linked.backend
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:text-xs">
-      <a
-        href={linked.url}
-        target="_blank"
-        rel="noreferrer"
-        className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:font-medium dshx:text-foreground dshx:hover:underline"
-      >
-        <ExternalLinkIcon aria-hidden className="dshx:size-3.5" />
-        Open {linked.remoteKey} in {label(linked.backend)}
-      </a>
+      {/^https?:\/\//u.test(linked.url) ? (
+        <a
+          href={linked.url}
+          target="_blank"
+          rel="noreferrer"
+          className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:font-medium dshx:text-foreground dshx:hover:underline"
+        >
+          <ExternalLinkIcon aria-hidden className="dshx:size-3.5" />
+          Open {linked.remoteKey} in {source}
+        </a>
+      ) : (
+        <p className="dshx:font-medium">
+          {linked.remoteKey} · {source}
+        </p>
+      )}
       <p className={cn('dshx:font-medium', stateTones[linked.state])}>{stateLabels[linked.state]}</p>
-      <p className="dshx:text-muted-foreground">
-        {linked.lastSyncedAt === null ? 'Not synced yet.' : `Last synced ${syncedAgo(linked.lastSyncedAt)}.`}
-        {linked.state === 'pending' ? ' Local edits go out on the next sync.' : null}
-      </p>
+      <p className="dshx:text-muted-foreground">{linked.lastSyncedAt === null ? 'Not synced yet.' : `Last synced ${syncedAgo(linked.lastSyncedAt)}.`}</p>
       {linked.lastError === null ? null : (
         <p role="alert" className="dshx:text-destructive">
           {linked.lastError.message}
@@ -204,12 +311,18 @@ const LinkedDetails = (props: { readonly linked: BacklogSyncItemView }): JSX.Ele
       {linked.state === 'conflict'
         ? linked.conflicts.slice(-3).map(conflict => (
             <p key={`${conflict.field}-${String(conflict.at)}`} className="dshx:text-muted-foreground">
-              {conflict.field}: both sides changed; kept the {conflict.kept === 'remote' ? label(linked.backend) : 'local'} value. See the note in the activity.
+              {conflict.field}:{' '}
+              {conflict.kept === 'none' ? 'both sides differ; make them agree' : `kept the ${conflict.kept === 'remote' ? source : 'backlog'} value`}.
             </p>
           ))
         : null}
       <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
-        <Button size="sm" variant="outline" disabled={actions.syncNow.isPending} onClick={() => actions.syncNow.mutate({ id: linked.itemId })}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={actions.syncNow.isPending}
+          onClick={() => actions.syncNow.mutate({ id: linked.itemId, ...(linked.bindingId !== undefined && { binding: linked.bindingId }) })}
+        >
           <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin')} />
           Sync now
         </Button>
@@ -217,7 +330,9 @@ const LinkedDetails = (props: { readonly linked: BacklogSyncItemView }): JSX.Ele
           size="sm"
           variant="ghost"
           disabled={actions.linkRemote.isPending}
-          onClick={() => actions.linkRemote.mutate({ id: linked.itemId, backend: linked.backend, remove: true })}
+          onClick={() =>
+            actions.linkRemote.mutate({ id: linked.itemId, ...refTarget(linked), remove: true }, { onError: failed('The item could not be unlinked. Retry.') })
+          }
         >
           <UnlinkIcon aria-hidden className="dshx:size-3.5" />
           Unlink
@@ -227,122 +342,144 @@ const LinkedDetails = (props: { readonly linked: BacklogSyncItemView }): JSX.Ele
   )
 }
 
-/** The sync chip in an item's header row: the linked issue and its state, or the ways to link one. */
-const SyncChip = (props: { readonly itemId: number; readonly itemLabel: string }): JSX.Element | null => {
+const createThrough = (actions: ReturnType<typeof useSyncActions>, input: { readonly itemId: number; readonly view: BacklogSyncBindingView }): void =>
+  actions.linkRemote.mutate(
+    { id: input.itemId, binding: input.view.binding.id, create: true },
+    {
+      onSuccess: output =>
+        BacklogNotices.show({
+          text: `Created ${output.item?.remoteKey ?? 'the remote item'} in ${bindingLabel(input.view)}.`,
+          kind: 'success',
+          sessionId: null,
+        }),
+      onError: failed(`Could not create the item in ${bindingLabel(input.view)}.`),
+    },
+  )
+
+/** An item's external refs in its header row, one chip each, and a way to link one more. */
+const SyncChips = (props: { readonly itemId: number; readonly itemLabel: string; readonly project?: string | null | undefined }): JSX.Element | null => {
   const status = useSyncStatus()
   const actions = useSyncActions()
-  const [linkBackend, setLinkBackend] = useState<SyncBackendKind | null>(null)
-  const linked = status.data?.items.find(candidate => candidate.itemId === props.itemId)
-  const backends = configuredBackends(status.data)
-  if (linked === undefined && backends.length === 0) return null
-  const create = (backend: SyncBackendKind): void =>
-    actions.linkRemote.mutate(
-      { id: props.itemId, backend, create: true },
-      {
-        onSuccess: output =>
-          BacklogNotices.show({ text: `Created ${output.item?.remoteKey ?? 'the issue'} in ${label(backend)}.`, kind: 'success', sessionId: null }),
-        onError: error => BacklogNotices.show({ text: errorMessage(error, `Could not create the ${label(backend)} issue.`), kind: 'failure', sessionId: null }),
-      },
-    )
+  const [linkBinding, setLinkBinding] = useState<string | null>(null)
+  const linked = (status.data?.items ?? []).filter(candidate => candidate.itemId === props.itemId)
+  const available = bindingsFor(status.data, props.project).filter(view => !linked.some(entry => entry.bindingId === view.binding.id))
+  if (linked.length === 0 && available.length === 0) return null
   return (
     <>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            size="xs"
-            aria-label={linked === undefined ? 'Remote sync: not linked' : `Remote sync: ${linked.remoteKey}, ${stateLabels[linked.state]}`}
-            className={cn('dshx:gap-1 dshx:text-xs', linked === undefined ? 'dshx:text-muted-foreground' : stateTones[linked.state])}
-          >
-            <CloudIcon aria-hidden className="dshx:size-3.5" />
-            {linked === undefined ? 'Not synced' : linked.remoteKey}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="dshx-root dshx:w-72 dshx:max-w-[calc(100vw-2rem)]">
-          {linked !== undefined ? (
-            <LinkedDetails linked={linked} />
-          ) : (
-            <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:text-xs">
-              <p className="dshx:text-muted-foreground">Mirror this item in a tracker: title, description, status, tags and new comments sync both ways.</p>
-              {backends.map(backend => (
-                <div key={backend} className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
-                  <Button size="sm" variant="outline" onClick={() => setLinkBackend(backend)}>
+      {linked.map(entry => (
+        <Popover key={`${entry.bindingId ?? entry.backend}-${entry.remoteKey}`}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="xs"
+              aria-label={`Remote sync: ${entry.remoteKey}, ${stateLabels[entry.state]}`}
+              className={cn('dshx:gap-1 dshx:text-xs', stateTones[entry.state])}
+            >
+              <CloudIcon aria-hidden className="dshx:size-3.5" />
+              {entry.remoteKey}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="dshx-root dshx:w-72 dshx:max-w-[calc(100vw-2rem)]">
+            <LinkedDetails linked={entry} />
+          </PopoverContent>
+        </Popover>
+      ))}
+      {available.length === 0 ? null : (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="xs"
+              aria-label={linked.length === 0 ? 'Remote sync: not linked' : 'Link to another source'}
+              className="dshx:gap-1 dshx:text-xs dshx:text-muted-foreground"
+            >
+              {linked.length === 0 ? <CloudIcon aria-hidden className="dshx:size-3.5" /> : <PlusIcon aria-hidden className="dshx:size-3.5" />}
+              {linked.length === 0 ? 'Not synced' : null}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="dshx-root dshx:flex dshx:w-80 dshx:max-w-[calc(100vw-2rem)] dshx:flex-col dshx:gap-2 dshx:text-xs">
+            {available.map(view => (
+              <div key={view.binding.id} className="dshx:flex dshx:flex-col dshx:gap-1">
+                <span className="dshx:font-medium">{bindingLabel(view)}</span>
+                <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
+                  <Button size="sm" variant="outline" onClick={() => setLinkBinding(view.binding.id)}>
                     <LinkIcon aria-hidden className="dshx:size-3.5" />
-                    Link to {label(backend)} issue…
+                    Link…
                   </Button>
-                  <Button size="sm" variant="outline" disabled={actions.linkRemote.isPending} onClick={() => create(backend)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={actions.linkRemote.isPending}
+                    onClick={() => createThrough(actions, { itemId: props.itemId, view })}
+                  >
                     <PlusIcon aria-hidden className="dshx:size-3.5" />
-                    Create in {label(backend)}
+                    Create
                   </Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </PopoverContent>
-      </Popover>
-      {linkBackend === null ? null : (
+              </div>
+            ))}
+          </PopoverContent>
+        </Popover>
+      )}
+      {linkBinding === null ? null : (
         <LinkRemoteDialog
           itemId={props.itemId}
           itemLabel={props.itemLabel}
-          backend={linkBackend}
+          bindingId={linkBinding}
           open
-          onOpenChange={open => (open ? undefined : setLinkBackend(null))}
+          onOpenChange={open => (open ? undefined : setLinkBinding(null))}
         />
       )}
     </>
   )
 }
 
-/**
- * The item menu's sync entries: Linear is always offered (an unconfigured backend answers with the setting to fix),
- * GitHub once a GitHub row exists; a linked item offers Sync now and Unlink instead.
- */
-const SyncMenuItems = (props: { readonly itemId: number; readonly onLink: (backend: SyncBackendKind) => void }): JSX.Element => {
+/** The item menu's sync entries: Sync now and Unlink per linked source, Link and Create per binding still free. */
+const SyncMenuItems = (props: {
+  readonly itemId: number
+  readonly project?: string | null | undefined
+  readonly onLink: (bindingId: string) => void
+}): JSX.Element => {
   const status = useSyncStatus()
   const actions = useSyncActions()
-  const linked = status.data?.items.find(candidate => candidate.itemId === props.itemId)
-  const backends: SyncBackendKind[] = [...new Set<SyncBackendKind>(['linear', ...configuredBackends(status.data)])]
-  const create = (backend: SyncBackendKind): void =>
-    actions.linkRemote.mutate(
-      { id: props.itemId, backend, create: true },
-      {
-        onSuccess: output =>
-          BacklogNotices.show({ text: `Created ${output.item?.remoteKey ?? 'the issue'} in ${label(backend)}.`, kind: 'success', sessionId: null }),
-        onError: error => BacklogNotices.show({ text: errorMessage(error, `Could not create the ${label(backend)} issue.`), kind: 'failure', sessionId: null }),
-      },
-    )
-  if (linked !== undefined) {
-    return (
-      <>
-        <ContextMenuItem
-          className="dshx:gap-2 dshx:text-[13px]"
-          disabled={actions.syncNow.isPending}
-          onSelect={() => actions.syncNow.mutate({ id: props.itemId })}
-        >
-          <RefreshCwIcon aria-hidden className="dshx:size-3.5" />
-          Sync now with {linked.remoteKey}
-        </ContextMenuItem>
-        <ContextMenuItem
-          className="dshx:gap-2 dshx:text-[13px]"
-          onSelect={() => actions.linkRemote.mutate({ id: props.itemId, backend: linked.backend, remove: true })}
-        >
-          <UnlinkIcon aria-hidden className="dshx:size-3.5" />
-          Unlink from {linked.remoteKey}
-        </ContextMenuItem>
-      </>
-    )
-  }
+  const linked = (status.data?.items ?? []).filter(candidate => candidate.itemId === props.itemId)
+  const available = bindingsFor(status.data, props.project).filter(view => !linked.some(entry => entry.bindingId === view.binding.id))
   return (
     <>
-      {backends.map(backend => (
-        <Fragment key={backend}>
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.onLink(backend)}>
-            <LinkIcon aria-hidden className="dshx:size-3.5" />
-            Link to {label(backend)} issue…
+      {linked.map(entry => (
+        <Fragment key={`${entry.bindingId ?? entry.backend}-${entry.remoteKey}`}>
+          <ContextMenuItem
+            className="dshx:gap-2 dshx:text-[13px]"
+            disabled={actions.syncNow.isPending}
+            onSelect={() => actions.syncNow.mutate({ id: props.itemId, ...(entry.bindingId !== undefined && { binding: entry.bindingId }) })}
+          >
+            <RefreshCwIcon aria-hidden className="dshx:size-3.5" />
+            Sync now with {entry.remoteKey}
           </ContextMenuItem>
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" disabled={actions.linkRemote.isPending} onSelect={() => create(backend)}>
+          <ContextMenuItem
+            className="dshx:gap-2 dshx:text-[13px]"
+            onSelect={() =>
+              actions.linkRemote.mutate({ id: props.itemId, ...refTarget(entry), remove: true }, { onError: failed('The item could not be unlinked. Retry.') })
+            }
+          >
+            <UnlinkIcon aria-hidden className="dshx:size-3.5" />
+            Unlink from {entry.remoteKey}
+          </ContextMenuItem>
+        </Fragment>
+      ))}
+      {available.map(view => (
+        <Fragment key={view.binding.id}>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.onLink(view.binding.id)}>
+            <LinkIcon aria-hidden className="dshx:size-3.5" />
+            Link to {bindingLabel(view)}…
+          </ContextMenuItem>
+          <ContextMenuItem
+            className="dshx:gap-2 dshx:text-[13px]"
+            disabled={actions.linkRemote.isPending}
+            onSelect={() => createThrough(actions, { itemId: props.itemId, view })}
+          >
             <CloudIcon aria-hidden className="dshx:size-3.5" />
-            Create in {label(backend)}
+            Create in {bindingLabel(view)}
           </ContextMenuItem>
         </Fragment>
       ))}
@@ -350,422 +487,554 @@ const SyncMenuItems = (props: { readonly itemId: number; readonly onLink: (backe
   )
 }
 
-const AUTO_SYNC_DEFAULT_MINUTES = 15
-const autoSyncPresets = [0, 5, 15, 30, 60, 1_440] as const
-const SYNC_TEST_KEY = [BacklogQueries.key, 'sync-test'] as const
-
-const autoSyncLabel = (minutes: number): string => {
-  if (minutes === 0) return 'Manual sync only'
-  if (minutes === 60) return 'Sync every hour'
-  if (minutes === 1_440) return 'Sync every day'
-  return `Sync every ${String(minutes)} min`
-}
-
-const credentialLabels = { reference: 'vault key', environment: 'Host environment', 'github-cli': 'gh CLI login' } as const
-
-const emptyRow = (backend: SyncBackendKind): BackendRow => ({
-  project: '',
-  backend,
-  enabled: true,
-  target: '',
-  secret: '',
-  autoSyncMinutes: AUTO_SYNC_DEFAULT_MINUTES,
-  pushAgentComments: false,
-})
-
-const isReferenceOrEmpty = (text: string): boolean => text.trim() === '' || parseSecretReference(text.trim()) !== null
-
 const inputClass =
   'dshx:h-8 dshx:min-w-0 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-sm dshx:outline-none dshx:focus-visible:border-ring'
 
-/** Tests the row as typed, once it stops changing; the key itself stays on the Host. */
-const useConnectionTest = (row: BackendRow) => {
+const isReferenceOrEmpty = (text: string): boolean => text.trim() === '' || parseSecretReference(text.trim()) !== null
+
+/** A removal the user confirms first: the bindings or links it drops are gone for good. */
+const ConfirmRemove = (props: {
+  readonly heading: string
+  readonly description: string
+  readonly label: string
+  readonly onConfirm: () => void
+}): JSX.Element => {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button type="button" variant="ghost" size="icon-xs" aria-label={props.label} onClick={() => setOpen(true)}>
+        <Trash2Icon />
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent className="dshx-root">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{props.heading}</AlertDialogTitle>
+            <AlertDialogDescription>{props.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={props.onConfirm}>Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+}
+
+/** The account a test saw, or the error with its fix. */
+const TestReport = (props: { readonly report: BacklogSyncTestView | undefined; readonly error: unknown }): JSX.Element | null => {
+  if (props.error !== null && props.error !== undefined)
+    return (
+      <p role="alert" className="dshx:text-xs dshx:text-destructive">
+        {failureText(props.error, 'The connection could not be tested. Retry.')}
+      </p>
+    )
+  const report = props.report
+  if (report === undefined) return null
+  if (report.error !== null)
+    return (
+      <p role="alert" className="dshx:text-xs dshx:text-destructive">
+        {report.error.message}
+      </p>
+    )
+  return (
+    <p role="status" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-success">
+      <CircleCheckIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
+      <span className="dshx:min-w-0 dshx:truncate">
+        {report.account ?? 'Connected'} · {credentialLabels[report.credential]}
+        {report.containers.length === 0 ? '' : ` · ${String(report.containers.length)} available`}
+      </span>
+    </p>
+  )
+}
+
+/** Adds or edits one connection: name, key reference and base URL, tested before it is saved. */
+const ConnectionForm = (props: {
+  readonly descriptor: ProviderDescriptor
+  readonly initial?: BacklogSyncConnectionView['connection'] | undefined
+  readonly takenIds: readonly string[]
+  readonly onDone: () => void
+}): JSX.Element => {
   const api = useApi(backlogApi)
-  const target = row.target.trim()
-  const secret = row.secret.trim()
-  const draft = useMemo(() => ({ backend: row.backend, project: row.project, target, secret }), [row.backend, row.project, target, secret])
-  const settled = useDebouncedValue({ value: draft, delayMs: 500 })
-  return useQuery({
-    queryKey: [...SYNC_TEST_KEY, settled],
-    queryFn: ({ signal }) => api.testSyncBackend(settled, { signal }),
-    enabled: isReferenceOrEmpty(settled.secret),
+  const actions = useSyncActions()
+  const [label, setLabel] = useState(props.initial?.label ?? props.descriptor.label)
+  const [credential, setCredential] = useState(props.initial?.credential ?? '')
+  const [baseUrl, setBaseUrl] = useState(props.initial?.baseUrl ?? '')
+  const test = useMutation({
+    mutationFn: () => api.testSyncConnection({ draft: { kind: props.descriptor.kind, credential: credential.trim(), baseUrl: baseUrl.trim() } }),
+  })
+  const instanceId =
+    props.initial?.instanceId ??
+    BacklogSyncModel.uniqueSlug(BacklogSyncModel.slugOf(label === props.descriptor.label ? props.descriptor.kind : label), new Set(props.takenIds))
+  const keyed = props.descriptor.credential !== 'none'
+  const save = (): void =>
+    actions.saveConnection.mutate(
+      { connection: { instanceId, kind: props.descriptor.kind, label: label.trim(), credential: credential.trim(), baseUrl: baseUrl.trim() } },
+      { onSuccess: props.onDone },
+    )
+  return (
+    <form
+      aria-label={`${props.initial === undefined ? 'New' : 'Edit'} ${props.descriptor.label} connection`}
+      className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3"
+      onSubmit={event => {
+        event.preventDefault()
+        save()
+      }}
+    >
+      <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
+        <input aria-label="Connection name" value={label} onChange={event => setLabel(event.currentTarget.value)} className={inputClass} />
+        {keyed ? (
+          <input
+            type="text"
+            data-secret-input="reference"
+            data-secret-alias={props.descriptor.environmentVariables[0] ?? `${props.descriptor.kind.toUpperCase()}_KEY`}
+            data-secret-scope="global"
+            aria-label={`${props.descriptor.label} key reference`}
+            placeholder={`secret:${props.descriptor.environmentVariables[0] ?? 'ALIAS'}`}
+            value={credential}
+            onChange={event => setCredential(event.currentTarget.value)}
+            className={cn(inputClass, 'dshx:font-mono!')}
+          />
+        ) : null}
+        {keyed ? (
+          <input
+            aria-label="API base URL"
+            placeholder="Default API"
+            value={baseUrl}
+            onChange={event => setBaseUrl(event.currentTarget.value)}
+            className={cn(inputClass, 'dshx:font-mono!')}
+          />
+        ) : null}
+      </div>
+      {isReferenceOrEmpty(credential) ? null : (
+        <p role="alert" className="dshx:text-xs dshx:text-destructive">
+          Keys are stored as vault references. Pick one with the key button in the field, or clear it to use the Host environment.
+        </p>
+      )}
+      <TestReport report={test.data} error={test.error} />
+      {actions.saveConnection.error === null ? null : (
+        <p role="alert" className="dshx:text-xs dshx:text-destructive">
+          {failureText(actions.saveConnection.error, 'The connection could not be saved. Retry.')}
+        </p>
+      )}
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+        <Button type="button" size="sm" variant="outline" disabled={test.isPending || !isReferenceOrEmpty(credential)} onClick={() => test.mutate()}>
+          <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', test.isPending && 'dshx:animate-spin')} />
+          Test connection
+        </Button>
+        <Button type="submit" size="sm" disabled={actions.saveConnection.isPending || label.trim() === '' || !isReferenceOrEmpty(credential)}>
+          Save connection
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={props.onDone}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+const supportsField = (descriptor: ProviderDescriptor | undefined, field: SyncFieldRule['field']): boolean => {
+  const capabilities = descriptor?.capabilities
+  if (capabilities === undefined) return true
+  if (field === 'tags') return capabilities.labels
+  if (field === 'priority') return capabilities.priority
+  if (field === 'parent') return capabilities.parent
+  if (field === 'links') return capabilities.relations.length > 0
+  return true
+}
+
+const defaultContainerLabel = (descriptor: ProviderDescriptor | undefined): string => {
+  if (descriptor?.kind === 'github') return 'From the project’s git remote'
+  if (descriptor?.kind === 'files') return 'backlog/ in the project'
+  return 'The only one the key sees'
+}
+
+/** Adds or edits one binding of a connection. */
+const BindingForm = (props: {
+  readonly connection: BacklogSyncConnectionView
+  readonly descriptor: ProviderDescriptor | undefined
+  readonly initial?: SyncBinding | undefined
+  readonly projectOptions: readonly ComboboxOption[]
+  readonly onDone: () => void
+}): JSX.Element => {
+  const api = useApi(backlogApi)
+  const actions = useSyncActions()
+  const initial = props.initial
+  const [container, setContainer] = useState(initial?.container ?? '')
+  const [scope, setScope] = useState<string | null>(initial?.scope ?? null)
+  const [direction, setDirection] = useState<SyncBinding['direction']>(initial?.direction ?? 'two-way')
+  const [fieldMap, setFieldMap] = useState<readonly SyncFieldRule[]>(initial?.fieldMap ?? BacklogSyncModel.defaultFieldMap())
+  const [policy, setPolicy] = useState<SyncConflictPolicy>(initial?.conflictPolicy ?? 'lww')
+  const [poll, setPoll] = useState(initial?.pollEverySec ?? 0)
+  const [pushAgentComments, setPushAgentComments] = useState(initial?.pushAgentComments ?? false)
+  const [importNew, setImportNew] = useState(initial?.importNew ?? false)
+  const discovered = useQuery({
+    queryKey: [BacklogQueries.key, 'sync-discover', props.connection.connection.instanceId],
+    queryFn: ({ signal }) => api.discoverSync({ connection: props.connection.connection.instanceId }, { signal }),
     staleTime: 5 * 60_000,
     retry: false,
   })
-}
-
-type ConnectionTestQuery = ReturnType<typeof useConnectionTest>
-
-/** The vault alias a missing key is created under; the Secret Catalog writes the reference back into the field. */
-const suggestedAliases = { linear: 'LINEAR_API_KEY', github: 'GITHUB_TOKEN' } as const satisfies Record<SyncBackendKind, string>
-
-/**
- * The Secret Catalog's plain-DOM contract (docs/secret-references.md): a bubbling event on a
- * `data-secret-input="reference"` field opens its create-and-bind form. Backlog cannot import the Catalog, which
- * depends on it.
- */
-const SECRET_CREATE_EVENT = 'secret-input:create'
-
-const requestVaultKey = (field: HTMLInputElement | null): void => {
-  if (field === null) return
-  field.focus()
-  field.dispatchEvent(new CustomEvent(SECRET_CREATE_EVENT, { bubbles: true }))
-}
-
-const connectionTarget = (report: NonNullable<ConnectionTestQuery['data']>): string | null => {
-  if (report.target !== null) return `${report.target.key}${report.target.name === report.target.key ? '' : ` · ${report.target.name}`}`
-  return report.targetSource === 'per-project' ? "each project's git remote" : null
-}
-
-const ConnectionLine = (props: { readonly row: BackendRow; readonly test: ConnectionTestQuery; readonly onCreateKey: () => void }): JSX.Element => {
-  const { test } = props
-  const retest = (
-    <Button type="button" variant="ghost" size="xs" disabled={test.isFetching} onClick={() => void test.refetch()}>
-      <RefreshCwIcon aria-hidden className={cn('dshx:size-3', test.isFetching && 'dshx:animate-spin')} />
-      Test connection
-    </Button>
-  )
-  if (!isReferenceOrEmpty(props.row.secret)) {
-    return (
-      <p role="alert" className="dshx:text-xs dshx:text-destructive">
-        Keys are stored as vault references. Pick one with the key button in the field, or clear it to use the Host environment.
-      </p>
+  const containers = discovered.data?.containers ?? []
+  const directionOf = (field: SyncFieldRule['field']): SyncFieldDirection => fieldMap.find(rule => rule.field === field)?.direction ?? 'off'
+  const setFieldDirection = (field: SyncFieldRule['field'], next: SyncFieldDirection): void =>
+    setFieldMap(current =>
+      BacklogSyncModel.syncedFields.flatMap(candidate => {
+        const kept = current.find(rule => rule.field === candidate)
+        if (candidate !== field) return kept === undefined ? [] : [kept]
+        return next === 'off' ? [] : [{ field, direction: next, values: kept?.values ?? [] }]
+      }),
     )
-  }
-  if (test.data === undefined) {
-    return (
-      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs">
-        {test.error === null ? (
-          <span className="dshx:text-muted-foreground">Testing connection…</span>
-        ) : (
-          <span role="alert" className="dshx:min-w-0 dshx:text-destructive">
-            {errorMessage(test.error, 'The connection could not be tested. Retry.')}
-          </span>
-        )}
-        {test.error === null ? null : retest}
-      </div>
+  const statusValues = fieldMap.find(rule => rule.field === 'status')?.values ?? []
+  const setStatusValue = (local: string, remote: string): void =>
+    setFieldMap(current =>
+      current.map(rule =>
+        rule.field !== 'status'
+          ? rule
+          : { ...rule, values: [...rule.values.filter(pair => pair.local !== local), ...(remote.trim() === '' ? [] : [{ local, remote: remote.trim() }])] },
+      ),
     )
-  }
-  const report = test.data
-  if (report.credential === 'missing') {
-    return (
-      <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
-        {props.row.backend === 'linear'
-          ? 'Needs a key: create one in the vault, pick one, or set LINEAR_API_KEY on the Host.'
-          : 'Needs a key: create one in the vault, pick one, set GITHUB_TOKEN, or run gh auth login on the Host.'}
-        <Button type="button" variant="outline" size="xs" onClick={props.onCreateKey}>
-          <KeyRoundIcon aria-hidden className="dshx:size-3" />
-          Create {suggestedAliases[props.row.backend]}
-        </Button>
-        {retest}
-      </div>
-    )
-  }
-  const target = connectionTarget(report)
-  return (
-    <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-xs">
-      {report.account === null ? null : (
-        <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:text-success">
-          <CircleCheckIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
-          <span className="dshx:min-w-0 dshx:truncate">
-            {report.account}
-            {target === null ? '' : ` → ${target}`}
-          </span>
-        </span>
-      )}
-      <span className="dshx:text-muted-foreground">{credentialLabels[report.credential]}</span>
-      {report.error === null ? null : (
-        <span role="alert" className="dshx:w-full dshx:text-destructive">
-          {report.error.message}
-        </span>
-      )}
-      {retest}
-    </div>
-  )
-}
-
-const rowProjectLabel = (row: BackendRow): string => (row.project === '' ? 'All other projects' : ItemGlyphs.projectName(row.project))
-
-/** A row whose connection works, on one line: tracker, project, account and target, interval and the switch. */
-const CollapsedRow = (props: {
-  readonly row: BackendRow
-  readonly position: number
-  readonly test: ConnectionTestQuery
-  readonly onChange: (change: Partial<BackendRow>) => void
-  readonly onExpand: () => void
-}): JSX.Element => {
-  const { row } = props
-  const report = props.test.data
-  const target = report === undefined ? null : connectionTarget(report)
-  return (
-    <fieldset
-      aria-label={`Sync backend ${String(props.position)}`}
-      data-collapsed=""
-      className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:px-3 dshx:py-1.5 dshx:text-xs"
-    >
-      <span className="dshx:shrink-0 dshx:text-sm dshx:font-medium">{label(row.backend)}</span>
-      <span className="dshx:min-w-0 dshx:shrink dshx:truncate dshx:text-muted-foreground">{rowProjectLabel(row)}</span>
-      {report === undefined ? (
-        <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">Testing connection…</span>
-      ) : (
-        <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1 dshx:text-success">
-          <CircleCheckIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
-          <span className="dshx:min-w-0 dshx:truncate">
-            {report.account}
-            {target === null ? '' : ` → ${target}`}
-          </span>
-        </span>
-      )}
-      <span className="dshx:ml-auto dshx:shrink-0 dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{autoSyncLabel(row.autoSyncMinutes)}</span>
-      <Switch
-        size="sm"
-        aria-label={`Enable sync backend ${String(props.position)}`}
-        checked={row.enabled}
-        onCheckedChange={checked => props.onChange({ enabled: checked })}
-      />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        aria-label={`Edit sync backend ${String(props.position)}`}
-        aria-expanded={false}
-        onClick={props.onExpand}
-      >
-        <PencilIcon />
-      </Button>
-    </fieldset>
-  )
-}
-
-const BackendRowEditor = (props: {
-  readonly row: BackendRow
-  readonly position: number
-  readonly startEditing: boolean
-  readonly projectOptions: readonly ComboboxOption[]
-  readonly onChange: (change: Partial<BackendRow>) => void
-  readonly onRemove: () => void
-}): JSX.Element => {
-  const { row } = props
-  const test = useConnectionTest(row)
-  const [editing, setEditing] = useState(props.startEditing)
-  const secretField = useRef<HTMLInputElement | null>(null)
-  const working = isReferenceOrEmpty(row.secret) && test.data?.ok === true
-  const pendingFirstTest = isReferenceOrEmpty(row.secret) && test.data === undefined && test.error === null
-  if (!editing && (working || pendingFirstTest)) {
-    return <CollapsedRow row={row} position={props.position} test={test} onChange={props.onChange} onExpand={() => setEditing(true)} />
-  }
-  const teams = test.data?.teams ?? []
-  const detectedTarget = test.data?.target?.key
-  const teamOptions: ComboboxOption[] = [
-    ...teams.map(team => ({ value: team.key, label: team.key, description: team.name })),
-    ...(row.target.trim() === '' || teams.some(team => team.key.toUpperCase() === row.target.trim().toUpperCase())
-      ? []
-      : [{ value: row.target, label: row.target, description: 'not visible to this key' }]),
+  const containerOptions: ComboboxOption[] = [
+    { value: '', label: defaultContainerLabel(props.descriptor) },
+    ...containers.map(entry => ({ value: entry.key, label: entry.key, ...(entry.name !== entry.key && { description: entry.name }) })),
+    ...(container === '' || containers.some(entry => entry.key === container) ? [] : [{ value: container, label: container }]),
   ]
-  const autoSyncOptions = [...new Set<number>([...autoSyncPresets, row.autoSyncMinutes])]
+  const pollOptions = [...new Set<number>([...pollPresets, poll])]
     .sort((left, right) => left - right)
-    .map(minutes => ({ value: String(minutes), label: autoSyncLabel(minutes) }))
-  const repositoryPlaceholder =
-    test.data?.targetSource === 'git-remote' && detectedTarget !== undefined
-      ? `${detectedTarget} (git remote)`
-      : row.project === ''
-        ? 'owner/repo or git remote'
-        : 'owner/repo'
+    .map(seconds => ({ value: String(seconds), label: pollLabel(seconds) }))
+  const writable = props.descriptor?.capabilities.write !== false
+  const save = (): void =>
+    actions.saveBinding.mutate(
+      {
+        binding: {
+          ...(initial !== undefined && { id: initial.id }),
+          connectionId: props.connection.connection.instanceId,
+          container: container.trim(),
+          scope,
+          direction,
+          fieldMap: [...fieldMap],
+          conflictPolicy: policy,
+          pollEverySec: poll,
+          pushAgentComments,
+          importNew,
+          enabled: initial?.enabled ?? true,
+        },
+      },
+      { onSuccess: props.onDone },
+    )
   return (
-    <fieldset
-      aria-label={`Sync backend ${String(props.position)}`}
-      className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3"
+    <form
+      aria-label={initial === undefined ? 'New binding' : `Edit binding ${initial.id}`}
+      className="dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted/30 dshx:p-3 dshx:text-xs"
+      onSubmit={event => {
+        event.preventDefault()
+        save()
+      }}
     >
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+        {containers.length > 0 ? (
+          <Combobox
+            label={props.descriptor?.containerLabel ?? 'Container'}
+            value={container}
+            options={containerOptions}
+            onValueChange={setContainer}
+            triggerClassName="dshx:min-w-0 dshx:max-w-56"
+          />
+        ) : (
+          <input
+            aria-label={props.descriptor?.containerLabel ?? 'Container'}
+            placeholder={defaultContainerLabel(props.descriptor)}
+            value={container}
+            onChange={event => setContainer(event.currentTarget.value)}
+            className={cn(inputClass, 'dshx:font-mono! dshx:w-56')}
+          />
+        )}
+        <Combobox
+          label="Project"
+          value={scope ?? ALL_PROJECTS}
+          options={props.projectOptions}
+          onValueChange={value => setScope(value === ALL_PROJECTS ? null : value)}
+          triggerClassName="dshx:min-w-0 dshx:max-w-48"
+        />
         <ToggleGroup
           type="single"
           size="sm"
           variant="outline"
-          value={row.backend}
-          aria-label="Tracker"
-          onValueChange={value => (value === 'linear' || value === 'github' ? props.onChange({ backend: value, target: '' }) : undefined)}
+          value={direction}
+          aria-label="Direction"
+          onValueChange={value => (value === 'two-way' || value === 'pull' || value === 'push' ? setDirection(value) : undefined)}
         >
-          <ToggleGroupItem value="linear">Linear</ToggleGroupItem>
-          <ToggleGroupItem value="github">GitHub</ToggleGroupItem>
+          {BacklogSyncModel.directions.map(value => (
+            <ToggleGroupItem key={value} value={value} disabled={value !== 'pull' && !writable}>
+              {directionLabels[value]}
+            </ToggleGroupItem>
+          ))}
         </ToggleGroup>
+      </div>
+      <fieldset className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-1.5 dshx:@max-pane-narrow:grid-cols-1" aria-label="Fields">
+        {BacklogSyncModel.syncedFields.map(field => (
+          <div key={field} className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
+            <span className={cn(!supportsField(props.descriptor, field) && 'dshx:text-muted-foreground')}>{fieldLabels[field]}</span>
+            <Combobox
+              label={`${fieldLabels[field]} sync`}
+              value={supportsField(props.descriptor, field) ? directionOf(field) : 'off'}
+              disabled={!supportsField(props.descriptor, field)}
+              options={BacklogSyncModel.fieldDirections.map(value => ({ value, label: fieldDirectionLabels[value] }))}
+              onValueChange={value => (isFieldDirection(value) ? setFieldDirection(field, value) : undefined)}
+              triggerClassName="dshx:w-28"
+            />
+          </div>
+        ))}
+      </fieldset>
+      {directionOf('status') === 'off' ? null : (
+        <fieldset className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2" aria-label="Remote status names">
+          {BacklogItems.statuses.map(status => (
+            <label key={status} className="dshx:flex dshx:items-center dshx:gap-1">
+              <ItemGlyphs.StatusIcon status={status} />
+              <input
+                aria-label={`Remote name for ${status}`}
+                placeholder={status}
+                value={statusValues.find(pair => pair.local === status)?.remote ?? ''}
+                onChange={event => setStatusValue(status, event.currentTarget.value)}
+                className={cn(inputClass, 'dshx:h-7 dshx:w-24 dshx:text-xs')}
+              />
+            </label>
+          ))}
+        </fieldset>
+      )}
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3">
         <Combobox
-          label="Project"
-          value={row.project === '' ? ALL_PROJECTS : row.project}
-          options={props.projectOptions}
-          onValueChange={value => props.onChange({ project: value === ALL_PROJECTS ? '' : value })}
-          triggerClassName="dshx:min-w-0 dshx:max-w-48"
+          label="Conflicts"
+          value={policy}
+          options={BacklogSyncModel.conflictPolicies.map(value => ({ value, label: policyLabels[value] }))}
+          onValueChange={value => (isPolicy(value) ? setPolicy(value) : undefined)}
+          triggerClassName="dshx:w-auto"
         />
-        <Combobox
-          label="Auto-sync"
-          value={String(row.autoSyncMinutes)}
-          options={autoSyncOptions}
-          onValueChange={value => props.onChange({ autoSyncMinutes: Number(value) })}
-          triggerClassName="dshx:w-auto dshx:min-w-0"
-        />
-        <div className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2">
-          <label className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs">
-            <Switch size="sm" checked={row.pushAgentComments === true} onCheckedChange={checked => props.onChange({ pushAgentComments: checked })} />
+        <Combobox label="Interval" value={String(poll)} options={pollOptions} onValueChange={value => setPoll(Number(value))} triggerClassName="dshx:w-auto" />
+        {props.descriptor?.capabilities.comments === 'read-write' ? (
+          <label className="dshx:flex dshx:items-center dshx:gap-1.5">
+            <Switch size="sm" checked={pushAgentComments} onCheckedChange={setPushAgentComments} />
             Push agent comments
           </label>
-          <label className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs">
-            <Switch size="sm" checked={row.enabled} onCheckedChange={checked => props.onChange({ enabled: checked })} />
-            Enabled
-          </label>
-          <Button type="button" variant="ghost" size="icon-xs" aria-label={`Remove sync backend ${String(props.position)}`} onClick={props.onRemove}>
-            <Trash2Icon />
+        ) : null}
+        <label className="dshx:flex dshx:items-center dshx:gap-1.5">
+          <Switch size="sm" checked={importNew} onCheckedChange={setImportNew} />
+          Import new remote items
+        </label>
+      </div>
+      {actions.saveBinding.error === null ? null : (
+        <p role="alert" className="dshx:text-destructive">
+          {failureText(actions.saveBinding.error, 'The binding could not be saved. Retry.')}
+        </p>
+      )}
+      <div className="dshx:flex dshx:gap-2">
+        <Button type="submit" size="sm" disabled={actions.saveBinding.isPending}>
+          Save binding
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={props.onDone}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+const scopeLabel = (scope: string | null): string => (scope === null ? 'Every project' : ItemGlyphs.projectName(scope))
+
+/** One binding on one line: what it syncs with which project, how often, and its actions. */
+const BindingRow = (props: {
+  readonly view: BacklogSyncBindingView
+  readonly connection: BacklogSyncConnectionView
+  readonly descriptor: ProviderDescriptor | undefined
+  readonly projectOptions: readonly ComboboxOption[]
+}): JSX.Element => {
+  const actions = useSyncActions()
+  const [editing, setEditing] = useState(false)
+  const { binding } = props.view
+  if (editing)
+    return (
+      <BindingForm
+        connection={props.connection}
+        descriptor={props.descriptor}
+        initial={binding}
+        projectOptions={props.projectOptions}
+        onDone={() => setEditing(false)}
+      />
+    )
+  return (
+    <div
+      role="group"
+      aria-label={`Binding ${binding.id}`}
+      className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:rounded-md dshx:border dshx:border-border dshx:px-2.5 dshx:py-1.5 dshx:text-xs"
+    >
+      <span className="dshx:font-mono dshx:font-medium">{binding.container === '' ? '(from project)' : binding.container}</span>
+      <span className="dshx:text-muted-foreground">{scopeLabel(binding.scope)}</span>
+      <span className="dshx:text-muted-foreground">{directionLabels[binding.direction]}</span>
+      <span className="dshx:text-muted-foreground">{pollLabel(binding.pollEverySec)}</span>
+      <span className="dshx:text-muted-foreground">{String(props.view.linked)} linked</span>
+      {props.view.owned ? null : <span className="dshx:text-warning">Runs on another Host</span>}
+      <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
+        <Button
+          type="button"
+          size="xs"
+          variant="ghost"
+          disabled={actions.syncNow.isPending || !props.view.owned}
+          onClick={() => actions.syncNow.mutate({ binding: binding.id })}
+          aria-label={`Sync ${binding.id} now`}
+        >
+          <RefreshCwIcon aria-hidden className={cn('dshx:size-3', actions.syncNow.isPending && 'dshx:animate-spin')} />
+          Sync now
+        </Button>
+        {binding.direction === 'push' ? null : (
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            disabled={actions.importAll.isPending || !props.view.owned}
+            onClick={() => actions.importAll.mutate(binding.id)}
+          >
+            <DownloadIcon aria-hidden className="dshx:size-3" />
+            Import all open
           </Button>
-          {working ? (
+        )}
+        <Switch
+          size="sm"
+          aria-label={`Enable binding ${binding.id}`}
+          checked={binding.enabled}
+          onCheckedChange={enabled =>
+            actions.saveBinding.mutate({ binding: { id: binding.id, enabled } }, { onError: failed('The binding could not be saved. Retry.') })
+          }
+        />
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={`Edit binding ${binding.id}`} onClick={() => setEditing(true)}>
+          <PencilIcon />
+        </Button>
+        <ConfirmRemove
+          label={`Remove binding ${binding.id}`}
+          heading={`Remove ${binding.id}?`}
+          description={`Its ${String(props.view.linked)} item links stop syncing and are dropped. Items and remote items stay.`}
+          onConfirm={() => actions.removeBinding.mutate(binding.id)}
+        />
+      </span>
+    </div>
+  )
+}
+
+/** One connection with its identity, its actions and its bindings. */
+const ConnectionCard = (props: {
+  readonly view: BacklogSyncConnectionView
+  readonly index: number
+  readonly count: number
+  readonly bindings: readonly BacklogSyncBindingView[]
+  readonly descriptor: ProviderDescriptor | undefined
+  readonly takenIds: readonly string[]
+  readonly projectOptions: readonly ComboboxOption[]
+}): JSX.Element => {
+  const api = useApi(backlogApi)
+  const actions = useSyncActions()
+  const client = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const { connection } = props.view
+  const test = useMutation({
+    mutationFn: () => api.testSyncConnection({ connection: connection.instanceId }),
+    onSettled: () => client.invalidateQueries({ queryKey: SYNC_STATUS_KEY }),
+  })
+  return (
+    <section
+      aria-label={`Connection ${connection.label}`}
+      className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3"
+    >
+      {editing && props.descriptor !== undefined ? (
+        <ConnectionForm descriptor={props.descriptor} initial={connection} takenIds={props.takenIds} onDone={() => setEditing(false)} />
+      ) : (
+        <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2">
+          <span className="dshx:text-sm dshx:font-medium">{connection.label}</span>
+          {props.view.providerLabel === connection.label ? null : <span className="dshx:text-xs dshx:text-muted-foreground">{props.view.providerLabel}</span>}
+          <span className={cn('dshx:text-xs', props.view.credential === 'missing' ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}>
+            {credentialLabels[props.view.credential]}
+          </span>
+          {connection.identity === null ? null : (
+            <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-success">
+              <CircleCheckIcon aria-hidden className="dshx:size-3.5" />
+              {connection.identity.account}
+            </span>
+          )}
+          {props.view.available ? null : <span className="dshx:text-xs dshx:text-destructive">Provider not loaded: enable its plugin</span>}
+          <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
+            <Button type="button" size="xs" variant="ghost" disabled={test.isPending} onClick={() => test.mutate()}>
+              <RefreshCwIcon aria-hidden className={cn('dshx:size-3', test.isPending && 'dshx:animate-spin')} />
+              Test
+            </Button>
             <Button
               type="button"
               variant="ghost"
               size="icon-xs"
-              aria-label={`Collapse sync backend ${String(props.position)}`}
-              aria-expanded
-              onClick={() => setEditing(false)}
+              aria-label={`Move ${connection.label} up`}
+              disabled={props.index === 0}
+              onClick={() => actions.moveConnection.mutate({ instanceId: connection.instanceId, direction: 'earlier' })}
             >
-              <ChevronUpIcon />
+              <ArrowUpIcon />
             </Button>
-          ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`Move ${connection.label} down`}
+              disabled={props.index === props.count - 1}
+              onClick={() => actions.moveConnection.mutate({ instanceId: connection.instanceId, direction: 'later' })}
+            >
+              <ArrowDownIcon />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`Edit ${connection.label}`}
+              disabled={props.descriptor === undefined}
+              onClick={() => setEditing(true)}
+            >
+              <PencilIcon />
+            </Button>
+            <ConfirmRemove
+              label={`Remove ${connection.label}`}
+              heading={`Remove ${connection.label}?`}
+              description={`Its ${String(props.bindings.length)} bindings and their item links go with it. Items and remote items stay.`}
+              onConfirm={() => actions.removeConnection.mutate(connection.instanceId)}
+            />
+          </span>
         </div>
-      </div>
-      <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
-        <input
-          ref={secretField}
-          type="text"
-          data-secret-input="reference"
-          data-secret-alias={suggestedAliases[row.backend]}
-          data-secret-scope="global"
-          aria-label={row.backend === 'linear' ? 'Linear API key reference' : 'GitHub token reference'}
-          placeholder={row.backend === 'linear' ? 'secret:LINEAR_API_KEY' : 'secret:GITHUB_TOKEN or gh login'}
-          value={row.secret}
-          onChange={event => props.onChange({ secret: event.currentTarget.value })}
-          className={cn(inputClass, 'dshx:font-mono!')}
-        />
-        {row.backend === 'linear' && teamOptions.length > 0 ? (
-          <Combobox
-            label="Linear team"
-            value={row.target === '' ? (detectedTarget ?? '') : row.target}
-            placeholder="Pick a team"
-            options={teamOptions}
-            onValueChange={value => props.onChange({ target: value })}
-            triggerClassName="dshx:min-w-0"
-            matchTriggerWidth
-          />
-        ) : (
-          <input
-            type="text"
-            aria-label={row.backend === 'linear' ? 'Linear team key' : 'GitHub repository'}
-            placeholder={row.backend === 'linear' ? 'Team key, e.g. ENG' : repositoryPlaceholder}
-            value={row.target}
-            onChange={event => props.onChange({ target: event.currentTarget.value })}
-            className={cn(inputClass, 'dshx:font-mono!')}
-          />
-        )}
-      </div>
-      <ConnectionLine row={row} test={test} onCreateKey={() => requestVaultKey(secretField.current)} />
-    </fieldset>
+      )}
+      <TestReport report={test.data} error={test.error} />
+      {props.bindings.map(binding => (
+        <BindingRow key={binding.binding.id} view={binding} connection={props.view} descriptor={props.descriptor} projectOptions={props.projectOptions} />
+      ))}
+      {adding ? (
+        <BindingForm connection={props.view} descriptor={props.descriptor} projectOptions={props.projectOptions} onDone={() => setAdding(false)} />
+      ) : (
+        <Button type="button" size="xs" variant="outline" className="dshx:self-start" onClick={() => setAdding(true)} disabled={!props.view.available}>
+          <PlusIcon aria-hidden className="dshx:size-3" />
+          Add binding
+        </Button>
+      )}
+    </section>
   )
 }
 
-/** A row in the form, keyed so its editor keeps its own state when rows above it are removed or restored. */
-interface EditorRow {
-  readonly key: number
-  readonly row: BackendRow
-  readonly startEditing: boolean
-}
-
-const sameRows = (input: { readonly left: readonly BackendRow[]; readonly right: readonly BackendRow[] }): boolean =>
-  JSON.stringify(input.left) === JSON.stringify(input.right)
-
-const keyRows = (input: { readonly counter: { current: number }; readonly rows: readonly BackendRow[] }): EditorRow[] =>
-  input.rows.map(row => {
-    input.counter.current += 1
-    return { key: input.counter.current, row, startEditing: false }
-  })
-
-/** Backend rows (saved as you edit), Sync all now and Import issue, under Backlog settings. */
+/** Connections and their bindings, and Import one item, under Backlog settings. */
 const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] }): JSX.Element => {
-  const settings = useSettings(backlogSettings)
   const status = useSyncStatus()
   const actions = useSyncActions()
-  const queryClient = useQueryClient()
-  const testsRunning = useIsFetching({ queryKey: SYNC_TEST_KEY }) > 0
-  const nextKey = useRef(0)
-  const [entries, setEntries] = useState<EditorRow[]>(() => keyRows({ counter: nextKey, rows: settings.value?.syncBackends ?? [] }))
-  const [removed, setRemoved] = useState<{ readonly entry: EditorRow; readonly index: number } | null>(null)
-  const [dirty, setDirty] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [addingKind, setAddingKind] = useState<string | null>(null)
   const [importReference, setImportReference] = useState('')
-  const editRevision = useRef(0)
-  const stored = settings.value?.syncBackends
-  const settledEntries = useDebouncedValue({ value: entries, delayMs: 800 })
-  const writable = settings.writable && settings.status === 'ready'
-  const savable = entries.every(entry => isReferenceOrEmpty(entry.row.secret))
-
-  useEffect(() => {
-    if (dirty || settings.status !== 'ready') return
-    const next = stored ?? []
-    setEntries(current => (sameRows({ left: current.map(entry => entry.row), right: next }) ? current : keyRows({ counter: nextKey, rows: next })))
-  }, [dirty, settings.status, stored])
-
-  const change = (next: (current: EditorRow[]) => EditorRow[]): void => {
-    editRevision.current += 1
-    setEntries(next)
-    setDirty(true)
-    setSaved(false)
-  }
-  const save = async (): Promise<void> => {
-    const revision = editRevision.current
-    setError(null)
-    try {
-      if (!writable) throw new Error('Backlog settings are not writable right now. Reload the page, then edit again.')
-      const clean = entries.map(entry => ({ ...entry.row, target: entry.row.target.trim(), secret: entry.row.secret.trim() }))
-      if (!(await settings.set('syncBackends', clean))) throw new Error('Backlog could not save the remote sync backends. Retry.')
-      if (editRevision.current === revision) {
-        setDirty(false)
-        setSaved(true)
-      }
-      await queryClient.invalidateQueries({ queryKey: SYNC_STATUS_KEY })
-    } catch (cause) {
-      setError(errorMessage(cause, 'Could not save the remote sync backends. Retry.'))
-    }
-  }
-
-  const saveLatest = useRef(save)
-  saveLatest.current = save
-  const shouldSave = dirty && savable && writable && settledEntries === entries
-  useEffect(() => {
-    if (shouldSave) void saveLatest.current()
-  }, [shouldSave])
-  const unsavedOnLeave = useRef(false)
-  unsavedOnLeave.current = dirty && savable && writable
-  useEffect(
-    () => () => {
-      if (unsavedOnLeave.current) void saveLatest.current()
-    },
-    [],
-  )
-
-  const addRow = (backend: SyncBackendKind): void => {
-    nextKey.current += 1
-    const entry: EditorRow = { key: nextKey.current, row: emptyRow(backend), startEditing: true }
-    change(current => [...current, entry])
-  }
-  const removeRow = (index: number): void => {
-    const entry = entries[index]
-    if (entry === undefined) return
-    setRemoved({ entry, index })
-    change(current => current.filter((_entry, at) => at !== index))
-  }
-  const undoRemove = (): void => {
-    if (removed === null) return
-    setRemoved(null)
-    change(current => [...current.slice(0, removed.index), removed.entry, ...current.slice(removed.index)])
-  }
-  const testAll = (): void => void queryClient.refetchQueries({ queryKey: SYNC_TEST_KEY, type: 'active' })
-
-  const importBackend = BacklogSyncModel.backendOfReference(importReference)
+  const data = status.data
+  const providers = data?.providers ?? []
+  const connections = data?.connections ?? []
+  const bindings = data?.bindings ?? []
+  const takenIds = connections.map(candidate => candidate.connection.instanceId)
+  const projectOptions: ComboboxOption[] = [
+    { value: ALL_PROJECTS, label: 'Every project' },
+    ...props.projectPaths.map(project => ({ value: project, label: ItemGlyphs.projectName(project), description: project })),
+  ]
+  const adding = addingKind === null ? undefined : providers.find(provider => provider.kind === addingKind)
   const importIssue = async (): Promise<void> => {
     const output = await actions.importRemote.mutateAsync({ reference: importReference.trim() })
     BacklogNotices.show({
@@ -777,17 +1046,6 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
     })
     setImportReference('')
   }
-  const projectOptions: ComboboxOption[] = [
-    { value: ALL_PROJECTS, label: 'All other projects' },
-    ...props.projectPaths.map(project => ({ value: project, label: ItemGlyphs.projectName(project), description: project })),
-  ]
-  const linkedCount = status.data?.items.length ?? 0
-  const saveState = (() => {
-    if (settings.mutation.pending) return 'Saving…'
-    if (dirty) return savable ? 'Unsaved changes' : 'Not saved: fix the key above'
-    return saved ? 'Saved' : null
-  })()
-
   return (
     <section
       className="dshx-root dshx:@container dshx:mx-auto dshx:w-full dshx:max-w-2xl dshx:p-5 dshx:@max-pane-narrow:p-3"
@@ -796,104 +1054,84 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
       <h3 id="backlog-remote-sync-title" className="dshx:text-base dshx:font-semibold">
         Remote sync
       </h3>
-      <div className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-3">
-        {entries.map((entry, index) => (
-          <BackendRowEditor
-            key={entry.key}
-            row={entry.row}
-            position={index + 1}
-            startEditing={entry.startEditing}
-            projectOptions={projectOptions}
-            onChange={edit =>
-              change(current => current.map(candidate => (candidate.key === entry.key ? { ...candidate, row: { ...candidate.row, ...edit } } : candidate)))
-            }
-            onRemove={() => removeRow(index)}
-          />
-        ))}
-        {removed === null ? null : (
-          <div role="status" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
-            <span className="dshx:min-w-0 dshx:truncate">
-              Removed the {label(removed.entry.row.backend)} backend for {rowProjectLabel(removed.entry.row)}.
-            </span>
-            <Button type="button" size="xs" variant="outline" disabled={!writable} onClick={undoRemove}>
-              <Undo2Icon aria-hidden className="dshx:size-3" />
-              Undo
-            </Button>
-          </div>
-        )}
-        {error === null ? null : (
-          <div role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-destructive">
-            {error}
-            <Button type="button" size="xs" variant="outline" onClick={() => void save()}>
-              Retry
-            </Button>
-          </div>
-        )}
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          {BacklogSyncModel.backends.map(backend => (
-            <Button
-              key={backend}
-              type="button"
-              size="sm"
-              variant="outline"
-              aria-label={`Add ${label(backend)} backend`}
-              disabled={!writable}
-              onClick={() => addRow(backend)}
-            >
-              <PlusIcon aria-hidden className="dshx:size-3.5" />
-              {label(backend)}
-            </Button>
+      {hostLacksSources(data) ? (
+        <p role="alert" className="dshx:mt-3 dshx:text-sm dshx:text-warning">
+          {HOST_RESTART}
+        </p>
+      ) : (
+        <div className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-3">
+          {status.error === null ? null : (
+            <p role="alert" className="dshx:text-sm dshx:text-destructive">
+              {failureText(status.error, 'Remote sync could not be read. Retry.')}
+            </p>
+          )}
+          {connections.map((view, index) => (
+            <ConnectionCard
+              key={view.connection.instanceId}
+              view={view}
+              index={index}
+              count={connections.length}
+              bindings={bindings.filter(binding => binding.binding.connectionId === view.connection.instanceId)}
+              descriptor={providers.find(provider => provider.kind === view.connection.kind)}
+              takenIds={takenIds}
+              projectOptions={projectOptions}
+            />
           ))}
-          {entries.length === 0 ? null : (
-            <Button type="button" size="sm" variant="outline" disabled={testsRunning} onClick={testAll}>
-              <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', testsRunning && 'dshx:animate-spin')} />
-              Test all
+          {adding === undefined ? null : <ConnectionForm descriptor={adding} takenIds={takenIds} onDone={() => setAddingKind(null)} />}
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+            {providers.map(provider => (
+              <Button
+                key={provider.kind}
+                type="button"
+                size="sm"
+                variant="outline"
+                aria-label={`Add ${provider.label} connection`}
+                onClick={() => setAddingKind(provider.kind)}
+              >
+                <PlusIcon aria-hidden className="dshx:size-3.5" />
+                {provider.label}
+              </Button>
+            ))}
+            {(data?.items.length ?? 0) === 0 ? null : (
+              <Button type="button" size="sm" variant="outline" disabled={actions.syncNow.isPending} onClick={() => actions.syncNow.mutate({})}>
+                <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin')} />
+                Sync all now ({String(data?.items.length ?? 0)})
+              </Button>
+            )}
+          </div>
+          <form
+            className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2"
+            aria-label="Import a remote item"
+            onSubmit={event => {
+              event.preventDefault()
+              void importIssue().catch(() => undefined)
+            }}
+          >
+            <input
+              type="text"
+              aria-label="Remote item to import"
+              placeholder="Import: ENG-12, #42 or a URL"
+              value={importReference}
+              onChange={event => setImportReference(event.currentTarget.value)}
+              className={cn(inputClass, 'dshx:font-mono! dshx:flex-1')}
+            />
+            <Button type="submit" size="sm" disabled={actions.importRemote.isPending || importReference.trim() === ''}>
+              Import
             </Button>
-          )}
-          {linkedCount === 0 ? null : (
-            <Button type="button" size="sm" variant="outline" disabled={actions.syncNow.isPending} onClick={() => actions.syncNow.mutate({})}>
-              <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin')} />
-              Sync all now ({String(linkedCount)})
-            </Button>
-          )}
-          {saveState === null ? null : (
-            <span role="status" className={cn('dshx:ml-auto dshx:text-xs', saveState === 'Saved' ? 'dshx:text-success' : 'dshx:text-muted-foreground')}>
-              {saveState}
-            </span>
-          )}
+            {actions.importRemote.error === null ? null : (
+              <p role="alert" className="dshx:w-full dshx:text-xs dshx:text-destructive">
+                {failureText(actions.importRemote.error, 'The item could not be imported. Check the reference and the bindings, then retry.')}
+              </p>
+            )}
+          </form>
         </div>
-      </div>
-      <form
-        className="dshx:mt-4 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2"
-        aria-label="Import an issue"
-        onSubmit={event => {
-          event.preventDefault()
-          void importIssue().catch(() => undefined)
-        }}
-      >
-        <input
-          type="text"
-          aria-label="Issue to import"
-          placeholder="Import an issue: ENG-12, #42 or its URL"
-          value={importReference}
-          onChange={event => setImportReference(event.currentTarget.value)}
-          className={cn(inputClass, 'dshx:font-mono! dshx:flex-1')}
-        />
-        <Button type="submit" size="sm" disabled={actions.importRemote.isPending || importBackend === undefined}>
-          {importBackend === undefined ? 'Import issue' : `Import from ${label(importBackend)}`}
-        </Button>
-        {actions.importRemote.error === null ? null : (
-          <p role="alert" className="dshx:w-full dshx:text-xs dshx:text-destructive">
-            {errorMessage(actions.importRemote.error, 'The issue could not be imported. Check the reference and the backend row, then retry.')}
-          </p>
-        )}
-      </form>
+      )}
     </section>
   )
 }
 
 export class BacklogSyncControls {
-  static readonly Chip = SyncChip
+  static readonly Chip = SyncChips
   static readonly MenuItems = SyncMenuItems
   static readonly LinkDialog = LinkRemoteDialog
   static readonly Settings = RemoteSyncSettings

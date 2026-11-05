@@ -9,7 +9,7 @@ import { LegacyImport, type LegacyImportPlan } from './legacy-import.js'
 import { LegacyBacklogTables } from './legacy-tables.js'
 import { BacklogOps, type BacklogOp, type BacklogOpRecord, type Hlc } from './op-log.js'
 import { ShortAlias } from './short-alias.js'
-import { BacklogSyncModel, type SyncMapping } from './sync-model.js'
+import { LegacySyncMappings, type SyncMapping } from './sync-legacy-mapping.js'
 import { ulid } from './ulid.js'
 
 /** Bumped when the fold changes what an item looks like: the next open rebuilds the `items` cache from `ops`. */
@@ -21,7 +21,7 @@ const META_LEGACY_IMPORT = 'legacy_import'
 const INSERT_CHUNK = 400
 
 const itemJson = Schema.fromJsonString(BacklogItems.itemSchema)
-const mappingJson = Schema.fromJsonString(BacklogSyncModel.mappingSchema)
+const mappingJson = Schema.fromJsonString(LegacySyncMappings.schema)
 const importMarkerJson = Schema.fromJsonString(
   Schema.Struct({
     at: Schema.Number,

@@ -1,7 +1,7 @@
 import type { BacklogEvent } from './item.js'
-import { BacklogSyncModel } from './sync-model.js'
+import { LegacySyncMappings } from './sync-legacy-mapping.js'
 
-/** `user`, `system`, `agent:<sessionId>` or `remote:<backend>`. */
+/** `user`, `system`, `agent:<sessionId>`, `remote:<bindingId>`, or `remote:<tracker>` on events carried over before bindings. */
 export type BacklogOrigin = string
 
 /**
@@ -11,7 +11,7 @@ export type BacklogOrigin = string
 const of = (event: Pick<BacklogEvent, 'origin' | 'actor' | 'kind' | 'detail'>): BacklogOrigin => {
   if (event.origin !== undefined) return event.origin
   if (event.actor !== 'system' || event.kind !== 'commented') return event.actor
-  const backend = BacklogSyncModel.importedCommentBackend(event.detail)
+  const backend = LegacySyncMappings.commentBackend(event.detail)
   return backend === undefined ? event.actor : `remote:${backend}`
 }
 

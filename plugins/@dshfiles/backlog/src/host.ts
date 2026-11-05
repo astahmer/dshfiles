@@ -29,10 +29,14 @@ import { LifecycleSignals } from './lifecycle-signals.js'
 import { CaptureProjects } from './project-target.js'
 import { ReplyGenerator } from './reply-generator.js'
 import { backlogSettings } from './settings.js'
-import { BacklogSync, RemoteBackends, RemoteSyncLoop } from './sync-service.js'
+import { ProviderCredentials } from './provider-credentials.js'
+import { builtInProviderRegistry } from './provider-builtins.js'
+import { ExternalProviderEndpoints } from './provider-registry.js'
+import { BacklogSyncEngine } from './sync-engine.js'
+import { BacklogSync, RemoteSyncLoop } from './sync-service.js'
+import { SyncSources } from './sync-sources.js'
 import { ShippedSummaries } from './shipped-summaries.js'
 import { SyncLocalProbes } from './sync-local-probes.js'
-import { BacklogSyncTables } from './sync-tables.js'
 import { BacklogStore } from './store.js'
 import { actorOf, ThreadStart } from './thread-start.js'
 import { TriageBackfill } from './triage-backfill.js'
@@ -64,8 +68,12 @@ const backlogServices = Layer.mergeAll(
   ShippedSummaries.layer,
 ).pipe(
   Layer.provideMerge(Triage.layer),
-  Layer.provideMerge(Layer.mergeAll(BacklogStore.layer, BacklogExport.layer, AiActivity.layer, CaptureProjects.layer, AttachmentExport.layer)),
-  Layer.provideMerge(Layer.mergeAll(BacklogSyncTables.layer, RemoteBackends.layer)),
+  Layer.provideMerge(BacklogSyncEngine.layer),
+  Layer.provideMerge(
+    Layer.mergeAll(BacklogStore.layer, BacklogExport.layer, AiActivity.layer, CaptureProjects.layer, AttachmentExport.layer, SyncSources.layer),
+  ),
+  Layer.provideMerge(builtInProviderRegistry),
+  Layer.provideMerge(Layer.mergeAll(ProviderCredentials.layer, ExternalProviderEndpoints.layer)),
   Layer.provideMerge(BacklogRepo.layer),
   Layer.provideMerge(Layer.mergeAll(BacklogDb.layer, LegacyBacklogTables.layer)),
   Layer.provideMerge(BacklogStorePaths.fromDshHome),
@@ -192,15 +200,56 @@ const backlogHandlers = Api.handlers(backlogApi, {
     AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_sync_now', id: input.id } }).pipe(
       Effect.andThen(
         input.id === undefined
-          ? BacklogSync.use(sync => sync.syncNow({ project: input.project }))
-          : Effect.flatMap(itemIdOf(input.id), id => BacklogSync.use(sync => sync.syncNow({ ...input, id }))),
+          ? BacklogSync.use(sync => sync.syncNow({ project: input.project, binding: input.binding }))
+          : Effect.flatMap(itemIdOf(input.id), id => BacklogSync.use(sync => sync.syncNow({ id, binding: input.binding }))),
       ),
     ),
-  linkRemote: (input, call) => Effect.flatMap(withItemId(input), resolved => BacklogSync.use(sync => sync.link({ ...resolved, actor: actorOf(call.caller) }))),
-  importRemote: (input, call) => BacklogSync.use(sync => sync.importRemote({ ...input, actor: actorOf(call.caller) })),
-  testSyncBackend: input =>
-    BacklogSync.use(sync => sync.testConnection({ ...input, project: input.project ?? '', target: input.target ?? '', secret: input.secret ?? '' })),
-  testSyncBackends: () => BacklogSync.use(sync => sync.testSaved),
+  linkRemote: (input, call) =>
+    Effect.flatMap(withItemId(input), resolved =>
+      BacklogSync.use(sync =>
+        sync.link({
+          id: resolved.id,
+          binding: resolved.binding,
+          provider: resolved.backend,
+          reference: resolved.reference,
+          create: resolved.create,
+          remove: resolved.remove,
+          actor: actorOf(call.caller),
+        }),
+      ),
+    ),
+  syncSources: () =>
+    BacklogSync.use(sync =>
+      Effect.map(sync.status({ ids: [] }), status => ({ providers: status.providers, connections: status.connections, bindings: status.bindings })),
+    ),
+  saveSyncConnection: input =>
+    BacklogSync.use(sync =>
+      sync.saveConnection({
+        connection: { ...input.connection, credential: input.connection.credential ?? '', baseUrl: input.connection.baseUrl ?? '' },
+        previousInstanceId: input.previousInstanceId,
+      }),
+    ),
+  removeSyncConnection: ({ confirm, instanceId }, call) =>
+    AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_sync_connection_remove' } }).pipe(
+      Effect.andThen(BacklogSync.use(sync => sync.removeConnection({ instanceId }))),
+    ),
+  moveSyncConnection: input => BacklogSync.use(sync => sync.moveConnection(input)),
+  saveSyncBinding: input => BacklogSync.use(sync => sync.saveBinding({ binding: input.binding })),
+  removeSyncBinding: ({ confirm, binding }, call) =>
+    AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_sync_binding_remove' } }).pipe(
+      Effect.andThen(BacklogSync.use(sync => sync.removeBinding({ binding }))),
+    ),
+  discoverSync: input => BacklogSync.use(sync => sync.discover(input)),
+  testSyncConnection: input => BacklogSync.use(sync => sync.testConnection(input)),
+  testSyncConnections: () => BacklogSync.use(sync => sync.testSaved),
+  importRemote: (input, call) =>
+    BacklogSync.use(sync =>
+      sync.importRemote({ provider: input.backend, binding: input.binding, reference: input.reference, project: input.project, actor: actorOf(call.caller) }),
+    ),
+  importAllRemote: ({ confirm, binding }, call) =>
+    AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_sync_import_all' } }).pipe(
+      Effect.andThen(BacklogSync.use(sync => sync.importAll({ binding, actor: actorOf(call.caller) }))),
+    ),
   editComment: (input, call) =>
     Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.editComment({ ...resolved, actor: actorOf(call.caller) }))),
   export: input => BacklogExport.use(exporter => exporter.run(input)),

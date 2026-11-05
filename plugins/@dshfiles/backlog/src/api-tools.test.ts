@@ -80,6 +80,14 @@ describe('backlog tool exposure', () => {
       'backlog_shipped',
       'backlog_start_thread',
       'backlog_summarize_shipped',
+      'backlog_sync_binding_remove',
+      'backlog_sync_binding_save',
+      'backlog_sync_connection_move',
+      'backlog_sync_connection_remove',
+      'backlog_sync_connection_save',
+      'backlog_sync_connections',
+      'backlog_sync_discover',
+      'backlog_sync_import_all',
       'backlog_sync_now',
       'backlog_sync_status',
       'backlog_sync_test_all',
@@ -105,6 +113,8 @@ describe('backlog tool exposure', () => {
       'backlog_ready',
       'backlog_referencing',
       'backlog_shipped',
+      'backlog_sync_connections',
+      'backlog_sync_discover',
       'backlog_sync_status',
       'backlog_sync_test_all',
       'backlog_sync_test_connection',
@@ -179,8 +189,27 @@ describe('backlog tool exposure', () => {
       'syncNow',
       'linkRemote',
       'importRemote',
+      'importAllRemote',
+      'saveSyncConnection',
+      'saveSyncBinding',
     ] as const) {
       expect(backlogApi.methods[name].description ?? '').toMatch(/Use it when the user asked/u)
+    }
+  })
+
+  test('sync configuration writes say the user must ask, and removals take an explicit confirm', () => {
+    for (const name of [
+      'saveSyncConnection',
+      'removeSyncConnection',
+      'moveSyncConnection',
+      'saveSyncBinding',
+      'removeSyncBinding',
+      'importAllRemote',
+    ] as const) {
+      expect(backlogApi.methods[name].description ?? '').toMatch(/only when the user asked/u)
+    }
+    for (const name of ['removeSyncConnection', 'removeSyncBinding', 'importAllRemote'] as const) {
+      expect(backlogApi.methods[name].description ?? '').toMatch(/confirm: true/u)
     }
   })
 

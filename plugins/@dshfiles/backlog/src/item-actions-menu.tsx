@@ -31,7 +31,6 @@ import { useBacklogActions, type BacklogUpdateInput } from './use-backlog-action
 import { BacklogTweetContext } from './backlog-tweet-context.js'
 import { BacklogNotices } from './notices.js'
 import { BacklogSyncControls } from './sync-controls.js'
-import type { SyncBackendKind } from './sync-model.js'
 import { BacklogReference } from './backlog-reference.js'
 
 const NO_PROJECT = 'no-project'
@@ -62,7 +61,7 @@ export const BacklogItemMenu = (props: {
 }): JSX.Element => {
   const item = props.item
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [linkBackend, setLinkBackend] = useState<SyncBackendKind | null>(null)
+  const [linkBinding, setLinkBinding] = useState<string | null>(null)
   const actions = useBacklogActions()
   const attention = item.attention ?? 'none'
   const selection = props.selection !== undefined && props.selection.length > 1 ? props.selection : [startThreadItemOf(item)]
@@ -145,7 +144,7 @@ export const BacklogItemMenu = (props: {
           {many ? null : (
             <>
               <ContextMenuSeparator />
-              <BacklogSyncControls.MenuItems itemId={item.id} onLink={setLinkBackend} />
+              <BacklogSyncControls.MenuItems itemId={item.id} project={item.project} onLink={setLinkBinding} />
             </>
           )}
           <ContextMenuSeparator />
@@ -317,13 +316,13 @@ export const BacklogItemMenu = (props: {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {linkBackend === null ? null : (
+      {linkBinding === null ? null : (
         <BacklogSyncControls.LinkDialog
           itemId={item.id}
           itemLabel={BacklogReference.labelOf(item)}
-          backend={linkBackend}
+          bindingId={linkBinding}
           open
-          onOpenChange={open => (open ? undefined : setLinkBackend(null))}
+          onOpenChange={open => (open ? undefined : setLinkBinding(null))}
         />
       )}
     </>

@@ -1,122 +1,100 @@
 import { Schema } from 'effect'
 
-const backendSchema = Schema.Literals(['linear', 'github'])
-const label = (backend: 'linear' | 'github'): string => (backend === 'linear' ? 'Linear' : 'GitHub')
 const settingsHint = 'Open Backlog settings › Remote sync'
 /** An item named by its ref when the caller knows it, else by its number. */
 const itemLabel = (error: { readonly itemId: number; readonly ref?: string | undefined }): string => `b:${error.ref ?? String(error.itemId)}`
 
-/** No enabled backend row serves the item's project. */
-export class SyncBackendUnconfigured extends Schema.TaggedError<SyncBackendUnconfigured>()(
-  'SyncBackendUnconfigured',
-  { backend: backendSchema, project: Schema.NullOr(Schema.String) },
-  { dshxWireCode: 'sync-backend-unconfigured' },
+/** No enabled binding of that provider serves the item's project. */
+export class SyncBindingMissing extends Schema.TaggedError<SyncBindingMissing>()(
+  'SyncBindingMissing',
+  { provider: Schema.String, project: Schema.NullOr(Schema.String) },
+  { dshxWireCode: 'sync-binding-missing' },
 ) {
   override get message(): string {
     const where = this.project === null ? 'items without a project' : this.project
-    return `No enabled ${label(this.backend)} backend is configured for ${where}. ${settingsHint}, add a ${label(this.backend)} row for that project (or leave its project empty to serve every project), then retry.`
+    return `No enabled ${this.provider} binding serves ${where}. ${settingsHint}, add a binding to a ${this.provider} connection scoped to that project (or to every project), then retry.`
   }
 }
 
-/** The backend row names no resolvable credential. */
-export class SyncCredentialMissing extends Schema.TaggedError<SyncCredentialMissing>()(
-  'SyncCredentialMissing',
-  { backend: backendSchema, environmentVariable: Schema.String },
-  { dshxWireCode: 'sync-credential-missing' },
+/** A binding or call names a connection that does not exist. */
+export class SyncConnectionMissing extends Schema.TaggedError<SyncConnectionMissing>()(
+  'SyncConnectionMissing',
+  { connection: Schema.String },
+  { dshxWireCode: 'sync-connection-missing' },
 ) {
   override get message(): string {
-    const cli = this.backend === 'github' ? ', or run `gh auth login` on the Host' : ''
-    return `The ${label(this.backend)} key does not resolve. ${settingsHint} and set its key to a Secret Catalog reference (secret:ALIAS), set ${this.environmentVariable} in the DSH Host environment${cli}, then retry.`
+    return `No connection “${this.connection.slice(0, 80)}” exists. ${settingsHint}, add the connection or pick an existing one, then retry.`
   }
 }
 
-/** The row names no team or repository, and none could be found on its own. */
-export class SyncTargetMissing extends Schema.TaggedError<SyncTargetMissing>()(
-  'SyncTargetMissing',
-  { backend: backendSchema, project: Schema.NullOr(Schema.String) },
-  { dshxWireCode: 'sync-target-missing' },
+/** A binding id names no binding. */
+export class SyncBindingUnknown extends Schema.TaggedError<SyncBindingUnknown>()(
+  'SyncBindingUnknown',
+  { binding: Schema.String },
+  { dshxWireCode: 'sync-binding-unknown' },
 ) {
   override get message(): string {
-    if (this.backend === 'linear') return `The Linear key sees several teams. ${settingsHint}, pick a team for this backend, then retry.`
-    const where = this.project === null ? 'Items without a project have' : `${this.project} has`
-    return `${where} no github.com git remote to take the repository from. ${settingsHint}, set the repository as owner/repo, then retry.`
+    return `No binding “${this.binding.slice(0, 80)}” exists. ${settingsHint} to see the bindings, then retry with one of them.`
   }
 }
 
-/** The remote answered, but refused the request (auth, permissions, validation). */
-export class SyncRemoteRejected extends Schema.TaggedError<SyncRemoteRejected>()(
-  'SyncRemoteRejected',
-  { backend: backendSchema, status: Schema.Number, detail: Schema.String },
-  { dshxWireCode: 'sync-remote-rejected' },
+/** A connection's provider kind is not served by any loaded plugin. */
+export class SyncProviderUnknown extends Schema.TaggedError<SyncProviderUnknown>()(
+  'SyncProviderUnknown',
+  { kind: Schema.String },
+  { dshxWireCode: 'sync-provider-unknown' },
 ) {
   override get message(): string {
-    const recovery =
-      this.status === 401 || this.status === 403
-        ? 'Check that the key is valid and can read and write issues there, then retry.'
-        : this.status === 429
-          ? 'The rate limit was reached; wait a minute, then retry.'
-          : 'Check the team or repository in Backlog settings › Remote sync, then retry.'
-    return `${label(this.backend)} refused the request (${String(this.status)}${this.detail === '' ? '' : `: ${this.detail.slice(0, 300)}`}). ${recovery}`
+    return `No loaded plugin provides “${this.kind.slice(0, 40)}” items. Enable the plugin that serves it in Settings › Plugins, or remove the connection in Backlog settings › Remote sync.`
   }
 }
 
-/** The network call itself failed or timed out. */
-export class SyncTransportFailed extends Schema.TaggedError<SyncTransportFailed>()(
-  'SyncTransportFailed',
-  { backend: backendSchema, cause: Schema.optional(Schema.Defect()) },
-  { dshxWireCode: 'sync-transport-failed' },
+/** The binding runs on another Host. */
+export class SyncNotOwner extends Schema.TaggedError<SyncNotOwner>()(
+  'SyncNotOwner',
+  { binding: Schema.String, ownerHostId: Schema.String },
+  { dshxWireCode: 'sync-not-owner' },
 ) {
   override get message(): string {
-    return `${label(this.backend)} could not be reached. Check the Host's network connection, then use Sync now to retry; local edits are kept and sync on the next pass.`
+    return `The binding “${this.binding.slice(0, 80)}” syncs from another Host (${this.ownerHostId.slice(0, 12)}). Run the sync there, or ${settingsHint} and move the binding to this Host.`
   }
 }
 
-/** The answer did not have the shape the adapter expects. */
-export class SyncResponseInvalid extends Schema.TaggedError<SyncResponseInvalid>()(
-  'SyncResponseInvalid',
-  { backend: backendSchema, cause: Schema.optional(Schema.Defect()) },
-  { dshxWireCode: 'sync-response-invalid' },
+/** A connection or binding the caller wants to save does not hold together. */
+export class SyncConfigInvalid extends Schema.TaggedError<SyncConfigInvalid>()(
+  'SyncConfigInvalid',
+  { detail: Schema.String },
+  { dshxWireCode: 'sync-config-invalid' },
 ) {
   override get message(): string {
-    return `${label(this.backend)} answered in an unexpected shape. Retry with Sync now; if it keeps failing, check the Host log for the response and report it.`
+    return `${this.detail.slice(0, 400)} Fix it in Backlog settings › Remote sync, then save again.`
   }
 }
 
-/** The issue reference does not name a reachable issue. */
-export class SyncRemoteNotFound extends Schema.TaggedError<SyncRemoteNotFound>()(
-  'SyncRemoteNotFound',
-  { backend: backendSchema, reference: Schema.String },
-  { dshxWireCode: 'sync-remote-not-found' },
-) {
-  override get message(): string {
-    const example = this.backend === 'linear' ? 'an identifier such as ENG-12 or its linear.app URL' : 'an issue number such as 42 or its github.com URL'
-    return `No ${label(this.backend)} issue matches “${this.reference.slice(0, 200)}”. Paste ${example} from the configured team or repository, then retry.`
-  }
-}
-
-/** The text names neither a Linear nor a GitHub issue. */
+/** The text names no issue of any loaded provider. */
 export class SyncReferenceUnrecognized extends Schema.TaggedError<SyncReferenceUnrecognized>()(
   'SyncReferenceUnrecognized',
-  { reference: Schema.String },
+  { reference: Schema.String, examples: Schema.Array(Schema.String) },
   { dshxWireCode: 'sync-reference-unrecognized' },
 ) {
   override get message(): string {
-    return `“${this.reference.slice(0, 200)}” is not a Linear or GitHub issue. Paste ENG-12, #42, owner/repo#42 or the issue URL, then retry.`
+    const examples = this.examples.length === 0 ? 'an issue URL' : this.examples.join(', ')
+    return `“${this.reference.slice(0, 200)}” names no issue of a connected provider. Paste ${examples}, or pass the binding to import from, then retry.`
   }
 }
 
-/** The item is not linked to a remote issue yet. */
+/** The item is not linked to a remote item yet. */
 export class SyncItemNotLinked extends Schema.TaggedError<SyncItemNotLinked>()(
   'SyncItemNotLinked',
   { itemId: Schema.Number, ref: Schema.optional(Schema.String) },
   { dshxWireCode: 'sync-item-not-linked' },
 ) {
   override get message(): string {
-    return `${itemLabel(this)} is not linked to a remote issue. Use “Link to Linear issue…” or “Create in Linear” from its menu first.`
+    return `${itemLabel(this)} is not linked to a remote item. Use “Link to…” or “Create in…” from its menu first.`
   }
 }
 
-/** The item already mirrors another issue. */
+/** The item already mirrors another remote item in that binding, or the remote item mirrors another backlog item. */
 export class SyncAlreadyLinked extends Schema.TaggedError<SyncAlreadyLinked>()(
   'SyncAlreadyLinked',
   { itemId: Schema.Number, ref: Schema.optional(Schema.String), remoteKey: Schema.String },
@@ -127,7 +105,7 @@ export class SyncAlreadyLinked extends Schema.TaggedError<SyncAlreadyLinked>()(
   }
 }
 
-/** The mapping could not be stored. */
+/** The sync state could not be stored. */
 export class SyncWriteFailed extends Schema.TaggedError<SyncWriteFailed>()(
   'SyncWriteFailed',
   { itemId: Schema.Number, ref: Schema.optional(Schema.String), cause: Schema.optional(Schema.Defect()) },
@@ -138,4 +116,13 @@ export class SyncWriteFailed extends Schema.TaggedError<SyncWriteFailed>()(
   }
 }
 
-export type RemoteBackendError = SyncRemoteRejected | SyncTransportFailed | SyncResponseInvalid | SyncRemoteNotFound | SyncTargetMissing
+/** The connections and bindings could not be stored. */
+export class SyncConfigWriteFailed extends Schema.TaggedError<SyncConfigWriteFailed>()(
+  'SyncConfigWriteFailed',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'sync-config-write-failed' },
+) {
+  override get message(): string {
+    return 'The remote sync settings could not be saved. Retry; if it keeps failing, check the Host log for the storage error.'
+  }
+}

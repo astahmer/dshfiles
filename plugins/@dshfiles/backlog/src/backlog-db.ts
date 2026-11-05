@@ -82,6 +82,15 @@ export const backlogMigrations = {
       heartbeat INTEGER NOT NULL
     )`
   }),
+  '4_sync_sources': Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`CREATE TABLE sync_connections (instance_id TEXT PRIMARY KEY, position INTEGER NOT NULL, connection TEXT NOT NULL)`
+    yield* sql`CREATE TABLE sync_bindings (binding_id TEXT PRIMARY KEY, connection_id TEXT NOT NULL, position INTEGER NOT NULL, binding TEXT NOT NULL)`
+    yield* sql`CREATE INDEX sync_bindings_connection ON sync_bindings (connection_id)`
+    yield* sql`CREATE TABLE external_refs (item_id TEXT NOT NULL, binding_id TEXT NOT NULL, key TEXT NOT NULL, ref TEXT NOT NULL, PRIMARY KEY (binding_id, key))`
+    yield* sql`CREATE UNIQUE INDEX external_refs_item_binding ON external_refs (item_id, binding_id)`
+    yield* sql`CREATE TABLE sync_state (binding_id TEXT PRIMARY KEY, cursor TEXT, last_pass_at INTEGER, last_error TEXT)`
+  }),
 }
 
 /** The backlog's SQLite file, through the shared store layer (WAL, migrations, `BEGIN IMMEDIATE`). */

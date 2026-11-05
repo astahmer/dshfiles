@@ -1315,7 +1315,7 @@ const PeekBody = (props: {
                   attention={item.attention ?? 'none'}
                   onPick={attention => actions.update.mutate({ id: item.id, attention })}
                 />
-                <BacklogSyncControls.Chip itemId={item.id} itemLabel={BacklogReference.labelOf(item)} />
+                <BacklogSyncControls.Chip itemId={item.id} itemLabel={BacklogReference.labelOf(item)} project={item.project} />
                 <span className="dshx:ml-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
                   {item.actors.map(actor => (
                     <AgentThreadChip

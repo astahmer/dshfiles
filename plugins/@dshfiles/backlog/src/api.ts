@@ -5,6 +5,7 @@ import { BacklogBackfill } from './backfill.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogItems } from './item.js'
 import { BacklogShipped } from './shipped.js'
+import { BacklogProviders } from './provider-port.js'
 import { BacklogSyncModel } from './sync-model.js'
 
 const idSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))
@@ -243,10 +244,13 @@ const backfillOutputSchema = Schema.Struct({
 
 const syncStateSchema = Schema.Literals(BacklogSyncModel.syncStates)
 const syncErrorViewSchema = Schema.Struct({ code: Schema.String, message: Schema.String })
+/** `bindingId` and `connectionLabel` came with bindings: a Host that predates them answers without, and the panel reads its tracker. */
 const syncItemSchema = Schema.Struct({
   itemId: idSchema,
   ref: refOutputSchema,
-  backend: BacklogSyncModel.backendSchema,
+  bindingId: Schema.optionalKey(Schema.String),
+  backend: Schema.String,
+  connectionLabel: Schema.optionalKey(Schema.String),
   remoteKey: Schema.String,
   url: Schema.String,
   state: syncStateSchema,
@@ -257,63 +261,146 @@ const syncItemSchema = Schema.Struct({
 const syncResultSchema = Schema.Struct({
   itemId: idSchema,
   ref: refOutputSchema,
+  bindingId: Schema.optionalKey(Schema.String),
   remoteKey: Schema.NullOr(Schema.String),
   state: syncStateSchema,
-  pulled: Schema.Array(Schema.Literals(BacklogSyncModel.syncedFields)),
-  pushed: Schema.Array(Schema.Literals(BacklogSyncModel.syncedFields)),
+  pulled: Schema.Array(BacklogSyncModel.fieldSchema),
+  pushed: Schema.Array(BacklogSyncModel.fieldSchema),
   conflicts: Schema.Array(BacklogSyncModel.conflictSchema),
   commentsPulled: nonNegativeCountSchema,
   commentsPushed: nonNegativeCountSchema,
   error: Schema.NullOr(syncErrorViewSchema),
 })
+const syncPassSchema = Schema.Struct({
+  bindingId: Schema.String,
+  records: nonNegativeCountSchema,
+  created: nonNegativeCountSchema,
+  removed: nonNegativeCountSchema,
+  complete: Schema.Boolean,
+  results: Schema.Array(syncResultSchema),
+})
+const credentialViewSchema = Schema.Literals(['reference', 'environment', 'fallback', 'none', 'missing'])
+const syncConnectionViewSchema = Schema.Struct({
+  connection: BacklogSyncModel.connectionSchema,
+  providerLabel: Schema.String,
+  available: Schema.Boolean,
+  credential: credentialViewSchema,
+})
+const syncBindingViewSchema = Schema.Struct({
+  binding: BacklogSyncModel.bindingSchema,
+  providerKind: Schema.String,
+  connectionLabel: Schema.String,
+  owned: Schema.Boolean,
+  linked: nonNegativeCountSchema,
+  lastPassAt: Schema.NullOr(Schema.Number.check(Schema.isFinite())),
+})
+const syncSourcesSchema = Schema.Struct({
+  providers: Schema.Array(BacklogProviders.descriptorSchema),
+  connections: Schema.Array(syncConnectionViewSchema),
+  bindings: Schema.Array(syncBindingViewSchema),
+})
+/**
+ * `providers`, `connections` and `bindings` came with connections and bindings; a Host that predates them answers
+ * `backends` instead, and the panel asks for a Host restart.
+ */
 const syncStatusSchema = Schema.Struct({
-  backends: Schema.Array(
-    Schema.Struct({
-      project: Schema.NullOr(Schema.String),
-      backend: BacklogSyncModel.backendSchema,
-      target: Schema.String,
-      enabled: Schema.Boolean,
-      autoSyncMinutes: nonNegativeCountSchema,
-      credential: Schema.Literals(['reference', 'environment', 'github-cli', 'missing']),
-    }),
-  ),
+  providers: Schema.optionalKey(Schema.Array(BacklogProviders.descriptorSchema)),
+  connections: Schema.optionalKey(Schema.Array(syncConnectionViewSchema)),
+  bindings: Schema.optionalKey(Schema.Array(syncBindingViewSchema)),
+  backends: Schema.optionalKey(Schema.Array(Schema.Struct({ backend: Schema.String, project: Schema.NullOr(Schema.String), target: Schema.String }))),
   items: Schema.Array(syncItemSchema),
 })
-const syncTargetSchema = Schema.Struct({ key: Schema.String, name: Schema.String })
 const syncConnectionSchema = Schema.Struct({
   ok: Schema.Boolean,
-  credential: Schema.Literals(['reference', 'environment', 'github-cli', 'missing']),
+  credential: Schema.Literals(['reference', 'environment', 'cli', 'none', 'missing']),
   account: Schema.NullOr(Schema.String),
-  target: Schema.NullOr(syncTargetSchema),
-  targetSource: Schema.NullOr(Schema.Literals(['setting', 'git-remote', 'only-team', 'per-project'])),
-  teams: Schema.Array(syncTargetSchema),
+  containers: Schema.Array(BacklogProviders.containerSchema),
   error: Schema.NullOr(syncErrorViewSchema),
+})
+const slugInputSchema = BacklogSyncModel.slugSchema
+const connectionInputSchema = Schema.Struct({
+  instanceId: slugInputSchema.annotate({ description: 'Stable id of the connection, lowercase with dashes, e.g. github-work.' }),
+  kind: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(32)).annotate({
+    description: 'Provider kind: linear, github, files, or one a plugin provides.',
+  }),
+  label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
+  credential: Schema.String.check(Schema.isMaxLength(400))
+    .pipe(Schema.optional)
+    .annotate({ description: 'secret:ALIAS reference to the key; empty uses the provider’s Host environment variable (or the gh CLI for GitHub).' }),
+  baseUrl: Schema.String.check(Schema.isMaxLength(500))
+    .pipe(Schema.optional)
+    .annotate({ description: 'API base URL for a self-hosted instance; empty uses the provider’s default.' }),
+})
+const connectionDraftSchema = Schema.Struct({
+  kind: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(32)),
+  credential: Schema.String.check(Schema.isMaxLength(400)),
+  baseUrl: Schema.String.check(Schema.isMaxLength(500)),
+})
+const connectionTargetSchema = Schema.Struct({
+  connection: slugInputSchema.pipe(Schema.optional).annotate({ description: 'A saved connection id.' }),
+  draft: connectionDraftSchema.pipe(Schema.optional).annotate({ description: 'An unsaved connection, as a settings form holds it.' }),
+}).check(Schema.makeFilter(input => (input.connection !== undefined || input.draft !== undefined ? undefined : 'Pass `connection` or `draft`.')))
+const bindingInputSchema = Schema.Struct({
+  id: slugInputSchema
+    .pipe(Schema.optional)
+    .annotate({ description: 'An existing binding to change; omit to add one. Fields left out keep their saved value.' }),
+  connectionId: slugInputSchema.pipe(Schema.optional),
+  container: Schema.String.check(Schema.isMaxLength(500))
+    .pipe(Schema.optional)
+    .annotate({ description: 'Team key, owner/repo or folder. Empty lets the provider derive it from the project (git remote, <project>/backlog).' }),
+  scope: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))
+    .pipe(Schema.optional)
+    .annotate({ description: 'Absolute project path, or null to serve every project without a binding of its own.' }),
+  direction: Schema.Literals(BacklogSyncModel.directions).pipe(Schema.optional),
+  fieldMap: Schema.Array(BacklogSyncModel.fieldRuleSchema).pipe(Schema.optional),
+  conflictPolicy: Schema.Literals(BacklogSyncModel.conflictPolicies).pipe(Schema.optional),
+  pollEverySec: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(BacklogSyncModel.maxPollSeconds)).pipe(
+    Schema.optional,
+  ),
+  pushAgentComments: Schema.Boolean.pipe(Schema.optional),
+  importNew: Schema.Boolean.pipe(Schema.optional),
+  enabled: Schema.Boolean.pipe(Schema.optional),
 })
 
 const renderSyncConnection = (output: typeof syncConnectionSchema.Type): string => {
   if (output.error !== null) return output.error.message
-  const target = output.target === null ? (output.targetSource === 'per-project' ? "each project's git remote" : 'no target') : output.target.key
-  return `Connected as ${output.account ?? '?'} → ${target} (key: ${output.credential}).`
+  const containers =
+    output.containers.length === 0
+      ? ''
+      : ` → ${output.containers
+          .slice(0, 8)
+          .map(container => container.key)
+          .join(', ')}${output.containers.length > 8 ? '…' : ''}`
+  return `Connected as ${output.account ?? '?'}${containers} (key: ${output.credential}).`
 }
-const savedSyncConnectionSchema = Schema.Struct({
-  backend: BacklogSyncModel.backendSchema,
-  project: Schema.String,
-  target: Schema.String,
-  enabled: Schema.Boolean,
-  report: syncConnectionSchema,
-})
-const renderSavedSyncConnections = (output: { readonly results: readonly (typeof savedSyncConnectionSchema.Type)[] }): string =>
-  output.results.length === 0
-    ? 'No sync backends are saved. Add one under Backlog settings › Remote sync.'
-    : output.results
-        .map(
-          result =>
-            `${result.backend} · ${result.project === '' ? 'all other projects' : result.project}${result.enabled ? '' : ' (disabled)'}: ${renderSyncConnection(result.report)}`,
-        )
+const renderSyncSources = (output: typeof syncSourcesSchema.Type): string =>
+  output.connections.length === 0
+    ? 'No sync connections are saved. Add one under Backlog settings › Remote sync.'
+    : output.connections
+        .map(view => {
+          const bindings = output.bindings.filter(binding => binding.binding.connectionId === view.connection.instanceId)
+          return [
+            `${view.connection.label} (${view.providerLabel}, ${view.connection.instanceId}; key: ${view.credential})`,
+            ...bindings.map(
+              binding =>
+                `  - ${binding.binding.id}: ${binding.binding.container || '(derived)'} · ${binding.binding.scope ?? 'every project'} · ${binding.binding.direction}${binding.binding.enabled ? '' : ' (disabled)'} · ${String(binding.linked)} linked`,
+            ),
+          ].join('\n')
+        })
         .join('\n')
+const renderSavedSyncConnections = (output: {
+  readonly results: readonly {
+    readonly connection: { readonly label: string; readonly instanceId: string }
+    readonly report: typeof syncConnectionSchema.Type
+  }[]
+}): string =>
+  output.results.length === 0
+    ? 'No sync connections are saved. Add one under Backlog settings › Remote sync.'
+    : output.results.map(result => `${result.connection.label} (${result.connection.instanceId}): ${renderSyncConnection(result.report)}`).join('\n')
 const remoteReferenceSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTargetChars)).annotate({
-  description: 'The issue: a URL, a Linear identifier such as ENG-12, or a GitHub issue number such as 42.',
+  description: 'The remote item: a URL, an identifier such as ENG-12, an issue number such as 42 or owner/repo#42, or a file name.',
 })
+const providerKindInputSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(32))
 
 const renderSyncResults = (output: { readonly results: readonly (typeof syncResultSchema.Type)[] }): string =>
   output.results.length === 0
@@ -325,6 +412,8 @@ const renderSyncResults = (output: { readonly results: readonly (typeof syncResu
             : `${BacklogReference.labelOf({ id: result.itemId, ref: result.ref })}: ${result.error.message}`,
         )
         .join('\n')
+const renderSyncPass = (output: typeof syncPassSchema.Type): string =>
+  `${output.bindingId}: read ${String(output.records)} remote items, created ${String(output.created)}, removed ${String(output.removed)}${output.complete ? '' : ' (more next pass)'}.\n${renderSyncResults(output)}`
 
 const epochMsSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 const tzOffsetSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(-840), Schema.isLessThanOrEqualTo(840))
@@ -699,7 +788,7 @@ export const backlogApi = defineApi({
       }),
       output: syncStatusSchema,
       description:
-        'Remote sync of backlog items: the configured backends (Linear teams, GitHub repositories) with whether a key is bound, and each linked item with its issue, sync state (synced, pending, conflict, error), last sync time, last error and recent conflicts. Read-only.',
+        'Remote sync of backlog items: the providers, connections (accounts) and bindings (sync flows), and each linked item with its binding, remote key, sync state (synced, pending, conflict, error), last sync time, last error and recent conflicts. Read-only.',
       tool: { name: 'backlog_sync_status', readOnly: true },
     }),
     syncNow: method({
@@ -708,22 +797,30 @@ export const backlogApi = defineApi({
         project: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))
           .pipe(Schema.optional)
           .annotate({ description: 'Only linked items of this project; null selects items without a project.' }),
+        binding: slugInputSchema
+          .pipe(Schema.optional)
+          .annotate({ description: 'Run one binding: pull what changed remotely since its last pass, then push local changes of its linked items.' }),
         confirm: confirmSchema,
       }),
-      output: Schema.Struct({ results: Schema.Array(syncResultSchema) }),
-      description: `Sync linked backlog items with their Linear or GitHub issues now: title, description, status and tags flow both ways (a field both sides changed goes to the side that changed last, with a conflict note on the item), and new comments are carried over once. Run only when the user asked. Without \`id\` it syncs every linked item, which an agent may run only with \`confirm: true\`. ${writeNote}`,
+      output: Schema.Struct({ results: Schema.Array(syncResultSchema), passes: Schema.optionalKey(Schema.Array(syncPassSchema)) }),
+      description: `Sync linked backlog items with their remote items now: each binding's field map decides which fields flow which way (a field both sides changed is settled by the binding's conflict policy, with a conflict note on the item), and new comments are carried over once. Run only when the user asked. Without \`id\` it syncs every linked item or a whole binding, which an agent may run only with \`confirm: true\`. ${writeNote}`,
       tool: { name: 'backlog_sync_now', readOnly: false, render: renderSyncResults },
     }),
     linkRemote: method({
       input: Schema.Struct({
         id: itemKeySchema,
-        backend: BacklogSyncModel.backendSchema,
+        binding: slugInputSchema
+          .pipe(Schema.optional)
+          .annotate({ description: 'The binding to link through; omit to use the one serving the item’s project.' }),
+        backend: providerKindInputSchema.pipe(Schema.optional).annotate({
+          description: 'Provider kind (linear, github, files…) when no binding is named; omit to read it from the reference.',
+        }),
         reference: remoteReferenceSchema.pipe(Schema.optional),
         create: Schema.Boolean.pipe(Schema.optional).annotate({
-          description: 'Create a new issue from the item in the configured team or repository instead of linking `reference`.',
+          description: 'Create a new remote item from the backlog item through the binding instead of linking `reference`.',
         }),
         remove: Schema.Boolean.pipe(Schema.optional).annotate({
-          description: 'Unlink the item from its issue and stop syncing it; neither side is deleted. Link it again to resume.',
+          description: 'Unlink the item (from `binding`, from every binding of `backend`, or from all) and stop syncing it; neither side is deleted.',
         }),
       }).check(
         Schema.makeFilter(input =>
@@ -731,47 +828,93 @@ export const backlogApi = defineApi({
         ),
       ),
       output: Schema.Struct({ item: Schema.NullOr(syncItemSchema), result: Schema.NullOr(syncResultSchema) }),
-      description: `Link one backlog item to a Linear or GitHub issue (adopting the issue's fields on the first sync, tags merged), create a new issue from it, or unlink it with \`remove: true\`. The issue URL is added to the item's links. Run only when the user asked; it writes to the remote tracker. ${writeNote}`,
+      description: `Link one backlog item to a remote item through a binding (adopting its fields on the first sync, tags merged), create a new remote item from it, or unlink it with \`remove: true\`. An item may be linked through several bindings, one remote item each. The remote URL is added to the item's links. Run only when the user asked; it writes to the remote tracker. ${writeNote}`,
       tool: { name: 'backlog_link_remote', readOnly: false },
     }),
-    testSyncBackend: method({
+    syncSources: method({
+      input: Schema.Struct({}),
+      output: syncSourcesSchema,
+      description:
+        'The sync providers, connections (accounts, with where each key comes from, never the key) and bindings (container, project scope, direction, field map, conflict policy, poll interval, owner Host). Read-only.',
+      tool: { name: 'backlog_sync_connections', readOnly: true, render: renderSyncSources },
+    }),
+    saveSyncConnection: method({
       input: Schema.Struct({
-        backend: BacklogSyncModel.backendSchema,
-        project: Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars))
-          .pipe(Schema.optional)
-          .annotate({ description: 'Absolute project path the row serves; empty or omitted serves every other project.' }),
-        target: Schema.String.check(Schema.isMaxLength(200)).pipe(Schema.optional).annotate({
-          description: "Linear team key or GitHub owner/repo. Empty: Linear uses the key's only team; GitHub reads the project's github.com git remote.",
-        }),
-        secret: Schema.String.check(Schema.isMaxLength(400)).pipe(Schema.optional).annotate({
-          description: 'secret:ALIAS reference to the key. Empty: LINEAR_API_KEY, or GITHUB_TOKEN / GH_TOKEN / a signed-in gh CLI on the Host.',
-        }),
+        connection: connectionInputSchema,
+        previousInstanceId: slugInputSchema.pipe(Schema.optional).annotate({ description: 'The id the connection had, to rename it; its bindings follow.' }),
       }),
+      output: syncConnectionViewSchema,
+      description: `Add or change one sync connection (an account of a provider). The key is stored only as a secret:ALIAS reference. Run only when the user asked for this change. ${writeNote}`,
+      tool: { name: 'backlog_sync_connection_save', readOnly: false },
+    }),
+    removeSyncConnection: method({
+      input: Schema.Struct({ instanceId: slugInputSchema, confirm: confirmSchema }),
+      output: Schema.Void,
+      description:
+        'Remove one sync connection with its bindings and every item link they hold; items and remote items stay. Run only when the user asked; an agent must pass `confirm: true`.',
+      tool: { name: 'backlog_sync_connection_remove', readOnly: false },
+    }),
+    moveSyncConnection: method({
+      input: Schema.Struct({ instanceId: slugInputSchema, direction: Schema.Literals(['earlier', 'later']) }),
+      output: Schema.Void,
+      description: 'Move one sync connection earlier or later in the list. Run only when the user asked for that order.',
+      tool: { name: 'backlog_sync_connection_move', readOnly: false },
+    }),
+    saveSyncBinding: method({
+      input: Schema.Struct({ binding: bindingInputSchema }),
+      output: syncBindingViewSchema,
+      description: `Add or change one sync binding: which container of which connection syncs with which projects, in which direction, which fields (with value maps), under which conflict policy (lww, local-wins, remote-wins, flag), how often, and whether a pull imports new remote items. A new binding needs \`connectionId\`; fields left out of a change keep their value. Run only when the user asked for this change. ${writeNote}`,
+      tool: { name: 'backlog_sync_binding_save', readOnly: false },
+    }),
+    removeSyncBinding: method({
+      input: Schema.Struct({ binding: slugInputSchema, confirm: confirmSchema }),
+      output: Schema.Void,
+      description:
+        'Remove one sync binding and every item link it holds; items and remote items stay. Run only when the user asked; an agent must pass `confirm: true`.',
+      tool: { name: 'backlog_sync_binding_remove', readOnly: false },
+    }),
+    discoverSync: method({
+      input: connectionTargetSchema,
       output: syncConnectionSchema,
       description:
-        'Test a Linear or GitHub sync backend (saved or not) on the Host: where its key comes from, the account it signs in as, the team or repository it reaches and, for Linear, every team the key can see. The key never leaves the Host. Read-only.',
+        'List the containers (teams, repositories, folders) a connection can bind, with the account it signs in as. The key never leaves the Host. Read-only.',
+      tool: { name: 'backlog_sync_discover', readOnly: true, render: renderSyncConnection },
+    }),
+    testSyncConnection: method({
+      input: connectionTargetSchema,
+      output: syncConnectionSchema,
+      description:
+        'Test one sync connection (saved or not) on the Host: where its key comes from, the account it signs in as and the containers it can see. The key never leaves the Host. Read-only.',
       tool: { name: 'backlog_sync_test_connection', readOnly: true, render: renderSyncConnection },
     }),
-    testSyncBackends: method({
+    testSyncConnections: method({
       input: Schema.Struct({}),
-      output: Schema.Struct({ results: Schema.Array(savedSyncConnectionSchema) }),
+      output: Schema.Struct({ results: Schema.Array(Schema.Struct({ connection: BacklogSyncModel.connectionSchema, report: syncConnectionSchema })) }),
       description:
-        'Test every saved Linear and GitHub sync backend row on the Host (the Test all button): each row with its tracker, project, target and enabled state, and the same report as backlog_sync_test_connection. The keys never leave the Host. Read-only.',
+        'Test every saved sync connection on the Host (the Test all button), with the same report as backlog_sync_test_connection. The keys never leave the Host. Read-only.',
       tool: { name: 'backlog_sync_test_all', readOnly: true, render: renderSavedSyncConnections },
     }),
     importRemote: method({
       input: Schema.Struct({
-        backend: BacklogSyncModel.backendSchema.pipe(Schema.optional).annotate({
-          description: 'Tracker of the issue; omit to read it from the reference (ENG-12 or linear.app is Linear; #42, owner/repo#42 or github.com is GitHub).',
+        backend: providerKindInputSchema.pipe(Schema.optional).annotate({
+          description:
+            'Provider kind of the remote item; omit to read it from the reference (ENG-12 or linear.app is Linear; #42, owner/repo#42 or github.com is GitHub).',
         }),
+        binding: slugInputSchema.pipe(Schema.optional).annotate({ description: 'The binding to import through; omit to use the one serving `project`.' }),
         reference: remoteReferenceSchema,
         project: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))
           .pipe(Schema.optional)
-          .annotate({ description: 'Project the new item belongs to; defaults to the project of the first enabled row for that backend.' }),
+          .annotate({ description: 'Project the new item belongs to; defaults to the binding’s project.' }),
       }),
       output: Schema.Struct({ detail: detailSchema, created: Schema.Boolean }),
-      description: `Import an existing Linear or GitHub issue as a new backlog item linked to it, with its title, description, status, labels and comments; an issue already linked returns its item. Run only when the user asked. ${writeNote}`,
+      description: `Import one existing remote item as a new backlog item linked to it, with its title, description, status, labels, priority and comments; a remote item already linked through that binding returns its item. Run only when the user asked. ${writeNote}`,
       tool: { name: 'backlog_import_remote', readOnly: false, render: output => renderItemPreview(output.detail.item) },
+    }),
+    importAllRemote: method({
+      input: Schema.Struct({ binding: slugInputSchema, confirm: confirmSchema }),
+      output: syncPassSchema,
+      description: `Import every open remote item of a binding that no backlog item mirrors yet, idempotently (already linked ones only sync). Comments come on each item's next sync. Run only when the user asked; an agent must pass \`confirm: true\`. ${writeNote}`,
+      tool: { name: 'backlog_sync_import_all', readOnly: false, render: renderSyncPass },
     }),
     acknowledge: method({
       input: Schema.Struct({ ids: Schema.Array(itemKeySchema).check(Schema.isMaxLength(500)) }),
@@ -913,6 +1056,11 @@ export type BacklogDetailResult = typeof detailResultSchema.Type
 export type BacklogRevertResult = typeof revertResultSchema.Type
 export type BacklogBackfillResult = typeof backfillOutputSchema.Type
 export type BacklogSyncStatusView = typeof syncStatusSchema.Type
+export type BacklogSyncSourcesView = typeof syncSourcesSchema.Type
+export type BacklogSyncConnectionView = typeof syncConnectionViewSchema.Type
+export type BacklogSyncBindingView = typeof syncBindingViewSchema.Type
+export type BacklogSyncTestView = typeof syncConnectionSchema.Type
+export type BacklogSyncPassView = typeof syncPassSchema.Type
 export type BacklogSyncItemView = typeof syncItemSchema.Type
 export type BacklogSyncResultView = typeof syncResultSchema.Type
 export type BacklogShippedView = typeof shippedOutputSchema.Type

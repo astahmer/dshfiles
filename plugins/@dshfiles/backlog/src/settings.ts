@@ -137,8 +137,9 @@ export const backlogSettings = defineSettings({
       }),
     )
       .default([])
+      .hidden()
       .description(
-        'Remote trackers backlog items mirror, one row per project and tracker. Linking, creating and importing issues is always your explicit action.',
+        'Earlier remote sync rows. The first start after connections and bindings moves them into Backlog settings › Remote sync once; edits here are no longer read.',
       ),
     savedViews: Schema.array(
       Schema.object({
