@@ -441,9 +441,73 @@
    then gives the whole width to the stage and leaves room for that bar; without the mark nothing changes, so a
    sidebar with no phone navigation keeps the rail. The inline grid template is a JS solve, hence !important. */
 @media (max-width: 639.98px) {
+  /* The occupant also publishes --dsh-phone-top-height (its top bar: Back, title, panels) and, while the software
+     keyboard is open, --dsh-keyboard-inset with data-phone-keyboard on the document (its tab bar then hides). The
+     frame sits between the bars on the dynamic viewport, so the composer stays just above whichever bar or keyboard
+     is at the bottom. */
+  /* `top`, not `margin-top`: a top margin collapses through the frame's parent and makes the document as much
+     taller than the viewport, which a focus or scroll-into-view then scrolls (the bars and stage shift up). */
   :global([data-shell-phone-nav]) .frame {
     grid-template-columns: 0px minmax(0, 1fr) 0px !important;
-    height: calc(100% - var(--dsh-phone-nav-height, 0px));
+    top: var(--dsh-phone-top-height, 0px);
+    height: calc(100% - var(--dsh-phone-top-height, 0px) - var(--dsh-phone-nav-height, 0px));
+    height: calc(100dvh - var(--dsh-phone-top-height, 0px) - var(--dsh-phone-nav-height, 0px));
+  }
+
+  /* The phone document never scrolls or rubber-bands as a whole: lists and the stage scroll inside. */
+  :global(html[data-shell-phone-nav]),
+  :global(html[data-shell-phone-nav]) body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  :global([data-shell-phone-nav][data-phone-keyboard]) .frame {
+    height: calc(100dvh - var(--dsh-phone-top-height, 0px) - var(--dsh-keyboard-inset, 0px));
+  }
+
+  /* The status strip becomes one chip in the top bar's trailing corner (plan §4.1 R5 compact; prior-art §3.2 rule 6):
+     it leaves the grid, so no 24px row sits between the stage and the tab bar. The occupant keeps that corner free. */
+  :global([data-shell-phone-nav]) .statusStrip[data-status-strip='compact'] {
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    right: max(4px, env(safe-area-inset-right, 0px));
+    height: 44px;
+    padding: 0;
+    border-top: none;
+    background: transparent;
+    z-index: 46;
+  }
+
+  :global([data-shell-phone-nav]) .statusChip {
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: none;
+    border-radius: 10px;
+  }
+
+  :global([data-shell-phone-nav]) .statusChipLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  :global([data-shell-phone-nav]) .statusChipDot {
+    width: 8px;
+    height: 8px;
+  }
+
+  :global([data-shell-phone-nav]) .statusSheet {
+    position: fixed;
+    top: calc(var(--dsh-phone-top-height, 44px) + 4px);
+    bottom: auto;
+    left: 8px;
+    right: 8px;
+    max-height: 60dvh;
   }
 
   :global([data-shell-phone-nav]) .handle[data-side='sidebar'] {

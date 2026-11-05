@@ -46,7 +46,8 @@ export function StatusStrip({ narrow, useSessions }: { readonly narrow: boolean;
       <div className={css.statusStrip} data-status-strip="compact" role="status">
         <button type="button" className={css.statusChip} aria-expanded={open} onClick={() => setOpen(current => !current)}>
           <span aria-hidden="true" className={css.statusChipDot} />
-          Status
+          {/* Phone: the chip is a 44px dot in the top bar, its label kept for assistive tech (AppFrame.module.css). */}
+          <span className={css.statusChipLabel}>Status</span>
         </button>
         {open ? (
           <div className={css.statusSheet} role="list" aria-label="Status">
