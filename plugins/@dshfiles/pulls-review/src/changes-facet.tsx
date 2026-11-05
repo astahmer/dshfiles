@@ -165,7 +165,8 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
   const rangeDiff = useQuery({
     queryKey: ['pulls-review', 'facet', cwd ?? '', base ?? ''],
     enabled: activeScope !== 'turn' && base !== undefined && cwd !== undefined && cwd.length > 0 && status.data !== undefined,
-    queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 60_000, request: hostSignal => review.review({ path: cwd ?? '', base }, { signal: hostSignal }) }),
+    queryFn: ({ signal }) =>
+      runHostRequest({ signal, timeoutMs: 60_000, request: hostSignal => review.review({ path: cwd ?? '', base }, { signal: hostSignal }) }),
   })
   const turnDiff = useQuery({
     queryKey: ['pulls-review', 'facet-turn', props.sessionId, activeSeq],
@@ -176,9 +177,13 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
 
   const rangeResult = rangeDiff.data
   const range =
-    activeScope !== 'turn' && rangeResult?.status === 'ok' && cwd !== undefined ? { workspacePath: cwd, base: rangeResult.base, head: rangeResult.head } : undefined
+    activeScope !== 'turn' && rangeResult?.status === 'ok' && cwd !== undefined
+      ? { workspacePath: cwd, base: rangeResult.base, head: rangeResult.head }
+      : undefined
   const rangeMarks = useRangeViewedMarks(range)
-  const turnMarks = useTurnViewedMarks(activeScope === 'turn' && props.sessionId !== undefined && activeSeq !== undefined ? { sessionId: props.sessionId, seq: activeSeq } : undefined)
+  const turnMarks = useTurnViewedMarks(
+    activeScope === 'turn' && props.sessionId !== undefined && activeSeq !== undefined ? { sessionId: props.sessionId, seq: activeSeq } : undefined,
+  )
   const marks: ViewedMarksView = activeScope === 'turn' ? turnMarks : rangeMarks
 
   const turnData = turnDiff.data
@@ -210,16 +215,15 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
       setCommentNotice('The composer is not loaded, so the comment cannot be queued. Copy it into your next message instead.')
       return
     }
-    const removed = selection.side === 'deletions'
+    const text = selection.side === 'deletions' ? `(on removed lines) ${comment.trim()}` : comment.trim()
+    const path = selection.file.name
+    // A one-line comment names no end line.
     const added = composer.value.attach({
       sessionId: props.sessionId,
-      attachment: {
-        kind: 'comment',
-        path: selection.file.name,
-        line: selection.start,
-        ...(selection.end === selection.start ? {} : { endLine: selection.end }),
-        text: removed ? `(on removed lines) ${comment.trim()}` : comment.trim(),
-      },
+      attachment:
+        selection.end === selection.start
+          ? { kind: 'comment', path, line: selection.start, text }
+          : { kind: 'comment', path, line: selection.start, endLine: selection.end, text },
     })
     if (!added) {
       setCommentNotice("This thread's composer is not on screen. Open the thread, then add the comment again.")
@@ -252,7 +256,10 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
           : undefined
 
   return (
-    <div className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-3" data-testid="changes-facet">
+    <div
+      className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-3"
+      data-testid="changes-facet"
+    >
       {cwd === undefined || cwd.length === 0 ? null : (
         <LandCard cwd={cwd} onLanded={refreshDiff} openHistory={props.openHistory} sessionId={props.sessionId} threadBusy={busy} />
       )}
@@ -407,7 +414,10 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
               {commentNotice}
             </p>
           )}
-          <div className="dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border" data-testid="changes-diffs">
+          <div
+            className="dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border"
+            data-testid="changes-diffs"
+          >
             <PatchView
               className="dshx:flex-1"
               empty={<p className={cn(HINT, 'dshx:p-3')}>No diff lines to display (binary or oversized files).</p>}
