@@ -58,7 +58,7 @@ export const MovedToDialog = (props: { readonly panels: readonly DestinationPane
   const rows = entries(props.panels)
   return (
     <Dialog open={isOpen} onOpenChange={setOpen}>
-      <DialogContent className="dshx:max-h-[min(640px,calc(100dvh-48px))] dshx:overflow-hidden dshx:sm:max-w-xl">
+      <DialogContent className="dshx:max-h-[min(640px,calc(100dvh-48px))] dshx:grid-rows-[auto_minmax(0,1fr)] dshx:overflow-hidden dshx:sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Where did a page go?</DialogTitle>
           <DialogDescription>The sidebar pages now live under the rail destinations. Open one, or find it in the palette by its old name.</DialogDescription>
