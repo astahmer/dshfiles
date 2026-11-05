@@ -189,7 +189,7 @@ function conflictScene(phase: number): ConflictScene {
 function MergeConflictGraphDemo() {
   const [phase, setPhase] = usePhases(conflictPhases)
   const scene = conflictScene(phase)
-  const conflicts = scene.revisions.reduce((sum, rev) => sum + (rev.resolved ? 0 : (rev.conflicts ?? 0)), 0)
+  const conflicts = scene.revisions.reduce((sum, rev) => sum + (rev.resolved || typeof rev.conflicts !== 'number' ? 0 : rev.conflicts), 0)
   return (
     <MergeConflictGraph
       heading="Refresh tokens in the auth middleware"

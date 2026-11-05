@@ -15,16 +15,16 @@ export interface MergeRevision {
   /** Bookmark / branch shown as a chip after the title. */
   readonly bookmark?: string
   readonly hash: string
-  readonly author: string
-  readonly age: string
+  readonly author?: string
+  readonly age?: string
   readonly lane: number
   /** Parent revision ids (lower rows). */
   readonly parents: readonly string[]
   readonly tone?: LaneTone
   /** Someone else's revision or trunk history: drawn quieter. */
   readonly muted?: boolean
-  /** Conflicting hunks this revision brings; shown as a warning count until `resolved`. */
-  readonly conflicts?: number
+  /** Conflicting hunks this revision brings, shown as a warning count until `resolved`; `true` when only the fact is known. */
+  readonly conflicts?: number | true | undefined
   readonly resolved?: boolean
   /** `working` spins (a merge being made), `ring` is a hollow node (not yet committed). */
   readonly node?: 'dot' | 'ring' | 'working'
@@ -36,7 +36,8 @@ export interface MergeConflictGraphProps extends Omit<React.HTMLAttributes<HTMLE
   readonly heading: string
   /** Change or PR number, e.g. "#128". */
   readonly number?: string
-  readonly state?: { readonly label: string; readonly tone: 'success' | 'muted' | 'violet' | 'info' }
+  /** `null` hides the state badge. */
+  readonly state?: { readonly label: string; readonly tone: 'success' | 'muted' | 'violet' | 'info' } | null
   /** The landing target row at the top ("Merge into main"). */
   readonly target: { readonly label: string; readonly status: MergeTargetStatus; readonly conflicts?: number }
   /** Revisions newest first. */
@@ -44,7 +45,7 @@ export interface MergeConflictGraphProps extends Omit<React.HTMLAttributes<HTMLE
   /** Live line in the footer while resolving ("Running 42 of 42 tests"). */
   readonly statusText?: string
   readonly onResolve?: () => void
-  /** Replaces the default footer (e.g. a MergeChecks block). */
+  /** Replaces the default footer (e.g. a MergeChecks block); `null` renders none. */
   readonly footer?: React.ReactNode
 }
 
@@ -118,10 +119,12 @@ export function MergeConflictGraph({
           {heading}
           {number ? <span className="dshx:ml-1 dshx:font-normal dshx:text-muted-foreground">{number}</span> : null}
         </h3>
-        <span className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-xs', stateText[state.tone])}>
-          <span className={cn('dshx:size-1.5 dshx:rounded-full', stateDot[state.tone])} />
-          {state.label}
-        </span>
+        {state === null ? null : (
+          <span className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-xs', stateText[state.tone])}>
+            <span className={cn('dshx:size-1.5 dshx:rounded-full', stateDot[state.tone])} />
+            {state.label}
+          </span>
+        )}
       </header>
       <PresenceList
         as="ul"
@@ -131,7 +134,7 @@ export function MergeConflictGraph({
         enter={null}
         itemClassName="dshx:relative"
       />
-      {footer ?? <DefaultFooter target={target} statusText={statusText} onResolve={onResolve} />}
+      {footer === undefined ? <DefaultFooter target={target} statusText={statusText} onResolve={onResolve} /> : footer}
     </section>
   )
 }
@@ -245,7 +248,8 @@ function RevisionRow({
   const ref = useRowEnter(delay)
   const underline = React.useRef<HTMLSpanElement>(null)
   const tone = revision.tone ?? toneForLane(revision.lane)
-  const conflicted = (revision.conflicts ?? 0) > 0 && revision.resolved !== true
+  const hasConflicts = revision.conflicts === true || (revision.conflicts ?? 0) > 0
+  const conflicted = hasConflicts && revision.resolved !== true
   const fraction = revision.progress ? Math.min(1, revision.progress.done / Math.max(1, revision.progress.total)) : 0
   React.useLayoutEffect(() => {
     if (underline.current == null) return
@@ -287,15 +291,19 @@ function RevisionRow({
             {revision.bookmark}
           </span>
         ) : null}
-        {(revision.conflicts ?? 0) > 0 ? (
+        {hasConflicts ? (
           <Pop swapKey={conflicted ? 'open' : 'done'} className="dshx:shrink-0">
             {conflicted ? (
-              <span
-                className="dshx:rounded dshx:bg-warning/15 dshx:px-1 dshx:text-[10.5px] dshx:font-medium dshx:text-warning"
-                aria-label={`${revision.conflicts} conflicts`}
-              >
-                {revision.conflicts}
-              </span>
+              revision.conflicts === true ? (
+                <TriangleAlertIcon role="img" aria-label="Conflict" className="dshx:size-3.5 dshx:text-warning" />
+              ) : (
+                <span
+                  className="dshx:rounded dshx:bg-warning/15 dshx:px-1 dshx:text-[10.5px] dshx:font-medium dshx:text-warning"
+                  aria-label={`${revision.conflicts} conflicts`}
+                >
+                  {revision.conflicts}
+                </span>
+              )
             ) : (
               <span
                 className="dshx:flex dshx:size-3.5 dshx:items-center dshx:justify-center dshx:rounded-full dshx:border dshx:border-success/50 dshx:text-success"
@@ -314,10 +322,17 @@ function RevisionRow({
       ) : (
         <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
           <span className="dshx:font-mono dshx:text-[11px] dshx:@max-pane-narrow:hidden">{revision.hash}</span>
-          <span>
-            <span className="dshx:@max-pane-narrow:hidden">{revision.author} · </span>
-            {revision.age}
-          </span>
+          {revision.author || revision.age ? (
+            <span>
+              {revision.author ? (
+                <span className="dshx:@max-pane-narrow:hidden">
+                  {revision.author}
+                  {revision.age ? ' · ' : ''}
+                </span>
+              ) : null}
+              {revision.age}
+            </span>
+          ) : null}
         </span>
       )}
       {revision.progress ? (

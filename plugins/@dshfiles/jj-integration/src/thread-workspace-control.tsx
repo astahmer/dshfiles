@@ -1,6 +1,7 @@
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useApi } from '@dshfiles/dshx/client'
+import { MergeConflictGraph, type MergeRevision } from '@dshfiles/plugin-ui/components/motion/merge-conflict-graph'
 import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -14,7 +15,7 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import { Schema } from 'effect'
-import { jjIntegrationApi, type ThreadView } from './api.js'
+import { jjIntegrationApi, type ThreadRevisionView, type ThreadView } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
@@ -41,6 +42,25 @@ const contractRejectionSchema = Schema.StructWithRest(Schema.Struct({ kind: Sche
 interface WorkspaceBlocker {
   readonly title: string
   readonly reason: 'working' | 'question'
+}
+
+const CONFLICT_GRAPH_ROWS = 6
+
+/** The thread's unlanded revisions (newest first, one linear line) as conflict-graph rows. */
+const conflictGraphRows = (revisions: readonly ThreadRevisionView[]): MergeRevision[] => {
+  const shown = revisions.slice(0, CONFLICT_GRAPH_ROWS)
+  return shown.map((revision, index) => {
+    const parent = shown[index + 1]
+    return {
+      id: revision.changeId,
+      title: revision.description.split('\n')[0] || revision.changeId.slice(0, 8),
+      hash: revision.changeId.slice(0, 8),
+      lane: 0,
+      parents: parent === undefined ? [] : [parent.changeId],
+      muted: !revision.conflict,
+      conflicts: revision.conflict ? true : undefined,
+    }
+  })
 }
 
 const folderName = (path: string): string =>
@@ -279,7 +299,24 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                 <TooltipContent className="dshx:max-w-96">{current?.path ?? cwd ?? ''}</TooltipContent>
               </Tooltip>
             </div>
-            <p className="dshx:px-3 dshx:pt-2 dshx:pb-3 dshx:text-xs dshx:text-muted-foreground">{statusText()}</p>
+            {conflicted && isThread ? (
+              <div className="dshx:px-3 dshx:pt-2 dshx:pb-3">
+                <MergeConflictGraph
+                  data-testid="workspace-conflict-graph"
+                  footer={null}
+                  heading={statusText()}
+                  revisions={conflictGraphRows(current.unlanded)}
+                  state={null}
+                  target={{
+                    label: props.t('rebaseThread', { bookmark: props.bookmark }),
+                    status: 'conflicts',
+                    conflicts: current.unlanded.filter(revision => revision.conflict).length,
+                  }}
+                />
+              </div>
+            ) : (
+              <p className="dshx:px-3 dshx:pt-2 dshx:pb-3 dshx:text-xs dshx:text-muted-foreground">{statusText()}</p>
+            )}
             {isThread &&
               (integrationQueued ? (
                 <div className="dshx:px-3 dshx:pb-3">
