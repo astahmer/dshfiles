@@ -160,6 +160,9 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 
 /** A value handler's `{ ok: false, code, message }`: the failure it names, as the contract's own failure shape. */
+/** The plugin API behind each allowlisted peer read (`remotePeerReadCalls`), by api id. */
+const peerReadTargets = new Map([['backlog', { packageId: '@dshfiles/backlog', apiId: 'backlog', version: 1 }]])
+
 const failed = (error: unknown) =>
   isTaggedFailure(error)
     ? { code: failureCodeOf(error), message: error.message }
@@ -912,6 +915,16 @@ const handlers = Api.handlers(multiHostApi, {
         }
         return Effect.succeed({ ok: false as const, ...failure })
       }),
+    )
+  }),
+  runtimePeerRead: Effect.fn('multi-host runtime peer read')(function* (input) {
+    const [apiId, method] = input.call.split('/')
+    const target = peerReadTargets.get(apiId ?? '')
+    if (target === undefined || method === undefined)
+      return { ok: false as const, code: 'call-not-allowed', message: 'That plugin call is not allowlisted for peers.' }
+    return yield* withRuntime(input.runtimeId, gateway => gateway.pluginApi(target)(method, input.input), { mutation: false }).pipe(
+      Effect.map(value => ({ ok: true as const, value })),
+      Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
     )
   }),
   threadCreate: Effect.fn('multi-host thread create')(function* (input) {

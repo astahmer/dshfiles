@@ -365,6 +365,7 @@ describe('multi-host tool exposure', () => {
     const untooled = [
       'runtimeCall',
       'runtimePluginCall',
+      'runtimePeerRead',
       'runtimePing',
       'runtimeOpenView',
       'runtimeCloseView',
@@ -374,6 +375,20 @@ describe('multi-host tool exposure', () => {
     ] as const
     for (const name of untooled) {
       expect(multiHostApi.methods[name].tool).toBeUndefined()
+    }
+  })
+})
+
+describe('runtimePeerRead', () => {
+  test('accepts only the allowlisted read-only peer calls', async () => {
+    const input = multiHostApi.methods.runtimePeerRead.input
+    if (input === undefined) throw new Error('runtimePeerRead has no input schema')
+    const boundary = standard(input)
+    const accepted = await boundary.validate({ runtimeId: 'runtime-1', call: 'backlog/peerOpsSince', input: { cursor: 0 } })
+    expect('issues' in accepted && accepted.issues !== undefined).toBe(false)
+    for (const call of ['backlog/capture', 'backlog/delete', 'jj-threads/provision', 'multi-host/remoteExec']) {
+      const refused = await boundary.validate({ runtimeId: 'runtime-1', call, input: {} })
+      expect('issues' in refused && refused.issues !== undefined).toBe(true)
     }
   })
 })

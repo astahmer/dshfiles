@@ -226,6 +226,12 @@ const remoteThreadSchema = Schema.Struct({
 })
 /** jj-integration methods a manager may call on a remote runtime; the folder and bookmark pickers need these. */
 const remotePluginMethodSchema = Schema.Literals(['projects', 'classifyWorkspaces', 'destination', 'provision', 'noFolder'])
+/**
+ * Read-only plugin methods another plugin of this Host may call on a remote runtime, as `<api id>/<method>`. Only these
+ * pass: a peer can read what it replicates and nothing else, and no call here writes on the remote runtime.
+ */
+export const remotePeerReadCalls = ['backlog/peerInfo', 'backlog/peerOpsSince', 'backlog/peerFiles'] as const
+const remotePeerReadCallSchema = Schema.Literals(remotePeerReadCalls)
 export const jjRevisionEffectSchema = Schema.Struct({
   changeId: Schema.String,
   commitId: Schema.String,
@@ -755,6 +761,12 @@ const effectMultiHostApi = defineApi({
     runtimePluginCall: method({
       input: Schema.Struct({ runtimeId: idSchema, method: remotePluginMethodSchema, input: jsonValueSchema }),
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }), failedSchema]),
+    }),
+    runtimePeerRead: method({
+      input: Schema.Struct({ runtimeId: idSchema, call: remotePeerReadCallSchema, input: jsonValueSchema }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }), failedSchema]),
+      description:
+        "Call one allowlisted read-only plugin method (such as the backlog's peer replication reads) on a remote runtime and return its value, or the remote failure code. A failed read is retried once on a fresh connection. Not an agent tool.",
     }),
     runtimeModels: method({
       input: Schema.Struct({ runtimeId: idSchema }),
