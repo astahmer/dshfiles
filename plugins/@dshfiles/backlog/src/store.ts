@@ -29,6 +29,7 @@ import { DueDates } from './due-date.js'
 import { Recurrence } from './recurrence.js'
 import { BacklogGates, type BacklogGate, type BacklogGateKind } from './gates.js'
 import type { BacklogTemplate } from './templates.js'
+import { ProjectGuidance } from './project-guidance.js'
 import { FieldRevert } from './field-revert.js'
 import { BacklogOps } from './op-log.js'
 import { BacklogShipped, type ShippedDigest, type ShippedQuery } from './shipped.js'
@@ -281,6 +282,8 @@ interface StoreState {
 
 /** What a read sees: the records, the time it reads at, the dormancy thresholds of that moment and how items relate. */
 interface StoreView {
+  /** Each project's agent guidance, from Backlog settings. */
+  readonly guidance: ReadonlyMap<string, string>
   readonly records: ReadonlyMap<number, BacklogItem>
   readonly revision: number
   readonly at: number
@@ -332,6 +335,7 @@ const detailIn = (view: StoreView, item: BacklogItem): BacklogDetail => ({
     .map(child => summarize(child, view.at, view.relations, null, view.dormantDays)),
   blockedBy: view.relations.openBlockersOf(item).map(blocker => summarize(blocker, view.at, view.relations, null, view.dormantDays)),
   lease: leaseView(view.relations.leaseOf(item)),
+  guidance: item.project === null ? null : (view.guidance.get(item.project) ?? null),
 })
 
 const listIn = (view: StoreView, query: BacklogListQuery, index?: BacklogSearchIndex) => {
@@ -879,9 +883,11 @@ export class BacklogStore extends Context.Service<
       const view = Effect.gen(function* () {
         const current = yield* Ref.get(state)
         const at = yield* Clock.currentTimeMillis
-        const dormantDays = (yield* settings.get).dormantAfterDays
+        const configured = yield* settings.get
+        const dormantDays = configured.dormantAfterDays
         const relations = ItemRelations.build({ items: current.records.values(), leases: current.leases, now: at })
-        return { records: current.records, revision: current.revision, at, dormantDays, relations } satisfies StoreView
+        const guidance = ProjectGuidance.mapOf(configured.projectGuidance ?? [])
+        return { records: current.records, revision: current.revision, at, dormantDays, relations, guidance } satisfies StoreView
       })
       const find = (id: number) => Effect.map(Ref.get(state), current => current.records.get(id))
       /** Names an item id by its ref, for event wording that mentions another item. */

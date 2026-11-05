@@ -26,6 +26,7 @@ import {
 import { StartThreadForm, startThreadItemOf } from './start-thread.js'
 import { StartThreadPlacementPlan } from './start-thread-workspace.js'
 import { BacklogStore, type BacklogActor } from './store.js'
+import { ProjectGuidance } from './project-guidance.js'
 
 /** The opening message carries the same bounded preview the list shows, not a whole body. */
 const PREVIEW_CHARS = 280
@@ -170,7 +171,9 @@ export class ThreadStart extends Context.Service<
         const details = items.map(detail => startThreadItemOf({ ...detail.item, preview: detail.item.body.slice(0, PREVIEW_CHARS) }))
         const context = yield* BacklogStartContext.prepare({ details: items, readFile: store.readFile })
         const raw = input.message ?? StartThreadForm.message(details)
-        const task = raw === '' ? context.text : `${raw}\n\n${context.text}`
+        const brief = raw === '' ? context.text : `${raw}\n\n${context.text}`
+        const guided = [...new Map(items.flatMap(detail => (detail.item.project === null || detail.guidance === null ? [] : [[detail.item.project, detail.guidance] as const]))).entries()]
+        const task = guided.length === 0 ? brief : `${ProjectGuidance.preamble(guided.map(([project, guidance]) => ({ project, guidance })))}\n\n---\n\n${brief}`
         const message = agent === null ? task : AgentComments.opening(agent, task)
         const placement = StartThreadPlacementPlan.of({
           workspaceId: input.workspaceId,

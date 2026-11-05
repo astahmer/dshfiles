@@ -172,6 +172,16 @@ export const backlogSettings = defineSettings({
     )
       .default(BacklogTemplates.defaults.map(template => ({ ...template, tags: [...template.tags], criteria: [...template.criteria] })))
       .description('Templates a capture can start from: the capture box picker, `/template <name>` in the text, or backlog_capture `template`.'),
+    projectGuidance: Schema.array(
+      Schema.object({
+        project: Schema.string().required().description('Absolute project path.'),
+        guidance: Schema.string().default('').description('Markdown for agents: conventions, commands, what not to touch.'),
+      }),
+    )
+      .default([])
+      .description(
+        'Standing instructions per project for agents: they open the first message of a thread started from one of its items, and backlog_get / backlog_ready return them. Edit them from the project overview in the Projects view.',
+      ),
   }),
   applies: 'live',
 })

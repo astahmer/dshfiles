@@ -1532,6 +1532,7 @@ const placeholderDetail = (summary: BacklogSummaryView) => {
     children: [],
     blockedBy: [],
     lease,
+    guidance: null,
   }
 }
 

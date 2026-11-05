@@ -1,10 +1,11 @@
 import { useBacklogSelection } from './use-backlog-selection.js'
 import { ArrowLeftIcon, FolderGit2Icon, GitCommitHorizontalIcon, MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 
-import { useApi } from '@dshfiles/dshx/client'
-import { keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
+import { useApi, useSettings } from '@dshfiles/dshx/client'
+import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 
 import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
@@ -14,6 +15,9 @@ import type { StartThreadItem } from './start-thread.js'
 import { BacklogQueries, type BacklogUpdateInput, useBacklogActions } from './use-backlog-actions.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { BacklogReference } from './backlog-reference.js'
+import { BacklogNotices } from './notices.js'
+import { ProjectGuidance } from './project-guidance.js'
+import { backlogSettings } from './settings.js'
 
 const DAY_MS = 86_400_000
 const NO_PROJECT = ''
@@ -117,6 +121,40 @@ const ItemLine = (props: {
     </li>
   </BacklogItemMenu>
 )
+
+/** The project's standing instructions for agents, saved on blur; empty removes them. */
+const GuidanceCard = (props: { readonly project: string }): JSX.Element => {
+  const settings = useSettings(backlogSettings)
+  const api = useApi(backlogApi)
+  const client = useQueryClient()
+  const saved = ProjectGuidance.mapOf(settings.value?.projectGuidance ?? []).get(props.project) ?? ''
+  const [draft, setDraft] = useState(saved)
+  const [seen, setSeen] = useState(saved)
+  if (seen !== saved) {
+    setSeen(saved)
+    setDraft(saved)
+  }
+  const save = useMutation({
+    mutationFn: (guidance: string) => api.setProjectGuidance({ project: props.project, guidance }),
+    onSuccess: () => client.invalidateQueries({ queryKey: [BacklogQueries.key] }),
+    onError: BacklogNotices.failure('The agent guidance was not saved.'),
+  })
+  return (
+    <Card heading="Agent guidance">
+      <Textarea
+        aria-label="Agent guidance"
+        placeholder="Conventions, commands and limits agents should follow on this project's items"
+        value={draft}
+        rows={Math.min(12, Math.max(3, draft.split('\n').length + 1))}
+        className="dshx:text-[13px]"
+        onChange={event => setDraft(event.currentTarget.value)}
+        onBlur={() => {
+          if (draft.trim() !== saved) save.mutate(draft)
+        }}
+      />
+    </Card>
+  )
+}
 
 const Overview = (props: {
   readonly project: Project
@@ -266,6 +304,7 @@ const Overview = (props: {
           </Card>
         </div>
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">
+          {project.key === NO_PROJECT ? null : <GuidanceCard project={project.key} />}
           <Card heading="Details">
             <dl className="dshx:grid dshx:grid-cols-[96px_minmax(0,1fr)] dshx:gap-y-2.5 dshx:text-[13px]">
               <dt className="dshx:text-muted-foreground">Items</dt>

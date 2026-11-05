@@ -20,6 +20,8 @@ import { AttachmentExport } from './attachment-file.js'
 import { BacklogSettingsTag, backlogSettingsLayer, sharedJevSettingsLayer } from './backlog-settings.js'
 import { BacklogItemNotFound, BacklogTemplateNotFound } from './errors.js'
 import { BacklogTemplates } from './templates.js'
+import { ProjectGuidance } from './project-guidance.js'
+import { BacklogItems } from './item.js'
 import { BacklogGates } from './gates.js'
 import type { BacklogDetailView } from './api.js'
 import { BacklogExport } from './backlog-export.js'
@@ -156,9 +158,22 @@ const backlogHandlers = Api.handlers(backlogApi, {
   projects: input => BacklogStore.use(store => store.projects({ hideAgentItems: input?.hideAgentItems === true })),
   referencing: input => BacklogStore.use(store => store.referencing(input)),
   ready: input =>
-    BacklogStore.use(store =>
-      store.list({ ready: true, freshness: 'all', limit: input.limit ?? 20, ...(input.project !== undefined && { project: input.project }) }),
-    ),
+    Effect.gen(function* () {
+      const listed = yield* BacklogStore.use(store =>
+        store.list({ ready: true, freshness: 'all', limit: input.limit ?? 20, ...(input.project !== undefined && { project: input.project }) }),
+      )
+      const guidance = ProjectGuidance.mapOf((yield* BacklogSettingsTag.use(settings => settings.get)).projectGuidance)
+      const projects = [...new Set(listed.items.flatMap(item => (item.project === null ? [] : [item.project])))]
+      return { ...listed, guidance: projects.flatMap(project => { const text = guidance.get(project); return text === undefined ? [] : [{ project, guidance: text }] }) }
+    }),
+  setProjectGuidance: input =>
+    Effect.gen(function* () {
+      const settings = yield* BacklogSettingsTag
+      const entries = ProjectGuidance.withGuidance((yield* settings.get).projectGuidance, input.project, input.guidance)
+      yield* settings.update({ projectGuidance: entries })
+      const project = BacklogItems.projectPath(input.project)
+      return { project, guidance: ProjectGuidance.mapOf(entries).get(project) ?? null }
+    }),
   claim: (input, call) => Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.claim({ id, actor: actorOf(call.caller) }))),
   release: (input, call) => Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.release({ id, actor: actorOf(call.caller) }))),
   capture: (input, call) =>

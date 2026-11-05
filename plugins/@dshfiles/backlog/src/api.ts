@@ -163,6 +163,8 @@ const detailSchema = Schema.Struct({
   children: Schema.Array(summarySchema).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   blockedBy: Schema.Array(summarySchema).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   lease: nullDefault(leaseSchema),
+  /** The project's standing instructions for agents (Projects view › overview); follow them while working on the item. */
+  guidance: nullDefault(Schema.String),
 })
 
 const detailResultSchema = Schema.Union([
@@ -256,6 +258,8 @@ const listOutputSchema = Schema.Struct({
   hiddenAgentItems: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(0)),
   ),
+  /** backlog_ready: the agent guidance of the projects its items belong to. */
+  guidance: Schema.optionalKey(Schema.Array(Schema.Struct({ project: Schema.String, guidance: Schema.String }))),
 })
 
 const previewText = (text: string): string => text.trim().replace(/\s+/g, ' ').slice(0, 240)
@@ -273,7 +277,12 @@ const renderItemPreview = (item: (typeof detailSchema.Type)['item']): string => 
   return [`${BacklogReference.labelOf(item)} — ${item.title}`, `${status}${project}`, ...(body === '' ? [] : [body]), ...sections].join('\n')
 }
 
+const withGuidance = (detail: typeof detailSchema.Type): string =>
+  typeof detail.guidance !== 'string' ? renderItemPreview(detail.item) : `${renderItemPreview(detail.item)}\n\nProject guidance:\n${detail.guidance}`
+
 const renderDetailPreview = (result: typeof detailResultSchema.Type): string => (result.ok ? renderItemPreview(result.value.item) : 'No backlog item found.')
+
+const renderGetPreview = (result: typeof detailResultSchema.Type): string => (result.ok ? withGuidance(result.value) : 'No backlog item found.')
 
 const renderCreatedPreview = (detail: typeof detailSchema.Type): string => renderItemPreview(detail.item)
 
@@ -537,7 +546,7 @@ const shippedOutputSchema = Schema.Struct({
   ),
 })
 
-const renderReady = (output: typeof listOutputSchema.Type): string =>
+const renderReadyItems = (output: typeof listOutputSchema.Type): string =>
   output.items.length === 0
     ? 'Nothing is ready: every open item is blocked, has open sub-issues, is claimed or snoozed.'
     : output.items
@@ -546,6 +555,9 @@ const renderReady = (output: typeof listOutputSchema.Type): string =>
             `${BacklogReference.labelOf(item)} ${item.priority === 'none' ? '' : `[${item.priority}] `}${item.title}${item.project === null ? '' : ` · ${item.project}`}`,
         )
         .join('\n')
+
+const renderReady = (output: typeof listOutputSchema.Type): string =>
+  `${renderReadyItems(output)}${(output.guidance ?? []).map(entry => `\n\nProject guidance for ${entry.project}:\n${entry.guidance}`).join('')}`
 
 const renderClaim = (result: typeof detailResultSchema.Type): string =>
   result.ok
@@ -612,7 +624,7 @@ export const backlogApi = defineApi({
       output: detailResultSchema,
       description:
         'One backlog item `b:<ref>` with its body, links, event history and the items that link to it. Read-only. Use `backlog_get_many` for several at once.',
-      tool: { name: 'backlog_get', readOnly: true, render: renderDetailPreview },
+      tool: { name: 'backlog_get', readOnly: true, render: renderGetPreview },
     }),
     getMany: method({
       input: Schema.Struct({
@@ -1104,6 +1116,18 @@ export const backlogApi = defineApi({
       description:
         'Revert one recorded field change of a backlog item: writes the typed value the field held before that change, read from the op log, as a new change. Refused with `stale` when the field changed again since. Run only when the user asked to revert that change, and pass `confirm: true`; an agent call without it is refused.',
       tool: { name: 'backlog_revert', readOnly: false, render: renderRevertPreview },
+    }),
+    setProjectGuidance: method({
+      input: Schema.Struct({
+        project: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTargetChars)).annotate({ description: 'Absolute project path.' }),
+        guidance: Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars)).annotate({
+          description: 'Markdown instructions for agents working on this project’s items; empty removes them.',
+        }),
+      }),
+      output: Schema.Struct({ project: Schema.String, guidance: Schema.NullOr(Schema.String) }),
+      description:
+        'Set one project’s standing guidance for agents: it opens the first message of threads started from its items and comes back with backlog_get and backlog_ready. Run only when the user asked for this change.',
+      tool: { name: 'backlog_set_project_guidance', readOnly: false },
     }),
     pullRequests: method({
       input: Schema.Struct({ id: itemKeySchema }),
