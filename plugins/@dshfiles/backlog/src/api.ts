@@ -122,7 +122,7 @@ const actorFilterSchema = Schema.Union([Schema.Literal(''), BacklogItems.actorId
 const listInputSchema = Schema.Struct({
   query: Schema.String.check(Schema.isMaxLength(500)).pipe(Schema.optional).annotate({
     description:
-      'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent has:thread|revision|url updated:<7d updated:>30d. Results rank by relevance and say which fields matched.',
+      'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent (touched by) created:me|agent|system (captured by) has:thread|revision|url updated:<7d updated:>30d. A leading - negates any operator or word (-created:agent, -kind:note, -#tag). Results rank by relevance and say which fields matched.',
   }),
   statuses: Schema.Array(BacklogItems.statusSchema).pipe(Schema.optional),
   kinds: Schema.Array(BacklogItems.kindSchema).pipe(Schema.optional),

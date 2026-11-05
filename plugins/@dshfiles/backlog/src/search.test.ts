@@ -72,4 +72,67 @@ describe('search', () => {
     expect(run('b:12', items).map(result => [result.id, result.fields])).toEqual([[12, ['id']]])
     expect(run('b:1', items).map(result => result.id)).toEqual([1])
   })
+
+  it('tells who captured an item apart from who touched it', () => {
+    const items = [
+      item(1, 'Captured by me, worked on by an agent', {
+        actors: [
+          { id: 'user', role: 'owner' },
+          { id: 'agent:session-a', role: 'contributor' },
+        ],
+      }),
+      item(2, 'Captured by an agent', {
+        actors: [{ id: 'agent:session-b', role: 'owner' }],
+        events: [{ at: 0, actor: 'agent:session-b', kind: 'created', detail: 'Captured by an agent' }],
+      }),
+      item(3, 'Imported by the system', { actors: [{ id: 'system', role: 'owner' }] }),
+      item(4, 'Owner entry lost', { actors: [], events: [{ at: 0, actor: 'agent:session-c', kind: 'created', detail: 'x' }] }),
+    ]
+    expect(run('by:agent', items).map(result => result.id)).toEqual([1, 2])
+    expect(run('created:agent', items).map(result => result.id)).toEqual([2, 4])
+    expect(run('created:me', items).map(result => result.id)).toEqual([1])
+    expect(run('created:user', items).map(result => result.id)).toEqual([1])
+    expect(run('created:system', items).map(result => result.id)).toEqual([3])
+    expect(run('created:me created:system', items).map(result => result.id)).toEqual([1, 3])
+  })
+
+  it('negates every operator and plain words with a leading dash', () => {
+    const items = [
+      item(1, 'Agent bug in the composer', {
+        kind: 'bug',
+        tags: ['composer'],
+        attention: 'blocked',
+        actors: [{ id: 'agent:session-a', role: 'owner' }],
+        links: [{ type: 'thread', target: 'session-a' }],
+        lastActivityAt: 9 * DAY_MS,
+      }),
+      item(2, 'A note of mine', {
+        kind: 'note',
+        status: 'doing',
+        project: '/work/nixfiles',
+        actors: [
+          { id: 'user', role: 'owner' },
+          { id: 'agent:session-b', role: 'contributor' },
+        ],
+      }),
+      item(3, 'A plain task', {}),
+    ]
+    const ids = (query: string) => run(query, items, 10 * DAY_MS).map(result => result.id)
+    expect(ids('-by:agent')).toEqual([3])
+    expect(ids('-created:agent')).toEqual([2, 3])
+    expect(ids('-created:me')).toEqual([1])
+    expect(ids('-kind:note')).toEqual([1, 3])
+    expect(ids('-is:bug -is:doing')).toEqual([3])
+    expect(ids('-is:blocked')).toEqual([2, 3])
+    expect(ids('-status:todo')).toEqual([2])
+    expect(ids('-#comp')).toEqual([2, 3])
+    expect(ids('-project:nix')).toEqual([1, 3])
+    expect(ids('-has:thread')).toEqual([2, 3])
+    expect(ids('-updated:<7d')).toEqual([2, 3])
+    expect(ids('-updated:>7d')).toEqual([1])
+    expect(ids('-composer')).toEqual([2, 3])
+    expect(ids('-"plain task"')).toEqual([1, 2])
+    expect(ids('a -note')).toEqual([1, 3])
+    expect(ids('-b:3')).toEqual([1, 2])
+  })
 })

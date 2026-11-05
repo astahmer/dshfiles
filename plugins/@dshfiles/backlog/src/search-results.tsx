@@ -75,8 +75,8 @@ export const SearchResults = (props: {
           <span className="dshx:tabular-nums dshx:text-foreground">{props.total}</span> {props.total === 1 ? 'result' : 'results'}, best match first
         </span>
         <span className="dshx:ml-auto dshx:hidden dshx:@min-[48rem]:inline">
-          Try <code>is:blocked</code> <code>kind:bug</code> <code>#tag</code> <code>project:</code> <code>has:thread</code> <code>by:agent</code>{' '}
-          <code>updated:&lt;7d</code>
+          Try <code>is:blocked</code> <code>kind:bug</code> <code>#tag</code> <code>project:</code> <code>has:thread</code> <code>created:me</code>{' '}
+          <code>-by:agent</code> <code>updated:&lt;7d</code>
         </span>
       </div>
       <ul aria-label="Search results" className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">

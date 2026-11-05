@@ -394,8 +394,13 @@ clears them. Words must all match; `"quoted phrases"` stay whole. Operators comb
 | kind, status, attention | `kind:bug`, `status:doing`, `is:blocked`, `is:needs-you` |
 | tag, project            | `#composer`, `project:welii`                             |
 | who touched it          | `by:agent`, `by:me`                                      |
+| who captured it         | `created:me`, `created:agent`, `created:system`          |
 | what it links           | `has:thread`, `has:revision`, `has:url`                  |
 | activity                | `updated:<7d`, `updated:>30d`                            |
+| leave out (any of them) | `-by:agent`, `-created:agent`, `-kind:note`, `-#tag`     |
+
+`created:` reads the item's owner (who captured it), while `by:` matches anyone who touched it. A leading `-`
+negates any operator, word or `"quoted phrase"`; an item matching one negated term is left out.
 
 **Views** saves the current view and search under a name in the plugin's settings (`savedViews`), so every
 browser lists the same views.
