@@ -1832,6 +1832,15 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/project-automations':
+        specifier: workspace:*
+        version: link:../project-automations
+      '@dshfiles/project-checks':
+        specifier: workspace:*
+        version: link:../project-checks
+      '@dshfiles/pull-requests':
+        specifier: workspace:*
+        version: link:../pull-requests
       '@dshfiles/settings-shell':
         specifier: workspace:*
         version: link:../settings-shell
@@ -1989,7 +1998,7 @@ importers:
         version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
-        version: 0.2.1-rc.2(03aeead0ec8c146d3890db8cd905c2c9)
+        version: 0.2.1-rc.2(dbbc032c9895bff35b74e9a5d27e3426)
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx

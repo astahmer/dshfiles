@@ -3,6 +3,8 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/pull-requests',
+  // The contract other plugins import to read pull-request state (the backlog's PR links and gates).
+  modules: { api: 'src/api.ts' },
   host: { entry: 'src/host.ts', bundleDependencies: ['@dshfiles/jj-cli'] },
   client: { entry: 'src/client-entry.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true },

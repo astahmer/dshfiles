@@ -15,7 +15,11 @@
     ".": "./dist/index.js",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./client": "./dist/client.js"
+    "./client": "./dist/client.js",
+    "./api": {
+      "types": "./src/automations-api.ts",
+      "default": "./dist/api.js"
+    }
   },
   "scripts": {
     "build": "dshx build",
