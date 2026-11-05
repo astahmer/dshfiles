@@ -27,6 +27,7 @@ import { ItemRelations, type BacklogLease, type ItemRelationIndex } from './item
 import type { LeaseWrite } from './backlog-repo.js'
 import { DueDates } from './due-date.js'
 import { Recurrence } from './recurrence.js'
+import type { BacklogTemplate } from './templates.js'
 import { FieldRevert } from './field-revert.js'
 import { BacklogOps } from './op-log.js'
 import { BacklogShipped, type ShippedDigest, type ShippedQuery } from './shipped.js'
@@ -114,6 +115,8 @@ export interface BacklogCaptureInput {
   readonly due?: string | undefined
   readonly recurrence?: string | undefined
   readonly criteria?: readonly CriterionInput[] | undefined
+  /** A template the capture starts from: its prefix, kind, priority, tags, body and criteria fill what the caller left out. */
+  readonly template?: BacklogTemplate | undefined
   /** Links the item starts with besides the ones its text names. */
   readonly extraLinks?: readonly BacklogLink[] | undefined
   readonly files?: readonly BacklogFileInput[] | undefined
@@ -1009,7 +1012,16 @@ export class BacklogStore extends Context.Service<
         const id = (yield* Ref.get(state)).nextId
         const ref = yield* repo.mintRef
         const triaged = BacklogItems.triage(text)
-        const priority = input.priority ?? triaged.priority
+        const template = input.template
+        const templatePriority = template === undefined || template.priority === 'none' ? undefined : template.priority
+        const priority = input.priority ?? triaged.priority ?? templatePriority
+        const prefix = template?.titlePrefix ?? ''
+        const title = prefix === '' || triaged.title.startsWith(prefix) ? triaged.title : `${prefix}${triaged.title}`.slice(0, BacklogItems.maxTitleChars)
+        const ownBody = input.fields?.body?.slice(0, BacklogItems.maxBodyChars) ?? triaged.body
+        const body = [ownBody, template?.body.trim() ?? ''].filter(part => part !== '').join('\n\n').slice(0, BacklogItems.maxBodyChars)
+        const ownTags = input.fields?.tags === undefined ? triaged.tags : [...new Set(input.fields.tags)].slice(0, 20)
+        const tags = [...new Set([...ownTags, ...(template?.tags ?? []).map(tag => tag.toLowerCase().replace(/^#/, ''))])].slice(0, 20)
+        const criteria = input.criteria ?? template?.criteria.map(text => ({ text }))
         const actorId = actorIdOf(actor)
         const files = filesOf(input.files ?? [], at)
         const attachments = files.map(file => file.attachment)
@@ -1022,12 +1034,12 @@ export class BacklogStore extends Context.Service<
         const item: BacklogItem = {
           id,
           ref,
-          title: triaged.title,
-          body: input.fields?.body?.slice(0, BacklogItems.maxBodyChars) ?? triaged.body,
-          kind: kind ?? triaged.kind,
+          title,
+          body,
+          kind: kind ?? template?.kind ?? triaged.kind,
           status: status ?? 'inbox',
           project: BacklogItems.projectOf(project ?? (actor.kind === 'agent' ? (actor.cwd ?? null) : null)),
-          tags: input.fields?.tags === undefined ? triaged.tags : [...new Set(input.fields.tags)].slice(0, 20),
+          tags,
           links: BacklogItems.uniqueLinks([...triaged.links, ...callerLinks(actor)]),
           attachments,
           actors: [{ id: actorId, role: 'owner' }],
@@ -1045,7 +1057,7 @@ export class BacklogStore extends Context.Service<
           ...(parent !== undefined && { parent }),
           ...(input.due !== undefined && { due: input.due }),
           ...(input.recurrence !== undefined && { recurrence: input.recurrence }),
-          ...(input.criteria !== undefined && input.criteria.length > 0 && { criteria: criteriaOf(input.criteria, []) }),
+          ...(criteria !== undefined && criteria.length > 0 && { criteria: criteriaOf(criteria, []) }),
           ...(input.extraLinks !== undefined && { links: BacklogItems.uniqueLinks([...triaged.links, ...callerLinks(actor), ...input.extraLinks]) }),
         }
         yield* repo.create({ item, origin, nextId: id + 1, files }).pipe(Effect.mapError(writeFailed(item, 'put')))

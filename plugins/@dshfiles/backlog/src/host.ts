@@ -17,8 +17,9 @@ import { AiActivity } from './ai-activity.js'
 import { BacklogAttention } from './attention-provider.js'
 import { backlogApi } from './api.js'
 import { AttachmentExport } from './attachment-file.js'
-import { backlogSettingsLayer, sharedJevSettingsLayer } from './backlog-settings.js'
-import { BacklogItemNotFound } from './errors.js'
+import { BacklogSettingsTag, backlogSettingsLayer, sharedJevSettingsLayer } from './backlog-settings.js'
+import { BacklogItemNotFound, BacklogTemplateNotFound } from './errors.js'
+import { BacklogTemplates } from './templates.js'
 import { BacklogExport } from './backlog-export.js'
 import { HostSpeech, hostEdgeLayer } from './host-edge-promise.js'
 import { BacklogDb, BacklogStorePaths } from './backlog-db.js'
@@ -130,7 +131,14 @@ const backlogHandlers = Api.handlers(backlogApi, {
         input.project === undefined && actor.kind === 'agent' && actor.cwd !== undefined
           ? yield* CaptureProjects.use(projects => projects.of(actor.cwd ?? ''))
           : input.project
-      const detail = yield* store.capture({ ...input, actor, ...(project !== undefined && { project }) })
+      const { template: templateName, ...fields } = input
+      const templates = (yield* BacklogSettingsTag.use(settings => settings.get)).templates
+      const command = templateName === undefined ? BacklogTemplates.extract(fields.text, templates) : null
+      const template = templateName === undefined ? command?.template : BacklogTemplates.find(templates, templateName)
+      if (templateName !== undefined && template === undefined)
+        return yield* new BacklogTemplateNotFound({ name: templateName, available: templates.map(candidate => candidate.name) })
+      const text = command === null || command.text === '' ? fields.text : command.text
+      const detail = yield* store.capture({ ...fields, text, actor, ...(project !== undefined && { project }), ...(template !== undefined && { template }) })
       yield* Triage.use(triage => triage.schedule(detail.item.id))
       yield* TweetImport.use(tweets => tweets.schedule(detail.item.id))
       return detail

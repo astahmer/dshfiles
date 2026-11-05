@@ -1253,6 +1253,7 @@ export const BacklogPanel = (props: {
                 projects={projectPaths}
                 projectFilter={projectFilters.length === 0 ? null : projectFilters.length === 1 ? (projectFilters[0] ?? null) : null}
                 reuseProject={settings.value?.reuseCaptureProject ?? true}
+                templates={(settings.value?.templates ?? []).map(entry => entry.name)}
                 status={captureStatus}
                 onClearStatus={() => setCaptureStatus(null)}
                 inputRef={captureComposer}

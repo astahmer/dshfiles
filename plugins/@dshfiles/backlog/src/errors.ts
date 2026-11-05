@@ -257,3 +257,16 @@ export class BacklogClaimRefused extends Schema.TaggedError<BacklogClaimRefused>
       : `Only an agent thread can claim b:${this.ref}. Start a thread for it instead, or set its status by hand.`
   }
 }
+
+/** A capture named a template the Backlog settings do not hold. */
+export class BacklogTemplateNotFound extends Schema.TaggedError<BacklogTemplateNotFound>()(
+  'BacklogTemplateNotFound',
+  { name: Schema.String, available: Schema.Array(Schema.String) },
+  { dshxWireCode: 'template-not-found' },
+) {
+  override get message(): string {
+    return this.available.length === 0
+      ? `No backlog template "${this.name}": none are configured. Add one in Settings › Backlog › templates, or capture without a template.`
+      : `No backlog template "${this.name}". Use one of: ${this.available.join(', ')}; or add it in Settings › Backlog › templates.`
+  }
+}

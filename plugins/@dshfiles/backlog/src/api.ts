@@ -618,6 +618,12 @@ export const backlogApi = defineApi({
           .annotate({ description: 'urgent, high, medium, low or none; overrides a `!1`…`!4` written in the text.' }),
         parent: refTextSchema.pipe(Schema.optional).annotate({ description: 'Capture it as a sub-issue of this item (`b:k3f9`); three levels deep at most.' }),
         due: DueDates.schema.pipe(Schema.optional).annotate({ description: 'The date it is due, YYYY-MM-DD with no time.' }),
+        template: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120))
+          .pipe(Schema.optional)
+          .annotate({
+            description:
+              'Start from a template in Backlog settings (by name, such as `Bug report`): it adds its title prefix, kind, priority, tags, body and acceptance criteria where the capture left them out. `/template <name>` in the text does the same.',
+          }),
         recurrence: Recurrence.schema
           .pipe(Schema.optional)
           .annotate({ description: '`daily`, `weekly`, `monthly` or `cron:<expr>`: finishing it creates the next occurrence.' }),

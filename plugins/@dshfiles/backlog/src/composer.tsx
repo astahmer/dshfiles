@@ -13,6 +13,7 @@ import { Schema } from 'effect'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import {
   ArrowUpIcon,
+  LayoutTemplateIcon,
   CheckIcon,
   FolderIcon,
   HashIcon,
@@ -184,6 +185,8 @@ export const Composer = (props: {
   readonly variant: 'chat' | 'compact'
   readonly autoFocus?: boolean
   readonly captureRequest?: { readonly id: number; readonly text: string }
+  /** Template names from Backlog settings; picking one fills the capture's kind, tags, body and criteria on the Host. */
+  readonly templates?: readonly string[]
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
@@ -204,6 +207,7 @@ export const Composer = (props: {
   const [status, setStatus] = useState<BacklogStatus>(props.status ?? 'inbox')
   const [statusTouched, setStatusTouched] = useState(false)
   const [kind, setKind] = useState<BacklogKind | null>(null)
+  const [template, setTemplate] = useState('')
   const [project, setProject] = useState<string | null>(() =>
     CaptureProject.initial({ filter: props.projectFilter ?? null, remembered: storedProject, reuse: reuseProject }),
   )
@@ -388,8 +392,10 @@ export const Composer = (props: {
       status,
       kind,
       project,
+      template,
     }
     setText('')
+    setTemplate('')
     attachments.clear()
     setKind(null)
     setProject(CaptureProject.next({ sent: project, filter: props.projectFilter ?? null, reuse: reuseProject }))
@@ -404,6 +410,8 @@ export const Composer = (props: {
       kind: kind ?? undefined,
       project: project ?? undefined,
       files: submitted.files.length > 0 ? submitted.files.map(fileInput) : undefined,
+      // Only sent when picked: a Host older than templates refuses the key.
+      ...(submitted.template === '' ? {} : { template: submitted.template }),
     }
     actions.capture.mutate(payload, {
       onSuccess: () => captureProject.set(CaptureProject.remembered({ sent: submitted.project, reuse: reuseProject })),
@@ -414,6 +422,7 @@ export const Composer = (props: {
         setStatus(submitted.status)
         setKind(submitted.kind)
         setProject(submitted.project)
+        setTemplate(submitted.template)
       },
     })
   }
@@ -597,6 +606,22 @@ export const Composer = (props: {
           )}
         />
 
+        {(props.templates ?? []).length === 0 ? null : (
+          <ChoiceChip
+            label="Template"
+            value={template}
+            values={['', ...(props.templates ?? [])]}
+            onPick={setTemplate}
+            renderTrigger={value => (
+              <>
+                <LayoutTemplateIcon aria-hidden className="dshx:size-3" />
+                {value === '' ? <span className="dshx:text-muted-foreground">Template</span> : <span className="dshx:max-w-32 dshx:truncate">{value}</span>}
+              </>
+            )}
+            render={value => (value === '' ? <span className="dshx:text-muted-foreground">No template</span> : <span>{value}</span>)}
+          />
+        )}
+
         <ProjectPicker
           label="Project of the new item"
           value={project ?? BacklogProjects.none}
@@ -683,7 +708,7 @@ export const Composer = (props: {
             <code>bug:</code> <code>idea:</code> <code>note:</code> set the kind
           </span>
           <span>
-            <HashIcon aria-hidden className="dshx:inline dshx:size-3" /> tags · <code>@</code> items, threads and projects · <code>/project</code> · paste or
+            <HashIcon aria-hidden className="dshx:inline dshx:size-3" /> tags · <code>@</code> items, threads and projects · <code>/project</code> · <code>/template</code> · paste or
             drop a file
           </span>
         </p>
