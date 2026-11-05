@@ -55,11 +55,11 @@ export class ReadableFetchProvider implements WebFetchProvider {
 
   /**
    * @param options - read per fetch, so a settings change reaches the next call without a restart.
-   * @param network - the transport; tests replace it.
+   * @param network - the transport: the Host builds it from `PublicNetwork.live` and `HopRequest`; tests replace it.
    */
   constructor(
     private readonly options: () => Promise<FetchOptions> | FetchOptions,
-    private readonly network: FetchNetwork = PublicNetwork.live,
+    private readonly network: FetchNetwork,
   ) {}
 
   /** No credentials to check: an anonymous public fetcher is always usable. */

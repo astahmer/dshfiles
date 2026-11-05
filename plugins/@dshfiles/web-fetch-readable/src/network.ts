@@ -13,6 +13,8 @@ import type { LookupFunction } from 'node:net'
 import { isIP } from 'node:net'
 import { proxyRouteFor } from '@deepseek-ai/dsh-http-proxy'
 import { WebError } from '@deepseek-ai/dsh-web'
+import { Effect, Exit, Option } from 'effect'
+import { FetchHttpClient, HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from 'effect/http'
 import ipaddr from 'ipaddr.js'
 import type { Dispatcher, Response } from 'undici'
 
@@ -47,10 +49,13 @@ interface Nat64Prefix {
   readonly length: number
 }
 
-const FAMILY_NUMBER: Readonly<Record<string, 4 | 6>> = { IPv4: 4, IPv6: 6 }
-
 /** A lookup's requested family as a number; 0 asks for any family. */
-const familyNumber = (family: number | string | undefined): number => (typeof family === 'number' ? family : (FAMILY_NUMBER[family ?? ''] ?? 0))
+const familyNumber = (family: number | string | undefined): number => {
+  if (typeof family === 'number') return family
+  if (family === 'IPv4') return 4
+  if (family === 'IPv6') return 6
+  return 0
+}
 
 const stripIpv6Brackets = (hostname: string): string => (hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname)
 
@@ -170,28 +175,65 @@ export class PublicNetwork {
     })
   }
 
-  /** The production transport. */
-  static readonly live: FetchNetwork = {
+  /** Resolution and proxy routing of the production transport; its two hop requests run as Effects (`HopRequest`). */
+  static readonly live: Pick<FetchNetwork, 'resolve' | 'proxyFor'> = {
     resolve: (hostname, signal) => PublicNetwork.resolvePublicAddresses(hostname, signal),
     proxyFor: url => {
       const route = proxyRouteFor(url)
       return route.proxied ? route.dispatcher : undefined
     },
-    request: async (url, addresses, headers, signal) => {
-      const { Agent, fetch } = await import('undici')
-      const dispatcher = new Agent({ autoSelectFamily: true, connect: { lookup: PublicNetwork.pinnedLookup(addresses) } })
-      try {
-        const response = await fetch(url, { method: 'GET', redirect: 'manual', headers, signal, dispatcher })
-        return { response, close: () => dispatcher.close() }
-      } catch (error) {
-        await dispatcher.close()
-        throw error
-      }
-    },
-    requestVia: async (dispatcher, url, headers, signal) => {
-      const { fetch } = await import('undici')
-      const response = await fetch(url, { method: 'GET', redirect: 'manual', headers, signal, dispatcher })
-      return { response, close: () => Promise.resolve() }
-    },
   }
+}
+
+/** The fetch failure itself, as the provider has always reported it, rather than its HttpClient wrapper. */
+const transportCause = (error: HttpClientError.HttpClientError): Error =>
+  error.reason._tag === 'TransportError' && error.reason.cause instanceof Error ? error.reason.cause : error
+
+/**
+ * One GET through Effect's HttpClient, sent by undici over `dispatcher` with redirects left to the provider. The
+ * provider's `signal` also bounds the body, which it reads after this Effect returns. Client tracing stays off: a
+ * span would record the URL and propagation would add trace headers to a third-party request.
+ */
+const sendHop = Effect.fnUntraced(function* (dispatcher: Dispatcher, url: URL, headers: Record<string, string>, signal: AbortSignal) {
+  const undici = yield* Effect.promise(() => import('undici'))
+  const send = (input: string | URL | globalThis.Request, init?: globalThis.RequestInit) =>
+    undici.fetch(
+      // SAFETY: FetchHttpClient passes the URL it built and a plain init; undici accepts both shapes.
+      input as URL,
+      { ...(init as Parameters<typeof undici.fetch>[1]), dispatcher, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal },
+    )
+  const response = yield* HttpClient.execute(HttpClientRequest.get(url, { headers })).pipe(
+    Effect.mapError(transportCause),
+    Effect.provide(FetchHttpClient.layer),
+    // SAFETY: undici's fetch is the WHATWG fetch; only its TypeScript Request/Response classes differ from the DOM ones.
+    Effect.provideService(FetchHttpClient.Fetch, send as unknown as typeof globalThis.fetch),
+    Effect.provideService(FetchHttpClient.RequestInit, { redirect: 'manual' }),
+    Effect.provideService(HttpClient.TracerDisabledWhen, () => true),
+  )
+  // FetchHttpClient responses always carry their Web Response; taking it hands the body over to the provider.
+  const web = HttpClientResponse.toWeb(response)
+  if (Option.isNone(web)) return yield* Effect.die(new Error('FetchHttpClient returned a response without its Web body'))
+  // SAFETY: the Web Response was created by undici's fetch above, so it is an undici Response.
+  return web.value as unknown as Response
+})
+
+/** The production hop requests: each hop goes through Effect's HttpClient over an undici dispatcher. */
+export class HopRequest {
+  /** A direct request over a fresh Agent whose lookup only answers with the validated addresses. */
+  static readonly pinned = Effect.fnUntraced(function* (url: URL, addresses: readonly PinnedAddress[], headers: Record<string, string>, signal: AbortSignal) {
+    const { Agent } = yield* Effect.promise(() => import('undici'))
+    const dispatcher = new Agent({ autoSelectFamily: true, connect: { lookup: PublicNetwork.pinnedLookup(addresses) } })
+    // A failed or interrupted hop closes its Agent here; a successful one leaves that to the provider, after the body.
+    const closeNow = Effect.callback<void>(resume => {
+      dispatcher.close(() => resume(Effect.void))
+    })
+    const response = yield* sendHop(dispatcher, url, headers, signal).pipe(Effect.onExit(exit => (Exit.isSuccess(exit) ? Effect.void : closeNow)))
+    return { response, close: () => dispatcher.close() } satisfies HopResponse
+  })
+
+  /** A request through the proxy dispatcher DSH routes this URL to. */
+  static readonly proxied = Effect.fnUntraced(function* (dispatcher: Dispatcher, url: URL, headers: Record<string, string>, signal: AbortSignal) {
+    const response = yield* sendHop(dispatcher, url, headers, signal)
+    return { response, close: () => Promise.resolve() } satisfies HopResponse
+  })
 }
