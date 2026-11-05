@@ -43,6 +43,7 @@ import { ResourcePanelHost } from './resource-panel-host.js'
 import { createWorkbenchTerminalSource } from './terminal-source.js'
 import { createNativePageAdmission } from './native-page-admission.js'
 import { ThreadFacets } from './thread-facets.js'
+import { threadOnScreen } from './thread-on-screen.js'
 import { captureLayoutArrangement, restoreLayoutArrangement } from './layout-arrangements.js'
 import { SavedLayouts, savedLayouts, type SavedLayout } from './saved-layouts.js'
 import { workbenchSettings } from './settings.js'
@@ -97,9 +98,10 @@ export default defineClient({
       }
     }, 'workbench: native terminal launcher')
     const facetAdmission = createNativePageAdmission(sidebarResourcePanels(), registry)
+    const facetThread = threadOnScreen({ mounted: ctx.sidebarRight.mounted, sessionDrafts: () => ctx.get('sessionDrafts') })
     const threadFacets = ThreadFacets.create({
       guide: { subscribe: listener => ctx.sidebarRightTabs.subscribe(listener), getSnapshot: () => ctx.sidebarRightTabs.guide() },
-      onScreen: { subscribe: listener => ctx.sidebarRight.mounted.subscribe(listener), getSnapshot: () => ctx.sidebarRight.mounted.getSnapshot() },
+      onScreen: facetThread,
       registry,
       admission: facetAdmission,
     })
@@ -659,7 +661,7 @@ export default defineClient({
      */
     const revealFacetPage = (definition: WorkbenchPanelDefinition, api: DockviewApi, target: NewViewSelection = {}): boolean => {
       const kind = definition.threadFacet?.kind
-      const onScreen = ctx.sidebarRight.mounted.getSnapshot()
+      const onScreen = facetThread.getSnapshot()
       if (kind === undefined || onScreen === undefined) return false
       const page = [...resourceRegistrations.values()].find(
         entry => entry.record.kind === kind && entry.record.sessionId === onScreen && threadFacets.follows(entry.record),
@@ -745,7 +747,7 @@ export default defineClient({
        * Changes facet instead of closing it (and the right pane with it). The previous thread keeps its native record.
        */
       const takeFacetPlace = (resource: SidebarResourcePanel): boolean => {
-        if (!threadFacets.follows(resource) || resource.sessionId !== ctx.sidebarRight.mounted.getSnapshot()) return false
+        if (!threadFacets.follows(resource) || resource.sessionId !== facetThread.getSnapshot()) return false
         for (const [id, registration] of resourceRegistrations) {
           if (id === resource.id || registration.record.kind !== resource.kind || registration.record.sessionId === resource.sessionId) continue
           const placed = placedIn(id)
@@ -783,7 +785,7 @@ export default defineClient({
       /** A kept page whose replacement never arrived gives its place up; while no thread is on screen it stays. */
       const settle = (): void => {
         settleTimer = undefined
-        const onScreen = ctx.sidebarRight.mounted.getSnapshot()
+        const onScreen = facetThread.getSnapshot()
         for (const id of [...following.keys()]) {
           const registration = resourceRegistrations.get(id)
           if (registration === undefined || placedIn(id) === undefined || resources.list().some(entry => entry.id === id)) {
@@ -797,7 +799,7 @@ export default defineClient({
       }
       const rebind = (): void => {
         rebindQueued = false
-        const onScreen = ctx.sidebarRight.mounted.getSnapshot()
+        const onScreen = facetThread.getSnapshot()
         // No thread on screen (a new-thread draft, a destination page): the facet keeps its place and its last
         // thread's body until a thread comes on screen, which runs `sync` again.
         if (onScreen === undefined) return
@@ -821,7 +823,7 @@ export default defineClient({
       const sync = (): void => {
         const entries = resources.list()
         const workbench = ctx.get('mainSurface')?.mode() === 'workbench'
-        const onScreen = ctx.sidebarRight.mounted.getSnapshot()
+        const onScreen = facetThread.getSnapshot()
         for (const [id, registration] of resourceRegistrations) {
           if (!workbench || entries.some(entry => entry.id === id)) continue
           if (threadFacets.follows(registration.record) && onScreen !== registration.record.sessionId && placedIn(id) !== undefined) {
@@ -862,7 +864,7 @@ export default defineClient({
       }
       const off = resources.subscribe(sync)
       const offMode = ctx.get('mainSurface')?.subscribe(sync)
-      const offScreen = ctx.sidebarRight.mounted.subscribe(sync)
+      const offScreen = facetThread.subscribe(sync)
       sync()
       return () => {
         off()

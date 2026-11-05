@@ -34,6 +34,10 @@
     "./conversation-header": {
       "types": "./src/conversation-header.ts",
       "default": "./dist/conversation-header.js"
+    },
+    "./thread-on-screen": {
+      "types": "./src/thread-on-screen.ts",
+      "default": "./dist/thread-on-screen.js"
     }
   },
   "scripts": {

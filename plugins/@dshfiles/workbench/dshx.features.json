@@ -665,6 +665,12 @@
           "id": "workbench.native-page-mint",
           "file": "plugins/@dshfiles/sidebar-right/src/workbench-dock.test.ts",
           "testName": "mints the store of a thread that came on screen before its seat rendered, so a Workbench facet pick lands in it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.thread-facets-skip-local-draft",
+          "file": "plugins/@dshfiles/workbench/src/thread-on-screen.test.ts",
+          "testName": "reads a New-thread draft as no thread until the Host created it, then as that thread"
         }
       ],
       "telemetry": [
