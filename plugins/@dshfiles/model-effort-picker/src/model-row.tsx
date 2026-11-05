@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { aiAccountsFastModeApi } from '@dshfiles/ai-accounts/model-fast-mode-api'
@@ -73,6 +73,16 @@ const EffortPicker = ({ efforts, effortIndex, busy, onSelect }: EffortPickerProp
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const total = efforts.length
+  // A wheel scroll does not move the pointer off the trigger, so the card stayed open and followed its row up the
+  // list, then stuck to the top of the window once the row scrolled out. Close it when anything around it scrolls.
+  useEffect(() => {
+    if (!open) return
+    const close = (event: Event) => {
+      if (event.target instanceof Node && event.target.contains(triggerRef.current)) setOpen(false)
+    }
+    window.addEventListener('scroll', close, { capture: true, passive: true })
+    return () => window.removeEventListener('scroll', close, { capture: true })
+  }, [open])
   return (
     <HoverCard closeDelay={80} onOpenChange={setOpen} open={open} openDelay={120}>
       <HoverCardTrigger asChild>
@@ -88,7 +98,7 @@ const EffortPicker = ({ efforts, effortIndex, busy, onSelect }: EffortPickerProp
           <EffortBars glyph={effortGlyph({ index: effortIndex, total })} />
         </button>
       </HoverCardTrigger>
-      <HoverCardContent align="end" className="dshx-root dshx:w-auto dshx:p-1.5" collisionPadding={8} data-model-effort-popover side="bottom" sideOffset={4}>
+      <HoverCardContent align="end" className="dshx-root dshx:w-auto dshx:p-1.5" collisionPadding={8} data-model-effort-popover hideWhenDetached side="bottom" sideOffset={4}>
         <p className="dshx:px-1 dshx:pb-1.5 dshx:text-[10px] dshx:font-medium dshx:text-muted-foreground">Reasoning effort</p>
         <div className="dshx:flex dshx:items-stretch dshx:gap-0.5">
           {efforts.map((effort, index) => (
