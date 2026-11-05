@@ -17,14 +17,14 @@ const collectText = <E>(stream: Stream.Stream<Uint8Array, E>) =>
 const ghOperations = ['repo-view', 'pr-view', 'auth-status', 'repo-info', 'pr-list', 'pr-create'] as const
 type GhOperation = (typeof ghOperations)[number]
 
-const operationFailure: Record<GhOperation, string> = {
+const operationFailure = {
   'repo-view': 'could not identify the repository',
   'repo-info': 'could not identify the repository',
   'pr-view': 'could not read the pull request',
   'auth-status': 'is not signed in to github.com',
   'pr-list': 'could not list pull requests for the branch',
   'pr-create': 'could not create the pull request',
-}
+} satisfies Record<GhOperation, string>
 
 export class GhCommandFailed extends Schema.TaggedError<GhCommandFailed>()('GhCommandFailed', {
   operation: Schema.Literals(ghOperations),
@@ -59,13 +59,27 @@ const isRateLimitMessage = (text: string): boolean => {
 
 const MISSING_EXECUTABLE = /ENOENT|not ?found|no such file/iu
 
+/** The fields of a spawn failure this check reads; the platform error's shape is not trusted, so each stays unparsed. */
+interface SpawnFailureData {
+  readonly reason?: unknown
+  readonly message?: unknown
+  readonly cause?: unknown
+}
+
+/** A tagged platform failure reason, e.g. `{ _tag: 'NotFound' }`. */
+interface FailureReasonData {
+  readonly _tag?: unknown
+}
+
+const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null
+
 /** Whether a spawn failure means the executable is absent, read from the platform error without trusting its shape. */
 const isMissingExecutable = (error: unknown): boolean => {
-  if (typeof error !== 'object' || error === null) return false
-  const reason: unknown = Reflect.get(error, 'reason')
-  const reasonTag = typeof reason === 'object' && reason !== null ? Reflect.get(reason, '_tag') : undefined
-  if (reasonTag === 'NotFound') return true
-  return MISSING_EXECUTABLE.test(String(Reflect.get(error, 'message') ?? '')) || MISSING_EXECUTABLE.test(String(Reflect.get(error, 'cause') ?? ''))
+  const failure: SpawnFailureData | undefined = isObject(error) ? error : undefined
+  if (failure === undefined) return false
+  const reason: FailureReasonData = isObject(failure.reason) ? failure.reason : {}
+  if (reason._tag === 'NotFound') return true
+  return MISSING_EXECUTABLE.test(String(failure.message ?? '')) || MISSING_EXECUTABLE.test(String(failure.cause ?? ''))
 }
 
 const summarizeStderr = (stderr: string): string =>

@@ -5,7 +5,7 @@ import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import { PullRequestCreator } from '../src/create.js'
-import { bookmarkFromTitle, parseGeneratedPullRequest } from '../src/create-model.js'
+import { CreateModel } from '../src/create-model.js'
 import { GhCommandFailed, GitHubCli, type GitHubPullRequestCreate } from '../src/github-cli.js'
 import { PullRequestMonitor } from '../src/monitor.js'
 import type { PullRequestRecord } from '../src/pull-request-model.js'
@@ -320,9 +320,9 @@ describe('pull request creation', () => {
   })
 
   it('names a bookmark from the thread title and reads a generated draft', () => {
-    expect(bookmarkFromTitle('Créer une PR — depuis le fil !', 'kkkk')).toBe('dsh/creer-une-pr-depuis-le-fil')
-    expect(bookmarkFromTitle('!!!', 'kkkk')).toBe('dsh/kkkk')
-    expect(parseGeneratedPullRequest('```\nTitle: "Add sprockets"\n\nBody text\n```')).toEqual({ title: 'Add sprockets', body: 'Body text' })
-    expect(parseGeneratedPullRequest('   ')).toBeUndefined()
+    expect(CreateModel.bookmarkFromTitle('Créer une PR — depuis le fil !', 'kkkk')).toBe('dsh/creer-une-pr-depuis-le-fil')
+    expect(CreateModel.bookmarkFromTitle('!!!', 'kkkk')).toBe('dsh/kkkk')
+    expect(CreateModel.parseGeneratedPullRequest('```\nTitle: "Add sprockets"\n\nBody text\n```')).toEqual({ title: 'Add sprockets', body: 'Body text' })
+    expect(CreateModel.parseGeneratedPullRequest('   ')).toBeUndefined()
   })
 })

@@ -2,14 +2,7 @@ import type { ApiCaller } from '@dshfiles/dshx/api'
 import { Jj, type JjOutput } from '@dshfiles/jj-cli'
 import { Context, Duration, Effect, Layer, Option } from 'effect'
 import {
-  bookmarkFromTitle,
-  COMMIT_TEMPLATE,
-  fallbackPullRequest,
-  GENERATION_SYSTEM_PROMPT,
-  generationInput,
-  parseCommitLines,
-  parseGeneratedPullRequest,
-  problem,
+  CreateModel,
   type CreateCommit,
   type CreateProblem,
   type PullRequestCreateInput,
@@ -72,14 +65,15 @@ export class PullRequestCreator extends Context.Service<
         jj.run({ args, cwd, timeout: Duration.seconds(timeoutSeconds) }).pipe(
           Effect.map((output): JjResult => {
             if (output.exitCode === 0) return { kind: 'ok', output }
-            if (NOT_A_REPOSITORY.test(output.stderr)) return { kind: 'problem', problem: problem('not-a-jj-repository', `${cwd} is not a jj workspace.`) }
+            if (NOT_A_REPOSITORY.test(output.stderr))
+              return { kind: 'problem', problem: CreateModel.problem('not-a-jj-repository', `${cwd} is not a jj workspace.`) }
             return { kind: 'ok', output }
           }),
           Effect.catch(error =>
             Effect.succeed<JjResult>(
               error._tag === 'JjSpawnFailed' && error.reason === 'executable-not-found'
-                ? { kind: 'problem', problem: problem('jj-missing', 'The jj executable was not found on the DSH Host PATH.') }
-                : { kind: 'problem', problem: problem('not-a-jj-repository', error.message) },
+                ? { kind: 'problem', problem: CreateModel.problem('jj-missing', 'The jj executable was not found on the DSH Host PATH.') }
+                : { kind: 'problem', problem: CreateModel.problem('not-a-jj-repository', error.message) },
             ),
           ),
         )
@@ -93,13 +87,14 @@ export class PullRequestCreator extends Context.Service<
             repository: null,
             problems: [
               missing
-                ? problem('gh-missing', 'The GitHub CLI (gh) is not installed on the DSH Host.')
-                : problem('gh-unauthenticated', 'The GitHub CLI is not signed in to github.com.'),
+                ? CreateModel.problem('gh-missing', 'The GitHub CLI (gh) is not installed on the DSH Host.')
+                : CreateModel.problem('gh-unauthenticated', 'The GitHub CLI is not signed in to github.com.'),
             ],
           }
         }
         const info = yield* github.repositoryInfo({ cwd }).pipe(Effect.option)
-        if (Option.isNone(info)) return { repository: null, problems: [problem('repository-unknown', `gh could not find a GitHub repository for ${cwd}.`)] }
+        if (Option.isNone(info))
+          return { repository: null, problems: [CreateModel.problem('repository-unknown', `gh could not find a GitHub repository for ${cwd}.`)] }
         return { repository: info.value, problems: [] }
       })
 
@@ -113,35 +108,40 @@ export class PullRequestCreator extends Context.Service<
           .map(line => line.trim().split(/\s+/u)[0] ?? '')
           .filter(name => name.length > 0)
         const remote = names.includes('origin') ? 'origin' : names[0]
-        if (remote === undefined) return { workspace: undefined, problems: [problem('no-remote', 'The workspace has no Git remote to push to.')] }
+        if (remote === undefined) return { workspace: undefined, problems: [CreateModel.problem('no-remote', 'The workspace has no Git remote to push to.')] }
 
         const base = repository?.defaultBranch ?? 'main'
         const baseRef = `${quoted(base)}@${quoted(remote)}`
         const baseFound = yield* runJj(['log', '--no-graph', '-r', `present(${baseRef})`, '-T', 'commit_id'], cwd)
         if (baseFound.kind === 'problem') return { workspace: undefined, problems: [baseFound.problem] }
         if (baseFound.output.stdout.trim().length === 0) {
-          problems.push(problem('base-missing', `The base branch ${base}@${remote} is not known locally.`))
+          problems.push(CreateModel.problem('base-missing', `The base branch ${base}@${remote} is not known locally.`))
           return { workspace: { remote, base, headCommitId: null, commits: [], existingBookmark: null }, problems }
         }
 
         const working = yield* runJj(['log', '--no-graph', '-r', '@', '-T', 'if(empty && description == "", "empty", "content")'], cwd)
         if (working.kind === 'problem') return { workspace: undefined, problems: [working.problem] }
         const head = working.output.stdout.trim() === 'empty' ? '@-' : '@'
-        const listed = yield* runJj(['log', '--no-graph', '-r', `${baseRef}..${head}`, '-T', COMMIT_TEMPLATE], cwd)
+        const listed = yield* runJj(['log', '--no-graph', '-r', `${baseRef}..${head}`, '-T', CreateModel.COMMIT_TEMPLATE], cwd)
         if (listed.kind === 'problem') return { workspace: undefined, problems: [listed.problem] }
-        const commits = parseCommitLines(listed.output.stdout)
+        const commits = CreateModel.parseCommitLines(listed.output.stdout)
         if (commits.length === 0) {
-          problems.push(problem('no-commits', `Nothing above ${base}@${remote} to push.`))
+          problems.push(CreateModel.problem('no-commits', `Nothing above ${base}@${remote} to push.`))
           return { workspace: { remote, base, headCommitId: null, commits, existingBookmark: null }, problems }
         }
         const undescribed = commits.filter(commit => !commit.described)
         if (undescribed.length > 0)
           problems.push(
-            problem('undescribed-commits', `${String(undescribed.length)} commit(s) have no description: ${undescribed.map(c => c.changeId).join(', ')}.`),
+            CreateModel.problem(
+              'undescribed-commits',
+              `${String(undescribed.length)} commit(s) have no description: ${undescribed.map(c => c.changeId).join(', ')}.`,
+            ),
           )
         const conflicted = commits.filter(commit => commit.conflicted)
         if (conflicted.length > 0)
-          problems.push(problem('conflicted-commits', `${String(conflicted.length)} commit(s) are conflicted: ${conflicted.map(c => c.changeId).join(', ')}.`))
+          problems.push(
+            CreateModel.problem('conflicted-commits', `${String(conflicted.length)} commit(s) are conflicted: ${conflicted.map(c => c.changeId).join(', ')}.`),
+          )
 
         const headCommitId = commits[0]?.commitId ?? null
         const bookmarks = yield* runJj(['log', '--no-graph', '-r', head, '-T', 'local_bookmarks.map(|b| b.name()).join("\\n")'], cwd)
@@ -162,7 +162,7 @@ export class PullRequestCreator extends Context.Service<
         readonly commits: readonly CreateCommit[]
         readonly route: { readonly provider: string; readonly model: string } | undefined
       }) {
-        const fallback = fallbackPullRequest({ threadTitle: input.threadTitle, commits: input.commits })
+        const fallback = CreateModel.fallbackPullRequest({ threadTitle: input.threadTitle, commits: input.commits })
         if (input.commits.length === 0) return { ...fallback, generation: { source: 'fallback' as const, note: 'No commits to describe yet.' } }
         if (!thread.canGenerate)
           return { ...fallback, generation: { source: 'fallback' as const, note: 'The Host has no language-model service; drafted from the commit messages.' } }
@@ -178,11 +178,11 @@ export class PullRequestCreator extends Context.Service<
           .complete({
             ...input.route,
             sessionId: input.sessionId,
-            system: GENERATION_SYSTEM_PROMPT,
-            input: generationInput({ threadTitle: input.threadTitle, messages: input.messages, commits: input.commits }),
+            system: CreateModel.GENERATION_SYSTEM_PROMPT,
+            input: CreateModel.generationInput({ threadTitle: input.threadTitle, messages: input.messages, commits: input.commits }),
           })
           .pipe(Effect.timeout('60 seconds'), Effect.option)
-        const parsed = Option.isSome(answer) ? parseGeneratedPullRequest(answer.value) : undefined
+        const parsed = Option.isSome(answer) ? CreateModel.parseGeneratedPullRequest(answer.value) : undefined
         if (parsed === undefined)
           return {
             ...fallback,
@@ -217,7 +217,7 @@ export class PullRequestCreator extends Context.Service<
             title: '',
             body: '',
             generation: { source: 'fallback', note: 'No workspace.' },
-            problems: [problem('no-session-cwd', 'This thread has no working directory.')],
+            problems: [CreateModel.problem('no-session-cwd', 'This thread has no working directory.')],
           } satisfies PullRequestCreatePreview
 
         const gh = yield* checkGitHub(cwd)
@@ -235,7 +235,7 @@ export class PullRequestCreator extends Context.Service<
         const bookmark =
           workspace === undefined || head === undefined
             ? null
-            : (workspace.existingBookmark ?? bookmarkFromTitle(snapshot.title.length > 0 ? snapshot.title : head.summary, head.changeId))
+            : (workspace.existingBookmark ?? CreateModel.bookmarkFromTitle(snapshot.title.length > 0 ? snapshot.title : head.summary, head.changeId))
         const existingUrl =
           gh.repository !== null && bookmark !== null
             ? yield* github.openPullRequestFor({ repo: gh.repository.repo, cwd, head: bookmark }).pipe(Effect.orElseSucceed(() => null))
@@ -278,7 +278,7 @@ export class PullRequestCreator extends Context.Service<
         const snapshot = yield* thread.read(sessionId)
         const cwd = input.cwd ?? snapshot.cwd ?? (cwdForCaller(caller) || undefined)
         if (cwd === undefined) {
-          const missing = problem('no-session-cwd', 'This thread has no working directory.')
+          const missing = CreateModel.problem('no-session-cwd', 'This thread has no working directory.')
           return failed('preflight', missing.message, missing.recovery, { problems: [missing] })
         }
         const gh = yield* checkGitHub(cwd)

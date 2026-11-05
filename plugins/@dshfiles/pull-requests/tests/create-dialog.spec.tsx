@@ -3,7 +3,7 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CreatePullRequestDialog, type CreateDialogApi, type Translate } from '../src/create-dialog.js'
-import { problem, type PullRequestCreateInput, type PullRequestCreatePreview } from '../src/create-model.js'
+import { CreateModel, type PullRequestCreateInput, type PullRequestCreatePreview } from '../src/create-model.js'
 
 const t: Translate = (key, params) => (params === undefined ? key : `${key} ${JSON.stringify(params)}`)
 const HEAD = 'a'.repeat(40)
@@ -94,7 +94,8 @@ describe('create pull request dialog', () => {
   it('shows every blocker with its recovery and keeps confirm disabled', async () => {
     const create = vi.fn()
     mount('session-dialog-blocked', {
-      preview: async () => preview({ status: 'blocked', problems: [problem('gh-unauthenticated', 'The GitHub CLI is not signed in to github.com.')] }),
+      preview: async () =>
+        preview({ status: 'blocked', problems: [CreateModel.problem('gh-unauthenticated', 'The GitHub CLI is not signed in to github.com.')] }),
       create,
     })
     const problems = await screen.findByTestId('dshfiles-pull-request-create-problems')
