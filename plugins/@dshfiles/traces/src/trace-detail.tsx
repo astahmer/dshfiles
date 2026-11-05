@@ -2,19 +2,18 @@ import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, ChevronRightIcon, CopyIcon, MessageSquareIcon, ScrollTextIcon } from '@dshfiles/plugin-ui/icons'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { animate, motionSafe, springs } from '@dshfiles/plugin-ui/motion'
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { TraceWaterfall } from '@dshfiles/plugin-ui/components/motion/trace-waterfall'
+import { CopyIcon, MessageSquareIcon, ScrollTextIcon } from '@dshfiles/plugin-ui/icons'
+import { useMemo, useState } from 'react'
 import { TraceFormat } from './format.js'
 import type { TracesTranslate } from './locales.js'
 import type { OpenThread } from './open-thread.js'
 import { ThreadLinks } from './thread-links.js'
 import { ServiceDot } from './trace-list.js'
 import type { AttributeValue, SpanRow, TraceDetail } from './types.js'
+import { WaterfallSpans } from './waterfall-spans.js'
 
 const REDACTED_VALUE = /^\[redacted: \d+ chars\]$/
-const INDENT_REM = 0.9
 
 const isRedacted = (value: AttributeValue): boolean => typeof value === 'string' && REDACTED_VALUE.test(value)
 
@@ -174,127 +173,41 @@ export const TraceDetailView = (props: {
   readonly t: TracesTranslate
 }): JSX.Element => {
   const trace = props.trace
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
+  const t = props.t
   const [selectedId, setSelectedId] = useState<string | null>(trace.spans[0]?.spanId ?? null)
-  const rows = useMemo(() => TraceFormat.visibleRows(trace.spans, collapsed), [trace.spans, collapsed])
+  const spans = useMemo(() => WaterfallSpans.fromRows(trace.spans), [trace.spans])
   const selected = trace.spans.find(span => span.spanId === selectedId) ?? trace.spans[0]
-  const total = Math.max(trace.durationMs, 0.001)
-  // When a trace opens, each bar grows from its start offset in time order, so the waterfall replays the run once.
-  const treeRef = useRef<HTMLOListElement>(null)
-  useLayoutEffect(() => {
-    const bars = Array.from(treeRef.current?.querySelectorAll<HTMLElement>('[data-testid="span-bar"]') ?? [])
-    if (bars.length === 0) return
-    const offsets = bars.map(bar => Number(bar.dataset.offsetFraction ?? 0))
-    const controls = animate(
-      bars,
-      { transform: ['scaleX(0)', 'scaleX(1)'] },
-      motionSafe({ ...springs.smooth, delay: (index: number) => Math.min(0.6, (offsets[index] ?? 0) * 0.6) }),
-    )
-    return () => controls.complete()
-    // Replays per trace, not on collapse or selection.
-  }, [trace.traceId])
-  const toggle = (spanId: string): void =>
-    setCollapsed(current => {
-      const next = new Set(current)
-      if (next.has(spanId)) next.delete(spanId)
-      else next.add(spanId)
-      return next
-    })
+  const labels = useMemo(
+    () => ({
+      heading: t('waterfallHeading'),
+      tree: t('waterfall'),
+      span: t('waterfallSpanColumn'),
+      duration: t('duration'),
+      spans: t('statSpans'),
+      cost: t('statCost'),
+      tokens: t('waterfallTokens'),
+      llmCalls: t('statModelCalls'),
+      toolCalls: t('statToolCalls'),
+      errors: t('statErrors'),
+      expand: t('expand'),
+      collapse: t('collapse'),
+      slowest: t('waterfallSlowest'),
+    }),
+    [t],
+  )
   return (
     <div className="dshx:grid dshx:grid-cols-[minmax(0,1fr)_minmax(16rem,24rem)] dshx:gap-3 dshx:@max-pane-compact:grid-cols-1">
-      <section className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1" aria-label={props.t('waterfall')}>
-        <div className="dshx:grid dshx:grid-cols-[minmax(10rem,38%)_minmax(0,1fr)] dshx:gap-2 dshx:border-b dshx:border-border dshx:pb-1 dshx:text-[11px] dshx:text-muted-foreground">
-          <span>
-            {trace.spans.length} {props.t('spans')} · {TraceFormat.duration(trace.durationMs)}
-          </span>
-          <div className="dshx:relative dshx:h-4">
-            {TraceFormat.axisTicks(trace.durationMs).map(tick => (
-              <span
-                key={tick.fraction}
-                className={cn(
-                  'dshx:absolute dshx:top-0 dshx:whitespace-nowrap dshx:font-mono',
-                  tick.fraction === 1 ? 'dshx:-translate-x-full' : tick.fraction > 0 ? 'dshx:-translate-x-1/2' : '',
-                  tick.fraction > 0 && tick.fraction < 1 ? 'dshx:@max-pane-narrow:hidden' : '',
-                )}
-                style={{ left: `${String(tick.fraction * 100)}%` }}
-              >
-                {tick.label}
-              </span>
-            ))}
-          </div>
-        </div>
-        <ol className="dshx:flex dshx:flex-col" role="tree" aria-label={props.t('waterfall')} ref={treeRef}>
-          {rows.map(span => {
-            const isCollapsed = collapsed.has(span.spanId)
-            const left = (span.offsetMs / total) * 100
-            const width = Math.max(0.4, (span.durationMs / total) * 100)
-            return (
-              <li
-                key={span.spanId}
-                role="treeitem"
-                aria-level={span.depth + 1}
-                aria-selected={selected?.spanId === span.spanId}
-                aria-expanded={span.childCount > 0 ? !isCollapsed : undefined}
-                data-span-id={span.spanId}
-                data-status={span.status}
-                className={cn(
-                  'dshx:grid dshx:cursor-pointer dshx:grid-cols-[minmax(10rem,38%)_minmax(0,1fr)] dshx:items-center dshx:gap-2 dshx:rounded dshx:px-1 dshx:py-0.5',
-                  selected?.spanId === span.spanId ? 'dshx:bg-accent' : 'dshx:hover:bg-accent/40',
-                )}
-                onClick={() => setSelectedId(span.spanId)}
-              >
-                <div
-                  className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:text-xs"
-                  style={{ paddingLeft: `${String(span.depth * INDENT_REM)}rem` }}
-                >
-                  {span.childCount > 0 ? (
-                    <button
-                      type="button"
-                      className="dshx:flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:hover:bg-muted"
-                      aria-label={`${isCollapsed ? props.t('expand') : props.t('collapse')} ${span.name}`}
-                      onClick={event => {
-                        event.stopPropagation()
-                        toggle(span.spanId)
-                      }}
-                    >
-                      {isCollapsed ? <ChevronRightIcon className="dshx:size-3" /> : <ChevronDownIcon className="dshx:size-3" />}
-                    </button>
-                  ) : (
-                    <span className="dshx:size-4 dshx:shrink-0" aria-hidden />
-                  )}
-                  <ServiceDot service={span.service} error={span.status === 'error'} />
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="dshx:min-w-0 dshx:truncate">
-                        <span className={cn(span.status === 'error' ? 'dshx:text-destructive' : '')}>{span.name}</span>
-                        <span className="dshx:ml-1 dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{span.service}</span>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{`${span.service} · ${span.name}`}</TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className="dshx:relative dshx:h-4 dshx:rounded-sm dshx:bg-muted/30">
-                  <div
-                    data-testid="span-bar"
-                    data-offset-fraction={span.offsetMs / total}
-                    className={cn(
-                      'dshx:absolute dshx:top-0.5 dshx:h-3 dshx:min-w-[2px] dshx:origin-left dshx:rounded-sm',
-                      span.status === 'error' ? 'dshx:bg-destructive' : TraceFormat.serviceTone(span.service),
-                    )}
-                    style={{ left: `${String(Math.min(left, 99.6))}%`, width: `${String(Math.min(width, 100 - Math.min(left, 99.6)))}%` }}
-                  />
-                  <span
-                    className="dshx:absolute dshx:top-0 dshx:whitespace-nowrap dshx:font-mono dshx:text-[10px] dshx:leading-4 dshx:text-muted-foreground"
-                    style={left + width > 80 ? { right: `${String(100 - left + 0.5)}%` } : { left: `${String(left + width + 0.5)}%` }}
-                  >
-                    {TraceFormat.duration(span.durationMs)}
-                  </span>
-                </div>
-              </li>
-            )
-          })}
-        </ol>
-      </section>
+      <TraceWaterfall
+        key={trace.traceId}
+        className="dshx:self-start"
+        subtitle={trace.spans[0]?.name}
+        spans={spans}
+        live={false}
+        minimumDuration={0.001}
+        selectedId={selected?.spanId ?? null}
+        onSelectSpan={setSelectedId}
+        labels={labels}
+      />
       {selected === undefined ? null : (
         <SpanDetailPanel
           traceId={trace.traceId}
@@ -303,7 +216,7 @@ export const TraceDetailView = (props: {
           onOpenThread={props.onOpenThread}
           currentSessionId={props.currentSessionId}
           onShowLogs={props.onShowLogs}
-          t={props.t}
+          t={t}
         />
       )}
     </div>

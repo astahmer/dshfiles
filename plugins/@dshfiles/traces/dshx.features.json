@@ -186,7 +186,7 @@
     {
       "id": "trace-explorer",
       "title": "Trace list and span waterfall",
-      "summary": "A Traces panel lists stored traces newest first with filters (text, service, error status, minimum duration) kept across reloads; opening one shows a collapsible span waterfall on a time axis, colored by service with errors in red, and a side panel with the selected span's attributes, events and resource attributes, plus an Open thread link when a span carries dsh.session.id.",
+      "summary": "A Traces panel lists stored traces newest first with filters (text, service, error status, minimum duration) kept across reloads; opening one shows a collapsible, keyboard-navigable span waterfall (the plugin-ui TraceWaterfall) on a time axis, colored by service with errors in red, totals of duration, cost, tokens, model and tool calls, and a side panel with the selected span's attributes, events and resource attributes, plus an Open thread link when a span carries dsh.session.id.",
       "reach": [
         "seed otlp-sample-trace",
         "click tab \"Observe\"",
@@ -248,9 +248,15 @@
         },
         {
           "kind": "unit-test",
-          "id": "traces.waterfall-collapse",
-          "file": "plugins/@dshfiles/traces/src/format.test.ts",
-          "testName": "hides the descendants of collapsed spans only"
+          "id": "traces.waterfall-nesting",
+          "file": "plugins/@dshfiles/traces/src/waterfall-spans.test.ts",
+          "testName": "nests by the Host depth order and converts milliseconds to seconds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.waterfall-cycles",
+          "file": "plugins/@dshfiles/traces/src/waterfall-spans.test.ts",
+          "testName": "keeps a parent cycle the Host listed flat as roots"
         }
       ],
       "telemetry": [

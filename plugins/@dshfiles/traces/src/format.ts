@@ -47,24 +47,6 @@ const serviceTone = (service: string): string => toneOf(service).background
 /** The same tone as an SVG fill. */
 const serviceFill = (service: string): string => toneOf(service).fill
 
-/** Five evenly spaced labels from 0 to the trace duration for the waterfall's time axis. */
-const axisTicks = (durationMs: number): readonly { readonly fraction: number; readonly label: string }[] =>
-  [0, 0.25, 0.5, 0.75, 1].map(fraction => ({ fraction, label: formatDuration(durationMs * fraction) }))
-
-export type CollapsibleRow = { readonly spanId: string; readonly depth: number }
-
-/** Rows still shown when the spans in `collapsed` hide their descendants; rows arrive in depth-first order. */
-const visibleRows = <Row extends CollapsibleRow>(rows: readonly Row[], collapsed: ReadonlySet<string>): Row[] => {
-  const shown: Row[] = []
-  let hiddenBelowDepth: number | null = null
-  for (const row of rows) {
-    if (hiddenBelowDepth !== null && row.depth > hiddenBelowDepth) continue
-    hiddenBelowDepth = collapsed.has(row.spanId) ? row.depth : null
-    shown.push(row)
-  }
-  return shown
-}
-
 /** List-price USD: cents for a dollar or more, three significant digits below it, so a $0.0004 call is not "$0.00". */
 const formatUsd = (usd: number | null | undefined): string => {
   if (usd === null || usd === undefined) return '—'
@@ -91,6 +73,4 @@ export class TraceFormat {
   static readonly attribute = formatAttribute
   static readonly serviceTone = serviceTone
   static readonly serviceFill = serviceFill
-  static readonly axisTicks = axisTicks
-  static readonly visibleRows = visibleRows
 }
