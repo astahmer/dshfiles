@@ -192,6 +192,7 @@
         "click tab \"Observe\"",
         "click button \"Traces\"",
         "click tab \"Traces\"",
+        "fill textbox \"Search traces\" \"POST /orders\"",
         "click row \"dshx-sample POST /orders*\"",
         "click treeitem \"charge card*\"",
         "expect complementary \"Span detail\""
