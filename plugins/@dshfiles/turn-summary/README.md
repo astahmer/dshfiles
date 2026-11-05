@@ -2,6 +2,8 @@
 
 ![A summary line under each finished turn](docs/screenshots/turn-summary-line.png)
 
+![A walkthrough card after a turn that changed code](docs/screenshots/turn-walkthrough.png)
+
 A footer under each finished turn that says what the agent did with tools:
 
 > Edited 3 files +42 −7 › · ran 6 commands › · tests 40/42 · read 4 files · 2 searches · **1 failed ›** · 1m 12s
@@ -11,6 +13,11 @@ A footer under each finished turn that says what the agent did with tools:
 - **Tests** are passed / total from the last Vitest, Jest or pytest summary a command printed in the turn; red when any failed.
 - The red **failure count** opens the failed commands and how each ended: `exit 1`, `signal SIGKILL`, `no exit code`, or `error` when the tool rejected the call.
 - **Duration** is the turn's wall time, from `turn/start` to `turn/end`.
+
+After a turn that edited files, a **walkthrough card** (plugin-ui `ActivityDock` with `DockChanges`) lists the changed
+files by folder, each folder with a one-line summary (`Edited 2 files · +40 −3`), and **Review in Changes** opens that
+turn's changed-files review in the right pane: pulls-review's Changes facet when it is loaded, else the native review
+tab. Its icon folds it to one button.
 
 Built with dshx (no port). Run `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.
 
@@ -27,10 +34,12 @@ All apply live.
 | `testResults`  | `true`  | Show passed / total tests from the last test-runner summary.   |
 | `duration`     | `true`  | Show how long the turn took.                                   |
 | `openLists`    | `true`  | Let the edited-file and command counts open their lists.       |
+| `walkthrough`  | `true`  | Show the walkthrough card after a turn that edited files.      |
 
 ## How it works
 
 - **Data.** A state-only Conversation Definition, registered on `ctx.uiConversation.events`, follows each turn's `turn/start`, `tool/call`, `tool/result` and `turn/end` events and, when the turn ends, publishes a `TurnActivitySummary` on the turn under `dshfiles-turn-activity` (a `ConversationTurnDataMap` key). It owns no view target, so it never claims an event from a native Definition.
+- **Changes address.** The Definition also follows the turn's `workspace/changes` event (the Host's changed-files summary) and publishes its sequence, which addresses the native `dsh-resource://changes-review/session/<id>/<seq>/<turn>` review; the card opens it in the right pane of the thread on screen.
 - **View.** A `conversation.chat.turnTail` list entry (the seat of the native "Edited files" chip) reads that value through `turn.data.source(...)`.
 - **Arguments** are read with the Host's own `PartialArguments` from `@deepseek-ai/dsh-util-values`; dshx inlines that package into client bundles for this plugin.
 - **Exit codes** come from the `[exit code: N]` / `[killed by signal: …]` footer the bash tool appends to its result.

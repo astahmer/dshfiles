@@ -79,6 +79,8 @@ export interface TurnActivitySummary {
   readonly searches: number
   readonly otherCalls: number
   readonly failedOtherCalls: number
+  /** Sequence of the turn's `workspace/changes` event once the Host summarized its changed files. */
+  readonly changesSeq: number | undefined
 }
 
 /** One part of the footer and the list it opens (`files` and `commands` open lists; the others are counts). */
@@ -122,6 +124,7 @@ export class TurnActivity {
     searches: 0,
     otherCalls: 0,
     failedOtherCalls: 0,
+    changesSeq: undefined,
   }
 
   static summarize(input: { readonly calls: readonly ToolCallRecord[]; readonly results: readonly ToolResultRecord[] }): TurnActivitySummary {
@@ -175,6 +178,7 @@ export class TurnActivity {
       searches,
       otherCalls,
       failedOtherCalls,
+      changesSeq: undefined,
     }
   }
 

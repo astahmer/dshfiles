@@ -285,7 +285,7 @@ export interface DockChangeGroup {
   readonly label: string
   readonly icon?: React.ReactNode
   readonly hint?: string
-  readonly name: string
+  readonly name?: string
   readonly branch?: string
   readonly files: readonly DockFileChange[]
   /** Files not listed ("+1 more in this source"). */
@@ -304,10 +304,10 @@ export function DockChanges({ groups, className }: { readonly groups: readonly D
           <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-muted-foreground dshx:[&_svg]:size-3.5">
             {group.icon}
             <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-medium">{group.label}</span>
-            <span className="dshx:shrink-0 dshx:text-xs">{group.files.length + (group.more ?? 0)} files</span>
+            <span className="dshx:shrink-0 dshx:text-xs">{fileCount(group.files.length + (group.more ?? 0))}</span>
           </div>
           {group.hint ? <p className="dshx:text-xs dshx:text-muted-foreground">{group.hint}</p> : null}
-          <span className="dshx:mt-1 dshx:truncate dshx:font-semibold dshx:text-foreground">{group.name}</span>
+          {group.name ? <span className="dshx:mt-1 dshx:truncate dshx:font-semibold dshx:text-foreground">{group.name}</span> : null}
           {group.branch ? (
             <button
               type="button"
@@ -343,5 +343,7 @@ export function DockChanges({ groups, className }: { readonly groups: readonly D
     </div>
   )
 }
+
+const fileCount = (count: number) => `${count} ${count === 1 ? 'file' : 'files'}`
 
 const extension = (path: string) => (path.split('.').pop() ?? '').slice(0, 3).toUpperCase()

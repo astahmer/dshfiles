@@ -6,6 +6,7 @@ import { Fragment, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { turnSummarySettings } from './settings.js'
 import { TURN_ACTIVITY_KEY } from './turn-activity-node.js'
 import { TurnActivity, type TurnActivitySummary, type TurnSegment } from './turn-activity.js'
+import { TurnWalkthrough } from './turn-walkthrough.js'
 
 type OpenList = 'files' | 'commands' | 'failures'
 
@@ -69,7 +70,12 @@ const CommandList = (props: { readonly summary: TurnActivitySummary; readonly on
  * The footer under a finished Turn: "Edited 3 files +42 −7 · ran 6 commands · 1 failed · tests 40/42 · 1m 12s". The
  * file and command counts open their lists (each file opens in the editor), and the failure count opens the failures.
  */
-export const TurnSummaryLine = (props: { readonly turn: TurnLocation; readonly openFile: (path: string) => void }): JSX.Element | null => {
+export const TurnSummaryLine = (props: {
+  readonly turn: TurnLocation
+  readonly openFile: (path: string) => void
+  /** Opens this turn's changed-files review at the `workspace/changes` sequence that addresses it. */
+  readonly openChanges: (input: { readonly seq: number; readonly turn: number }) => void
+}): JSX.Element | null => {
   const source = props.turn.data.source(TURN_ACTIVITY_KEY)
   const summary = useSyncExternalStore(source.subscribe, source.getSnapshot)
   const settings = useSettings(turnSummarySettings).value
@@ -88,6 +94,7 @@ export const TurnSummaryLine = (props: { readonly turn: TurnLocation; readonly o
   const start = props.turn.start?.time
   const end = props.turn.end?.time
   const duration = settings?.duration !== false && start !== undefined && end !== undefined ? TurnActivity.duration(end - start) : undefined
+  const changesSeq = summary.changesSeq
   const label = (segment: TurnSegment, index: number): string => (index === 0 ? segment.text.charAt(0).toUpperCase() + segment.text.slice(1) : segment.text)
   const segmentView = (segment: TurnSegment, index: number): ReactNode => {
     const list = segment.key === 'files' || segment.key === 'commands' ? segment.key : undefined
@@ -132,6 +139,13 @@ export const TurnSummaryLine = (props: { readonly turn: TurnLocation; readonly o
       {open === 'files' && <FileList openFile={props.openFile} summary={summary} />}
       {open === 'commands' && <CommandList onlyFailed={false} summary={summary} />}
       {open === 'failures' && canList && <CommandList onlyFailed summary={summary} />}
+      {settings?.walkthrough !== false && (
+        <TurnWalkthrough
+          openChanges={changesSeq === undefined ? undefined : () => props.openChanges({ seq: changesSeq, turn: props.turn.turn })}
+          summary={summary}
+          turn={props.turn.turn}
+        />
+      )}
     </div>
   )
 }

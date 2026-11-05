@@ -101,6 +101,57 @@
           "reason": "Client-only: the summary footer renders browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "turn-walkthrough",
+      "title": "A walkthrough card after a turn that changed code",
+      "summary": "Under a finished turn that edited files, a compact card lists the changed files grouped by folder, each folder with a one-line summary (\"Edited 2 files · +40 −3\") and the turn's total lines added and removed. Review in Changes opens that turn's changed-files review in the right pane (the Changes facet when pulls-review is loaded, else the native review tab). The card's icon folds it to one button.",
+      "reach": [
+        "seed tool-call-thread",
+        "expect text \"Tool finished.\"",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]]\"",
+        "press Enter",
+        "expect text \"Changed 1 file\""
+      ],
+      "surfaces": ["client", "settings"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: turn walkthrough card",
+      "configuration": [
+        {
+          "key": "walkthrough",
+          "defaultValue": "true",
+          "constraints": "Boolean; show the walkthrough card after a turn that edited files.",
+          "choices": ["true", "false"],
+          "coveredBy": ["turn-summary.walkthrough-groups"]
+        }
+      ],
+      "states": ["no-edits", "edited", "changes-address-known", "folded", "disabled"],
+      "failureModes": [
+        "Review in Changes appears only once the Host has summarized the turn's changed files (its workspace/changes event); a turn from an older Host has no link.",
+        "The link opens in the right pane of the thread on screen; in a split layout it follows the pane's mounted thread."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "turn-summary.walkthrough-groups",
+          "file": "plugins/@dshfiles/turn-summary/src/turn-walkthrough-model.test.ts",
+          "testName": "groups files by folder below the folder they share, in first-edit order"
+        },
+        {
+          "kind": "unit-test",
+          "id": "turn-summary.walkthrough-address",
+          "file": "plugins/@dshfiles/turn-summary/src/turn-walkthrough-model.test.ts",
+          "testName": "addresses the native per-turn review"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the card renders browser state and opens a right-pane address; it starts no Host work."
+        }
+      ]
     }
   ]
 }
