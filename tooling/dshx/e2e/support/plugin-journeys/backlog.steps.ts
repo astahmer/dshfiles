@@ -1,10 +1,13 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 import { globalPanelEntryPoint, openGlobalPanel } from '../plugin-view-names.js'
+import { mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Then, When } from '../bdd.js'
+import { bootComposedPluginProfile } from '../boot.js'
+import { Given, Then, When } from '../bdd.js'
 import { backlogLabel, backlogRef, withBacklogRefs } from './backlog-refs.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion, restartScratchProfileInBrowser, settingsNavEntry } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion, restartScratchProfileInBrowser, settingsNavEntry, visitIsolatedPluginProfile } from '../steps.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { openActivity } from './activity-timeline.steps.js'
@@ -168,22 +171,54 @@ Then('the Jev settings show a successful save', async ({ page }: { page: Page })
   await expect(page.getByRole('checkbox', { name: 'Enable Jev' })).toBeChecked()
 })
 
-When('a Linear sync backend for team {string} is saved with the key {string}', async ({ page }: { page: Page }, team: string, key: string) => {
-  const section = page.getByRole('region', { name: 'Remote sync' })
-  await section.getByRole('button', { name: 'Add Linear backend', exact: true }).click()
-  const row = section.getByRole('group', { name: 'Sync backend 1' })
-  await row.getByRole('textbox', { name: 'Linear team key', exact: true }).fill(team)
-  const reference = row.getByRole('textbox', { name: 'Linear API key reference', exact: true })
-  await expect(reference).toHaveAttribute('data-secret-input', 'reference')
-  await reference.fill(key)
+/** A Linear row as `syncBackends` held it before connections and bindings; the first start migrates it. */
+const legacyLinearRowPatch = (team: string) => `- id: dshfiles-backlog
+  config:
+    syncBackends:
+      - project: ''
+        backend: linear
+        enabled: true
+        target: ${team}
+        secret: 'secret:DSH_TEST_LINEAR'
+        autoSyncMinutes: 15
+        pushAgentComments: false
+`
+
+Given('the isolated plugin profile {string} is booted with a saved Linear sync row for team {string}', async ({ page }: { page: Page }, packageId: string, team: string) => {
+  const profile = await bootComposedPluginProfile({ packageIds: [packageId], profileLabel: `${packageId}-legacy-sync-row`, cordisPatch: legacyLinearRowPatch(team) })
+  await visitIsolatedPluginProfile(page, profile)
 })
 
-Then('the remote sync settings show a successful save', async ({ page }: { page: Page }) => {
-  const section = page.getByRole('region', { name: 'Remote sync' })
-  await expect(section.getByRole('status').filter({ hasText: /^Saved$/u })).toBeVisible()
-  await expect(section.getByRole('combobox', { name: 'Auto-sync', exact: true })).toHaveText(/Sync every 15 min/u)
-  await expect(section.getByRole('button', { name: /^Sync all now/u })).toHaveCount(0)
-  await expect(section.getByRole('textbox', { name: 'Issue to import', exact: true })).toBeVisible()
+const remoteSync = (page: Page) => page.getByRole('region', { name: 'Remote sync' })
+const scratchFolders = new WeakMap<Page, string>()
+const scratchFolderOf = (page: Page): string => {
+  const folder = scratchFolders.get(page)
+  if (folder === undefined) throw new Error('No scratch folder is bound yet.')
+  return folder
+}
+
+When('a markdown files connection is bound to a scratch folder', async ({ page }: { page: Page }) => {
+  const folder = await mkdtemp(join(tmpdir(), 'dshfiles-backlog-e2e-files-'))
+  scratchFolders.set(page, folder)
+  const section = remoteSync(page)
+  await section.getByRole('button', { name: 'Add Markdown files connection', exact: true }).click()
+  await section.getByRole('form', { name: 'New Markdown files connection' }).getByRole('button', { name: 'Save connection', exact: true }).click()
+  const connection = section.getByRole('region', { name: 'Connection Markdown files' })
+  await connection.getByRole('button', { name: 'Add binding', exact: true }).click()
+  const binding = connection.getByRole('form', { name: 'New binding' })
+  await binding.getByRole('textbox', { name: 'Folder', exact: true }).fill(folder)
+  await binding.getByRole('button', { name: 'Save binding', exact: true }).click()
+})
+
+Then('the files binding is listed under its connection', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-sync-files-binding', async () => {
+    const connection = remoteSync(page).getByRole('region', { name: 'Connection Markdown files' })
+    await expect(connection.getByText('no key needed', { exact: true })).toBeVisible()
+    const binding = connection.getByRole('group', { name: /^Binding files-/u })
+    await expect(binding).toContainText(scratchFolderOf(page))
+    await expect(binding).toContainText('0 linked')
+    await expect(binding.getByRole('button', { name: 'Import all open', exact: true })).toBeVisible()
+  })
 })
 
 When('the Backlog views are shown again', async ({ page }: { page: Page }) => {
@@ -191,44 +226,93 @@ When('the Backlog views are shown again', async ({ page }: { page: Page }) => {
   await expect(feed(page)).toBeVisible()
 })
 
-Then('item b:{int} offers Linear links in its sync chip', async ({ page }: { page: Page }, id: number) => {
+const fileOfItem = async (page: Page, id: number): Promise<string> => {
+  const ref = (await backlogLabel(page, id)).replace(/^b:/u, '')
+  const names = await readdir(scratchFolderOf(page))
+  const name = names.find(candidate => candidate.startsWith(`${ref}-`) && candidate.endsWith('.md'))
+  if (name === undefined) throw new Error(`No file for ${ref} in the scratch folder: ${names.join(', ')}`)
+  return join(scratchFolderOf(page), name)
+}
+
+When('item b:{int} is created in the scratch folder from its sync chip', async ({ page }: { page: Page }, _id: number) => {
+  await peek(page).getByRole('button', { name: 'Remote sync: not linked', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Create', exact: true }).click()
+  await expect(peek(page).getByRole('button', { name: /^Remote sync: .+\.md, Synced$/u })).toBeVisible()
+})
+
+Then('the scratch folder holds the file of item b:{int}', async ({ page }: { page: Page }, id: number) => {
+  await recordAssertion(page, 'backlog-sync-files-created', async () => {
+    const text = await readFile(await fileOfItem(page, id), 'utf8')
+    expect(text).toMatch(/^---\n/u)
+    expect(text).toContain('title: Mirror this item in files')
+    expect(text).toContain('status: inbox')
+  })
+})
+
+When('the file of item b:{int} is edited to the title {string}', async ({ page }: { page: Page }, id: number, title: string) => {
+  const path = await fileOfItem(page, id)
+  const text = await readFile(path, 'utf8')
+  await writeFile(path, text.replace(/^title: .*$/mu, `title: ${title}`))
+})
+
+When('item b:{int} is synced from its sync chip', async ({ page }: { page: Page }, _id: number) => {
+  await peek(page).getByRole('button', { name: /^Remote sync: .+\.md, /u }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Sync now', exact: true }).click()
+  await page.keyboard.press('Escape')
+})
+
+Then('item b:{int} is titled {string}', async ({ page }: { page: Page }, id: number, title: string) => {
+  await recordAssertion(page, 'backlog-sync-files-pulled', async () => {
+    await expect(peek(page)).toContainText(title)
+    await expect(feed(page)).toContainText(title)
+  })
+  expect(await backlogLabel(page, id)).toMatch(/^b:/u)
+  await finishJourneyAssertions(page)
+})
+
+Then('the remote sync settings show the migrated Linear connection with its {string} binding', async ({ page }: { page: Page }, team: string) => {
+  await recordAssertion(page, 'backlog-sync-settings-migrated', async () => {
+    const connection = remoteSync(page).getByRole('region', { name: 'Connection Linear' })
+    await expect(connection.getByText('vault key', { exact: true })).toBeVisible()
+    const binding = connection.getByRole('group', { name: `Binding linear-${team.toLowerCase()}` })
+    await expect(binding).toContainText(team)
+    await expect(binding).toContainText('Every project')
+    await expect(binding).toContainText('Every 15 min')
+    await expect(binding.getByRole('switch', { name: `Enable binding linear-${team.toLowerCase()}` })).toBeChecked()
+    await expect(remoteSync(page).getByRole('button', { name: /^Sync all now/u })).toHaveCount(0)
+    await expect(remoteSync(page).getByRole('textbox', { name: 'Remote item to import', exact: true })).toBeVisible()
+  })
+})
+
+Then('item b:{int} offers the {string} binding in its sync chip', async ({ page }: { page: Page }, id: number, binding: string) => {
   await recordAssertion(page, `backlog-sync-chip-b${String(id)}`, async () => {
     await peek(page).getByRole('button', { name: 'Remote sync: not linked', exact: true }).click()
-    const popover = page.getByRole('dialog').filter({ hasText: 'Mirror this item in a tracker' })
-    await expect(popover.getByRole('button', { name: 'Link to Linear issue…', exact: true })).toBeVisible()
-    await expect(popover.getByRole('button', { name: 'Create in Linear', exact: true })).toBeVisible()
+    const popover = page.getByRole('dialog').filter({ hasText: binding })
+    await expect(popover.getByRole('button', { name: 'Link…', exact: true })).toBeVisible()
+    await expect(popover.getByRole('button', { name: 'Create', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
   })
 })
 
-Then('backlog item b:{int} offers Linear links in its context menu', async ({ page }: { page: Page }, id: number) => {
+Then('backlog item b:{int} offers {string} in its context menu', async ({ page }: { page: Page }, id: number, binding: string) => {
   const target = await contextTarget(page, id, 'feed')
   await target.click({ button: 'right' })
-  await expect(contextMenu(page).getByRole('menuitem', { name: 'Link to Linear issue…', exact: true })).toBeVisible()
-  await expect(contextMenu(page).getByRole('menuitem', { name: 'Create in Linear', exact: true })).toBeVisible()
+  await expect(contextMenu(page).getByRole('menuitem', { name: `Link to ${binding}…`, exact: true })).toBeVisible()
+  await expect(contextMenu(page).getByRole('menuitem', { name: `Create in ${binding}`, exact: true })).toBeVisible()
   await page.keyboard.press('Escape')
 })
 
-When('backlog item b:{int} is linked to the Linear issue {string}', async ({ page }: { page: Page }, id: number, issue: string) => {
+When('backlog item b:{int} is linked through {string} to {string}', async ({ page }: { page: Page }, id: number, binding: string, issue: string) => {
   const target = await contextTarget(page, id, 'feed')
   await target.click({ button: 'right' })
-  await contextMenu(page).getByRole('menuitem', { name: 'Link to Linear issue…', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: `Link ${await backlogLabel(page, id)} to a Linear issue` })
-  await dialog.getByRole('textbox', { name: 'Linear issue', exact: true }).fill(issue)
-  await dialog.getByRole('button', { name: 'Link issue', exact: true }).click()
-})
-
-Then('the link dialog explains how to add a Linear backend', async ({ page }: { page: Page }) => {
-  const dialog = page.getByRole('dialog', { name: /^Link b:[0-9a-z]+ to a Linear issue$/ })
-  await expect(dialog.getByRole('alert')).toContainText('No enabled Linear backend is configured')
-  await expect(dialog.getByRole('alert')).toContainText('Backlog settings › Remote sync')
-  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
-  await expect(dialog).toHaveCount(0)
-  await finishJourneyAssertions(page)
+  await contextMenu(page).getByRole('menuitem', { name: `Link to ${binding}…`, exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: `Link ${await backlogLabel(page, id)} through ${binding}` })
+  await dialog.getByRole('textbox', { name: 'Remote item', exact: true }).fill(issue)
+  await dialog.getByRole('button', { name: 'Link', exact: true }).click()
 })
 
 Then('the link dialog explains how to bind the Linear key', async ({ page }: { page: Page }) => {
-  const dialog = page.getByRole('dialog', { name: /^Link b:[0-9a-z]+ to a Linear issue$/ })
+  const dialog = page.getByRole('dialog', { name: /^Link b:[0-9a-z]+ through Linear · ENG$/u })
   await expect(dialog.getByRole('alert')).toContainText('The Linear key does not resolve')
   await expect(dialog.getByRole('alert')).toContainText('Backlog settings › Remote sync')
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()

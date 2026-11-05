@@ -14,27 +14,33 @@ Feature: Backlog
     Then the Jev settings show a successful save
 
   @scenario:backlog.remote-sync-link
-  Scenario: Link an item to Linear from its menu before any backend exists
-    Given the isolated plugin profile "@dshfiles/backlog" is booted
-    When the Backlog panel is opened
-    And "Mirror this item in Linear" is captured
-    Then backlog item b:1 offers Linear links in its context menu
-    When backlog item b:1 is linked to the Linear issue "ENG-1"
-    Then the link dialog explains how to add a Linear backend
-
-  @scenario:backlog.remote-sync-settings
-  Scenario: Configure a Linear backend and link an item, with a recovery path when the key is missing
+  Scenario: Bind a folder of markdown files, create an item's file, and pull an editor's change back
     Given the isolated plugin profile "@dshfiles/backlog" is booted
     When the Backlog panel is opened
     And the Backlog settings are opened
-    And a Linear sync backend for team "ENG" is saved with the key "secret:DSH_TEST_LINEAR"
-    Then the remote sync settings show a successful save
+    And a markdown files connection is bound to a scratch folder
+    Then the files binding is listed under its connection
+    When the Backlog views are shown again
+    And "Mirror this item in files" is captured
+    And backlog item b:1 is opened
+    And item b:1 is created in the scratch folder from its sync chip
+    Then the scratch folder holds the file of item b:1
+    When the file of item b:1 is edited to the title "Edited in an editor"
+    And item b:1 is synced from its sync chip
+    Then item b:1 is titled "Edited in an editor"
+
+  @scenario:backlog.remote-sync-settings
+  Scenario: A Linear sync row saved before connections opens as a connection with its binding
+    Given the isolated plugin profile "@dshfiles/backlog" is booted with a saved Linear sync row for team "ENG"
+    When the Backlog panel is opened
+    And the Backlog settings are opened
+    Then the remote sync settings show the migrated Linear connection with its "ENG" binding
     When the Backlog views are shown again
     And "Mirror this item in Linear" is captured
     And backlog item b:1 is opened
-    Then item b:1 offers Linear links in its sync chip
-    And backlog item b:1 offers Linear links in its context menu
-    When backlog item b:1 is linked to the Linear issue "ENG-1"
+    Then item b:1 offers the "Linear · ENG" binding in its sync chip
+    And backlog item b:1 offers "Linear · ENG" in its context menu
+    When backlog item b:1 is linked through "Linear · ENG" to "ENG-1"
     Then the link dialog explains how to bind the Linear key
 
   @scenario:backlog.capture-triage
