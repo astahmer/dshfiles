@@ -2088,14 +2088,18 @@
     {
       "id": "remote-sync-settings",
       "title": "Configure remote sync backends and import issues",
-      "summary": "Backlog settings › Remote sync holds one row per project and tracker (Linear team key or GitHub owner/repo, a secret:ALIAS key reference, an auto-sync interval, on/off), a Sync all now control, and Import an issue, which turns an existing Linear or GitHub issue into a linked item with its status, labels and comments. Agents import with backlog_import_remote when the user asked.",
+      "summary": "Backlog settings › Remote sync holds one row per project and tracker, saved as you edit: a secret:ALIAS key reference (empty falls back to the Host environment, and for GitHub to a signed-in gh CLI), a Linear team picked from the teams the key sees (or the key's only team) or a GitHub owner/repo (empty reads the project's github.com git remote), an auto-sync interval (15 minutes for a new row) and on/off. Each row tests its connection on the Host and shows the signed-in account and the target it reaches. Sync all now appears once items are linked, and Import an issue reads Linear or GitHub from the pasted id or URL. Agents test with backlog_sync_test_connection and import with backlog_import_remote when the user asked.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
         "click button \"Backlog settings\"",
         "expect textbox \"Issue to import\"",
-        "click button \"Add backend\"",
-        "expect textbox \"Linear team key\""
+        "click button \"Add Linear backend\"",
+        "expect textbox \"Linear team key\"",
+        "click button \"Add GitHub backend\"",
+        "expect textbox \"GitHub repository\"",
+        "fill textbox \"Issue to import\" \"https://github.com/acme/app/issues/1\"",
+        "expect button \"Import from GitHub\""
       ],
       "surfaces": ["client", "host", "settings", "storage", "tool", "integration"],
       "surface": "settingsSection",
@@ -2105,16 +2109,18 @@
         {
           "key": "dshfiles-backlog.syncBackends",
           "defaultValue": "[]",
-          "constraints": "Rows of { project, backend: linear|github, enabled, target, secret (secret:ALIAS reference only, resolved on the Host), autoSyncMinutes 0–1440 }; a row with an empty project serves every project without a row of its own.",
+          "constraints": "Rows of { project, backend: linear|github, enabled, target, secret (secret:ALIAS reference only, resolved on the Host), autoSyncMinutes 0–1440 }; a row with an empty project serves every project without a row of its own. An empty Linear target uses the key's only team; an empty GitHub target reads the item project's github.com git remote.",
           "coveredBy": ["backlog.remote-sync-settings"]
         }
       ],
-      "states": ["no-backend", "configured", "auto-sync", "imported", "already-imported"],
+      "states": ["no-backend", "configured", "auto-sync", "imported", "already-imported", "connection-ok", "connection-failed", "unsaved"],
       "failureModes": [
         "Settings stay read-only while the namespace is unavailable; the form says so instead of saving.",
-        "The form stores a Secret Catalog reference, never a key value; an empty reference falls back to LINEAR_API_KEY or GITHUB_TOKEN in the Host environment.",
+        "The form stores a Secret Catalog reference, never a key value, and does not save a key field holding anything else; an empty reference falls back to LINEAR_API_KEY, or GITHUB_TOKEN, GH_TOKEN and then `gh auth token` on the Host.",
         "Importing an issue already linked returns its item instead of a duplicate; a reference outside the configured team or repository is refused with an example of what to paste.",
-        "A failing auto-sync tick is logged and retried on the next minute; each item's error stays visible on its sync chip."
+        "A failing auto-sync tick is logged and retried on the next minute; each item's error stays visible on its sync chip.",
+        "Test connection names the missing key, a Linear key that sees several teams, an unknown team key, or a project without a github.com remote, each with the setting to change; the key never reaches the browser.",
+        "Import refuses text that is neither a Linear nor a GitHub issue reference with examples of what to paste."
       ],
       "externalDependencies": [
         {
@@ -2157,6 +2163,24 @@
           "id": "backlog.remote-sync-github-references",
           "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
           "testName": "reads GitHub issue references only within the configured repository"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-test-linear",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "tests a Linear key without a team: names the account, lists the teams and uses the only one"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.remote-sync-detect-github",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "takes the GitHub repository from the project's git remote and the token from the gh CLI"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.remote-sync-remote-urls",
+          "file": "plugins/@dshfiles/backlog/src/sync-local-probes.test.ts",
+          "testName": "prefers origin, then upstream, then the first github.com remote"
         }
       ],
       "telemetry": [
@@ -2183,6 +2207,16 @@
           "span": "linear request",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
           "testName": "creates a Linear issue from an item, maps status and labels, and records its spans"
+        },
+        {
+          "kind": "automatic",
+          "source": "jj"
+        },
+        {
+          "kind": "custom",
+          "span": "backlog sync test connection",
+          "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
+          "testName": "takes the GitHub repository from the project's git remote and the token from the gh CLI"
         }
       ]
     },

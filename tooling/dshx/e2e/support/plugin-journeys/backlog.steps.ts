@@ -169,19 +169,19 @@ Then('the Jev settings show a successful save', async ({ page }: { page: Page })
 
 When('a Linear sync backend for team {string} is saved with the key {string}', async ({ page }: { page: Page }, team: string, key: string) => {
   const section = page.getByRole('region', { name: 'Remote sync' })
-  await section.getByRole('button', { name: 'Add backend', exact: true }).click()
+  await section.getByRole('button', { name: 'Add Linear backend', exact: true }).click()
   const row = section.getByRole('group', { name: 'Sync backend 1' })
   await row.getByRole('textbox', { name: 'Linear team key', exact: true }).fill(team)
   const reference = row.getByRole('textbox', { name: 'Linear API key reference', exact: true })
   await expect(reference).toHaveAttribute('data-secret-input', 'reference')
   await reference.fill(key)
-  await section.getByRole('button', { name: 'Save sync backends', exact: true }).click()
 })
 
 Then('the remote sync settings show a successful save', async ({ page }: { page: Page }) => {
   const section = page.getByRole('region', { name: 'Remote sync' })
-  await expect(section.getByRole('status').filter({ hasText: 'Remote sync backends saved.' })).toBeVisible()
-  await expect(section.getByRole('button', { name: 'Sync all now (0)', exact: true })).toBeDisabled()
+  await expect(section.getByRole('status').filter({ hasText: /^Saved$/u })).toBeVisible()
+  await expect(section.getByRole('combobox', { name: 'Auto-sync', exact: true })).toHaveText(/Sync every 15 min/u)
+  await expect(section.getByRole('button', { name: /^Sync all now/u })).toHaveCount(0)
   await expect(section.getByRole('textbox', { name: 'Issue to import', exact: true })).toBeVisible()
 })
 
@@ -1508,7 +1508,9 @@ When('Backlog Jev is enabled without a secret reference', async ({ page }: { pag
   const enabled = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevEnabled"]').getByRole('switch')
   if ((await enabled.getAttribute('aria-checked')) !== 'true') await enabled.click()
   await expect(enabled).toHaveAttribute('aria-checked', 'true')
-  await expect(page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] [data-secret-input="reference"]')).toHaveValue('')
+  await expect(page.locator('[data-settings-namespace="dshfiles-settings-shell"] [data-setting-path="jevSecret"] [data-secret-input="reference"]')).toHaveValue(
+    '',
+  )
   await page.keyboard.press('Escape')
 })
 

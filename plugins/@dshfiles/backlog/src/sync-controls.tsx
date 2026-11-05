@@ -1,14 +1,17 @@
+import { parseSecretReference } from '@dshfiles/credential-port'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
+import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { ContextMenuItem } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { CloudIcon, ExternalLinkIcon, LinkIcon, PlusIcon, RefreshCwIcon, Trash2Icon, UnlinkIcon } from '@dshfiles/plugin-ui/icons'
+import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
+import { CircleCheckIcon, CloudIcon, ExternalLinkIcon, LinkIcon, PlusIcon, RefreshCwIcon, Trash2Icon, UnlinkIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 
 import { backlogApi, type BacklogSyncItemView, type BacklogSyncResultView, type BacklogSyncStatusView } from './api.js'
 import { ItemGlyphs } from './item-glyphs.js'
@@ -326,12 +329,223 @@ const SyncMenuItems = (props: { readonly itemId: number; readonly onLink: (backe
   )
 }
 
-const emptyRow = (): BackendRow => ({ project: '', backend: 'linear', enabled: true, target: '', secret: '', autoSyncMinutes: 0 })
+const AUTO_SYNC_DEFAULT_MINUTES = 15
+const autoSyncPresets = [0, 5, 15, 30, 60, 1_440] as const
+const SYNC_TEST_KEY = [BacklogQueries.key, 'sync-test'] as const
+
+const autoSyncLabel = (minutes: number): string => {
+  if (minutes === 0) return 'Manual sync only'
+  if (minutes === 60) return 'Sync every hour'
+  if (minutes === 1_440) return 'Sync every day'
+  return `Sync every ${String(minutes)} min`
+}
+
+const credentialLabels = { reference: 'vault key', environment: 'Host environment', 'github-cli': 'gh CLI login' } as const
+
+const emptyRow = (backend: SyncBackendKind): BackendRow => ({
+  project: '',
+  backend,
+  enabled: true,
+  target: '',
+  secret: '',
+  autoSyncMinutes: AUTO_SYNC_DEFAULT_MINUTES,
+})
+
+const isReferenceOrEmpty = (text: string): boolean => text.trim() === '' || parseSecretReference(text.trim()) !== null
 
 const inputClass =
   'dshx:h-8 dshx:min-w-0 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-sm dshx:outline-none dshx:focus-visible:border-ring'
 
-/** Backend rows, Sync all now and Import issue, under Backlog settings. */
+/** Tests the row as typed, once it stops changing; the key itself stays on the Host. */
+const useConnectionTest = (row: BackendRow) => {
+  const api = useApi(backlogApi)
+  const target = row.target.trim()
+  const secret = row.secret.trim()
+  const draft = useMemo(() => ({ backend: row.backend, project: row.project, target, secret }), [row.backend, row.project, target, secret])
+  const settled = useDebouncedValue({ value: draft, delayMs: 500 })
+  return useQuery({
+    queryKey: [...SYNC_TEST_KEY, settled],
+    queryFn: ({ signal }) => api.testSyncBackend(settled, { signal }),
+    enabled: isReferenceOrEmpty(settled.secret),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+}
+
+type ConnectionTestQuery = ReturnType<typeof useConnectionTest>
+
+const ConnectionLine = (props: { readonly row: BackendRow; readonly test: ConnectionTestQuery }): JSX.Element => {
+  const { test } = props
+  const retest = (
+    <Button type="button" variant="ghost" size="xs" disabled={test.isFetching} onClick={() => void test.refetch()}>
+      <RefreshCwIcon aria-hidden className={cn('dshx:size-3', test.isFetching && 'dshx:animate-spin')} />
+      Test connection
+    </Button>
+  )
+  if (!isReferenceOrEmpty(props.row.secret)) {
+    return (
+      <p role="alert" className="dshx:text-xs dshx:text-destructive">
+        Keys are stored as vault references. Pick one with the key button in the field, or clear it to use the Host environment.
+      </p>
+    )
+  }
+  if (test.data === undefined) {
+    return (
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs">
+        {test.error === null ? (
+          <span className="dshx:text-muted-foreground">Testing connection…</span>
+        ) : (
+          <span role="alert" className="dshx:min-w-0 dshx:text-destructive">
+            {errorMessage(test.error, 'The connection could not be tested. Retry.')}
+          </span>
+        )}
+        {test.error === null ? null : retest}
+      </div>
+    )
+  }
+  const report = test.data
+  if (report.credential === 'missing') {
+    return (
+      <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
+        {props.row.backend === 'linear'
+          ? 'Needs a key: pick one from the vault, or set LINEAR_API_KEY on the Host.'
+          : 'Needs a key: pick one from the vault, set GITHUB_TOKEN, or run gh auth login on the Host.'}
+        {retest}
+      </div>
+    )
+  }
+  const target =
+    report.target === null
+      ? report.targetSource === 'per-project'
+        ? "each project's git remote"
+        : null
+      : `${report.target.key}${report.target.name === report.target.key ? '' : ` · ${report.target.name}`}`
+  return (
+    <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-xs">
+      {report.account === null ? null : (
+        <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:text-success">
+          <CircleCheckIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
+          <span className="dshx:min-w-0 dshx:truncate">
+            {report.account}
+            {target === null ? '' : ` → ${target}`}
+          </span>
+        </span>
+      )}
+      <span className="dshx:text-muted-foreground">{credentialLabels[report.credential]}</span>
+      {report.error === null ? null : (
+        <span role="alert" className="dshx:w-full dshx:text-destructive">
+          {report.error.message}
+        </span>
+      )}
+      {retest}
+    </div>
+  )
+}
+
+const BackendRowEditor = (props: {
+  readonly row: BackendRow
+  readonly position: number
+  readonly projectOptions: readonly ComboboxOption[]
+  readonly onChange: (change: Partial<BackendRow>) => void
+  readonly onRemove: () => void
+}): JSX.Element => {
+  const { row } = props
+  const test = useConnectionTest(row)
+  const teams = test.data?.teams ?? []
+  const detectedTarget = test.data?.target?.key
+  const teamOptions: ComboboxOption[] = [
+    ...teams.map(team => ({ value: team.key, label: team.key, description: team.name })),
+    ...(row.target.trim() === '' || teams.some(team => team.key.toUpperCase() === row.target.trim().toUpperCase())
+      ? []
+      : [{ value: row.target, label: row.target, description: 'not visible to this key' }]),
+  ]
+  const autoSyncOptions = [...new Set<number>([...autoSyncPresets, row.autoSyncMinutes])]
+    .sort((left, right) => left - right)
+    .map(minutes => ({ value: String(minutes), label: autoSyncLabel(minutes) }))
+  const repositoryPlaceholder =
+    test.data?.targetSource === 'git-remote' && detectedTarget !== undefined
+      ? `${detectedTarget} (git remote)`
+      : row.project === ''
+        ? 'owner/repo or git remote'
+        : 'owner/repo'
+  return (
+    <fieldset
+      aria-label={`Sync backend ${String(props.position)}`}
+      className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3"
+    >
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+        <ToggleGroup
+          type="single"
+          size="sm"
+          variant="outline"
+          value={row.backend}
+          aria-label="Tracker"
+          onValueChange={value => (value === 'linear' || value === 'github' ? props.onChange({ backend: value, target: '' }) : undefined)}
+        >
+          <ToggleGroupItem value="linear">Linear</ToggleGroupItem>
+          <ToggleGroupItem value="github">GitHub</ToggleGroupItem>
+        </ToggleGroup>
+        <Combobox
+          label="Project"
+          value={row.project === '' ? ALL_PROJECTS : row.project}
+          options={props.projectOptions}
+          onValueChange={value => props.onChange({ project: value === ALL_PROJECTS ? '' : value })}
+          triggerClassName="dshx:min-w-0 dshx:max-w-48"
+        />
+        <Combobox
+          label="Auto-sync"
+          value={String(row.autoSyncMinutes)}
+          options={autoSyncOptions}
+          onValueChange={value => props.onChange({ autoSyncMinutes: Number(value) })}
+          triggerClassName="dshx:w-auto dshx:min-w-0"
+        />
+        <div className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2">
+          <label className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs">
+            <Switch size="sm" checked={row.enabled} onCheckedChange={checked => props.onChange({ enabled: checked })} />
+            Enabled
+          </label>
+          <Button type="button" variant="ghost" size="icon-xs" aria-label={`Remove sync backend ${String(props.position)}`} onClick={props.onRemove}>
+            <Trash2Icon />
+          </Button>
+        </div>
+      </div>
+      <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
+        <input
+          type="text"
+          data-secret-input="reference"
+          aria-label={row.backend === 'linear' ? 'Linear API key reference' : 'GitHub token reference'}
+          placeholder={row.backend === 'linear' ? 'secret:LINEAR_API_KEY' : 'secret:GITHUB_TOKEN or gh login'}
+          value={row.secret}
+          onChange={event => props.onChange({ secret: event.currentTarget.value })}
+          className={cn(inputClass, 'dshx:font-mono!')}
+        />
+        {row.backend === 'linear' && teamOptions.length > 0 ? (
+          <Combobox
+            label="Linear team"
+            value={row.target === '' ? (detectedTarget ?? '') : row.target}
+            placeholder="Pick a team"
+            options={teamOptions}
+            onValueChange={value => props.onChange({ target: value })}
+            triggerClassName="dshx:min-w-0"
+            matchTriggerWidth
+          />
+        ) : (
+          <input
+            type="text"
+            aria-label={row.backend === 'linear' ? 'Linear team key' : 'GitHub repository'}
+            placeholder={row.backend === 'linear' ? 'Team key, e.g. ENG' : repositoryPlaceholder}
+            value={row.target}
+            onChange={event => props.onChange({ target: event.currentTarget.value })}
+            className={cn(inputClass, 'dshx:font-mono!')}
+          />
+        )}
+      </div>
+      <ConnectionLine row={row} test={test} />
+    </fieldset>
+  )
+}
+
+/** Backend rows (saved as you edit), Sync all now and Import issue, under Backlog settings. */
 const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] }): JSX.Element => {
   const settings = useSettings(backlogSettings)
   const status = useSyncStatus()
@@ -341,35 +555,58 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [importBackend, setImportBackend] = useState<SyncBackendKind>('linear')
   const [importReference, setImportReference] = useState('')
+  const editRevision = useRef(0)
   const stored = settings.value?.syncBackends
+  const settledRows = useDebouncedValue({ value: rows, delayMs: 800 })
+  const writable = settings.writable && settings.status === 'ready'
+  const savable = rows.every(row => isReferenceOrEmpty(row.secret))
 
   useEffect(() => {
     if (!dirty && settings.status === 'ready') setRows([...(stored ?? [])])
   }, [dirty, settings.status, stored])
 
-  const writable = settings.writable && settings.status === 'ready'
-  const edit = (index: number, change: Partial<BackendRow>): void => {
-    setRows(current => current.map((row, at) => (at === index ? { ...row, ...change } : row)))
+  const change = (next: (current: BackendRow[]) => BackendRow[]): void => {
+    editRevision.current += 1
+    setRows(next)
     setDirty(true)
     setSaved(false)
   }
   const save = async (): Promise<void> => {
+    const revision = editRevision.current
     setError(null)
     try {
-      if (!writable) throw new Error('Backlog settings are not writable right now.')
+      if (!writable) throw new Error('Backlog settings are not writable right now. Reload the page, then edit again.')
       const clean = rows.map(row => ({ ...row, target: row.target.trim(), secret: row.secret.trim() }))
       if (!(await settings.set('syncBackends', clean))) throw new Error('Backlog could not save the remote sync backends. Retry.')
-      setDirty(false)
-      setSaved(true)
+      if (editRevision.current === revision) {
+        setDirty(false)
+        setSaved(true)
+      }
       await queryClient.invalidateQueries({ queryKey: SYNC_STATUS_KEY })
     } catch (cause) {
-      setError(errorMessage(cause, 'Could not save the remote sync backends.'))
+      setError(errorMessage(cause, 'Could not save the remote sync backends. Retry.'))
     }
   }
+
+  const saveLatest = useRef(save)
+  saveLatest.current = save
+  const shouldSave = dirty && savable && writable && settledRows === rows
+  useEffect(() => {
+    if (shouldSave) void saveLatest.current()
+  }, [shouldSave])
+  const unsavedOnLeave = useRef(false)
+  unsavedOnLeave.current = dirty && savable && writable
+  useEffect(
+    () => () => {
+      if (unsavedOnLeave.current) void saveLatest.current()
+    },
+    [],
+  )
+
+  const importBackend = BacklogSyncModel.backendOfReference(importReference)
   const importIssue = async (): Promise<void> => {
-    const output = await actions.importRemote.mutateAsync({ backend: importBackend, reference: importReference.trim() })
+    const output = await actions.importRemote.mutateAsync({ reference: importReference.trim() })
     BacklogNotices.show({
       text: output.created
         ? `Imported as b:${String(output.detail.item.id)} — ${output.detail.item.title}`
@@ -379,185 +616,93 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
     })
     setImportReference('')
   }
-  const projectOptions = [
-    { value: ALL_PROJECTS, label: 'Every other project' },
+  const projectOptions: ComboboxOption[] = [
+    { value: ALL_PROJECTS, label: 'All other projects' },
     ...props.projectPaths.map(project => ({ value: project, label: ItemGlyphs.projectName(project), description: project })),
   ]
   const linkedCount = status.data?.items.length ?? 0
+  const saveState = (() => {
+    if (settings.mutation.pending) return 'Saving…'
+    if (dirty) return savable ? 'Unsaved changes' : 'Not saved: fix the key above'
+    return saved ? 'Saved' : null
+  })()
 
   return (
-    <section className="dshx-root dshx:mx-auto dshx:w-full dshx:max-w-2xl dshx:p-5 dshx:@max-pane-narrow:p-3" aria-labelledby="backlog-remote-sync-title">
+    <section
+      className="dshx-root dshx:@container dshx:mx-auto dshx:w-full dshx:max-w-2xl dshx:p-5 dshx:@max-pane-narrow:p-3"
+      aria-labelledby="backlog-remote-sync-title"
+    >
       <h3 id="backlog-remote-sync-title" className="dshx:text-base dshx:font-semibold">
         Remote sync
       </h3>
-      <p className="dshx:mt-1 dshx:text-sm dshx:text-muted-foreground">
-        Mirror items in Linear or GitHub Issues. Keys stay in the Host vault as secret:ALIAS references. Linking, creating and importing issues is always your
-        action; a field both sides changed goes to the side that changed last, with a note on the item.
-      </p>
-      <form
-        className="dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-3"
-        onSubmit={event => {
-          event.preventDefault()
-          void save()
-        }}
-      >
-        {rows.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">No backend yet. Add one to link items.</p> : null}
+      <div className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-3">
         {rows.map((row, index) => (
-          <fieldset
+          <BackendRowEditor
             key={`${String(index)}-${row.backend}`}
-            aria-label={`Sync backend ${String(index + 1)}`}
-            className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3"
-          >
-            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-              <ToggleGroup
-                type="single"
-                size="sm"
-                variant="outline"
-                value={row.backend}
-                aria-label="Tracker"
-                onValueChange={value => (value === 'linear' || value === 'github' ? edit(index, { backend: value }) : undefined)}
-              >
-                <ToggleGroupItem value="linear">Linear</ToggleGroupItem>
-                <ToggleGroupItem value="github">GitHub</ToggleGroupItem>
-              </ToggleGroup>
-              <Combobox
-                label="Project"
-                value={row.project === '' ? ALL_PROJECTS : row.project}
-                options={projectOptions}
-                onValueChange={value => edit(index, { project: value === ALL_PROJECTS ? '' : value })}
-                triggerClassName="dshx:min-w-0 dshx:max-w-56"
-              />
-              <label className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs">
-                <input type="checkbox" checked={row.enabled} onChange={event => edit(index, { enabled: event.currentTarget.checked })} />
-                Enabled
-              </label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label={`Remove sync backend ${String(index + 1)}`}
-                onClick={() => {
-                  setRows(current => current.filter((_row, at) => at !== index))
-                  setDirty(true)
-                }}
-              >
-                <Trash2Icon />
-              </Button>
-            </div>
-            <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
-              <input
-                type="text"
-                aria-label={row.backend === 'linear' ? 'Linear team key' : 'GitHub repository'}
-                placeholder={row.backend === 'linear' ? 'Team key, e.g. ENG' : 'owner/repo'}
-                value={row.target}
-                onChange={event => edit(index, { target: event.currentTarget.value })}
-                className={cn(inputClass, 'dshx:font-mono!')}
-              />
-              <input
-                type="text"
-                data-secret-input="reference"
-                aria-label={row.backend === 'linear' ? 'Linear API key reference' : 'GitHub token reference'}
-                placeholder={row.backend === 'linear' ? 'secret:LINEAR_API_KEY' : 'secret:GITHUB_TOKEN'}
-                value={row.secret}
-                onChange={event => edit(index, { secret: event.currentTarget.value })}
-                className={cn(inputClass, 'dshx:font-mono!')}
-              />
-            </div>
-            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1 dshx:text-xs dshx:text-muted-foreground">
-              <label className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2">
-                Auto-sync every
-                <input
-                  type="number"
-                  min={0}
-                  max={1440}
-                  aria-label="Auto-sync minutes"
-                  value={row.autoSyncMinutes}
-                  onChange={event => edit(index, { autoSyncMinutes: Math.max(0, Math.min(1_440, Math.trunc(Number(event.currentTarget.value) || 0))) })}
-                  className={cn(inputClass, 'dshx:w-20')}
-                />
-                minutes
-              </label>
-              <span className="dshx:min-w-0">
-                0 syncs only on Sync now. An empty key uses {row.backend === 'linear' ? 'LINEAR_API_KEY' : 'GITHUB_TOKEN'} from the Host environment.
-              </span>
-            </div>
-          </fieldset>
+            row={row}
+            position={index + 1}
+            projectOptions={projectOptions}
+            onChange={edit => change(current => current.map((candidate, at) => (at === index ? { ...candidate, ...edit } : candidate)))}
+            onRemove={() => change(current => current.filter((_row, at) => at !== index))}
+          />
         ))}
         {error === null ? null : (
-          <p role="alert" className="dshx:text-sm dshx:text-destructive">
+          <div role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-destructive">
             {error}
-          </p>
+            <Button type="button" size="xs" variant="outline" onClick={() => void save()}>
+              Retry
+            </Button>
+          </div>
         )}
-        {saved ? (
-          <p role="status" className="dshx:text-sm dshx:text-success">
-            Remote sync backends saved.
-          </p>
-        ) : null}
-        <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={!writable}
-            onClick={() => {
-              setRows(current => [...current, emptyRow()])
-              setDirty(true)
-              setSaved(false)
-            }}
-          >
-            <PlusIcon aria-hidden className="dshx:size-3.5" />
-            Add backend
-          </Button>
-          <Button type="submit" size="sm" disabled={!writable || !dirty || settings.mutation.pending}>
-            Save sync backends
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={actions.syncNow.isPending || linkedCount === 0}
-            onClick={() => actions.syncNow.mutate({})}
-          >
-            <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin')} />
-            Sync all now ({String(linkedCount)})
-          </Button>
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+          {BacklogSyncModel.backends.map(backend => (
+            <Button
+              key={backend}
+              type="button"
+              size="sm"
+              variant="outline"
+              aria-label={`Add ${label(backend)} backend`}
+              disabled={!writable}
+              onClick={() => change(current => [...current, emptyRow(backend)])}
+            >
+              <PlusIcon aria-hidden className="dshx:size-3.5" />
+              {label(backend)}
+            </Button>
+          ))}
+          {linkedCount === 0 ? null : (
+            <Button type="button" size="sm" variant="outline" disabled={actions.syncNow.isPending} onClick={() => actions.syncNow.mutate({})}>
+              <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', actions.syncNow.isPending && 'dshx:animate-spin')} />
+              Sync all now ({String(linkedCount)})
+            </Button>
+          )}
+          {saveState === null ? null : (
+            <span role="status" className={cn('dshx:ml-auto dshx:text-xs', saveState === 'Saved' ? 'dshx:text-success' : 'dshx:text-muted-foreground')}>
+              {saveState}
+            </span>
+          )}
         </div>
-      </form>
+      </div>
       <form
-        className="dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-2"
+        className="dshx:mt-4 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2"
         aria-label="Import an issue"
         onSubmit={event => {
           event.preventDefault()
           void importIssue().catch(() => undefined)
         }}
       >
-        <span className="dshx:text-sm dshx:font-medium">Import an issue as an item</span>
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          <ToggleGroup
-            type="single"
-            size="sm"
-            variant="outline"
-            value={importBackend}
-            aria-label="Import from"
-            onValueChange={value => (value === 'linear' || value === 'github' ? setImportBackend(value) : undefined)}
-          >
-            <ToggleGroupItem value="linear">Linear</ToggleGroupItem>
-            <ToggleGroupItem value="github">GitHub</ToggleGroupItem>
-          </ToggleGroup>
-          <input
-            type="text"
-            aria-label="Issue to import"
-            placeholder={importBackend === 'linear' ? 'ENG-12 or its linear.app URL' : '42 or its github.com URL'}
-            value={importReference}
-            onChange={event => setImportReference(event.currentTarget.value)}
-            className={cn(inputClass, 'dshx:font-mono! dshx:flex-1')}
-          />
-          <Button type="submit" size="sm" disabled={actions.importRemote.isPending || importReference.trim() === ''}>
-            Import issue
-          </Button>
-        </div>
+        <input
+          type="text"
+          aria-label="Issue to import"
+          placeholder="Import an issue: ENG-12, #42 or its URL"
+          value={importReference}
+          onChange={event => setImportReference(event.currentTarget.value)}
+          className={cn(inputClass, 'dshx:font-mono! dshx:flex-1')}
+        />
+        <Button type="submit" size="sm" disabled={actions.importRemote.isPending || importBackend === undefined}>
+          {importBackend === undefined ? 'Import issue' : `Import from ${label(importBackend)}`}
+        </Button>
         {actions.importRemote.error === null ? null : (
-          <p role="alert" className="dshx:text-xs dshx:text-destructive">
+          <p role="alert" className="dshx:w-full dshx:text-xs dshx:text-destructive">
             {errorMessage(actions.importRemote.error, 'The issue could not be imported. Check the reference and the backend row, then retry.')}
           </p>
         )}

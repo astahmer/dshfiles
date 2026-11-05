@@ -300,43 +300,52 @@ dropping the rest of the draft.
 
 ## Agent tools
 
-| Tool                       | Kind                                                                                  |
-| -------------------------- | ------------------------------------------------------------------------------------- |
-| `backlog_list`             | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`) |
-| `backlog_get`              | read: one item with history and backlinks                                             |
-| `backlog_get_many`         | read: up to 50 items at once, unknown ids listed separately                           |
-| `backlog_referencing`      | read: items linking to a thread, revision, branch, workspace, URL or item             |
-| `backlog_capture`          | write                                                                                 |
-| `backlog_update`           | write: edit or move                                                                   |
-| `backlog_link`             | write: link or unlink                                                                 |
-| `backlog_comment`          | write, optionally with images or files                                                |
-| `backlog_attach_file`      | write: keep one base64 image or file with an item                                     |
-| `backlog_read_file`        | read: one image or file as a data URL; `save: true` also returns a temp file path     |
-| `backlog_remove_file`      | write: remove one image or file                                                       |
-| `backlog_triage`           | write: run triage on one item now                                                     |
-| `backlog_triage_backfill`  | write: triage items captured before triage was set up, oldest first                   |
-| `backlog_start_thread`     | write: start one thread for items, in the item project's own jj workspace, linked     |
-| `backlog_projects`         | read: per-project counts, who needs you, people                                       |
-| `backlog_accept_proposal`  | write                                                                                 |
-| `backlog_dismiss_proposal` | write                                                                                 |
-| `backlog_sync_status`      | read: remote sync backends and each linked item's issue, state, last sync and errors  |
-| `backlog_sync_now`         | write: sync one linked item, a project's, or every one now                            |
-| `backlog_link_remote`      | write: link an item to a Linear/GitHub issue, create one from it, or unlink it        |
-| `backlog_import_remote`    | write: import an existing Linear/GitHub issue as a linked item                        |
+| Tool                           | Kind                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------- |
+| `backlog_list`                 | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`) |
+| `backlog_get`                  | read: one item with history and backlinks                                             |
+| `backlog_get_many`             | read: up to 50 items at once, unknown ids listed separately                           |
+| `backlog_referencing`          | read: items linking to a thread, revision, branch, workspace, URL or item             |
+| `backlog_capture`              | write                                                                                 |
+| `backlog_update`               | write: edit or move                                                                   |
+| `backlog_link`                 | write: link or unlink                                                                 |
+| `backlog_comment`              | write, optionally with images or files                                                |
+| `backlog_attach_file`          | write: keep one base64 image or file with an item                                     |
+| `backlog_read_file`            | read: one image or file as a data URL; `save: true` also returns a temp file path     |
+| `backlog_remove_file`          | write: remove one image or file                                                       |
+| `backlog_triage`               | write: run triage on one item now                                                     |
+| `backlog_triage_backfill`      | write: triage items captured before triage was set up, oldest first                   |
+| `backlog_start_thread`         | write: start one thread for items, in the item project's own jj workspace, linked     |
+| `backlog_projects`             | read: per-project counts, who needs you, people                                       |
+| `backlog_accept_proposal`      | write                                                                                 |
+| `backlog_dismiss_proposal`     | write                                                                                 |
+| `backlog_sync_status`          | read: remote sync backends and each linked item's issue, state, last sync and errors  |
+| `backlog_sync_now`             | write: sync one linked item, a project's, or every one now                            |
+| `backlog_link_remote`          | write: link an item to a Linear/GitHub issue, create one from it, or unlink it        |
+| `backlog_import_remote`        | write: import an existing Linear/GitHub issue as a linked item                        |
+| `backlog_sync_test_connection` | read: a backend's key source, signed-in account, target and visible Linear teams      |
 
 ## Remote sync (Linear, GitHub Issues)
 
 Items can mirror an issue in Linear or GitHub Issues, so the backlog lives somewhere shared without giving up
-the local feed. **Backlog settings › Remote sync** holds one row per project and tracker: a Linear team key or a
-GitHub `owner/repo`, a `secret:ALIAS` reference to a Linear personal API key or a GitHub token (empty falls back
-to `LINEAR_API_KEY` / `GITHUB_TOKEN` in the Host environment), an auto-sync interval in minutes (0 syncs only on
-**Sync now**) and an on/off switch. A row with an empty project serves every project that has no row of its own.
-The key is resolved on the Host through `@dshfiles/credential-port` and never reaches a browser.
+the local feed. **Backlog settings › Remote sync** holds one row per project and tracker, saved as you edit:
+
+- a `secret:ALIAS` reference to a Linear personal API key or a GitHub token. Empty falls back to `LINEAR_API_KEY`,
+  or to `GITHUB_TOKEN`, `GH_TOKEN` and then `gh auth token` on the Host;
+- a Linear team, picked from the teams the key sees (empty uses the key's only team), or a GitHub `owner/repo`
+  (empty reads the project's github.com git remote: `origin`, then `upstream`, then the first one);
+- an auto-sync interval (15 minutes for a new row; **Manual sync only** syncs on **Sync now**) and an on/off switch.
+
+A row with an empty project (**All other projects**) serves every project that has no row of its own. Each row tests
+its connection as you type and shows the account it signs in as and the team or repository it reaches. The key is
+resolved on the Host through `@dshfiles/credential-port` and never reaches a browser.
 
 Linking is always your action: an item's row menu and the cloud chip in its detail offer **Link to Linear
 issue…** (paste `ENG-12` or its URL) and **Create in Linear**, the GitHub equivalents once a GitHub row exists,
 and **Sync now** / **Unlink** for a linked item. The settings section also has **Sync all now** and **Import an
-issue**, which turns an existing issue into a linked item (an issue already linked returns its item).
+issue**, which turns an existing issue into a linked item (an issue already linked returns its item); it reads the
+tracker from what you paste (`ENG-12` or a linear.app URL is Linear, `#42`, `owner/repo#42` or a github.com URL is
+GitHub).
 
 What syncs, and how conflicts settle:
 
