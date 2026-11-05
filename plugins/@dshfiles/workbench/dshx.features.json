@@ -818,6 +818,59 @@
       ]
     },
     {
+      "id": "phone-thread-panel-sheet",
+      "title": "Open the thread panel as a bottom sheet on a phone",
+      "summary": "Below 640px the frame gives the right column no width, so the Workbench dock (the thread panel: Changes, Cost, Jobs, Context and the other facets) rises as a bottom sheet above the tab bar instead of a cramped column: same surface, same facet tabs and Choose a view, with a grab handle, Close, a scrim and Escape to put it away. The phone top bar's Thread panels button and the existing toggle open it. On a phone the main region's tab rows are hidden (the stack, Back and the sheet navigate instead), the sheet's facet tabs get 40px rows, and Choose a view does not autofocus its search so the software keyboard stays down. The sheet's open state belongs to the page (every phone load starts closed) and the dock controls drive it on a phone, so the remembered desktop right pane is neither opened over a phone nor changed from one. Desktop keeps the right pane and tab rows.",
+      "surfaces": [
+        "client"
+      ],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "workbench: right pane as a narrow column; phone reached facets only through the main pane's New tab",
+      "configuration": [],
+      "states": [
+        "closed",
+        "open-chooser",
+        "open-facet"
+      ],
+      "failureModes": [
+        "Without the phone shell (no data-shell-phone-nav) the main tab rows stay, so a profile without phone navigation keeps its tabs.",
+        "Crossing the 640px breakpoint remounts the dock surface; its saved layout restores the facet tabs."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "workbench.phone-sheet-close",
+          "file": "plugins/@dshfiles/workbench/src/phone-sheet.test.tsx",
+          "testName": "shows the thread panel as a dialog and puts it away from Close, the scrim and Escape"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.phone-sheet-hidden",
+          "file": "plugins/@dshfiles/workbench/src/phone-sheet.test.tsx",
+          "testName": "keeps the surface mounted but hidden, with no scrim, while closed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.phone-sheet-own-state",
+          "file": "plugins/@dshfiles/workbench/src/phone-sheet.test.tsx",
+          "testName": "drives the page-local sheet on a phone and leaves the remembered desktop pane alone"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "workbench.phone-sheet-browser",
+          "reason": "The Gherkin harness is Chromium 1440x900 only; the WebKit 390x844 scripted phone journey plans/ade-ux/phase6/capture/journey-plan.json opens the Changes facet in the sheet and closes it."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only presentation of the existing dock surface; facet pages are admitted through the native page records with no new Host I/O."
+        }
+      ]
+    },
+    {
       "id": "native-resource-panels",
       "title": "Host native preview diff and terminal resources as panels",
       "summary": "The owned sidebar-right declarer supplies addressable real tab occurrences, retaining their Session resource lifecycle while their presentation docks in the workbench.",

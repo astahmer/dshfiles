@@ -83,3 +83,18 @@
 [data-workbench-window-floats] > div > .dv-shell > .dv-render-overlay[data-workbench-window-layer='body'] {
   z-index: calc(var(--dv-overlay-z-index, 999) + var(--dshfiles-workbench-window-rank) * 2 + 1) !important;
 }
+
+/* Phone (plans/ade-ux §8 phase 6): the stage is a stack, not tabs. With the phone shell present (the left-column
+ * occupant marks the document with data-shell-phone-nav and draws a top bar with Back), the main region's tab rows
+ * are desktop chrome that only crowd 390px: hide them; the list, Back and the thread panel sheet navigate instead.
+ * Without that shell nothing changes, so a profile without phone navigation keeps its tabs. */
+@media (max-width: 639.98px) {
+  [data-shell-phone-nav] [data-workbench-region='main'] .dv-tabs-and-actions-container {
+    display: none;
+  }
+
+  /* Inside the thread panel sheet, the facet tabs stay but get touch-sized rows. */
+  [data-phone-sheet] .dshfiles-workbench-theme {
+    --dv-tabs-and-actions-container-height: 40px;
+  }
+}

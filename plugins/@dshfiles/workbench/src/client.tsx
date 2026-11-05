@@ -51,6 +51,7 @@ import { NewViewTabs, type NewViewSelection } from './new-view.js'
 import { NewThreadSource } from './new-thread-source.js'
 import { TabRows } from './tab-row-visibility.js'
 import { SidebarPreviewMigration } from './sidebar-preview-migration.js'
+import { PhoneSheet, phoneAwareDockActions, usePhoneSheetOpen, usePhoneWidth } from './phone-sheet.js'
 
 const DROP_DIRECTIONS = { top: 'above', bottom: 'below', left: 'left', right: 'right', center: 'within' } as const satisfies Record<
   NonNullable<WorkbenchPanelDrop['position']>,
@@ -123,7 +124,8 @@ export default defineClient({
     const sidebarPreviewMigration = SidebarPreviewMigration.create()
     let syncMainTabs: (() => void) | undefined
     let resettingLayout = false
-    const dockActions = createDockPaneActions()
+    // On a phone the same controls open the thread panel sheet instead of the remembered desktop right pane.
+    const dockActions = phoneAwareDockActions(createDockPaneActions())
     ctx.effect(() => {
       // Legacy settings are decode-only compatibility data, never renderer choices.
       ctx.get('mainSurface')?.setMode('workbench')
@@ -1268,12 +1270,14 @@ export default defineClient({
           // The column reserves a track only while its occupant reports itself
           // shown, exactly as the native right sidebar does.
           const shown = props.shown !== false
+          const phone = usePhoneWidth()
+          const sheetOpen = usePhoneSheetOpen()
           useLayoutEffect(() => {
             if (shown) ctx.layout.openRightbar(true, false)
             else ctx.layout.closeRightbar()
             return () => ctx.layout.closeRightbar()
           }, [shown])
-          return (
+          const view = (
             <WorkbenchView
               registry={registry}
               onResetLayout={resetLayout}
@@ -1297,6 +1301,14 @@ export default defineClient({
                 </>
               )}
             />
+          )
+          // Phone: the frame gives the right column no width, so the same surface rises as a bottom sheet instead.
+          return phone ? (
+            <PhoneSheet shown={shown && sheetOpen} heading="Thread panel" onClose={dockActions.close}>
+              {view}
+            </PhoneSheet>
+          ) : (
+            view
           )
         }),
       ),
@@ -1350,7 +1362,11 @@ export default defineClient({
     }
     const RightPanelModeReporter = decorate(() => {
       const settings = useSettings(workbenchSettings)
-      const shown = rightPaneVisibility.useValue() === true
+      const desktopShown = rightPaneVisibility.useValue() === true
+      const phone = usePhoneWidth()
+      const sheetOpen = usePhoneSheetOpen()
+      // A phone shows the dock only as its sheet, from this page's own open state.
+      const shown = phone ? sheetOpen : desktopShown
       useLayoutEffect(() => {
         if (settings.value !== undefined || settings.status !== 'loading') migrateDockVisibility(settings.value?.rightPanel === 'dock' ? 'dock' : 'native')
       }, [settings.value, settings.status])

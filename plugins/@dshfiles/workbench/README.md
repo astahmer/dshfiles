@@ -2,6 +2,8 @@
 
 ![The original conversation toolbar and child views stay bound to each visible thread](docs/screenshots/conversation-header.png)
 
+![On a phone the thread panel rises as a bottom sheet: Changes and Context facets](docs/screenshots/phone-thread-panel-sheet.png)
+
 <details>
 <summary>Split-pane and narrow-header verification</summary>
 

@@ -28,7 +28,8 @@ export const NewViewChooser = (props: {
   const [search, setSearch] = useState('')
   const searchInput = useRef<HTMLInputElement>(null)
   useEffect(() => {
-    if (props.autoFocus === false) return
+    // A touch device would raise its software keyboard over the list just because the chooser opened.
+    if (props.autoFocus === false || window.matchMedia?.('(pointer: coarse)').matches === true) return
     searchInput.current?.focus({ preventScroll: true })
     // Dockview finishes header activation after mounting its retained portal.
     // Restore focus once at the next paint; hidden/inactive panes cancel it.
