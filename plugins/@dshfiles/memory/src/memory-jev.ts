@@ -73,7 +73,11 @@ export class MemoryJev extends Context.Service<
       const shared = yield* Effect.serviceOption(SharedJevSettingsTag)
       if (Option.isSome(shared)) {
         yield* SharedJevKey.adopt(shared.value, (yield* settings.get).jevSecret).pipe(
-          Effect.tap(result => (result.kind === 'deferred' ? Effect.logWarning('memory: the earlier Jev key stays in Memory settings until the shared key can be written', result.cause) : Effect.void)),
+          Effect.tap(result =>
+            result.kind === 'deferred'
+              ? Effect.logWarning('memory: the earlier Jev key stays in Memory settings until the shared key can be written', result.cause)
+              : Effect.void,
+          ),
           Effect.forkScoped,
         )
       }

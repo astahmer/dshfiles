@@ -9,7 +9,12 @@ import { ChatReferenceModel, chatReferenceQueryKeys } from './chat-reference.js'
 import { ChatReferenceLinks } from './chat-reference-links.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { ReferenceGraphView } from './reference-graph-view.js'
-import { chatReferencePreviewDismissEvent, chatReferencePreviewEvent, chatReferencePreviewRequestSchema, type ChatReferencePreviewRequest } from './chat-reference.js'
+import {
+  chatReferencePreviewDismissEvent,
+  chatReferencePreviewEvent,
+  chatReferencePreviewRequestSchema,
+  type ChatReferencePreviewRequest,
+} from './chat-reference.js'
 
 /** Moving the pointer from a reference into the card must not close it, so leaving waits out a short grace. */
 const CLOSE_GRACE_MS = 140

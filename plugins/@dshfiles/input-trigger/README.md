@@ -24,8 +24,8 @@ plugin.add(EntityKinds, {
   kind: 'backlog',
   label: 'Backlog item',
   mentionPrefixes: ['b', 'backlog'], // `@b:` / `@backlog:` list only this kind
-  mentionSource: mentions,            // registered with `inputTriggers` here, in registry order
-  Preview: decorate(BacklogCard),     // the body of the one shared reference card
+  mentionSource: mentions, // registered with `inputTriggers` here, in registry order
+  Preview: decorate(BacklogCard), // the body of the one shared reference card
 })
 ```
 

@@ -43,7 +43,17 @@ const platform = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)
 /** The Host services memory reads through dshx, and the edges that adapt DSH's Promise services and TypeSafe. */
 const hostEdges = Layer.mergeAll(Summarizer.layer, AgentScopes.layer).pipe(
   Layer.provideMerge(Layer.mergeAll(SessionReads.layer, Jev.layer)),
-  Layer.provideMerge(Layer.mergeAll(Settings.layer(memorySettings), Settings.layer(settingsShellSettings), HostApis.layer, SecretReferenceResolver.layer, Llm.layer, FetchHttpClient.layer, platform)),
+  Layer.provideMerge(
+    Layer.mergeAll(
+      Settings.layer(memorySettings),
+      Settings.layer(settingsShellSettings),
+      HostApis.layer,
+      SecretReferenceResolver.layer,
+      Llm.layer,
+      FetchHttpClient.layer,
+      platform,
+    ),
+  ),
 )
 
 /** Every memory service and background loop of one activation. */

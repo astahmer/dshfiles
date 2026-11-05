@@ -17,7 +17,12 @@ export const pinnedPlan = (writes: readonly PlanWrite[] | undefined, activity: L
 }
 
 /** A chip beside the native plan-mode control: "Step 2 of 5 · Write the tests · 1m 04s", opening the whole plan. */
-export const PlanPin = (props: { readonly writes: readonly PlanWrite[] | undefined; readonly activity: LiveActivity | undefined; readonly timing: boolean; readonly running: boolean }): ReactNode => {
+export const PlanPin = (props: {
+  readonly writes: readonly PlanWrite[] | undefined
+  readonly activity: LiveActivity | undefined
+  readonly timing: boolean
+  readonly running: boolean
+}): ReactNode => {
   const progress = pinnedPlan(props.writes, props.activity)
   const now = useNow(progress !== undefined && props.running && props.timing)
   if (progress === undefined) return null

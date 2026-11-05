@@ -404,69 +404,69 @@ export const MemoryReferencePreview = (props: {
   const copyText = copyTextOf(card)
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:flex-col" data-dshfiles-memory-preview>
-        <div className="dshx:border-b dshx:border-border dshx:px-3 dshx:py-2" data-dshfiles-memory-preview-header>
-          {card === undefined ? (
-            <div className="dshx:flex dshx:items-center dshx:gap-2">
-              <Skeleton className="dshx:size-7 dshx:rounded-xl" />
-              <div className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-1.5">
-                <Skeleton className="dshx:h-3 dshx:w-24" />
-                <Skeleton className="dshx:h-2.5 dshx:w-40" />
-              </div>
+      <div className="dshx:border-b dshx:border-border dshx:px-3 dshx:py-2" data-dshfiles-memory-preview-header>
+        {card === undefined ? (
+          <div className="dshx:flex dshx:items-center dshx:gap-2">
+            <Skeleton className="dshx:size-7 dshx:rounded-xl" />
+            <div className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-1.5">
+              <Skeleton className="dshx:h-3 dshx:w-24" />
+              <Skeleton className="dshx:h-2.5 dshx:w-40" />
             </div>
-          ) : (
-            <CardHeader card={card} request={{ id: props.id, range: props.range }} />
-          )}
-        </div>
-        <div className="dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-4 dshx:[max-height:min(20rem,48vh)]">
-          {preview.isPending && card === undefined ? (
-            <div className="dshx:flex dshx:flex-col dshx:gap-2">
-              <Skeleton className="dshx:h-4 dshx:w-11/12" />
-              <Skeleton className="dshx:h-3 dshx:w-full" />
-              <Skeleton className="dshx:h-3 dshx:w-3/5" />
-            </div>
-          ) : null}
-          {preview.isError ? (
-            <p role="alert" className="dshx:text-xs dshx:text-destructive">
-              {errorMessage(preview.error, 'This memory is unavailable; it may have been forgotten. Search Memory for it instead.')}
-            </p>
-          ) : null}
-          {card?.kind === 'note' ? (
-            <NotePreview
-              note={card.note}
-              onOpenThread={props.openThread}
-              onOpenNote={id => {
-                props.openInMemory({ id: `n:${String(id)}` })
-                props.close()
-              }}
-            />
-          ) : null}
-          {card?.kind === 'digest' ? <DigestCard thread={card.thread} onOpenThread={props.openThread} /> : null}
-          {card?.kind === 'excerpt' ? <ExcerptCard summary={card.summary} /> : null}
-          {card?.kind === 'missing' ? <MissingCard id={props.id} summary={card.summary} /> : null}
-        </div>
-        <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1.5 dshx:border-t dshx:border-border dshx:px-4 dshx:py-2.5">
-          <Button
-            size="xs"
-            variant="ghost"
-            disabled={copyText.length === 0}
-            onClick={() => {
-              void textCopy.copy(copyText)
-            }}
-          >
-            {textCopy.copied ? <CheckIcon /> : <CopyIcon />}
-            {textCopy.copied ? 'Copied' : 'Copy'}
-          </Button>
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => {
-              props.openInMemory(props.range === undefined ? { id: props.id } : { id: props.id, range: props.range })
+          </div>
+        ) : (
+          <CardHeader card={card} request={{ id: props.id, range: props.range }} />
+        )}
+      </div>
+      <div className="dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-4 dshx:[max-height:min(20rem,48vh)]">
+        {preview.isPending && card === undefined ? (
+          <div className="dshx:flex dshx:flex-col dshx:gap-2">
+            <Skeleton className="dshx:h-4 dshx:w-11/12" />
+            <Skeleton className="dshx:h-3 dshx:w-full" />
+            <Skeleton className="dshx:h-3 dshx:w-3/5" />
+          </div>
+        ) : null}
+        {preview.isError ? (
+          <p role="alert" className="dshx:text-xs dshx:text-destructive">
+            {errorMessage(preview.error, 'This memory is unavailable; it may have been forgotten. Search Memory for it instead.')}
+          </p>
+        ) : null}
+        {card?.kind === 'note' ? (
+          <NotePreview
+            note={card.note}
+            onOpenThread={props.openThread}
+            onOpenNote={id => {
+              props.openInMemory({ id: `n:${String(id)}` })
               props.close()
             }}
-          >
-            Open in Memory
-          </Button>
-        </div>
+          />
+        ) : null}
+        {card?.kind === 'digest' ? <DigestCard thread={card.thread} onOpenThread={props.openThread} /> : null}
+        {card?.kind === 'excerpt' ? <ExcerptCard summary={card.summary} /> : null}
+        {card?.kind === 'missing' ? <MissingCard id={props.id} summary={card.summary} /> : null}
+      </div>
+      <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1.5 dshx:border-t dshx:border-border dshx:px-4 dshx:py-2.5">
+        <Button
+          size="xs"
+          variant="ghost"
+          disabled={copyText.length === 0}
+          onClick={() => {
+            void textCopy.copy(copyText)
+          }}
+        >
+          {textCopy.copied ? <CheckIcon /> : <CopyIcon />}
+          {textCopy.copied ? 'Copied' : 'Copy'}
+        </Button>
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={() => {
+            props.openInMemory(props.range === undefined ? { id: props.id } : { id: props.id, range: props.range })
+            props.close()
+          }}
+        >
+          Open in Memory
+        </Button>
+      </div>
     </div>
   )
 }

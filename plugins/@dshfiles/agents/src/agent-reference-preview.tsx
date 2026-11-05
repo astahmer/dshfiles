@@ -162,7 +162,9 @@ export const AgentReferencePreview = (props: {
           </p>
         ) : null}
         {missing ? (
-          <p className="dshx:text-xs dshx:text-muted-foreground">No agent {AgentReference.label(props.handle)}. It may have been removed; the Agents page lists the current ones.</p>
+          <p className="dshx:text-xs dshx:text-muted-foreground">
+            No agent {AgentReference.label(props.handle)}. It may have been removed; the Agents page lists the current ones.
+          </p>
         ) : null}
         {found === null ? null : <AgentCard agent={found} threads={threads.data ?? []} openThread={props.openThread} />}
       </div>

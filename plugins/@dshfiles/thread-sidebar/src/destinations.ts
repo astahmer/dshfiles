@@ -64,17 +64,85 @@ export interface DestinationSection {
  * panel exists, so they remain one click away.
  */
 export const KNOWN_SECTIONS: readonly DestinationSection[] = [
-  { panelId: 'dshfiles-thread-board', destination: 'threads', label: 'Board', description: 'The same threads as columns.', formerLabels: ['Thread Sidebar: Board'] },
-  { panelId: 'attention-inbox', destination: 'inbox', label: 'Needs you', description: 'Questions, approvals and failures waiting on you.', formerLabels: ['Inbox'] },
-  { panelId: 'jj-integration', destination: 'land', label: 'Workspaces', description: 'Thread workspaces ready, blocked or behind.', order: 1, formerLabels: ['JJ Integration: Thread integration', 'Land'] },
-  { panelId: 'pulls-review', destination: 'land', label: 'Review', description: 'Review a workspace before landing it.', order: 2, formerLabels: ['pulls.review: Reviews', 'Review'] },
-  { panelId: 'dshfiles-jujutsu', destination: 'land', label: 'History', description: 'The revision graph of a project.', order: 3, formerLabels: ['Jujutsu: Revision graph', 'Revision graph'] },
-  { panelId: 'dshfiles-jujutsu-source-control', destination: 'land', label: 'Source control', description: 'Working-copy changes and commits.', order: 4, formerLabels: ['Jujutsu: Source Control', 'Source control'] },
-  { panelId: 'dshfiles-backlog-panel', destination: 'work', label: 'Backlog', description: 'Tasks, bugs, ideas and notes.', order: 1, formerLabels: ['Backlog: Items', 'Backlog'] },
+  {
+    panelId: 'dshfiles-thread-board',
+    destination: 'threads',
+    label: 'Board',
+    description: 'The same threads as columns.',
+    formerLabels: ['Thread Sidebar: Board'],
+  },
+  {
+    panelId: 'attention-inbox',
+    destination: 'inbox',
+    label: 'Needs you',
+    description: 'Questions, approvals and failures waiting on you.',
+    formerLabels: ['Inbox'],
+  },
+  {
+    panelId: 'jj-integration',
+    destination: 'land',
+    label: 'Workspaces',
+    description: 'Thread workspaces ready, blocked or behind.',
+    order: 1,
+    formerLabels: ['JJ Integration: Thread integration', 'Land'],
+  },
+  {
+    panelId: 'pulls-review',
+    destination: 'land',
+    label: 'Review',
+    description: 'Review a workspace before landing it.',
+    order: 2,
+    formerLabels: ['pulls.review: Reviews', 'Review'],
+  },
+  {
+    panelId: 'dshfiles-jujutsu',
+    destination: 'land',
+    label: 'History',
+    description: 'The revision graph of a project.',
+    order: 3,
+    formerLabels: ['Jujutsu: Revision graph', 'Revision graph'],
+  },
+  {
+    panelId: 'dshfiles-jujutsu-source-control',
+    destination: 'land',
+    label: 'Source control',
+    description: 'Working-copy changes and commits.',
+    order: 4,
+    formerLabels: ['Jujutsu: Source Control', 'Source control'],
+  },
+  {
+    panelId: 'dshfiles-backlog-panel',
+    destination: 'work',
+    label: 'Backlog',
+    description: 'Tasks, bugs, ideas and notes.',
+    order: 1,
+    formerLabels: ['Backlog: Items', 'Backlog'],
+  },
   { panelId: 'schedules', destination: 'work', label: 'Schedules', description: 'Reminders and recurring prompts.', order: 2, formerLabels: ['Schedules'] },
-  { panelId: 'dshfiles-agents', destination: 'agents', label: 'Directory', description: 'Configured agents and their threads.', order: 1, formerLabels: ['Agents: Directory', 'Agents'] },
-  { panelId: 'agent-communication', destination: 'agents', label: 'Messages', description: 'What agents sent each other.', order: 2, formerLabels: ['Agent Communication: Messages', 'Messages'] },
-  { panelId: 'dshfiles-agent-toolkit', destination: 'agents', label: 'Capabilities', description: 'Tools, skills and MCP servers an agent can use.', order: 3, formerLabels: ['Agent Toolkit: Capabilities'] },
+  {
+    panelId: 'dshfiles-agents',
+    destination: 'agents',
+    label: 'Directory',
+    description: 'Configured agents and their threads.',
+    order: 1,
+    formerLabels: ['Agents: Directory', 'Agents'],
+  },
+  {
+    panelId: 'agent-communication',
+    destination: 'agents',
+    label: 'Messages',
+    description: 'What agents sent each other.',
+    order: 2,
+    formerLabels: ['Agent Communication: Messages', 'Messages'],
+  },
+  {
+    panelId: 'dshfiles-agent-toolkit',
+    destination: 'agents',
+    label: 'Capabilities',
+    description: 'Tools, skills and MCP servers an agent can use.',
+    order: 3,
+    formerLabels: ['Agent Toolkit: Capabilities'],
+  },
   // Phase 5: one Usage page (Cost · Quota · Requests · Tools); quota history and forecast are views of its Quota tab.
   {
     panelId: 'dshfiles-usage',
@@ -87,7 +155,14 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
   // Listed only in compositions without @dshfiles/usage, where ai-accounts keeps these pages of its own.
   { panelId: 'ai-accounts-usage', destination: 'observe', label: 'Quota history', description: 'Account quota over time.', order: 2 },
   { panelId: 'ai-accounts-forecast', destination: 'observe', label: 'Quota forecast', description: 'When each account runs out.', order: 3 },
-  { panelId: 'activity-timeline', destination: 'observe', label: 'Activity', description: 'What happened, thread by thread.', order: 4, formerLabels: ['Activity Timeline: Activity'] },
+  {
+    panelId: 'activity-timeline',
+    destination: 'observe',
+    label: 'Activity',
+    description: 'What happened, thread by thread.',
+    order: 4,
+    formerLabels: ['Activity Timeline: Activity'],
+  },
   { panelId: 'traces', destination: 'observe', label: 'Traces', description: 'Spans, logs, metrics and alerts.', order: 5, formerLabels: ['Traces: Explorer'] },
   // Phase 5: one Processes page (Jobs · Dev servers · RAM); RAM is a tab of it.
   {
@@ -100,15 +175,78 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
   },
   // Listed only without @dshfiles/background-jobs, where worktree-memory keeps its own RAM page.
   { panelId: 'dshfiles-worktree-memory', destination: 'observe', label: 'RAM', description: 'Process memory per workspace.', order: 7 },
-  { panelId: 'dshfiles-multi-host-hosts', destination: 'observe', label: 'Hosts', description: 'Machines threads run on.', order: 8, formerLabels: ['Multi-host: Hosts', 'Hosts'] },
-  { panelId: 'dshfiles-memory-panel', destination: 'knowledge', label: 'Memory', description: 'Notes and thread digests.', order: 1, formerLabels: ['Memory: Browser', 'Memory'] },
-  { panelId: 'dshfiles-resources', destination: 'knowledge', label: 'Resources', description: 'Resource packs and their properties.', order: 2, formerLabels: ['Resource Packs: Resources'] },
-  { panelId: 'component-gallery', destination: 'knowledge', label: 'Component gallery', description: 'Every shared plugin component, live.', order: 3, formerLabels: ['Component Gallery: Components', 'Component gallery'] },
-  { panelId: 'dshfiles-whiteboard', destination: 'knowledge', label: 'Whiteboard', description: 'Per-project boards you and agents draw on.', order: 4, formerLabels: ['Whiteboard: Boards', 'Whiteboard'] },
-  { panelId: 'dshfiles-agentsview', destination: 'knowledge', label: 'Agent CLI threads', description: 'Read-only threads Claude Code and Codex recorded here.', order: 5, formerLabels: ['Agent CLI threads'] },
-  { panelId: 'ai-accounts', destination: 'settings', label: 'AI accounts', description: 'Accounts, models and routing.', order: 1, formerLabels: ['AI Accounts: Accounts'] },
-  { panelId: 'mcp-servers', destination: 'settings', label: 'MCP servers', description: 'Tool servers agents connect to.', order: 2, formerLabels: ['MCP Servers: Servers'] },
-  { panelId: 'secret-catalog', destination: 'settings', label: 'Secrets', description: 'Credential aliases, never values.', order: 3, formerLabels: ['Secret Catalog: Secrets', 'Secrets'] },
+  {
+    panelId: 'dshfiles-multi-host-hosts',
+    destination: 'observe',
+    label: 'Hosts',
+    description: 'Machines threads run on.',
+    order: 8,
+    formerLabels: ['Multi-host: Hosts', 'Hosts'],
+  },
+  {
+    panelId: 'dshfiles-memory-panel',
+    destination: 'knowledge',
+    label: 'Memory',
+    description: 'Notes and thread digests.',
+    order: 1,
+    formerLabels: ['Memory: Browser', 'Memory'],
+  },
+  {
+    panelId: 'dshfiles-resources',
+    destination: 'knowledge',
+    label: 'Resources',
+    description: 'Resource packs and their properties.',
+    order: 2,
+    formerLabels: ['Resource Packs: Resources'],
+  },
+  {
+    panelId: 'component-gallery',
+    destination: 'knowledge',
+    label: 'Component gallery',
+    description: 'Every shared plugin component, live.',
+    order: 3,
+    formerLabels: ['Component Gallery: Components', 'Component gallery'],
+  },
+  {
+    panelId: 'dshfiles-whiteboard',
+    destination: 'knowledge',
+    label: 'Whiteboard',
+    description: 'Per-project boards you and agents draw on.',
+    order: 4,
+    formerLabels: ['Whiteboard: Boards', 'Whiteboard'],
+  },
+  {
+    panelId: 'dshfiles-agentsview',
+    destination: 'knowledge',
+    label: 'Agent CLI threads',
+    description: 'Read-only threads Claude Code and Codex recorded here.',
+    order: 5,
+    formerLabels: ['Agent CLI threads'],
+  },
+  {
+    panelId: 'ai-accounts',
+    destination: 'settings',
+    label: 'AI accounts',
+    description: 'Accounts, models and routing.',
+    order: 1,
+    formerLabels: ['AI Accounts: Accounts'],
+  },
+  {
+    panelId: 'mcp-servers',
+    destination: 'settings',
+    label: 'MCP servers',
+    description: 'Tool servers agents connect to.',
+    order: 2,
+    formerLabels: ['MCP Servers: Servers'],
+  },
+  {
+    panelId: 'secret-catalog',
+    destination: 'settings',
+    label: 'Secrets',
+    description: 'Credential aliases, never values.',
+    order: 3,
+    formerLabels: ['Secret Catalog: Secrets', 'Secrets'],
+  },
   { panelId: 'plugins', destination: 'settings', label: 'Plugins', description: 'Installed plugins and the marketplace.', order: 4, formerLabels: ['Plugins'] },
 ]
 
@@ -150,7 +288,14 @@ const resolve = (panels: readonly DestinationPanel[], contributed: readonly Dest
     const section = mapped.get(panel.id)
     const resolved: ResolvedSection =
       section === undefined
-        ? { panelId: panel.id, destination: 'settings', label: withoutPluginPrefix(panel.label), order: 1000 + panel.order, formerLabels: [panel.label], unmapped: true }
+        ? {
+            panelId: panel.id,
+            destination: 'settings',
+            label: withoutPluginPrefix(panel.label),
+            order: 1000 + panel.order,
+            formerLabels: [panel.label],
+            unmapped: true,
+          }
         : { ...section, unmapped: false }
     byDestination.get(resolved.destination)?.push(resolved)
   }

@@ -5,16 +5,8 @@
       "id": "conversation-header",
       "title": "Keep the original conversation toolbar and child views inside each thread",
       "summary": "Every fixed conversation hosts the original Rich Composer header inside its own retained SessionProvider: title/mode, contributed workspace utilities, Pin and thread actions, and native Chat/Trajectory/Traces/Requests navigation when those providers are present. The original header child has one declarer behind a reusable owned Factory, shared with native mode; no borrowed renderer or global-following duplicate is used. Native selected views drive the existing content/composer instead of a forced Chat view. The original right-sidebar opener uses the registered Workbench dock actions, not the hidden native carrier. Outer Workbench tab layout, original blank hero and independent view-only panels retain their owners.",
-      "reach": [
-        "seed tool-call-thread",
-        "expect button \"More thread actions\"",
-        "expect tab \"Chat\"",
-        "expect tab \"Trajectory\""
-      ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "reach": ["seed tool-call-thread", "expect button \"More thread actions\"", "expect tab \"Chat\"", "expect tab \"Trajectory\""],
+      "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "thread-header: conversation toolbar",
@@ -65,24 +57,12 @@
         "click option \"Toggle the right pane*\"",
         "expect region \"Choose a view\""
       ],
-      "surfaces": [
-        "client",
-        "integration",
-        "storage"
-      ],
+      "surfaces": ["client", "integration", "storage"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: right pane",
       "configuration": [],
-      "states": [
-        "populated",
-        "other-tab-remains",
-        "last-closed",
-        "reopened-empty",
-        "view-adopted",
-        "restored-hidden",
-        "floating-owned"
-      ],
+      "states": ["populated", "other-tab-remains", "last-closed", "reopened-empty", "view-adopted", "restored-hidden", "floating-owned"],
       "failureModes": [
         "Only the right-region empty close policy changes; the main grid stays permanent and left/bottom behavior is unchanged.",
         "Floating panels still belong to their source API, so an empty grid with a live float does not hide that source pane."
@@ -132,23 +112,12 @@
         "click button \"Show tab row\"",
         "expect tab \"Thread Sidebar: Threads\""
       ],
-      "surfaces": [
-        "client",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["client", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: Hide tab row",
       "configuration": [],
-      "states": [
-        "single-shown",
-        "single-hidden",
-        "restored-hidden",
-        "multi-shown",
-        "single-again-shown",
-        "explicitly-recovered"
-      ],
+      "states": ["single-shown", "single-hidden", "restored-hidden", "multi-shown", "single-again-shown", "explicitly-recovered"],
       "failureModes": [
         "The native edge-shell variant does not restore hideHeader and is not offered this action; owned root/nested Workbenches use ordinary grid groups.",
         "Content context menus are not intercepted; the tab/blank row, local content control and global command are the presentation entry points."
@@ -196,24 +165,12 @@
         "click menuitem \"Hide tab row\"",
         "expect button \"Add AI account\""
       ],
-      "surfaces": [
-        "client",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["client", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: AI Accounts: Preview tab",
       "configuration": [],
-      "states": [
-        "legacy-fixed",
-        "ordinary-left-group",
-        "content-only",
-        "moved",
-        "closed",
-        "explicitly-reopened",
-        "standalone-fallback"
-      ],
+      "states": ["legacy-fixed", "ordinary-left-group", "content-only", "moved", "closed", "explicitly-reopened", "standalone-fallback"],
       "failureModes": [
         "Mixed or unnamed preview contributors use the existing truthful Thread Sidebar: Plugin previews label, not a guessed account-specific owner.",
         "The one-time browser migration marker only controls initial seating; native layout JSON remains the actual placement and tab-row owner."
@@ -254,29 +211,13 @@
       "id": "window-floating",
       "title": "Root-pane windows float across the application",
       "summary": "Float panel and native Shift-float keep the same pane API, panel and renderer but move native chrome and persistent content through window coordinates. Main, left, right and bottom floats can leave their source pane, overlap with native chrome/body interleaving and per-window focus order, resize and reload, and their tabs can dock through the existing cross-region owner. Nested paint-contained surfaces remain local. Hiding a source pane retains native descendant visibility semantics rather than inventing another floating resource owner.",
-      "reach": [
-        "rightclick tab \"Thread Sidebar: Threads\"",
-        "click menuitem \"Float panel\"",
-        "expect button \"Search threads\""
-      ],
-      "surfaces": [
-        "client",
-        "integration",
-        "storage"
-      ],
+      "reach": ["rightclick tab \"Thread Sidebar: Threads\"", "click menuitem \"Float panel\"", "expect button \"Search threads\""],
+      "surfaces": ["client", "integration", "storage"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: Float panel",
       "configuration": [],
-      "states": [
-        "docked",
-        "window-floating",
-        "overlapping",
-        "resized",
-        "restored",
-        "redocked",
-        "nested-local"
-      ],
+      "states": ["docked", "window-floating", "overlapping", "resized", "restored", "redocked", "nested-local"],
       "failureModes": [
         "Only root Dockviews escape ordinary frame-column overflow; registered nested content keeps its paint containment.",
         "Legacy local float coordinates may shift on first use of window space, but native viewport bounds keep the window reachable without resetting the layout."
@@ -340,16 +281,8 @@
       "id": "main-conversation",
       "title": "Workbench as the main conversation surface",
       "summary": "One fixed Session-bound conversation tab contains both native chat history and the real text-input editor. Sidebar clicks open a closed conversation as a new kept tab or focus its existing tab; other tabs never follow global selection. Closing all tabs leaves the docked chooser, not a resurrected global conversation. Legacy global-following aliases retire without changing fixed tab identity. Genuinely empty fixed Sessions use the native centered welcome, workspace/model controls and original composer; unsent drafts do not turn them into active transcripts. Loading history settles without a false welcome, and the first real turn becomes normal scrollable chat without replacing the editor.",
-      "reach": [
-        "seed tool-call-thread",
-        "click button \"New thread\"",
-        "expect text \"Into the Unknown\""
-      ],
-      "surfaces": [
-        "client",
-        "integration",
-        "settings"
-      ],
+      "reach": ["seed tool-call-thread", "click button \"New thread\"", "expect text \"Into the Unknown\""],
+      "surfaces": ["client", "integration", "settings"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: main conversation tab",
@@ -358,27 +291,12 @@
           "key": "mainSurface",
           "defaultValue": "workbench",
           "constraints": "Hidden legacy decode-only field; explicit native values no longer select a renderer. The centre always uses the Workbench.",
-          "choices": [
-            "native",
-            "workbench"
-          ],
-          "coveredBy": [
-            "workbench.main-hosts-the-conversation",
-            "workbench.default-main-surface"
-          ]
+          "choices": ["native", "workbench"],
+          "coveredBy": ["workbench.main-hosts-the-conversation", "workbench.default-main-surface"]
         }
       ],
-      "states": [
-        "workbench",
-        "thread-selected",
-        "empty-welcome",
-        "history-settling",
-        "active-chat",
-        "legacy-preference-migrated"
-      ],
-      "failureModes": [
-        "The owned frame is required; the surface never re-declares main or recursively hosts its legacy workbench key."
-      ],
+      "states": ["workbench", "thread-selected", "empty-welcome", "history-settling", "active-chat", "legacy-preference-migrated"],
+      "failureModes": ["The owned frame is required; the surface never re-declares main or recursively hosts its legacy workbench key."],
       "externalDependencies": [],
       "verification": [
         {
@@ -463,24 +381,13 @@
       "id": "main-panel-sources",
       "title": "Choose plugin views and one Settings hub",
       "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use producer-declared Plugin: View names, including Settings Shell: Settings and AI Accounts: Preview. Conversations open only from the thread list or New thread, never as a separate Rich Composer/current-conversation choice. Search matches full qualified names; special ordering uses stable IDs. Restored reusable panels refresh their captions without changing IDs or remounting, while user conversation, scoped and resource titles remain untouched. Empty right/bottom panes and semantic Start use the same chooser; Settings leaves and runtime occurrences are not primary suggestions.",
-      "reach": [
-        "click button \"New tab\"",
-        "expect region \"Choose a view\""
-      ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "reach": ["click button \"New tab\"", "expect region \"Choose a view\""],
+      "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "main-tabs: New tab chooser",
       "configuration": [],
-      "states": [
-        "available",
-        "open",
-        "closed",
-        "source-removed"
-      ],
+      "states": ["available", "open", "closed", "source-removed"],
       "failureModes": [
         "Foreign child slots remain in their original assemblies unless their declarer opts in; unavailable sources are not reconstructed from private props."
       ],
@@ -570,29 +477,14 @@
       "id": "all-region-drag",
       "title": "Drag panels across centre right and bottom",
       "summary": "Real tab drags move one owned panel across all root regions, including an empty target, and each region restores its persisted arrangement.",
-      "reach": [
-        "click button \"Collapse sidebar\"",
-        "click button \"Pane options\"",
-        "expect menuitem \"Toggle the bottom panel\""
-      ],
-      "surfaces": [
-        "client",
-        "integration",
-        "storage"
-      ],
+      "reach": ["click button \"Collapse sidebar\"", "click button \"Pane options\"", "expect menuitem \"Toggle the bottom panel\""],
+      "surfaces": ["client", "integration", "storage"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: panel drag",
       "configuration": [],
-      "states": [
-        "centre",
-        "right",
-        "bottom",
-        "reloaded"
-      ],
-      "failureModes": [
-        "Cross-instance targets require embedder adoption and empty-target handling; a source copy must not survive a successful move."
-      ],
+      "states": ["centre", "right", "bottom", "reloaded"],
+      "failureModes": ["Cross-instance targets require embedder adoption and empty-target handling; a source copy must not survive a successful move."],
       "externalDependencies": [],
       "verification": [
         {
@@ -622,26 +514,13 @@
         "click radio \"right\"",
         "expect radio \"right\""
       ],
-      "surfaces": [
-        "client",
-        "integration",
-        "storage",
-        "settings"
-      ],
+      "surfaces": ["client", "integration", "storage", "settings"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: tab semantics",
       "configuration": [],
-      "states": [
-        "preview",
-        "kept",
-        "pinned",
-        "unread",
-        "closed"
-      ],
-      "failureModes": [
-        "The renderer must not become a second navigation actor or remount a thread whenever status changes."
-      ],
+      "states": ["preview", "kept", "pinned", "unread", "closed"],
+      "failureModes": ["The renderer must not become a second navigation actor or remount a thread whenever status changes."],
       "externalDependencies": [],
       "verification": [
         {
@@ -702,24 +581,12 @@
         "click button \"Terminal: Terminal\"",
         "expect tab \"Terminal*\""
       ],
-      "surfaces": [
-        "client",
-        "integration",
-        "storage"
-      ],
+      "surfaces": ["client", "integration", "storage"],
       "surface": "threadFacet",
       "destination": "thread-panel",
       "currentSurface": "main-tabs: New tab › Terminal: Terminal",
       "configuration": [],
-      "states": [
-        "available",
-        "opened",
-        "moved",
-        "hidden",
-        "restored",
-        "closed",
-        "session-unavailable"
-      ],
+      "states": ["available", "opened", "moved", "hidden", "restored", "closed", "session-unavailable"],
       "failureModes": [
         "The native terminal provider and a conversation/workspace context are required; an unavailable provider shows guidance rather than inventing a Session or PTY.",
         "Cancelled unseated launch intents close only their exact newly created native occurrence and never open another pane.",
@@ -763,22 +630,12 @@
         "click button \"Cost*\"",
         "expect text \"List-price estimates of this thread*\""
       ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
       "currentSurface": "workbench: Choose a view › Thread panels",
       "configuration": [],
-      "states": [
-        "listed",
-        "no-thread",
-        "opened",
-        "following",
-        "kept-without-thread",
-        "closed"
-      ],
+      "states": ["listed", "no-thread", "opened", "following", "kept-without-thread", "closed"],
       "failureModes": [
         "With no thread on screen the rows are disabled and the chooser says to open a thread; nothing is asked of the native owner.",
         "Only the single page of a kind follows the thread; addressed resources (a file, one of several terminals) stay with the thread that opened them.",
@@ -821,18 +678,12 @@
       "id": "phone-thread-panel-sheet",
       "title": "Open the thread panel as a bottom sheet on a phone",
       "summary": "Below 640px the frame gives the right column no width, so the Workbench dock (the thread panel: Changes, Cost, Jobs, Context and the other facets) rises as a bottom sheet above the tab bar instead of a cramped column: same surface, same facet tabs and Choose a view, with a grab handle, Close, a scrim and Escape to put it away. The phone top bar's Thread panels button and the existing toggle open it. On a phone the main region's tab rows are hidden (the stack, Back and the sheet navigate instead), the sheet's facet tabs get 40px rows, and Choose a view does not autofocus its search so the software keyboard stays down. The sheet's open state belongs to the page (every phone load starts closed) and the dock controls drive it on a phone, so the remembered desktop right pane is neither opened over a phone nor changed from one. Desktop keeps the right pane and tab rows.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
       "currentSurface": "workbench: right pane as a narrow column; phone reached facets only through the main pane's New tab",
       "configuration": [],
-      "states": [
-        "closed",
-        "open-chooser",
-        "open-facet"
-      ],
+      "states": ["closed", "open-chooser", "open-facet"],
       "failureModes": [
         "Without the phone shell (no data-shell-phone-nav) the main tab rows stay, so a profile without phone navigation keeps its tabs.",
         "Crossing the 640px breakpoint remounts the dock surface; its saved layout restores the facet tabs."
@@ -882,22 +733,12 @@
         "click option \"New terminal*\"",
         "expect tab \"Terminal*\""
       ],
-      "surfaces": [
-        "client",
-        "integration",
-        "storage"
-      ],
+      "surfaces": ["client", "integration", "storage"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "right-pane: native preview, diff and terminal resources",
       "configuration": [],
-      "states": [
-        "preview",
-        "review",
-        "terminal",
-        "hidden",
-        "restored"
-      ],
+      "states": ["preview", "review", "terminal", "hidden", "restored"],
       "failureModes": [
         "Without the owned sidebar-right cooperation native resources retain their original native surface; the workbench never fakes a tab occurrence or terminal lifecycle."
       ],
@@ -920,28 +761,13 @@
       "id": "nested-surfaces",
       "title": "Split panes into Dockview groups and restore legacy layouts",
       "summary": "Pane options Split right and Split down create actual Dockview groups with chooser tabs. Existing nested-container layouts remain restorable, movable and resettable, but no control creates new nested containers.",
-      "reach": [
-        "click button \"Pane options\"",
-        "click menuitem \"Split right\"",
-        "expect region \"Choose a view\""
-      ],
-      "surfaces": [
-        "client",
-        "integration",
-        "storage"
-      ],
+      "reach": ["click button \"Pane options\"", "click menuitem \"Split right\"", "expect region \"Choose a view\""],
+      "surfaces": ["client", "integration", "storage"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: Pane options › Split",
       "configuration": [],
-      "states": [
-        "chooser",
-        "split-right",
-        "split-down",
-        "legacy-nested-restored",
-        "moved-out",
-        "restored"
-      ],
+      "states": ["chooser", "split-right", "split-down", "legacy-nested-restored", "moved-out", "restored"],
       "failureModes": [
         "Container cycles are rejected; every child surface needs an independent stable path and named-layout capture rather than relying on the parent's Dockview JSON."
       ],
@@ -970,18 +796,8 @@
       "id": "dockable-panel-layouts",
       "title": "Arrange plugin panels in independent layouts",
       "summary": "Quiet group chrome has New tab after tabs and Pane options at the far right, without a Workbench heading or persistent toolbar. Pane options groups Split right/down, Layouts, Move tab to, Reset layout and bottom toggling. Splits are Dockview groups; saved layouts win. Scratchpad and Ticker remain developer fixtures.",
-      "reach": [
-        "click button \"Collapse sidebar\"",
-        "click button \"Pane options\"",
-        "click menuitem \"Layouts\"",
-        "expect dialog \"Saved layouts\""
-      ],
-      "surfaces": [
-        "client",
-        "integration",
-        "storage",
-        "settings"
-      ],
+      "reach": ["click button \"Collapse sidebar\"", "click button \"Pane options\"", "click menuitem \"Layouts\"", "expect dialog \"Saved layouts\""],
+      "surfaces": ["client", "integration", "storage", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "workbench: Pane options › Layouts",
@@ -990,34 +806,18 @@
           "key": "headerToggle",
           "defaultValue": "false",
           "constraints": "Hidden legacy decode-only field; the main Pane options opener is offered only while the right pane is closed.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "workbench.surface-layouts"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["workbench.surface-layouts"]
         },
         {
           "key": "demoPanels",
           "defaultValue": "false",
           "constraints": "Boolean; offer the Scratchpad and Ticker developer fixtures in the New tab chooser.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "workbench.default-layout"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["workbench.default-layout"]
         }
       ],
-      "states": [
-        "tabbed",
-        "split",
-        "floating",
-        "closed",
-        "reset"
-      ],
+      "states": ["tabbed", "split", "floating", "closed", "reset"],
       "failureModes": [
         "Malformed persisted layout falls back to defaults.",
         "An unavailable registered plugin remains a closable placeholder and recovers when it registers."
@@ -1133,12 +933,7 @@
         "click button \"Expand sidebar\"",
         "expect button \"Close pane\""
       ],
-      "surfaces": [
-        "client",
-        "integration",
-        "storage",
-        "settings"
-      ],
+      "surfaces": ["client", "integration", "storage", "settings"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: right pane and bottom panel",
@@ -1147,36 +942,18 @@
           "key": "rightPanel",
           "defaultValue": "native",
           "constraints": "Hidden legacy migration input: dock initializes an open pane and native a closed pane once. It never selects native chrome or overrides subsequent browser-local visibility.",
-          "choices": [
-            "native",
-            "dock"
-          ],
-          "coveredBy": [
-            "workbench.global-dock"
-          ]
+          "choices": ["native", "dock"],
+          "coveredBy": ["workbench.global-dock"]
         },
         {
           "key": "bottomPanel",
           "defaultValue": "hidden",
           "constraints": "One of hidden or shown; applies live to the bottom row below left and centre, never underneath the full-height right pane.",
-          "choices": [
-            "hidden",
-            "shown"
-          ],
-          "coveredBy": [
-            "workbench.bottom-panel"
-          ]
+          "choices": ["hidden", "shown"],
+          "coveredBy": ["workbench.bottom-panel"]
         }
       ],
-      "states": [
-        "closed",
-        "dock",
-        "bottom-open",
-        "panel-moved",
-        "layout-saved",
-        "layout-applied",
-        "reloaded"
-      ],
+      "states": ["closed", "dock", "bottom-open", "panel-moved", "layout-saved", "layout-applied", "reloaded"],
       "failureModes": [
         "The owned frame must supply the main, right and bottom seats before this plugin activates.",
         "A rejected saved dock layout falls back to an empty tabbed pane; reusable views remain available from its picker.",
@@ -1274,24 +1051,13 @@
       "id": "layout-recovery",
       "title": "Recover all panes and semantic tabs",
       "summary": "Reset always reveals the left chat list and selects the authorized current-conversation view in a docked centre group, even when a tool was active or views were floating, moved or absent. Root, nested and project-scoped layouts reset together without changing chat tabs, drafts, pins or named layouts. A global command-palette recovery remains available independently of centre controls.",
-      "surfaces": [
-        "client",
-        "storage"
-      ],
+      "surfaces": ["client", "storage"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: Pane options › Reset layout",
-      "reach": [
-        "click button \"Pane options\"",
-        "click menuitem \"Reset layout\"",
-        "expect button \"New tab\""
-      ],
+      "reach": ["click button \"Pane options\"", "click menuitem \"Reset layout\"", "expect button \"New tab\""],
       "configuration": [],
-      "states": [
-        "moved",
-        "reset",
-        "reloaded"
-      ],
+      "states": ["moved", "reset", "reloaded"],
       "failureModes": [
         "Per-pane defaults cannot recover cross-pane semantic placements; reset cancels pending handoffs before rebuilding main and left defaults."
       ],
@@ -1325,23 +1091,13 @@
       "id": "early-panel-registration",
       "title": "Queue panel-open requests before mount",
       "summary": "Retain stable panel registrations and early open requests until the matching dock view mounts.",
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "workbench: panel registration",
       "configuration": [],
-      "states": [
-        "registered",
-        "queued-open",
-        "mounted",
-        "placeholder"
-      ],
-      "failureModes": [
-        "A duplicate or missing panel identity cannot silently replace another registration."
-      ],
+      "states": ["registered", "queued-open", "mounted", "placeholder"],
+      "failureModes": ["A duplicate or missing panel identity cannot silently replace another registration."],
       "externalDependencies": [],
       "verification": [
         {

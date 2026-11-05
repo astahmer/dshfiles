@@ -60,8 +60,7 @@ const jujutsuHandlers = Api.handlers(jujutsuApi, {
   revisionRelationship: input => RevisionReader.use(reader => reader.relationship(input)).pipe(asReadFailure('Could not compare revisions.')),
   graphSlice: input => RevisionReader.use(reader => reader.slice(input)).pipe(asReadFailure('Could not read revision history.')),
   referenceGraph: input => RevisionReader.use(reader => reader.referenceGraph(input)).pipe(asReadFailure('Could not read a graph around that reference.')),
-  referenceTitles: input =>
-    RevisionReader.use(reader => reader.referenceTitles(input)).pipe(Effect.map(output => ({ titles: [...output.titles] }))),
+  referenceTitles: input => RevisionReader.use(reader => reader.referenceTitles(input)).pipe(Effect.map(output => ({ titles: [...output.titles] }))),
   details: input => RevisionReader.use(reader => reader.details(input)).pipe(asReadFailure('Could not load revision details.')),
   revisionFiles: input => RevisionReader.use(reader => reader.fileStats(input)).pipe(Effect.catchTag('InvalidJjOutput', Effect.die)),
   editTimes: input =>

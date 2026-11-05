@@ -87,7 +87,10 @@ describe('TurnActivity.summarize', () => {
       'ran 2 commands',
       'tests 40/42',
     ])
-    expect(TurnActivity.segments(summary, { includeReads: true, lineCounts: false, testResults: false }).map(segment => segment.text)).toEqual(['edited 2 files', 'ran 2 commands'])
+    expect(TurnActivity.segments(summary, { includeReads: true, lineCounts: false, testResults: false }).map(segment => segment.text)).toEqual([
+      'edited 2 files',
+      'ran 2 commands',
+    ])
     expect(TurnActivity.testCounts('===== 3 failed, 12 passed in 1.20s =====')).toEqual({ passed: 12, failed: 3, total: 15 })
     expect(TurnActivity.duration(72_000)).toBe('1m 12s')
   })

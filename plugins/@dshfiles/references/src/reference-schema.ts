@@ -23,4 +23,3 @@ export const attachmentSchema = Schema.Struct({
   sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
   names: Schema.Array(nameSchema).check(Schema.isMaxLength(32)),
 })
-

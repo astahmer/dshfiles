@@ -14,9 +14,7 @@ export type ChatReferenceTitleLoader = (input: {
 }) => Promise<{ readonly titles: readonly ChatReferenceTitleRow[] }>
 
 /** A reference's title state: still loading, or settled with the repository that resolved it (null when none did). */
-export type ChatReferenceTitleEntry =
-  | { readonly state: 'pending' }
-  | { readonly state: 'settled'; readonly title: string; readonly targetPath: string | null }
+export type ChatReferenceTitleEntry = { readonly state: 'pending' } | { readonly state: 'settled'; readonly title: string; readonly targetPath: string | null }
 
 const BATCH_LIMIT = 100
 

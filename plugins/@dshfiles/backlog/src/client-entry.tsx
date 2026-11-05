@@ -345,9 +345,7 @@ export default defineClient({
     )
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 3, label: 'Backlog' }, PanelGlyph))
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))
-    ctx.slots.inject('shell.overlay', () =>
-      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-backlog-notices', order: 121 }, decorate(NoticeOverlay)),
-    )
+    ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-backlog-notices', order: 121 }, decorate(NoticeOverlay)))
     ctx.slots.inject('conversation.user.text.node', () =>
       ctx.slots.register({ name: 'conversation.user.text.node', key: 'backlog', priority: 100 }, BacklogMentionChip),
     )

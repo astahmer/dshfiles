@@ -313,7 +313,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     const stage = find(stageSession) ?? (stageSession === undefined ? find(selectedThreadId) : undefined)
     return stage === undefined || stage.blank ? undefined : stage.id
   })
-  const stageTitle = props.useSessions(state => (stageThread === undefined ? undefined : Object.values(state.byId).find(session => session.id === stageThread)?.displayTitle))
+  const stageTitle = props.useSessions(state =>
+    stageThread === undefined ? undefined : Object.values(state.byId).find(session => session.id === stageThread)?.displayTitle,
+  )
   // Fixed (default): the rail and one list; the Workbench left panes render only in free docking (plans/ade-ux §4.1).
   const docking = preferences.layoutMode === 'docking'
   const contentOverridden = props.contentOverridden && docking

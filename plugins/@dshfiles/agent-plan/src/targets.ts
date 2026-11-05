@@ -15,10 +15,10 @@ const NONE: ConversationLocationDataSource<undefined> = { getSnapshot: () => und
  * Bind the readers to `ctx.uiConversation`. A Session the Conversation service does not know yet (or no longer) reads
  * as empty instead of throwing, so a card renders its native fallback.
  */
-export const agentTargets = <SessionId,>(uiConversation: {
+export const agentTargets = <SessionId>(uiConversation: {
   binding(sessionId: SessionId): { target(target: 'dshfiles-agent-plan' | 'dshfiles-agent-activity'): ConversationLocationDataSource<unknown> }
 }): AgentTargets<SessionId> => {
-  const read = <Value,>(sessionId: SessionId, target: 'dshfiles-agent-plan' | 'dshfiles-agent-activity'): ConversationLocationDataSource<Value | undefined> => {
+  const read = <Value>(sessionId: SessionId, target: 'dshfiles-agent-plan' | 'dshfiles-agent-activity'): ConversationLocationDataSource<Value | undefined> => {
     try {
       // SAFETY: ConversationViewSnapshotMap (conversation-targets.ts) types each target's snapshot as Value.
       return uiConversation.binding(sessionId).target(target) as ConversationLocationDataSource<Value | undefined>
@@ -29,7 +29,10 @@ export const agentTargets = <SessionId,>(uiConversation: {
   return { plan: sessionId => read(sessionId, 'dshfiles-agent-plan'), activity: sessionId => read(sessionId, 'dshfiles-agent-activity') }
 }
 
-export const useTarget = <SessionId, Value>(sessionId: SessionId, select: (sessionId: SessionId) => ConversationLocationDataSource<Value | undefined>): Value | undefined => {
+export const useTarget = <SessionId, Value>(
+  sessionId: SessionId,
+  select: (sessionId: SessionId) => ConversationLocationDataSource<Value | undefined>,
+): Value | undefined => {
   const source = useMemo(() => select(sessionId), [select, sessionId])
   return useSyncExternalStore(source.subscribe, source.getSnapshot)
 }

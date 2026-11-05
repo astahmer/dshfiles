@@ -48,13 +48,14 @@ export const NewViewChooser = (props: {
     .toSorted((left, right) => left.facet.order - right.facet.order)
   const views = available
     .filter(definition => definition.threadFacet === undefined)
-    .filter(matches).sort((left, right) => {
-    const priority = (definition: WorkbenchPanelDefinition): number => {
-      const index = [NewThreadSource.id, 'dshfiles-settings', 'dshfiles-thread-sidebar.workbench-navigation'].indexOf(definition.id)
-      return index === -1 ? 3 : index
-    }
-    return priority(left) - priority(right) || left.title.localeCompare(right.title)
-  })
+    .filter(matches)
+    .sort((left, right) => {
+      const priority = (definition: WorkbenchPanelDefinition): number => {
+        const index = [NewThreadSource.id, 'dshfiles-settings', 'dshfiles-thread-sidebar.workbench-navigation'].indexOf(definition.id)
+        return index === -1 ? 3 : index
+      }
+      return priority(left) - priority(right) || left.title.localeCompare(right.title)
+    })
   const actions = menuRows
     .filter(row => row.menu === NEW_VIEW_MENU && [row.title, ...(row.keywords ?? [])].some(text => text.toLocaleLowerCase().includes(query)))
     .toSorted((left, right) => (left.order ?? 100) - (right.order ?? 100) || left.title.localeCompare(right.title))

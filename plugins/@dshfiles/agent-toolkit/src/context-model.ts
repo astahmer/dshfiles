@@ -69,7 +69,12 @@ const agent = (input: AgentInput | null): ContextSection =>
   )
 
 const memory = (input: { readonly project: string; readonly text: string } | null): ContextSection =>
-  section('memory', input === null || input.text.trim() === '' ? [] : [{ id: 'start-block', name: 'Memory start block', detail: input.project, tokens: textTokens(input.text) }])
+  section(
+    'memory',
+    input === null || input.text.trim() === ''
+      ? []
+      : [{ id: 'start-block', name: 'Memory start block', detail: input.project, tokens: textTokens(input.text) }],
+  )
 
 export interface SkillInput {
   readonly name: string
@@ -114,7 +119,12 @@ export interface ReferenceInput {
 const references = (input: readonly ReferenceInput[]): ContextSection =>
   section(
     'references',
-    input.map(reference => ({ id: reference.name, name: reference.name, detail: reference.path, tokens: textTokens(reference.name, reference.path, reference.source, reference.description) })),
+    input.map(reference => ({
+      id: reference.name,
+      name: reference.name,
+      detail: reference.path,
+      tokens: textTokens(reference.name, reference.path, reference.source, reference.description),
+    })),
   )
 
 /** `12`, `1.2k`, `12k`: the estimate as the facet prints it. */

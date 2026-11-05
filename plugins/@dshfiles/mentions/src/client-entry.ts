@@ -300,6 +300,12 @@ export default defineClient({
     }
 
     // Files and threads are the first `@` group; input-trigger's entity registry registers it with the composer.
-    metadata?.plugin?.add(EntityKinds, { kind: ENTITY_KIND, label: 'File or thread', order: 0, mentionPrefixes: ['thread', 't', 'file', 'f'], mentionSource: source })
+    metadata?.plugin?.add(EntityKinds, {
+      kind: ENTITY_KIND,
+      label: 'File or thread',
+      order: 0,
+      mentionPrefixes: ['thread', 't', 'file', 'f'],
+      mentionSource: source,
+    })
   },
 })

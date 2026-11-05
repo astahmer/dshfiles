@@ -49,7 +49,11 @@ export const useRangeViewedMarks = (range: ViewedRange | undefined): ViewedMarks
     refetchInterval: POLL_MS,
     retry: (count, error) => !isApiOwnerMissing(error) && count < 2,
     queryFn: ({ signal }) =>
-      runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.rangeState(range ?? { workspacePath: '-', base: '-', head: '-' }, { signal: hostSignal }) }),
+      runHostRequest({
+        signal,
+        timeoutMs: 30_000,
+        request: hostSignal => api.rangeState(range ?? { workspacePath: '-', base: '-', head: '-' }, { signal: hostSignal }),
+      }),
   })
   useStopWhenOwnerMissing(query.error, stopPolling)
   const mutation = useMutation({

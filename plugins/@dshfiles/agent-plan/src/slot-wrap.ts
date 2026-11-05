@@ -37,7 +37,7 @@ export const wrapSlotEntries = <Props extends object>(input: {
     }
     for (const entry of entries) {
       const component = entry.component
-      if (!input.matches(entry) || typeof component !== 'function' && (typeof component !== 'object' || component === null)) continue
+      if (!input.matches(entry) || (typeof component !== 'function' && (typeof component !== 'object' || component === null))) continue
       if (wrappers.has(component)) continue
       originals.set(entry, component)
       // SAFETY: the ledger erases component types; every entry of one slot cell renders with that cell's props, which

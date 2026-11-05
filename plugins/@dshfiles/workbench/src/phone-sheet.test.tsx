@@ -48,7 +48,11 @@ describe('phoneAwareDockActions', () => {
       key: 'test.right-pane-visible',
       schema: Schema.NullOr(Schema.Boolean),
       fallback: null,
-      storage: () => ({ getItem: key => values.get(key) ?? null, setItem: (key, value) => void values.set(key, value), removeItem: key => void values.delete(key) }),
+      storage: () => ({
+        getItem: key => values.get(key) ?? null,
+        setItem: (key, value) => void values.set(key, value),
+        removeItem: key => void values.delete(key),
+      }),
     })
     visibility.set(true)
     let phone = true

@@ -5,7 +5,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
-  ReferenceChip: (props: { readonly label: string; readonly title: string }) => createElement('span', { 'data-ref-chip': 'session', title: props.title }, props.label),
+  ReferenceChip: (props: { readonly label: string; readonly title: string }) =>
+    createElement('span', { 'data-ref-chip': 'session', title: props.title }, props.label),
 }))
 
 import { SessionMentionChip, SessionReferenceLinks } from './session-reference-links.js'
@@ -50,7 +51,12 @@ describe('session reference links', () => {
     // A sent chip carries `@label`; the thread comes from the conversation's recall events.
     const raw = '@Mention target'
     const container = mount(
-      <SessionMentionChip interactive node={{ id: 'session', start: 0, end: raw.length, data: { label: 'Mention target' } }} raw={raw} sessionId="session-sender" />,
+      <SessionMentionChip
+        interactive
+        node={{ id: 'session', start: 0, end: raw.length, data: { label: 'Mention target' } }}
+        raw={raw}
+        sessionId="session-sender"
+      />,
     )
     const link = container.querySelector('[data-dshfiles-session-link]')
     expect(link?.getAttribute('role')).toBe('link')
@@ -74,7 +80,14 @@ describe('session reference links', () => {
 
   it('keeps a queued or previewed chip inert', () => {
     const raw = mention('Mention target', 'session-target')
-    const container = mount(<SessionMentionChip sessionId="session-sender" interactive={false} node={{ id: 'session', start: 0, end: raw.length, data: { label: 'Mention target' } }} raw={raw} />)
+    const container = mount(
+      <SessionMentionChip
+        sessionId="session-sender"
+        interactive={false}
+        node={{ id: 'session', start: 0, end: raw.length, data: { label: 'Mention target' } }}
+        raw={raw}
+      />,
+    )
     expect(container.querySelector('[role="link"]')).toBeNull()
   })
 

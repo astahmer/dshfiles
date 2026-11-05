@@ -319,7 +319,8 @@ const groupEntries = (input: {
     const rest = kept.filter(field => !isJevField(field))
     const title = pageTitle(original)
     // The one shared key (this plugin's own field) leads the Jev entry; the plugins that use it follow with their switches.
-    if (jev.length > 0 && original.ns === SHARED_JEV_NAMESPACE) jevPages.unshift({
+    if (jev.length > 0 && original.ns === SHARED_JEV_NAMESPACE)
+      jevPages.unshift({
         ...original,
         pageId: `${JEV_ENTRY_ID}:${original.ns}`,
         title: 'Key',

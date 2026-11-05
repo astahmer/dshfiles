@@ -27,15 +27,13 @@ const formerEntries = new Set(FORMER_NAVIGATION.map(former => former.entry))
 const entries = (panels: readonly DestinationPanel[]): readonly MovedEntry[] =>
   KNOWN_SECTIONS.flatMap(section => {
     const named = (section.formerLabels ?? []).filter((label, index) => index === 0 || formerEntries.has(label))
-    return named.map(entry => (
-      {
-        entry,
-        location: `${destinationLabel(section.destination)} › ${section.label}`,
-        destination: section.destination,
-        panelId: section.panelId,
-        available: panels.some(panel => panel.id === section.panelId),
-      }
-    ))
+    return named.map(entry => ({
+      entry,
+      location: `${destinationLabel(section.destination)} › ${section.label}`,
+      destination: section.destination,
+      panelId: section.panelId,
+      available: panels.some(panel => panel.id === section.panelId),
+    }))
   }).sort((left, right) => left.entry.localeCompare(right.entry))
 
 let open = false

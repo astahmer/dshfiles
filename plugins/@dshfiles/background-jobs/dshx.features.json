@@ -6,33 +6,13 @@
       "id": "jobs-board",
       "title": "Cross-Session background jobs board",
       "summary": "The Jobs tab of Observe › Processes: One page lists every background job of every Session: running jobs projected live from the job registry, finished or interrupted ones from the session logs, classified into deterministic categories derived from the job kind and label.",
-      "reach": [
-        "click tab \"Observe\"",
-        "click button \"Processes\"",
-        "expect text \"What runs on this host for your threads*\""
-      ],
-      "surfaces": [
-        "host",
-        "tool",
-        "storage",
-        "client"
-      ],
+      "reach": ["click tab \"Observe\"", "click button \"Processes\"", "expect text \"What runs on this host for your threads*\""],
+      "surfaces": ["host", "tool", "storage", "client"],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: Background Jobs: Jobs",
       "configuration": [],
-      "states": [
-        "running",
-        "finished",
-        "interrupted",
-        "filtered",
-        "searched",
-        "grouped",
-        "paged",
-        "indexing",
-        "registry-unavailable",
-        "history-only"
-      ],
+      "states": ["running", "finished", "interrupted", "filtered", "searched", "grouped", "paged", "indexing", "registry-unavailable", "history-only"],
       "failureModes": [
         "A job of another Session is listed and described, but stopping it goes through the registry's owner fence, not a client-side bypass.",
         "A job whose output ring belongs to an earlier DSH process reports that only its lifecycle record was retained instead of an empty output.",
@@ -152,19 +132,12 @@
       "id": "batch-stop-jobs",
       "title": "Stop a selection of running jobs",
       "summary": "Running rows carry a checkbox; Shift/Cmd select ranges and toggles, select-all covers the visible running rows, and stopping the selection goes through one confirmation that names the count. Each kill still passes the registry's owner fence.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "observe",
       "currentSurface": "left-nav: Background Jobs: Jobs › batch stop",
       "configuration": [],
-      "states": [
-        "unselected",
-        "range-selected",
-        "confirmed",
-        "partially-stopped"
-      ],
+      "states": ["unselected", "range-selected", "confirmed", "partially-stopped"],
       "failureModes": [
         "Finished rows have no checkbox, so a batch can never target a job that already settled.",
         "A kill the owner fence refuses stays selected and is reported instead of being retried without the fence."
@@ -189,33 +162,19 @@
           "reason": "Client-only: Stop a selection of running jobs renders browser state and starts no Host work of its own."
         }
       ],
-      "reach": [
-        "click tab \"Observe\"",
-        "click button \"Jobs\"",
-        "expect checkbox \"Select all running jobs\""
-      ]
+      "reach": ["click tab \"Observe\"", "click button \"Jobs\"", "expect checkbox \"Select all running jobs\""]
     },
     {
       "id": "processes-page",
       "title": "Observe › Processes: jobs, dev servers and RAM on one page",
       "summary": "One Processes page (plans/ade-ux §6 \"Processes in 3 boards\") owned by background-jobs: Jobs, then the tabs other plugins add through the `@dshfiles/background-jobs/process-views` registry (Dev servers from preview, RAM from worktree-memory). Its navigation glyph carries their marks (RAM pressure and detached memory). `ProcessesNavigation` lets the former RAM page and saved tabs land on their tab; palette rows find it by the old names (Background Jobs: Jobs, Worktree Memory: RAM).",
-      "reach": [
-        "click tab \"Observe\"",
-        "click button \"Processes\"",
-        "expect heading \"Processes\""
-      ],
-      "surfaces": [
-        "client"
-      ],
+      "reach": ["click tab \"Observe\"", "click button \"Processes\"", "expect heading \"Processes\""],
+      "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "observe: Processes",
       "configuration": [],
-      "states": [
-        "jobs",
-        "provider-tab",
-        "no-providers"
-      ],
+      "states": ["jobs", "provider-tab", "no-providers"],
       "failureModes": [
         "A provider cannot replace the Jobs tab; one tab per id, the first registration wins.",
         "Without providers the page is the Jobs board alone, with no tab row."
@@ -245,29 +204,14 @@
       "id": "thread-jobs-facet",
       "title": "Thread panel Jobs facet",
       "summary": "A Jobs tab in the thread panel (the right pane's tab chooser): this thread's background jobs with output and Stop, then each Processes view that can filter to one thread (its dev servers, the RAM its process trees use), and a link to Observe › Processes. Registered as a right-pane page tab type, so it follows the thread on stage without changing sidebar-right.",
-      "reach": [
-        "seed tool-call-thread",
-        "click button \"New tab\"",
-        "click button \"Jobs*\"",
-        "expect heading \"Jobs\""
-      ],
-      "surfaces": [
-        "client"
-      ],
+      "reach": ["seed tool-call-thread", "click button \"New tab\"", "click button \"Jobs*\"", "expect heading \"Jobs\""],
+      "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
       "currentSurface": "workbench: Choose a view › Thread panels › Jobs",
       "configuration": [],
-      "states": [
-        "loading",
-        "empty",
-        "running",
-        "finished",
-        "stop-armed"
-      ],
-      "failureModes": [
-        "Stopping a job goes through the registry's owner fence, as on the board."
-      ],
+      "states": ["loading", "empty", "running", "finished", "stop-armed"],
+      "failureModes": ["Stopping a job goes through the registry's owner fence, as on the board."],
       "externalDependencies": [],
       "verification": [
         {

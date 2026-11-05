@@ -62,7 +62,11 @@ export class Triage extends Context.Service<
       if (Option.isSome(shared)) {
         const legacy = (yield* settings.get).jevSecret
         yield* SharedJevKey.adopt(shared.value, legacy).pipe(
-          Effect.tap(result => (result.kind === 'deferred' ? Effect.logWarning('backlog: the earlier Jev key stays in Backlog settings until the shared key can be written', result.cause) : Effect.void)),
+          Effect.tap(result =>
+            result.kind === 'deferred'
+              ? Effect.logWarning('backlog: the earlier Jev key stays in Backlog settings until the shared key can be written', result.cause)
+              : Effect.void,
+          ),
           Effect.forkScoped,
         )
       }

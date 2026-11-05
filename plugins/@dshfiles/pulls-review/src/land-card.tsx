@@ -81,7 +81,8 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
   const land = useMutation({
     mutationFn: (thread: ThreadView) =>
       runHostRequest({ timeoutMs: 300_000, request: signal => jj.land({ path: thread.path, sessionId: props.sessionId }, { signal }) }),
-    onSuccess: result => setNotice({ tone: result.status === 'landed' || result.status === 'nothing-to-land' ? 'success' : 'failure', text: describeResult(result) }),
+    onSuccess: result =>
+      setNotice({ tone: result.status === 'landed' || result.status === 'nothing-to-land' ? 'success' : 'failure', text: describeResult(result) }),
     onError: error => setNotice({ tone: 'failure', text: errorMessage(error, 'Landing failed. Refresh the card and try again.') }),
     onSettled: refresh,
   })
@@ -126,26 +127,22 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
   const revisions = thread?.unlanded ?? []
 
   return (
-    <section aria-label="Land" className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:p-3" data-testid="land-card">
+    <section
+      aria-label="Land"
+      className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:p-3"
+      data-testid="land-card"
+    >
       <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         <GitMergeIcon aria-hidden className="dshx:size-4 dshx:text-muted-foreground" />
         <h3 className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-medium">Land on {bookmark}</h3>
-        <Button
-          aria-label="Open History"
-          className="dshx:shrink-0"
-          onClick={props.openHistory}
-          size="xs"
-          type="button"
-          variant="ghost"
-        >
+        <Button aria-label="Open History" className="dshx:shrink-0" onClick={props.openHistory} size="xs" type="button" variant="ghost">
           <History aria-hidden className="dshx:size-3.5" />
           History
         </Button>
       </header>
       {thread === null ? (
         <p className={HINT}>
-          This thread edits the project checkout directly, so there is nothing to land. Start the next thread in its own workspace to land its work
-          here.
+          This thread edits the project checkout directly, so there is nothing to land. Start the next thread in its own workspace to land its work here.
         </p>
       ) : (
         <ul className="dshx:flex dshx:flex-col dshx:gap-1">

@@ -21,7 +21,5 @@
     "src/native/client/AppFrame.module.css",
     "src/native/client/columns.ts"
   ],
-  "added": [
-    "src/native/client/StatusStrip.tsx"
-  ]
+  "added": ["src/native/client/StatusStrip.tsx"]
 }

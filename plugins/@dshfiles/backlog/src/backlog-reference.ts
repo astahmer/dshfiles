@@ -1,4 +1,3 @@
-
 /**
  * `b:<id>` is how every surface writes an item number (the capture grammar, the mention chip, the tool descriptions),
  * so an Agent's markdown needs no other syntax. The leading boundary keeps `rb:12` and `/b:12` out, and the digit

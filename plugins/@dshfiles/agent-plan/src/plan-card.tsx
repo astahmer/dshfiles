@@ -20,7 +20,8 @@ export interface PlanCallFacts {
  */
 export const planCardModel = (input: { readonly call: PlanCallFacts; readonly writes: readonly PlanWrite[]; readonly running: boolean }) => {
   const callTime = input.call.callTime
-  const ownIndex = callTime === undefined ? -1 : input.writes.findIndex(write => write.time >= callTime && (input.call.turn === undefined || write.turn === input.call.turn))
+  const ownIndex =
+    callTime === undefined ? -1 : input.writes.findIndex(write => write.time >= callTime && (input.call.turn === undefined || write.turn === input.call.turn))
   const history = ownIndex < 0 ? [] : PlanProgress.lineage(input.writes, ownIndex)
   const next = ownIndex < 0 ? undefined : input.writes[ownIndex + 1]
   const progress = PlanProgress.progress(input.call.items, history)

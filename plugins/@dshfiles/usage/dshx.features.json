@@ -6,23 +6,12 @@
       "id": "usage-index",
       "title": "Incremental request and tool index from session logs",
       "summary": "Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, memory and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, plus privacy-reduced tool execution durations, outcomes and returned-text sizes. Reads only the Zstandard frames each log gained since the last pass. Costs join per-route, per-context-band list prices from the AI Accounts models.dev catalog at query time.",
-      "surfaces": [
-        "host",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["host", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "host: usage ledger",
       "configuration": [],
-      "states": [
-        "empty",
-        "first-index",
-        "incremental",
-        "torn-frame",
-        "unpriced-route",
-        "catalog-refreshed"
-      ],
+      "states": ["empty", "first-index", "incremental", "torn-frame", "unpriced-route", "catalog-refreshed"],
       "failureModes": [
         "A log the writer is still appending to keeps its torn final frame for the next pass instead of failing.",
         "A stored fold state that no longer decodes restarts that log from its first byte; rows upsert by event sequence, so nothing doubles.",
@@ -132,21 +121,12 @@
         "click tab \"Requests\"",
         "expect heading \"Request log\""
       ],
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: Usage: Analytics › Requests",
       "configuration": [],
-      "states": [
-        "empty",
-        "loading",
-        "filtered",
-        "searched",
-        "sorted",
-        "thread-missing"
-      ],
+      "states": ["empty", "loading", "filtered", "searched", "sorted", "thread-missing"],
       "failureModes": [
         "DSH exposes no API to scroll a thread to one turn, so a row opens its thread but cannot jump to the step (see plans/dsh-host-gaps.md).",
         "A subagent session absent from the thread list opens its parent thread instead; an archived or deleted thread shows a notice."
@@ -186,9 +166,7 @@
         "click text \"Daily calendar\"",
         "expect text \"Cache savings (estimate)\""
       ],
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: Usage: Analytics › Charts",
@@ -248,22 +226,12 @@
         "expect text \"Jev API usage\"",
         "expect text \"Usage by API key · calendar month to date\""
       ],
-      "surfaces": [
-        "host",
-        "storage",
-        "integration",
-        "client"
-      ],
+      "surfaces": ["host", "storage", "integration", "client"],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: Usage: Analytics › Charts › Jev",
       "configuration": [],
-      "states": [
-        "empty",
-        "recorded",
-        "failed",
-        "missing-token-usage"
-      ],
+      "states": ["empty", "recorded", "failed", "missing-token-usage"],
       "failureModes": [
         "Calls made outside DSH are not observed; provider-reported balance and account-wide history are not available from the documented Jev API.",
         "Configured credential labels are local references, not proof of provider billing identity; provider account-wide balance/history are not documented API capabilities.",
@@ -335,25 +303,12 @@
         "expect text \"Output by category\"",
         "expect text \"Every tool\""
       ],
-      "surfaces": [
-        "client",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["client", "storage", "integration"],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: Usage: Analytics › Tools & Jev",
       "configuration": [],
-      "states": [
-        "empty",
-        "loading",
-        "populated",
-        "filtered-range",
-        "measured-output",
-        "unmeasured-output",
-        "hourly-timeline",
-        "daily-timeline"
-      ],
+      "states": ["empty", "loading", "populated", "filtered-range", "measured-output", "unmeasured-output", "hourly-timeline", "daily-timeline"],
       "failureModes": [
         "Tool records with no result remain unknown or interrupted, not assumed successful.",
         "A tool result with no text (an image, or a record written before returned tokens were measured) keeps the call but adds no tokens; the row shows the measured share.",
@@ -410,21 +365,12 @@
       "id": "usage-otel-export",
       "title": "OTLP metrics export",
       "summary": "The read-only usage_otel_metrics Agent tool returns an OTLP/HTTP JSON metrics request from the local SQLite usage ledger. It includes model requests and token use, tool category/source counts and Jev requests per calling plugin with token counters and duration histograms. It never makes a network request; quota and Fast-mode history remain in AI Accounts storage.",
-      "surfaces": [
-        "host",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["host", "storage", "integration"],
       "surface": "agentToolOnly",
       "destination": "none",
       "currentSurface": "agent tool: usage_otel_metrics",
       "configuration": [],
-      "states": [
-        "empty",
-        "populated",
-        "bounded-range",
-        "source-cap"
-      ],
+      "states": ["empty", "populated", "bounded-range", "source-cap"],
       "failureModes": [
         "An export range wider than 365 days is rejected.",
         "Named tool source points cap at 500 while category totals remain exact.",
@@ -471,27 +417,13 @@
       "id": "usage-quota-tab",
       "title": "Usage › Quota: account quota, history and forecast in the Usage page",
       "summary": "Observe › Usage has four tabs, Cost · Quota · Requests · Tools (plans/ade-ux §6). Quota hosts ai-accounts' views through the `@dshfiles/ai-accounts/quota-views` contract: Accounts (one account's current limits and its recorded requests and cost), History (quota snapshots, pace, banked resets) and Forecast (forecast, pace, table, coverage, hand-off). Usage provides `UsageNavigation`, so the quota status item, the account Usage tab, saved tabs of the former Usage history and Quota forecast pages and the palette rows (by their old names too) land on the right view and account. Without ai-accounts the tab says to turn it on.",
-      "reach": [
-        "click tab \"Observe\"",
-        "click button \"Usage\"",
-        "click tab \"Quota\"",
-        "click radio \"Forecast\"",
-        "expect radio \"Accounts\""
-      ],
-      "surfaces": [
-        "client"
-      ],
+      "reach": ["click tab \"Observe\"", "click button \"Usage\"", "click tab \"Quota\"", "click radio \"Forecast\"", "expect radio \"Accounts\""],
+      "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "observe: Usage › Quota",
       "configuration": [],
-      "states": [
-        "accounts",
-        "history",
-        "forecast",
-        "account-preselected",
-        "quota-views-missing"
-      ],
+      "states": ["accounts", "history", "forecast", "account-preselected", "quota-views-missing"],
       "failureModes": [
         "Without @dshfiles/ai-accounts the Quota tab shows how to turn it on instead of an empty panel.",
         "The dependency stays one way (usage → ai-accounts): ai-accounts owns the quota-views contract because usage already imports its price catalog, so a usage-owned registry would close a cycle."
@@ -527,26 +459,13 @@
       "id": "thread-cost-facet",
       "title": "Thread panel Cost facet",
       "summary": "A Cost tab in the thread panel (the right pane's tab chooser): the account route and model of the thread's last request, list-price cost per turn with tokens, models and failures, side requests apart, and links to this thread's requests (Usage › Requests filtered to the thread), Usage › Quota for that route, and Traces. Registered as a right-pane page tab type, so it follows the thread on stage without changing sidebar-right.",
-      "reach": [
-        "seed tool-call-thread",
-        "click button \"New tab\"",
-        "click button \"Cost*\"",
-        "expect text \"Per turn\""
-      ],
-      "surfaces": [
-        "client"
-      ],
+      "reach": ["seed tool-call-thread", "click button \"New tab\"", "click button \"Cost*\"", "expect text \"Per turn\""],
+      "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
       "currentSurface": "workbench: Choose a view › Thread panels › Cost",
       "configuration": [],
-      "states": [
-        "loading",
-        "empty",
-        "per-turn",
-        "unpriced",
-        "read-failed"
-      ],
+      "states": ["loading", "empty", "per-turn", "unpriced", "read-failed"],
       "failureModes": [
         "An unpriced request leaves its turn's cost unknown rather than zero.",
         "Only the thread's own requests are counted; subagents' requests stay in their own threads.",

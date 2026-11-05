@@ -55,7 +55,8 @@ export const PhoneTopBarModel = {
     if (owner === undefined) {
       const title = input.selectedThreadId === null ? 'New thread' : input.stageTitle?.trim() || 'Thread'
       const from = input.origin === undefined ? undefined : PhoneTopBarModel.pageLabel(input.destinations, input.origin.panelId)
-      if (from !== undefined && input.origin !== undefined) return { title, back: { to: 'page', panelId: input.origin.panelId, label: from }, thread: input.selectedThreadId !== null }
+      if (from !== undefined && input.origin !== undefined)
+        return { title, back: { to: 'page', panelId: input.origin.panelId, label: from }, thread: input.selectedThreadId !== null }
       const threads = input.destinations.find(candidate => candidate.id === 'threads')
       return { title, back: { to: 'threads', label: threads?.label ?? 'Threads' }, thread: input.selectedThreadId !== null }
     }
@@ -78,7 +79,8 @@ export const PhoneTopBarModel = {
 } as const
 
 const editable = (element: Element | null): boolean =>
-  element instanceof HTMLElement && (element.isContentEditable || element.matches('input:not([type=checkbox]):not([type=radio]):not([type=button]), textarea, select'))
+  element instanceof HTMLElement &&
+  (element.isContentEditable || element.matches('input:not([type=checkbox]):not([type=radio]):not([type=button]), textarea, select'))
 
 /**
  * The software keyboard on iOS WebKit shrinks the visual viewport, not the layout viewport, so `position: fixed` bars
@@ -122,4 +124,3 @@ export const useSoftwareKeyboard = (): void => {
     }
   }, [])
 }
-

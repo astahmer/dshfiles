@@ -6,14 +6,8 @@
       "id": "turn-summary-line",
       "title": "A summary footer under each finished turn",
       "summary": "Under each finished turn, one line says what the agent did with tools: files edited with lines added and removed, commands run, tests passed out of total from the last test-runner summary, files read and searches, and how long the turn took — \"Edited 3 files +42 −7 · ran 6 commands · 1 failed · tests 40/42 · 1m 12s\". The file count opens the edited files (each opens in the editor), the command count opens every command with its outcome, and the red failure count opens the failed commands with how each ended (exit code, signal, or a call the tool rejected). Each part can be switched off.",
-      "reach": [
-        "seed tool-call-thread",
-        "expect text \"Tool finished.\""
-      ],
-      "surfaces": [
-        "client",
-        "settings"
-      ],
+      "reach": ["seed tool-call-thread", "expect text \"Tool finished.\""],
+      "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
       "destination": "transcript",
       "currentSurface": "transcript: turn summary footer",
@@ -22,94 +16,53 @@
           "key": "enabled",
           "defaultValue": "true",
           "constraints": "Boolean; show the summary line under finished turns.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "turn-summary.model-commands"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["turn-summary.model-commands"]
         },
         {
           "key": "includeReads",
           "defaultValue": "true",
           "constraints": "Boolean; count file reads and searches as well as commands and edits.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "turn-summary.model-parts"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["turn-summary.model-parts"]
         },
         {
           "key": "listFailures",
           "defaultValue": "true",
           "constraints": "Boolean; let the failed-command count open the list of failed commands.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "turn-summary.model-commands"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["turn-summary.model-commands"]
         },
         {
           "key": "lineCounts",
           "defaultValue": "true",
           "constraints": "Boolean; show lines added and removed next to the edited-file count, counted from the edit calls.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "turn-summary.model-footer"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["turn-summary.model-footer"]
         },
         {
           "key": "testResults",
           "defaultValue": "true",
           "constraints": "Boolean; show passed / total tests from the last Vitest, Jest or pytest summary a command printed.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "turn-summary.model-footer"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["turn-summary.model-footer"]
         },
         {
           "key": "duration",
           "defaultValue": "true",
           "constraints": "Boolean; show how long the turn took from its start to its end.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "turn-summary.model-footer"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["turn-summary.model-footer"]
         },
         {
           "key": "openLists",
           "defaultValue": "true",
           "constraints": "Boolean; let the edited-file and command counts open their lists.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "turn-summary.model-footer"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["turn-summary.model-footer"]
         }
       ],
-      "states": [
-        "no-tools",
-        "all-succeeded",
-        "commands-failed",
-        "tests-reported",
-        "disabled"
-      ],
+      "states": ["no-tools", "all-succeeded", "commands-failed", "tests-reported", "disabled"],
       "failureModes": [
         "A turn whose tool calls fell outside the loaded history summarises only the calls still loaded.",
         "The summary sits under the turn, not in each \"Ran commands\" group header: the Host draws that header with no plugin seam.",

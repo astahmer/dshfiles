@@ -70,7 +70,7 @@ describe('memory inline references', () => {
     const rule = MemoryInlineReference.userTextRule
     const text = 'Per memory: n:1, `t:abc#2` — ok'
     const first = rule.match(text, 0, read)
-    expect(first).toEqual({ id: 'memory', start: text.indexOf('memory:'), end: text.indexOf(',') , data: { id: 'n:1', range: null } })
+    expect(first).toEqual({ id: 'memory', start: text.indexOf('memory:'), end: text.indexOf(','), data: { id: 'n:1', range: null } })
     const second = rule.match(text, first?.end ?? 0, read)
     expect(second).toEqual({ id: 'memory', start: text.indexOf('t:abc'), end: text.indexOf('#2') + 2, data: { id: 't:abc', range: '2' } })
     expect(rule.match(text, second?.end ?? 0, read)).toBeUndefined()

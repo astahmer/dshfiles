@@ -14,7 +14,11 @@ export interface FailureComposer {
  * The bar under a native failure row: retry count, and two actions that write into the composer for the user to send.
  * Neither sends on its own: the user reviews the text first, the same contract `test-runs` uses for "Ask to fix".
  */
-export const FailureActions = (props: { readonly facts: FailureFacts; readonly composer: FailureComposer | undefined; readonly actions: boolean }): ReactNode => {
+export const FailureActions = (props: {
+  readonly facts: FailureFacts
+  readonly composer: FailureComposer | undefined
+  readonly actions: boolean
+}): ReactNode => {
   const retry = Failure.retryLabel(props.facts)
   const actionable = props.actions && props.composer !== undefined && Failure.actionable(props.facts)
   if (retry === undefined && !actionable) return null

@@ -15,7 +15,11 @@ describe('ChangesScopeModel', () => {
   })
 
   it('reads the turn card address the native review tab would open', () => {
-    expect(ChangesScopeModel.parseTurnAddress('dsh-resource://changes-review/session/session-a%2Fb/42/3')).toEqual({ sessionId: 'session-a/b', seq: 42, turn: 3 })
+    expect(ChangesScopeModel.parseTurnAddress('dsh-resource://changes-review/session/session-a%2Fb/42/3')).toEqual({
+      sessionId: 'session-a/b',
+      seq: 42,
+      turn: 3,
+    })
     expect(ChangesScopeModel.parseTurnAddress('dsh-resource://changes-review/session/s/x/3')).toBeUndefined()
     expect(ChangesScopeModel.parseTurnAddress('dsh-resource://file/session/s/a.ts')).toBeUndefined()
     expect(ChangesScopeModel.turnAddressPattern).toBe('dsh-resource://changes-review/**')
@@ -83,7 +87,11 @@ describe('LandCardModel', () => {
     expect(busy.reason).toContain('Land when idle')
     const undescribed = LandCardModel.readiness({ thread: { canRebase: true, behind: false, unlanded: [revision('  ')] }, threadBusy: false, pending: false })
     expect(undescribed).toMatchObject({ canLand: false, canQueue: false, undescribed: 1, reason: 'Describe every revision first.' })
-    const conflicted = LandCardModel.readiness({ thread: { canRebase: false, behind: false, unlanded: [revision('a', true)] }, threadBusy: false, pending: false })
+    const conflicted = LandCardModel.readiness({
+      thread: { canRebase: false, behind: false, unlanded: [revision('a', true)] },
+      threadBusy: false,
+      pending: false,
+    })
     expect(conflicted).toMatchObject({ canLand: false, canQueue: false, conflicts: 1, reason: 'Resolve the conflicts first.' })
     expect(LandCardModel.readiness({ thread: null, threadBusy: false, pending: false }).canLand).toBe(false)
     expect(LandCardModel.behindText({ behind: false, unlanded: [] }, 'main')).toBe('Up to date with main')

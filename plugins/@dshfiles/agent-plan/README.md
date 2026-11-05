@@ -19,14 +19,14 @@ Built with dshx (no port). The view ideas come from affectUI Agent Plan, AI Elem
 
 All apply live. Turning a card off restores the native view.
 
-| Key             | Default | Meaning                                                                    |
-| --------------- | ------- | -------------------------------------------------------------------------- |
-| `enabled`       | `true`  | Master switch for every card below.                                        |
-| `planCard`      | `true`  | Draw `todo_write` calls as the plan card instead of the native todo row.   |
-| `stepTiming`    | `true`  | Show how long each step took.                                              |
-| `pinnedStep`    | `true`  | Pin the current plan step beside the composer.                             |
-| `activityStrip` | `true`  | Show what runs now beside the composer controls.                           |
-| `failureCard`   | `true`  | Add the retry count and Retry / Ask to fix under failure rows.             |
+| Key             | Default | Meaning                                                                  |
+| --------------- | ------- | ------------------------------------------------------------------------ |
+| `enabled`       | `true`  | Master switch for every card below.                                      |
+| `planCard`      | `true`  | Draw `todo_write` calls as the plan card instead of the native todo row. |
+| `stepTiming`    | `true`  | Show how long each step took.                                            |
+| `pinnedStep`    | `true`  | Pin the current plan step beside the composer.                           |
+| `activityStrip` | `true`  | Show what runs now beside the composer controls.                         |
+| `failureCard`   | `true`  | Add the retry count and Retry / Ask to fix under failure rows.           |
 
 ## How it works
 

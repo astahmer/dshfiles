@@ -6,28 +6,13 @@
       "id": "settings-shell-port",
       "title": "Native Settings shell, ported",
       "summary": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
-      "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings*\"",
-        "expect button \"General\""
-      ],
-      "surfaces": [
-        "client",
-        "settings",
-        "integration"
-      ],
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"General\""],
+      "surfaces": ["client", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "sidebar: Account menu › Settings",
       "configuration": [],
-      "states": [
-        "closed",
-        "open",
-        "compact-navigation",
-        "onboarding",
-        "disconnected",
-        "update-available"
-      ],
+      "states": ["closed", "open", "compact-navigation", "onboarding", "disconnected", "update-available"],
       "failureModes": [
         "When the running DSH ships another version of the native Settings package, the Host warns at boot and General shows the running version, so the port is refreshed instead of drifting silently.",
         "The native welcome notice stores its acknowledgement in the switched-off row's namespace, so the shell ports that step and keeps the acknowledgement in its own namespace; someone who acknowledged the native notice sees it once more."
@@ -62,27 +47,13 @@
       "id": "settings-workbench-panels",
       "title": "One dockable Settings hub with real navigation and forms",
       "summary": "The New tab chooser offers one Settings hub with actual section navigation, search and native/plugin forms. Leaf sections remain registered for saved layouts and explicit links but are hidden from primary suggestions. The authorized shell renderer and ConfigForm remain the owners. Workbench pane chrome is mandatory; hidden right-pane tabs retain their state. It is the same grouped page as the stage page, for free-docking layouts.",
-      "reach": [
-        "click button \"Collapse sidebar\"",
-        "click button \"New tab\"",
-        "click button \"Settings\"",
-        "expect button \"General\""
-      ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "reach": ["click button \"Collapse sidebar\"", "click button \"New tab\"", "click button \"Settings\"", "expect button \"General\""],
+      "surfaces": ["client", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "main-tabs: New tab › Settings",
       "configuration": [],
-      "states": [
-        "registered",
-        "open",
-        "label-updated",
-        "source-removed",
-        "disposed"
-      ],
+      "states": ["registered", "open", "label-updated", "source-removed", "disposed"],
       "failureModes": [
         "Without a mounted workbench the sources remain registered but no docked panel is shown.",
         "A removed settings section or namespace unregisters; an existing panel never falls through to another section.",
@@ -119,31 +90,13 @@
       "id": "dsh-release-notice",
       "title": "DSH release notice and TL;DR",
       "summary": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, shows a concise English TL;DR across newer releases, links to the official notes, and lets the user dismiss that release notice.",
-      "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings*\"",
-        "expect button \"Check for DSH updates\""
-      ],
-      "surfaces": [
-        "client",
-        "host",
-        "api",
-        "tool",
-        "storage"
-      ],
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"Check for DSH updates\""],
+      "surfaces": ["client", "host", "api", "tool", "storage"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "sidebar: Settings trigger release mark › General",
       "configuration": [],
-      "states": [
-        "checking",
-        "up-to-date",
-        "update-available",
-        "summary-expanded",
-        "dismissed",
-        "comparison-unknown",
-        "unavailable"
-      ],
+      "states": ["checking", "up-to-date", "update-available", "summary-expanded", "dismissed", "comparison-unknown", "unavailable"],
       "failureModes": [
         "GitHub is unavailable or returns an invalid payload; Settings stays usable and offers a manual retry.",
         "The installed version is absent from the bounded release history; the plugin reports that comparison is unknown instead of guessing.",
@@ -196,21 +149,12 @@
         "click option \"Settings: General*\"",
         "expect tab \"Settings\""
       ],
-      "surfaces": [
-        "client",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["client", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: the Settings page in the stage",
       "configuration": [],
-      "states": [
-        "closed",
-        "open",
-        "panel-hidden",
-        "restored-on-reload"
-      ],
+      "states": ["closed", "open", "panel-hidden", "restored-on-reload"],
       "failureModes": [
         "With no other tab left, main-tabs keeps showing Settings: it cannot show an empty main view.",
         "A plugin that still dispatches dshfiles:open-settings with surface modal gets the page; there is no dialog to open."
@@ -246,21 +190,12 @@
         "click option \"Settings: General*\"",
         "expect group \"Models & accounts\""
       ],
-      "surfaces": [
-        "client",
-        "settings"
-      ],
+      "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: task groups in the Settings navigation",
       "configuration": [],
-      "states": [
-        "grouped",
-        "linked-page-loaded",
-        "linked-page-missing",
-        "jev-gathered",
-        "other-group"
-      ],
+      "states": ["grouped", "linked-page-loaded", "linked-page-missing", "jev-gathered", "other-group"],
       "failureModes": [
         "A section or namespace nobody placed shows under Other with its own label until the group map in src/settings-groups.ts places it.",
         "A linked page whose plugin is not loaded is left out rather than offered as a dead link.",
@@ -328,19 +263,12 @@
         "fill searchbox \"Search settings\" \"max tabs\"",
         "expect text \"1 Setting Found\""
       ],
-      "surfaces": [
-        "client",
-        "settings"
-      ],
+      "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Search settings",
       "configuration": [],
-      "states": [
-        "empty-query",
-        "results",
-        "no-results"
-      ],
+      "states": ["empty-query", "results", "no-results"],
       "failureModes": [
         "Native sections draw their own rows: a match on a section's name offers to open it, and the settings they draw stay searchable and open that section."
       ],
@@ -384,20 +312,12 @@
         "click button \"Show coding view*\"",
         "expect switch \"Show coding view\""
       ],
-      "surfaces": [
-        "client",
-        "settings",
-        "tool"
-      ],
+      "surfaces": ["client", "settings", "tool"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Search settings › section controls",
       "configuration": [],
-      "states": [
-        "entry-results",
-        "section-opened-at-target",
-        "invalid-entries-skipped"
-      ],
+      "states": ["entry-results", "section-opened-at-target", "invalid-entries-skipped"],
       "failureModes": [
         "A section whose published entries do not decode is skipped with one console warning.",
         "A section registered imperatively must publish its own entries with publishSettingsSearchEntries."
@@ -456,24 +376,13 @@
         "click button \"Main tabs\"",
         "expect spinbutton \"Max tabs\""
       ],
-      "surfaces": [
-        "client",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["client", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: plugin pages",
       "configuration": [],
-      "states": [
-        "ready",
-        "read-only",
-        "unavailable",
-        "refused"
-      ],
-      "failureModes": [
-        "A namespace whose plugin is not loaded shows its fields disabled with an explanation."
-      ],
+      "states": ["ready", "read-only", "unavailable", "refused"],
+      "failureModes": ["A namespace whose plugin is not loaded shows its fields disabled with an explanation."],
       "externalDependencies": [],
       "verification": [
         {
@@ -508,22 +417,13 @@
         "press Enter",
         "expect button \"Reset to default\""
       ],
-      "surfaces": [
-        "client",
-        "settings"
-      ],
+      "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Reset to default",
       "configuration": [],
-      "states": [
-        "default",
-        "modified",
-        "pending"
-      ],
-      "failureModes": [
-        "A refused value shows under its row and the row returns to the stored value."
-      ],
+      "states": ["default", "modified", "pending"],
+      "failureModes": ["A refused value shows under its row and the row returns to the stored value."],
       "externalDependencies": [],
       "verification": [
         {
@@ -555,21 +455,12 @@
         "click button \"More ways to open the configuration file\"",
         "expect menuitem \"Copy path\""
       ],
-      "surfaces": [
-        "client",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["client", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Open configuration file",
       "configuration": [],
-      "states": [
-        "no-document",
-        "document",
-        "copied",
-        "failed"
-      ],
+      "states": ["no-document", "document", "copied", "failed"],
       "failureModes": [
         "If the document is absent or desktop path opening is unavailable, the native action creates/opens it in the Host's text editor.",
         "Remote (non-loopback) browsers get neither the action nor the path."
@@ -593,15 +484,8 @@
       "id": "shared-jev-key",
       "title": "Set the Jev key once",
       "summary": "Settings › Tools & MCP › Jev leads with one Key: a secret:ALIAS reference (Secret Catalog picker) that Backlog triage and Memory's signal gates both resolve on the Host. Each plugin's earlier key stays stored but hidden as the fallback while the shared key is empty, and is copied into an empty shared key once, never over a set one. Backlog's Jev section and Memory's review link here.",
-      "reach": [
-        "click button \"Settings\"",
-        "fill searchbox \"Search settings\" \"Jev\"",
-        "expect text \"Key\""
-      ],
-      "surfaces": [
-        "client",
-        "host"
-      ],
+      "reach": ["click button \"Settings\"", "fill searchbox \"Search settings\" \"Jev\"", "expect text \"Key\""],
+      "surfaces": ["client", "host"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Tools & MCP › Jev › Key",
@@ -610,19 +494,10 @@
           "key": "dshfiles-settings-shell.jevSecret",
           "defaultValue": "",
           "constraints": "Secret Catalog reference only (secret:ALIAS or secret:ALIAS@env); resolves on the Host. Empty falls back to each plugin's earlier key, then TYPESAFE_API_KEY.",
-          "coveredBy": [
-            "settings-shell.jev-key-adopt",
-            "settings-shell.jev-key-first"
-          ]
+          "coveredBy": ["settings-shell.jev-key-adopt", "settings-shell.jev-key-first"]
         }
       ],
-      "states": [
-        "shared-set",
-        "shared-empty-legacy-fallback",
-        "adopted-once",
-        "adoption-deferred",
-        "environment-fallback"
-      ],
+      "states": ["shared-set", "shared-empty-legacy-fallback", "adopted-once", "adoption-deferred", "environment-fallback"],
       "failureModes": [
         "A Host without settings-shell's namespace keeps each plugin reading its own earlier key and the environment.",
         "When Backlog and Memory held different earlier keys, the first adopted one becomes shared; the other stays stored in its plugin and is used again if the shared key is cleared."

@@ -40,7 +40,8 @@ const context = (surface: InlineReferenceContext['surface']): InlineReferenceCon
 const renderRun = (text: string, surface: InlineReferenceContext['surface'] = 'prose') =>
   render(<p>{InlineReferenceModel.renderText(text, [backlogInlineReference], context(surface))}</p>)
 
-const links = (container: Element): readonly string[] => [...container.querySelectorAll('[data-dshfiles-backlog-reference]')].map(element => element.textContent ?? '')
+const links = (container: Element): readonly string[] =>
+  [...container.querySelectorAll('[data-dshfiles-backlog-reference]')].map(element => element.textContent ?? '')
 
 const previews = (): { readonly requests: { readonly id: number; readonly anchorId: number }[]; readonly stop: () => void } => {
   const requests: { readonly id: number; readonly anchorId: number }[] = []

@@ -371,8 +371,8 @@ const BacklogSettingsPanel = (): JSX.Element => {
         <div className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm">
           <span className="dshx:font-medium">TypeSafe API key</span>
           <span className="dshx:text-xs dshx:text-muted-foreground">
-            One key serves Backlog triage and Memory. Set it in Settings › Tools & MCP › Jev; without it, TYPESAFE_API_KEY from the DSH Host
-            environment is used.
+            One key serves Backlog triage and Memory. Set it in Settings › Tools & MCP › Jev; without it, TYPESAFE_API_KEY from the DSH Host environment is
+            used.
           </span>
           <Button type="button" variant="outline" size="sm" className="dshx:self-start" onClick={openJevKeySettings}>
             <KeyRoundIcon aria-hidden /> Open Jev settings

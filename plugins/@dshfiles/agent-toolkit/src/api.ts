@@ -36,7 +36,9 @@ export const agentToolkitApi = defineApi({
         name: 'context_instruction_files',
         readOnly: true,
         render: output =>
-          output.files.length === 0 ? 'No workspace instruction files for that folder.' : output.files.map(file => `${file.path} · ${describeSize(file.bytes)}`).join('\n'),
+          output.files.length === 0
+            ? 'No workspace instruction files for that folder.'
+            : output.files.map(file => `${file.path} · ${describeSize(file.bytes)}`).join('\n'),
       },
     }),
   },

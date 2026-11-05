@@ -75,7 +75,6 @@ export const referencesApi = defineApi({
   },
 })
 
-
 export class ReferencesWire {
   static readonly describe = describe
 }

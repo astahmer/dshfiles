@@ -34,7 +34,10 @@ export default defineClient({
     })
     // The one reference-preview card every entity kind renders into.
     ctx.slots.inject('shell.overlay', () =>
-      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-entity-preview', order: 120 }, decorate(() => createElement(EntityPreviewOverlay))),
+      ctx.slots.register(
+        { name: 'shell.overlay', id: 'dshfiles-entity-preview', order: 120 },
+        decorate(() => createElement(EntityPreviewOverlay)),
+      ),
     )
   },
 })

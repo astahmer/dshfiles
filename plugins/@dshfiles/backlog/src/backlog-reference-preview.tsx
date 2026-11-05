@@ -53,7 +53,9 @@ export const BacklogReferencePreview = (props: {
             {errorMessage(preview.error, 'Backlog item is unavailable. Open the Backlog page to search for it.')}
           </p>
         ) : null}
-        {missing ? <p className="dshx:text-xs dshx:text-muted-foreground">No backlog item {BacklogReference.label(props.id)}. Search the Backlog page for it.</p> : null}
+        {missing ? (
+          <p className="dshx:text-xs dshx:text-muted-foreground">No backlog item {BacklogReference.label(props.id)}. Search the Backlog page for it.</p>
+        ) : null}
         {detail === undefined ? null : (
           <>
             <p className="dshx:text-sm dshx:font-medium">{detail.item.title}</p>

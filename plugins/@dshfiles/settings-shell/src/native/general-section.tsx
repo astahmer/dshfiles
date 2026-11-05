@@ -37,8 +37,8 @@ export const GeneralSection = (
     <div
       className={cn(
         "dshx:flex dshx:w-full dshx:flex-col dshx:[&>[data-slot='settings.general.item']>:last-child]:border-b-0",
-        "dshx:@max-pane-narrow:[&_[class$=row]]:flex-wrap dshx:@max-pane-narrow:[&_[class$=row]]:gap-y-2",
-        "dshx:@max-pane-narrow:[&_[class$=rowText]]:min-w-0! dshx:@max-pane-narrow:[&_[class$=rowText]]:flex-[1_1_12rem]!",
+        'dshx:@max-pane-narrow:[&_[class$=row]]:flex-wrap dshx:@max-pane-narrow:[&_[class$=row]]:gap-y-2',
+        'dshx:@max-pane-narrow:[&_[class$=rowText]]:min-w-0! dshx:@max-pane-narrow:[&_[class$=rowText]]:flex-[1_1_12rem]!',
       )}
       ref={column}
     >

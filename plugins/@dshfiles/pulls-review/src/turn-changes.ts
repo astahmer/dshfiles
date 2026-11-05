@@ -88,7 +88,10 @@ const patchOf = (diff: TurnFileDiff): string => {
     `--- ${diff.before ? `a/${diff.path}` : '/dev/null'}`,
     `+++ ${diff.after ? `b/${diff.path}` : '/dev/null'}`,
   ]
-  const hunks = diff.hunks.flatMap(hunk => [`@@ -${String(hunk.oldStart)},${String(hunk.oldLines)} +${String(hunk.newStart)},${String(hunk.newLines)} @@`, ...hunk.lines])
+  const hunks = diff.hunks.flatMap(hunk => [
+    `@@ -${String(hunk.oldStart)},${String(hunk.oldLines)} +${String(hunk.newStart)},${String(hunk.newLines)} @@`,
+    ...hunk.lines,
+  ])
   return `${[...header, ...hunks].join('\n')}\n`
 }
 

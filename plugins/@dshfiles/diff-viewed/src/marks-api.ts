@@ -63,13 +63,7 @@ export type ViewedTarget = typeof viewedTargetSchema.Type
  */
 const rangeViewedKey = (range: ViewedRange, path: string): string => JSON.stringify(['range', range.workspacePath, range.base, range.head, path])
 
-const rangeKeyPartsSchema = Schema.Tuple([
-  Schema.Literal('range'),
-  Schema.String,
-  Schema.String,
-  Schema.String,
-  Schema.String.check(Schema.isMinLength(1)),
-])
+const rangeKeyPartsSchema = Schema.Tuple([Schema.Literal('range'), Schema.String, Schema.String, Schema.String, Schema.String.check(Schema.isMinLength(1))])
 
 /** The range and path of a revision-range key, or null for a turn key or anything malformed. */
 const rangeFromKey = (key: string): (ViewedRange & { readonly path: string }) | null => {
@@ -132,7 +126,10 @@ export const diffViewedApi = defineApi({
       },
     }),
     set: method({
-      input: Schema.Struct({ targets: Schema.Array(viewedTargetSchema).check(Schema.isMinLength(1), Schema.isMaxLength(MAX_SET_TARGETS)), viewed: Schema.Boolean }),
+      input: Schema.Struct({
+        targets: Schema.Array(viewedTargetSchema).check(Schema.isMinLength(1), Schema.isMaxLength(MAX_SET_TARGETS)),
+        viewed: Schema.Boolean,
+      }),
       output: Schema.Struct({ revision: rangeMarksSchema.fields.revision, changed: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)) }),
       description: 'Mark files of one turn or one revision range viewed, or not viewed, in one write.',
       tool: {

@@ -295,9 +295,7 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
         <p className="dshx:text-xs dshx:text-muted-foreground">
           The Host records hooks that ran. It has no durable skipped-hook event, so skipped and unsupported hooks cannot be attributed here.
         </p>
-        {hooks.length === 0 ? (
-          <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No native hook records are available for this thread.</p>
-        ) : null}
+        {hooks.length === 0 ? <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No native hook records are available for this thread.</p> : null}
         <ItemGroup className="dshx:divide-y dshx:rounded-md dshx:border dshx:empty:hidden">
           {hooks.map(event => (
             <Item role="listitem" size="sm" className="dshx:gap-3 dshx:rounded-none dshx:px-3 dshx:py-2" key={`${event.seq}-${event.kind}`}>

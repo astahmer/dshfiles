@@ -17,10 +17,7 @@
         "click button \"Step 2 of 3: Fix the rounding bug. Show the plan\"",
         "expect list \"Plan steps\""
       ],
-      "surfaces": [
-        "client",
-        "settings"
-      ],
+      "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
       "destination": "transcript",
       "currentSurface": "transcript: todo_write tool card",
@@ -29,46 +26,25 @@
           "key": "enabled",
           "defaultValue": "true",
           "constraints": "Boolean; master switch for every agent-plan card. Off restores every native view.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "agent-plan.plan-progress"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["agent-plan.plan-progress"]
         },
         {
           "key": "planCard",
           "defaultValue": "true",
           "constraints": "Boolean; draw todo_write calls as the plan card instead of the native todo row.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "agent-plan.plan-card"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["agent-plan.plan-card"]
         },
         {
           "key": "stepTiming",
           "defaultValue": "true",
           "constraints": "Boolean; show how long each step took, from successive todo_write call times.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "agent-plan.plan-timing"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["agent-plan.plan-timing"]
         }
       ],
-      "states": [
-        "first-write",
-        "step-in-progress",
-        "all-done",
-        "failed-call",
-        "disabled"
-      ],
+      "states": ["first-write", "step-in-progress", "all-done", "failed-call", "disabled"],
       "failureModes": [
         "A plan whose earlier todo_write calls fell outside the loaded history times its steps only from the writes still loaded.",
         "A step the agent marked done without first marking it in progress is timed from the write before it."
@@ -110,10 +86,7 @@
         "press Enter",
         "expect button \"Step 2 of 3: Fix the rounding bug. Show the plan\""
       ],
-      "surfaces": [
-        "client",
-        "settings"
-      ],
+      "surfaces": ["client", "settings"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: plan chip beside plan mode",
@@ -122,25 +95,12 @@
           "key": "pinnedStep",
           "defaultValue": "true",
           "constraints": "Boolean; pin the current plan step beside the composer.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "agent-plan.pinned-step"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["agent-plan.pinned-step"]
         }
       ],
-      "states": [
-        "hidden-no-plan",
-        "step-in-progress",
-        "hidden-plan-done",
-        "hidden-new-turn",
-        "disabled"
-      ],
-      "failureModes": [
-        "A plan from an earlier turn is not pinned once a new turn starts, matching the native todo dock."
-      ],
+      "states": ["hidden-no-plan", "step-in-progress", "hidden-plan-done", "hidden-new-turn", "disabled"],
+      "failureModes": ["A plan from an earlier turn is not pinned once a new turn starts, matching the native todo dock."],
       "externalDependencies": [],
       "verification": [
         {
@@ -166,10 +126,7 @@
         "press Enter",
         "expect button \"Running now: bash*\""
       ],
-      "surfaces": [
-        "client",
-        "settings"
-      ],
+      "surfaces": ["client", "settings"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: activity strip",
@@ -178,22 +135,11 @@
           "key": "activityStrip",
           "defaultValue": "true",
           "constraints": "Boolean; show the live activity strip beside the composer controls.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "agent-plan.activity-strip"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["agent-plan.activity-strip"]
         }
       ],
-      "states": [
-        "idle-hidden",
-        "tool-running",
-        "jobs-running",
-        "subagents-running",
-        "disabled"
-      ],
+      "states": ["idle-hidden", "tool-running", "jobs-running", "subagents-running", "disabled"],
       "failureModes": [
         "Background jobs registered before the loaded history window are not listed until their next event.",
         "Queued messages are not counted here: the native queue dock above the composer already lists them."
@@ -229,10 +175,7 @@
         "press Enter",
         "expect button \"Ask to fix\""
       ],
-      "surfaces": [
-        "client",
-        "settings"
-      ],
+      "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
       "destination": "transcript",
       "currentSurface": "transcript: turn error row",
@@ -241,23 +184,11 @@
           "key": "failureCard",
           "defaultValue": "true",
           "constraints": "Boolean; add the retry count and Retry / Ask to fix actions under failure rows.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "agent-plan.failure-card"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["agent-plan.failure-card"]
         }
       ],
-      "states": [
-        "turn-error",
-        "retry-scheduled",
-        "retry-gave-up",
-        "stopped",
-        "no-composer",
-        "disabled"
-      ],
+      "states": ["turn-error", "retry-scheduled", "retry-gave-up", "stopped", "no-composer", "disabled"],
       "failureModes": [
         "Without a Composer provider (@dshfiles/rich-composer) the actions are hidden and only the retry count shows.",
         "Retry does not resend the failed request: it writes a message the user sends, so the next turn starts fresh."

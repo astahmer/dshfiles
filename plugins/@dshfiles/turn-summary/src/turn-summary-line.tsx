@@ -26,7 +26,11 @@ const FileList = (props: { readonly summary: TurnActivitySummary; readonly openF
     {props.summary.editedFileStats.map(file => (
       <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5" key={file.path}>
         <FileIcon aria-hidden className="dshx:size-3 dshx:shrink-0" />
-        <button className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:hover:text-foreground dshx:hover:underline" onClick={() => props.openFile(file.path)} type="button">
+        <button
+          className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:hover:text-foreground dshx:hover:underline"
+          onClick={() => props.openFile(file.path)}
+          type="button"
+        >
           {file.path}
         </button>
         {file.added + file.removed > 0 && (
