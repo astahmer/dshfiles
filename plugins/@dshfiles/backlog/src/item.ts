@@ -243,7 +243,14 @@ const freshness = (
   return limit > 0 && idleDays >= limit ? 'dormant' : 'fresh'
 }
 
-const appendEvent = (events: readonly BacklogEvent[], event: BacklogEvent): BacklogEvent[] => [...events, event].slice(-MAX_EVENTS)
+/** The `created` event names the item's author, so trimming the oldest events always keeps it. */
+const appendEvent = (events: readonly BacklogEvent[], event: BacklogEvent): BacklogEvent[] => {
+  const appended = [...events, event]
+  if (appended.length <= MAX_EVENTS) return appended
+  const [first] = appended
+  if (first?.kind !== 'created') return appended.slice(-MAX_EVENTS)
+  return [first, ...appended.slice(-(MAX_EVENTS - 1))]
+}
 
 /** The marker a backfill leaves when triage looked at an item and found nothing to change; not activity of its own. */
 const triageNoChange = 'found nothing to change'
