@@ -7,7 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   // The native chip: an inline label carrying its title (no activation of its own).
-  ReferenceChip: (props: { readonly label: string; readonly title: string }) => createElement('span', { 'data-ref-chip': 'session', title: props.title }, props.label),
+  ReferenceChip: (props: { readonly label: string; readonly title: string }) =>
+    createElement('span', { 'data-ref-chip': 'session', title: props.title }, props.label),
 }))
 
 import { chatReferencePreviewDismissEvent, chatReferencePreviewEvent, type ChatReference } from './chat-reference.js'
@@ -37,8 +38,7 @@ const titleStore = (titles: Readonly<Record<string, { readonly title: string; re
 }
 
 const flush = async (): Promise<void> => {
-  const pending = flushes
-  flushes = []
+  const pending = flushes.splice(0)
   await act(async () => {
     for (const run of pending) run()
     await Promise.resolve()
@@ -66,7 +66,11 @@ describe('chat reference links', () => {
   const opened: { readonly reference: ChatReference; readonly targetPath: string }[] = []
   beforeEach(() => {
     opened.length = 0
-    detach = ChatReferenceLinks.attach('session-1', { cwd: '/repo', bookmarks: ['main'], onOpen: (reference, targetPath) => opened.push({ reference, targetPath }) })
+    detach = ChatReferenceLinks.attach('session-1', {
+      cwd: '/repo',
+      bookmarks: ['main'],
+      onOpen: (reference, targetPath) => opened.push({ reference, targetPath }),
+    })
   })
   afterEach(() => {
     act(() => root?.unmount())
@@ -149,7 +153,9 @@ describe('chat reference links', () => {
     renderCodes(['jj:main'])
     const requests: unknown[] = []
     let dismissed = 0
-    const onPreview = (event: Event): void => void requests.push((event as CustomEvent).detail)
+    const onPreview = (event: Event): void => {
+      if (event instanceof CustomEvent) requests.push(event.detail)
+    }
     const onDismiss = (): void => void (dismissed += 1)
     window.addEventListener(chatReferencePreviewEvent, onPreview)
     window.addEventListener(chatReferencePreviewDismissEvent, onDismiss)

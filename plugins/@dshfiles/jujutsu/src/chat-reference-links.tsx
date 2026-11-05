@@ -1,7 +1,13 @@
 import { ReferenceChip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { InlineReferenceModel } from '@dshfiles/chat/inline-references'
 import { useEffect, useRef, useSyncExternalStore, type KeyboardEvent, type MouseEvent } from 'react'
-import { ChatReferenceModel, chatReferencePreviewDismissEvent, chatReferencePreviewEvent, chatReferencePreviewRequestSchema, type ChatReference } from './chat-reference.js'
+import {
+  ChatReferenceModel,
+  chatReferencePreviewDismissEvent,
+  chatReferencePreviewEvent,
+  chatReferencePreviewRequestSchema,
+  type ChatReference,
+} from './chat-reference.js'
 import type { ChatReferenceTitleStore } from './chat-reference-titles.js'
 import { SchemaHelpers } from './schema-helpers.js'
 
@@ -33,9 +39,15 @@ const attach = (sessionId: string, session: ChatReferenceSession): (() => void) 
 
 const NO_SUBSCRIPTION = (): (() => void) => () => {}
 
-const ChatReferenceChip = (props: { readonly sessionId: string; readonly session: ChatReferenceSession; readonly reference: ChatReference; readonly source: string }): JSX.Element => {
+const ChatReferenceChip = (props: {
+  readonly sessionId: string
+  readonly session: ChatReferenceSession
+  readonly reference: ChatReference
+  readonly source: string
+}): JSX.Element => {
   const { sessionId, session, reference } = props
-  const store = titles
+  // The title store is module state a test or the plugin can replace; read it once so this render and its effects agree.
+  const store = ChatReferenceLinks.titles()
   useSyncExternalStore(store?.subscribe ?? NO_SUBSCRIPTION, store?.getVersion ?? (() => 0))
   const entry = store?.get(sessionId, session.cwd, reference)
   useEffect(() => store?.request(sessionId, session.cwd, reference), [store, sessionId, session.cwd, reference])
