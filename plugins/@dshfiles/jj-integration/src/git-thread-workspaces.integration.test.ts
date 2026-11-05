@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -211,5 +211,32 @@ describe.skipIf(!gitAvailable)('thread workspaces in a git-only repository', () 
     await threads.removeUntrackedEntry({ repoRoot: repo, name: 'stray' })
     expect(existsSync(stray)).toBe(false)
     expect(await threads.danglingEmptyRevisions({ repoRoot: repo, abandon: false })).toEqual([])
+  })
+
+  it('locates the repository from a subfolder, not its parent', async () => {
+    const sub = join(repo, 'nested', 'deeper')
+    mkdirSync(sub, { recursive: true })
+    expect(await threads.locate(sub)).toEqual({ repoRoot: repo, workspaceRoot: repo, threadName: undefined, vcs: 'git' })
+  })
+
+  it('treats worktrees in a threads directory reached through a symlink as threads, never as untracked folders', async () => {
+    const real = join(root, 'real-threads')
+    mkdirSync(real)
+    const link = join(root, 'linked-threads')
+    symlinkSync(real, link)
+    const linked = ThreadWorkspacesTestSupport.promiseThreads({ settings: { threadsDirectory: link } })
+    const thread = await linked.provision(repo)
+    writeFileSync(join(thread.path, 'unsaved.txt'), 'work in progress\n')
+
+    expect((await linked.list(repo)).map(entry => entry.name)).toEqual([thread.name])
+    expect(await linked.untrackedEntries(repo)).toEqual([])
+    await expect(linked.removeUntrackedEntry({ repoRoot: repo, name: thread.name })).rejects.toThrow()
+    expect(readFileSync(join(real, 'repo', thread.name, 'unsaved.txt'), 'utf8')).toBe('work in progress\n')
+    await expect(linked.discard({ repoRoot: repo, name: '../repo', force: true })).rejects.toThrow()
+  })
+
+  it('refuses a bookmark that looks like an option or names no branch, with a recovery hint', async () => {
+    await expect(threads.provision(repo, '--output=/tmp/x')).rejects.toThrow(/Settings/)
+    await expect(threads.provision(repo, 'no-such-branch')).rejects.toThrow(/Settings/)
   })
 })

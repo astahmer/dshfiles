@@ -91,7 +91,16 @@ const make = Effect.gen(function* () {
   const settings = yield* JjSettings
   const metadata = yield* ThreadMetadata
 
-  const threadsDirectory = metadata.threadsDirectory
+  /** The path with symlinks resolved, as git reports worktree paths; a missing tail keeps its resolved parent. */
+  const canonical = (target: string): Effect.Effect<string> =>
+    fileSystem.realPath(target).pipe(
+      Effect.catch(() => {
+        const parent = path.dirname(target)
+        return parent === target ? Effect.succeed(path.resolve(target)) : Effect.map(canonical(parent), real => path.join(real, path.basename(target)))
+      }),
+    )
+  // Compared with git's worktree paths, which git always reports with symlinks resolved.
+  const threadsDirectory = (repoRoot: string) => Effect.flatMap(metadata.threadsDirectory(repoRoot), canonical)
   const bookmark = Effect.map(settings.get, current => current.bookmark)
   const exists = (target: string) => fileSystem.exists(target).pipe(Effect.orElseSucceed(() => false))
   const filesFailed = (detail: string) => (cause: PlatformError.PlatformError) => new WorkspaceFilesFailed({ detail, cause })
@@ -118,10 +127,14 @@ const make = Effect.gen(function* () {
   const targetRef = Effect.fnUntraced(function* (cwd: string, name?: string) {
     const target = name ?? (yield* bookmark)
     if (isObjectId(target)) return target
+    const recovery = 'Set the bookmark in Settings › Workspaces to an existing branch, or fetch it, then retry.'
+    if (target.length === 0 || target.startsWith('-') || (yield* run(['check-ref-format', '--branch', target], cwd)).exitCode !== 0)
+      return yield* gitFailed(`"${target}" is not a valid branch name. ${recovery}`)
     const local = yield* run(['rev-parse', '--verify', '--quiet', `refs/heads/${target}^{commit}`], cwd)
     if (local.exitCode === 0) return target
     const remote = yield* run(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${target}^{commit}`], cwd)
-    return remote.exitCode === 0 ? `origin/${target}` : target
+    if (remote.exitCode === 0) return `origin/${target}`
+    return yield* gitFailed(`No branch "${target}" exists here or on origin. ${recovery}`)
   })
 
   const commitOf = Effect.fnUntraced(function* (cwd: string, ref: string) {
@@ -130,16 +143,22 @@ const make = Effect.gen(function* () {
     return commit
   })
 
-  const worktrees = (repoRoot: string) => Effect.map(git(['worktree', 'list', '--porcelain'], repoRoot), parseWorktrees)
+  const worktrees = (repoRoot: string) =>
+    Effect.map(git(['worktree', 'list', '--porcelain'], repoRoot), stdout =>
+      parseWorktrees(stdout).map(record => ({ ...record, path: path.resolve(record.path) })),
+    )
 
   const locate = Effect.fn('git thread workspaces locate')(function* (target: string) {
-    const notARepository = new NotARepository({ detail: `${target} is not inside a git repository.` })
+    const notARepository = new NotARepository({
+      detail: `${target} is not inside a git repository. Open a folder inside a git or jj checkout, or run git init there.`,
+    })
     if (!(yield* exists(target))) return yield* notARepository
-    const output = yield* run(['rev-parse', '--show-toplevel', '--git-common-dir'], target)
+    // --path-format=absolute: git otherwise prints the common dir relative to the cwd, not to the toplevel.
+    const output = yield* run(['rev-parse', '--path-format=absolute', '--show-toplevel', '--git-common-dir'], target)
     const [toplevel, commonDir] = lines(output.stdout)
     if (output.exitCode !== 0 || toplevel === undefined || commonDir === undefined) return yield* notARepository
     const workspaceRoot = path.resolve(toplevel)
-    const common = path.resolve(workspaceRoot, commonDir)
+    const common = path.resolve(commonDir)
     // A bare repository has no main worktree to own thread workspaces.
     if (path.basename(common) !== '.git') return yield* notARepository
     const repoRoot = path.dirname(common)
@@ -440,8 +459,11 @@ const make = Effect.gen(function* () {
     readonly target: string
   }) {
     yield* ensureSafeName(input.name, 'discard workspace')
+    if (!THREAD_WORKSPACE_NAME.test(input.name)) return yield* new UnsafePath({ detail: `Refusing to discard ${input.name}: it is not a managed thread name.` })
     const workspaceRoot = path.join(yield* threadsDirectory(input.repoRoot), input.name)
     const present = yield* exists(path.join(workspaceRoot, '.git'))
+    if (present && !(yield* worktrees(input.repoRoot)).some(record => record.path === workspaceRoot))
+      return yield* new UnsafePath({ detail: `${workspaceRoot} is not a worktree of ${input.repoRoot}; remove it from the repository it belongs to.` })
     const hasBranch = yield* branchExists(input.repoRoot, input.name)
     const work = present
       ? yield* unlandedIn(workspaceRoot, input.target)
@@ -449,7 +471,7 @@ const make = Effect.gen(function* () {
         ? yield* revisions(`${input.target}..${threadBranch(input.name)}`, input.repoRoot)
         : []
     if (work.length > 0 && !input.force) return { status: 'has-work', revisions: work } satisfies DiscardOutcome
-    if (present) yield* run(['worktree', 'remove', '--force', workspaceRoot], input.repoRoot)
+    if (present) yield* git(['worktree', 'remove', '--force', workspaceRoot], input.repoRoot)
     yield* removeTree(workspaceRoot)
     yield* git(['worktree', 'prune'], input.repoRoot)
     if (hasBranch) yield* git(['branch', '-D', threadBranch(input.name)], input.repoRoot)
@@ -485,7 +507,7 @@ const make = Effect.gen(function* () {
   })
 
   const secondaryWorkspaces = Effect.fn('git thread workspaces list secondary')(function* (repoRoot: string) {
-    const directory = path.resolve(yield* threadsDirectory(repoRoot))
+    const directory = yield* threadsDirectory(repoRoot)
     const [main, ...others] = yield* worktrees(repoRoot)
     if (main === undefined) return []
     const target = yield* targetRef(repoRoot)
@@ -569,8 +591,8 @@ const make = Effect.gen(function* () {
   })
 
   const ownedByWorktree = Effect.fnUntraced(function* (repoRoot: string) {
-    const roots = new Set((yield* worktrees(repoRoot)).map(record => path.resolve(record.path)))
-    return (entry: string): Effect.Effect<boolean> => Effect.succeed(roots.has(path.resolve(entry)))
+    const roots = new Set((yield* worktrees(repoRoot)).map(record => record.path))
+    return (entry: string): Effect.Effect<boolean> => Effect.map(canonical(entry), real => roots.has(real))
   })
 
   const untrackedEntries = Effect.fn('git thread workspaces untracked')(function* (repoRoot: string) {
@@ -599,6 +621,11 @@ const make = Effect.gen(function* () {
         yield* ensureSafeName(input.name, 'remove')
         const entry = path.join(yield* threadsDirectory(input.repoRoot), input.name)
         if (yield* (yield* ownedByWorktree(input.repoRoot))(entry)) return yield* new UnsafePath({ detail: `${input.name} belongs to a git worktree now.` })
+        // A checkout git no longer lists (another repository's, or one with a broken link) may still hold uncommitted work.
+        if (yield* exists(path.join(entry, '.git')))
+          return yield* new UnsafePath({
+            detail: `${input.name} holds a git checkout; discard it from its own repository, or remove it by hand once its work is safe.`,
+          })
         yield* removeTree(entry)
         yield* git(['worktree', 'prune'], input.repoRoot)
       }),

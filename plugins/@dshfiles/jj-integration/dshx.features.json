@@ -164,6 +164,9 @@
       "destination": "composer",
       "currentSurface": "composer: new-thread destination bar",
       "surfaces": ["host", "client", "tool", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: run row Workspace segment",
       "configuration": [
         {
           "key": "bookmark",
