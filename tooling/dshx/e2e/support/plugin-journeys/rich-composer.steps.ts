@@ -148,8 +148,23 @@ const openNewProjectThread = async (page: Page, input: { readonly title: string;
   const route = new URL(profile.url)
   route.searchParams.set('thread', sessionId)
   await page.goto(route.href)
-  await page.getByText(input.title, { exact: true }).first().click()
+  await openThreadRow(page, sessionId)
   return { call, sessionId }
+}
+
+/**
+ * Opens a thread from the sidebar list, as a reader would. The rail shows the list under its Threads destination only,
+ * and a row seats a hover-only action strip over its right half, so the click lands on the left half of the row's
+ * trigger (not its title's centre, which the revealed strip covers in the narrow sidebar).
+ */
+const openThreadRow = async (page: Page, sessionId: string): Promise<void> => {
+  const railThreads = page.getByRole('navigation', { name: 'Destinations', exact: true }).getByRole('tab', { name: 'Threads', exact: true })
+  if ((await railThreads.count()) > 0 && (await railThreads.getAttribute('aria-selected')) !== 'true') await railThreads.click()
+  const row = page.getByRole('region', { name: 'Threads', exact: true }).locator(`article[data-thread-id="${sessionId}"]`)
+  await row
+    .locator(':scope > div > button')
+    .first()
+    .click({ position: { x: 24, y: 16 } })
 }
 
 // No provider answers in the scratch profile, so each turn fails at once and its prompt stays in the transcript.
@@ -223,27 +238,24 @@ When('a new thread shows its run row', async ({ page }: { page: Page }) => {
   await expect(runRow(page)).toBeVisible()
 })
 
-Then(
-  'the run row holds project, host, workspace and model, and sending with the defaults collapses it to a summary chip',
-  async ({ page }: { page: Page }) => {
-    await recordAssertion(page, 'rich-composer-run-row-holds-every-pre-send-choice', async () => {
-      const row = runRow(page)
-      await expect(row.locator('[data-run-segment="project"]')).toBeVisible()
-      await expect(row.getByRole('button', { name: 'Run on Local', exact: true })).toBeVisible()
-      await expect(row.locator('[data-run-segment="workspace"]')).toBeVisible()
-      await expect(row.locator('[data-run-segment="model"]')).toBeVisible()
-      // The input keeps no second model seat while the row holds it.
-      await expect(page.locator('[data-composer-card] [data-slot="conversation.input.model"]')).toHaveCount(0)
-    })
-    await recordAssertion(page, 'rich-composer-run-row-sends-with-defaults', async () => {
-      // Zero chip changes: type and send with the row's defaults.
-      await newThreadComposer(page).click()
-      await page.keyboard.type('run row default send')
-      await page.keyboard.press('Enter')
-      await expect(failedTurns(page)).toHaveCount(1, { timeout: 30_000 })
-      await expect(runRow(page)).toHaveCount(0)
-      await expect(page.locator('[data-run-summary]')).toBeVisible()
-    })
-    await finishJourneyAssertions(page)
-  },
-)
+Then('the run row holds project, host, workspace and model, and sending with the defaults collapses it to a summary chip', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'rich-composer-run-row-holds-every-pre-send-choice', async () => {
+    const row = runRow(page)
+    await expect(row.locator('[data-run-segment="project"]')).toBeVisible()
+    await expect(row.getByRole('button', { name: 'Run on Local', exact: true })).toBeVisible()
+    await expect(row.locator('[data-run-segment="workspace"]')).toBeVisible()
+    await expect(row.locator('[data-run-segment="model"]')).toBeVisible()
+    // The input keeps no second model seat while the row holds it.
+    await expect(page.locator('[data-composer-card] [data-slot="conversation.input.model"]')).toHaveCount(0)
+  })
+  await recordAssertion(page, 'rich-composer-run-row-sends-with-defaults', async () => {
+    // Zero chip changes: type and send with the row's defaults.
+    await newThreadComposer(page).click()
+    await page.keyboard.type('run row default send')
+    await page.keyboard.press('Enter')
+    await expect(failedTurns(page)).toHaveCount(1, { timeout: 30_000 })
+    await expect(runRow(page)).toHaveCount(0)
+    await expect(page.locator('[data-run-summary]')).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
