@@ -7,6 +7,7 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { LiveActivity, type ActivityEvent, type ActivityState, type LiveActivity as LiveActivityView } from './live-activity.js'
 import { PlanProgress, type PlanWrite } from './plan-progress.js'
+import { Wire } from './wire.js'
 
 export const PLAN_TARGET = 'dshfiles-agent-plan'
 export const ACTIVITY_TARGET = 'dshfiles-agent-activity'
@@ -23,10 +24,27 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
 const turnOf = (match: ConversationMatch): number | undefined =>
   match.location.kind === 'turn' || match.location.kind === 'step' ? match.location.turn.turn : undefined
 
-const field = (value: unknown, key: string): unknown => (typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined)
-const stringField = (value: unknown, key: string): string | undefined => {
-  const found = field(value, key)
-  return typeof found === 'string' ? found : undefined
+/** The payload fields of the Session events this plugin folds; each stays unparsed until read. */
+interface EventData {
+  readonly todos?: unknown
+  readonly turn?: unknown
+  readonly callId?: unknown
+  readonly name?: unknown
+  readonly message?: unknown
+  readonly jobId?: unknown
+  readonly kind?: unknown
+  readonly label?: unknown
+  readonly startedAt?: unknown
+}
+
+/** The tool message a `tool/result` event carries. */
+interface ToolMessageData {
+  readonly toolCallId?: unknown
+}
+
+const readEventData = (event: SessionEventLike): EventData => {
+  const data: unknown = event.data
+  return Wire.isObject(data) ? data : {}
 }
 
 /** One Context per durable `todo/write`, so each write keeps the time and turn its own event carries. */
@@ -40,7 +58,7 @@ const planWriteDefinition: ConversationNodeDefinitionInput<PlanWrite> = {
       seq: 'seq' in event ? event.seq : 0,
       time: 'time' in event ? event.time : Date.now(),
       turn: turnOf(match),
-      todos: PlanProgress.itemsOf(field(event.data, 'todos')) ?? [],
+      todos: PlanProgress.itemsOf(readEventData(event).todos) ?? [],
     }
   },
   update: context => context.state,
@@ -58,13 +76,17 @@ const planView: ConversationViewDefinition<ConversationViewNode, readonly PlanWr
       empty,
       replace: ({ nodes }) => {
         writes.clear()
-        // SAFETY: every node of this target is built by planWriteDefinition, whose data is a PlanWrite.
-        for (const node of nodes) writes.set(node.id, node.data as PlanWrite)
+        for (const node of nodes) {
+          // SAFETY: every node of this target is built by planWriteDefinition, whose data is a PlanWrite.
+          writes.set(node.id, node.data as PlanWrite)
+        }
         return snapshot()
       },
       apply: ({ upserts }) => {
-        // SAFETY: as above, this target's nodes carry PlanWrite data.
-        for (const node of upserts) writes.set(node.id, node.data as PlanWrite)
+        for (const node of upserts) {
+          // SAFETY: every node of this target is built by planWriteDefinition, whose data is a PlanWrite.
+          writes.set(node.id, node.data as PlanWrite)
+        }
         return snapshot()
       },
     }
@@ -72,35 +94,41 @@ const planView: ConversationViewDefinition<ConversationViewNode, readonly PlanWr
 }
 
 const activityEventOf = (event: SessionEventLike): ActivityEvent | undefined => {
-  const data: unknown = event.data
+  const data = readEventData(event)
   const time = 'time' in event ? event.time : Date.now()
   // `job/*` events are declared by @deepseek-ai/dsh-jobs, which this client does not import; read the type as text.
   const type: string = event.type
   switch (type) {
     case 'turn/start':
-      return { type: 'turn-start', turn: Number(field(data, 'turn')) }
+      return { type: 'turn-start', turn: Number(data.turn) }
     case 'turn/end':
-      return { type: 'turn-end', turn: Number(field(data, 'turn')) }
+      return { type: 'turn-end', turn: Number(data.turn) }
     case 'tool/call': {
-      const callId = stringField(data, 'callId')
-      const name = stringField(data, 'name')
+      const callId = Wire.readString(data.callId)
+      const name = Wire.readString(data.name)
       return callId === undefined || name === undefined ? undefined : { type: 'tool-call', callId, name, time }
     }
     case 'tool/result': {
-      const callId = stringField(field(data, 'message'), 'toolCallId')
+      const message: ToolMessageData = Wire.isObject(data.message) ? data.message : {}
+      const callId = Wire.readString(message.toolCallId)
       return callId === undefined ? undefined : { type: 'tool-result', callId }
     }
     case 'job/registered': {
-      const jobId = stringField(data, 'jobId')
+      const jobId = Wire.readString(data.jobId)
       if (jobId === undefined) return undefined
-      const startedAt = field(data, 'startedAt')
+      const startedAt = data.startedAt
       return {
         type: 'job-registered',
-        job: { jobId, kind: stringField(data, 'kind') ?? 'job', label: stringField(data, 'label') ?? jobId, startedAt: typeof startedAt === 'number' ? startedAt : time },
+        job: {
+          jobId,
+          kind: Wire.readString(data.kind) ?? 'job',
+          label: Wire.readString(data.label) ?? jobId,
+          startedAt: typeof startedAt === 'number' ? startedAt : time,
+        },
       }
     }
     case 'job/settled': {
-      const jobId = stringField(data, 'jobId')
+      const jobId = Wire.readString(data.jobId)
       return jobId === undefined ? undefined : { type: 'job-settled', jobId }
     }
     default:
@@ -137,7 +165,8 @@ const activityView: ConversationViewDefinition<ConversationViewNode, LiveActivit
   target: ACTIVITY_TARGET,
   create: () => {
     // SAFETY: this target's only node is built by activityDefinition, whose data is a LiveActivity view.
-    const latest = (nodes: readonly ConversationViewNode[], fallback: LiveActivityView): LiveActivityView => (nodes.at(-1)?.data as LiveActivityView | undefined) ?? fallback
+    const latest = (nodes: readonly ConversationViewNode[], fallback: LiveActivityView): LiveActivityView =>
+      (nodes.at(-1)?.data as LiveActivityView | undefined) ?? fallback
     let current = IDLE
     return {
       empty: IDLE,

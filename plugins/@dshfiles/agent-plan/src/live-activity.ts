@@ -38,8 +38,10 @@ export interface ActivityState {
 
 const isSubagent = (job: LiveJob): boolean => /agent/i.test(job.kind)
 
+const EMPTY: ActivityState = { turn: undefined, tools: new Map(), jobs: new Map() }
+
 export const LiveActivity = {
-  empty: { turn: undefined, tools: new Map(), jobs: new Map() } satisfies ActivityState as ActivityState,
+  empty: EMPTY,
 
   /** Apply one event; a turn boundary closes calls left without a result (an interrupted turn). */
   apply(state: ActivityState, event: ActivityEvent): ActivityState {
@@ -75,7 +77,8 @@ export const LiveActivity = {
 
   /** Split jobs into background work and subagents, oldest first. */
   view(state: ActivityState): LiveActivity {
-    const byStart = <Row extends { readonly startedAt: number }>(rows: Iterable<Row>): Row[] => [...rows].toSorted((left, right) => left.startedAt - right.startedAt)
+    const byStart = <Row extends { readonly startedAt: number }>(rows: Iterable<Row>): Row[] =>
+      [...rows].toSorted((left, right) => left.startedAt - right.startedAt)
     const jobs = byStart(state.jobs.values())
     return { turn: state.turn, tools: byStart(state.tools.values()), jobs: jobs.filter(job => !isSubagent(job)), subagents: jobs.filter(isSubagent) }
   },

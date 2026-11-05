@@ -1,5 +1,7 @@
 /** Pure model of an agent's todo plan over time: step N of M and per-step timing from successive `todo/write` events. */
 
+import { Wire } from './wire.js'
+
 export type PlanStatus = 'pending' | 'in_progress' | 'completed'
 
 export interface PlanItem {
@@ -35,20 +37,27 @@ export interface PlanProgress {
   readonly done: boolean
 }
 
-const STATUSES: ReadonlySet<string> = new Set(['pending', 'in_progress', 'completed'])
-const RANK: Readonly<Record<PlanStatus, number>> = { pending: 0, in_progress: 1, completed: 2 }
+const RANK = { pending: 0, in_progress: 1, completed: 2 } satisfies Readonly<Record<PlanStatus, number>>
+
+/** One todo as the model sent it; each field stays unparsed until read. */
+interface TodoData {
+  readonly content?: unknown
+  readonly status?: unknown
+}
+
+/** The three statuses the todo tool accepts. */
+const isPlanStatus = (value: unknown): value is PlanStatus => value === 'pending' || value === 'in_progress' || value === 'completed'
 
 /** Read a model-supplied list (call args or an event payload) without trusting its shape. */
-const itemsOf = (value: unknown): readonly PlanItem[] | undefined => {
+const parseItems = (value: unknown): readonly PlanItem[] | undefined => {
   if (!Array.isArray(value)) return undefined
   const items: PlanItem[] = []
   for (const candidate of value) {
-    if (typeof candidate !== 'object' || candidate === null) return undefined
-    const content: unknown = Reflect.get(candidate, 'content')
-    const status: unknown = Reflect.get(candidate, 'status')
-    if (typeof content !== 'string' || content.trim() === '' || typeof status !== 'string' || !STATUSES.has(status)) return undefined
-    // SAFETY: `status` was checked against the three statuses the todo tool accepts.
-    items.push({ content: content.trim(), status: status as PlanStatus })
+    const todo: TodoData | undefined = Wire.isObject(candidate) ? candidate : undefined
+    if (todo === undefined) return undefined
+    const content = Wire.readString(todo.content)
+    if (content === undefined || content.trim() === '' || !isPlanStatus(todo.status)) return undefined
+    items.push({ content: content.trim(), status: todo.status })
   }
   return items
 }
@@ -62,7 +71,7 @@ const formatDuration = (ms: number): string => {
 }
 
 export const PlanProgress = {
-  itemsOf,
+  itemsOf: parseItems,
   formatDuration,
 
   /** `todos` from a `todo_write` call's raw JSON arguments, or undefined while incomplete or invalid. */
@@ -70,7 +79,7 @@ export const PlanProgress = {
     if (argsRaw === undefined) return undefined
     try {
       const parsed: unknown = JSON.parse(argsRaw)
-      return typeof parsed === 'object' && parsed !== null ? itemsOf(Reflect.get(parsed, 'todos')) : undefined
+      return Wire.isObject(parsed) && 'todos' in parsed ? parseItems(parsed.todos) : undefined
     } catch {
       return undefined
     }

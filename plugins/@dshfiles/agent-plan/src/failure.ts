@@ -1,5 +1,7 @@
 /** Pure copy for the failure card: what failed, how many retries ran, and the text its actions put in the composer. */
 
+import { Wire } from './wire.js'
+
 export interface FailureFacts {
   /** `turn-error` for a turn that ended in an error, `model-retry` for a request the Host is retrying. */
   readonly kind: 'turn-error' | 'model-retry'
@@ -13,42 +15,67 @@ export interface FailureFacts {
   readonly provider: string | undefined
 }
 
-const text = (value: unknown): string | undefined => (typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined)
-const count = (value: unknown): number | undefined => (typeof value === 'number' && Number.isFinite(value) ? value : undefined)
-const field = (value: unknown, key: string): unknown => (typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined)
+/** The fields of a native `turn-error` node the card reads; each stays unparsed until read. */
+interface TurnErrorData {
+  readonly message?: unknown
+  readonly code?: unknown
+}
+
+/** The fields of a native `model-retry` node's current attempt the card reads. */
+interface RetryAttemptData {
+  readonly failure?: unknown
+  readonly retryState?: unknown
+  readonly retry?: unknown
+  readonly mode?: unknown
+  readonly maxRetries?: unknown
+  readonly provider?: unknown
+}
+
+/** The provider failure a retry attempt carries. */
+interface ProviderFailureData {
+  readonly message?: unknown
+  readonly reason?: unknown
+  readonly code?: unknown
+  readonly kind?: unknown
+}
+
+const parseTurnError = (data: unknown): FailureFacts => {
+  const fields: TurnErrorData = Wire.isObject(data) ? data : {}
+  return {
+    kind: 'turn-error',
+    message: Wire.readText(fields.message) ?? '',
+    code: Wire.readText(fields.code),
+    retry: undefined,
+    maxRetries: undefined,
+    retryState: undefined,
+    provider: undefined,
+  }
+}
+
+const parseModelRetry = (data: unknown): FailureFacts => {
+  const current: RetryAttemptData = Wire.isObject(data) && 'current' in data && Wire.isObject(data.current) ? data.current : {}
+  const failure: ProviderFailureData = Wire.isObject(current.failure) ? current.failure : {}
+  const state = Wire.readText(current.retryState)
+  return {
+    kind: 'model-retry',
+    message: Wire.readText(failure.message) ?? Wire.readText(failure.reason) ?? '',
+    code: Wire.readText(failure.code) ?? Wire.readText(failure.kind),
+    retry: Wire.readNumber(current.retry),
+    maxRetries: current.mode === 'normal' ? Wire.readNumber(current.maxRetries) : undefined,
+    retryState: state === 'scheduled' || state === 'started' || state === 'cancelled' ? state : undefined,
+    provider: Wire.readText(current.provider),
+  }
+}
 
 /** Codes the Host uses for a turn the user or DSH stopped, which need no fixing. */
 const STOPPED_CODES: ReadonlySet<string> = new Set(['INTERRUPTED', 'ACCOUNT_SIGNED_OUT'])
 
 export const Failure = {
   /** Read a native `turn-error` node's data. */
-  fromTurnError(data: unknown): FailureFacts {
-    return {
-      kind: 'turn-error',
-      message: text(field(data, 'message')) ?? '',
-      code: text(field(data, 'code')),
-      retry: undefined,
-      maxRetries: undefined,
-      retryState: undefined,
-      provider: undefined,
-    }
-  },
+  fromTurnError: parseTurnError,
 
   /** Read a native `model-retry` node's data: its current attempt carries the provider failure. */
-  fromModelRetry(data: unknown): FailureFacts {
-    const current = field(data, 'current')
-    const failure = field(current, 'failure')
-    const state = text(field(current, 'retryState'))
-    return {
-      kind: 'model-retry',
-      message: text(field(failure, 'message')) ?? text(field(failure, 'reason')) ?? '',
-      code: text(field(failure, 'code')) ?? text(field(failure, 'kind')),
-      retry: count(field(current, 'retry')),
-      maxRetries: field(current, 'mode') === 'normal' ? count(field(current, 'maxRetries')) : undefined,
-      retryState: state === 'scheduled' || state === 'started' || state === 'cancelled' ? state : undefined,
-      provider: text(field(current, 'provider')),
-    }
-  },
+  fromModelRetry: parseModelRetry,
 
   /** Whether the card offers actions: a stopped turn and a retry still in flight need none. */
   actionable(facts: FailureFacts): boolean {
