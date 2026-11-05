@@ -528,7 +528,11 @@ export class BacklogStore extends Context.Service<
       /** The ref of the item this one is a sub-issue of. */
       readonly parent?: string | undefined
       readonly files?: readonly BacklogFileInput[] | undefined
+      /** Fields a remote source already knows, used as they are instead of being read from `text`. */
+      readonly fields?: { readonly body?: string | undefined; readonly tags?: readonly string[] | undefined } | undefined
       readonly actor: BacklogActor
+      /** Who wrote it when that is not the actor, such as `remote:<bindingId>` for an item a sync imported. */
+      readonly origin?: string | undefined
     }) => Effect.Effect<BacklogDetail, BacklogWriteFailed | BacklogParentInvalid>
     readonly attachFile: (input: { readonly id: number; readonly file: BacklogFileInput; readonly actor: BacklogActor }) => Detailed
     readonly importTweetContext: (input: {
@@ -542,9 +546,15 @@ export class BacklogStore extends Context.Service<
     readonly removeFile: (input: { readonly id: number; readonly attachmentId: string; readonly actor: BacklogActor }) => Detailed
     readonly delete: (input: { readonly id: number }) => Effect.Effect<BacklogResult<void>, BacklogWriteFailed>
     readonly update: (
-      input: BacklogUpdate & { readonly actor: BacklogActor },
+      input: BacklogUpdate & { readonly actor: BacklogActor; readonly origin?: string | undefined },
     ) => Effect.Effect<BacklogResult<BacklogDetail>, BacklogWriteFailed | BacklogParentInvalid>
-    readonly link: (input: { readonly id: number; readonly link: BacklogLink; readonly remove?: boolean | undefined; readonly actor: BacklogActor }) => Detailed
+    readonly link: (input: {
+      readonly id: number
+      readonly link: BacklogLink
+      readonly remove?: boolean | undefined
+      readonly actor: BacklogActor
+      readonly origin?: string | undefined
+    }) => Detailed
     readonly comment: (input: {
       readonly id: number
       readonly text: string
@@ -753,7 +763,7 @@ export class BacklogStore extends Context.Service<
           events: [...item.events, { at, actor: actorId, origin: actorId, ...event, ...(fieldChanges.length !== 0 && { fieldChanges }) }],
         }
         const next = withOptional(withOptional(merged, 'parent', parent), 'delegate', delegate)
-        yield* persist(next, actorId, leaseWrite)
+        yield* persist(next, event.origin ?? actorId, leaseWrite)
         const stored = next.events.at(-1)
         if (stored !== undefined) yield* PubSub.publish(notices, { item: next, event: stored })
         return yield* detailOf(next)
@@ -820,7 +830,9 @@ export class BacklogStore extends Context.Service<
         readonly priority?: BacklogPriority | undefined
         readonly parent?: string | undefined
         readonly files?: readonly BacklogFileInput[] | undefined
+        readonly fields?: { readonly body?: string | undefined; readonly tags?: readonly string[] | undefined } | undefined
         readonly actor: BacklogActor
+        readonly origin?: string | undefined
       }) {
         const { text, project, status, kind, actor } = input
         const parent = input.parent === undefined ? undefined : yield* checkedParent({ item: { id: 0 }, parentRef: input.parent })
@@ -833,19 +845,20 @@ export class BacklogStore extends Context.Service<
         const files = filesOf(input.files ?? [], at)
         const attachments = files.map(file => file.attachment)
         const startedInThread = actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '' ? actor.sessionId : null
+        const origin = input.origin ?? actorId
         const createdEvent: BacklogEvent =
           startedInThread === null
-            ? { at, actor: actorId, origin: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars) }
-            : { at, actor: actorId, origin: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars), threadId: startedInThread }
+            ? { at, actor: actorId, origin, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars) }
+            : { at, actor: actorId, origin, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars), threadId: startedInThread }
         const item: BacklogItem = {
           id,
           ref,
           title: triaged.title,
-          body: triaged.body,
+          body: input.fields?.body?.slice(0, BacklogItems.maxBodyChars) ?? triaged.body,
           kind: kind ?? triaged.kind,
           status: status ?? 'inbox',
           project: BacklogItems.projectOf(project ?? (actor.kind === 'agent' ? (actor.cwd ?? null) : null)),
-          tags: triaged.tags,
+          tags: input.fields?.tags === undefined ? triaged.tags : [...new Set(input.fields.tags)].slice(0, 20),
           links: BacklogItems.uniqueLinks([...triaged.links, ...callerLinks(actor)]),
           attachments,
           actors: [{ id: actorId, role: 'owner' }],
@@ -862,9 +875,9 @@ export class BacklogStore extends Context.Service<
           ...(priority !== undefined && priority !== 'none' && { priority }),
           ...(parent !== undefined && { parent }),
         }
-        yield* repo.create({ item, origin: actorId, nextId: id + 1, files }).pipe(Effect.mapError(writeFailed(item, 'put')))
+        yield* repo.create({ item, origin, nextId: id + 1, files }).pipe(Effect.mapError(writeFailed(item, 'put')))
         yield* Ref.update(state, current => ({ ...current, nextId: id + 1 }))
-        yield* persist(item, actorId)
+        yield* persist(item, origin)
         yield* PubSub.publish(notices, { item, event: createdEvent })
         return yield* detailOf(item)
       }, serialized)
@@ -952,8 +965,11 @@ export class BacklogStore extends Context.Service<
         return found(undefined)
       }, serialized)
 
-      const update = Effect.fn('backlog store update')(function* (input: BacklogUpdate & { readonly actor: BacklogActor }) {
-        const { id, actor, ...requested } = input
+      const update = Effect.fn('backlog store update')(function* (
+        input: BacklogUpdate & { readonly actor: BacklogActor; readonly origin?: string | undefined },
+      ) {
+        const { id, actor, origin, ...requested } = input
+        const by = origin === undefined ? {} : { origin }
         return yield* withItem(id, item =>
           Effect.gen(function* () {
             const parent =
@@ -967,14 +983,14 @@ export class BacklogStore extends Context.Service<
                 ...(change.snoozedUntil === undefined ? [] : [change.snoozedUntil === null ? 'woke it' : 'snoozed it']),
                 ...(clearedSuggestion ? ['cleared closed-item suggestion'] : []),
               ]
-              return found(yield* touchAndCloseDuplicates(item, actor, { kind: 'edited', detail: details.join('; ') }, change))
+              return found(yield* touchAndCloseDuplicates(item, actor, { kind: 'edited', detail: details.join('; '), ...by }, change))
             }
             if (actor.kind === 'user') change.humanFields = [...new Set([...item.humanFields, ...userChanged])]
             const detail =
               change.status === undefined
                 ? `${changed.join(', ')}`
                 : `${item.status} → ${change.status}${changed.length > 1 ? `; ${changed.filter(field => field !== 'status').join(', ')}` : ''}`
-            return found(yield* touchAndCloseDuplicates(item, actor, { kind: change.status === undefined ? 'edited' : 'moved', detail }, change))
+            return found(yield* touchAndCloseDuplicates(item, actor, { kind: change.status === undefined ? 'edited' : 'moved', detail, ...by }, change))
           }),
         )
       })
@@ -984,6 +1000,7 @@ export class BacklogStore extends Context.Service<
         readonly link: BacklogLink
         readonly remove?: boolean | undefined
         readonly actor: BacklogActor
+        readonly origin?: string | undefined
       }) {
         return yield* withItem(input.id, item =>
           Effect.gen(function* () {
@@ -996,7 +1013,8 @@ export class BacklogStore extends Context.Service<
               : BacklogItems.uniqueLinks([...item.links, { ...input.link, provenance }])
             const label = `${input.link.relation === undefined || input.link.relation === 'related' ? '' : `${input.link.relation} `}${input.link.type}:${input.link.target}`
             const sourceThread = input.link.type === 'thread' ? { threadId: input.link.target } : {}
-            return found(yield* touch(item, input.actor, { kind: removing ? 'unlinked' : 'linked', detail: label, ...sourceThread }, { links }))
+            const by = input.origin === undefined ? {} : { origin: input.origin }
+            return found(yield* touch(item, input.actor, { kind: removing ? 'unlinked' : 'linked', detail: label, ...sourceThread, ...by }, { links }))
           }),
         )
       })
