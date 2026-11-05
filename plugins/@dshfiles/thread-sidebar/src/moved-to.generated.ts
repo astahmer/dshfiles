@@ -8,6 +8,7 @@ export interface FormerNavigationEntry {
 
 export const FORMER_NAVIGATION: readonly FormerNavigationEntry[] = [
   { entry: 'Activity Timeline: Activity', destinations: ['inbox', 'observe'] },
+  { entry: 'Agent CLI threads', destinations: ['knowledge'] },
   { entry: 'Agent Toolkit: Capabilities', destinations: ['thread-panel'] },
   { entry: 'Agents', destinations: ['agents'] },
   { entry: 'AI Accounts: Accounts', destinations: ['settings'] },
@@ -15,6 +16,7 @@ export const FORMER_NAVIGATION: readonly FormerNavigationEntry[] = [
   { entry: 'AI Accounts: Usage history', destinations: ['observe'] },
   { entry: 'Background Jobs: Jobs', destinations: ['observe'] },
   { entry: 'Backlog', destinations: ['inbox', 'work', 'settings'] },
+  { entry: 'Backlog: Items', destinations: ['work', 'settings'] },
   { entry: 'Component gallery', destinations: ['knowledge'] },
   { entry: 'Hosts', destinations: ['observe'] },
   { entry: 'Inbox', destinations: ['inbox'] },
@@ -30,6 +32,7 @@ export const FORMER_NAVIGATION: readonly FormerNavigationEntry[] = [
   { entry: 'Thread Sidebar: Board', destinations: ['threads'] },
   { entry: 'Traces: Explorer', destinations: ['inbox', 'observe'] },
   { entry: 'Usage: Analytics', destinations: ['observe'] },
+  { entry: 'Whiteboard', destinations: ['knowledge'] },
   { entry: 'Worktree Memory: RAM', destinations: ['observe'] },
   { entry: 'Plugins', destinations: ['settings'] },
   { entry: 'Schedules', destinations: ['work'] },

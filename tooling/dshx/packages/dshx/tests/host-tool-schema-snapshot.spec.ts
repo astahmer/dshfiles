@@ -11,7 +11,7 @@ import { buildHost, type BuildHostOptions } from '../src/compiler/host/build.js'
 import { resolveDshxConfig } from '../src/config/resolve.js'
 import { createTestHost } from '../src/testing/index.js'
 
-const expectedCounts = { hostBundles: 59, apiMethods: 486, apiToolBindings: 338, apiToolSchemas: 337, definedTools: 24, tools: 361 }
+const expectedCounts = { hostBundles: 64, apiMethods: 518, apiToolBindings: 364, apiToolSchemas: 363, definedTools: 24, tools: 387 }
 const fixturePath = new URL('../../../e2e/fixtures/tool-schemas.json', import.meta.url)
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)

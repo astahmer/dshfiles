@@ -373,7 +373,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "attentionApi",
       "importFrom": "@dshfiles/activity-timeline/attention-api",
       "owner": "@dshfiles/activity-timeline",
-      "source": "plugins/@dshfiles/activity-timeline/src/attention-api.ts:161",
+      "source": "plugins/@dshfiles/activity-timeline/src/attention-api.ts:165",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/activity-timeline:attention",
@@ -683,7 +683,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "backlogApi",
       "importFrom": "@dshfiles/backlog/api",
       "owner": "@dshfiles/backlog",
-      "source": "plugins/@dshfiles/backlog/src/api.ts:184",
+      "source": "plugins/@dshfiles/backlog/src/api.ts:236",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/backlog:backlog",
@@ -696,8 +696,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/backlog owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: list, revision, aiActivity, projects, get, getMany, referencing, capture, attachFile, readFile, removeFile, delete, speechStatus, jevSetupStatus, classifyReply, generateReply, transcribeSpeech, enrichTweet, update, link, agentContinuationCandidates, continueAgentThread, startThread, acknowledge, triage, backfillTriage, backfillTriageStatus, applyProposal, dismissProposal, comment, editComment, deleteComment",
-        "Agent tools: backlog_list (read-only), backlog_projects (read-only), backlog_get (read-only), backlog_get_many (read-only), backlog_referencing (read-only), backlog_capture, backlog_attach_file, backlog_read_file (read-only), backlog_remove_file, backlog_delete, backlog_enrich_tweet, backlog_update, backlog_link, backlog_start_thread, backlog_triage, backlog_triage_backfill, backlog_triage_backfill_status (read-only), backlog_accept_proposal, backlog_dismiss_proposal, backlog_comment"
+        "Methods: list, revision, aiActivity, projects, get, getMany, referencing, capture, attachFile, readFile, removeFile, delete, speechStatus, jevSetupStatus, classifyReply, generateReply, transcribeSpeech, enrichTweet, update, link, agentContinuationCandidates, continueAgentThread, startThread, syncStatus, syncNow, linkRemote, importRemote, acknowledge, triage, backfillTriage, backfillTriageStatus, applyProposal, dismissProposal, comment, editComment, deleteComment",
+        "Agent tools: backlog_list (read-only), backlog_projects (read-only), backlog_get (read-only), backlog_get_many (read-only), backlog_referencing (read-only), backlog_capture, backlog_attach_file, backlog_read_file (read-only), backlog_remove_file, backlog_delete, backlog_enrich_tweet, backlog_update, backlog_link, backlog_start_thread, backlog_sync_status (read-only), backlog_sync_now, backlog_link_remote, backlog_import_remote, backlog_triage, backlog_triage_backfill, backlog_triage_backfill_status (read-only), backlog_accept_proposal, backlog_dismiss_proposal, backlog_comment"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -1819,7 +1819,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "DestinationSections",
       "importFrom": "@dshfiles/thread-sidebar/destinations",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:114",
+      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:116",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/thread-sidebar.destination-section",
@@ -1833,6 +1833,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Additive: each contribution adds an entry; @dshfiles/thread-sidebar renders nothing for it when absent.",
       "details": [
         "Registry id: @dshfiles/thread-sidebar.destination-section"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "ThreadRowActions",
+      "importFrom": "@dshfiles/thread-sidebar/thread-row-actions",
+      "owner": "@dshfiles/thread-sidebar",
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-row-actions.ts:25",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/thread-sidebar.row-action",
+      "kind": "registry",
+      "title": "ThreadRowActions",
+      "summary": "Contribution registry owned by @dshfiles/thread-sidebar.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(ThreadRowActions, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/thread-sidebar renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/thread-sidebar.row-action"
       ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
@@ -1919,6 +1941,71 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/usage/src/session-log.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "QuestionHtmlPreview",
+      "importFrom": "@dshfiles/user-questions/html-preview",
+      "owner": "@dshfiles/user-questions",
+      "source": "plugins/@dshfiles/user-questions/src/html-preview.ts:22",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/user-questions.html-preview",
+      "kind": "registry",
+      "title": "QuestionHtmlPreview",
+      "summary": "Contribution registry owned by @dshfiles/user-questions.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(QuestionHtmlPreview, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/user-questions renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/user-questions.html-preview"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "whiteboardApi",
+      "importFrom": "@dshfiles/whiteboard/api",
+      "owner": "@dshfiles/whiteboard",
+      "source": "plugins/@dshfiles/whiteboard/src/api.ts:20",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "api:@dshfiles/whiteboard:whiteboard",
+      "kind": "api",
+      "title": "whiteboardApi (whiteboard)",
+      "summary": "The one contract the Whiteboards page, other Host plugins and agent tools share.",
+      "scope": "host, called from clients, other Host plugins and agents",
+      "mode": "host methods",
+      "registration": "useApi(whiteboardApi) in a Client slot, or createHostApiClient(ctx, whiteboardApi, packageId) on the Host",
+      "risk": "additive",
+      "riskNote": "Calling is additive; @dshfiles/whiteboard owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
+      "details": [
+        "Methods: list, read, write, rename, delete, restore",
+        "Agent tools: whiteboard_list (read-only), whiteboard_read (read-only), whiteboard_write, whiteboard_rename, whiteboard_delete, whiteboard_restore"
+      ],
+      "docs": "tooling/dshx/docs/guides/api.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/whiteboard/xstate-diagram",
+      "kind": "module",
+      "title": "@dshfiles/whiteboard/xstate-diagram",
+      "summary": "Renders an xstate v5 machine as Mermaid text, without importing xstate: it reads the live `machine.root` state node tree (`states`, `initial`, `transitions`, `always`, `invoke`), which every v5 machine exposes. - `flowchart` is what `whiteboard_write({ mermaid })` turns into editable Excalidraw shapes: mermaid-to-exca…",
+      "publicSymbol": "DiagramGuard, DiagramTransition, DiagramStateNode, DiagramMachine, DiagramFormat, machineToMermaid",
+      "importFrom": "@dshfiles/whiteboard/xstate-diagram",
+      "owner": "@dshfiles/whiteboard",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/whiteboard/src/xstate-diagram.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2115,7 +2202,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/command-palette › palette-search"
       ],
       "details": [
-        "Used by 19 catalog feature(s)",
+        "Used by 20 catalog feature(s)",
         "Destinations in use: land, none, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2143,7 +2230,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-communication › agent-directory"
       ],
       "details": [
-        "Used by 57 catalog feature(s)",
+        "Used by 59 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2252,7 +2339,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › selection-context-menu"
       ],
       "details": [
-        "Used by 26 catalog feature(s)",
+        "Used by 28 catalog feature(s)",
         "Destinations in use: knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2280,7 +2367,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 21 catalog feature(s)",
+        "Used by 22 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2364,7 +2451,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 43 catalog feature(s)",
+        "Used by 47 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2448,7 +2535,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › bounded-batch-resolution"
       ],
       "details": [
-        "Used by 19 catalog feature(s)",
+        "Used by 21 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2476,7 +2563,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › auxiliary-and-wait-spans"
       ],
       "details": [
-        "Used by 95 catalog feature(s)",
+        "Used by 96 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
