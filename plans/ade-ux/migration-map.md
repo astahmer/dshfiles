@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-394 features from 89 plugins.
+399 features from 91 plugins.
 
 ## Counts
 
@@ -18,12 +18,12 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Work |  |  | 1 |  | 8 | 3 | 1 |  | 5 |  |  |  |  |  | 18 |
 | Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  |  | 5 |
 | Observe |  |  |  |  | 21 | 1 |  |  | 2 |  |  |  |  |  | 24 |
-| Knowledge |  |  |  |  | 4 |  | 1 |  | 1 |  |  |  |  |  | 6 |
+| Knowledge |  |  |  |  | 5 |  | 1 |  | 1 |  |  |  |  |  | 7 |
 | Settings |  |  |  |  | 2 |  |  |  | 1 |  | 43 |  |  |  | 46 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 26 |  | 26 |
-| Composer |  |  |  | 54 |  |  |  |  |  |  |  |  |  |  | 54 |
+| Composer |  |  |  | 55 |  |  |  |  |  |  |  |  |  |  | 55 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 21 | 21 |
-| No place of its own | 19 |  | 17 |  |  |  | 1 | 92 |  |  |  | 7 |  |  | 136 |
+| No place of its own | 19 |  | 17 |  |  |  | 1 | 95 |  |  |  | 7 |  |  | 139 |
 
 ## By current left-nav entry
 
@@ -39,6 +39,7 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | AI Accounts: Usage history | Observe | ai-accounts/usage-history-and-pricing → Observe (destinationSection) |
 | Background Jobs: Jobs | Observe | background-jobs/batch-stop-jobs → Observe (rowAction)<br>background-jobs/jobs-board → Observe (destinationSection) |
 | Backlog | Work, Inbox, Settings | backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/project-scope → Work (destinationSection)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/secret-link-reveal → Work (detail)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/tweet-context-enrichment → Work (rowAction) |
+| Component gallery | Knowledge | component-gallery/component-gallery-page → Knowledge (destinationSection) |
 | Hosts | Observe | multi-host/fleet-update → Observe (destinationSection)<br>multi-host/host-management → Observe (destinationSection)<br>multi-host/host-settings → Observe (detail)<br>multi-host/isolated-runtime-views → Observe (rowAction) |
 | Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
 | Land | Land | jj-integration/thread-integration-attention-view → Land (destinationSection)<br>jj-integration/thread-integration-empty → Land (destinationSection)<br>jj-integration/thread-integration-row-details → Land (detail)<br>jj-integration/thread-workspaces-panel → Land (destinationSection) |
@@ -65,16 +66,16 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | --- | ---: | --- |
 | agent tool | 23 | No place of its own 18, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
 | agent tools | 1 | No place of its own 1 |
-| client | 12 | No place of its own 12 |
-| composer | 55 | Composer 52, Thread panel 2, Settings 1 |
+| client | 13 | No place of its own 13 |
+| composer | 56 | Composer 53, Thread panel 2, Settings 1 |
 | composer and transcript | 1 | Threads 1 |
 | conversation-view | 2 | Thread panel 2 |
 | dialog | 3 | No place of its own 1, Settings 1, Thread panel 1 |
-| host | 45 | No place of its own 45 |
+| host | 47 | No place of its own 47 |
 | Host contract | 1 | Inbox 1 |
 | Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
 | keyboard | 3 | No place of its own 3 |
-| left-nav | 89 | Observe 21, Work 16, Land 13, Settings 13, Inbox 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
+| left-nav | 90 | Observe 21, Work 16, Land 13, Settings 13, Inbox 12, Knowledge 5, Agents 4, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 10 | No place of its own 7, Thread panel 2, Settings 1 |
 | observe | 2 | Observe 2 |
 | overlay | 4 | Agents 1, Knowledge 1, No place of its own 1, Work 1 |
@@ -246,10 +247,11 @@ rail destination; 24 features.
 
 ### Knowledge
 
-rail destination; 6 features.
+rail destination; 7 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
+| component-gallery/component-gallery-page: Browse every shared component on one page | destinationSection | left-nav: Component gallery |
 | memory/memory-panel: Browse and clean up memory in the Memory panel | destinationSection | left-nav: Memory |
 | memory/usage-telemetry: Show what memory costs and whether it holds up | destinationSection | left-nav: Memory › Analytics |
 | references/session-references: Attach named outside directories and git repositories to a thread | destinationSection | agent tool: reference_* and /reference (no UI) |
@@ -345,7 +347,7 @@ facets of the active thread; 26 features.
 
 ### Composer
 
-run row, chips, `/` and `@` sources; 54 features.
+run row, chips, `/` and `@` sources; 55 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -361,6 +363,7 @@ run row, chips, `/` and `@` sources; 54 features.
 | input-trigger/codex-at-tokens: Codex-style @ token targeting | composerContribution | composer: @ menu |
 | input-trigger/command-chip-restore: Restore a persisted command chip | composerContribution | composer: command chips |
 | input-trigger/command-slash-entries: Slash entries for dshx commands | composerContribution | composer: / menu |
+| jj-integration/git-thread-workspaces: Thread workspaces in git-only repositories | composerContribution | composer: run row Workspace segment |
 | jj-integration/new-thread-preparation: New thread prepares its destination while the draft is written | composerContribution | composer: New thread draft |
 | jj-integration/new-thread-project-default: New thread returns to its project | composerContribution | composer: new-thread destination bar |
 | jj-integration/new-thread-project-picker: Pick a New-thread project | composerContribution | composer: Choose workspace |
@@ -434,7 +437,7 @@ cards inline in the active thread; 21 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 136 features.
+palette commands, status items, agent tools, infrastructure; 139 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -502,6 +505,7 @@ palette commands, status items, agent tools, infrastructure; 136 features.
 | frame-layout/panel-width-persistence: Persist the frame's dragged panel widths | infrastructure | shell: panel widths |
 | frame-layout/phone-navigation-seat: Give the stage the full width on a phone | infrastructure | shell: frame columns at phone width |
 | frame-layout/status-strip: One status strip at the bottom of the frame | infrastructure | shell: status strip |
+| git-cli/git-cli-run: One Effect service that runs the git CLI | infrastructure | host: library |
 | git-worktrees/git-file-snapshots: Snapshot and restore a git workspace's files | infrastructure | host: git file snapshots |
 | git-worktrees/git-thread-worktrees: Isolate threads in git worktrees | infrastructure | settings: git worktree isolation (opt-in) |
 | goal-stall-guard/pause-stalled-goals: Pause goals after consecutive empty rounds | infrastructure | host: goal rounds |
@@ -526,6 +530,7 @@ palette commands, status items, agent tools, infrastructure; 136 features.
 | plugin-ui/debounced-client-values: Debounce fast-changing client input | infrastructure | client: library |
 | plugin-ui/query-client-binding: Provide host-backed client queries | infrastructure | client: library |
 | plugin-ui/schema-validated-persistent-values: Persist schema-validated client values | infrastructure | client: library |
+| plugin-ui/shared-motion: Animate components with one shared motion layer | infrastructure | client: library |
 | plugin-ui/touch-targets: Give kit controls a 44px touch target | infrastructure | client: library |
 | plugin-ui/typed-forms-and-accessible-tables: Compose validated forms and accessible data tables | infrastructure | client: library |
 | preview/render-html: Offline HTML screenshots for other Host plugins | infrastructure | host: preview-render contract |
@@ -552,6 +557,7 @@ palette commands, status items, agent tools, infrastructure; 136 features.
 | traces/otlp-receiver: Local OTLP/HTTP receiver | infrastructure | host: OTLP receiver (read in left-nav: Traces: Explorer) |
 | ui-styles/one-shared-stylesheet: One shared plugin stylesheet | infrastructure | client: shared stylesheet |
 | usage/usage-index: Incremental request and tool index from session logs | infrastructure | host: usage ledger |
+| vcs-provider-port/vcs-detection: Which VCS owns a path | infrastructure | host: library |
 | vcs-provider-port/vcs-provider-resolution: One port for version-control providers | infrastructure | host: library |
 | workbench/all-region-drag: Drag panels across centre right and bottom | infrastructure | workbench: panel drag |
 | workbench/conversation-header: Keep the original conversation toolbar and child views inside each thread | infrastructure | thread-header: conversation toolbar |

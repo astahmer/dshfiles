@@ -1819,7 +1819,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "DestinationSections",
       "importFrom": "@dshfiles/thread-sidebar/destinations",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:113",
+      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:114",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/thread-sidebar.destination-section",
@@ -2143,7 +2143,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-communication › agent-directory"
       ],
       "details": [
-        "Used by 55 catalog feature(s)",
+        "Used by 57 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2171,7 +2171,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/background-jobs › thread-jobs-facet"
       ],
       "details": [
-        "Used by 25 catalog feature(s)",
+        "Used by 26 catalog feature(s)",
         "Destinations in use: thread-panel"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2252,7 +2252,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › selection-context-menu"
       ],
       "details": [
-        "Used by 25 catalog feature(s)",
+        "Used by 26 catalog feature(s)",
         "Destinations in use: knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2308,7 +2308,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agents › agent-mentions"
       ],
       "details": [
-        "Used by 54 catalog feature(s)",
+        "Used by 55 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2476,7 +2476,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › auxiliary-and-wait-spans"
       ],
       "details": [
-        "Used by 91 catalog feature(s)",
+        "Used by 95 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

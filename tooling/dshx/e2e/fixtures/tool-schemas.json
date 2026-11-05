@@ -61,12 +61,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 485,
-  "apiToolBindings": 337,
-  "apiToolNameCount": 337,
-  "apiToolSchemas": 336,
+  "apiMethods": 486,
+  "apiToolBindings": 338,
+  "apiToolNameCount": 338,
+  "apiToolSchemas": 337,
   "definedTools": 24,
-  "tools": 360,
+  "tools": 361,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -3070,6 +3070,23 @@
           "workspacePath",
           "base",
           "head"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "context_instruction_files",
+      "description": "The AGENTS.md-compatible instruction files DSH's workspace instruction loader finds for a thread folder with its default discovery settings (user-global first, then project root to folder), with their sizes. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "description": "Absolute folder a thread works in.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd"
         ],
         "additionalProperties": false
       }
@@ -8057,7 +8074,7 @@
     },
     {
       "name": "shell_navigation_counts",
-      "description": "Read how often each rail destination and section was opened in the DSH GUI, and from which surface (rail, phone tab bar, list index, palette, moved-to help). Ids and counts only. Read-only.",
+      "description": "Read how often each rail destination and section was opened in the DSH GUI, and from which surface (rail, phone tab bar, list index, palette, moved-to help, phone Back). Ids and counts only. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {}
