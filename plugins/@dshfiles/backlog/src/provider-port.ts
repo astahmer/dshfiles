@@ -71,6 +71,8 @@ const descriptorSchema = Schema.Struct({
   referenceExample: shortText(120),
   /** Settings a binding of this kind may carry beyond its container: Notion's property names. */
   bindingOptions: Schema.optionalKey(Schema.Array(bindingOptionSchema).check(Schema.isMaxLength(12))),
+  /** Settings a connection of this kind needs beyond its key and base URL: the account email Jira signs in with. Never a secret. */
+  connectionOptions: Schema.optionalKey(Schema.Array(bindingOptionSchema).check(Schema.isMaxLength(6))),
 })
 
 /** An account as the provider receives it: the credential stays a `secret:ALIAS` reference the provider resolves. */
@@ -80,6 +82,8 @@ const connectionSchema = Schema.Struct({
   label: shortText(80),
   credential: shortText(400),
   baseUrl: shortText(500),
+  /** The connection's provider-specific settings, keyed by the descriptor's `connectionOptions`; absent when it has none. */
+  options: Schema.optionalKey(bindingOptionsSchema),
 })
 
 const containerSchema = Schema.Struct({ key: shortText(500), name: shortText(200), url: Schema.optionalKey(shortText(500)) })

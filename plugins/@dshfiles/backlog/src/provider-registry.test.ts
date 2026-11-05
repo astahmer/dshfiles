@@ -111,6 +111,38 @@ describe('the provider registry', () => {
     }).pipe(Effect.provide(syncTestLayer({ client: fakeLinear().client, external: [{ owner: '@acme/notion', client: trashingClient(calls) }] })))
   })
 
+  it.effect('hands a connection its provider settings on test, on save and on every call it scopes', () => {
+    const seen: string[] = []
+    const descriptor: ProviderDescriptor = {
+      ...trashingDescriptor,
+      kind: 'jira-like',
+      connectionOptions: [{ key: 'email', label: 'Account email', placeholder: 'me@example.com' }],
+    }
+    const client: ExternalProviderClient = {
+      ...notionClient([]),
+      describe: () => Effect.succeed({ providers: [descriptor] }),
+      identity: input => {
+        seen.push(`identity ${JSON.stringify(input.connection.options ?? {})}`)
+        return Effect.succeed({ account: 'me', credentialSource: 'reference' as const, containers: [] })
+      },
+      resolve: input => {
+        seen.push(`resolve ${JSON.stringify(input.connection.options ?? {})}`)
+        return Effect.succeed(page)
+      },
+    }
+    return Effect.gen(function* () {
+      const sync = yield* BacklogSync
+      yield* sync.testConnection({ draft: { kind: 'jira-like', credential: '', baseUrl: '', options: { email: 'draft@example.com' } } })
+      const saved = yield* sync.saveConnection({
+        connection: { instanceId: 'jira', kind: 'jira-like', label: 'Jira', credential: '', baseUrl: '', options: { email: 'me@example.com' } },
+      })
+      expect(saved.connection.options).toEqual({ email: 'me@example.com' })
+      yield* sync.saveBinding({ binding: { id: 'eng', connectionId: 'jira', container: 'ENG' } })
+      yield* sync.importRemote({ reference: 'https://notion.so/page-1', actor: { kind: 'user' } })
+      expect(seen).toEqual(['identity {"email":"draft@example.com"}', 'resolve {"email":"me@example.com"}'])
+    }).pipe(Effect.provide(syncTestLayer({ client: fakeLinear().client, external: [{ owner: '@acme/jira', client }] })))
+  })
+
   it.effect('imports and pushes the due date, acceptance criteria and summary a provider carries', () => {
     const pushed: RemotePatch[] = []
     const descriptor: ProviderDescriptor = {

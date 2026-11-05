@@ -298,7 +298,14 @@ const backlogHandlers = Api.handlers(backlogApi, {
   saveSyncConnection: input =>
     BacklogSync.use(sync =>
       sync.saveConnection({
-        connection: { ...input.connection, credential: input.connection.credential ?? '', baseUrl: input.connection.baseUrl ?? '' },
+        connection: {
+          instanceId: input.connection.instanceId,
+          kind: input.connection.kind,
+          label: input.connection.label,
+          credential: input.connection.credential ?? '',
+          baseUrl: input.connection.baseUrl ?? '',
+          ...(input.connection.options !== undefined && { options: input.connection.options }),
+        },
         previousInstanceId: input.previousInstanceId,
       }),
     ),

@@ -71,6 +71,7 @@ const providerConnection = (connection: SyncConnection): ProviderConnection => (
   label: connection.label,
   credential: connection.credential,
   baseUrl: connection.baseUrl,
+  ...(connection.options !== undefined && { options: connection.options }),
 })
 
 const scopeOf = (context: BindingContext, project: string | null): ProviderScope => ({

@@ -598,7 +598,9 @@ A provider is a plugin serving the `backlog-provider` Host API, the `vcs-provide
 `create`, `comment` and `remove` (called only when the descriptor's `delete` is `archive` or `delete`), all in the
 canonical record shape. A descriptor may list `bindingOptions` (key, label, placeholder): the binding form shows one
 text field per option, the binding stores them as `options`, and every call scoped to that binding carries them
-(Notion's property names). A handler fails with `BacklogProviderFailed` (its `dshxWireCode` is
+(Notion's property names). `connectionOptions` work the same way one level up: the connection form shows one field per
+option, the connection stores them as `options` (never a key; changing one clears the last Test result), and `identity`
+and every scoped call receive them on `connection.options` (Jira's account email). A handler fails with `BacklogProviderFailed` (its `dshxWireCode` is
 `backlog-provider-failed`): the backlog calls providers through `HostApis.typed` with that class declared, so its code
 (`not-found`, `rejected`, …), HTTP status and detail arrive intact and the user sees the provider's own recovery
 (“share the page with the integration”, “check the key”) rather than a generic refusal; only a call that never reached

@@ -563,8 +563,18 @@ const ConnectionForm = (props: {
   const [label, setLabel] = useState(props.initial?.label ?? props.descriptor.label)
   const [credential, setCredential] = useState(props.initial?.credential ?? '')
   const [baseUrl, setBaseUrl] = useState(props.initial?.baseUrl ?? '')
+  const [options, setOptions] = useState<Readonly<Record<string, string>>>(props.initial?.options ?? {})
+  const optionFields = props.descriptor.connectionOptions ?? []
+  const filledOptions = Object.fromEntries(
+    optionFields.flatMap(option => {
+      const value = (options[option.key] ?? '').trim()
+      return value === '' ? [] : [[option.key, value] as const]
+    }),
+  )
+  const draftOptions = optionFields.length === 0 ? {} : { options: filledOptions }
   const test = useMutation({
-    mutationFn: () => api.testSyncConnection({ draft: { kind: props.descriptor.kind, credential: credential.trim(), baseUrl: baseUrl.trim() } }),
+    mutationFn: () =>
+      api.testSyncConnection({ draft: { kind: props.descriptor.kind, credential: credential.trim(), baseUrl: baseUrl.trim(), ...draftOptions } }),
   })
   const instanceId =
     props.initial?.instanceId ??
@@ -572,7 +582,7 @@ const ConnectionForm = (props: {
   const keyed = props.descriptor.credential !== 'none'
   const save = (): void =>
     actions.saveConnection.mutate(
-      { connection: { instanceId, kind: props.descriptor.kind, label: label.trim(), credential: credential.trim(), baseUrl: baseUrl.trim() } },
+      { connection: { instanceId, kind: props.descriptor.kind, label: label.trim(), credential: credential.trim(), baseUrl: baseUrl.trim(), ...draftOptions } },
       { onSuccess: props.onDone },
     )
   return (
@@ -608,6 +618,19 @@ const ConnectionForm = (props: {
             className={cn(inputClass, 'dshx:font-mono!')}
           />
         ) : null}
+        {optionFields.map(option => (
+          <input
+            key={option.key}
+            aria-label={option.label}
+            placeholder={option.placeholder}
+            value={options[option.key] ?? ''}
+            onChange={event => {
+              const value = event.currentTarget.value
+              setOptions(current => ({ ...current, [option.key]: value }))
+            }}
+            className={inputClass}
+          />
+        ))}
       </div>
       {isReferenceOrEmpty(credential) ? null : (
         <p role="alert" className="dshx:text-xs dshx:text-destructive">

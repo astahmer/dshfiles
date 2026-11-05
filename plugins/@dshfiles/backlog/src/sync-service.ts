@@ -98,9 +98,13 @@ export interface SyncConnectionDraft {
   readonly kind: string
   readonly credential: string
   readonly baseUrl: string
+  readonly options?: Readonly<Record<string, string>> | undefined
 }
 
 const errorView = (error: { readonly _tag: string; readonly message: string }) => ({ code: error._tag.slice(0, 64), message: error.message.slice(0, 1_000) })
+
+const sameOptions = (left: Readonly<Record<string, string>> | undefined, right: Readonly<Record<string, string>> | undefined): boolean =>
+  JSON.stringify(Object.entries(left ?? {}).sort()) === JSON.stringify(Object.entries(right ?? {}).sort())
 
 type ConfigError = SyncConnectionMissing | SyncBindingUnknown | SyncBindingMissing | SyncProviderUnknown | SyncNotOwner
 type LinkError =
@@ -589,6 +593,7 @@ export class BacklogSync extends Context.Service<
             label: input.draft.kind,
             credential: input.draft.credential,
             baseUrl: input.draft.baseUrl,
+            ...(input.draft.options !== undefined && { options: input.draft.options }),
             identity: null,
           } satisfies SyncConnection
         const found = (yield* snapshot).connections.find(connection => connection.instanceId === input.connection)
@@ -673,7 +678,12 @@ export class BacklogSync extends Context.Service<
           return yield* new SyncConfigInvalid({ detail: 'A connection keeps its provider; add a new connection for another provider.' })
         const saved: SyncConnection = {
           ...input.connection,
-          identity: previous?.credential === input.connection.credential ? (previous.identity ?? null) : null,
+          identity:
+            previous?.credential === input.connection.credential &&
+            previous.baseUrl === input.connection.baseUrl &&
+            sameOptions(previous.options, input.connection.options)
+              ? (previous.identity ?? null)
+              : null,
         }
         const connections =
           previous === undefined

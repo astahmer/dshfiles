@@ -392,12 +392,16 @@ const connectionInputSchema = Schema.Struct({
     .annotate({ description: 'secret:ALIAS reference to the key; empty uses the provider’s Host environment variable (or the gh CLI for GitHub).' }),
   baseUrl: Schema.String.check(Schema.isMaxLength(500))
     .pipe(Schema.optional)
-    .annotate({ description: 'API base URL for a self-hosted instance; empty uses the provider’s default.' }),
+    .annotate({ description: 'API base URL for a self-hosted instance; empty uses the provider’s default. Jira needs https://<site>.atlassian.net.' }),
+  options: BacklogProviders.bindingOptionsSchema.pipe(Schema.optional).annotate({
+    description: 'Provider settings its descriptor lists in connectionOptions, e.g. { email } for Jira. Never a key.',
+  }),
 })
 const connectionDraftSchema = Schema.Struct({
   kind: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(32)),
   credential: Schema.String.check(Schema.isMaxLength(400)),
   baseUrl: Schema.String.check(Schema.isMaxLength(500)),
+  options: BacklogProviders.bindingOptionsSchema.pipe(Schema.optional),
 })
 const connectionTargetSchema = Schema.Struct({
   connection: slugInputSchema.pipe(Schema.optional).annotate({ description: 'A saved connection id.' }),

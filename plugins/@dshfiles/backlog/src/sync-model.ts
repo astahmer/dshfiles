@@ -59,6 +59,8 @@ const connectionSchema = Schema.Struct({
   label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
   credential: Schema.String.check(Schema.isMaxLength(400)),
   baseUrl: Schema.String.check(Schema.isMaxLength(500)),
+  /** Provider-specific settings its descriptor names in `connectionOptions` (Jira's account email); never a key. */
+  options: Schema.optionalKey(BacklogProviders.bindingOptionsSchema),
   /** What the last Test connection saw; never the key. */
   identity: Schema.NullOr(
     Schema.Struct({
