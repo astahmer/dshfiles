@@ -1,4 +1,4 @@
-export type BacklogView = 'feed' | 'inbox' | 'items' | 'board' | 'projects'
+export type BacklogView = 'feed' | 'inbox' | 'items' | 'board' | 'projects' | 'shipped'
 
 export type BacklogViewSelection = Record<BacklogView, number | null>
 

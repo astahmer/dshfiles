@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { setBacklogViewSelection, type BacklogViewSelection } from './view-selection.js'
 
-const emptySelection: BacklogViewSelection = { feed: null, inbox: null, items: null, board: null, projects: null }
+const emptySelection: BacklogViewSelection = { feed: null, inbox: null, items: null, board: null, projects: null, shipped: null }
 
 describe('backlog view selection', () => {
   it('keeps each view’s open item independent', () => {

@@ -136,9 +136,14 @@ export const backlogSettings = defineSettings({
     savedViews: Schema.array(
       Schema.object({
         name: Schema.string().required(),
-        view: Schema.union([Schema.const('feed'), Schema.const('inbox'), Schema.const('items'), Schema.const('board'), Schema.const('projects')]).default(
-          'items',
-        ),
+        view: Schema.union([
+          Schema.const('feed'),
+          Schema.const('inbox'),
+          Schema.const('items'),
+          Schema.const('board'),
+          Schema.const('projects'),
+          Schema.const('shipped'),
+        ]).default('items'),
         query: Schema.string().default(''),
       }),
     )

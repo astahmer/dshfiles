@@ -32,6 +32,7 @@ import {
   ListFilterIcon,
   MessagesSquareIcon,
   PlusIcon,
+  RocketIcon,
   Rows3Icon,
   SearchIcon,
   Settings2Icon,
@@ -59,6 +60,8 @@ import { ItemsView } from './items-view.js'
 import { panelDraftKey } from './panel-draft.js'
 import { BacklogProjectPaths } from './project-paths.js'
 import { ProjectsView } from './projects-view.js'
+import { BacklogShipped } from './shipped.js'
+import { ShippedView } from './shipped-view.js'
 import { ProjectFilterPicker } from './project-picker.js'
 import { SearchResults } from './search-results.js'
 import { SearchScopes, type SearchScope } from './search-scope.js'
@@ -78,16 +81,16 @@ type View = BacklogView
 /** Agents write from other threads; a short poll keeps the open panel current without a push channel. */
 const REFRESH_MS = 5_000
 const MAX_ANIMATED_ITEMS = 150
-const views = ['feed', 'inbox', 'items', 'board', 'projects'] as const
-const viewLabels = { feed: 'Feed', inbox: 'Inbox', items: 'Items', board: 'Board', projects: 'Projects' } satisfies Record<View, string>
-const viewIcons = { feed: MessagesSquareIcon, inbox: InboxIcon, items: Rows3Icon, board: KanbanIcon, projects: FolderKanbanIcon } as const
+const views = ['feed', 'inbox', 'items', 'board', 'projects', 'shipped'] as const
+const viewLabels = { feed: 'Feed', inbox: 'Inbox', items: 'Items', board: 'Board', projects: 'Projects', shipped: 'Shipped' } satisfies Record<View, string>
+const viewIcons = { feed: MessagesSquareIcon, inbox: InboxIcon, items: Rows3Icon, board: KanbanIcon, projects: FolderKanbanIcon, shipped: RocketIcon } as const
 
 const sortOrderSchema = Schema.Literals(['updated', 'created'])
 const defaultSort = { feed: 'updated', inbox: 'updated', items: 'updated' } as const
 
 /** Each view, and the full search results, keeps its own "Hide agent items" choice; hiding is the default. */
 type AgentItemsScope = View | 'search'
-const hideAgentItemsDefaults = { feed: true, inbox: true, items: true, board: true, projects: true, search: true } as const
+const hideAgentItemsDefaults = { feed: true, inbox: true, items: true, board: true, projects: true, shipped: true, search: true } as const
 const hiddenByDefault = Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(true)))
 
 const preferencesSchema = Schema.Struct({
@@ -108,8 +111,10 @@ const preferencesSchema = Schema.Struct({
     items: hiddenByDefault,
     board: hiddenByDefault,
     projects: hiddenByDefault,
+    shipped: hiddenByDefault,
     search: hiddenByDefault,
   }).pipe(Schema.withDecodingDefaultKey(Effect.succeed(hideAgentItemsDefaults))),
+  shippedPeriod: Schema.Literals(BacklogShipped.unitPeriods).pipe(Schema.withDecodingDefaultKey(Effect.succeed('week'))),
 })
 
 const preferences = createStoredValue({
@@ -124,6 +129,7 @@ const preferences = createStoredValue({
     projects: [],
     sort: { feed: 'updated' as const, inbox: 'updated' as const, items: 'updated' as const },
     hideAgentItems: hideAgentItemsDefaults,
+    shippedPeriod: 'week' as const,
   },
 })
 
@@ -502,8 +508,8 @@ export const BacklogPanel = (props: {
   const [search, setSearch] = useState<SearchScope>(SearchScopes.idle)
   const query = search.query
   const [kinds, setKinds] = useState<BacklogKind[]>([])
-  const [openIds, setOpenIds] = useState<BacklogViewSelection>({ feed: null, inbox: null, items: null, board: null, projects: null })
-  const [cursorIds, setCursorIds] = useState<BacklogViewSelection>({ feed: null, inbox: null, items: null, board: null, projects: null })
+  const [openIds, setOpenIds] = useState<BacklogViewSelection>({ feed: null, inbox: null, items: null, board: null, projects: null, shipped: null })
+  const [cursorIds, setCursorIds] = useState<BacklogViewSelection>({ feed: null, inbox: null, items: null, board: null, projects: null, shipped: null })
   const openId = openIds[view]
   const cursorId = cursorIds[view]
   const setOpenId = useCallback((id: number | null): void => setOpenIds(selection => setBacklogViewSelection(selection, view, id)), [view])
@@ -890,12 +896,16 @@ export const BacklogPanel = (props: {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
-            <AgentItemsToggle
-              hidden={hideAgentItems}
-              hiddenCount={(view === 'inbox' && !showsResults ? inbox.data : list.data)?.hiddenAgentItems ?? 0}
-              toggle={() => setPreference({ hideAgentItems: { ...stored.hideAgentItems, [agentItemsScope]: !hideAgentItems } })}
-            />
-            <FilterMenu kinds={kinds} setKinds={setKinds} showDormant={stored.showDormant} setShowDormant={value => setPreference({ showDormant: value })} />
+            {view === 'shipped' && !showsResults ? null : (
+              <AgentItemsToggle
+                hidden={hideAgentItems}
+                hiddenCount={(view === 'inbox' && !showsResults ? inbox.data : list.data)?.hiddenAgentItems ?? 0}
+                toggle={() => setPreference({ hideAgentItems: { ...stored.hideAgentItems, [agentItemsScope]: !hideAgentItems } })}
+              />
+            )}
+            {view === 'shipped' && !showsResults ? null : (
+              <FilterMenu kinds={kinds} setKinds={setKinds} showDormant={stored.showDormant} setShowDormant={value => setPreference({ showDormant: value })} />
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -1062,6 +1072,18 @@ export const BacklogPanel = (props: {
                       captureInto={startCapture}
                       projectPaths={projectPaths}
                       startThread={openStartThread}
+                    />
+                  )}
+                  {view === 'shipped' && (
+                    <ShippedView
+                      period={stored.shippedPeriod}
+                      setPeriod={shippedPeriod => setPreference({ shippedPeriod })}
+                      projects={projectFilters}
+                      openId={openId}
+                      cursorId={cursorId}
+                      select={select}
+                      hover={setCursorId}
+                      openSettings={() => setShowSettings(true)}
                     />
                   )}
                   {view === 'projects' && (
