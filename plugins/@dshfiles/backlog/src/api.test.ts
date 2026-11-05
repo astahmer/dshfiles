@@ -75,3 +75,16 @@ describe('client decode', () => {
     expect(decoded.backlinks[0]?.attachments).toEqual([])
   })
 })
+
+describe('list view', () => {
+  it('reads a list from a Host without the agent-item filter as hiding none', () => {
+    expect(BacklogViews.list({ revision: 1, total: 1, items: [legacySummary] }).hiddenAgentItems).toBe(0)
+  })
+})
+
+describe('agent-item filter input', () => {
+  it('adds hideAgentItems only when hiding, so an older Host never sees the key', () => {
+    expect(BacklogViews.hidingAgentItems({ query: 'x' }, false)).toEqual({ query: 'x' })
+    expect(BacklogViews.hidingAgentItems({ query: 'x' }, true)).toEqual({ query: 'x', hideAgentItems: true })
+  })
+})

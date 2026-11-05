@@ -48,6 +48,8 @@ export interface BacklogListQuery {
   readonly freshness?: 'active' | 'all' | BacklogFreshness | undefined
   /** Only open items that want the user: attention set, or a triage suggestion waiting. Snoozed items are left out. */
   readonly inbox?: boolean | undefined
+  /** Leaves out items an agent captured that the user never touched, unless they ask for attention or wait on a suggestion. */
+  readonly hideAgentItems?: boolean | undefined
   readonly limit?: number | undefined
 }
 
@@ -225,16 +227,18 @@ const listIn = (view: StoreView, query: BacklogListQuery, index?: BacklogSearchI
       const state = BacklogItems.freshness(item, at, view.dormantDays)
       return freshnessFilter === 'active' ? state === 'fresh' || state === 'stale' : state === freshnessFilter
     })
-  const scored = matching.flatMap(item => {
+  const matched = matching.flatMap(item => {
     const match = BacklogSearch.score(item, search, at)
     return match === null ? [] : [{ item, match }]
   })
+  const scored = query.hideAgentItems === true ? matched.filter(entry => !BacklogItems.isUnclaimedAgentItem(entry.item)) : matched
   // A text search ranks by relevance, then activity; browsing keeps the activity order.
   scored.sort((left, right) => right.match.score - left.match.score || byActivity(left.item, right.item))
   const limit = Math.min(query.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT)
   return {
     revision: view.revision,
     total: scored.length,
+    hiddenAgentItems: matched.length - scored.length,
     items: scored.slice(0, limit).map(entry => summarize(entry.item, at, entry.match, view.dormantDays)),
   }
 }

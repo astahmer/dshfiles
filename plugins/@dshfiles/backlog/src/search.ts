@@ -1,4 +1,4 @@
-import type { BacklogItem, BacklogLink } from './item.js'
+import { BacklogItems, type BacklogItem, type BacklogLink } from './item.js'
 
 const DAY_MS = 86_400_000
 const SNIPPET_RADIUS = 60
@@ -129,15 +129,11 @@ const snippetAround = (text: string, term: string): string => {
 
 const isActor = (actorId: string, kind: ActorKind): boolean => (kind === 'agent' ? actorId.startsWith('agent:') : actorId === kind)
 
-/** The actor who captured the item: its owner, or the `created` event of a row that lost its owner entry. */
-const creatorOf = (item: BacklogItem): string | undefined =>
-  item.actors.find(actor => actor.role === 'owner')?.id ?? item.events.find(event => event.kind === 'created')?.actor
-
 const tagMatches = (item: BacklogItem, tag: string): boolean => item.tags.some(own => own.startsWith(tag))
 const projectMatches = (item: BacklogItem, project: string): boolean => (item.project ?? '').toLowerCase().includes(project)
 const touchedBy = (item: BacklogItem, kind: ActorKind): boolean => item.actors.some(actor => isActor(actor.id, kind))
 const createdBy = (item: BacklogItem, kind: ActorKind): boolean => {
-  const creator = creatorOf(item)
+  const creator = BacklogItems.creatorOf(item)
   return creator !== undefined && isActor(creator, kind)
 }
 const hasLink = (item: BacklogItem, type: BacklogLink['type']): boolean => item.links.some(link => link.type === type)
@@ -221,7 +217,6 @@ const score = (item: BacklogItem, query: SearchQuery, now: number): SearchMatch 
 
 export class BacklogSearch {
   static readonly parse = parse
-  static readonly creatorOf = creatorOf
   static readonly score = score
   static readonly sourcesOf = sourcesOf
 }

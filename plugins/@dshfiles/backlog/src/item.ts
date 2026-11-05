@@ -252,6 +252,20 @@ const appendEvent = (events: readonly BacklogEvent[], event: BacklogEvent): Back
   return [first, ...appended.slice(-(MAX_EVENTS - 1))]
 }
 
+/** The actor who captured the item: its owner, or the `created` event of a row that lost its owner entry. */
+const creatorOf = (item: Pick<BacklogItem, 'actors' | 'events'>): string | undefined =>
+  item.actors.find(actor => actor.role === 'owner')?.id ?? item.events.find(event => event.kind === 'created')?.actor
+
+/**
+ * An item an agent captured that nobody has claimed yet: the user never touched it (any edit, comment, move or pin
+ * adds them as an actor), and it neither asks for attention nor waits on a suggestion. "Hide agent items" hides these.
+ */
+const isUnclaimedAgentItem = (item: Pick<BacklogItem, 'actors' | 'events' | 'attention' | 'proposal'>): boolean =>
+  (creatorOf(item)?.startsWith('agent:') ?? false) &&
+  !item.actors.some(actor => actor.id === 'user') &&
+  (item.attention ?? 'none') === 'none' &&
+  (item.proposal ?? null) === null
+
 /** The marker a backfill leaves when triage looked at an item and found nothing to change; not activity of its own. */
 const triageNoChange = 'found nothing to change'
 
@@ -295,4 +309,6 @@ export class BacklogItems {
   static readonly projectOf = projectOf
   static readonly freshness = freshness
   static readonly appendEvent = appendEvent
+  static readonly creatorOf = creatorOf
+  static readonly isUnclaimedAgentItem = isUnclaimedAgentItem
 }

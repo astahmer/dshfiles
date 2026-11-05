@@ -140,6 +140,10 @@ const listInputSchema = Schema.Struct({
   inbox: Schema.Boolean.pipe(Schema.optional).annotate({
     description: 'Only open items that want the user: attention set, or a triage suggestion waiting; closed items are excluded.',
   }),
+  hideAgentItems: Schema.Boolean.pipe(Schema.optional).annotate({
+    description:
+      'Leave out items an agent captured that the user never touched, unless they ask for attention or wait on a suggestion. Defaults to false: every item is listed.',
+  }),
   limit: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(2_000)).pipe(Schema.optional),
 })
 
@@ -147,6 +151,10 @@ const listOutputSchema = Schema.Struct({
   revision: Schema.Number.check(Schema.isFinite()),
   total: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   items: Schema.Array(summarySchema),
+  /** How many matching items `hideAgentItems` left out; a Host without the filter reports none. */
+  hiddenAgentItems: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(0)),
+  ),
 })
 
 const previewText = (text: string): string => text.trim().replace(/\s+/g, ' ').slice(0, 240)
@@ -675,6 +683,13 @@ export class BacklogViews {
   static readonly summary = (value: BacklogSummaryInput): BacklogSummaryView => Schema.decodeUnknownSync(summarySchema)(value)
 
   static readonly list = (value: BacklogListInput): BacklogListView => Schema.decodeUnknownSync(listOutputSchema)(value)
+
+  /**
+   * Adds `hideAgentItems` only when a view hides them: the Host refuses unknown input keys, so a Host that predates the
+   * filter keeps answering a view that shows everything.
+   */
+  static readonly hidingAgentItems = <Input extends object>(input: Input, hidden: boolean): Input | (Input & { readonly hideAgentItems: true }) =>
+    hidden ? { ...input, hideAgentItems: true } : input
 
   static readonly detail = (value: BacklogDetailInput): BacklogDetailView => Schema.decodeUnknownSync(detailSchema)(value)
 

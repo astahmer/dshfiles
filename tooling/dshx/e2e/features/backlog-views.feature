@@ -70,6 +70,19 @@ Feature: Backlog views
     And searching "alpha is:idea" lists only "alpha dashboard"
     And searching "b:3" lists only "alpha cleanup"
 
+  @scenario:backlog.hide-agent-items-toggle
+  Scenario: Hide agent items is on in every view and remembered per view
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Captured by me" is captured
+    Then the Backlog hides agent items and the feed shows "Captured by me"
+    When agent items are shown in the Backlog
+    Then the Backlog shows agent items
+    When the Board view is opened
+    Then the Backlog hides agent items
+    When the Backlog Feed view is opened again
+    Then the Feed still shows agent items
+
   @scenario:backlog.saved-views
   Scenario: Save a search as a view, reapply it from another view and delete it
     Given the isolated plugin profile "@dshfiles/backlog" is booted

@@ -21,6 +21,8 @@ import {
   KeyRoundIcon,
   ArrowDownWideNarrowIcon,
   BookmarkIcon,
+  BotIcon,
+  BotOffIcon,
   FolderIcon,
   FolderKanbanIcon,
   XIcon,
@@ -82,6 +84,11 @@ const viewIcons = { feed: MessagesSquareIcon, inbox: InboxIcon, items: Rows3Icon
 const sortOrderSchema = Schema.Literals(['updated', 'created'])
 const defaultSort = { feed: 'updated', inbox: 'updated', items: 'updated' } as const
 
+/** Each view, and the full search results, keeps its own "Hide agent items" choice; hiding is the default. */
+type AgentItemsScope = View | 'search'
+const hideAgentItemsDefaults = { feed: true, inbox: true, items: true, board: true, projects: true, search: true } as const
+const hiddenByDefault = Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(true)))
+
 const preferencesSchema = Schema.Struct({
   view: Schema.Literals(views),
   groupBy: Schema.Literals(['status', 'kind', 'project', 'attention']),
@@ -94,6 +101,14 @@ const preferencesSchema = Schema.Struct({
     inbox: sortOrderSchema.pipe(Schema.withDecodingDefaultKey(Effect.succeed('updated'))),
     items: sortOrderSchema.pipe(Schema.withDecodingDefaultKey(Effect.succeed('updated'))),
   }).pipe(Schema.withDecodingDefaultKey(Effect.succeed(defaultSort))),
+  hideAgentItems: Schema.Struct({
+    feed: hiddenByDefault,
+    inbox: hiddenByDefault,
+    items: hiddenByDefault,
+    board: hiddenByDefault,
+    projects: hiddenByDefault,
+    search: hiddenByDefault,
+  }).pipe(Schema.withDecodingDefaultKey(Effect.succeed(hideAgentItemsDefaults))),
 })
 
 const preferences = createStoredValue({
@@ -107,6 +122,7 @@ const preferences = createStoredValue({
     project: null,
     projects: [],
     sort: { feed: 'updated' as const, inbox: 'updated' as const, items: 'updated' as const },
+    hideAgentItems: hideAgentItemsDefaults,
   },
 })
 
@@ -191,6 +207,40 @@ const FilterMenu = (props: {
         </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+/** Hides items agents captured that you have not touched yet; the badge counts what this view hides. */
+const AgentItemsToggle = (props: { readonly hidden: boolean; readonly hiddenCount: number; readonly toggle: () => void }): JSX.Element => {
+  const Icon = props.hidden ? BotOffIcon : BotIcon
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label="Hide agent items"
+          aria-pressed={props.hidden}
+          onClick={props.toggle}
+          className={cn(
+            'dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:transition-colors dshx:hover:bg-accent',
+            props.hidden ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
+          )}
+        >
+          <Icon aria-hidden className="dshx:size-3.5" />
+          <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">Agent items</span>
+          {props.hidden && props.hiddenCount > 0 ? (
+            <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[10px] dshx:tabular-nums dshx:text-muted-foreground">
+              {props.hiddenCount}
+            </span>
+          ) : null}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {props.hidden
+          ? `${String(props.hiddenCount)} agent ${props.hiddenCount === 1 ? 'item' : 'items'} hidden until you touch them; click to show`
+          : 'Showing agent items; click to hide the ones you have not touched'}
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -471,6 +521,8 @@ export const BacklogPanel = (props: {
   const searchInput = useRef<HTMLInputElement>(null)
   const debounced = useDebouncedValue({ value: query, delayMs: 120 })
   const showsResults = SearchScopes.showsResults({ query: debounced, submitted: search.submitted })
+  const agentItemsScope: AgentItemsScope = showsResults ? 'search' : view
+  const hideAgentItems = stored.hideAgentItems[agentItemsScope]
 
   const queryClient = useQueryClient()
   // A cheap number that changes with any write; lists and details refetch only when it moves.
@@ -512,7 +564,7 @@ export const BacklogPanel = (props: {
   // `undefined` is not a JSON value, so an unfiltered list omits the key instead of carrying the scope along.
   const scoped = projectFilters.length === 0 ? {} : { projects: projectFilters }
   const list = useQuery({
-    queryKey: [BacklogQueries.key, 'list', debounced, kinds, projectFilters, showsResults ? stored.statuses : []],
+    queryKey: [BacklogQueries.key, 'list', debounced, kinds, projectFilters, showsResults ? stored.statuses : [], hideAgentItems],
     queryFn: async ({ signal }) => {
       const statusFilter = showsResults && stored.statuses.length > 0 ? { statuses: stored.statuses } : {}
       const input: Parameters<typeof api.list>[0] = {
@@ -523,16 +575,19 @@ export const BacklogPanel = (props: {
         freshness: 'all',
         limit: showsResults ? 200 : 2_000,
       }
-      return BacklogViews.list(await api.list(input, { signal }))
+      return BacklogViews.list(await api.list(BacklogViews.hidingAgentItems(input, hideAgentItems), { signal }))
     },
     placeholderData: keepPreviousData,
   })
   const searchStatusCounts = useQuery({
-    queryKey: [BacklogQueries.key, 'search-status-counts', debounced, kinds, projectFilters],
+    queryKey: [BacklogQueries.key, 'search-status-counts', debounced, kinds, projectFilters, stored.hideAgentItems.search],
     queryFn: async ({ signal }) => {
       const counts = await Promise.all(
         BacklogItems.statuses.map(async status => {
-          const result = await api.list({ query: debounced, kinds, statuses: [status], ...scoped, freshness: 'all', limit: 1 }, { signal })
+          const result = await api.list(
+            BacklogViews.hidingAgentItems({ query: debounced, kinds, statuses: [status], ...scoped, freshness: 'all', limit: 1 }, stored.hideAgentItems.search),
+            { signal },
+          )
           return [status, BacklogViews.list(result).total] as const
         }),
       )
@@ -543,8 +598,13 @@ export const BacklogPanel = (props: {
     enabled: showsResults,
   })
   const inbox = useQuery({
-    queryKey: [BacklogQueries.key, 'list', 'inbox', projectFilters, debounced],
-    queryFn: async ({ signal }) => BacklogViews.list(await api.list({ inbox: true, query: debounced, ...scoped, freshness: 'all', limit: 200 }, { signal })),
+    queryKey: [BacklogQueries.key, 'list', 'inbox', projectFilters, debounced, stored.hideAgentItems.inbox],
+    queryFn: async ({ signal }) =>
+      BacklogViews.list(
+        await api.list(BacklogViews.hidingAgentItems({ inbox: true, query: debounced, ...scoped, freshness: 'all', limit: 200 }, stored.hideAgentItems.inbox), {
+          signal,
+        }),
+      ),
     placeholderData: keepPreviousData,
   })
   const projectCatalog = useQuery({
@@ -821,6 +881,11 @@ export const BacklogPanel = (props: {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
+            <AgentItemsToggle
+              hidden={hideAgentItems}
+              hiddenCount={(view === 'inbox' && !showsResults ? inbox.data : list.data)?.hiddenAgentItems ?? 0}
+              toggle={() => setPreference({ hideAgentItems: { ...stored.hideAgentItems, [agentItemsScope]: !hideAgentItems } })}
+            />
             <FilterMenu kinds={kinds} setKinds={setKinds} showDormant={stored.showDormant} setShowDormant={value => setPreference({ showDormant: value })} />
             <Tooltip>
               <TooltipTrigger asChild>
@@ -992,6 +1057,7 @@ export const BacklogPanel = (props: {
                   {view === 'projects' && (
                     <ProjectsView
                       query={debounced}
+                      hideAgentItems={hideAgentItems}
                       matchingProjects={
                         debounced === ''
                           ? projectFilters.length === 0

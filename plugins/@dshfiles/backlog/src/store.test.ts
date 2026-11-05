@@ -278,7 +278,6 @@ describe('store', () => {
       expect((yield* reopened.capture({ text: 'three', actor: user })).item.id).toBe(3)
     }).pipe(Effect.scoped),
   )
-
 })
 
 describe('triage proposals', () => {
@@ -568,6 +567,35 @@ describe('thread turn signals', () => {
       yield* store.update({ id: 1, attention: 'needs-input', actor: user })
       const handSet = yield* store.settleAnsweredQuestion({ id: 1, threadId: 'session-abc123', reason: 'the thread’s question was answered' })
       expect(handSet.ok && handSet.value.item.attention).toBe('needs-input')
+    }).pipe(Effect.scoped),
+  )
+})
+
+describe('hiding agent items', () => {
+  it.effect('hides items an agent captured until the user touches them, keeps those asking for attention, and counts the rest', () =>
+    Effect.gen(function* () {
+      const store = yield* openStore()
+      const mine = yield* store.capture({ text: 'captured by me', actor: user })
+      const untouched = yield* store.capture({ text: 'agent noise', actor: agent })
+      const claimed = yield* store.capture({ text: 'agent item I moved', actor: agent })
+      const asking = yield* store.capture({ text: 'agent item asking', actor: agent })
+      const suggested = yield* store.capture({ text: 'agent item with a suggestion', actor: agent })
+      yield* store.update({ id: claimed.item.id, status: 'todo', actor: user })
+      yield* store.update({ id: asking.item.id, attention: 'needs-input', actor: agent })
+      yield* store.propose({ id: suggested.item.id, proposal: { kind: 'note', confidence: 0.5, reason: 'looks like a note', source: 'jev', at: 0 } })
+      yield* store.comment({ id: mine.item.id, text: 'an agent replied', actor: agent })
+
+      const hidden = yield* store.list({ hideAgentItems: true })
+      expect(hidden.items.map(item => item.id).sort()).toEqual([mine.item.id, claimed.item.id, asking.item.id, suggested.item.id].sort())
+      expect(hidden.hiddenAgentItems).toBe(1)
+      expect(hidden.total).toBe(4)
+
+      const everything = yield* store.list({})
+      expect(everything.items.map(item => item.id)).toContain(untouched.item.id)
+      expect(everything.hiddenAgentItems).toBe(0)
+
+      expect((yield* store.list({ hideAgentItems: true, query: 'noise' })).hiddenAgentItems).toBe(1)
+      expect((yield* store.list({ hideAgentItems: true, query: 'captured' })).hiddenAgentItems).toBe(0)
     }).pipe(Effect.scoped),
   )
 })

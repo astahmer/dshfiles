@@ -120,6 +120,7 @@ const ItemLine = (props: {
 const Overview = (props: {
   readonly project: Project
   readonly query: string
+  readonly hideAgentItems: boolean
   readonly back: () => void
   readonly select: (id: number) => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
@@ -130,10 +131,16 @@ const Overview = (props: {
   const actions = useBacklogActions()
   const project = props.project
   const list = useQuery({
-    queryKey: [BacklogQueries.key, 'list', 'project', project.key, props.query],
+    queryKey: [BacklogQueries.key, 'list', 'project', project.key, props.query, props.hideAgentItems],
     queryFn: async ({ signal }) =>
       BacklogViews.list(
-        await api.list({ project: project.key === NO_PROJECT ? null : project.key, query: props.query, freshness: 'all', limit: 500 }, { signal }),
+        await api.list(
+          BacklogViews.hidingAgentItems(
+            { project: project.key === NO_PROJECT ? null : project.key, query: props.query, freshness: 'all', limit: 500 },
+            props.hideAgentItems,
+          ),
+          { signal },
+        ),
       ),
     placeholderData: keepPreviousData,
   })
@@ -335,6 +342,7 @@ const Overview = (props: {
 /** Projects come from where work was captured; nobody creates or administers them. */
 export const ProjectsView = (props: {
   readonly query: string
+  readonly hideAgentItems: boolean
   /** Projects holding an item that matches the search; null when nothing is searched. */
   readonly matchingProjects: ReadonlySet<string> | null
   readonly selectedProject: string | null
@@ -363,6 +371,7 @@ export const ProjectsView = (props: {
         <Overview
           project={selected}
           query={props.query}
+          hideAgentItems={props.hideAgentItems}
           triageOff={props.triageOff}
           back={() => props.setSelectedProject(null)}
           select={props.select}

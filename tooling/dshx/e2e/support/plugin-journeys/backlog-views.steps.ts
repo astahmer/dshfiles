@@ -176,6 +176,43 @@ Then('the Projects overview is shown', async ({ page }: { page: Page }) => {
   await finishJourneyAssertions(page)
 })
 
+const agentItemsToggle = (page: Page) => page.getByRole('button', { name: 'Hide agent items', exact: true })
+
+Then('the Backlog hides agent items and the feed shows {string}', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'backlog-hide-agent-items-default', async () => {
+    await expect(agentItemsToggle(page)).toHaveAttribute('aria-pressed', 'true')
+    await expect(feed(page)).toContainText(title)
+  })
+})
+
+When('agent items are shown in the Backlog', async ({ page }: { page: Page }) => {
+  await agentItemsToggle(page).click()
+})
+
+Then('the Backlog shows agent items', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-hide-agent-items-off', async () => {
+    await expect(agentItemsToggle(page)).toHaveAttribute('aria-pressed', 'false')
+  })
+})
+
+Then('the Backlog hides agent items', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-hide-agent-items-per-view', async () => {
+    await expect(agentItemsToggle(page)).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+When('the Backlog Feed view is opened again', async ({ page }: { page: Page }) => {
+  await viewButton(page, 'Feed').click()
+  await expect(viewButton(page, 'Feed')).toHaveAttribute('aria-current', 'page')
+})
+
+Then('the Feed still shows agent items', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-hide-agent-items-remembered', async () => {
+    await expect(agentItemsToggle(page)).toHaveAttribute('aria-pressed', 'false')
+  })
+  await finishJourneyAssertions(page)
+})
+
 const search = async (page: Page, query: string): Promise<void> => {
   await searchInput(page).fill(query)
   await searchInput(page).press('Enter')

@@ -1043,7 +1043,7 @@
     {
       "id": "search-and-views",
       "title": "Search with reasons and saved views",
-      "summary": "Relevance-ranked search (a trigram index narrows which items are scored; ranking is the token scorer's) over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators; each result says where it matched. Typing filters the current view in place (Feed, Items, Board, Inbox, Projects); Enter opens the ranked results view. Multi-select status chips show counts for the current search and narrow results. Views save a view and search to the plugin settings.",
+      "summary": "Relevance-ranked search (a trigram index narrows which items are scored; ranking is the token scorer's) over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators, `created:` for who captured an item and a leading `-` that negates any operator, word or phrase; each result says where it matched. Typing filters the current view in place (Feed, Items, Board, Inbox, Projects); Enter opens the ranked results view. Multi-select status chips show counts for the current search and narrow results. Views save a view and search to the plugin settings.",
       "surfaces": ["client", "host", "settings", "tool"],
       "surface": "destinationSection",
       "destination": "work",
@@ -1092,6 +1092,18 @@
           "id": "backlog.search-unit-recency",
           "file": "plugins/@dshfiles/backlog/src/search.test.ts",
           "testName": "filters by recency and matches ids exactly"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.search-unit-created",
+          "file": "plugins/@dshfiles/backlog/src/search.test.ts",
+          "testName": "tells who captured an item apart from who touched it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.search-unit-negation",
+          "file": "plugins/@dshfiles/backlog/src/search.test.ts",
+          "testName": "negates every operator and plain words with a leading dash"
         },
         {
           "kind": "unit-test",
@@ -1536,6 +1548,49 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "hide-agent-items",
+      "title": "Hide items agents captured",
+      "summary": "A toggle in the header of every view (Feed, Inbox, Items, Board, Projects and the search results), on by default and remembered per view, hides items an agent captured that the user never touched. An item the user edited, moved, commented on or pinned shows again, and so does one asking for attention or waiting on a triage suggestion. The toggle counts what the current view hides. The Host filters the list (`hideAgentItems`); `backlog_list` keeps listing every item unless an agent asks for the filter.",
+      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Hide agent items\"", "expect button \"Hide agent items\""],
+      "surfaces": ["client", "host", "tool"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › header › Agent items",
+      "configuration": [],
+      "states": ["hiding", "showing"],
+      "failureModes": ["A Host that predates the filter ignores it: every item shows and the toggle counts none until the Host restarts."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.hide-agent-items-toggle",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.hide-agent-items-store",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "hides items an agent captured until the user touches them, keeps those asking for attention, and counts the rest"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.hide-agent-items-legacy-host",
+          "file": "plugins/@dshfiles/backlog/src/api.test.ts",
+          "testName": "reads a list from a Host without the agent-item filter as hiding none"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     },

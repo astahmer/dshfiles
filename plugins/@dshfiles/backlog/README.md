@@ -90,6 +90,12 @@ Freshness is derived on read and never stored:
 | `done` / `dropped` | archived after 7 days                       |
 | pinned             | never                                       |
 
+**Agent items** in the header of every view (Feed, Inbox, Items, Board, Projects and the search results) hides
+items an agent captured that you never touched. It is on by default and each view remembers its own choice; its
+badge counts what the current view hides. Editing, moving, commenting on or pinning such an item makes it yours
+and it shows again; one asking for attention or waiting on a triage suggestion always shows. The Host does the
+filtering (`hideAgentItems` on `list`); `backlog_list` lists every item unless an agent passes it.
+
 Dormant and archived items stay in search, filters and backlinks. Any edit, move, link or comment makes
 an item fresh again. The list groups the feed like a chat history (Pinned, Today, Yesterday, This week,
 Earlier). The board shows the same items by status; each card names its project beside the item id,
@@ -300,30 +306,30 @@ dropping the rest of the draft.
 
 ## Agent tools
 
-| Tool                           | Kind                                                                                  |
-| ------------------------------ | ------------------------------------------------------------------------------------- |
-| `backlog_list`                 | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`) |
-| `backlog_get`                  | read: one item with history and backlinks                                             |
-| `backlog_get_many`             | read: up to 50 items at once, unknown ids listed separately                           |
-| `backlog_referencing`          | read: items linking to a thread, revision, branch, workspace, URL or item             |
-| `backlog_capture`              | write                                                                                 |
-| `backlog_update`               | write: edit or move                                                                   |
-| `backlog_link`                 | write: link or unlink                                                                 |
-| `backlog_comment`              | write, optionally with images or files                                                |
-| `backlog_attach_file`          | write: keep one base64 image or file with an item                                     |
-| `backlog_read_file`            | read: one image or file as a data URL; `save: true` also returns a temp file path     |
-| `backlog_remove_file`          | write: remove one image or file                                                       |
-| `backlog_triage`               | write: run triage on one item now                                                     |
-| `backlog_triage_backfill`      | write: triage items captured before triage was set up, oldest first                   |
-| `backlog_start_thread`         | write: start one thread for items, in the item project's own jj workspace, linked     |
-| `backlog_projects`             | read: per-project counts, who needs you, people                                       |
-| `backlog_accept_proposal`      | write                                                                                 |
-| `backlog_dismiss_proposal`     | write                                                                                 |
-| `backlog_sync_status`          | read: remote sync backends and each linked item's issue, state, last sync and errors  |
-| `backlog_sync_now`             | write: sync one linked item, a project's, or every one now                            |
-| `backlog_link_remote`          | write: link an item to a Linear/GitHub issue, create one from it, or unlink it        |
-| `backlog_import_remote`        | write: import an existing Linear/GitHub issue as a linked item                        |
-| `backlog_sync_test_connection` | read: a backend's key source, signed-in account, target and visible Linear teams      |
+| Tool                           | Kind                                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `backlog_list`                 | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`, `hideAgentItems`) |
+| `backlog_get`                  | read: one item with history and backlinks                                                               |
+| `backlog_get_many`             | read: up to 50 items at once, unknown ids listed separately                                             |
+| `backlog_referencing`          | read: items linking to a thread, revision, branch, workspace, URL or item                               |
+| `backlog_capture`              | write                                                                                                   |
+| `backlog_update`               | write: edit or move                                                                                     |
+| `backlog_link`                 | write: link or unlink                                                                                   |
+| `backlog_comment`              | write, optionally with images or files                                                                  |
+| `backlog_attach_file`          | write: keep one base64 image or file with an item                                                       |
+| `backlog_read_file`            | read: one image or file as a data URL; `save: true` also returns a temp file path                       |
+| `backlog_remove_file`          | write: remove one image or file                                                                         |
+| `backlog_triage`               | write: run triage on one item now                                                                       |
+| `backlog_triage_backfill`      | write: triage items captured before triage was set up, oldest first                                     |
+| `backlog_start_thread`         | write: start one thread for items, in the item project's own jj workspace, linked                       |
+| `backlog_projects`             | read: per-project counts, who needs you, people                                                         |
+| `backlog_accept_proposal`      | write                                                                                                   |
+| `backlog_dismiss_proposal`     | write                                                                                                   |
+| `backlog_sync_status`          | read: remote sync backends and each linked item's issue, state, last sync and errors                    |
+| `backlog_sync_now`             | write: sync one linked item, a project's, or every one now                                              |
+| `backlog_link_remote`          | write: link an item to a Linear/GitHub issue, create one from it, or unlink it                          |
+| `backlog_import_remote`        | write: import an existing Linear/GitHub issue as a linked item                                          |
+| `backlog_sync_test_connection` | read: a backend's key source, signed-in account, target and visible Linear teams                        |
 
 ## Remote sync (Linear, GitHub Issues)
 
