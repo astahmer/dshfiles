@@ -78,9 +78,9 @@ Then('pausing the automation shows that no run is planned', async ({ page }: { p
   await openAutomations(page)
   const row = rowOf(page, 'Minute check')
   await recordAssertion(page, 'project-automations-pause-and-resume', async () => {
-    await row.getByRole('switch', { name: 'Enabled: Minute check', exact: true }).click()
-    await expect(row).toContainText('Paused: no run is planned.')
-    await row.getByRole('switch', { name: 'Enabled: Minute check', exact: true }).click()
+    await row.getByRole('switch', { name: 'Minute check enabled', exact: true }).click()
+    await expect(row).toContainText('Paused')
+    await row.getByRole('switch', { name: 'Minute check enabled', exact: true }).click()
     await expect(row).toContainText('Next run')
   })
   await finishJourneyAssertions(page)

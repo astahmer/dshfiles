@@ -9,14 +9,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
+import { RoutineList, type Routine, type RoutineRunStatus } from '@dshfiles/plugin-ui/components/motion/routine-list'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
 import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
-import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
-import { PlayIcon, PencilIcon, PlusIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { ClockIcon, FolderIcon, PencilIcon, PlusIcon, Trash2Icon, WebhookIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Schema } from 'effect'
 import { useState } from 'react'
@@ -35,6 +35,8 @@ const when = (value: string | number | null | undefined): string => {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
+
+const RUN_STATUS = { started: 'ok', failed: 'failed', rejected: 'skipped' } as const satisfies Record<RunRecord['outcome'], RoutineRunStatus>
 
 const outcomeVariant = (outcome: RunRecord['outcome']): 'default' | 'secondary' | 'destructive' =>
   outcome === 'started' ? 'default' : outcome === 'rejected' ? 'secondary' : 'destructive'
@@ -78,85 +80,72 @@ const RunLine = (props: { readonly run: RunRecord; readonly showTitle: boolean; 
   )
 }
 
-const AutomationRow = (props: {
+/** One automation as a kit routine row: schedule, countdown, recent-run strip and switch, with its URL and last run below. */
+const automationRoutine = (props: {
   readonly automation: AutomationView
+  readonly runs: readonly RunRecord[]
   readonly busy: boolean
-  readonly onToggle: (enabled: boolean) => void
-  readonly onRunNow: () => void
   readonly onEdit: () => void
   readonly onDelete: () => void
   readonly openThread: (sessionId: string) => void
-}): JSX.Element => {
+}): Routine => {
   const { automation } = props
   const url = automation.webhookUrl ?? (automation.webhookPath === null ? null : `${window.location.origin}${automation.webhookPath}`)
-  const next = automation.trigger.kind === 'schedule' ? automation.trigger.nextRunAt : null
-  return (
-    <li
-      aria-label={automation.title}
-      className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3 dshx:rounded-xl dshx:border dshx:border-border dshx:p-4"
-      data-automation-id={automation.id}
-    >
-      <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:justify-between dshx:gap-3">
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-          <h3 className="dshx:m-0 dshx:truncate dshx:text-base dshx:font-semibold">{automation.title}</h3>
-          <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">
-            {automation.projectTitle ?? 'Project no longer registered'} · {automation.trigger.kind === 'webhook' ? 'Webhook' : automation.schedule}
-            {automation.agentPreset === undefined ? '' : ` · ${automation.agentPreset}`}
-            {automation.model === undefined ? '' : ` · ${automation.model.model}`}
-          </p>
-          {automation.trigger.kind === 'schedule' ? (
-            <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{automation.enabled ? `Next run ${when(next)}` : 'Paused: no run is planned.'}</p>
-          ) : null}
-        </div>
-        <Switch
-          aria-label={`Enabled: ${automation.title}`}
-          checked={automation.enabled}
-          disabled={props.busy}
-          onCheckedChange={checked => props.onToggle(checked)}
-        />
-      </div>
-      {url === null ? null : (
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2">
-          <CopyField label="Webhook URL" value={url} />
-          <Collapsible>
-            <CollapsibleTrigger asChild>
-              <Button type="button" size="sm" variant="link" className="dshx:h-auto dshx:self-start dshx:p-0">
-                How to sign a request
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
-              <p className="dshx:m-0">
-                POST with x-dsh-timestamp (Unix seconds) and x-dsh-signature: sha256= HMAC-SHA256 of “timestamp.body” keyed with the value of{' '}
-                {automation.trigger.kind === 'webhook' ? automation.trigger.secretRef : 'the secret'}. Requests more than 5 minutes off, replays and more than{' '}
-                {automation.trigger.kind === 'webhook' ? automation.trigger.ratePerMinute : 10} per minute are refused.
-              </p>
-              <CopyField label="Signed test request" value={AutomationFormModel.curlExample(url)} multiline />
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
-      )}
-      <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
-        <ul className="dshx:m-0 dshx:min-w-0 dshx:flex-1 dshx:list-none dshx:p-0">
+  const nextRunAt = automation.trigger.kind === 'schedule' && automation.trigger.nextRunAt !== null ? Date.parse(automation.trigger.nextRunAt) : Number.NaN
+  const webhook = automation.trigger.kind === 'webhook'
+  return {
+    id: automation.id,
+    name: automation.title,
+    schedule: [webhook ? 'Webhook' : automation.schedule, automation.agentPreset, automation.model?.model].filter(part => part !== undefined).join(' · '),
+    enabled: automation.enabled,
+    ...(!Number.isNaN(nextRunAt) && { nextRunAt }),
+    history: props.runs
+      .filter(run => run.automationId === automation.id)
+      .toReversed()
+      .map(run => ({ id: run.id, status: RUN_STATUS[run.outcome], label: `${when(run.startedAt)} · ${run.trigger} · ${run.outcome}` })),
+    sources: [webhook ? { label: 'Webhook', icon: WebhookIcon } : { label: 'Schedule', icon: ClockIcon }],
+    destination: { label: automation.projectTitle ?? 'Project no longer registered', icon: FolderIcon },
+    ...(automation.agentPreset !== undefined && { agent: { name: automation.agentPreset } }),
+    busy: props.busy,
+    runnable: true,
+    actions: (
+      <>
+        <Button type="button" size="icon-xs" variant="ghost" disabled={props.busy} onClick={props.onEdit} aria-label={`Edit ${automation.title}`}>
+          <PencilIcon />
+        </Button>
+        <Button type="button" size="icon-xs" variant="ghost" disabled={props.busy} onClick={props.onDelete} aria-label={`Delete ${automation.title}`}>
+          <Trash2Icon />
+        </Button>
+      </>
+    ),
+    footer: (
+      <>
+        {url === null ? null : <CopyField label="Webhook URL" value={url} />}
+        <ul className="dshx:m-0 dshx:min-w-0 dshx:list-none dshx:p-0">
           {automation.lastRun === null ? (
             <li className="dshx:text-sm dshx:text-muted-foreground">No run yet.</li>
           ) : (
             <RunLine run={automation.lastRun} showTitle={false} openThread={props.openThread} />
           )}
         </ul>
-        <div className="dshx:flex dshx:shrink-0 dshx:gap-2">
-          <Button type="button" size="sm" variant="outline" disabled={props.busy} onClick={props.onRunNow}>
-            <PlayIcon /> Run now
-          </Button>
-          <Button type="button" size="sm" variant="outline" disabled={props.busy} onClick={props.onEdit} aria-label={`Edit ${automation.title}`}>
-            <PencilIcon /> <span className="dshx:@max-pane-narrow:sr-only">Edit</span>
-          </Button>
-          <Button type="button" size="sm" variant="outline" disabled={props.busy} onClick={props.onDelete} aria-label={`Delete ${automation.title}`}>
-            <Trash2Icon /> <span className="dshx:@max-pane-narrow:sr-only">Delete</span>
-          </Button>
-        </div>
+      </>
+    ),
+    details: (
+      <div className="dshx:flex dshx:flex-col dshx:gap-2">
+        <p className="dshx:m-0 dshx:whitespace-pre-wrap dshx:break-words">{automation.prompt}</p>
+        {url === null ? null : (
+          <>
+            <p className="dshx:m-0">
+              POST with x-dsh-timestamp (Unix seconds) and x-dsh-signature: sha256= HMAC-SHA256 of “timestamp.body” keyed with the value of{' '}
+              {automation.trigger.kind === 'webhook' ? automation.trigger.secretRef : 'the secret'}. Requests more than 5 minutes off, replays and more than{' '}
+              {automation.trigger.kind === 'webhook' ? automation.trigger.ratePerMinute : 10} per minute are refused.
+            </p>
+            <CopyField label="Signed test request" value={AutomationFormModel.curlExample(url)} multiline />
+          </>
+        )}
       </div>
-    </li>
-  )
+    ),
+  }
 }
 
 /** The Automations page: every project automation with its controls, then the latest runs of all of them. */
@@ -207,96 +196,101 @@ export const AutomationsPanel = (props: {
   }
 
   return (
-    <main
-      aria-label="Automations"
-      className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-col dshx:gap-5 dshx:overflow-y-auto dshx:p-5 dshx:@max-pane-narrow:p-3"
-    >
-      <PageHeader heading="Automations" description="Schedules and signed webhooks that start a new thread in a project.">
-        <Button type="button" size="sm" onClick={openNew}>
-          <PlusIcon /> New automation
-        </Button>
-      </PageHeader>
-      {list.isError ? (
-        <div role="alert" className="dshx:flex dshx:flex-col dshx:items-start dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
-          <p className="dshx:m-0">{HOST_DOWN}</p>
-          <Button type="button" size="sm" variant="outline" onClick={() => void list.refetch()}>
-            Retry
+    <TooltipProvider>
+      <main
+        aria-label="Automations"
+        className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-col dshx:gap-5 dshx:overflow-y-auto dshx:p-5 dshx:@max-pane-narrow:p-3"
+      >
+        <PageHeader heading="Automations" description="Schedules and signed webhooks that start a new thread in a project.">
+          <Button type="button" size="sm" onClick={openNew}>
+            <PlusIcon /> New automation
           </Button>
-        </div>
-      ) : null}
-      {list.data?.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No automations yet</EmptyTitle>
-            <EmptyDescription>Create one to start a thread on a schedule or when a signed webhook arrives, such as a failed CI run.</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : null}
-      {list.data === undefined || list.data.length === 0 ? null : (
-        <ul aria-label="Automation list" className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:gap-3 dshx:p-0">
-          {list.data.map(automation => (
-            <AutomationRow
-              key={automation.id}
-              automation={automation}
-              busy={busy}
-              openThread={props.openThread}
-              onToggle={enabled => toggle.mutate({ id: automation.id, enabled })}
-              onRunNow={() => runNow.mutate(automation.id)}
-              onEdit={() => {
-                save.reset()
-                setDialog({ id: automation.id, initial: AutomationFormModel.of(automation, browserTimeZone()) })
-              }}
-              onDelete={() => setDeleting(automation)}
-            />
-          ))}
-        </ul>
-      )}
-      {failure === null ? null : (
-        <p role="alert" className="dshx:m-0 dshx:text-sm dshx:text-destructive">
-          {errorMessage(failure, HOST_DOWN)}
-        </p>
-      )}
-      <section aria-label="Recent runs" className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2">
-        <h2 className="dshx:m-0 dshx:text-sm dshx:font-semibold">Recent runs</h2>
-        {runs.data === undefined || runs.data.length === 0 ? (
-          <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">No run yet. Use Run now to try an automation.</p>
-        ) : (
-          <ul className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:gap-2 dshx:p-0">
-            {runs.data.map(run => (
-              <RunLine key={run.id} run={run} showTitle openThread={props.openThread} />
-            ))}
-          </ul>
+        </PageHeader>
+        {list.isError ? (
+          <div role="alert" className="dshx:flex dshx:flex-col dshx:items-start dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
+            <p className="dshx:m-0">{HOST_DOWN}</p>
+            <Button type="button" size="sm" variant="outline" onClick={() => void list.refetch()}>
+              Retry
+            </Button>
+          </div>
+        ) : null}
+        {list.data?.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyTitle>No automations yet</EmptyTitle>
+              <EmptyDescription>Create one to start a thread on a schedule or when a signed webhook arrives, such as a failed CI run.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : null}
+        {list.data === undefined || list.data.length === 0 ? null : (
+          <RoutineList
+            aria-label="Automation list"
+            heading={null}
+            className="dshx:rounded-xl dshx:border dshx:border-border dshx:pt-3"
+            routines={list.data.map(automation =>
+              automationRoutine({
+                automation,
+                runs: runs.data ?? [],
+                busy,
+                openThread: props.openThread,
+                onEdit: () => {
+                  save.reset()
+                  setDialog({ id: automation.id, initial: AutomationFormModel.of(automation, browserTimeZone()) })
+                },
+                onDelete: () => setDeleting(automation),
+              }),
+            )}
+            onToggle={(id, enabled) => toggle.mutate({ id, enabled })}
+            onRunNow={id => runNow.mutate(id)}
+          />
         )}
-      </section>
-      {dialog === null ? null : (
-        <AutomationDialog
-          open
-          editing={dialog.id !== undefined}
-          initial={dialog.initial}
-          projects={projects}
-          pending={save.isPending}
-          error={save.error === null ? null : errorMessage(save.error, HOST_DOWN)}
-          onOpenChange={open => (open ? undefined : setDialog(null))}
-          onSubmit={form => save.mutate({ id: dialog.id, form })}
-        />
-      )}
-      <AlertDialog open={deleting !== null} onOpenChange={open => (open ? undefined : setDeleting(null))}>
-        <AlertDialogContent className="dshx-root" size="sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete “{deleting?.title}”?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Its schedule or webhook URL stops and its run history is deleted. Threads it already started are kept. To stop it for a while instead, turn it
-              off.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => (deleting === null ? undefined : remove.mutate(deleting.id))}>
-              Delete automation
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </main>
+        {failure === null ? null : (
+          <p role="alert" className="dshx:m-0 dshx:text-sm dshx:text-destructive">
+            {errorMessage(failure, HOST_DOWN)}
+          </p>
+        )}
+        <section aria-label="Recent runs" className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2">
+          <h2 className="dshx:m-0 dshx:text-sm dshx:font-semibold">Recent runs</h2>
+          {runs.data === undefined || runs.data.length === 0 ? (
+            <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">No run yet. Use Run now to try an automation.</p>
+          ) : (
+            <ul className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:gap-2 dshx:p-0">
+              {runs.data.map(run => (
+                <RunLine key={run.id} run={run} showTitle openThread={props.openThread} />
+              ))}
+            </ul>
+          )}
+        </section>
+        {dialog === null ? null : (
+          <AutomationDialog
+            open
+            editing={dialog.id !== undefined}
+            initial={dialog.initial}
+            projects={projects}
+            pending={save.isPending}
+            error={save.error === null ? null : errorMessage(save.error, HOST_DOWN)}
+            onOpenChange={open => (open ? undefined : setDialog(null))}
+            onSubmit={form => save.mutate({ id: dialog.id, form })}
+          />
+        )}
+        <AlertDialog open={deleting !== null} onOpenChange={open => (open ? undefined : setDeleting(null))}>
+          <AlertDialogContent className="dshx-root" size="sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete “{deleting?.title}”?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Its schedule or webhook URL stops and its run history is deleted. Threads it already started are kept. To stop it for a while instead, turn it
+                off.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={() => (deleting === null ? undefined : remove.mutate(deleting.id))}>
+                Delete automation
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </main>
+    </TooltipProvider>
   )
 }

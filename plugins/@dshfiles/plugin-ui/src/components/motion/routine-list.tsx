@@ -40,13 +40,23 @@ export interface Routine {
   readonly history: readonly RoutineRun[]
   readonly sources: readonly RoutineEndpoint[]
   readonly destination: RoutineEndpoint
-  readonly agent: { readonly name: string; readonly tone?: AgentTone }
+  readonly agent?: { readonly name: string; readonly tone?: AgentTone }
   /** Expanded body: prompt, recent output, settings. */
   readonly details?: React.ReactNode
+  /** Always visible under the row: a webhook URL, the last run with a link to its thread. */
+  readonly footer?: React.ReactNode
+  /** Extra row controls after Run now (Edit, Delete). */
+  readonly actions?: React.ReactNode
+  /** Locks the switch and Run now while a change is in flight. */
+  readonly busy?: boolean
+  /** Run now stays available while paused (a manual run ignores the schedule). Defaults to `enabled`. */
+  readonly runnable?: boolean
 }
 
-export interface RoutineListProps extends React.HTMLAttributes<HTMLElement> {
+export interface RoutineListProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
   readonly routines: readonly Routine[]
+  /** Header title; `null` keeps only the "N of M on schedule" line, for a page that has its own heading. */
+  readonly heading?: React.ReactNode
   readonly onToggle?: (id: string, enabled: boolean) => void
   readonly onRunNow?: (id: string) => void
   readonly onNew?: () => void
@@ -72,7 +82,7 @@ export const formatCountdown = (ms: number): string => {
  * writes, and keeps a strip of recent runs whose newest bar pops in. Hover reveals Run now; the switch pauses it.
  * Scheduled threads, cron-like agent jobs, backlog triage runs.
  */
-export function RoutineList({ routines, onToggle, onRunNow, onNew, historyLength = 12, className, ...props }: RoutineListProps) {
+export function RoutineList({ routines, heading = 'Routines', onToggle, onRunNow, onNew, historyLength = 12, className, ...props }: RoutineListProps) {
   const rootRef = React.useRef<HTMLElement>(null)
   const onSchedule = routines.filter(routine => routine.enabled).length
 
@@ -92,7 +102,7 @@ export function RoutineList({ routines, onToggle, onRunNow, onNew, historyLength
     <section ref={rootRef} aria-label="Routines" className={cn('dshx:@container dshx:flex dshx:flex-col dshx:gap-1 dshx:text-sm', className)} {...props}>
       <header className="dshx:flex dshx:items-start dshx:gap-3 dshx:px-3 dshx:pb-2">
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-          <h3 className="dshx:font-medium">Routines</h3>
+          {heading === null ? null : <h3 className="dshx:font-medium">{heading}</h3>}
           <p className="dshx:flex dshx:gap-1 dshx:text-muted-foreground">
             <RollingNumber value={onSchedule} /> of {routines.length} on schedule
           </p>
@@ -137,7 +147,7 @@ function RoutineRow({
   const bodyId = React.useId()
   const switchId = React.useId()
   return (
-    <li className="dshx:group dshx:relative">
+    <li aria-label={routine.name} data-routine-id={routine.id} className="dshx:group dshx:relative">
       <div className="dshx:flex dshx:gap-3 dshx:rounded-xl dshx:px-3 dshx:py-3 dshx:transition-colors dshx:motion-reduce:transition-none dshx:hover:bg-muted/60 dshx:focus-within:bg-muted/60">
         <div
           className={cn(
@@ -164,10 +174,14 @@ function RoutineRow({
           {/* Below 28rem the schedule and the countdown stack instead of truncating each other. */}
           <p className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground dshx:@max-pane-narrow:flex-col dshx:@max-pane-narrow:items-start dshx:@max-pane-narrow:gap-0">
             <span className="dshx:max-w-full dshx:truncate">{routine.schedule}</span>
-            <span aria-hidden className="dshx:@max-pane-narrow:hidden">
-              ·
-            </span>
-            <NextRun routine={routine} />
+            {routine.enabled && routine.running !== true && routine.nextRunAt === undefined ? null : (
+              <>
+                <span aria-hidden className="dshx:@max-pane-narrow:hidden">
+                  ·
+                </span>
+                <NextRun routine={routine} />
+              </>
+            )}
           </p>
           <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:pt-0.5 dshx:text-xs dshx:text-muted-foreground">
             {routine.sources.map(source => (
@@ -175,8 +189,12 @@ function RoutineRow({
             ))}
             <ArrowRightIcon aria-label="to" className="dshx:size-3 dshx:shrink-0" />
             <Endpoint endpoint={routine.destination} />
-            <span aria-hidden className="dshx:mx-1 dshx:h-3 dshx:w-px dshx:bg-border" />
-            <AgentAvatar name={routine.agent.name} tone={routine.agent.tone ?? 'chart-4'} size="xs" />
+            {routine.agent === undefined ? null : (
+              <>
+                <span aria-hidden className="dshx:mx-1 dshx:h-3 dshx:w-px dshx:bg-border" />
+                <AgentAvatar name={routine.agent.name} tone={routine.agent.tone ?? 'chart-4'} size="xs" />
+              </>
+            )}
           </div>
         </div>
         <div className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:items-end dshx:gap-1.5">
@@ -187,7 +205,7 @@ function RoutineRow({
               <Button
                 variant="ghost"
                 size="xs"
-                disabled={!routine.enabled}
+                disabled={!(routine.runnable ?? routine.enabled) || routine.busy === true}
                 onClick={() => onRunNow(routine.id)}
                 className="dshx:opacity-0 dshx:transition-opacity dshx:motion-reduce:transition-none dshx:group-hover:opacity-100 dshx:group-focus-within:opacity-100 dshx:@max-pane-narrow:opacity-100"
               >
@@ -195,10 +213,11 @@ function RoutineRow({
                 <span className="dshx:@max-pane-narrow:sr-only">Run now</span>
               </Button>
             ) : null}
+            {routine.actions}
             <label htmlFor={switchId} className="dshx:sr-only">
               {routine.name} enabled
             </label>
-            <Switch id={switchId} checked={routine.enabled} onCheckedChange={checked => onToggle?.(routine.id, checked)} />
+            <Switch id={switchId} checked={routine.enabled} disabled={routine.busy === true} onCheckedChange={checked => onToggle?.(routine.id, checked)} />
           </div>
           {routine.lastRun ? (
             <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
@@ -213,9 +232,10 @@ function RoutineRow({
           <RunStrip runs={routine.history.slice(-historyLength)} running={routine.running === true} />
         </div>
       </div>
+      {routine.footer === undefined ? null : <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:px-3 dshx:pb-3">{routine.footer}</div>}
       <HeightReveal open={open} id={bodyId}>
         <div className="dshx:mx-3 dshx:mb-3 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">
-          {routine.details ?? `${routine.agent.name} runs ${routine.schedule.toLowerCase()} and posts to ${routine.destination.label}.`}
+          {routine.details ?? `${routine.agent?.name ?? 'It'} runs ${routine.schedule.toLowerCase()} and posts to ${routine.destination.label}.`}
         </div>
       </HeightReveal>
       {last ? null : <div aria-hidden className="dshx:mx-3 dshx:h-px dshx:bg-border" />}
