@@ -13,8 +13,7 @@ export type RevertPlan =
 
 const valueOf = (item: BacklogItem | null, field: BacklogHumanField): FieldValue | undefined => (item === null ? undefined : item[field])
 
-const recordsInOrder = (records: readonly BacklogOpRecord[]): BacklogOpRecord[] =>
-  [...records].sort((left, right) => BacklogOps.compareHlc(left.hlc, right.hlc) || (left.opId < right.opId ? -1 : 1))
+const recordsInOrder = (records: readonly BacklogOpRecord[]): BacklogOpRecord[] => [...records].sort(BacklogOps.compareRecords)
 
 const namesChange = (item: BacklogItem | null, at: number, field: BacklogHumanField): boolean =>
   item?.events.some(event => event.at === at && event.fieldChanges?.some(change => change.field === field) === true) === true

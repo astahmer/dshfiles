@@ -4,7 +4,7 @@ import { BacklogBackfill, type BackfillScope, type BackfillSelection } from './b
 import { BacklogSettingsTag } from './backlog-settings.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogRepo } from './backlog-repo.js'
-import { BacklogClaimRefused, BacklogItemClaimed, BacklogMergeInvalid, BacklogParentInvalid, BacklogWriteFailed } from './errors.js'
+import { BacklogClaimRefused, BacklogItemClaimed, BacklogMergeInvalid, BacklogParentInvalid, BacklogPeerIngestFailed, BacklogWriteFailed } from './errors.js'
 import { BacklogOrigins } from './event-origin.js'
 import {
   BacklogItems,
@@ -27,11 +27,12 @@ import { ItemRelations, type BacklogLease, type ItemRelationIndex } from './item
 import type { LeaseWrite } from './backlog-repo.js'
 import { DueDates } from './due-date.js'
 import { Recurrence } from './recurrence.js'
+import { derivedUlid } from './ulid.js'
 import { BacklogGates, type BacklogGate, type BacklogGateKind } from './gates.js'
 import type { BacklogTemplate } from './templates.js'
 import { ProjectGuidance } from './project-guidance.js'
 import { FieldRevert } from './field-revert.js'
-import { BacklogOps } from './op-log.js'
+import { BacklogOps, type BacklogOpRecord } from './op-log.js'
 import { BacklogShipped, type ShippedDigest, type ShippedQuery } from './shipped.js'
 import { BacklogSearch, type SearchMatch } from './search.js'
 import { BacklogSearchIndex } from './search-index.js'
@@ -276,6 +277,8 @@ interface StoreState {
   readonly leases: ReadonlyMap<number, BacklogLease>
   /** A merged duplicate's ref → the ref of the item it was merged into. */
   readonly redirects: ReadonlyMap<string, string>
+  /** The ref each legacy item shows on other Hosts → its id, so a reference written there resolves here too. */
+  readonly derived: ReadonlyMap<string, number>
   readonly nextId: number
   readonly revision: number
 }
@@ -648,10 +651,13 @@ const redirectedRef = (redirects: ReadonlyMap<string, string>, ref: string): str
  * An item id from a caller: a number is the item's own id, a string a `b:<ref>` with or without its prefix. A merged
  * duplicate's ref resolves to the item it was merged into; its number still opens the duplicate itself.
  */
-const resolveIn = (current: Pick<StoreState, 'records' | 'redirects'>, key: number | string): number | undefined => {
+const resolveIn = (current: Pick<StoreState, 'records' | 'redirects' | 'derived'>, key: number | string): number | undefined => {
   if (typeof key === 'number') return current.records.has(key) ? key : undefined
   const ref = BacklogReference.parse(key)
-  return ref === undefined ? undefined : idOfRef(current.records, redirectedRef(current.redirects, ref))
+  if (ref === undefined) return undefined
+  const target = redirectedRef(current.redirects, ref)
+  const derived = current.derived.get(target)
+  return idOfRef(current.records, target) ?? (derived !== undefined && current.records.has(derived) ? derived : undefined)
 }
 
 /** Removes an optional field for null, or sets it; undefined leaves it as it is. */
@@ -711,6 +717,20 @@ const isClearable = (field: string): field is ClearableField => clearableFields.
 const clearedValue = (field: BacklogHumanField): string | null | undefined => {
   if (isClearable(field)) return null
   return field === 'attention' || field === 'priority' ? 'none' : undefined
+}
+
+/** The item id, `create` op id and ref seed of one occurrence of a recurring item, the same on every Host that spawns it. */
+interface OccurrenceIdentity {
+  readonly itemId: string
+  readonly createOpId: string
+  readonly refSeed: string
+}
+
+const occurrenceIdentity = (input: { readonly doneItemId: string; readonly date: string; readonly createdAt: number }): OccurrenceIdentity => {
+  const seed = `recurrence:${input.doneItemId}:${input.date}`
+  const dated = Date.parse(`${input.date}T00:00:00.000Z`)
+  const time = Number.isFinite(dated) ? dated : input.createdAt
+  return { itemId: derivedUlid({ time, seed }), createOpId: derivedUlid({ time, seed: `${seed}:create` }), refSeed: seed }
 }
 
 const isIdleNudge = (event: BacklogEvent): boolean => event.kind === 'commented' && event.detail.startsWith('Thread idle nudge:')
@@ -858,6 +878,13 @@ export class BacklogStore extends Context.Service<
     /** Several items in one call, in the order asked, with the ids that do not exist kept separate. */
     readonly getMany: (ids: readonly number[]) => Effect.Effect<{ readonly items: BacklogDetail[]; readonly missing: number[] }>
     readonly referencing: (link: BacklogLink) => Effect.Effect<BacklogSummary[]>
+    /**
+     * Adds ops pulled from a peer Host. It holds the write permit, so a local write never diffs against an item the
+     * peer just changed, and only the items those ops touch are folded again.
+     */
+    readonly ingestPeerOps: (
+      records: readonly BacklogOpRecord[],
+    ) => Effect.Effect<{ readonly inserted: number; readonly items: number }, BacklogPeerIngestFailed>
   }
 >()('@dshfiles/backlog/BacklogStore') {
   static readonly layer = Layer.effect(
@@ -874,6 +901,7 @@ export class BacklogStore extends Context.Service<
         records,
         leases,
         redirects,
+        derived: yield* repo.derivedAliases,
         nextId: Math.max(storedNextId, Math.max(0, ...records.keys()) + 1),
         revision: yield* Clock.currentTimeMillis,
       })
@@ -1004,6 +1032,13 @@ export class BacklogStore extends Context.Service<
         const today = DueDates.dateOf(yield* Clock.currentTimeMillis)
         const due = Recurrence.nextDue({ recurrence: done.recurrence, due: done.due, today })
         const doneRef = BacklogReference.refOf(done)
+        const identity = occurrenceIdentity({
+          doneItemId: Option.getOrElse(yield* repo.canonicalId(done.id), () => `local-${String(done.id)}`),
+          date: due ?? today,
+          createdAt: done.createdAt,
+        })
+        const spawnedId = yield* repo.numericId(identity.itemId)
+        const spawned = Option.isNone(spawnedId) ? undefined : (yield* Ref.get(state)).records.get(spawnedId.value)
         const occurrence: BacklogCaptureInput = {
           text: done.title,
           kind: done.kind,
@@ -1017,13 +1052,17 @@ export class BacklogStore extends Context.Service<
           extraLinks: [{ type: 'item', target: doneRef, relation: 'related', provenance: 'inferred' }],
           actor: { kind: 'system' },
         }
+        // Another Host that finished this same occurrence already created the next one: link it instead of making a twin.
         // A parent that can no longer hold it (deleted, too deep) leaves the next occurrence top-level rather than lost.
-        const next = yield* createItem(done.parent === undefined ? occurrence : { ...occurrence, parent: done.parent }).pipe(
-          Effect.catchTag('BacklogParentInvalid', () => createItem(occurrence)),
-          // Without a parent nothing is checked, so this cannot fail; it only narrows the error channel.
-          Effect.catchTag('BacklogParentInvalid', error => Effect.die(error)),
-        )
-        const nextRef = BacklogReference.refOf(next.item)
+        const next =
+          spawned === undefined
+            ? (yield* createItem(done.parent === undefined ? occurrence : { ...occurrence, parent: done.parent }, identity).pipe(
+                Effect.catchTag('BacklogParentInvalid', () => createItem(occurrence, identity)),
+                // Without a parent nothing is checked, so this cannot fail; it only narrows the error channel.
+                Effect.catchTag('BacklogParentInvalid', error => Effect.die(error)),
+              )).item
+            : spawned
+        const nextRef = BacklogReference.refOf(next)
         yield* touch(
           done,
           { kind: 'system' },
@@ -1078,12 +1117,12 @@ export class BacklogStore extends Context.Service<
       })
 
       /** A new item, inside a write that already holds the permit (capture, or the next occurrence of a recurring item). */
-      const createItem = Effect.fnUntraced(function* (input: BacklogCaptureInput) {
+      const createItem = Effect.fnUntraced(function* (input: BacklogCaptureInput, identity?: OccurrenceIdentity) {
         const { text, project, status, kind, actor } = input
         const parent = input.parent === undefined ? undefined : yield* checkedParent({ item: { id: 0 }, parentRef: input.parent })
         const at = yield* Clock.currentTimeMillis
         const id = (yield* Ref.get(state)).nextId
-        const ref = yield* repo.mintRef
+        const ref = yield* repo.mintRef(identity?.refSeed)
         const triaged = BacklogItems.triage(text)
         const template = input.template
         const templatePriority = template === undefined || template.priority === 'none' ? undefined : template.priority
@@ -1136,7 +1175,15 @@ export class BacklogStore extends Context.Service<
           ...(criteria !== undefined && criteria.length > 0 && { criteria: criteriaOf(criteria, []) }),
           ...(input.extraLinks !== undefined && { links: BacklogItems.uniqueLinks([...triaged.links, ...callerLinks(actor), ...input.extraLinks]) }),
         }
-        yield* repo.create({ item, origin, nextId: id + 1, files }).pipe(Effect.mapError(writeFailed(item, 'put')))
+        yield* repo
+          .create({
+            item,
+            origin,
+            nextId: id + 1,
+            files,
+            identity: identity === undefined ? undefined : { itemId: identity.itemId, createOpId: identity.createOpId },
+          })
+          .pipe(Effect.mapError(writeFailed(item, 'put')))
         yield* Ref.update(state, current => ({ ...current, nextId: id + 1 }))
         yield* persist(item, origin)
         yield* PubSub.publish(notices, { item, event: createdEvent })
@@ -1515,8 +1562,9 @@ export class BacklogStore extends Context.Service<
           )
           yield* touch(other, { kind: 'system' }, { kind: 'linked', detail: `${duplicateLabel} → ${survivorLabel} (merged)` }, { links: rewritten })
         }
-        const at = yield* Clock.currentTimeMillis
-        yield* repo.addRedirect({ alias: duplicateRef, target: survivorRef, at }).pipe(Effect.mapError(writeFailed(duplicate, 'put')))
+        yield* repo
+          .addRedirect({ itemId: duplicate.id, targetId: survivor.id, alias: duplicateRef, target: survivorRef, origin: actorIdOf(input.actor) })
+          .pipe(Effect.mapError(writeFailed(duplicate, 'put')))
         yield* Ref.update(state, current => ({ ...current, redirects: new Map(current.redirects).set(duplicateRef, survivorRef) }))
       })
 
@@ -1737,6 +1785,35 @@ export class BacklogStore extends Context.Service<
         return { items, missing }
       })
 
+      const ingestPeerOps = Effect.fn('backlog store ingest peer ops')(function* (records: readonly BacklogOpRecord[]) {
+        const result = yield* repo
+          .ingest({ records, nextId: (yield* Ref.get(state)).nextId })
+          .pipe(Effect.mapError(cause => new BacklogPeerIngestFailed({ cause })))
+        if (result.inserted === 0) return { inserted: 0, items: 0 }
+        const at = yield* Clock.currentTimeMillis
+        yield* Ref.update(state, current => {
+          const next = new Map(current.records)
+          const leases = new Map(current.leases)
+          for (const entry of result.items) {
+            if (entry.item === null) {
+              next.delete(entry.id)
+              leases.delete(entry.id)
+              continue
+            }
+            next.set(entry.id, withProject(entry.item))
+          }
+          return {
+            ...current,
+            records: next,
+            leases,
+            redirects: new Map([...current.redirects, ...result.redirects]),
+            nextId: Math.max(current.nextId, result.nextId),
+            revision: Math.max(current.revision + 1, at),
+          }
+        })
+        return { inserted: result.inserted, items: result.items.length }
+      }, serialized)
+
       return BacklogStore.of({
         revision: Effect.map(Ref.get(state), current => current.revision),
         changes: Stream.fromPubSub(notices),
@@ -1779,6 +1856,7 @@ export class BacklogStore extends Context.Service<
         labelOf: id => Effect.map(find(id), item => BacklogReference.labelOf(item ?? { id })),
         getMany,
         referencing: link => Effect.map(view, current => referencingIn(current, link)),
+        ingestPeerOps,
       })
     }),
   )

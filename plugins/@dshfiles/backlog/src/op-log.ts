@@ -107,6 +107,13 @@ const opSchema = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('comment-edit'), target: commentTargetSchema, event: eventSchema }),
   Schema.Struct({ kind: Schema.Literal('comment-delete'), target: commentTargetSchema }),
   Schema.Struct({ kind: Schema.Literal('delete') }),
+  /** Another Host minted the same `b:<ref>` for an older item, so this one takes a new ref; every Host writes the same op. */
+  Schema.Struct({ kind: Schema.Literal('rename-ref'), ref: BacklogItems.refSchema, event: eventSchema }),
+  /**
+   * This merged duplicate's ref names the survivor (its canonical id): each Host maps the two items to the refs it shows,
+   * since a legacy `b:<n>` means a different item on every Host.
+   */
+  Schema.Struct({ kind: Schema.Literal('redirect'), target: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) }),
 ])
 
 export type BacklogOp = typeof opSchema.Type
@@ -333,6 +340,12 @@ const applyOp = (input: { readonly id: number; readonly item: BacklogItem | null
       if (index >= 0) item.events = item.events.filter((_event, position) => position !== index)
       break
     }
+    case 'rename-ref':
+      item.ref = op.ref
+      item.events = [...item.events, op.event]
+      break
+    case 'redirect':
+      break
   }
   return item
 }
@@ -489,13 +502,16 @@ const createOps = (item: BacklogItem): BacklogOp[] => {
   return [create, ...rest.map(eventOf)]
 }
 
-/** Folds stored ops (any order) into the item, or `null` when it was deleted or never created. */
+/** The log's one total order, the same on every Host: HLC stamp, then op id. */
+const compareRecords = (left: BacklogOpRecord, right: BacklogOpRecord): number =>
+  compareHlc(left.hlc, right.hlc) || (left.opId < right.opId ? -1 : left.opId > right.opId ? 1 : 0)
+
+/**
+ * Folds stored ops into the item, or `null` when it was deleted or never created. The ops are sorted by the log's total
+ * order first, so the same set of ops folds to the same item whatever order they arrived in, on every Host.
+ */
 const fold = (input: { readonly id: number; readonly records: readonly BacklogOpRecord[] }): BacklogItem | null =>
-  applyOps({
-    id: input.id,
-    item: null,
-    ops: [...input.records].sort((left, right) => compareHlc(left.hlc, right.hlc) || (left.opId < right.opId ? -1 : 1)).map(record => record.op),
-  })
+  applyOps({ id: input.id, item: null, ops: [...input.records].sort(compareRecords).map(record => record.op) })
 
 const opJson = Schema.fromJsonString(opSchema)
 
@@ -504,6 +520,9 @@ export class BacklogOps {
   static readonly json = opJson
   static readonly nextHlc = nextHlc
   static readonly compareHlc = compareHlc
+  static readonly compareRecords = compareRecords
+  /** Bumped whenever an op kind is added: a peer whose ops this Host cannot decode is refused, never half-ingested. */
+  static readonly schemaVersion = 2
   static readonly diff = diff
   static readonly createOps = createOps
   static readonly apply = applyOps

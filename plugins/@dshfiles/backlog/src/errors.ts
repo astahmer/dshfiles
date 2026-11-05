@@ -292,3 +292,14 @@ export class BacklogAutomationsUnavailable extends Schema.TaggedError<BacklogAut
     return `The rule was not scheduled: ${this.reason}. Enable Project automations in Settings › Plugins, or create the automation with automation_save.`
   }
 }
+
+/** Ops pulled from a peer Host could not be stored; nothing of that batch was kept, so the next pull retries it. */
+export class BacklogPeerIngestFailed extends Schema.TaggedError<BacklogPeerIngestFailed>()(
+  'BacklogPeerIngestFailed',
+  { cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'peer-ingest-failed' },
+) {
+  override get message(): string {
+    return 'Ops from a peer Host could not be stored. The next pull retries them; if it keeps failing, check the Host log for the storage error.'
+  }
+}

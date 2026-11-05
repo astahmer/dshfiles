@@ -140,10 +140,13 @@ const tweetContextUrlSchema = Schema.String.check(Schema.isMaxLength(2_048), abs
 
 const actorSchema = Schema.Struct({ id: actorIdSchema, role: Schema.Literals(['owner', 'contributor']) })
 
+/** A `b:<ref>`: 4 or 5 lowercase Crockford base32 characters. */
+const refSchema = Schema.String.check(Schema.isPattern(/^[0-9a-hjkmnp-tv-z]{4,5}$/))
+
 const itemSchema = Schema.Struct({
   id: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
   /** The short alias (`k3f9`) an item created since short aliases shows as `b:k3f9`; absent on a legacy `b:<id>` item. */
-  ref: Schema.optionalKey(Schema.String.check(Schema.isPattern(/^[0-9a-hjkmnp-tv-z]{4,5}$/))),
+  ref: Schema.optionalKey(refSchema),
   title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_TITLE_CHARS)),
   body: Schema.String.check(Schema.isMaxLength(MAX_BODY_CHARS)),
   kind: kindSchema,
@@ -437,6 +440,7 @@ export class BacklogItems {
   static readonly humanFieldSchema = Schema.Literals(humanFieldNames)
   static readonly tagSchema = Schema.String.check(Schema.isMaxLength(60))
   static readonly attachmentSchema = attachmentSchema
+  static readonly refSchema = refSchema
   static readonly tweetContextUrlSchema = tweetContextUrlSchema
   static readonly itemSchema = itemSchema
   static readonly proposalSchema = proposalSchema

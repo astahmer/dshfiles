@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto'
+import { createHash, randomInt } from 'node:crypto'
 
 import { BacklogReference } from './backlog-reference.js'
 
@@ -23,7 +23,38 @@ const mint = (input: { readonly taken: Pick<ReadonlySet<string>, 'size' | 'has'>
   }
 }
 
+/** A pick that every Host repeats for the same seed: bytes of `sha256(seed:n)`, so a derived alias needs no coordination. */
+const seededPick = (seed: string): ((bound: number) => number) => {
+  const state = { block: 0, offset: 0, bytes: createHash('sha256').update(`${seed}:0`).digest() }
+  return bound => {
+    if (state.offset >= state.bytes.length) {
+      state.block += 1
+      state.offset = 0
+      state.bytes = createHash('sha256')
+        .update(`${seed}:${String(state.block)}`)
+        .digest()
+    }
+    const byte = state.bytes[state.offset] ?? 0
+    state.offset += 1
+    return byte % bound
+  }
+}
+
+/**
+ * A 5-character alias every Host derives from the same seed (an item id): what an item shows on a Host that cannot use
+ * its original ref, so all those Hosts agree on it without exchanging anything.
+ */
+const derived = (input: { readonly seed: string; readonly taken: Pick<ReadonlySet<string>, 'has'> }): string => {
+  const pick = seededPick(input.seed)
+  for (;;) {
+    const candidate = draw(5, pick)
+    if (hasLetter.test(candidate) && !input.taken.has(candidate)) return candidate
+  }
+}
+
 export class ShortAlias {
   static readonly mint = mint
+  static readonly derived = derived
+  static readonly seededPick = seededPick
   static readonly growAt = GROW_AT
 }

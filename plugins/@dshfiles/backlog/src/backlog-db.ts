@@ -96,6 +96,31 @@ export const backlogMigrations = {
     const sql = yield* SqlClient.SqlClient
     yield* sql`CREATE TABLE alias_redirects (alias TEXT PRIMARY KEY, target TEXT NOT NULL, created_at INTEGER NOT NULL)`
   }),
+  /**
+   * The order this Host stored each op in: what a peer's cursor counts, because an HLC stamp is no cursor once ops from
+   * other Hosts arrive late with older stamps. `rowid` seeds it but cannot be the cursor itself: VACUUM may renumber it.
+   */
+  '6_op_sequence': Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`ALTER TABLE ops ADD COLUMN seq INTEGER`
+    yield* sql`UPDATE ops SET seq = rowid`
+    yield* sql`CREATE UNIQUE INDEX ops_seq ON ops (seq)`
+  }),
+  /** Per multi-host runtime: the backlog Host behind it, how far its log was pulled, and how the last pull went. Local to this Host. */
+  '7_peer_state': Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`CREATE TABLE peer_state (
+      runtime_id TEXT PRIMARY KEY,
+      remote_host_id TEXT,
+      cursor INTEGER NOT NULL DEFAULT 0,
+      head INTEGER NOT NULL DEFAULT 0,
+      pulled INTEGER NOT NULL DEFAULT 0,
+      last_pull_at INTEGER,
+      last_success_at INTEGER,
+      last_error_code TEXT,
+      last_error TEXT
+    )`
+  }),
 }
 
 /** The backlog's SQLite file, through the shared store layer (WAL, migrations, `BEGIN IMMEDIATE`). */
