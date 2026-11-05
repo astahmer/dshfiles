@@ -583,15 +583,13 @@ const PhoneNavigation = (
     if (!listOpen) props.toggleSidebar()
   }
   const stageOwner = Destinations.owning(props.destinations, props.activePanelId)?.id
-  const current: PhoneTab | null = !listOpen
-    ? stageOwner === 'inbox'
-      ? 'inbox'
-      : null
-    : moreOpen || !['threads', 'inbox'].includes(props.destination.id)
-      ? 'more'
-      : props.destination.id === 'inbox'
-        ? 'inbox'
-        : 'threads'
+  /** The highlighted tab: with the list closed, only the inbox page in the stage; with it open, the shown destination. */
+  const currentTab = (): PhoneTab | null => {
+    if (!listOpen) return stageOwner === 'inbox' ? 'inbox' : null
+    if (moreOpen || !['threads', 'inbox'].includes(props.destination.id)) return 'more'
+    return props.destination.id === 'inbox' ? 'inbox' : 'threads'
+  }
+  const current = currentTab()
   const select = (tab: PhoneTab): void => {
     if (tab === 'new') {
       props.startSession()

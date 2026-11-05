@@ -15,7 +15,7 @@
   "ast-grep": {
     "no-deeply-nested-ternary": 0,
     "no-deeply-nested-ternary-tsx": 0,
-    "no-direct-json-parse": 151,
+    "no-direct-json-parse": 150,
     "no-direct-json-parse-tsx": 3,
     "no-export-from": 0,
     "no-identity-hook-selector": 0,

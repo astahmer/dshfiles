@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict'
+import * as Schema from 'effect/Schema'
 import { test } from 'vitest'
 import { DEFAULT_PREFERENCES } from './organization.js'
 import { SidebarPreferencesModel } from './preferences.js'
 import { threadSidebarSettings } from './settings.js'
 import { ThreadNotificationModel } from './thread-notifications.js'
+
+/** Stored preference text, parsed through the schema JSON boundary. */
+const parseStored = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))
 
 /**
  * The Host hands the plugin the settings schema's resolved output, and Schemastery drops a
@@ -49,7 +53,7 @@ test('older preferences default arrow keys to switching threads immediately', ()
 test('older stored preferences default the header and thread split to natural height', () => {
   const stored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: undefined })
   assert.ok(stored)
-  assert.equal(SidebarPreferencesModel.decode(JSON.parse(stored))?.headerRegionHeight, null)
+  assert.equal(SidebarPreferencesModel.decode(parseStored(stored))?.headerRegionHeight, null)
 })
 
 test('older preferences gain attention modes and default child-thread actions to enabled', () => {
@@ -141,8 +145,8 @@ test('valid saved split heights persist and invalid heights are rejected', () =>
   const stored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: 384 })
   const invalidStored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: 24 })
 
-  assert.equal(SidebarPreferencesModel.decode(JSON.parse(stored))?.headerRegionHeight, 384)
-  assert.equal(SidebarPreferencesModel.decode(JSON.parse(invalidStored)), null)
+  assert.equal(SidebarPreferencesModel.decode(parseStored(stored))?.headerRegionHeight, 384)
+  assert.equal(SidebarPreferencesModel.decode(parseStored(invalidStored)), null)
 })
 
 test('preferences saved before navigation and palette settings existed gain their defaults', () => {
@@ -157,7 +161,7 @@ test('preferences saved before navigation and palette settings existed gain thei
 })
 
 test('a disabled chord persists as null', () => {
-  assert.equal(SidebarPreferencesModel.decode(JSON.parse(JSON.stringify({ ...DEFAULT_PREFERENCES, paletteChord: null })))?.paletteChord, null)
+  assert.equal(SidebarPreferencesModel.decode(parseStored(JSON.stringify({ ...DEFAULT_PREFERENCES, paletteChord: null })))?.paletteChord, null)
 })
 
 test('migration copies browser values only into Host keys still at their default', () => {

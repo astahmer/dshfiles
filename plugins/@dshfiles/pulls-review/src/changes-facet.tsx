@@ -242,18 +242,24 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
     )
 
   const loading = activeScope === 'turn' ? turnDiff.isPending && activeSeq !== undefined : rangeDiff.isPending || status.isPending
-  const failure =
-    activeScope === 'turn'
-      ? turnDiff.isError
-        ? errorMessage(turnDiff.error, "This turn's changes could not be read.")
-        : undefined
-      : rangeDiff.isError
-        ? errorMessage(rangeDiff.error, "The workspace's diff could not be read.")
-        : rangeResult?.status === 'failed'
-          ? rangeResult.reason === 'not-a-repository'
-            ? `${rangeResult.message} Revision scopes need a Jujutsu workspace; This turn still shows what each turn wrote.`
-            : rangeResult.message
-          : undefined
+  const readFailure = (): string | undefined => {
+    if (activeScope === 'turn') return turnDiff.isError ? errorMessage(turnDiff.error, "This turn's changes could not be read.") : undefined
+    if (rangeDiff.isError) return errorMessage(rangeDiff.error, "The workspace's diff could not be read.")
+    if (rangeResult?.status !== 'failed') return undefined
+    if (rangeResult.reason === 'not-a-repository')
+      return `${rangeResult.message} Revision scopes need a Jujutsu workspace; This turn still shows what each turn wrote.`
+    return rangeResult.message
+  }
+  const failure = readFailure()
+  /** Which one body the facet shows under its scope picker, in priority order. */
+  const readView = (): 'no-turn' | 'loading' | 'failure' | 'none' | 'empty' | 'files' => {
+    if (activeScope === 'turn' && latestTurn === undefined && !turns.isPending) return 'no-turn'
+    if (loading) return 'loading'
+    if (failure !== undefined) return 'failure'
+    if (diff === undefined) return 'none'
+    return diff.files.length === 0 ? 'empty' : 'files'
+  }
+  const view = readView()
 
   return (
     <div
@@ -305,22 +311,22 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
       </div>
       <p className={HINT}>{ChangesScopeModel.hint(activeScope, bookmark)}</p>
 
-      {activeScope === 'turn' && latestTurn === undefined && !turns.isPending ? (
-        <EmptyState>No turn of this thread changed files yet.</EmptyState>
-      ) : loading ? (
+      {view === 'no-turn' ? <EmptyState>No turn of this thread changed files yet.</EmptyState> : null}
+      {view === 'loading' ? (
         <p className={cn(HINT, 'dshx:flex dshx:items-center dshx:gap-2')}>
           <Spinner /> Reading changes…
         </p>
-      ) : failure !== undefined ? (
+      ) : null}
+      {view === 'failure' ? (
         <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive" role="alert">
           <span className="dshx:min-w-0">{failure}</span>
           <Button onClick={refreshDiff} size="xs" variant="outline">
             Try again
           </Button>
         </p>
-      ) : diff === undefined ? null : diff.files.length === 0 ? (
-        <EmptyState>No changes in this scope.</EmptyState>
-      ) : (
+      ) : null}
+      {view === 'empty' ? <EmptyState>No changes in this scope.</EmptyState> : null}
+      {view === 'files' && diff !== undefined ? (
         <>
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2" data-testid="changes-summary">
             <Stat>{diff.files.length === 1 ? '1 file' : `${String(diff.files.length)} files`}</Stat>
@@ -445,7 +451,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
             />
           </div>
         </>
-      )}
+      ) : null}
     </div>
   )
 }

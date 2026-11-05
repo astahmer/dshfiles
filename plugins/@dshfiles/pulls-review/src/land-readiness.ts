@@ -18,6 +18,19 @@ export interface LandReadiness {
   readonly reason: string | undefined
 }
 
+/** Why Land is not offered yet, checked in the order the card explains them; undefined once nothing blocks. */
+const blockingReason = (
+  thread: LandThread,
+  facts: { readonly conflicts: number; readonly undescribed: number; readonly busy: boolean },
+): string | undefined => {
+  if (thread.unlanded.length === 0) return undefined
+  if (facts.conflicts > 0) return 'Resolve the conflicts first.'
+  if (facts.undescribed > 0) return 'Describe every revision first.'
+  if (facts.busy) return 'The thread is working or waiting for an answer. Land once it is idle, or queue it with Land when idle.'
+  if (thread.canRebase === undefined) return 'Could not tell whether the thread is idle; Land checks again when you click it.'
+  return undefined
+}
+
 /**
  * The client's preview of jj-integration's own land guard, so the button explains itself before the Host refuses:
  * conflicts and undescribed revisions block, and a thread that is working or waiting on a question blocks until idle.
@@ -25,24 +38,12 @@ export interface LandReadiness {
  */
 const readiness = (input: { readonly thread: LandThread | null; readonly threadBusy: boolean; readonly pending: boolean }): LandReadiness => {
   const thread = input.thread
-  if (thread === null)
-    return { canLand: false, canQueue: false, conflicts: 0, undescribed: 0, reason: undefined }
+  if (thread === null) return { canLand: false, canQueue: false, conflicts: 0, undescribed: 0, reason: undefined }
   const conflicts = thread.unlanded.filter(revision => revision.conflict).length
   const undescribed = thread.unlanded.filter(revision => revision.description.trim().length === 0).length
   const busy = input.threadBusy || thread.canRebase === false
   const blockedByContent = conflicts > 0 || undescribed > 0
-  const reason =
-    thread.unlanded.length === 0
-      ? undefined
-      : conflicts > 0
-        ? 'Resolve the conflicts first.'
-        : undescribed > 0
-          ? 'Describe every revision first.'
-          : busy
-            ? 'The thread is working or waiting for an answer. Land once it is idle, or queue it with Land when idle.'
-            : thread.canRebase === undefined
-              ? 'Could not tell whether the thread is idle; Land checks again when you click it.'
-              : undefined
+  const reason = blockingReason(thread, { conflicts, undescribed, busy })
   return {
     canLand: thread.unlanded.length > 0 && !blockedByContent && !busy && !input.pending,
     canQueue: thread.unlanded.length > 0 && !blockedByContent && busy,

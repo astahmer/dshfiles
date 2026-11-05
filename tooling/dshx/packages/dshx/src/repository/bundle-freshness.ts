@@ -32,10 +32,8 @@ export type BundleFreshnessReport =
  */
 // scripts/profile-sync.ts imports this file as TypeScript source under Node type stripping, where `../json.js` does not
 // resolve; this module keeps its own schema-checked JSON boundary instead of importing src/json.ts.
-const decodeJson = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: string): S['Type'] => {
-  const value: unknown = JSON.parse(text)
-  return Schema.decodeUnknownSync(schema)(value)
-}
+const decodeJson = <S extends Schema.Constraint & { readonly DecodingServices: never }>(schema: S, text: string): S['Type'] =>
+  Schema.decodeUnknownSync(Schema.fromJsonString(schema))(text)
 
 const inspect = (input: { readonly directory: string }): BundleFreshnessReport => {
   const packagePath = join(input.directory, 'package.json')

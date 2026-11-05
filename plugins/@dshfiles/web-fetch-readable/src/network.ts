@@ -47,6 +47,11 @@ interface Nat64Prefix {
   readonly length: number
 }
 
+const FAMILY_NUMBER: Readonly<Record<string, 4 | 6>> = { IPv4: 4, IPv6: 6 }
+
+/** A lookup's requested family as a number; 0 asks for any family. */
+const familyNumber = (family: number | string | undefined): number => (typeof family === 'number' ? family : (FAMILY_NUMBER[family ?? ''] ?? 0))
+
 const stripIpv6Brackets = (hostname: string): string => (hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname)
 
 export class PublicNetwork {
@@ -136,7 +141,7 @@ export class PublicNetwork {
   /** A connector lookup that only ever answers with the validated set. */
   static pinnedLookup(addresses: readonly PinnedAddress[]): LookupFunction {
     return (hostname, options, callback) => {
-      const family = typeof options.family === 'number' ? options.family : options.family === 'IPv4' ? 4 : options.family === 'IPv6' ? 6 : 0
+      const family = familyNumber(options.family)
       const eligible = family === 0 ? addresses : addresses.filter(address => address.family === family)
       const selected = eligible[0]
       if (selected === undefined) {
