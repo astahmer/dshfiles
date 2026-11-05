@@ -1319,6 +1319,13 @@ const PeekBody = (props: {
                   overdue={DueDates.isOverdue({ due: item.due, status: item.status, today: DueDates.dateOf(Date.now()) })}
                   onPick={due => actions.update.mutate({ id: item.id, due }, { onError: BacklogNotices.failure('The due date was not saved.') })}
                 />
+                <ItemPickers.Recurrence
+                  itemLabel={BacklogReference.labelOf(item)}
+                  recurrence={item.recurrence ?? null}
+                  onPick={recurrence =>
+                    actions.update.mutate({ id: item.id, recurrence }, { onError: BacklogNotices.failure('The repeat rule was not saved.') })
+                  }
+                />
                 <ItemPickers.Attention
                   itemLabel={BacklogReference.labelOf(item)}
                   attention={item.attention ?? 'none'}
@@ -1484,6 +1491,7 @@ const placeholderDetail = (summary: BacklogSummaryView) => {
     planApproval,
     due,
     overdue: _overdue,
+    recurrence,
     ...fields
   } = summary
   return {
@@ -1493,6 +1501,7 @@ const placeholderDetail = (summary: BacklogSummaryView) => {
       ...(delegate !== null && { delegate }),
       ...(planApproval !== null && { planApproval }),
       ...(due !== null && { due }),
+      ...(recurrence !== null && { recurrence }),
       body: summary.preview,
       tweetContextUrls: summary.tweetContextUrls ?? [],
       humanFields: [],

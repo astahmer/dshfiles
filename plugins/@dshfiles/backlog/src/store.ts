@@ -26,6 +26,7 @@ import {
 import { ItemRelations, type BacklogLease, type ItemRelationIndex } from './item-relations.js'
 import type { LeaseWrite } from './backlog-repo.js'
 import { DueDates } from './due-date.js'
+import { Recurrence } from './recurrence.js'
 import { FieldRevert } from './field-revert.js'
 import { BacklogOps } from './op-log.js'
 import { BacklogShipped, type ShippedDigest, type ShippedQuery } from './shipped.js'
@@ -35,7 +36,7 @@ import { ThreadLifecycle } from './thread-lifecycle.js'
 import { BacklogTriage } from './triage.js'
 
 /** Optional fields an edit may remove: null clears them, undefined leaves them as they are. */
-const clearableFields = ['parent', 'delegate', 'criteria', 'plan', 'planApproval', 'summary', 'due'] as const
+const clearableFields = ['parent', 'delegate', 'criteria', 'plan', 'planApproval', 'summary', 'due', 'recurrence'] as const
 type ClearableField = (typeof clearableFields)[number]
 type ClearableChange = { -readonly [K in ClearableField]?: NonNullable<BacklogItem[K]> | null | undefined }
 
@@ -97,6 +98,30 @@ export interface BacklogUpdate {
   readonly summary?: string | null | undefined
   /** The date it is due (`2026-11-05`), or null to clear it. */
   readonly due?: string | null | undefined
+  /** `daily`, `weekly`, `monthly` or `cron:<expr>`; finishing the item creates the next occurrence. null stops it. */
+  readonly recurrence?: string | null | undefined
+}
+
+/** What a new item is made from: free text plus the fields a caller already knows. */
+export interface BacklogCaptureInput {
+  readonly text: string
+  readonly project?: string | null | undefined
+  readonly status?: BacklogStatus | undefined
+  readonly kind?: BacklogKind | undefined
+  readonly priority?: BacklogPriority | undefined
+  /** The ref of the item this one is a sub-issue of. */
+  readonly parent?: string | undefined
+  readonly due?: string | undefined
+  readonly recurrence?: string | undefined
+  readonly criteria?: readonly CriterionInput[] | undefined
+  /** Links the item starts with besides the ones its text names. */
+  readonly extraLinks?: readonly BacklogLink[] | undefined
+  readonly files?: readonly BacklogFileInput[] | undefined
+  /** Fields a remote source already knows, used as they are instead of being read from `text`. */
+  readonly fields?: { readonly body?: string | undefined; readonly tags?: readonly string[] | undefined } | undefined
+  readonly actor: BacklogActor
+  /** Who wrote it when that is not the actor, such as `remote:<bindingId>` for an item a sync imported. */
+  readonly origin?: string | undefined
 }
 
 export interface CriterionInput {
@@ -213,6 +238,7 @@ const summarize = (
   criteriaProgress: BacklogItems.criteriaRollup(item.criteria),
   planApproval: item.planApproval ?? null,
   due: item.due ?? null,
+  recurrence: item.recurrence ?? null,
   overdue: DueDates.isOverdue({ due: item.due, status: item.status, today: DueDates.dateOf(now) }),
 })
 
@@ -492,6 +518,10 @@ const updateChange = (item: BacklogItem, fields: Omit<BacklogUpdate, 'id'>, acto
       changed.push('attention')
     }
   }
+  if (fields.recurrence !== undefined && fields.recurrence !== (item.recurrence ?? null)) {
+    change.recurrence = fields.recurrence
+    recordChange('recurrence')
+  }
   if (fields.due !== undefined && fields.due !== (item.due ?? null)) {
     change.due = fields.due
     recordChange('due')
@@ -609,6 +639,13 @@ const withClearable = (item: BacklogItem, change: ClearableChange): BacklogItem 
     (base: BacklogItem) =>
       clearOrSet({ item: base, value: change.summary, set: (next, summary) => ({ ...next, summary }), remove: ({ summary: _summary, ...rest }) => rest }),
     (base: BacklogItem) => clearOrSet({ item: base, value: change.due, set: (next, due) => ({ ...next, due }), remove: ({ due: _due, ...rest }) => rest }),
+    (base: BacklogItem) =>
+      clearOrSet({
+        item: base,
+        value: change.recurrence,
+        set: (next, recurrence) => ({ ...next, recurrence }),
+        remove: ({ recurrence: _recurrence, ...rest }) => rest,
+      }),
   ].reduce((next, apply) => apply(next), item)
 
 const isClearable = (field: string): field is ClearableField => clearableFields.some(candidate => candidate === field)
@@ -634,22 +671,7 @@ export class BacklogStore extends Context.Service<
     readonly revision: Effect.Effect<number>
     /** Every stored event, after it is durable, for the Activity timeline. */
     readonly changes: Stream.Stream<BacklogChangeNotice>
-    readonly capture: (input: {
-      readonly text: string
-      readonly project?: string | null | undefined
-      readonly status?: BacklogStatus | undefined
-      readonly kind?: BacklogKind | undefined
-      readonly priority?: BacklogPriority | undefined
-      /** The ref of the item this one is a sub-issue of. */
-      readonly parent?: string | undefined
-      readonly due?: string | undefined
-      readonly files?: readonly BacklogFileInput[] | undefined
-      /** Fields a remote source already knows, used as they are instead of being read from `text`. */
-      readonly fields?: { readonly body?: string | undefined; readonly tags?: readonly string[] | undefined } | undefined
-      readonly actor: BacklogActor
-      /** Who wrote it when that is not the actor, such as `remote:<bindingId>` for an item a sync imported. */
-      readonly origin?: string | undefined
-    }) => Effect.Effect<BacklogDetail, BacklogWriteFailed | BacklogParentInvalid>
+    readonly capture: (input: BacklogCaptureInput) => Effect.Effect<BacklogDetail, BacklogWriteFailed | BacklogParentInvalid>
     readonly attachFile: (input: { readonly id: number; readonly file: BacklogFileInput; readonly actor: BacklogActor }) => Detailed
     readonly importTweetContext: (input: {
       readonly id: number
@@ -867,7 +889,7 @@ export class BacklogStore extends Context.Service<
           const afterText = BacklogItems.displayValue(after).slice(0, BacklogItems.maxBodyChars)
           return beforeText === afterText ? [] : [{ field, before: beforeText, after: afterText }]
         })
-        const { parent, delegate, criteria, plan, planApproval, summary, due, ...fields } = change
+        const { parent, delegate, criteria, plan, planApproval, summary, due, recurrence, ...fields } = change
         const merged: BacklogItem = {
           ...item,
           ...fields,
@@ -875,7 +897,7 @@ export class BacklogStore extends Context.Service<
           lastActivityAt: at,
           events: [...item.events, { at, actor: actorId, origin: actorId, ...event, ...(fieldChanges.length !== 0 && { fieldChanges }) }],
         }
-        const next = withClearable(merged, { parent, delegate, criteria, plan, planApproval, summary, due })
+        const next = withClearable(merged, { parent, delegate, criteria, plan, planApproval, summary, due, recurrence })
         yield* persist(next, event.origin ?? actorId, leaseWrite)
         const stored = next.events.at(-1)
         if (stored !== undefined) yield* PubSub.publish(notices, { item: next, event: stored })
@@ -899,11 +921,55 @@ export class BacklogStore extends Context.Service<
         }
       })
 
+      /**
+       * A recurring item that reached done hands its rule to a new occurrence: same title, body, kind, priority, tags,
+       * project, parent and criteria (unchecked), due at the next date. The rule moves to the new item, so moving the old
+       * one back and forth never creates a second occurrence.
+       */
+      const spawnNextOccurrence = Effect.fnUntraced(function* (done: BacklogItem) {
+        if (done.recurrence === undefined) return
+        const today = DueDates.dateOf(yield* Clock.currentTimeMillis)
+        const due = Recurrence.nextDue({ recurrence: done.recurrence, due: done.due, today })
+        const doneRef = BacklogReference.refOf(done)
+        const occurrence: BacklogCaptureInput = {
+          text: done.title,
+          kind: done.kind,
+          status: 'todo',
+          project: done.project,
+          ...(done.priority !== undefined && { priority: done.priority }),
+          ...(due !== null && { due }),
+          recurrence: done.recurrence,
+          ...(done.criteria !== undefined && { criteria: done.criteria.map(criterion => ({ id: criterion.id, text: criterion.text, done: false })) }),
+          fields: { body: done.body, tags: done.tags },
+          extraLinks: [{ type: 'item', target: doneRef, relation: 'related', provenance: 'inferred' }],
+          actor: { kind: 'system' },
+        }
+        // A parent that can no longer hold it (deleted, too deep) leaves the next occurrence top-level rather than lost.
+        const next = yield* createItem(done.parent === undefined ? occurrence : { ...occurrence, parent: done.parent }).pipe(
+          Effect.catchTag('BacklogParentInvalid', () => createItem(occurrence)),
+          // Without a parent nothing is checked, so this cannot fail; it only narrows the error channel.
+          Effect.catchTag('BacklogParentInvalid', error => Effect.die(error)),
+        )
+        const nextRef = BacklogReference.refOf(next.item)
+        yield* touch(
+          done,
+          { kind: 'system' },
+          { kind: 'edited', detail: `recurs as ${BacklogReference.label(nextRef)}${due === null ? '' : ` due ${due}`}` },
+          { recurrence: null, links: BacklogItems.uniqueLinks([...done.links, { type: 'item', target: nextRef, relation: 'related', provenance: 'inferred' }]) },
+        )
+      })
+
       const touchAndCloseDuplicates = Effect.fnUntraced(function* (item: BacklogItem, actor: BacklogActor, event: EventDraft, change: BacklogChange) {
         const detail = yield* touch(item, actor, event, change)
         if (change.status === 'done' && item.status !== 'done') {
           const resolved = yield* find(item.id)
           if (resolved !== undefined) yield* closeDuplicateTargets(resolved)
+          const latest = yield* find(item.id)
+          if (latest?.recurrence !== undefined) {
+            yield* spawnNextOccurrence(latest)
+            const current = yield* find(item.id)
+            if (current !== undefined) return yield* detailOf(current)
+          }
         }
         return detail
       })
@@ -935,19 +1001,8 @@ export class BacklogStore extends Context.Service<
         return parentRef
       })
 
-      const capture = Effect.fn('backlog store capture')(function* (input: {
-        readonly text: string
-        readonly project?: string | null | undefined
-        readonly status?: BacklogStatus | undefined
-        readonly kind?: BacklogKind | undefined
-        readonly priority?: BacklogPriority | undefined
-        readonly parent?: string | undefined
-        readonly due?: string | undefined
-        readonly files?: readonly BacklogFileInput[] | undefined
-        readonly fields?: { readonly body?: string | undefined; readonly tags?: readonly string[] | undefined } | undefined
-        readonly actor: BacklogActor
-        readonly origin?: string | undefined
-      }) {
+      /** A new item, inside a write that already holds the permit (capture, or the next occurrence of a recurring item). */
+      const createItem = Effect.fnUntraced(function* (input: BacklogCaptureInput) {
         const { text, project, status, kind, actor } = input
         const parent = input.parent === undefined ? undefined : yield* checkedParent({ item: { id: 0 }, parentRef: input.parent })
         const at = yield* Clock.currentTimeMillis
@@ -989,12 +1044,19 @@ export class BacklogStore extends Context.Service<
           ...(priority !== undefined && priority !== 'none' && { priority }),
           ...(parent !== undefined && { parent }),
           ...(input.due !== undefined && { due: input.due }),
+          ...(input.recurrence !== undefined && { recurrence: input.recurrence }),
+          ...(input.criteria !== undefined && input.criteria.length > 0 && { criteria: criteriaOf(input.criteria, []) }),
+          ...(input.extraLinks !== undefined && { links: BacklogItems.uniqueLinks([...triaged.links, ...callerLinks(actor), ...input.extraLinks]) }),
         }
         yield* repo.create({ item, origin, nextId: id + 1, files }).pipe(Effect.mapError(writeFailed(item, 'put')))
         yield* Ref.update(state, current => ({ ...current, nextId: id + 1 }))
         yield* persist(item, origin)
         yield* PubSub.publish(notices, { item, event: createdEvent })
         return yield* detailOf(item)
+      })
+
+      const capture = Effect.fn('backlog store capture')(function* (input: BacklogCaptureInput) {
+        return yield* createItem(input)
       }, serialized)
 
       const attachFile = Effect.fn('backlog store attach file')(function* (input: {

@@ -2,6 +2,7 @@ import { Effect, Schema } from 'effect'
 
 import { BacklogReference } from './backlog-reference.js'
 import { DueDates } from './due-date.js'
+import { Recurrence } from './recurrence.js'
 
 const DAY_MS = 86_400_000
 const MAX_TITLE_CHARS = 200
@@ -38,6 +39,7 @@ const humanFieldNames = [
   'planApproval',
   'summary',
   'due',
+  'recurrence',
 ] as const
 const MAX_CRITERIA = 50
 const MAX_CRITERION_CHARS = 500
@@ -179,6 +181,8 @@ const itemSchema = Schema.Struct({
   summary: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(MAX_BODY_CHARS))),
   /** The date it is due, without a time; overdue while open past it. */
   due: Schema.optionalKey(DueDates.schema),
+  /** `daily`, `weekly`, `monthly` or `cron:<expr>`: finishing it creates the next occurrence. */
+  recurrence: Schema.optionalKey(Recurrence.schema),
 })
 
 export type BacklogPriority = typeof prioritySchema.Type

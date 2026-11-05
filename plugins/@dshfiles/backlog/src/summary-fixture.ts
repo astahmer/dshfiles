@@ -14,4 +14,5 @@ export const summaryRelationDefaults = {
   planApproval: null,
   due: null,
   overdue: false,
+  recurrence: null,
 } as const satisfies Partial<BacklogSummaryView>

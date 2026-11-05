@@ -4,6 +4,7 @@ import { AgentConfirmation } from './agent-confirmation.js'
 import { BacklogBackfill } from './backfill.js'
 import { BacklogReference } from './backlog-reference.js'
 import { DueDates } from './due-date.js'
+import { Recurrence } from './recurrence.js'
 import { BacklogItems } from './item.js'
 import { BacklogShipped } from './shipped.js'
 import { BacklogProviders } from './provider-port.js'
@@ -145,6 +146,8 @@ const summarySchema = Schema.Struct({
   /** The date it is due, and whether it is past while still open (from the Host's calendar). */
   due: nullDefault(Schema.String),
   overdue: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+  /** How it repeats: finishing it creates the next occurrence. */
+  recurrence: nullDefault(Schema.String),
 })
 
 const detailSchema = Schema.Struct({
@@ -615,6 +618,9 @@ export const backlogApi = defineApi({
           .annotate({ description: 'urgent, high, medium, low or none; overrides a `!1`…`!4` written in the text.' }),
         parent: refTextSchema.pipe(Schema.optional).annotate({ description: 'Capture it as a sub-issue of this item (`b:k3f9`); three levels deep at most.' }),
         due: DueDates.schema.pipe(Schema.optional).annotate({ description: 'The date it is due, YYYY-MM-DD with no time.' }),
+        recurrence: Recurrence.schema
+          .pipe(Schema.optional)
+          .annotate({ description: '`daily`, `weekly`, `monthly` or `cron:<expr>`: finishing it creates the next occurrence.' }),
         files: Schema.Array(fileInputSchema)
           .check(Schema.isMaxLength(BacklogItems.maxAttachments))
           .pipe(Schema.optional)
@@ -743,6 +749,12 @@ export const backlogApi = defineApi({
         due: Schema.NullOr(DueDates.schema)
           .pipe(Schema.optional)
           .annotate({ description: 'The date it is due, YYYY-MM-DD with no time, or null to clear it. Open items past it show as overdue in the Inbox.' }),
+        recurrence: Schema.NullOr(Recurrence.schema)
+          .pipe(Schema.optional)
+          .annotate({
+            description:
+              '`daily`, `weekly`, `monthly` or `cron:<min hour dom month dow>`: when the item is done the Host creates the next occurrence with the next due date (criteria unchecked). null stops repeating.',
+          }),
         summary: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars)))
           .pipe(Schema.optional)
           .annotate({ description: 'Final summary of what was done, written when closing the item; Shipped shows it.' }),

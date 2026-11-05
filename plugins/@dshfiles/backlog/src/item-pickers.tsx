@@ -7,7 +7,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { CalendarIcon, CheckIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
+import { CalendarIcon, CheckIcon, FolderIcon, RepeatIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 
@@ -16,6 +16,7 @@ import { WorkGlyphs } from './work-glyphs.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogProjects, ProjectPicker } from './project-picker.js'
 import { DueDates } from './due-date.js'
+import { Recurrence } from './recurrence.js'
 
 const triggerClass =
   'dshx:inline-flex dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
@@ -259,7 +260,64 @@ const DuePicker = (props: {
   )
 }
 
+const recurrencePresets = ['daily', 'weekly', 'monthly'] as const
+
+/** How an item repeats: finishing it creates the next occurrence on the Host. */
+const RecurrencePicker = (props: { readonly itemLabel: string; readonly recurrence: string | null; readonly onPick: (recurrence: string | null) => void }): JSX.Element => {
+  const [open, setOpen] = useState(false)
+  const [cron, setCron] = useState(props.recurrence?.startsWith('cron:') === true ? props.recurrence.slice(5) : '')
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
+        aria-label={`Repeat ${props.itemLabel}`}
+        className={cn(triggerClass, 'dshx:h-7 dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground', props.recurrence === null ? '' : 'dshx:text-foreground')}
+        onClick={event => event.stopPropagation()}
+      >
+        <RepeatIcon aria-hidden className="dshx:size-3.5" />
+        {props.recurrence === null ? 'Repeat' : Recurrence.label(props.recurrence)}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="dshx-root dshx:min-w-56" onClick={event => event.stopPropagation()}>
+        <DropdownMenuLabel className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground">Repeat when done</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {recurrencePresets.map(preset => (
+          <DropdownMenuItem key={preset} onSelect={() => props.onPick(preset)} className="dshx:gap-2 dshx:text-[13px]">
+            {Recurrence.label(preset)}
+            {props.recurrence === preset ? <CheckIcon aria-hidden className="dshx:ml-auto dshx:size-3.5" /> : null}
+          </DropdownMenuItem>
+        ))}
+        <form
+          className="dshx:px-2 dshx:py-1.5"
+          onKeyDown={event => event.stopPropagation()}
+          onSubmit={event => {
+            event.preventDefault()
+            if (cron.trim() === '') return
+            props.onPick(`cron:${cron.trim()}`)
+            setOpen(false)
+          }}
+        >
+          <input
+            aria-label="Cron rule"
+            placeholder="cron: 0 9 * * 1"
+            value={cron}
+            onChange={event => setCron(event.currentTarget.value)}
+            className="dshx:h-8 dshx:w-full dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:font-mono! dshx:text-xs"
+          />
+        </form>
+        {props.recurrence === null ? null : (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => props.onPick(null)} className="dshx:text-[13px]">
+              Stop repeating
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export class ItemPickers {
+  static readonly Recurrence = RecurrencePicker
   static readonly Due = DuePicker
   static readonly dueShortcuts = dueShortcuts
   static readonly Priority = PriorityPicker
