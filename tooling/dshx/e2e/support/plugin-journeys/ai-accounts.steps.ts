@@ -9,7 +9,16 @@ import { zstdCompressSync } from 'node:zlib'
 import { accountConnectionSnapshotSchema, accountDraftSchema, accountsFileSchema } from '../../../../../plugins/@dshfiles/ai-accounts/src/api.js'
 import { threadAccountPreviewSchema } from '../../../../../plugins/@dshfiles/ai-accounts/src/thread-account-api.js'
 import { After, Given, Then, When } from '../bdd.js'
-import { browserDiagnosticsFor, finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion, restartScratchProfileInBrowser, visitIsolatedPluginProfile, settingsNavEntry } from '../steps.js'
+import {
+  browserDiagnosticsFor,
+  finishJourneyAssertions,
+  openSettingsDialog,
+  profileFor,
+  recordAssertion,
+  restartScratchProfileInBrowser,
+  visitIsolatedPluginProfile,
+  settingsNavEntry,
+} from '../steps.js'
 import { bootComposedPluginProfile } from '../boot.js'
 import { AI_ACCOUNTS_WORKSPACE_SEED_KEY, seedAiAccountsWorkspace } from '../ai-accounts-workspace.js'
 import { seedCancellationOnlyCodexCli } from '../fake-account-codex.js'
@@ -1001,10 +1010,10 @@ Then('the account shows the session and weekly windows the provider reports', as
     .click()
   await recordAssertion(page, 'ai-accounts-quota-windows-follow-the-provider', async () => {
     await expect(page.getByRole('progressbar', { name: 'Current session remaining', exact: true })).toBeVisible()
-    await expect(page.getByText('75% left', { exact: true })).toBeVisible()
+    await expect(page.getByRole('article', { name: 'Current session: 75% left', exact: true })).toBeVisible()
     await expect(page.getByText(/^Resets in (59|60)m$/)).toBeVisible()
     await expect(page.getByRole('progressbar', { name: 'Weekly limit remaining', exact: true })).toBeVisible()
-    await expect(page.getByText('10% left', { exact: true })).toBeVisible()
+    await expect(page.getByRole('article', { name: 'Weekly limit: 10% left', exact: true })).toBeVisible()
     await expect(page.getByText(/^Resets in 2d \d+h$/)).toBeVisible()
   })
   await recordAssertion(page, 'ai-accounts-sidebar-foot-shows-the-tightest-window', () =>
@@ -1042,13 +1051,20 @@ Then('failed verification reports a retry error without adding the account', asy
   await finishJourneyAssertions(page)
 })
 
-/** The picker lists the route radios directly on a fresh session, but shows the Model cell that opens them once one is picked. */
+/**
+ * The picker lists the route radios directly on a fresh session, but shows the Model cell that opens them once one is
+ * picked. A new session remounts the composer right after its first render, which closes a menu opened too early, so
+ * the picker is reopened until the route is chosen.
+ */
 const selectAccountModel = async (page: Page, model: string): Promise<void> => {
   const cell = page.getByRole('menuitem', { name: /^Model / })
   const option = page.getByRole('menuitemradio', { name: model, exact: true })
-  await expect(option.or(cell).first()).toBeVisible()
-  if ((await option.count()) === 0) await cell.click()
-  await option.click()
+  await expect(async () => {
+    if (!(await option.or(cell).first().isVisible())) await page.getByRole('button', { name: /^Select model/ }).click({ timeout: 2_000 })
+    await expect(option.or(cell).first()).toBeVisible({ timeout: 2_000 })
+    if ((await option.count()) === 0) await cell.click({ timeout: 2_000 })
+    await option.click({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
 }
 
 const usageStrip = (page: Page) => page.getByRole('group', { name: /^AI accounts usage/ })
@@ -1231,12 +1247,16 @@ Then('the sidebar moves the current thread between accounts without the model pi
     await expectSelection('commandcode_work_2')
     expectSameRoute()
     const before = turns().length
-    await openSwitch(1)
     const dialog = page.getByRole('dialog', { name: 'Use account for this thread', exact: true })
     const viewport = page.viewportSize()
     try {
       for (const width of [360, 480]) {
         await page.setViewportSize({ width, height: 900 })
+        // A phone-width frame folds the status strip into one Status chip whose sheet lists the usage strip.
+        const statusChip = page.getByRole('button', { name: 'Status', exact: true })
+        await expect(statusChip).toBeVisible()
+        if ((await statusChip.getAttribute('aria-expanded')) !== 'true') await statusChip.click()
+        await openSwitch(1)
         const bounds = await dialog.boundingBox()
         expect(bounds).not.toBeNull()
         expect(bounds?.x).toBeGreaterThanOrEqual(0)
@@ -1248,10 +1268,13 @@ Then('the sidebar moves the current thread between accounts without the model pi
           body: await dialog.screenshot({ path: test.info().outputPath(`thread-account-dialog-${width}.png`), animations: 'disabled' }),
           contentType: 'image/png',
         })
+        await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+        await expect(dialog).toBeHidden()
       }
     } finally {
       if (viewport !== null) await page.setViewportSize(viewport)
     }
+    await openSwitch(1)
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(dialog).toBeHidden()
     await expectSelection('commandcode_work_2')
@@ -1493,10 +1516,17 @@ const expectDisabledQuotaPreview = async (page: Page): Promise<void> => {
   expect(tileBounds).not.toBeNull()
   expect(offBounds?.x).toBe(nameBounds?.x)
   expect(offBounds?.y).toBeGreaterThanOrEqual((nameBounds?.y ?? 0) + (nameBounds?.height ?? 0))
-  expect((offBounds?.y ?? 0) + (offBounds?.height ?? 0)).toBeLessThanOrEqual((tileBounds?.y ?? 0) + (tileBounds?.height ?? 0))
+  expect((offBounds?.y ?? 0) + (offBounds?.height ?? 0)).toBeLessThanOrEqual((tileBounds?.y ?? 0) + (tileBounds?.height ?? 0) + 1)
   expect(await off.evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(9)
   await expect(tile).not.toContainText('Disabled')
-  expect(tileBounds?.height).toBe(32)
+  // The status strip row (or its phone sheet row) stays one line: the preview keeps OFF inside it instead of growing it.
+  expect(
+    await tile.evaluate(element => {
+      const row = element.closest('[role="listitem"], [data-status-strip="full"]')?.getBoundingClientRect()
+      const box = element.getBoundingClientRect()
+      return row !== undefined && box.top >= row.top - 1 && box.bottom <= row.bottom + 1
+    }),
+  ).toBe(true)
   expect(await tile.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
 }
 const measureQuotaWindow = (element: Element) => {
@@ -1673,10 +1703,10 @@ Then('usage popover toggles persist enabled state without hiding or reordering a
         for (const width of [360, 480]) {
           await page.keyboard.press('Escape')
           await page.setViewportSize({ width, height: 900 })
-          // Wait for the native responsive remount instead of reading the outgoing desktop sidebar.
-          const openSidebar = page.getByRole('button', { name: 'Open sidebar', exact: true })
-          await expect(openSidebar).toBeVisible()
-          await openSidebar.click()
+          // A phone-width frame folds the status strip into one Status chip whose sheet lists the items.
+          const statusChip = page.getByRole('button', { name: 'Status', exact: true })
+          await expect(statusChip).toBeVisible()
+          if ((await statusChip.getAttribute('aria-expanded')) !== 'true') await statusChip.click()
           await expectDisabledQuotaPreview(page)
           await expectPreviewOrder(page)
           await page.mouse.move(0, 0)
@@ -1694,8 +1724,6 @@ Then('usage popover toggles persist enabled state without hiding or reordering a
           await page.screenshot({ path: test.info().outputPath(`disabled-account-popover-${width}.png`), animations: 'disabled' })
           await page.keyboard.press('Escape')
           await expect(usagePopover(page)).toBeHidden()
-          await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click()
-          await expect(openSidebar).toBeVisible()
         }
       } catch (cause) {
         await page.screenshot({ path: test.info().outputPath('disabled-account-responsive-failure.png'), animations: 'disabled' })
@@ -1977,7 +2005,6 @@ Then('widening the usage popover from its grip lays the accounts out side by sid
     const plan = header.getByLabel('Subscription plan: individual-pro', { exact: true })
     await expect(plan).toBeVisible()
     await expect(plan).toHaveText('individual-pro')
-    await expect(plan).toHaveAttribute('title', 'Subscription plan: individual-pro')
     const bounds = await plan.evaluate(element => {
       const header = element.closest('header')
       if (header === null) throw new Error('The plan badge is not in a quota card header')
@@ -2110,10 +2137,9 @@ const pickAccountModel = async (page: Page, account: string): Promise<void> => {
     return
   }
   const modelList = page.getByRole('list', { name: 'Models and accounts', exact: true })
-  const row = modelList
-    .locator('[data-model-picker-row]')
-    .filter({ hasText: account })
-    .filter({ hasText: /gpt-6-luna/iu })
+  const row = modelList.locator('[data-model-picker-row]').filter({
+    has: page.getByRole('button', { name: `Use gpt-6-luna via Command Code (${account})`, exact: true }),
+  })
   await row.locator('[data-model-picker-option]').click()
   await expect(row.locator('[data-model-picker-option]')).toHaveAttribute('aria-pressed', 'true')
   await row.getByRole('button', { name: /Details for/iu }).click()

@@ -160,14 +160,14 @@ Feature: AI Accounts
 
   @scenario:ai-accounts.pool-failover @scenario:ai-accounts.active-chat-account
   Scenario: A rate-limited account hands the turn to a healthy one
-    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    Given the isolated AI Accounts profile with the status strip is booted
     When a rate-limited and a healthy Command Code account share a local fake provider
     And a new thread asks the first account's model a question
     Then the healthy account answers and the rate-limited one cools down
 
   @scenario:ai-accounts.priority-routing
   Scenario: Priority serves each request from the first healthy account in list order
-    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    Given the isolated AI Accounts profile with the status strip is booted
     When a rate-limited and a healthy Command Code account share a local fake provider
     And request distribution is set to Priority
     And a new thread asks the second account's model a question
