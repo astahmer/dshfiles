@@ -2,6 +2,7 @@ import { Clock, Context, Effect, Layer, Option, PubSub, Ref, Semaphore, Stream }
 import type { BacklogDetailView, BacklogSummaryView } from './api.js'
 import { BacklogBackfill, type BackfillScope, type BackfillSelection } from './backfill.js'
 import { BacklogSettingsTag } from './backlog-settings.js'
+import { BacklogReference } from './backlog-reference.js'
 import { BacklogRepo } from './backlog-repo.js'
 import { BacklogWriteFailed } from './errors.js'
 import {
@@ -124,6 +125,7 @@ const closedStateChange = (input: {
 
 const summarize = (item: BacklogItem, now: number, match: SearchMatch | null = null, dormantDays = BacklogItems.defaultDormantDays): BacklogSummary => ({
   id: item.id,
+  ref: BacklogReference.refOf(item),
   title: item.title,
   kind: item.kind,
   status: item.status,
@@ -196,7 +198,7 @@ const detailIn = (view: StoreView, item: BacklogItem): BacklogDetail => ({
     ),
     freshness: BacklogItems.freshness(item, view.at, view.dormantDays),
   },
-  backlinks: referencingIn(view, { type: 'item', target: String(item.id) }),
+  backlinks: referencingIn(view, { type: 'item', target: BacklogReference.refOf(item) }),
 })
 
 const listIn = (view: StoreView, query: BacklogListQuery, index?: BacklogSearchIndex) => {
@@ -347,7 +349,8 @@ const proposalChange = (input: {
   readonly item: BacklogItem
   readonly chosen: BacklogProposal
   readonly actor: BacklogActor
-  readonly exists: (id: number) => boolean
+  /** The ref of a live item, or undefined when no item has that id. */
+  readonly refOfId: (id: number) => string | undefined
 }) => {
   const { item, chosen, actor } = input
   const locked = actor.kind === 'system' ? new Set(item.humanFields) : new Set<BacklogHumanField>()
@@ -369,8 +372,8 @@ const proposalChange = (input: {
     change.tags = chosen.tags
     applied.tags = chosen.tags
   }
-  if (chosen.duplicateOf !== undefined && input.exists(chosen.duplicateOf)) {
-    const duplicateTarget = String(chosen.duplicateOf)
+  const duplicateTarget = chosen.duplicateOf === undefined ? undefined : input.refOfId(chosen.duplicateOf)
+  if (chosen.duplicateOf !== undefined && duplicateTarget !== undefined) {
     const existingLinks = item.links.filter(link => link.type !== 'item' || link.target !== duplicateTarget)
     change.links = BacklogItems.uniqueLinks([...existingLinks, { type: 'item', target: duplicateTarget, relation: 'duplicates' }])
     applied.duplicateOf = chosen.duplicateOf
@@ -382,6 +385,23 @@ const proposalChange = (input: {
     change.humanFields = [...new Set([...item.humanFields, ...owned])]
   }
   return { change, applied }
+}
+
+/** The id of the item a `b:<ref>` names: a legacy number only names an item created before short aliases. */
+const idOfRef = (records: ReadonlyMap<number, BacklogItem>, ref: string): number | undefined => {
+  if (BacklogReference.isLegacy(ref)) {
+    const item = records.get(Number(ref))
+    return item !== undefined && item.ref === undefined ? item.id : undefined
+  }
+  for (const item of records.values()) if (item.ref === ref) return item.id
+  return undefined
+}
+
+/** An item id from a caller: a number is the item's own id, a string a `b:<ref>` with or without its prefix. */
+const resolveIn = (records: ReadonlyMap<number, BacklogItem>, key: number | string): number | undefined => {
+  if (typeof key === 'number') return records.has(key) ? key : undefined
+  const ref = BacklogReference.parse(key)
+  return ref === undefined ? undefined : idOfRef(records, ref)
 }
 
 const isIdleNudge = (event: BacklogEvent): boolean => event.kind === 'commented' && event.detail.startsWith('Thread idle nudge:')
@@ -474,6 +494,8 @@ export class BacklogStore extends Context.Service<
     readonly projects: Effect.Effect<ReturnType<typeof projectsIn>>
     readonly list: (query: BacklogListQuery) => Effect.Effect<ReturnType<typeof listIn>>
     readonly get: (id: number) => Effect.Effect<BacklogResult<BacklogDetail>>
+    /** The id of the item a caller names: its number, or a `b:<ref>` (`k3f9`, `b:k3f9`, a legacy `12`). */
+    readonly resolve: (key: number | string) => Effect.Effect<number | undefined>
     /** Several items in one call, in the order asked, with the ids that do not exist kept separate. */
     readonly getMany: (ids: readonly number[]) => Effect.Effect<{ readonly items: BacklogDetail[]; readonly missing: number[] }>
     readonly referencing: (link: BacklogLink) => Effect.Effect<BacklogSummary[]>
@@ -503,6 +525,11 @@ export class BacklogStore extends Context.Service<
         return { records: current.records, revision: current.revision, at, dormantDays } satisfies StoreView
       })
       const find = (id: number) => Effect.map(Ref.get(state), current => current.records.get(id))
+      /** Names an item id by its ref, for event wording that mentions another item. */
+      const refLookup = Effect.map(Ref.get(state), current => (id: number) => {
+        const target = current.records.get(id)
+        return target === undefined ? undefined : BacklogReference.refOf(target)
+      })
       const detailOf = (item: BacklogItem) => Effect.map(view, current => detailIn(current, item))
       const unchanged = (item: BacklogItem) => Effect.map(detailOf(item), found)
       const serialized = <A, E, R>(effect: Effect.Effect<A, E, R>) => writes.withPermit(effect)
@@ -567,12 +594,17 @@ export class BacklogStore extends Context.Service<
       const closeDuplicateTargets = Effect.fnUntraced(function* (source: BacklogItem) {
         for (const link of source.links) {
           if (link.type !== 'item' || link.relation !== 'duplicates') continue
-          const targetId = Number(link.target)
-          if (!Number.isSafeInteger(targetId)) continue
+          const targetId = idOfRef((yield* Ref.get(state)).records, link.target)
+          if (targetId === undefined) continue
           const target = yield* find(targetId)
           if (target === undefined || target.status === 'done' || target.status === 'dropped' || target.humanFields.includes('status')) continue
           const change = { status: 'done' as const, ...closedStateChange({ item: target, status: 'done' }) }
-          yield* touch(target, { kind: 'system' }, { kind: 'moved', detail: `${target.status} → done (duplicate b:${String(source.id)} resolved)` }, change)
+          yield* touch(
+            target,
+            { kind: 'system' },
+            { kind: 'moved', detail: `${target.status} → done (duplicate ${BacklogReference.labelOf(source)} resolved)` },
+            change,
+          )
         }
       })
 
@@ -600,6 +632,7 @@ export class BacklogStore extends Context.Service<
         const { text, project, status, kind, actor } = input
         const at = yield* Clock.currentTimeMillis
         const id = (yield* Ref.get(state)).nextId
+        const ref = yield* repo.mintRef
         const triaged = BacklogItems.triage(text)
         const actorId = actorIdOf(actor)
         const files = filesOf(input.files ?? [], at)
@@ -611,6 +644,7 @@ export class BacklogStore extends Context.Service<
             : { at, actor: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars), threadId: startedInThread }
         const item: BacklogItem = {
           id,
+          ref,
           title: triaged.title,
           body: triaged.body,
           kind: kind ?? triaged.kind,
@@ -846,9 +880,15 @@ export class BacklogStore extends Context.Service<
       }, serialized)
 
       const propose = Effect.fn('backlog store propose')(function* (input: { readonly id: number; readonly proposal: BacklogProposal }) {
+        const lookup = yield* refLookup
         return yield* withItem(input.id, item =>
           Effect.map(
-            touch(item, { kind: 'system' }, { kind: 'triaged', detail: `suggested ${BacklogTriage.describe(input.proposal)}` }, { proposal: input.proposal }),
+            touch(
+              item,
+              { kind: 'system' },
+              { kind: 'triaged', detail: `suggested ${BacklogTriage.describe(input.proposal, lookup)}` },
+              { proposal: input.proposal },
+            ),
             found,
           ),
         )
@@ -864,8 +904,16 @@ export class BacklogStore extends Context.Service<
             const chosen = input.proposal ?? item.proposal ?? undefined
             if (chosen === undefined) return yield* unchanged(item)
             const current = yield* Ref.get(state)
-            const { change, applied } = proposalChange({ item, chosen, actor: input.actor, exists: id => current.records.has(id) })
-            const detail = `applied ${BacklogTriage.describe(applied) || 'nothing'}`
+            const { change, applied } = proposalChange({
+              item,
+              chosen,
+              actor: input.actor,
+              refOfId: id => {
+                const target = current.records.get(id)
+                return target === undefined ? undefined : BacklogReference.refOf(target)
+              },
+            })
+            const detail = `applied ${BacklogTriage.describe(applied, yield* refLookup) || 'nothing'}`
             return found(yield* touchAndCloseDuplicates(item, input.actor, { kind: 'triaged', detail }, change))
           }),
         )
@@ -965,11 +1013,12 @@ export class BacklogStore extends Context.Service<
       }, serialized)
 
       const dismissProposal = Effect.fn('backlog store dismiss proposal')(function* (input: { readonly id: number; readonly actor: BacklogActor }) {
+        const lookup = yield* refLookup
         return yield* withItem(input.id, item =>
           item.proposal === undefined || item.proposal === null
             ? unchanged(item)
             : Effect.map(
-                touch(item, input.actor, { kind: 'triaged', detail: `dismissed ${BacklogTriage.describe(item.proposal)}` }, { proposal: null }),
+                touch(item, input.actor, { kind: 'triaged', detail: `dismissed ${BacklogTriage.describe(item.proposal, lookup)}` }, { proposal: null }),
                 found,
               ),
         )
@@ -1022,6 +1071,7 @@ export class BacklogStore extends Context.Service<
         projects: Effect.map(view, projectsIn),
         list: query => Effect.map(view, current => listIn(current, query, searchIndex)),
         get,
+        resolve: key => Effect.map(Ref.get(state), current => resolveIn(current.records, key)),
         getMany,
         referencing: link => Effect.map(view, current => referencingIn(current, link)),
       })

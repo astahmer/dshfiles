@@ -26,6 +26,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useIsFetching, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 
+import { BacklogReference } from './backlog-reference.js'
 import { backlogApi, type BacklogSyncItemView, type BacklogSyncResultView, type BacklogSyncStatusView } from './api.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogNotices } from './notices.js'
@@ -64,14 +65,14 @@ const useSyncStatus = () => {
 }
 
 const resultNotice = (result: BacklogSyncResultView): string => {
-  if (result.error !== null) return `b:${String(result.itemId)}: ${result.error.message}`
+  if (result.error !== null) return `${BacklogReference.labelOf({ id: result.itemId, ref: result.ref })}: ${result.error.message}`
   const moved = [
     ...(result.pulled.length > 0 ? [`pulled ${result.pulled.join(', ')}`] : []),
     ...(result.pushed.length > 0 ? [`pushed ${result.pushed.join(', ')}`] : []),
     ...(result.commentsPulled + result.commentsPushed > 0 ? [`${String(result.commentsPulled + result.commentsPushed)} comments`] : []),
   ]
   const conflict = result.conflicts.length > 0 ? ` · conflict on ${result.conflicts.map(conflict => conflict.field).join(', ')} (note added)` : ''
-  return `b:${String(result.itemId)} ↔ ${result.remoteKey ?? 'issue'}: ${moved.length === 0 ? 'already in sync' : moved.join(' · ')}${conflict}`
+  return `${BacklogReference.labelOf({ id: result.itemId, ref: result.ref })} ↔ ${result.remoteKey ?? 'issue'}: ${moved.length === 0 ? 'already in sync' : moved.join(' · ')}${conflict}`
 }
 
 /** Every sync write the panel makes; each settles by refreshing the backlog and the sync state. */
@@ -110,6 +111,7 @@ const configuredBackends = (status: BacklogSyncStatusView | undefined): SyncBack
 /** Links one item to an issue the user names, or creates one from it. */
 const LinkRemoteDialog = (props: {
   readonly itemId: number
+  readonly itemLabel: string
   readonly backend: SyncBackendKind
   readonly open: boolean
   readonly onOpenChange: (open: boolean) => void
@@ -120,7 +122,7 @@ const LinkRemoteDialog = (props: {
   const submit = async (): Promise<void> => {
     const linked = await actions.linkRemote.mutateAsync({ id: props.itemId, backend: props.backend, reference: reference.trim() })
     BacklogNotices.show({
-      text: linked.result === null ? `b:${String(props.itemId)} linked.` : resultNotice(linked.result),
+      text: linked.result === null ? `${props.itemLabel} linked.` : resultNotice(linked.result),
       kind: linked.result?.error === null || linked.result === null ? 'success' : 'failure',
       sessionId: null,
     })
@@ -132,7 +134,7 @@ const LinkRemoteDialog = (props: {
       <DialogContent className="dshx-root">
         <DialogHeader>
           <DialogTitle>
-            Link b:{props.itemId} to a {label(props.backend)} issue
+            Link {props.itemLabel} to a {label(props.backend)} issue
           </DialogTitle>
           <DialogDescription>
             The issue’s title, description and status replace the item’s on the first sync (the old values stay in its history); tags from both sides are kept.
@@ -226,7 +228,7 @@ const LinkedDetails = (props: { readonly linked: BacklogSyncItemView }): JSX.Ele
 }
 
 /** The sync chip in an item's header row: the linked issue and its state, or the ways to link one. */
-const SyncChip = (props: { readonly itemId: number }): JSX.Element | null => {
+const SyncChip = (props: { readonly itemId: number; readonly itemLabel: string }): JSX.Element | null => {
   const status = useSyncStatus()
   const actions = useSyncActions()
   const [linkBackend, setLinkBackend] = useState<SyncBackendKind | null>(null)
@@ -279,7 +281,13 @@ const SyncChip = (props: { readonly itemId: number }): JSX.Element | null => {
         </PopoverContent>
       </Popover>
       {linkBackend === null ? null : (
-        <LinkRemoteDialog itemId={props.itemId} backend={linkBackend} open onOpenChange={open => (open ? undefined : setLinkBackend(null))} />
+        <LinkRemoteDialog
+          itemId={props.itemId}
+          itemLabel={props.itemLabel}
+          backend={linkBackend}
+          open
+          onOpenChange={open => (open ? undefined : setLinkBackend(null))}
+        />
       )}
     </>
   )
@@ -757,8 +765,8 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
     const output = await actions.importRemote.mutateAsync({ reference: importReference.trim() })
     BacklogNotices.show({
       text: output.created
-        ? `Imported as b:${String(output.detail.item.id)} — ${output.detail.item.title}`
-        : `Already in the backlog as b:${String(output.detail.item.id)}.`,
+        ? `Imported as ${BacklogReference.labelOf(output.detail.item)} — ${output.detail.item.title}`
+        : `Already in the backlog as ${BacklogReference.labelOf(output.detail.item)}.`,
       kind: 'success',
       sessionId: null,
     })

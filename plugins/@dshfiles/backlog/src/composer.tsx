@@ -48,6 +48,7 @@ import { continueMarkdownList } from './list-continuation.js'
 import { BacklogProjects, ProjectPicker } from './project-picker.js'
 import { serializeProjectReferenceDraft } from './project-reference-draft.js'
 import { useBacklogActions } from './use-backlog-actions.js'
+import { BacklogReference } from './backlog-reference.js'
 
 export interface ComposerThread {
   readonly id: string
@@ -149,10 +150,10 @@ const ReferenceDialog = (props: {
         {props.mode === 'item' ? (
           <CommandGroup heading="Backlog items">
             {(items.data?.items ?? []).map(item => (
-              <CommandItem key={item.id} value={`${item.title} b:${String(item.id)}`} onSelect={() => props.onPickItem(item)}>
+              <CommandItem key={item.id} value={`${item.title} ${BacklogReference.labelOf(item)}`} onSelect={() => props.onPickItem(item)}>
                 <ItemGlyphs.StatusIcon status={item.status} />
                 <span className="dshx:truncate">{item.title}</span>
-                <span className="dshx:ml-auto dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">b:{item.id}</span>
+                <span className="dshx:ml-auto dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">{BacklogReference.labelOf(item)}</span>
               </CommandItem>
             ))}
           </CommandGroup>
@@ -692,7 +693,7 @@ export const Composer = (props: {
         onClose={() => setReferenceMode(null)}
         onPickItem={item => {
           setReferenceMode(null)
-          insert(`b:${String(item.id)} `)
+          insert(`${BacklogReference.labelOf(item)} `)
         }}
         onPickThread={thread => {
           setReferenceMode(null)

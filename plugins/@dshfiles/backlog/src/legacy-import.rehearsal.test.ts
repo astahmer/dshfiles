@@ -142,6 +142,19 @@ describe.skipIf(directory === undefined)('legacy import rehearsal', () => {
         let mappingsMatched = 0
         for (const [key, value] of mappings) if (BacklogOps.sameValue(Option.getOrUndefined(yield* repo.mappings.get(key)), value)) mappingsMatched += 1
 
+        // Every legacy `b:<n>` still names its item, in every written form, and stays a number (no short alias).
+        let aliasesResolved = 0
+        for (const legacy of items) {
+          const forms = [String(legacy.id), `b:${String(legacy.id)}`, legacy.id]
+          const resolved = yield* Effect.forEach(forms, form => store.resolve(form))
+          if (resolved.every(id => id === legacy.id) && served.get(legacy.id)?.ref === undefined) aliasesResolved += 1
+        }
+        const itemLinks = items.flatMap(item => item.links.filter(link => link.type === 'item').map(link => ({ from: item.id, target: link.target })))
+        let itemLinksResolved = 0
+        for (const link of itemLinks) if ((yield* store.resolve(link.target)) !== undefined) itemLinksResolved += 1
+        const fresh = yield* store.capture({ text: 'rehearsal: a new item gets a short alias', actor: { kind: 'user' } })
+        const freshRef = fresh.item.ref ?? ''
+
         const listTimes: number[] = []
         const searchTimes: number[] = []
         const operatorTimes: number[] = []
@@ -162,6 +175,7 @@ describe.skipIf(directory === undefined)('legacy import rehearsal', () => {
           mismatches,
           attachments: { files: files.length, live: attachmentsMatched + attachmentsMissing, matched: attachmentsMatched, missing: attachmentsMissing },
           mappings: { legacy: mappings.length, matched: mappingsMatched },
+          aliases: { legacy: items.length, resolved: aliasesResolved, itemLinks: itemLinks.length, itemLinksResolved, newItemRef: freshRef },
           importReport: Option.getOrUndefined(yield* imported.repo.importReport),
           tables: yield* repo.counts,
           nextCapture: yield* repo.nextId,
@@ -179,6 +193,10 @@ describe.skipIf(directory === undefined)('legacy import rehearsal', () => {
         expect(counts.foldEqual).toBe(items.length)
         expect(attachmentsMissing).toBe(0)
         expect(mappingsMatched).toBe(mappings.length)
+        expect(aliasesResolved).toBe(items.length)
+        expect(freshRef).toMatch(/^[0-9a-hjkmnp-tv-z]{4}$/u)
+        expect(yield* store.resolve(freshRef)).toBe(fresh.item.id)
+        expect(yield* store.resolve(String(fresh.item.id))).toBeUndefined()
       }).pipe(Effect.scoped),
     600_000,
   )

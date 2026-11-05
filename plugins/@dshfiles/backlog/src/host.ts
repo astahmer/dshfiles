@@ -17,6 +17,7 @@ import { BacklogAttention } from './attention-provider.js'
 import { backlogApi } from './api.js'
 import { AttachmentExport } from './attachment-file.js'
 import { backlogSettingsLayer, sharedJevSettingsLayer } from './backlog-settings.js'
+import { BacklogItemNotFound } from './errors.js'
 import { HostSpeech, hostEdgeLayer } from './host-edge-promise.js'
 import { BacklogDb, BacklogStorePaths } from './backlog-db.js'
 import { BacklogRepo } from './backlog-repo.js'
@@ -67,10 +68,31 @@ const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, BacklogA
   Layer.provideMerge(hostEdges),
 )
 
+/** No item has id 0, so a reference that names nothing reaches each verb as an id it answers `not-found` for. */
+const NO_ITEM = 0
+const itemIdOf = (key: number | string) => BacklogStore.use(store => Effect.map(store.resolve(key), id => id ?? NO_ITEM))
+const withItemId = <Input extends { readonly id: number | string }>(input: Input) => Effect.map(itemIdOf(input.id), id => ({ ...input, id }))
+/** Every key resolved, with the keys that name no item kept as the caller wrote them. */
+const itemIdsOf = (keys: readonly (number | string)[]) =>
+  BacklogStore.use(store =>
+    Effect.map(
+      Effect.forEach(keys, key => Effect.map(store.resolve(key), id => ({ key, id }))),
+      entries => ({
+        ids: entries.flatMap(entry => (entry.id === undefined ? [] : [entry.id])),
+        unknown: entries.flatMap(entry => (entry.id === undefined ? [entry.key] : [])),
+      }),
+    ),
+  )
+
 const backlogHandlers = Api.handlers(backlogApi, {
   list: input => BacklogStore.use(store => store.list(input)),
-  get: input => BacklogStore.use(store => store.get(input.id)),
-  getMany: input => BacklogStore.use(store => store.getMany(input.ids)),
+  get: input => Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.get(id))),
+  getMany: input =>
+    Effect.gen(function* () {
+      const keys = yield* itemIdsOf(input.ids)
+      const result = yield* BacklogStore.use(store => store.getMany(keys.ids))
+      return { items: result.items, missing: [...keys.unknown, ...result.missing] }
+    }),
   revision: () => BacklogStore.use(store => store.revision),
   aiActivity: () => AiActivity.use(activity => Effect.map(activity.isActive, active => ({ active }))),
   projects: () => BacklogStore.use(store => store.projects),
@@ -88,53 +110,77 @@ const backlogHandlers = Api.handlers(backlogApi, {
       yield* TweetImport.use(tweets => tweets.schedule(detail.item.id))
       return detail
     }),
-  triage: input => Triage.use(triage => AiActivity.use(activity => activity.track(triage.item(input.id)))),
+  triage: input => Effect.flatMap(itemIdOf(input.id), id => Triage.use(triage => AiActivity.use(activity => activity.track(triage.item(id))))),
   backfillTriage: input => TriageBackfill.use(backfill => backfill.start(input)),
   backfillTriageStatus: input => TriageBackfill.use(backfill => backfill.status(input.jobId)),
-  acknowledge: input => BacklogStore.use(store => store.acknowledge(input)),
-  applyProposal: (input, call) => BacklogStore.use(store => store.applyProposal({ id: input.id, actor: actorOf(call.caller) })),
-  dismissProposal: (input, call) => BacklogStore.use(store => store.dismissProposal({ id: input.id, actor: actorOf(call.caller) })),
-  attachFile: (input, call) => BacklogStore.use(store => store.attachFile({ id: input.id, file: input.file, actor: actorOf(call.caller) })),
-  enrichTweet: (input, call) => TweetImport.use(tweets => tweets.import({ id: input.id, url: input.url, actor: actorOf(call.caller) })),
-  readFile: input =>
+  acknowledge: input => Effect.flatMap(itemIdsOf(input.ids), keys => BacklogStore.use(store => store.acknowledge({ ids: keys.ids }))),
+  applyProposal: (input, call) => Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.applyProposal({ id, actor: actorOf(call.caller) }))),
+  dismissProposal: (input, call) =>
+    Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.dismissProposal({ id, actor: actorOf(call.caller) }))),
+  attachFile: (input, call) =>
+    Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.attachFile({ id, file: input.file, actor: actorOf(call.caller) }))),
+  enrichTweet: (input, call) =>
+    Effect.flatMap(itemIdOf(input.id), id => TweetImport.use(tweets => tweets.import({ id, url: input.url, actor: actorOf(call.caller) }))),
+  readFile: keyed =>
     Effect.gen(function* () {
+      const input = yield* withItemId(keyed)
       const result = yield* BacklogStore.use(store => store.readFile(input))
       if (!result.ok || input.save !== true) return result
       const path = yield* AttachmentExport.use(files => files.write({ id: input.id, attachmentId: input.attachmentId, dataUrl: result.value.dataUrl }))
       return { ok: true as const, value: { dataUrl: result.value.dataUrl, path } }
     }),
-  removeFile: (input, call) => BacklogStore.use(store => store.removeFile({ ...input, actor: actorOf(call.caller) })),
-  delete: input => BacklogSync.use(sync => Effect.map(sync.deleteItem({ id: input.id }), result => (result.ok ? { ok: true as const } : result))),
+  removeFile: (input, call) =>
+    Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.removeFile({ ...resolved, actor: actorOf(call.caller) }))),
+  delete: input =>
+    Effect.flatMap(itemIdOf(input.id), id =>
+      BacklogSync.use(sync => Effect.map(sync.deleteItem({ id }), result => (result.ok ? { ok: true as const } : result))),
+    ),
   speechStatus: () => HostSpeech.use(speech => speech.status),
   jevSetupStatus: () => Triage.use(triage => Effect.map(triage.jevNeedsSetup, needsSetup => ({ needsSetup }))),
   classifyReply: input => Triage.use(triage => triage.classifyReply(input.text)),
-  generateReply: input => ReplyGenerator.use(replies => replies.generate(input)),
+  generateReply: input => Effect.flatMap(withItemId(input), resolved => ReplyGenerator.use(replies => replies.generate(resolved))),
   transcribeSpeech: input => HostSpeech.use(speech => AiActivity.use(activity => activity.track(speech.transcribe(input.audioBase64)))),
-  update: (input, call) =>
+  update: (keyed, call) =>
     Effect.gen(function* () {
+      const input = yield* withItemId(keyed)
       const updated = yield* BacklogStore.use(store => store.update({ ...input, actor: actorOf(call.caller) }))
       if (updated.ok && (input.title !== undefined || input.body !== undefined)) yield* TweetImport.use(tweets => tweets.schedule(input.id))
       return updated
     }),
-  link: (input, call) =>
+  link: (keyed, call) =>
     Effect.gen(function* () {
+      const input = yield* withItemId(keyed)
       const result = yield* BacklogStore.use(store => store.link({ ...input, actor: actorOf(call.caller) }))
       if (result.ok && input.link.type === 'url') yield* TweetImport.use(tweets => tweets.schedule(input.id))
       return result
     }),
-  agentContinuationCandidates: input => ThreadStart.use(threads => threads.continuationCandidates(input)),
-  continueAgentThread: input => ThreadStart.use(threads => threads.continueThread(input)),
-  startThread: (input, call) => ThreadStart.use(threads => threads.start(input, call.caller)),
-  comment: (input, call) => BacklogStore.use(store => store.comment({ ...input, actor: actorOf(call.caller) })),
-  syncStatus: input => BacklogSync.use(sync => sync.status(input)),
-  syncNow: input => BacklogSync.use(sync => sync.syncNow(input)),
-  linkRemote: (input, call) => BacklogSync.use(sync => sync.link({ ...input, actor: actorOf(call.caller) })),
+  agentContinuationCandidates: input => Effect.flatMap(withItemId(input), resolved => ThreadStart.use(threads => threads.continuationCandidates(resolved))),
+  continueAgentThread: input => Effect.flatMap(withItemId(input), resolved => ThreadStart.use(threads => threads.continueThread(resolved))),
+  startThread: (input, call) =>
+    Effect.gen(function* () {
+      const keys = yield* itemIdsOf(input.ids)
+      if (keys.unknown.length > 0) return yield* new BacklogItemNotFound({ ids: keys.unknown })
+      return yield* ThreadStart.use(threads => threads.start({ ...input, ids: keys.ids }, call.caller))
+    }),
+  comment: (input, call) =>
+    Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.comment({ ...resolved, actor: actorOf(call.caller) }))),
+  syncStatus: input =>
+    input.ids === undefined
+      ? BacklogSync.use(sync => sync.status({}))
+      : Effect.flatMap(itemIdsOf(input.ids), keys => BacklogSync.use(sync => sync.status({ ids: keys.ids }))),
+  syncNow: input =>
+    input.id === undefined
+      ? BacklogSync.use(sync => sync.syncNow({ project: input.project }))
+      : Effect.flatMap(itemIdOf(input.id), id => BacklogSync.use(sync => sync.syncNow({ ...input, id }))),
+  linkRemote: (input, call) => Effect.flatMap(withItemId(input), resolved => BacklogSync.use(sync => sync.link({ ...resolved, actor: actorOf(call.caller) }))),
   importRemote: (input, call) => BacklogSync.use(sync => sync.importRemote({ ...input, actor: actorOf(call.caller) })),
   testSyncBackend: input =>
     BacklogSync.use(sync => sync.testConnection({ ...input, project: input.project ?? '', target: input.target ?? '', secret: input.secret ?? '' })),
   testSyncBackends: () => BacklogSync.use(sync => sync.testSaved),
-  editComment: (input, call) => BacklogStore.use(store => store.editComment({ ...input, actor: actorOf(call.caller) })),
-  deleteComment: (input, call) => BacklogStore.use(store => store.deleteComment({ ...input, actor: actorOf(call.caller) })),
+  editComment: (input, call) =>
+    Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.editComment({ ...resolved, actor: actorOf(call.caller) }))),
+  deleteComment: (input, call) =>
+    Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.deleteComment({ ...resolved, actor: actorOf(call.caller) }))),
 })
 
 /**
@@ -145,7 +191,7 @@ const itemLifecycleSection = definePromptSection({
   name: 'dshfiles-backlog:item-lifecycle',
   order: 910,
   text: [
-    'Backlog: a thread naming `b:12` links that item and moves it to `doing`. Keep it current while you work: move it to',
+    'Backlog: a thread naming an item (`b:k3f9`, or a legacy `b:12`) links it and moves it to `doing`. Keep it current while you work: move it to',
     '`done` with `backlog_update` once the thread has resolved it. When only part of it is done, or the work is stuck,',
     'leave it `doing`, add a `partial` or `blocked` tag, set `attention` when the user must decide something,',
     '`backlog_comment` what is done and what is missing, and say the same in your final reply.',

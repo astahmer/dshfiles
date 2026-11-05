@@ -232,15 +232,15 @@ describe('store', () => {
     Effect.gen(function* () {
       yield* TestClock.setTime(1)
       const store = yield* openStore()
-      yield* store.capture({ text: 'parent epic', actor: user })
-      yield* store.capture({ text: 'child step, part of b:1', actor: user })
+      const parentRef = (yield* store.capture({ text: 'parent epic', actor: user })).item.ref ?? ''
+      yield* store.capture({ text: `child step, part of b:${parentRef}`, actor: user })
       yield* store.link({ id: 2, link: { type: 'branch', target: 'feat/backlog' }, actor: user })
 
       const parent = yield* store.get(1)
       expect(parent.ok && parent.value.backlinks.map(item => item.id)).toEqual([2])
       expect((yield* store.referencing({ type: 'branch', target: 'feat/backlog' })).map(item => item.id)).toEqual([2])
 
-      yield* store.link({ id: 2, link: { type: 'item', target: '1' }, remove: true, actor: user })
+      yield* store.link({ id: 2, link: { type: 'item', target: parentRef }, remove: true, actor: user })
       const unlinked = yield* store.get(1)
       expect(unlinked.ok && unlinked.value.backlinks).toEqual([])
     }).pipe(Effect.scoped),
@@ -326,16 +326,16 @@ describe('triage proposals', () => {
     Effect.gen(function* () {
       yield* TestClock.setTime(9)
       const store = yield* openStore()
-      yield* store.capture({ text: 'parent epic', actor: user })
+      const parentRef = (yield* store.capture({ text: 'parent epic', actor: user })).item.ref ?? ''
       yield* store.capture({ text: 'paste drops chips', actor: user })
-      yield* store.link({ id: 2, link: { type: 'item', target: '1', provenance: 'extracted' }, actor: user })
+      yield* store.link({ id: 2, link: { type: 'item', target: parentRef, provenance: 'extracted' }, actor: user })
       yield* store.propose({ id: 2, proposal: { kind: 'bug', duplicateOf: 1, confidence: 0.5, reason: 'Broken.', source: 'model', at: 9 } })
       expect((yield* store.list({})).items.find(entry => entry.id === 2)?.proposal?.kind).toBe('bug')
 
       const accepted = yield* store.applyProposal({ id: 2, actor: user })
       expect(accepted.ok && accepted.value.item.kind).toBe('bug')
       expect(accepted.ok && accepted.value.item.humanFields).toEqual(['kind'])
-      expect(accepted.ok && accepted.value.item.links).toEqual([{ type: 'item', target: '1', relation: 'duplicates' }])
+      expect(accepted.ok && accepted.value.item.links).toEqual([{ type: 'item', target: parentRef, relation: 'duplicates' }])
       expect(accepted.ok && accepted.value.item.proposal).toBeNull()
     }).pipe(Effect.scoped),
   )
@@ -345,7 +345,7 @@ describe('triage proposals', () => {
       yield* TestClock.setTime(9)
       const store = yield* openStore()
       yield* store.capture({ text: 'canonical work', actor: user })
-      yield* store.capture({ text: 'duplicate work', actor: user })
+      const duplicateRef = (yield* store.capture({ text: 'duplicate work', actor: user })).item.ref ?? ''
       yield* store.propose({ id: 2, proposal: { duplicateOf: 1, confidence: 0.9, reason: 'Same work.', source: 'model', at: 9 } })
       yield* store.applyProposal({ id: 2, actor: user })
       yield* store.propose({ id: 2, proposal: { status: 'done', confidence: 0.9, reason: 'Work completed.', source: 'jev', at: 9 } })
@@ -356,7 +356,7 @@ describe('triage proposals', () => {
       const canonical = yield* store.get(1)
       expect(duplicate.ok && duplicate.value.item.status).toBe('done')
       expect(canonical.ok && canonical.value.item.status).toBe('done')
-      expect(canonical.ok && canonical.value.item.events.at(-1)?.detail).toBe('inbox → done (duplicate b:2 resolved)')
+      expect(canonical.ok && canonical.value.item.events.at(-1)?.detail).toBe(`inbox → done (duplicate b:${duplicateRef} resolved)`)
     }).pipe(Effect.scoped),
   )
 

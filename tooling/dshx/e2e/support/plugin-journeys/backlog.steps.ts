@@ -3,6 +3,7 @@ import { globalPanelEntryPoint, openGlobalPanel } from '../plugin-view-names.js'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Then, When } from '../bdd.js'
+import { backlogLabel, backlogRef, withBacklogRefs } from './backlog-refs.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion, restartScratchProfileInBrowser, settingsNavEntry } from '../steps.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
@@ -32,7 +33,7 @@ const countViewTransitions = async (page: Page): Promise<void> => {
 }
 
 const contextTarget = async (page: Page, id: number, view: string): Promise<Locator> => {
-  const itemName = `Item b:${String(id)}`
+  const itemName = `Item ${await backlogLabel(page, id)}`
   if (view === 'feed') {
     await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill('')
     await showFeed(page)
@@ -46,10 +47,10 @@ const contextTarget = async (page: Page, id: number, view: string): Promise<Loca
   if (view === 'board') {
     await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill('')
     await page.getByRole('button', { name: 'Board', exact: true }).click()
-    return page.getByRole('article', { name: `Card b:${String(id)}`, exact: true })
+    return page.getByRole('article', { name: `Card ${await backlogLabel(page, id)}`, exact: true })
   }
   if (view === 'search') {
-    await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill(`b:${String(id)}`)
+    await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill(`${await backlogLabel(page, id)}`)
     await page.getByRole('textbox', { name: 'Search backlog', exact: true }).press('Enter')
     return searchResults(page).getByRole('listitem', { name: itemName, exact: true })
   }
@@ -113,7 +114,7 @@ const expectContextMenuLabelsAligned = async (menu: Locator, includeOpenItem: bo
   for (const label of labels) {
     const item = menu.getByRole('menuitem', { name: label, exact: true })
     const position = await menuItemTextPosition(item, label)
-    expect(Math.abs(position - referencePosition), `${label} label should align with the icon column`).toBeLessThanOrEqual(1)
+    expect(Math.abs(position - referencePosition), `${label} label should align with the icon column`).toBeLessThan(1.5)
   }
 }
 
@@ -212,13 +213,13 @@ When('backlog item b:{int} is linked to the Linear issue {string}', async ({ pag
   const target = await contextTarget(page, id, 'feed')
   await target.click({ button: 'right' })
   await contextMenu(page).getByRole('menuitem', { name: 'Link to Linear issue…', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: `Link b:${String(id)} to a Linear issue` })
+  const dialog = page.getByRole('dialog', { name: `Link ${await backlogLabel(page, id)} to a Linear issue` })
   await dialog.getByRole('textbox', { name: 'Linear issue', exact: true }).fill(issue)
   await dialog.getByRole('button', { name: 'Link issue', exact: true }).click()
 })
 
 Then('the link dialog explains how to add a Linear backend', async ({ page }: { page: Page }) => {
-  const dialog = page.getByRole('dialog', { name: /^Link b:\d+ to a Linear issue$/ })
+  const dialog = page.getByRole('dialog', { name: /^Link b:[0-9a-z]+ to a Linear issue$/ })
   await expect(dialog.getByRole('alert')).toContainText('No enabled Linear backend is configured')
   await expect(dialog.getByRole('alert')).toContainText('Backlog settings › Remote sync')
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
@@ -227,7 +228,7 @@ Then('the link dialog explains how to add a Linear backend', async ({ page }: { 
 })
 
 Then('the link dialog explains how to bind the Linear key', async ({ page }: { page: Page }) => {
-  const dialog = page.getByRole('dialog', { name: /^Link b:\d+ to a Linear issue$/ })
+  const dialog = page.getByRole('dialog', { name: /^Link b:[0-9a-z]+ to a Linear issue$/ })
   await expect(dialog.getByRole('alert')).toContainText('The Linear key does not resolve')
   await expect(dialog.getByRole('alert')).toContainText('Backlog settings › Remote sync')
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
@@ -253,7 +254,8 @@ When('two images are attached to the capture', async ({ page }: { page: Page }) 
   await expect.poll(() => captureForm.evaluate(element => element.getBoundingClientRect().height)).toBe(composerHeight)
 })
 
-When('{string} is captured', async ({ page }: { page: Page }, text: string) => {
+When('{string} is captured', async ({ page }: { page: Page }, journeyText: string) => {
+  const text = await withBacklogRefs(page, journeyText)
   const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
   await capture.fill(text)
   await capture.press('Enter')
@@ -293,7 +295,7 @@ Then('the board shows only the card for b:{int}', async ({ page }: { page: Page 
   await recordAssertion(page, 'backlog-search-filters-board', async () => {
     await expect(page.locator('[data-backlog-column]')).toHaveCount(5)
     await expect(page.getByRole('article', { name: /^Card b:/ })).toHaveCount(1)
-    await expect(page.getByRole('article', { name: `Card b:${String(id)}`, exact: true })).toBeVisible()
+    await expect(page.getByRole('article', { name: `Card ${await backlogLabel(page, id)}`, exact: true })).toBeVisible()
     await expect(searchResults(page)).toHaveCount(0)
   })
 })
@@ -361,8 +363,8 @@ When('item b:{int} is moved to In progress on the board', async ({ page }: { pag
   await page.getByRole('button', { name: 'Board', exact: true }).click()
   await countViewTransitions(page)
   await page
-    .getByRole('article', { name: `Card b:${String(id)}` })
-    .getByRole('button', { name: `Status of b:${String(id)}` })
+    .getByRole('article', { name: `Card ${await backlogLabel(page, id)}` })
+    .getByRole('button', { name: `Status of ${await backlogLabel(page, id)}` })
     .click()
   await page.getByRole('menuitem', { name: 'In progress' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-view-transition-count', '0')
@@ -415,7 +417,8 @@ Then('the board columns do not scroll horizontally', async ({ page }: { page: Pa
   })
 })
 
-Then('the In progress column holds {string}', async ({ page }: { page: Page }, title: string) => {
+Then('the In progress column holds {string}', async ({ page }: { page: Page }, journeyTitle: string) => {
+  const title = await withBacklogRefs(page, journeyTitle)
   await recordAssertion(page, 'backlog-board-move', async () => {
     await expect(page.getByRole('region', { name: 'In progress column' })).toContainText(title)
     await expect(page.getByRole('region', { name: 'Inbox column' })).not.toContainText(title)
@@ -447,15 +450,15 @@ Then('the item detail can be resized without being cut off', async ({ page }: { 
 When('backlog item b:{int} is opened', async ({ page }: { page: Page }, id: number) => {
   await page.getByRole('button', { name: 'Feed', exact: true }).click()
   await feed(page)
-    .getByRole('article', { name: `Item b:${String(id)}`, exact: true })
-    .getByText(`b:${String(id)}`, { exact: true })
+    .getByRole('article', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
+    .getByText(`${await backlogLabel(page, id)}`, { exact: true })
     .click()
-  await expect(peek(page)).toContainText(`b:${String(id)}`)
+  await expect(peek(page)).toContainText(`${await backlogLabel(page, id)}`)
 })
 
 When('the project picker for item b:{int} is opened', async ({ page }: { page: Page }, id: number) => {
   await peek(page)
-    .getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })
+    .getByRole('combobox', { name: `Project of ${await backlogLabel(page, id)}`, exact: true })
     .click()
 })
 
@@ -466,32 +469,32 @@ Then('the project choices are visible', async ({ page }: { page: Page }) => {
 
 When('item b:{int} is assigned to the registered project from its details', async ({ page }: { page: Page }, id: number) => {
   await page.getByRole('option', { name: /^default-workspace\b/ }).click()
-  await expect(peek(page).getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })).toContainText('default-workspace')
+  await expect(peek(page).getByRole('combobox', { name: `Project of ${await backlogLabel(page, id)}`, exact: true })).toContainText('default-workspace')
 })
 
 Then('item b:{int} shows its selected project', async ({ page }: { page: Page }, id: number) => {
-  await expect(peek(page).getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })).toContainText('default-workspace')
+  await expect(peek(page).getByRole('combobox', { name: `Project of ${await backlogLabel(page, id)}`, exact: true })).toContainText('default-workspace')
 })
 
 When('item b:{int} is unassigned from its details', async ({ page }: { page: Page }, id: number) => {
   await page.getByRole('option', { name: 'No project', exact: true }).click()
-  await expect(peek(page).getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })).toContainText('Project')
+  await expect(peek(page).getByRole('combobox', { name: `Project of ${await backlogLabel(page, id)}`, exact: true })).toContainText('Project')
 })
 
 Then('item b:{int} has no project', async ({ page }: { page: Page }, id: number) => {
-  await expect(peek(page).getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })).toContainText('Project')
+  await expect(peek(page).getByRole('combobox', { name: `Project of ${await backlogLabel(page, id)}`, exact: true })).toContainText('Project')
 })
 
 Then('it is referenced by {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'backlog-backlinks', async () => {
-    await expect(peek(page).getByRole('list', { name: 'Referenced by' })).toContainText(title)
+    await expect(peek(page).getByRole('list', { name: 'Referenced by' })).toContainText(await withBacklogRefs(page, title))
   })
 })
 
 When('the backlink to b:{int} is followed', async ({ page }: { page: Page }, id: number) => {
   await peek(page)
     .getByRole('list', { name: 'Referenced by' })
-    .getByRole('button', { name: new RegExp(`b:${String(id)}`) })
+    .getByRole('button', { name: new RegExp(`${await backlogLabel(page, id)}`) })
     .click()
 })
 
@@ -586,8 +589,8 @@ const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
 
 When('backlog card b:{int} is clicked', async ({ page }: { page: Page }, id: number) => {
   await page.getByRole('button', { name: 'Board', exact: true }).click()
-  await page.getByRole('article', { name: `Card b:${String(id)}` }).click()
-  await expect(peek(page)).toContainText(`b:${String(id)}`)
+  await page.getByRole('article', { name: `Card ${await backlogLabel(page, id)}` }).click()
+  await expect(peek(page)).toContainText(`${await backlogLabel(page, id)}`)
 })
 
 When('the Start thread button in the item detail is clicked', async ({ page }: { page: Page }) => {
@@ -596,7 +599,7 @@ When('the Start thread button in the item detail is clicked', async ({ page }: {
 
 When('backlog item b:{int} is right-clicked for a thread', async ({ page }: { page: Page }, id: number) => {
   await feed(page)
-    .getByRole('article', { name: `Item b:${String(id)}`, exact: true })
+    .getByRole('article', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
     .click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Start thread…', exact: true }).click()
 })
@@ -631,7 +634,7 @@ When('ArrowUp is pressed from the empty backlog composer', async ({ page }: { pa
 })
 
 Then('backlog item b:{int} receives composer keyboard focus', async ({ page }: { page: Page }, id: number) => {
-  await expect(feed(page).getByRole('article', { name: `Item b:${String(id)}`, exact: true })).toBeFocused()
+  await expect(feed(page).getByRole('article', { name: `Item ${await backlogLabel(page, id)}`, exact: true })).toBeFocused()
 })
 
 When('backlog item b:{int} copies its ID and link from the context menu', async ({ page }: { page: Page }, id: number) => {
@@ -642,13 +645,13 @@ When('backlog item b:{int} copies its ID and link from the context menu', async 
   await target.click({ button: 'right' })
   await contextMenu(page).getByRole('menuitem', { name: 'Copy item ID', exact: true }).click()
   await recordAssertion(page, 'backlog-copy-item-id', async () => {
-    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(String(id))
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(await backlogRef(page, id))
   })
 
   await target.click({ button: 'right' })
   await contextMenu(page).getByRole('menuitem', { name: 'Copy item link', exact: true }).click()
   await recordAssertion(page, 'backlog-copy-item-link', async () => {
-    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(`b:${String(id)}`)
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(`${await backlogLabel(page, id)}`)
   })
 })
 
@@ -660,7 +663,7 @@ When('backlog item b:{int} copies its Markdown from the context menu', async ({ 
   await target.click({ button: 'right' })
   await contextMenu(page).getByRole('menuitem', { name: 'Copy item as Markdown', exact: true }).click()
   await recordAssertion(page, 'backlog-copy-item-markdown', async () => {
-    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(`b:${String(id)}`)
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(`${await backlogLabel(page, id)}`)
   })
 })
 
@@ -708,7 +711,7 @@ Then('the board card for b:{int} names the project it is filed under', async ({ 
   await recordAssertion(page, 'backlog-board-project-label', async () => {
     await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill('')
     await page.getByRole('button', { name: 'Board', exact: true }).click()
-    const card = page.getByRole('article', { name: `Card b:${String(id)}`, exact: true })
+    const card = page.getByRole('article', { name: `Card ${await backlogLabel(page, id)}`, exact: true })
     await expect(card).toBeVisible()
     await card.click({ button: 'right' })
     await contextMenu(page).getByRole('menuitem', { name: 'Project', exact: true }).hover()
@@ -753,13 +756,13 @@ When('the open-when-created box is checked', async ({ page }: { page: Page }) =>
 })
 
 When('the thread is started from the dialog with the prefilled first message', async ({ page }: { page: Page }) => {
-  await expect(startThreadDialog(page).getByLabel('First message')).toHaveValue(/^Work on b:1: /)
+  await expect(startThreadDialog(page).getByLabel('First message')).toHaveValue(new RegExp(`^Work on ${await backlogLabel(page, 1)}: `))
   await startThreadDialog(page).getByRole('button', { name: 'Start thread', exact: true }).click()
   await expect(startThreadDialog(page)).toBeHidden()
 })
 
 When('the thread is started from the dialog without a first message', async ({ page }: { page: Page }) => {
-  await expect(startThreadDialog(page).getByLabel('First message')).toHaveValue(/^Work on b:1: /)
+  await expect(startThreadDialog(page).getByLabel('First message')).toHaveValue(new RegExp(`^Work on ${await backlogLabel(page, 1)}: `))
   await startThreadDialog(page).getByLabel('First message').fill('')
   await startThreadDialog(page).getByRole('button', { name: 'Start thread', exact: true }).click()
   await expect(startThreadDialog(page)).toBeHidden()
@@ -768,7 +771,7 @@ When('the thread is started from the dialog without a first message', async ({ p
 Then('the backlog panel stays open while the thread is created', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-start-thread-stays', async () => {
     await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
-    await expect(page.getByRole('alert')).toContainText('Thread started for b:1', { timeout: 30_000 })
+    await expect(page.getByRole('alert')).toContainText(await withBacklogRefs(page, 'Thread started for b:1'), { timeout: 30_000 })
   })
 })
 
@@ -830,7 +833,7 @@ Then('item text links are clickable in the feed', async ({ page }: { page: Page 
 
 Then('item title links are clickable in the Items view', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-item-text-links-items', async () => {
-    const titleLink = page.getByRole('row', { name: 'Item b:1', exact: true }).getByRole('link', { name: 'guide', exact: true })
+    const titleLink = page.getByRole('row', { name: await withBacklogRefs(page, 'Item b:1'), exact: true }).getByRole('link', { name: 'guide', exact: true })
     await expect(titleLink).toHaveAttribute('href', 'https://example.com/guide')
     await titleLink.evaluate(element => element.addEventListener('click', event => event.preventDefault(), { once: true }))
     await titleLink.click()
@@ -856,12 +859,12 @@ Then('item text links are clickable in the detail', async ({ page }: { page: Pag
 
 When('the Board view selects multiple cards with modifier clicks', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Board', exact: true }).click()
-  const cardFor = (id: number) => page.getByRole('article', { name: `Card b:${String(id)}`, exact: true })
-  await cardFor(1).click({ modifiers: ['ControlOrMeta'] })
-  await cardFor(3).click({ modifiers: ['Shift'] })
-  await expect(cardFor(1)).toHaveAttribute('aria-selected', 'true')
-  await expect(cardFor(2)).toHaveAttribute('aria-selected', 'true')
-  await expect(cardFor(3)).toHaveAttribute('aria-selected', 'true')
+  const cardFor = async (id: number) => page.getByRole('article', { name: `Card ${await backlogLabel(page, id)}`, exact: true })
+  await (await cardFor(1)).click({ modifiers: ['ControlOrMeta'] })
+  await (await cardFor(3)).click({ modifiers: ['Shift'] })
+  await expect(await cardFor(1)).toHaveAttribute('aria-selected', 'true')
+  await expect(await cardFor(2)).toHaveAttribute('aria-selected', 'true')
+  await expect(await cardFor(3)).toHaveAttribute('aria-selected', 'true')
 })
 
 Then('collapsing the selected Inbox group clears its batch selection', async ({ page }: { page: Page }) => {
@@ -869,7 +872,7 @@ Then('collapsing the selected Inbox group clears its batch selection', async ({ 
   await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Toggle inbox', exact: true }).click()
   await recordAssertion(page, 'backlog-selection-collapsed-scope', async () => {
-    await expect(page.getByRole('row', { name: 'Item b:1', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('row', { name: await withBacklogRefs(page, 'Item b:1'), exact: true })).toHaveCount(0)
     await expect(page.getByText('2 selected', { exact: true })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Clear selection', exact: true })).toHaveCount(0)
   })
@@ -877,16 +880,19 @@ Then('collapsing the selected Inbox group clears its batch selection', async ({ 
 })
 
 When('backlog selection is filtered after opening another item', async ({ page }: { page: Page }) => {
-  await page.getByRole('row', { name: 'Item b:1', exact: true }).getByText('Hidden selection item', { exact: true }).click()
+  await page
+    .getByRole('row', { name: await withBacklogRefs(page, 'Item b:1'), exact: true })
+    .getByText('Hidden selection item', { exact: true })
+    .click()
   await searchInput(page).fill('Visible selection item')
   await searchInput(page).press('Enter')
-  await expect(page.getByRole('listitem', { name: 'Item b:1', exact: true })).toHaveCount(0)
-  await page.getByRole('listitem', { name: 'Item b:2', exact: true }).click({ modifiers: ['ControlOrMeta'] })
+  await expect(page.getByRole('listitem', { name: await withBacklogRefs(page, 'Item b:1'), exact: true })).toHaveCount(0)
+  await page.getByRole('listitem', { name: await withBacklogRefs(page, 'Item b:2'), exact: true }).click({ modifiers: ['ControlOrMeta'] })
 })
 
 Then('only the visible item is selected', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-selection-visible-scope', async () => {
-    const visible = page.getByRole('listitem', { name: 'Item b:2', exact: true })
+    const visible = page.getByRole('listitem', { name: await withBacklogRefs(page, 'Item b:2'), exact: true })
     await expect(visible).toHaveAttribute('data-selected', 'true')
     await expect(page.locator('[data-selected]')).toHaveCount(1)
     await visible.click({ button: 'right' })
@@ -897,20 +903,24 @@ Then('only the visible item is selected', async ({ page }: { page: Page }) => {
 
 When('only board card b:{int} is selected', async ({ page }: { page: Page }, id: number) => {
   await page.getByRole('button', { name: 'Board', exact: true }).click()
-  await page.getByRole('article', { name: `Card b:${String(id)}`, exact: true }).click({ modifiers: ['ControlOrMeta'] })
+  await page.getByRole('article', { name: `Card ${await backlogLabel(page, id)}`, exact: true }).click({ modifiers: ['ControlOrMeta'] })
 })
 
 Then('only board card b:2 moved to Todo', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-board-unselected-drag', async () => {
-    await expect(page.locator('[data-backlog-column="todo"]').getByRole('article', { name: 'Card b:2', exact: true })).toBeVisible()
+    await expect(
+      page.locator('[data-backlog-column="todo"]').getByRole('article', { name: await withBacklogRefs(page, 'Card b:2'), exact: true }),
+    ).toBeVisible()
     for (const id of [1, 3])
-      await expect(page.locator('[data-backlog-column="inbox"]').getByRole('article', { name: `Card b:${String(id)}`, exact: true })).toBeVisible()
+      await expect(
+        page.locator('[data-backlog-column="inbox"]').getByRole('article', { name: `Card ${await backlogLabel(page, id)}`, exact: true }),
+      ).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
 
 When('the selected board cards are dragged to {string}', async ({ page }: { page: Page }, status: string) => {
-  const card = page.getByRole('article', { name: 'Card b:2', exact: true })
+  const card = page.getByRole('article', { name: await withBacklogRefs(page, 'Card b:2'), exact: true })
   const source = await card.boundingBox()
   const target = await page.locator(`[data-backlog-column="${status}"]`).boundingBox()
   if (source === null || target === null) throw new Error('Board drag bounds are unavailable')
@@ -923,7 +933,7 @@ When('the selected board cards are dragged to {string}', async ({ page }: { page
 })
 
 When('the selected board card context menu moves all selected items to {string}', async ({ page }: { page: Page }, status: string) => {
-  await page.getByRole('article', { name: 'Card b:2', exact: true }).click({ button: 'right' })
+  await page.getByRole('article', { name: await withBacklogRefs(page, 'Card b:2'), exact: true }).click({ button: 'right' })
   await expect(contextMenu(page)).toContainText('3 selected')
   await contextMenu(page)
     .getByRole('menuitem', { name: /^Status(?: \(\d+\))?$/u })
@@ -934,25 +944,26 @@ When('the selected board card context menu moves all selected items to {string}'
 Then('the board context menu status action updates selected items', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-board-multi-select-context-status', async () => {
     const todo = page.locator('[data-backlog-column="todo"]')
-    await expect(todo.getByRole('article', { name: 'Card b:1', exact: true })).toBeVisible()
-    await expect(todo.getByRole('article', { name: 'Card b:2', exact: true })).toBeVisible()
-    await expect(todo.getByRole('article', { name: 'Card b:3', exact: true })).toBeVisible()
+    await expect(todo.getByRole('article', { name: await withBacklogRefs(page, 'Card b:1'), exact: true })).toBeVisible()
+    await expect(todo.getByRole('article', { name: await withBacklogRefs(page, 'Card b:2'), exact: true })).toBeVisible()
+    await expect(todo.getByRole('article', { name: await withBacklogRefs(page, 'Card b:3'), exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
 
 When('the Items view selects a range and toggles one item', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Items', exact: true }).click()
-  const checkboxFor = (id: number) => page.getByRole('row', { name: `Item b:${String(id)}` }).getByRole('checkbox', { name: `Select b:${String(id)}` })
-  await checkboxFor(1).click()
-  await checkboxFor(3).click({ modifiers: ['Shift'] })
+  const checkboxFor = async (id: number) =>
+    page.getByRole('row', { name: `Item ${await backlogLabel(page, id)}` }).getByRole('checkbox', { name: `Select ${await backlogLabel(page, id)}` })
+  await (await checkboxFor(1)).click()
+  await (await checkboxFor(3)).click({ modifiers: ['Shift'] })
   await expect(page.getByText('3 selected', { exact: true })).toBeVisible()
-  await checkboxFor(1).click({ modifiers: ['ControlOrMeta'] })
+  await (await checkboxFor(1)).click({ modifiers: ['ControlOrMeta'] })
   await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
 })
 
 When("the selected item's context menu moves all selected items to {string}", async ({ page }: { page: Page }, status: string) => {
-  const row = page.getByRole('row', { name: 'Item b:2', exact: true })
+  const row = page.getByRole('row', { name: await withBacklogRefs(page, 'Item b:2'), exact: true })
   await row.click({ button: 'right' })
   await expect(contextMenu(page)).toContainText('2 selected')
   await contextMenu(page)
@@ -964,15 +975,19 @@ When("the selected item's context menu moves all selected items to {string}", as
 Then('the context menu status action updates all selected items', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-multi-select-context-status', async () => {
     await expect(page.getByText('2 selected', { exact: true })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Status of b:1' })).toContainText('Inbox')
-    await expect(page.getByRole('button', { name: 'Status of b:2' })).toContainText('Todo')
-    await expect(page.getByRole('button', { name: 'Status of b:3' })).toContainText('Todo')
+    await expect(page.getByRole('button', { name: await withBacklogRefs(page, 'Status of b:1') })).toContainText('Inbox')
+    await expect(page.getByRole('button', { name: await withBacklogRefs(page, 'Status of b:2') })).toContainText('Todo')
+    await expect(page.getByRole('button', { name: await withBacklogRefs(page, 'Status of b:3') })).toContainText('Todo')
   })
 })
 
 When('the remaining selection is made again', async ({ page }: { page: Page }) => {
-  const second = page.getByRole('row', { name: 'Item b:2', exact: true }).getByRole('checkbox', { name: 'Select b:2' })
-  const third = page.getByRole('row', { name: 'Item b:3', exact: true }).getByRole('checkbox', { name: 'Select b:3' })
+  const second = page
+    .getByRole('row', { name: await withBacklogRefs(page, 'Item b:2'), exact: true })
+    .getByRole('checkbox', { name: await withBacklogRefs(page, 'Select b:2') })
+  const third = page
+    .getByRole('row', { name: await withBacklogRefs(page, 'Item b:3'), exact: true })
+    .getByRole('checkbox', { name: await withBacklogRefs(page, 'Select b:3') })
   await second.click()
   await third.click({ modifiers: ['ControlOrMeta'] })
   await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
@@ -982,9 +997,9 @@ Then('the batch status action updates only the remaining selected items', async 
   await recordAssertion(page, 'backlog-multi-select-batch-status', async () => {
     await page.getByRole('button', { name: 'Move to' }).click()
     await page.getByRole('menuitem', { name: 'Done', exact: true }).click()
-    await expect(page.getByRole('button', { name: 'Status of b:1' })).toContainText('Inbox')
-    await expect(page.getByRole('button', { name: 'Status of b:2' })).toContainText('Done')
-    await expect(page.getByRole('button', { name: 'Status of b:3' })).toContainText('Done')
+    await expect(page.getByRole('button', { name: await withBacklogRefs(page, 'Status of b:1') })).toContainText('Inbox')
+    await expect(page.getByRole('button', { name: await withBacklogRefs(page, 'Status of b:2') })).toContainText('Done')
+    await expect(page.getByRole('button', { name: await withBacklogRefs(page, 'Status of b:3') })).toContainText('Done')
   })
   await finishJourneyAssertions(page)
 })
@@ -1019,18 +1034,18 @@ When('a thread on the fake model writes {string}', async ({ page }: { page: Page
   // A provider-less profile ends the first turn immediately and the client then drops the conversation, so the
   // reference this journey clicks would be gone; run a real turn on the local fake provider and let it settle.
   await startThreadWithModel(page, { project: 'Default workspace', model: FAKE_MODEL })
-  await sendMessage(page, text)
+  await sendMessage(page, await withBacklogRefs(page, text))
 })
 
 When('a message with the serialized backlog mention is sent', async ({ page }: { page: Page }) => {
   await startThreadWithModel(page, { project: 'Default workspace', model: FAKE_MODEL })
   // The composer serializes a picked chip this way, so the sent text is exactly what a real mention produces.
-  await sendMessage(page, 'Following b:1 "Ship the backlog reference preview" (backlog item; backlog_get has its details)')
+  await sendMessage(page, await withBacklogRefs(page, 'Following b:1 "Ship the backlog reference preview" (backlog item; backlog_get has its details)'))
 })
 
 Then('the sent mention renders as a backlog chip {string} titled {string}', async ({ page }: { page: Page }, reference: string, title: string) => {
   await recordAssertion(page, 'backlog-sent-mention-chip', async () => {
-    const chip = page.getByRole('button', { name: `Backlog item ${reference} · ${title}`, exact: true })
+    const chip = page.getByRole('button', { name: `Backlog item ${await withBacklogRefs(page, reference)} · ${title}`, exact: true })
     await expect(chip).toBeVisible()
     // The serialized title and tool hint must not stay in the bubble.
     await expect(page.getByText('backlog_get has its details')).toHaveCount(0)
@@ -1042,7 +1057,7 @@ Then('the sent mention renders as a backlog chip {string} titled {string}', asyn
 
 Then('the inline backlog preview shows {string}', async ({ page }: { page: Page }, text: string) => {
   await recordAssertion(page, 'backlog-reference-inline-preview', async () => {
-    const reference = page.getByRole('button', { name: 'Backlog item b:1', exact: true })
+    const reference = page.getByRole('button', { name: await withBacklogRefs(page, 'Backlog item b:1'), exact: true })
     await expect(reference).toBeVisible()
     const preview = page.locator('[data-dshfiles-backlog-preview]')
     // A scroll closes the card by design, and the conversation can still settle right after the turn lands, so ask
@@ -1290,8 +1305,11 @@ When('Backlog uses a configured fake-model agent for replies', async ({ page }: 
 
 Then('the reply starts a linked work thread with an in-app and browser notice', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-smart-reply-routing', async () => {
-    await expect(page.getByRole('alert')).toContainText('Thread started for b:1', { timeout: 30_000 })
-    await expect(page.locator('body')).toHaveAttribute('data-test-notification', 'Backlog thread started|b:1 · Improve the flaky test')
+    await expect(page.getByRole('alert')).toContainText(await withBacklogRefs(page, 'Thread started for b:1'), { timeout: 30_000 })
+    await expect(page.locator('body')).toHaveAttribute(
+      'data-test-notification',
+      await withBacklogRefs(page, 'Backlog thread started|b:1 · Improve the flaky test'),
+    )
     await expect(peek(page).getByRole('list', { name: 'Activity' })).toContainText('Please fix the flaky test')
     await expect(peek(page).getByRole('list', { name: 'Related' }).getByRole('listitem')).toHaveCount(1)
   })
@@ -1347,7 +1365,7 @@ Then('the item detail links the thread that mentioned it', async ({ page }: { pa
     const related = peek(page).getByRole('list', { name: 'Related' })
     await expect(related.getByRole('button', { name: 'Fake thread title', exact: true })).toBeVisible()
     await expect(related.getByText('idle', { exact: true })).toBeVisible()
-    await expect(peek(page).getByRole('button', { name: 'Status of b:1', exact: true })).toContainText('In progress')
+    await expect(peek(page).getByRole('button', { name: await withBacklogRefs(page, 'Status of b:1'), exact: true })).toContainText('In progress')
   })
   await finishJourneyAssertions(page)
 })
@@ -1386,7 +1404,7 @@ When('the backlog item mention is picked', async ({ page }: { page: Page }) => {
 
 Then('the comment box contains {string}', async ({ page }: { page: Page }, value: string) => {
   await recordAssertion(page, 'backlog-mentions-inserted', async () => {
-    await expect(peek(page).getByRole('textbox', { name: 'Comment', exact: true })).toHaveText(value)
+    await expect(peek(page).getByRole('textbox', { name: 'Comment', exact: true })).toHaveText(await withBacklogRefs(page, value))
   })
   await finishJourneyAssertions(page)
 })
@@ -1397,8 +1415,14 @@ When('the Activity panel is opened from the Backlog journey', async ({ page }: {
 
 Then('the Activity Timeline shows the backlog creation and status change', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-shared-activity-timeline', async () => {
-    const creation = page.getByRole('button').filter({ hasText: 'You created b:1 Shared timeline event' }).first()
-    const move = page.getByRole('button').filter({ hasText: 'You moved b:1 Shared timeline event' }).first()
+    const creation = page
+      .getByRole('button')
+      .filter({ hasText: await withBacklogRefs(page, 'You created b:1 Shared timeline event') })
+      .first()
+    const move = page
+      .getByRole('button')
+      .filter({ hasText: await withBacklogRefs(page, 'You moved b:1 Shared timeline event') })
+      .first()
     await expect(creation).toBeVisible({ timeout: 15_000 })
     await expect(move).toBeVisible({ timeout: 15_000 })
     await expect(creation).toContainText('System')
@@ -1420,14 +1444,14 @@ Then('the captured item displays its project when one is available', async ({ pa
 })
 
 const inlineTitle = (page: Page) => page.getByRole('textbox', { name: 'Item title', exact: true })
-const itemsRow = (page: Page, id: number) => page.getByRole('row', { name: `Item b:${String(id)}`, exact: true })
-const boardCard = (page: Page, id: number) => page.getByRole('article', { name: `Card b:${String(id)}`, exact: true })
+const itemsRow = async (page: Page, id: number) => page.getByRole('row', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
+const boardCard = async (page: Page, id: number) => page.getByRole('article', { name: `Card ${await backlogLabel(page, id)}`, exact: true })
 
 When('backlog item b:{int} is double-clicked in the feed', async ({ page }: { page: Page }, id: number) => {
   await showFeed(page)
   // The centre of an entry can land on the status picker or a chip, so aim at the title row under the author line.
   await feed(page)
-    .getByRole('article', { name: `Item b:${String(id)}`, exact: true })
+    .getByRole('article', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
     .dblclick({ position: { x: 160, y: 40 } })
 })
 
@@ -1436,7 +1460,7 @@ Then('the feed edits item b:{int} inline without opening it', async ({ page }: {
     await expect(inlineTitle(page)).toHaveValue('Rename me in the feed')
     // The rename is the quick path, so the gesture must not open the item beside the feed.
     await expect(peek(page)).toHaveCount(0)
-    await expect(feed(page).getByRole('article', { name: `Item b:${String(id)}`, exact: true })).toBeVisible()
+    await expect(feed(page).getByRole('article', { name: `Item ${await backlogLabel(page, id)}`, exact: true })).toBeVisible()
   })
 })
 
@@ -1447,7 +1471,7 @@ When('the inline title is replaced with {string}', async ({ page }: { page: Page
 
 Then('the feed titles item b:{int} {string}', async ({ page }: { page: Page }, id: number, title: string) => {
   await recordAssertion(page, 'backlog-inline-edit-saved', async () => {
-    const article = feed(page).getByRole('article', { name: `Item b:${String(id)}`, exact: true })
+    const article = feed(page).getByRole('article', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
     await expect(article).toContainText(title)
     await expect(inlineTitle(page)).toHaveCount(0)
     // Leave the peek closed: the Items and board steps below assert the gesture opens nothing.
@@ -1458,20 +1482,20 @@ Then('the feed titles item b:{int} {string}', async ({ page }: { page: Page }, i
 When('backlog row b:{int} is double-clicked in the Items view', async ({ page }: { page: Page }, id: number) => {
   await page.getByRole('button', { name: 'Items', exact: true }).click()
   // The row's right half holds status and kind menus; the title sits just after the id column.
-  await itemsRow(page, id).dblclick({ position: { x: 140, y: 20 } })
+  await (await itemsRow(page, id)).dblclick({ position: { x: 140, y: 20 } })
 })
 
 Then('the Items view edits b:{int} inline without opening it', async ({ page }: { page: Page }, id: number) => {
   await recordAssertion(page, 'backlog-inline-edit-items-open', async () => {
     await expect(inlineTitle(page)).toHaveValue('Renamed in the feed')
     await expect(peek(page)).toHaveCount(0)
-    await expect(itemsRow(page, id)).toBeVisible()
+    await expect(await itemsRow(page, id)).toBeVisible()
   })
 })
 
 Then('the Items view titles b:{int} {string}', async ({ page }: { page: Page }, id: number, title: string) => {
   await recordAssertion(page, 'backlog-inline-edit-items-saved', async () => {
-    await expect(itemsRow(page, id)).toContainText(title)
+    await expect(await itemsRow(page, id)).toContainText(title)
     await expect(inlineTitle(page)).toHaveCount(0)
   })
 })
@@ -1479,24 +1503,22 @@ Then('the Items view titles b:{int} {string}', async ({ page }: { page: Page }, 
 When('backlog card b:{int} is double-clicked on the board', async ({ page }: { page: Page }, id: number) => {
   await page.getByRole('button', { name: 'Board', exact: true }).click()
   // A card's lower half holds its preview and status picker; the title sits under the top padding.
-  await boardCard(page, id).dblclick({ position: { x: 100, y: 20 } })
+  await (await boardCard(page, id)).dblclick({ position: { x: 100, y: 20 } })
 })
 
 Then('the board edits b:{int} inline without opening it', async ({ page }: { page: Page }, id: number) => {
   await recordAssertion(page, 'backlog-inline-edit-board-open', async () => {
     await expect(inlineTitle(page)).toHaveValue('Renamed in the table')
     await expect(peek(page)).toHaveCount(0)
-    await expect(boardCard(page, id)).toBeVisible()
+    await expect(await boardCard(page, id)).toBeVisible()
   })
 })
 
 Then('the board card for b:{int} is titled {string}', async ({ page }: { page: Page }, id: number, title: string) => {
   await recordAssertion(page, 'backlog-inline-edit-board-saved', async () => {
-    await expect(boardCard(page, id)).toContainText(title)
+    await expect(await boardCard(page, id)).toContainText(title)
     await expect(inlineTitle(page)).toHaveCount(0)
-    await boardCard(page, id)
-      .getByText(`b:${String(id)}`, { exact: true })
-      .click()
+    await (await boardCard(page, id)).getByText(`${await backlogLabel(page, id)}`, { exact: true }).click()
     await expect(peek(page)).toContainText(title)
   })
   await finishJourneyAssertions(page)

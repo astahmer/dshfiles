@@ -1,4 +1,5 @@
 import type { BacklogSummaryView } from './api.js'
+import { BacklogReference } from './backlog-reference.js'
 
 type MarkdownItem = {
   readonly id: BacklogSummaryView['id']
@@ -14,7 +15,7 @@ type MarkdownItem = {
 
 export const backlogItemMarkdown = (item: MarkdownItem): string => {
   const metadata = [
-    `- **ID:** \`b:${String(item.id)}\``,
+    `- **ID:** \`${BacklogReference.labelOf(item)}\``,
     `- **Kind:** ${item.kind}`,
     `- **Status:** ${item.status}`,
     ...(item.project === null ? [] : [`- **Project:** \`${item.project}\``]),

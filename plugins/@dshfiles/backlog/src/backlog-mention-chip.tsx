@@ -8,5 +8,5 @@ interface BacklogMentionChipProps {
 
 /** One sent Backlog mention uses the shared chip and preview behavior. */
 export const BacklogMentionChip = ({ node, interactive }: BacklogMentionChipProps): JSX.Element => (
-  <BacklogReferenceChip id={node.data.id} itemTitle={node.data.title} interactive={interactive} />
+  <BacklogReferenceChip reference={node.data.ref} itemTitle={node.data.title} interactive={interactive} />
 )

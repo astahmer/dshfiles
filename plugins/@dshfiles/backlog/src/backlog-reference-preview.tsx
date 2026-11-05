@@ -28,24 +28,25 @@ const StatusLine = (props: { readonly kind: BacklogKind; readonly status: Backlo
   </span>
 )
 
-/** The backlog item card the shared reference preview draws for one `b:<id>`. */
+/** The backlog item card the shared reference preview draws for one `b:<ref>`. */
 export const BacklogReferencePreview = (props: {
-  readonly id: number
+  /** The ref as written: `k3f9` or a legacy `12`. */
+  readonly reference: string
   readonly close: () => void
   /** Opens the Backlog page on this item, the way the sidebar's Backlog row would. */
   readonly openInBacklog: (id: number) => void
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const preview = useQuery({
-    queryKey: ['dshfiles-backlog', 'reference-preview', props.id],
+    queryKey: ['dshfiles-backlog', 'reference-preview', props.reference],
     retry: false,
-    queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: props.id }, { signal })),
+    queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: BacklogReference.requestId(props.reference) }, { signal })),
   })
   const detail = preview.data?.ok === true ? preview.data.value : undefined
   const missing = preview.data?.ok === false
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-2.5 dshx:p-4" data-dshfiles-backlog-preview>
-      <h2 className="dshx:m-0 dshx:text-sm dshx:font-medium dshx:text-muted-foreground">Backlog · {BacklogReference.label(props.id)}</h2>
+      <h2 className="dshx:m-0 dshx:text-sm dshx:font-medium dshx:text-muted-foreground">Backlog · {BacklogReference.label(props.reference)}</h2>
       <div className="dshx:flex dshx:flex-col dshx:gap-2">
         {preview.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Loading backlog item…</p> : null}
         {preview.isError ? (
@@ -54,7 +55,7 @@ export const BacklogReferencePreview = (props: {
           </p>
         ) : null}
         {missing ? (
-          <p className="dshx:text-xs dshx:text-muted-foreground">No backlog item {BacklogReference.label(props.id)}. Search the Backlog page for it.</p>
+          <p className="dshx:text-xs dshx:text-muted-foreground">No backlog item {BacklogReference.label(props.reference)}. Search the Backlog page for it.</p>
         ) : null}
         {detail === undefined ? null : (
           <>
@@ -75,7 +76,7 @@ export const BacklogReferencePreview = (props: {
             size="xs"
             variant="outline"
             onClick={() => {
-              props.openInBacklog(props.id)
+              if (detail !== undefined) props.openInBacklog(detail.item.id)
               props.close()
             }}
           >

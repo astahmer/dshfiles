@@ -4,15 +4,16 @@ import { BacklogReference } from './backlog-reference.js'
 import { previewBacklogReference } from './backlog-inline-reference.js'
 
 interface BacklogReferenceChipProps {
-  readonly id: number
+  /** The item's ref as written: `k3f9` or a legacy `12`. */
+  readonly reference: string
   readonly itemTitle?: string | null
   readonly interactive?: boolean
 }
 
-export const BacklogReferenceChip = ({ id, itemTitle, interactive = true }: BacklogReferenceChipProps): JSX.Element => {
+export const BacklogReferenceChip = ({ reference: ref, itemTitle, interactive = true }: BacklogReferenceChipProps): JSX.Element => {
   const reference = useRef<HTMLButtonElement | null>(null)
   const resolvedTitle = itemTitle?.trim() ?? ''
-  const label = resolvedTitle === '' ? BacklogReference.label(id) : `${BacklogReference.label(id)} · ${resolvedTitle}`
+  const label = resolvedTitle === '' ? BacklogReference.label(ref) : `${BacklogReference.label(ref)} · ${resolvedTitle}`
   const content = (
     <>
       <ClipboardListIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
@@ -36,7 +37,7 @@ export const BacklogReferenceChip = ({ id, itemTitle, interactive = true }: Back
         onClick={event => {
           if (event.detail > 1 || (event.detail !== 0 && document.getSelection()?.isCollapsed === false)) return
           const element = reference.current
-          if (element !== null) previewBacklogReference(id, element)
+          if (element !== null) previewBacklogReference(ref, element)
         }}
         ref={reference}
         type="button"
@@ -46,9 +47,9 @@ export const BacklogReferenceChip = ({ id, itemTitle, interactive = true }: Back
         </span>
       </button>
       <button
-        aria-label={`Copy ${BacklogReference.label(id)} reference`}
+        aria-label={`Copy ${BacklogReference.label(ref)} reference`}
         className="dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
-        onClick={() => void navigator.clipboard?.writeText(BacklogReference.label(id)).catch(() => undefined)}
+        onClick={() => void navigator.clipboard?.writeText(BacklogReference.label(ref)).catch(() => undefined)}
         type="button"
       >
         <CopyIcon aria-hidden className="dshx:size-3" />

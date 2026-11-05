@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
+import { backlogLabel, withBacklogRefs } from './backlog-refs.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 /**
@@ -16,7 +17,7 @@ const searchResults = (page: Page) => page.getByRole('list', { name: 'Search res
 const capture = (page: Page) => page.getByRole('textbox', { name: 'Capture', exact: true })
 const captureSuggestions = (page: Page) => page.getByRole('listbox', { name: 'Suggestions', exact: true })
 const inbox = (page: Page) => page.getByRole('region', { name: 'Inbox', exact: true })
-const inboxRow = (page: Page, id: number) => inbox(page).getByRole('listitem', { name: `Item b:${String(id)}`, exact: true })
+const inboxRow = async (page: Page, id: number) => inbox(page).getByRole('listitem', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
 const itemsTable = (page: Page) => page.getByRole('table', { name: 'Backlog items' })
 const viewButton = (page: Page, name: string) => page.getByRole('navigation', { name: 'Backlog views' }).getByRole('button', { name, exact: true })
 
@@ -36,7 +37,7 @@ Then('the feed shows one {string} separator above both entries', async ({ page }
         node => node.getAttribute('aria-label') ?? node.textContent?.trim() ?? '',
       ),
     )
-    expect(order).toEqual([label, 'Item b:1', 'Item b:2'])
+    expect(order).toEqual([label, await withBacklogRefs(page, 'Item b:1'), await withBacklogRefs(page, 'Item b:2')])
   })
   await finishJourneyAssertions(page)
 })
@@ -46,9 +47,9 @@ Then(
   async ({ page }: { page: Page }, filter: string, first: number, second: number, absent: number) => {
     await recordAssertion(page, 'backlog-inbox-filter-all', async () => {
       await showInboxFilter(page, filter)
-      await expect(inboxRow(page, first)).toBeVisible()
-      await expect(inboxRow(page, second)).toBeVisible()
-      await expect(inboxRow(page, absent)).toHaveCount(0)
+      await expect(await inboxRow(page, first)).toBeVisible()
+      await expect(await inboxRow(page, second)).toBeVisible()
+      await expect(await inboxRow(page, absent)).toHaveCount(0)
     })
   },
 )
@@ -56,8 +57,8 @@ Then(
 Then('the Inbox {string} filter lists b:{int} and b:{int}', async ({ page }: { page: Page }, filter: string, first: number, second: number) => {
   await recordAssertion(page, 'backlog-inbox-filter-suggestions', async () => {
     await showInboxFilter(page, filter)
-    await expect(inboxRow(page, first)).toBeVisible({ timeout: 30_000 })
-    await expect(inboxRow(page, second)).toBeVisible({ timeout: 30_000 })
+    await expect(await inboxRow(page, first)).toBeVisible({ timeout: 30_000 })
+    await expect(await inboxRow(page, second)).toBeVisible({ timeout: 30_000 })
   })
 })
 
@@ -65,29 +66,29 @@ Then('the Inbox {string} filter lists only b:{int}', async ({ page }: { page: Pa
   await recordAssertion(page, `backlog-inbox-filter-${filter.toLowerCase().replaceAll(' ', '-')}`, async () => {
     await showInboxFilter(page, filter)
     await expect(inbox(page).getByRole('listitem', { name: /^Item b:/ })).toHaveCount(1)
-    await expect(inboxRow(page, id)).toBeVisible()
+    await expect(await inboxRow(page, id)).toBeVisible()
   })
 })
 
 When('Inbox item b:{int} is opened from the {string} filter', async ({ page }: { page: Page }, id: number, filter: string) => {
   await showInboxFilter(page, filter)
-  await expect(inboxRow(page, id).getByLabel('Unread', { exact: true })).toBeVisible()
-  await inboxRow(page, id).click({ position: { x: 60, y: 12 } })
-  await expect(peek(page)).toContainText(`b:${String(id)}`)
+  await expect((await inboxRow(page, id)).getByLabel('Unread', { exact: true })).toBeVisible()
+  await (await inboxRow(page, id)).click({ position: { x: 60, y: 12 } })
+  await expect(peek(page)).toContainText(`${await backlogLabel(page, id)}`)
 })
 
 Then('Inbox item b:{int} is no longer unread', async ({ page }: { page: Page }, id: number) => {
   await recordAssertion(page, 'backlog-inbox-acknowledged', async () => {
-    await expect(inboxRow(page, id).getByLabel('Unread', { exact: true })).toHaveCount(0)
+    await expect((await inboxRow(page, id)).getByLabel('Unread', { exact: true })).toHaveCount(0)
     // Read is not done: the request stays listed until its attention is cleared.
-    await expect(inboxRow(page, id)).toBeVisible()
+    await expect(await inboxRow(page, id)).toBeVisible()
   })
 })
 
 When('Inbox item b:{int} is resolved', async ({ page }: { page: Page }, id: number) => {
   await showInboxFilter(page, 'Blocked')
-  await inboxRow(page, id).hover()
-  await inboxRow(page, id).getByRole('button', { name: 'Resolve', exact: true }).click()
+  await (await inboxRow(page, id)).hover()
+  await (await inboxRow(page, id)).getByRole('button', { name: 'Resolve', exact: true }).click()
 })
 
 Then('the Inbox {string} filter is empty', async ({ page }: { page: Page }, filter: string) => {
@@ -228,7 +229,7 @@ Then('searching {string} lists {int} results', async ({ page }: { page: Page }, 
 
 Then('searching {string} lists only {string}', async ({ page }: { page: Page }, query: string, title: string) => {
   await recordAssertion(page, `backlog-search-operator-${query.replaceAll(/[^a-z0-9]+/gi, '-').toLowerCase()}`, async () => {
-    await search(page, query)
+    await search(page, await withBacklogRefs(page, query))
     await expect(searchResults(page).getByRole('listitem', { name: /^Item b:/ })).toHaveCount(1)
     await expect(searchResults(page)).toContainText(title)
   })
@@ -302,12 +303,13 @@ When('the capture is sent', async ({ page }: { page: Page }) => {
   await capture(page).press('Enter')
 })
 
-Then('backlog item b:{int} is referenced by {string}', async ({ page }: { page: Page }, id: number, title: string) => {
+Then('backlog item b:{int} is referenced by {string}', async ({ page }: { page: Page }, id: number, journeyTitle: string) => {
   await recordAssertion(page, 'backlog-capture-autocomplete-sent', async () => {
+    const title = await withBacklogRefs(page, journeyTitle)
     await expect(feed(page)).toContainText(title)
     await feed(page)
-      .getByRole('article', { name: `Item b:${String(id)}`, exact: true })
-      .getByText(`b:${String(id)}`, { exact: true })
+      .getByRole('article', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
+      .getByText(`${await backlogLabel(page, id)}`, { exact: true })
       .click()
     await expect(peek(page).getByRole('list', { name: 'Referenced by' })).toContainText(title)
   })
@@ -346,7 +348,7 @@ When('the capture is retried', async ({ page }: { page: Page }) => {
 
 Then('the feed shows {string} without a capture error', async ({ page }: { page: Page }, text: string) => {
   await recordAssertion(page, 'backlog-capture-retried', async () => {
-    await expect(feed(page).getByRole('article', { name: 'Item b:1', exact: true })).toContainText(text)
+    await expect(feed(page).getByRole('article', { name: await withBacklogRefs(page, 'Item b:1'), exact: true })).toContainText(text)
     await expect(page.getByRole('alert').filter({ has: page.getByRole('button', { name: 'Retry' }) })).toHaveCount(0)
     await expect(capture(page)).toHaveText('')
   })
@@ -355,16 +357,16 @@ Then('the feed shows {string} without a capture error', async ({ page }: { page:
 
 When('the {string} of b:{int} is set to {string} in the inspector', async ({ page }: { page: Page }, field: string, id: number, value: string) => {
   await peek(page)
-    .getByRole('button', { name: `${field} of b:${String(id)}`, exact: true })
+    .getByRole('button', { name: `${field} of ${await backlogLabel(page, id)}`, exact: true })
     .click()
   await page.getByRole('menuitem', { name: new RegExp(`^${value}`) }).click()
-  await expect(peek(page).getByRole('button', { name: `${field} of b:${String(id)}`, exact: true })).toContainText(value)
+  await expect(peek(page).getByRole('button', { name: `${field} of ${await backlogLabel(page, id)}`, exact: true })).toContainText(value)
 })
 
 Then('the inspector shows b:{int} as a {string} in {string}', async ({ page }: { page: Page }, id: number, kind: string, status: string) => {
   await recordAssertion(page, 'backlog-inspector-pickers', async () => {
-    await expect(peek(page).getByRole('button', { name: `Kind of b:${String(id)}`, exact: true })).toContainText(kind)
-    await expect(peek(page).getByRole('button', { name: `Status of b:${String(id)}`, exact: true })).toContainText(status)
+    await expect(peek(page).getByRole('button', { name: `Kind of ${await backlogLabel(page, id)}`, exact: true })).toContainText(kind)
+    await expect(peek(page).getByRole('button', { name: `Status of ${await backlogLabel(page, id)}`, exact: true })).toContainText(status)
   })
 })
 
@@ -405,7 +407,7 @@ When('a low-confidence fake triage suggestion titled {string} is captured', asyn
 
 const openFromSuggestions = async (page: Page, id: number): Promise<void> => {
   await showInboxFilter(page, 'Suggestions')
-  await inboxRow(page, id).click({ position: { x: 60, y: 12 } })
+  await (await inboxRow(page, id)).click({ position: { x: 60, y: 12 } })
   await expect(peek(page).getByRole('region', { name: 'Triage suggestion', exact: true })).toBeVisible()
 }
 
@@ -424,7 +426,7 @@ Then('backlog item b:{int} is titled {string} without a suggestion', async ({ pa
     await expect(peek(page)).toContainText(title)
     await expect(peek(page).getByRole('region', { name: 'Triage suggestion', exact: true })).toHaveCount(0)
     await showInboxFilter(page, 'Suggestions')
-    await expect(inboxRow(page, id)).toHaveCount(0)
+    await expect(await inboxRow(page, id)).toHaveCount(0)
   })
 })
 
@@ -435,7 +437,7 @@ Then('backlog item b:{int} keeps its title without a suggestion', async ({ page 
     await expect(activity).toContainText('dismissed a suggestion')
     await expect(activity).not.toContainText('applied')
     await showInboxFilter(page, 'Suggestions')
-    await expect(inboxRow(page, id)).toHaveCount(0)
+    await expect(await inboxRow(page, id)).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

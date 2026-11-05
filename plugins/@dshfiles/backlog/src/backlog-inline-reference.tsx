@@ -4,23 +4,23 @@ import type { KeyboardEvent, MouseEvent } from 'react'
 import { BacklogReference } from './backlog-reference.js'
 
 /** Ask the shared reference card (input-trigger's entity registry) to show one item under an element. */
-export const previewBacklogReference = (id: number, element: Element): boolean =>
-  BacklogReference.id(String(id)) !== undefined && EntityPreview.request({ kind: BacklogReference.entityKind, id: String(id) }, element)
+export const previewBacklogReference = (ref: string, element: Element): boolean =>
+  BacklogReference.parse(ref) !== undefined && EntityPreview.request({ kind: BacklogReference.entityKind, id: ref }, element)
 
-/** A written `b:<id>`: the text stays as the author wrote it and opens the item's card. */
-const BacklogReferenceLink = (props: { readonly id: number; readonly text: string }): JSX.Element => {
+/** A written `b:<ref>`: the text stays as the author wrote it and opens the item's card. */
+const BacklogReferenceLink = (props: { readonly reference: string; readonly text: string }): JSX.Element => {
   const onClick = (event: MouseEvent<HTMLElement>): void => {
     if (event.button !== 0 || document.getSelection()?.isCollapsed === false) return
-    if (previewBacklogReference(props.id, event.currentTarget)) event.preventDefault()
+    if (previewBacklogReference(props.reference, event.currentTarget)) event.preventDefault()
   }
   const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
     if (event.key !== 'Enter' && event.key !== ' ') return
-    if (previewBacklogReference(props.id, event.currentTarget)) event.preventDefault()
+    if (previewBacklogReference(props.reference, event.currentTarget)) event.preventDefault()
   }
   return (
     <span
-      aria-label={`Preview backlog item ${BacklogReference.label(props.id)}`}
-      data-dshfiles-backlog-reference={String(props.id)}
+      aria-label={`Preview backlog item ${BacklogReference.label(props.reference)}`}
+      data-dshfiles-backlog-reference={props.reference}
       onClick={onClick}
       onKeyDown={onKeyDown}
       role="link"
@@ -32,12 +32,12 @@ const BacklogReferenceLink = (props: { readonly id: number; readonly text: strin
 }
 
 /**
- * `b:<id>` in an answer or a backlog comment. Inline code counts (an Agent often backticks the token); Chat never offers
+ * `b:<ref>` in an answer or a backlog comment. Inline code counts (an Agent often backticks the token); Chat never offers
  * fenced code or link text.
  */
-export const backlogInlineReference = InlineReferenceModel.define<number>({
+export const backlogInlineReference = InlineReferenceModel.define<string>({
   id: 'backlog-item',
   surfaces: ['prose', 'code'],
-  match: text => BacklogReference.matches(text).map(match => ({ start: match.start, end: match.end, value: match.id })),
-  render: input => <BacklogReferenceLink id={input.value} text={input.text} />,
+  match: text => BacklogReference.matches(text).map(match => ({ start: match.start, end: match.end, value: match.ref })),
+  render: input => <BacklogReferenceLink reference={input.value} text={input.text} />,
 })

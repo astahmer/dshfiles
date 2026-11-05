@@ -33,7 +33,7 @@ describe('backlog focus', () => {
   })
 
   it('keeps the item a reference asked for until the panel takes it', () => {
-    const seen: (number | null)[] = []
+    const seen: (number | string | null)[] = []
     const stop = BacklogFocusModel.subscribe(() => {
       seen.push(BacklogFocusModel.read())
     })

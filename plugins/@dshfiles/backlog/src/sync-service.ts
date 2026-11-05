@@ -5,6 +5,7 @@ import { HttpClient } from 'effect/http'
 import type { BacklogDetailView } from './api.js'
 import { BacklogSettingsTag } from './backlog-settings.js'
 import { BacklogItemNotFound, type BacklogWriteFailed } from './errors.js'
+import { BacklogReference } from './backlog-reference.js'
 import { BacklogItems, type BacklogItem, type BacklogKind } from './item.js'
 import type { BacklogSettings } from './settings.js'
 import { BacklogStore, type BacklogActor, type BacklogResult } from './store.js'
@@ -65,6 +66,7 @@ const rowFor = (rows: readonly BackendRow[], backend: SyncBackendKind, project: 
 /** What the agent tools and the panel read about one linked item. */
 export interface SyncItemView {
   readonly itemId: number
+  readonly ref?: string
   readonly backend: SyncBackendKind
   readonly remoteKey: string
   readonly url: string
@@ -77,6 +79,7 @@ export interface SyncItemView {
 /** What one sync pass did for one item. */
 export interface SyncItemResult {
   readonly itemId: number
+  readonly ref?: string
   readonly remoteKey: string | null
   readonly state: SyncState
   readonly pulled: readonly SyncField[]
@@ -349,6 +352,7 @@ export class BacklogSync extends Context.Service<
 
       const viewOf = (mapping: SyncMapping, item: BacklogItem | undefined): SyncItemView => ({
         itemId: mapping.itemId,
+        ...(item !== undefined && { ref: BacklogReference.refOf(item) }),
         backend: mapping.backend,
         remoteKey: mapping.remoteKey,
         url: mapping.url,
@@ -385,10 +389,16 @@ export class BacklogSync extends Context.Service<
             : [],
         )
         const pushedPairs = yield* Effect.forEach(outgoing, event =>
-          Effect.map(backend.comment(mapping.remoteId, BacklogSyncModel.exportedCommentText(mapping.itemId, event.actor, event.detail)), created => ({
-            local: event.commentId,
-            remote: created.id,
-          })),
+          Effect.map(
+            backend.comment(
+              mapping.remoteId,
+              BacklogSyncModel.exportedCommentText(BacklogReference.labelOf(item ?? { id: mapping.itemId }), event.actor, event.detail),
+            ),
+            created => ({
+              local: event.commentId,
+              remote: created.id,
+            }),
+          ),
         )
         const pairs = [...mapping.comments, ...pulledPairs, ...pushedPairs]
         const pulled = pulledPairs.length
@@ -432,6 +442,7 @@ export class BacklogSync extends Context.Service<
         yield* save(next)
         return {
           itemId: item.id,
+          ref: BacklogReference.refOf(item),
           remoteKey: next.remoteKey,
           state: next.state,
           pulled,

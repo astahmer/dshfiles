@@ -28,6 +28,7 @@ import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { itemTransitionName } from './view-transition.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { BacklogReference } from './backlog-reference.js'
 
 const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']
 const boardStatusSchema = Schema.Literals(['inbox', 'todo', 'doing', 'done', 'dropped'])
@@ -108,7 +109,7 @@ const CardFace = (props: {
             className="dshx:-mt-1 dshx:-mr-1.5 dshx:opacity-0 dshx:transition-opacity dshx:group-hover/card:opacity-100"
             onPointerDown={event => event.stopPropagation()}
           >
-            <ItemPickers.Status id={item.id} status={item.status} onPick={props.onPickStatus} />
+            <ItemPickers.Status itemLabel={BacklogReference.labelOf(item)} status={item.status} onPick={props.onPickStatus} />
           </span>
         )}
       </div>
@@ -134,7 +135,7 @@ const CardFace = (props: {
               {item.activity.comments}
             </span>
           )}
-          <span className="dshx:font-mono!">b:{item.id}</span>
+          <span className="dshx:font-mono!">{BacklogReference.labelOf(item)}</span>
         </span>
       </div>
     </>
@@ -178,7 +179,7 @@ const BoardCard = (props: {
       <article
         tabIndex={-1}
         data-backlog-card-id={item.id}
-        aria-label={`Card b:${String(item.id)}`}
+        aria-label={`Card ${BacklogReference.labelOf(item)}`}
         aria-selected={props.selected}
         onPointerDown={event => props.startDrag(event, item, rename.openSoon, event.shiftKey, event.metaKey || event.ctrlKey)}
         onDoubleClick={rename.renameOnDoubleClick}

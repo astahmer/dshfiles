@@ -1,6 +1,7 @@
 import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { Schema } from 'effect'
+import { BacklogReference } from './backlog-reference.js'
 
 const effortSchema = Schema.Struct({ id: Schema.String, name: Schema.String, description: Schema.optionalKey(Schema.String) })
 const modelSchema = Schema.Struct({
@@ -24,6 +25,8 @@ export interface StartThreadProject {
 /** What starting a thread reads from an item; a summary or a full detail both satisfy it. */
 export interface StartThreadItem {
   readonly id: number
+  /** The `b:<ref>` the item shows; absent from an older Host's answer. */
+  readonly ref?: string | undefined
   readonly title: string
   /** The opening message's context line; empty when the title already says it. */
   readonly preview: string
@@ -219,7 +222,7 @@ export class StartThreadForm {
   /** The opening message: enough for the agent to find every item without pasting the whole bodies. */
   static message(items: readonly StartThreadItem[]): string {
     const body = items.map((item, index) => {
-      const heading = `${index === 0 ? 'Work on' : 'Also'} b:${String(item.id)}: ${item.title}`
+      const heading = `${index === 0 ? 'Work on' : 'Also'} ${BacklogReference.labelOf(item)}: ${item.title}`
       const preview = item.preview.trim()
       // A selection keeps headings only: each preview could be a whole item, and the agent reads them from b: refs.
       if (items.length > 1 || preview === '' || preview === item.title) return heading
@@ -250,7 +253,7 @@ export class StartThreadForm {
 
   /** The items a report names, so the panel can say what a background run is doing. */
   static refs(items: readonly StartThreadItem[]): string {
-    return items.map(item => `b:${String(item.id)}`).join(', ')
+    return items.map(item => `${BacklogReference.labelOf(item)}`).join(', ')
   }
 
   /** What a run reports while it waits for the jj workspace and the Session: the work is under way, not done. */
@@ -267,11 +270,12 @@ export class StartThreadForm {
 /** The item fields a started thread reads, so every list can hand its row straight to the dialog. */
 export const startThreadItemOf = (item: {
   readonly id: number
+  readonly ref?: string | undefined
   readonly title: string
   readonly project: string | null
   readonly preview?: string | null | undefined
   readonly body?: string | null | undefined
-}): StartThreadItem => ({ id: item.id, title: item.title, project: item.project, preview: item.preview ?? item.body ?? '' })
+}): StartThreadItem => ({ id: item.id, ref: item.ref, title: item.title, project: item.project, preview: item.preview ?? item.body ?? '' })
 
 /** The items' own target as a `StartThreadTarget`, for a caller that starts a thread without the dialog. */
 export const defaultTargetFor = (items: readonly StartThreadItem[], projects: readonly StartThreadProject[]): StartThreadTarget => {

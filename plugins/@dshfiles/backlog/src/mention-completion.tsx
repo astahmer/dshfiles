@@ -10,6 +10,7 @@ import { InlineCompletion, type InlineToken } from './inline-completion.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import type { ComposerFile } from './composer-files.js'
+import { BacklogReference } from './backlog-reference.js'
 
 /** The thread fields an `@` row needs; the composer's `ComposerThread` satisfies it. */
 export interface MentionThread {
@@ -78,15 +79,15 @@ export const useMentionCompletion = (props: {
       .then(result =>
         setItemSuggestions(
           result.items.map(item => ({
-            key: `b:${String(item.id)}`,
-            insert: `b:${String(item.id)} `,
+            key: `${BacklogReference.labelOf(item)}`,
+            insert: `${BacklogReference.labelOf(item)} `,
             label: (
               <>
                 <ItemGlyphs.StatusIcon status={item.status} />
                 <span className="dshx:truncate">{item.title}</span>
               </>
             ),
-            hint: `b:${String(item.id)}`,
+            hint: `${BacklogReference.labelOf(item)}`,
           })),
         ),
       )

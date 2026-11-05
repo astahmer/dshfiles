@@ -36,6 +36,7 @@ import { StatusFilterBar } from './status-filter-bar.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { itemTransitionName } from './view-transition.js'
+import { BacklogReference } from './backlog-reference.js'
 
 type GroupBy = 'status' | 'kind' | 'project' | 'attention'
 type Entry =
@@ -149,7 +150,7 @@ const Row = (props: {
       <div
         tabIndex={-1}
         role="row"
-        aria-label={`Item b:${String(item.id)}`}
+        aria-label={`Item ${BacklogReference.labelOf(item)}`}
         aria-selected={props.selected}
         onClick={event => {
           if (rename.renaming) return
@@ -171,7 +172,7 @@ const Row = (props: {
         <span className="dshx:flex dshx:justify-center" onClick={event => event.stopPropagation()}>
           <input
             type="checkbox"
-            aria-label={`Select b:${String(item.id)}`}
+            aria-label={`Select ${BacklogReference.labelOf(item)}`}
             checked={props.selected}
             onClick={event => {
               if (!event.shiftKey && !event.metaKey && !event.ctrlKey) return
@@ -193,7 +194,7 @@ const Row = (props: {
           />
         </span>
         <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-          <span className="dshx:w-10 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">b:{item.id}</span>
+          <span className="dshx:w-12 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">{BacklogReference.labelOf(item)}</span>
           {rename.renaming ? (
             <BacklogInlineTitle
               id={item.id}
@@ -233,10 +234,19 @@ const Row = (props: {
         </div>
         <span onClick={event => event.stopPropagation()} className="dshx:flex dshx:items-center">
           <span className={wideOnly}>
-            <ItemPickers.Status id={item.id} status={item.status} withLabel onPick={status => actions.update.mutate({ id: item.id, status })} />
+            <ItemPickers.Status
+              itemLabel={BacklogReference.labelOf(item)}
+              status={item.status}
+              withLabel
+              onPick={status => actions.update.mutate({ id: item.id, status })}
+            />
           </span>
           <span className="dshx:hidden dshx:@max-pane-compact:inline-flex">
-            <ItemPickers.Status id={item.id} status={item.status} onPick={status => actions.update.mutate({ id: item.id, status })} />
+            <ItemPickers.Status
+              itemLabel={BacklogReference.labelOf(item)}
+              status={item.status}
+              onPick={status => actions.update.mutate({ id: item.id, status })}
+            />
           </span>
         </span>
         <span className={cn('dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground', roomyOnly)}>

@@ -2,6 +2,7 @@ import type { JevQuestion } from '@dshfiles/jev'
 import { Effect, Option, Schema } from 'effect'
 
 import { BacklogItems, type BacklogItem, type BacklogKind, type BacklogProposal, type BacklogStatus } from './item.js'
+import { BacklogReference } from './backlog-reference.js'
 
 const MAX_CANDIDATES = 5
 const MAX_CORRECTIONS = 5
@@ -122,18 +123,18 @@ Answer with one JSON object and nothing else:
 - Do not change the item's status. Captures start in inbox; the user chooses when to move them.
 - title: a short, clear title; keep the author's wording when it is already clear.
 - tags: at most 3 lowercase single-word topics; reuse tags from similar items.
-- duplicateOf: the id of a similar item describing the same work, else null.
+- duplicateOf: the number after "id" of a similar item describing the same work, else null.
 - confidence: 0..1, how sure you are of the whole answer.
 - reason: one short sentence.`
 
 const modelInput = (item: BacklogItem, candidates: readonly BacklogItem[], corrections: readonly TriageCorrection[]): string =>
   [
-    `Item b:${String(item.id)} (currently kind ${item.kind}, status ${item.status}, tags ${item.tags.join(', ') || 'none'}):`,
+    `Item ${BacklogReference.labelOf(item)} (currently kind ${item.kind}, status ${item.status}, tags ${item.tags.join(', ') || 'none'}):`,
     item.title,
     item.body.slice(0, 2_000),
     candidates.length === 0
       ? ''
-      : `\nSimilar items:\n${candidates.map(other => `- b:${String(other.id)} [${other.kind}, ${other.status}, #${other.tags.join(' #')}] ${other.title}`).join('\n')}`,
+      : `\nSimilar items:\n${candidates.map(other => `- id ${String(other.id)} (${BacklogReference.labelOf(other)}) [${other.kind}, ${other.status}, #${other.tags.join(' #')}] ${other.title}`).join('\n')}`,
     corrections.length === 0
       ? ''
       : `\nThe user corrected earlier triage like this:\n${corrections.map(entry => `- "${entry.title}": suggested ${entry.suggested}; user chose ${entry.chosen}`).join('\n')}`,
@@ -273,14 +274,20 @@ const resolveThread = Effect.fn('backlog triage resolve thread')(function* (requ
   return proposal
 })
 
-/** "kind bug, status todo, tags a b, duplicate of b:3" — the wording events and the peek share. */
-const describe = (proposal: Pick<BacklogProposal, 'kind' | 'status' | 'title' | 'tags' | 'duplicateOf'>): string =>
+/**
+ * "kind bug, status todo, tags a b, duplicate of b:3" — the wording events and the peek share. `refOf` names the
+ * duplicate by its ref when the caller can look it up; otherwise its id stands in.
+ */
+const describe = (
+  proposal: Pick<BacklogProposal, 'kind' | 'status' | 'title' | 'tags' | 'duplicateOf'>,
+  refOf: (id: number) => string | undefined = () => undefined,
+): string =>
   [
     proposal.kind === undefined ? '' : `kind ${proposal.kind}`,
     proposal.status === undefined ? '' : `status ${proposal.status}`,
     proposal.title === undefined ? '' : `title "${proposal.title}"`,
     proposal.tags === undefined ? '' : `tags ${proposal.tags.join(' ')}`,
-    proposal.duplicateOf === undefined ? '' : `duplicate of b:${String(proposal.duplicateOf)}`,
+    proposal.duplicateOf === undefined ? '' : `duplicate of b:${refOf(proposal.duplicateOf) ?? String(proposal.duplicateOf)}`,
   ]
     .filter(Boolean)
     .join(', ')

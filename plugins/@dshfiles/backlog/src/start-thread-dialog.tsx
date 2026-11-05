@@ -15,6 +15,7 @@ import {
 } from './start-thread.js'
 import { continueMarkdownList } from './list-continuation.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { BacklogReference } from './backlog-reference.js'
 
 const labelClass = 'dshx:text-xs dshx:font-medium dshx:text-muted-foreground'
 
@@ -107,8 +108,8 @@ export const StartThreadDialog = (props: {
           <DialogTitle>Start thread</DialogTitle>
           <DialogDescription className="dshx:line-clamp-2">
             {props.items.length === 1
-              ? `b:${String(props.items[0]?.id)} · ${props.items[0]?.title ?? ''}`
-              : `${props.items.map(item => `b:${String(item.id)}`).join(', ')} · ${String(props.items.length)} items`}
+              ? `${props.items[0] === undefined ? '' : BacklogReference.labelOf(props.items[0])} · ${props.items[0]?.title ?? ''}`
+              : `${props.items.map(item => `${BacklogReference.labelOf(item)}`).join(', ')} · ${String(props.items.length)} items`}
           </DialogDescription>
         </DialogHeader>
         <div className="dshx:flex dshx:flex-col dshx:gap-3">

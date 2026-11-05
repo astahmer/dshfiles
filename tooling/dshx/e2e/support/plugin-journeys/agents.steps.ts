@@ -2,25 +2,27 @@ import { expect, type Page } from '@playwright/test'
 import { openGlobalPanel } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { withBacklogRefs } from './backlog-refs.js'
 
 const peek = (page: Page) => page.getByRole('complementary', { name: 'Item detail' })
 
 When('{string} is commented on the open item', async ({ page }: { page: Page }, text: string) => {
   const comment = peek(page).getByRole('textbox', { name: 'Comment', exact: true })
-  await comment.fill(text)
+  await comment.fill(await withBacklogRefs(page, text))
   await peek(page).getByRole('button', { name: 'Reply', exact: true }).click()
   // Backlog's comment box is a rich (contentEditable) editor, so it empties its text, not a value.
   await expect(comment).toHaveText('')
 })
 
-Then('the agent thread {string} opens with its instructions for {string}', async ({ page }: { page: Page }, title: string, task: string) => {
+Then('the agent thread {string} opens with its instructions for {string}', async ({ page }: { page: Page }, title: string, journeyTask: string) => {
+  const task = await withBacklogRefs(page, journeyTask)
   await recordAssertion(page, 'agents-comment-dispatch-starts-a-thread', async () => {
     await expect(page.getByRole('treeitem', { name: new RegExp(`^${title}\\b`, 'u') })).toHaveAttribute('aria-selected', 'true')
     // The sent message renders the agent mention as a chip, then its instructions, then the item heading the backlog
     // adds before the task, so the thread can find the item it was started for.
     await expect(page.getByText('Work as', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'dsh', exact: true }).first()).toBeVisible()
-    await expect(page.getByText(new RegExp(`---\\s*Work on b:\\d+: ${title}[\\s\\S]*${task}`, 'u'))).toBeVisible()
+    await expect(page.getByText(new RegExp(`---\\s*Work on b:[0-9a-z]+: ${title}[\\s\\S]*${task}`, 'u'))).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
@@ -187,7 +189,7 @@ When('{string} is typed in the open item comment box', async ({ page }: { page: 
   const box = commentBox(page)
   await box.click()
   await box.press('End')
-  await box.type(text)
+  await box.type(await withBacklogRefs(page, text))
 })
 
 Then('the agent suggestion {string} is offered', async ({ page }: { page: Page }, handle: string) => {

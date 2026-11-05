@@ -61,13 +61,13 @@ const Picker = <Value extends string>(props: {
 }
 
 const StatusPicker = (props: {
-  readonly id: number
+  readonly itemLabel: string
   readonly status: BacklogStatus
   readonly onPick: (status: BacklogStatus) => void
   readonly withLabel?: boolean
 }): JSX.Element => (
   <Picker
-    label={`Status of b:${String(props.id)}`}
+    label={`Status of ${props.itemLabel}`}
     value={props.status}
     values={BacklogItems.statuses}
     onPick={props.onPick}
@@ -87,9 +87,9 @@ const StatusPicker = (props: {
   />
 )
 
-const KindPicker = (props: { readonly id: number; readonly kind: BacklogKind; readonly onPick: (kind: BacklogKind) => void }): JSX.Element => (
+const KindPicker = (props: { readonly itemLabel: string; readonly kind: BacklogKind; readonly onPick: (kind: BacklogKind) => void }): JSX.Element => (
   <Picker
-    label={`Kind of b:${String(props.id)}`}
+    label={`Kind of ${props.itemLabel}`}
     value={props.kind}
     values={BacklogItems.kinds}
     onPick={props.onPick}
@@ -110,13 +110,13 @@ const KindPicker = (props: { readonly id: number; readonly kind: BacklogKind; re
 )
 
 const ProjectPickerField = (props: {
-  readonly id: number
+  readonly itemLabel: string
   readonly project: string | null
   readonly projects: readonly string[]
   readonly onPick: (project: string | null) => void
 }): JSX.Element => (
   <ProjectPicker
-    label={`Project of b:${String(props.id)}`}
+    label={`Project of ${props.itemLabel}`}
     value={props.project ?? BacklogProjects.none}
     projects={props.projects}
     onPick={value => props.onPick(value === BacklogProjects.none ? null : value)}
@@ -138,12 +138,12 @@ const ProjectPickerField = (props: {
 )
 
 const AttentionPicker = (props: {
-  readonly id: number
+  readonly itemLabel: string
   readonly attention: BacklogAttention
   readonly onPick: (attention: BacklogAttention) => void
 }): JSX.Element => (
   <Picker
-    label={`Attention of b:${String(props.id)}`}
+    label={`Attention of ${props.itemLabel}`}
     value={props.attention}
     values={BacklogItems.attentions}
     onPick={props.onPick}

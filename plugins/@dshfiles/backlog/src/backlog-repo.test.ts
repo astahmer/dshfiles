@@ -251,3 +251,45 @@ describe('the legacy import', () => {
     }).pipe(Effect.scoped),
   )
 })
+
+describe('short aliases', () => {
+  it.effect('gives a new item a fixed short alias while legacy numbers keep resolving, across a restart', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(1_000)
+      const rows = backlogRows({ legacy: { items: [legacyItem({ id: 3 })], files: [], mappings: [], nextId: 9 } })
+      const { store } = yield* open(rows)
+      const created = yield* store.capture({ text: 'fresh work, see b:3', actor: user })
+      const ref = created.item.ref ?? ''
+
+      expect(ref).toMatch(/^[0-9a-hjkmnp-tv-z]{4}$/u)
+      expect(/[a-z]/u.test(ref)).toBe(true)
+      expect(created.item.id).toBe(9)
+      expect(created.item.links).toEqual([{ type: 'item', target: '3', provenance: 'extracted' }])
+      expect((yield* store.list({})).items.map(item => [item.id, item.ref])).toEqual(
+        expect.arrayContaining([
+          [3, '3'],
+          [9, ref],
+        ]),
+      )
+
+      expect(yield* store.resolve('3')).toBe(3)
+      expect(yield* store.resolve('b:3')).toBe(3)
+      expect(yield* store.resolve(ref)).toBe(9)
+      expect(yield* store.resolve(`b:${ref.toUpperCase()}`)).toBe(9)
+      expect(yield* store.resolve(9)).toBe(9)
+      // A new item's number is private: written as `b:9` it names nothing.
+      expect(yield* store.resolve('9')).toBeUndefined()
+      expect(yield* store.resolve('zzzz')).toBeUndefined()
+
+      const legacyDetail = yield* store.get(3)
+      expect(legacyDetail.ok && legacyDetail.value.backlinks.map(item => item.id)).toEqual([9])
+
+      const reopened = yield* open(rows)
+      const again = yield* reopened.store.get(9)
+      expect(again.ok && again.value.item.ref).toBe(ref)
+      expect(yield* reopened.store.resolve(ref)).toBe(9)
+      expect(yield* reopened.store.resolve('3')).toBe(3)
+      expect((yield* reopened.store.capture({ text: 'another', actor: user })).item.ref).not.toBe(ref)
+    }).pipe(Effect.scoped),
+  )
+})

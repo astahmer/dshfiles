@@ -21,7 +21,7 @@ describe('backlog sent mentions', () => {
       id: 'backlog',
       start: 0,
       end: text.length,
-      data: { id: 12, title: 'Composer drops chips' },
+      data: { ref: '12', title: 'Composer drops chips' },
     })
   })
 
@@ -30,7 +30,7 @@ describe('backlog sent mentions', () => {
       id: 'backlog',
       start: 'Working on '.length,
       end: 'Working on b:12'.length,
-      data: { id: 12, title: null },
+      data: { ref: '12', title: null },
     })
   })
 
@@ -46,7 +46,7 @@ describe('backlog sent mentions', () => {
 
     try {
       await act(async () => {
-        root.render(<BacklogMentionChip node={{ id: 'backlog', start: 0, end: 5, data: { id: 12, title: 'Composer drops chips' } }} interactive />)
+        root.render(<BacklogMentionChip node={{ id: 'backlog', start: 0, end: 5, data: { ref: '12', title: 'Composer drops chips' } }} interactive />)
       })
       const button = container.querySelector('button')
       expect(button?.textContent).toBe('b:12 · Composer drops chips')
@@ -69,7 +69,7 @@ describe('backlog sent mentions', () => {
     const root = createRoot(container)
 
     act(() => {
-      root.render(<BacklogMentionChip node={{ id: 'backlog', start: 0, end: 4, data: { id: 7, title: null } }} interactive={false} />)
+      root.render(<BacklogMentionChip node={{ id: 'backlog', start: 0, end: 4, data: { ref: '7', title: null } }} interactive={false} />)
     })
     expect(container.querySelector('button')).toBeNull()
     expect(container.querySelector('[data-ref-chip="backlog"]')?.textContent).toBe('b:7')

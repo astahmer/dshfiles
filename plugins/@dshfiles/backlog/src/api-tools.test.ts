@@ -4,6 +4,16 @@ import { backlogApi } from './api.js'
 import { BacklogItems } from './item.js'
 
 describe('backlog tool exposure', () => {
+  test('item ids take a number from an older caller or a written reference, and reject anything else', () => {
+    const get = backlogApi.methods.get.input
+    const getMany = backlogApi.methods.getMany.input
+    if (get === undefined || getMany === undefined) throw new Error('Get input schemas are missing')
+    const validate = Schema.decodeUnknownResult(get)
+    for (const id of [12, '12', 'b:12', 'k3f9', 'b:k3f9', 'K3F9', '7hq2x']) expect(Result.isSuccess(validate({ id }))).toBe(true)
+    for (const id of [0, -1, 1.5, '', 'b:', 'todo', 'k3f', 'k3f9xyz', 'b:0', 'session-abc']) expect(Result.isFailure(validate({ id }))).toBe(true)
+    expect(Result.isSuccess(Schema.decodeUnknownResult(getMany)({ ids: [12, 'b:k3f9'] }))).toBe(true)
+  })
+
   test('empty actor filters mean no filter without weakening actor ID validation', async () => {
     const schema = backlogApi.methods.list.input
     if (schema === undefined) throw new Error('List input schema is missing')

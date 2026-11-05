@@ -52,7 +52,7 @@ describe('backlog @ mentions', () => {
     expect(picked).toEqual({
       insert: {
         source: 'backlog',
-        ref: '{"id":12,"title":"Composer drops chips"}',
+        ref: '{"ref":"12","title":"Composer drops chips"}',
         label: 'b:12 Composer drops chips',
         clipboardText: 'b:12 Composer drops chips',
       },

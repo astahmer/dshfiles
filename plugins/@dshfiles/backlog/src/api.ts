@@ -1,9 +1,19 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { Effect, Schema, SchemaGetter } from 'effect'
+import { BacklogReference } from './backlog-reference.js'
 import { BacklogItems } from './item.js'
 import { BacklogSyncModel } from './sync-model.js'
 
 const idSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))
+const refTextSchema = Schema.String.check(
+  Schema.makeFilter(value => (BacklogReference.parse(value) === undefined ? 'Expected a backlog reference such as b:k3f9, k3f9 or a legacy 12.' : undefined)),
+)
+/** An item a caller names: its `b:<ref>` (`b:k3f9`, `k3f9`, a legacy `b:12` or `12`), or the number an older caller sends. */
+const itemKeySchema = Schema.Union([idSchema, refTextSchema]).annotate({
+  description: 'The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number.',
+})
+/** The `b:<ref>` an item shows; a Host older than short aliases answers without it, and `BacklogReference.refOf` falls back to the id. */
+const refOutputSchema = Schema.optionalKey(Schema.String)
 const freshnessSchema = Schema.Literals(BacklogItems.freshnessStates)
 const fileInputSchema = Schema.Struct({
   ...BacklogItems.attachmentPayloadFields,
@@ -18,7 +28,7 @@ const commentHasBody = (input: { readonly text: string; readonly files?: readonl
   input.text.trim().length > 0 || (input.files?.length ?? 0) > 0
 
 const commentInputSchema = Schema.Struct({
-  id: idSchema,
+  id: itemKeySchema,
   text: Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars)).annotate({
     description: 'Reply text; it may be empty only when the comment includes an attachment.',
   }),
@@ -54,6 +64,7 @@ const transcriptionSchema = Schema.Union([
 
 const summarySchema = Schema.Struct({
   id: idSchema,
+  ref: refOutputSchema,
   title: Schema.String,
   kind: BacklogItems.kindSchema,
   status: BacklogItems.statusSchema,
@@ -108,7 +119,7 @@ const detailResultSchema = Schema.Union([
 
 const detailManySchema = Schema.Struct({
   items: Schema.Array(detailSchema),
-  missing: Schema.Array(idSchema),
+  missing: Schema.Array(itemKeySchema),
 })
 
 /** An empty string means "no filter", so decoding folds it to an absent actor while the id itself stays strict. */
@@ -163,7 +174,7 @@ const renderItemPreview = (item: (typeof detailSchema.Type)['item']): string => 
   const body = previewText(item.body)
   const status = `${item.kind} · ${item.status}`
   const project = item.project === null ? '' : ` · ${item.project}`
-  return [`b:${String(item.id)} — ${item.title}`, `${status}${project}`, ...(body === '' ? [] : [body])].join('\n')
+  return [`${BacklogReference.labelOf(item)} — ${item.title}`, `${status}${project}`, ...(body === '' ? [] : [body])].join('\n')
 }
 
 const renderDetailPreview = (result: typeof detailResultSchema.Type): string => (result.ok ? renderItemPreview(result.value.item) : 'No backlog item found.')
@@ -191,6 +202,7 @@ const syncStateSchema = Schema.Literals(BacklogSyncModel.syncStates)
 const syncErrorViewSchema = Schema.Struct({ code: Schema.String, message: Schema.String })
 const syncItemSchema = Schema.Struct({
   itemId: idSchema,
+  ref: refOutputSchema,
   backend: BacklogSyncModel.backendSchema,
   remoteKey: Schema.String,
   url: Schema.String,
@@ -201,6 +213,7 @@ const syncItemSchema = Schema.Struct({
 })
 const syncResultSchema = Schema.Struct({
   itemId: idSchema,
+  ref: refOutputSchema,
   remoteKey: Schema.NullOr(Schema.String),
   state: syncStateSchema,
   pulled: Schema.Array(Schema.Literals(BacklogSyncModel.syncedFields)),
@@ -265,8 +278,8 @@ const renderSyncResults = (output: { readonly results: readonly (typeof syncResu
     : output.results
         .map(result =>
           result.error === null
-            ? `b:${String(result.itemId)} ↔ ${result.remoteKey ?? '?'}: ${result.state}${result.pulled.length > 0 ? ` · pulled ${result.pulled.join(', ')}` : ''}${result.pushed.length > 0 ? ` · pushed ${result.pushed.join(', ')}` : ''}`
-            : `b:${String(result.itemId)}: ${result.error.message}`,
+            ? `${BacklogReference.labelOf({ id: result.itemId, ref: result.ref })} ↔ ${result.remoteKey ?? '?'}: ${result.state}${result.pulled.length > 0 ? ` · pulled ${result.pulled.join(', ')}` : ''}${result.pushed.length > 0 ? ` · pushed ${result.pushed.join(', ')}` : ''}`
+            : `${BacklogReference.labelOf({ id: result.itemId, ref: result.ref })}: ${result.error.message}`,
         )
         .join('\n')
 
@@ -316,17 +329,20 @@ export const backlogApi = defineApi({
       tool: { name: 'backlog_projects', readOnly: true },
     }),
     get: method({
-      input: Schema.Struct({ id: idSchema }),
+      input: Schema.Struct({ id: itemKeySchema }),
       output: detailResultSchema,
       description:
-        'One backlog item `b:<id>` with its body, links, event history and the items that link to it. Read-only. Use `backlog_get_many` for several at once.',
+        'One backlog item `b:<ref>` with its body, links, event history and the items that link to it. Read-only. Use `backlog_get_many` for several at once.',
       tool: { name: 'backlog_get', readOnly: true, render: renderDetailPreview },
     }),
     getMany: method({
       input: Schema.Struct({
-        ids: Schema.Array(idSchema)
+        ids: Schema.Array(itemKeySchema)
           .check(Schema.isMinLength(1), Schema.isMaxLength(50))
-          .annotate({ description: 'Item ids (`b:<id>` numbers). Duplicates are read once; unknown ids are reported, not failed.' }),
+          .annotate({
+            description:
+              'Items as written (`b:k3f9`, `k3f9`, a legacy `b:12`) or their numbers. Duplicates are read once; unknown ones are reported, not failed.',
+          }),
       }),
       output: detailManySchema,
       description:
@@ -343,7 +359,7 @@ export const backlogApi = defineApi({
       input: Schema.Struct({
         text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxBodyChars)).annotate({
           description:
-            'Free text. First line is the title; a `bug:`/`idea:`/`note:`/`question:`/`task:` prefix sets the kind; `#tags`, `b:<id>`, `jj:<rev>`, `branch:<name>`, session ids and URLs become links.',
+            'Free text. First line is the title; a `bug:`/`idea:`/`note:`/`question:`/`task:` prefix sets the kind; `#tags`, `b:<ref>`, `jj:<rev>`, `branch:<name>`, session ids and URLs become links.',
         }),
         project: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))
           .pipe(Schema.optional)
@@ -360,14 +376,14 @@ export const backlogApi = defineApi({
       tool: { name: 'backlog_capture', readOnly: false, render: renderCreatedPreview },
     }),
     attachFile: method({
-      input: Schema.Struct({ id: idSchema, file: fileInputSchema }),
+      input: Schema.Struct({ id: itemKeySchema, file: fileInputSchema }),
       output: detailResultSchema,
       description: `Keep one image or file with an existing backlog item. ${writeNote}`,
       tool: { name: 'backlog_attach_file', readOnly: false, render: renderDetailPreview },
     }),
     readFile: method({
       input: Schema.Struct({
-        id: idSchema,
+        id: itemKeySchema,
         attachmentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
         save: Schema.Boolean.pipe(Schema.optional).annotate({
           description: 'Also write the bytes to a temporary file and return its absolute path, for an image or file reader that needs a path.',
@@ -378,14 +394,14 @@ export const backlogApi = defineApi({
       tool: { name: 'backlog_read_file', readOnly: true },
     }),
     removeFile: method({
-      input: Schema.Struct({ id: idSchema, attachmentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) }),
+      input: Schema.Struct({ id: itemKeySchema, attachmentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)) }),
       output: detailResultSchema,
       description: `Remove one image or file from a backlog item. ${writeNote}`,
       tool: { name: 'backlog_remove_file', readOnly: false, render: renderDetailPreview },
     }),
     delete: method({
       input: Schema.Struct({
-        id: idSchema,
+        id: itemKeySchema,
         confirm: Schema.Literal(true).annotate({ description: 'Explicit opt-in acknowledging this permanently deletes the item and its attachments.' }),
       }),
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true) }), Schema.Struct({ ok: Schema.Literal(false), reason: Schema.Literal('not-found') })]),
@@ -412,7 +428,7 @@ export const backlogApi = defineApi({
     }),
     generateReply: method({
       input: Schema.Struct({
-        id: idSchema,
+        id: itemKeySchema,
         text: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxBodyChars)),
         provider: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
         model: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
@@ -426,14 +442,14 @@ export const backlogApi = defineApi({
       description: 'Transcribe one browser microphone recording through the Host voice-input bundle. Not an agent tool.',
     }),
     enrichTweet: method({
-      input: Schema.Struct({ id: idSchema, url: BacklogItems.tweetContextUrlSchema }),
+      input: Schema.Struct({ id: itemKeySchema, url: BacklogItems.tweetContextUrlSchema }),
       output: detailResultSchema,
       description: `Retrieve public tweet text and media for a URL already in one backlog item. Use it when the user asked; this sends the post ID to FxEmbed and appends quoted, untrusted tweet text plus available images without replacing the existing description.`,
       tool: { name: 'backlog_enrich_tweet', readOnly: false, render: renderDetailPreview },
     }),
     update: method({
       input: Schema.Struct({
-        id: idSchema,
+        id: itemKeySchema,
         title: Schema.String.check(Schema.isMaxLength(BacklogItems.maxTitleChars)).pipe(Schema.optional),
         body: Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars)).pipe(Schema.optional),
         kind: BacklogItems.kindSchema.pipe(Schema.optional),
@@ -458,19 +474,19 @@ export const backlogApi = defineApi({
       tool: { name: 'backlog_update', readOnly: false, render: renderDetailPreview },
     }),
     link: method({
-      input: Schema.Struct({ id: idSchema, link: BacklogItems.linkSchema, remove: Schema.Boolean.pipe(Schema.optional) }),
+      input: Schema.Struct({ id: itemKeySchema, link: BacklogItems.linkSchema, remove: Schema.Boolean.pipe(Schema.optional) }),
       output: detailResultSchema,
       description: `Link a backlog item to a thread, jj revision, branch, workspace, URL or another item (\`remove: true\` unlinks). ${writeNote}`,
       tool: { name: 'backlog_link', readOnly: false, render: renderDetailPreview },
     }),
     agentContinuationCandidates: method({
-      input: Schema.Struct({ id: idSchema, handle: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)) }),
+      input: Schema.Struct({ id: itemKeySchema, handle: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)) }),
       output: Schema.Array(agentContinuationCandidateSchema).check(Schema.isMaxLength(50)),
       description: 'List threads for an agent that are already linked to one backlog item, for an explicit continue-or-new choice.',
     }),
     continueAgentThread: method({
       input: Schema.Struct({
-        id: idSchema,
+        id: itemKeySchema,
         handle: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
         sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
         text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxBodyChars)),
@@ -480,7 +496,7 @@ export const backlogApi = defineApi({
     }),
     startThread: method({
       input: Schema.Struct({
-        ids: Schema.Array(idSchema)
+        ids: Schema.Array(itemKeySchema)
           .check(Schema.isMinLength(1), Schema.isMaxLength(20))
           .annotate({ description: 'The items the thread works on; every one of them is linked and named in the opening message.' }),
         workspaceId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))
@@ -506,13 +522,13 @@ export const backlogApi = defineApi({
             "The thread's first message; the items' own headings by default. An agent's identity and instructions are prepended when `agent` is named.",
         }),
       }),
-      output: Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)), linked: Schema.Array(idSchema), missing: Schema.Array(idSchema) }),
+      output: Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)), linked: Schema.Array(idSchema), missing: Schema.Array(itemKeySchema) }),
       description: `Start one thread for these items: it runs in its own jj workspace of their project, is named after the first item, receives every selected item's full description, all current replies in order, and every item- and reply-level attachment, and links to every item. Missing or unreadable items/files and upload or prompt failures reject the start instead of silently omitting context. ${writeNote}`,
       tool: { name: 'backlog_start_thread', readOnly: false },
     }),
     syncStatus: method({
       input: Schema.Struct({
-        ids: Schema.Array(idSchema)
+        ids: Schema.Array(itemKeySchema)
           .check(Schema.isMaxLength(500))
           .pipe(Schema.optional)
           .annotate({ description: 'Only these items; omit for every linked item.' }),
@@ -524,7 +540,7 @@ export const backlogApi = defineApi({
     }),
     syncNow: method({
       input: Schema.Struct({
-        id: idSchema.pipe(Schema.optional).annotate({ description: 'One linked item; omit to sync every linked item (of `project`, when given).' }),
+        id: itemKeySchema.pipe(Schema.optional).annotate({ description: 'One linked item; omit to sync every linked item (of `project`, when given).' }),
         project: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))
           .pipe(Schema.optional)
           .annotate({ description: 'Only linked items of this project; null selects items without a project.' }),
@@ -535,7 +551,7 @@ export const backlogApi = defineApi({
     }),
     linkRemote: method({
       input: Schema.Struct({
-        id: idSchema,
+        id: itemKeySchema,
         backend: BacklogSyncModel.backendSchema,
         reference: remoteReferenceSchema.pipe(Schema.optional),
         create: Schema.Boolean.pipe(Schema.optional).annotate({
@@ -593,12 +609,12 @@ export const backlogApi = defineApi({
       tool: { name: 'backlog_import_remote', readOnly: false, render: output => renderItemPreview(output.detail.item) },
     }),
     acknowledge: method({
-      input: Schema.Struct({ ids: Schema.Array(idSchema).check(Schema.isMaxLength(500)) }),
+      input: Schema.Struct({ ids: Schema.Array(itemKeySchema).check(Schema.isMaxLength(500)) }),
       output: Schema.Void,
       description: 'Mark Inbox items as seen by the user. Presentation state for the panel; not an agent tool.',
     }),
     triage: method({
-      input: Schema.Struct({ id: idSchema }),
+      input: Schema.Struct({ id: itemKeySchema }),
       output: detailResultSchema,
       description:
         'Run automatic triage on one item now (Jev and the configured cheap model). A confident answer applies, skipping fields the user set by hand; otherwise it is left as a proposal on the item.',
@@ -624,13 +640,13 @@ export const backlogApi = defineApi({
       tool: { name: 'backlog_triage_backfill_status', readOnly: true },
     }),
     applyProposal: method({
-      input: Schema.Struct({ id: idSchema }),
+      input: Schema.Struct({ id: itemKeySchema }),
       output: detailResultSchema,
       description: `Accept the triage proposal on an item: its kind, status, title and tags apply, and a suspected duplicate is linked. ${writeNote}`,
       tool: { name: 'backlog_accept_proposal', readOnly: false, render: renderDetailPreview },
     }),
     dismissProposal: method({
-      input: Schema.Struct({ id: idSchema }),
+      input: Schema.Struct({ id: itemKeySchema }),
       output: detailResultSchema,
       description: `Dismiss the triage proposal on an item without changing it. ${writeNote}`,
       tool: { name: 'backlog_dismiss_proposal', readOnly: false, render: renderDetailPreview },
@@ -643,7 +659,7 @@ export const backlogApi = defineApi({
     }),
     editComment: method({
       input: Schema.Struct({
-        id: idSchema,
+        id: itemKeySchema,
         commentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
         text: Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars)),
         files: Schema.Array(fileInputSchema)
@@ -655,7 +671,7 @@ export const backlogApi = defineApi({
       description: 'Edit one of the current user’s previous replies in the backlog panel.',
     }),
     deleteComment: method({
-      input: Schema.Struct({ id: idSchema, commentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)) }),
+      input: Schema.Struct({ id: itemKeySchema, commentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)) }),
       output: detailResultSchema,
       description: 'Delete one of the current user’s previous replies in the backlog panel.',
     }),

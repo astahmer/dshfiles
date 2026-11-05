@@ -5,7 +5,7 @@ import { BacklogFocusModel } from './backlog-focus.js'
 export const usePanelRequests = (props: {
   readonly draftKey: string
   readonly visible: boolean
-  readonly onFocus: (id: number) => void
+  readonly onFocus: (id: number | string) => void
   readonly onCapture: (request: { readonly id: number; readonly text: string }) => void
 }): void => {
   const { visible, draftKey, onFocus, onCapture } = props

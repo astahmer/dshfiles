@@ -79,6 +79,7 @@ import { workspaceReferenceLabel } from './workspace-reference-label.js'
 import { SecretLinkRevealSlot } from './secret-link-reveal.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { BacklogReference } from './backlog-reference.js'
 
 type OpenThread = (sessionId: string) => void
 type ThreadLabel = (sessionId: string) => string
@@ -380,8 +381,17 @@ const TagsField = (props: { readonly id: number; readonly tags: readonly string[
 /** Triage's or a finished thread's suggestion, shown until accepted or dismissed, with its confidence and reason. */
 const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogProposal }): JSX.Element => {
   const actions = useBacklogActions()
+  const api = useApi(backlogApi)
   const proposal = props.proposal
   const fromThread = proposal.origin === 'thread'
+  const duplicateOf = proposal.duplicateOf
+  const duplicate = useQuery({
+    queryKey: ['dshfiles-backlog', 'duplicate-ref', duplicateOf],
+    enabled: duplicateOf !== undefined,
+    staleTime: 60_000,
+    queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: duplicateOf ?? 0 }, { signal })),
+  })
+  const duplicateRef = duplicate.data?.ok === true ? BacklogReference.refOf(duplicate.data.value.item) : undefined
   return (
     <section
       aria-label={fromThread ? 'Thread suggestion' : 'Triage suggestion'}
@@ -390,7 +400,7 @@ const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogPr
       <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
         <WandSparklesIcon aria-hidden className="dshx:size-3.5 dshx:text-violet" />
         <span className="dshx:font-medium">{fromThread ? 'Thread suggests' : 'Triage suggests'}</span>
-        <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">{BacklogTriage.describe(proposal)}</span>
+        <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">{BacklogTriage.describe(proposal, () => duplicateRef)}</span>
         <span className="dshx:ml-auto dshx:text-muted-foreground">{Math.round(proposal.confidence * 100)}%</span>
       </div>
       {proposal.reason === '' ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{proposal.reason}</p>}
@@ -918,7 +928,7 @@ const LinkRow = (props: {
     queryKey: ['dshfiles-backlog', 'reference-title', link.target],
     enabled: link.type === 'item',
     staleTime: 30_000,
-    queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: Number(link.target) }, { signal })),
+    queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: BacklogReference.requestId(link.target) }, { signal })),
   })
   const Icon = linkIcons[link.type]
   const [urlOpen, setUrlOpen] = useState(false)
@@ -931,7 +941,7 @@ const LinkRow = (props: {
     <li className="dshx:group/link dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:transition-colors dshx:hover:bg-accent/50">
       <Icon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
       {link.type === 'item' && (
-        <BacklogReferenceChip id={Number(link.target)} itemTitle={linkedItem.data?.ok === true ? linkedItem.data.value.item.title : null} />
+        <BacklogReferenceChip reference={link.target} itemTitle={linkedItem.data?.ok === true ? linkedItem.data.value.item.title : null} />
       )}
       {link.type === 'url' && (
         <Popover open={urlOpen} onOpenChange={setUrlOpen}>
@@ -1120,7 +1130,7 @@ const PeekBody = (props: {
               <span>/</span>
             </>
           )}
-          <span className="dshx:font-mono! dshx:text-foreground">b:{item.id}</span>
+          <span className="dshx:font-mono! dshx:text-foreground">{BacklogReference.labelOf(item)}</span>
           {item.freshness === 'fresh' ? null : <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[11px]">{item.freshness}</span>}
         </nav>
         <TooltipProvider>
@@ -1131,7 +1141,7 @@ const PeekBody = (props: {
                   variant="ghost"
                   size="icon-xs"
                   aria-label="Start thread"
-                  onClick={() => props.startThread([startThreadItemOf({ id: item.id, title: item.title, project: item.project, preview: item.body })])}
+                  onClick={() => props.startThread([startThreadItemOf({ id: item.id, ref: item.ref, title: item.title, project: item.project, preview: item.body })])}
                 >
                   <MessagesSquareIcon />
                 </Button>
@@ -1187,25 +1197,30 @@ const PeekBody = (props: {
           >
             <div
               tabIndex={-1}
-              aria-label={`Item b:${String(item.id)}`}
+              aria-label={`Item ${BacklogReference.labelOf(item)}`}
               className="dshx:flex dshx:flex-col dshx:gap-3 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50"
             >
               <TitleField id={item.id} title={item.title} />
               <div className="dshx:-ml-1.5 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
-                <ItemPickers.Status id={item.id} status={item.status} withLabel onPick={status => actions.update.mutate({ id: item.id, status })} />
-                <ItemPickers.Kind id={item.id} kind={item.kind} onPick={kind => actions.update.mutate({ id: item.id, kind })} />
+                <ItemPickers.Status
+                  itemLabel={BacklogReference.labelOf(item)}
+                  status={item.status}
+                  withLabel
+                  onPick={status => actions.update.mutate({ id: item.id, status })}
+                />
+                <ItemPickers.Kind itemLabel={BacklogReference.labelOf(item)} kind={item.kind} onPick={kind => actions.update.mutate({ id: item.id, kind })} />
                 <ItemPickers.Project
-                  id={item.id}
+                  itemLabel={BacklogReference.labelOf(item)}
                   project={item.project}
                   projects={props.projectPaths}
                   onPick={project => actions.update.mutate({ id: item.id, project })}
                 />
                 <ItemPickers.Attention
-                  id={item.id}
+                  itemLabel={BacklogReference.labelOf(item)}
                   attention={item.attention ?? 'none'}
                   onPick={attention => actions.update.mutate({ id: item.id, attention })}
                 />
-                <BacklogSyncControls.Chip itemId={item.id} />
+                <BacklogSyncControls.Chip itemId={item.id} itemLabel={BacklogReference.labelOf(item)} />
                 <span className="dshx:ml-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
                   {item.actors.map(actor => (
                     <AgentThreadChip
@@ -1266,7 +1281,7 @@ const PeekBody = (props: {
           <Section title="Relationships" action={<AddLink id={item.id} />}>
             {groups.length === 0 && props.detail.backlinks.length === 0 ? (
               <p className="dshx:text-xs dshx:text-muted-foreground">
-                Nothing linked yet. Threads that mention b:{item.id} and revisions that close it link themselves.
+                Nothing linked yet. Threads that mention {BacklogReference.labelOf(item)} and revisions that close it link themselves.
               </p>
             ) : null}
             {groups.map(group => (
@@ -1309,7 +1324,7 @@ const PeekBody = (props: {
                           className="dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/50"
                         >
                           <ItemGlyphs.StatusIcon status={backlink.status} />
-                          <span className="dshx:font-mono! dshx:text-xs dshx:text-muted-foreground">b:{backlink.id}</span>
+                          <span className="dshx:font-mono! dshx:text-xs dshx:text-muted-foreground">{BacklogReference.labelOf(backlink)}</span>
                           <span className="dshx:min-w-0 dshx:truncate">{backlink.title}</span>
                         </button>
                       </li>
@@ -1332,7 +1347,7 @@ const PeekBody = (props: {
               agentReplying={agentReplying}
             />
             <CommentBox
-              item={{ id: item.id, title: item.title, project: item.project, preview: item.body.slice(0, 500) }}
+              item={{ id: item.id, ref: item.ref, title: item.title, project: item.project, preview: item.body.slice(0, 500) }}
               threads={props.threads}
               projects={props.projectPaths}
               openCreatedByDefault={props.openCreatedByDefault}
@@ -1462,7 +1477,7 @@ const ItemPeek = (props: {
           triageOff={props.triageOff}
         />
       ) : (
-        <p className="dshx:p-6 dshx:text-sm dshx:text-muted-foreground">b:{props.id} does not exist.</p>
+        <p className="dshx:p-6 dshx:text-sm dshx:text-muted-foreground">This item no longer exists. Search the Backlog for it.</p>
       )}
     </aside>
   )

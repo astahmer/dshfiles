@@ -7,6 +7,7 @@ import { BacklogItems, type BacklogAttachment, type BacklogItem } from './item.j
 import { LegacyImport, type LegacyImportPlan } from './legacy-import.js'
 import { LegacyBacklogTables } from './legacy-tables.js'
 import { BacklogOps, type BacklogOp, type BacklogOpRecord, type Hlc } from './op-log.js'
+import { ShortAlias } from './short-alias.js'
 import { BacklogSyncModel, type SyncMapping } from './sync-model.js'
 import { ulid } from './ulid.js'
 
@@ -43,7 +44,7 @@ const encodeMapping = Schema.encodeEffect(mappingJson)
 
 const MetaRow = Schema.Struct({ value: Schema.String })
 const ItemRow = Schema.Struct({ item: Schema.String })
-const AliasRow = Schema.Struct({ alias: Schema.String, item_id: Schema.String })
+const AliasRow = Schema.Struct({ alias: Schema.String, item_id: Schema.String, kind: Schema.String })
 const OpRow = Schema.Struct({
   op_id: Schema.String,
   item_id: Schema.String,
@@ -101,8 +102,10 @@ export class BacklogRepo extends Context.Service<
     readonly foldAll: Effect.Effect<readonly BacklogItem[], unknown>
     /** The ops of one item, in log order. */
     readonly opsOf: (itemId: number) => Effect.Effect<readonly BacklogOpRecord[], unknown>
-    /** The canonical id of a numeric `b:<n>` alias. */
+    /** The canonical id of an item's numeric id. */
     readonly canonicalId: (itemId: number) => Effect.Effect<Option.Option<string>>
+    /** A short alias no item, live or deleted, has ever held: what a new item shows as `b:<ref>`. */
+    readonly mintRef: Effect.Effect<string>
     /** How many rows each table holds, and how many attachment byte files exist. */
     readonly counts: Effect.Effect<{ readonly ops: number; readonly items: number; readonly attachments: number; readonly mappings: number }, unknown>
     /** The receipt the one-time import left, if it ran. */
@@ -192,9 +195,16 @@ export class BacklogRepo extends Context.Service<
         sql`INSERT OR REPLACE INTO attachments (item_id, attachment_id, sha256, media_type, bytes, created_at)
           VALUES (${input.itemId}, ${input.attachment.id}, ${input.sha256}, ${input.attachment.mediaType}, ${input.size}, ${input.attachment.createdAt})`
 
+      /**
+       * `legacy` is the public `b:<n>` of an item created before short aliases, `key` the private numeric id of a newer
+       * one (never shown, never resolved as `b:<n>`), and `short` its `b:<ref>`. Both numeric kinds map the store's id.
+       */
       const loadAliases = Effect.map(
-        SqlSchema.findAll({ Request: Schema.Void, Result: AliasRow, execute: () => sql`SELECT alias, item_id FROM aliases WHERE kind = 'legacy'` })(undefined),
-        rows => new Map(rows.map(row => [Number(row.alias), row.item_id])),
+        SqlSchema.findAll({ Request: Schema.Void, Result: AliasRow, execute: () => sql`SELECT alias, item_id, kind FROM aliases` })(undefined),
+        rows => ({
+          numeric: new Map(rows.flatMap(row => (row.kind === 'legacy' || row.kind === 'key' ? [[Number(row.alias), row.item_id] as const] : []))),
+          short: new Set(rows.flatMap(row => (row.kind === 'short' ? [row.alias] : []))),
+        }),
       )
 
       const readOps = (itemId: string | null) =>
@@ -282,7 +292,9 @@ export class BacklogRepo extends Context.Service<
         yield* writeImport(LegacyImport.plan({ snapshot, host: hostId }))
       }
 
-      const aliases = yield* Ref.make(yield* loadAliases)
+      const loaded = yield* loadAliases
+      const aliases = yield* Ref.make(loaded.numeric)
+      const shortAliases = yield* Ref.make(loaded.short)
 
       if (Option.getOrUndefined(yield* metaGet(META_FOLD_VERSION))?.value !== FOLD_VERSION) {
         const folded = yield* foldWith(yield* Ref.get(aliases))
@@ -333,9 +345,12 @@ export class BacklogRepo extends Context.Service<
         const itemId = ulid(input.item.createdAt)
         const records = yield* stamp({ itemId, origin: input.origin, ops: BacklogOps.createOps(input.item) })
         const blobs = yield* Effect.forEach(input.files, file => Effect.map(putBlob(file.data), blob => ({ ...blob, attachment: file.attachment })))
+        const ref = input.item.ref
         yield* sql.withTransaction(
           Effect.gen(function* () {
-            yield* sql`INSERT INTO aliases (alias, item_id, kind, created_at) VALUES (${String(input.item.id)}, ${itemId}, 'legacy', ${input.item.createdAt})`
+            yield* sql`INSERT INTO aliases (alias, item_id, kind, created_at) VALUES (${String(input.item.id)}, ${itemId}, ${ref === undefined ? 'legacy' : 'key'}, ${input.item.createdAt})`
+            if (ref !== undefined)
+              yield* sql`INSERT INTO aliases (alias, item_id, kind, created_at) VALUES (${ref}, ${itemId}, 'short', ${input.item.createdAt})`
             yield* insertOps(records)
             yield* writeItemRow({ itemId, item: input.item, deleted: false })
             yield* Effect.forEach(blobs, blob => insertAttachment({ itemId, ...blob }), { discard: true })
@@ -343,7 +358,10 @@ export class BacklogRepo extends Context.Service<
           }),
         )
         yield* Ref.update(aliases, current => new Map(current).set(input.item.id, itemId))
+        if (ref !== undefined) yield* Ref.update(shortAliases, current => new Set(current).add(ref))
       })
+
+      const mintRef = Effect.flatMap(Ref.get(shortAliases), taken => Effect.sync(() => ShortAlias.mint({ taken })))
 
       const append = Effect.fnUntraced(function* (input: { readonly prev: BacklogItem; readonly next: BacklogItem; readonly origin: string }) {
         const ops = BacklogOps.diff(input.prev, input.next)
@@ -471,6 +489,7 @@ export class BacklogRepo extends Context.Service<
         foldAll: Effect.map(Effect.flatMap(Ref.get(aliases), foldWith), entries => entries.flatMap(entry => (entry.item === null ? [] : [entry.item]))),
         opsOf: itemId => Effect.flatMap(requireCanonical(itemId), readOps),
         canonicalId: canonicalIdNow,
+        mintRef,
         counts: Effect.all({ ops: countOf('ops'), items: countOf('items'), attachments: countOf('attachments'), mappings: countOf('sync_mappings') }),
         importReport: Effect.flatMap(metaGet(META_LEGACY_IMPORT), row =>
           Option.isNone(row) ? Effect.succeedNone : Effect.map(Schema.decodeUnknownEffect(importMarkerJson)(row.value.value), Option.some),

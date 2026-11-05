@@ -29,11 +29,12 @@ import { BacklogTweetContext } from './backlog-tweet-context.js'
 import { BacklogNotices } from './notices.js'
 import { BacklogSyncControls } from './sync-controls.js'
 import type { SyncBackendKind } from './sync-model.js'
+import { BacklogReference } from './backlog-reference.js'
 
 const NO_PROJECT = 'no-project'
 type BacklogMenuItem = Pick<
   BacklogSummaryView,
-  'id' | 'title' | 'kind' | 'status' | 'project' | 'pinned' | 'tags' | 'links' | 'tweetContextUrls' | 'attachments'
+  'id' | 'ref' | 'title' | 'kind' | 'status' | 'project' | 'pinned' | 'tags' | 'links' | 'tweetContextUrls' | 'attachments'
 > & {
   readonly attention?: BacklogSummaryView['attention'] | undefined
   readonly preview?: BacklogSummaryView['preview'] | undefined
@@ -77,8 +78,8 @@ export const BacklogItemMenu = (props: {
       const count = result.ok ? result.value.item.attachments.length - item.attachments.length : 0
       BacklogNotices.show({
         text: result.ok
-          ? `Retrieved tweet content for b:${String(item.id)}${count > 0 ? ` · ${String(count)} images` : ''}`
-          : `Backlog item b:${String(item.id)} no longer exists.`,
+          ? `Retrieved tweet content for ${BacklogReference.labelOf(item)}${count > 0 ? ` · ${String(count)} images` : ''}`
+          : `Backlog item ${BacklogReference.labelOf(item)} no longer exists.`,
         kind: result.ok ? 'success' : 'failure',
         sessionId: null,
       })
@@ -103,7 +104,8 @@ export const BacklogItemMenu = (props: {
         </ContextMenuTrigger>
         <ContextMenuContent className="dshx-root dshx:min-w-52">
           <ContextMenuLabel className="dshx:max-w-64 dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
-            {selection.length > 1 ? `${String(selection.length)} selected · ` : null}b:{item.id} · {item.title}
+            {selection.length > 1 ? `${String(selection.length)} selected · ` : null}
+            {BacklogReference.labelOf(item)} · {item.title}
           </ContextMenuLabel>
           <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.startThread(selection)}>
             <MessagesSquareIcon aria-hidden className="dshx:size-3.5" />
@@ -115,12 +117,12 @@ export const BacklogItemMenu = (props: {
               Open item
             </ContextMenuItem>
           )}
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(selectedIds.map(String).join(', '))}>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(selection.map(BacklogReference.refOf).join(', '))}>
             <CopyIcon aria-hidden className="dshx:size-3.5" />
             {many ? 'Copy item IDs' : 'Copy item ID'}
             {countSuffix}
           </ContextMenuItem>
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(selectedIds.map(id => `b:${String(id)}`).join(' '))}>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(selection.map(BacklogReference.labelOf).join(' '))}>
             <LinkIcon aria-hidden className="dshx:size-3.5" />
             {many ? 'Copy item links' : 'Copy item link'}
             {countSuffix}
@@ -254,10 +256,12 @@ export const BacklogItemMenu = (props: {
       <Dialog open={deleteOpen} onOpenChange={open => (actions.delete.isPending ? undefined : setDeleteOpen(open))}>
         <DialogContent className="dshx-root">
           <DialogHeader>
-            <DialogTitle>{many ? `Delete ${String(selection.length)} items permanently?` : `Delete b:${String(item.id)} permanently?`}</DialogTitle>
+            <DialogTitle>
+              {many ? `Delete ${String(selection.length)} items permanently?` : `Delete ${BacklogReference.labelOf(item)} permanently?`}
+            </DialogTitle>
             <DialogDescription>
               {many
-                ? `This permanently removes ${selectedIds.map(id => `b:${String(id)}`).join(', ')} and their attachments. This cannot be undone. Dropping them keeps them in your backlog.`
+                ? `This permanently removes ${selection.map(BacklogReference.labelOf).join(', ')} and their attachments. This cannot be undone. Dropping them keeps them in your backlog.`
                 : `This permanently removes “${item.title}” and its attachments. This cannot be undone. Dropping the item keeps it in your backlog.`}
             </DialogDescription>
           </DialogHeader>
@@ -276,7 +280,13 @@ export const BacklogItemMenu = (props: {
         </DialogContent>
       </Dialog>
       {linkBackend === null ? null : (
-        <BacklogSyncControls.LinkDialog itemId={item.id} backend={linkBackend} open onOpenChange={open => (open ? undefined : setLinkBackend(null))} />
+        <BacklogSyncControls.LinkDialog
+          itemId={item.id}
+          itemLabel={BacklogReference.labelOf(item)}
+          backend={linkBackend}
+          open
+          onOpenChange={open => (open ? undefined : setLinkBackend(null))}
+        />
       )}
     </>
   )

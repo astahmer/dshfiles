@@ -6,14 +6,15 @@ import { BacklogReference } from './backlog-reference.js'
 const SUFFIX = ' (backlog item; backlog_get has its details)'
 /** A serialized mention, or a bare item number written in prose. */
 export interface BacklogMentionMatch {
-  readonly id: number
+  /** The item's ref: `k3f9` or a legacy `12`. */
+  readonly ref: string
   readonly title: string | null
   /** Offset of the leading `b` in the scanned text. */
   readonly start: number
   readonly end: number
 }
 
-const itemReference = /b:([1-9]\d*)(?![\w])/uy
+const itemReference = /b:([0-9A-Za-z]{1,12})(?!\w)/uy
 const quotedTitle = / ("(?:[^"\\]|\\.)*")/uy
 
 /** A word, slash or another colon before the token means the writer did not mean an item number. */
@@ -25,12 +26,12 @@ const titleOf = (quoted: string | undefined): string | null => {
 }
 
 /** The full serialized mention the composer sends; the Agent reads the id, the title and where to learn more. */
-export const formatBacklogMention = (value: { readonly id: number; readonly title: string }): string =>
-  `b:${String(value.id)} ${JSON.stringify(value.title)}${SUFFIX}`
+export const formatBacklogMention = (value: { readonly ref: string; readonly title: string }): string =>
+  `${BacklogReference.label(value.ref)} ${JSON.stringify(value.title)}${SUFFIX}`
 
 /**
  * The nearest mention at or after `from`, including the serialized title when this is exactly what the composer wrote.
- * A suffix that is not our serialization stays visible, so only the `b:<id>` token becomes a chip.
+ * A suffix that is not our serialization stays visible, so only the `b:<ref>` token becomes a chip.
  */
 export const nextBacklogMention = (text: string, from: number): BacklogMentionMatch | undefined => {
   for (let start = text.indexOf('b:', from); start >= 0; start = text.indexOf('b:', start + 1)) {
@@ -38,16 +39,16 @@ export const nextBacklogMention = (text: string, from: number): BacklogMentionMa
     itemReference.lastIndex = start
     const match = itemReference.exec(text)
     if (match === null) continue
-    const id = BacklogReference.id(match[1])
-    if (id === undefined) continue
+    const ref = BacklogReference.parse(match[1])
+    if (ref === undefined) continue
     const tokenEnd = start + match[0].length
     quotedTitle.lastIndex = tokenEnd
     const quoted = quotedTitle.exec(text)
-    if (quoted === null) return { id, title: null, start, end: tokenEnd }
+    if (quoted === null) return { ref, title: null, start, end: tokenEnd }
     const title = titleOf(quoted[1])
     const tail = tokenEnd + quoted[0].length
-    if (title === null || !text.startsWith(SUFFIX, tail)) return { id, title: null, start, end: tokenEnd }
-    return { id, title, start, end: tail + SUFFIX.length }
+    if (title === null || !text.startsWith(SUFFIX, tail)) return { ref, title: null, start, end: tokenEnd }
+    return { ref, title, start, end: tail + SUFFIX.length }
   }
   return undefined
 }

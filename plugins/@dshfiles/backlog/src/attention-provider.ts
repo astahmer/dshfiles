@@ -4,6 +4,7 @@ import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Effect, Layer, Stream } from 'effect'
 import type { BacklogSummaryView } from './api.js'
 import { BacklogStore } from './store.js'
+import { BacklogReference } from './backlog-reference.js'
 
 /** The inbox source of backlog items whose attention asks the user for something. */
 export const BACKLOG_ATTENTION_SOURCE = 'backlog.attention'
@@ -34,12 +35,13 @@ const draftsOf = (items: readonly BacklogSummaryView[]): readonly AttentionDraft
     if (item.attention === 'none' || item.status === 'done' || item.status === 'dropped') return []
     const copy = COPY[item.attention]
     const id = String(item.id)
+    const ref = BacklogReference.refOf(item)
     const last = item.activity.last?.detail.trim() ?? ''
     return [
       {
         dedupeKey: `${id}:${item.attention}`,
         subject: { kind: 'backlog-item', id, label: clamp(item.title, 200) },
-        reason: clamp(copy.reason(item.title, id), 500),
+        reason: clamp(copy.reason(item.title, ref), 500),
         ...(last.length > 0 && { detail: clamp(last, 2000) }),
         severity: copy.severity,
         verbs: ['Done', 'Snooze', 'MuteSource'],

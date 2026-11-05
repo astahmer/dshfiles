@@ -1,5 +1,7 @@
 import { Effect, Schema } from 'effect'
 
+import { BacklogReference } from './backlog-reference.js'
+
 const DAY_MS = 86_400_000
 const MAX_TITLE_CHARS = 200
 const MAX_BODY_CHARS = 20_000
@@ -93,6 +95,8 @@ const actorSchema = Schema.Struct({ id: actorIdSchema, role: Schema.Literals(['o
 
 const itemSchema = Schema.Struct({
   id: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  /** The short alias (`k3f9`) an item created since short aliases shows as `b:k3f9`; absent on a legacy `b:<id>` item. */
+  ref: Schema.optionalKey(Schema.String.check(Schema.isPattern(/^[0-9a-hjkmnp-tv-z]{4,5}$/))),
   title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_TITLE_CHARS)),
   body: Schema.String.check(Schema.isMaxLength(MAX_BODY_CHARS)),
   kind: kindSchema,
@@ -147,7 +151,6 @@ const kindPrefixes = new Map<string, BacklogKind>([
 ])
 
 const linkPatterns: readonly { readonly type: BacklogLink['type']; readonly pattern: RegExp }[] = [
-  { type: 'item', pattern: /(?<![\w/])b:(\d+)\b/g },
   { type: 'revision', pattern: /(?<![\w/])jj:([\w.@/-]+[\w])/g },
   { type: 'thread', pattern: /(?<![\w/-])(session-[\w-]{6,})/g },
   { type: 'branch', pattern: /(?<![\w/])branch:([\w./-]+[\w])/g },
@@ -165,13 +168,14 @@ const uniqueLinks = (links: readonly BacklogLink[]): BacklogLink[] =>
   links.filter((link, index) => links.findIndex(other => sameLink(other, link)) === index).slice(0, MAX_LINKS)
 
 const extractLinks = (text: string): BacklogLink[] =>
-  uniqueLinks(
-    linkPatterns.flatMap(({ type, pattern }) =>
+  uniqueLinks([
+    ...BacklogReference.matches(text).map(match => ({ type: 'item' as const, target: match.ref, provenance: 'extracted' as const })),
+    ...linkPatterns.flatMap(({ type, pattern }) =>
       [...text.matchAll(pattern)].flatMap(match =>
         match[1] === undefined ? [] : [{ type, target: match[1].slice(0, MAX_TARGET_CHARS), provenance: 'extracted' as const }],
       ),
     ),
-  )
+  ])
 
 const extractTags = (text: string): string[] =>
   [...new Set([...text.matchAll(tagPattern)].flatMap(match => (match[1] === undefined ? [] : [match[1].toLowerCase()])))].slice(0, MAX_TAGS)

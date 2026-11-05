@@ -4,11 +4,17 @@ import { BacklogSignals } from './signals.js'
 
 describe('signals', () => {
   it('finds item mentions without matching paths or longer words', () => {
-    expect(BacklogSignals.mentionsIn('look at b:12 and b:3, not lib:4 or ab:5 or /b:6; b:12 again')).toEqual([12, 3])
+    expect(BacklogSignals.mentionsIn('look at b:12 and b:3, not lib:4 or ab:5 or /b:6; b:12 again, b:k3f9 and b:todo')).toEqual(['12', '3', 'k3f9'])
   })
 
   it('closes only the items a magic word names', () => {
-    expect(BacklogSignals.closedBy('feat(backlog): board\n\nPart of b:1.\nCloses b:12, b:13 and b:14\nFixes: b:2')).toEqual([12, 13, 14, 2])
+    expect(BacklogSignals.closedBy('feat(backlog): board\n\nPart of b:1.\nCloses b:12, b:13 and b:14\nFixes: b:2\nResolves b:k3f9')).toEqual([
+      '12',
+      '13',
+      '14',
+      '2',
+      'k3f9',
+    ])
     expect(BacklogSignals.closedBy('refactor: touch b:7 again')).toEqual([])
   })
 
@@ -42,7 +48,7 @@ describe('signals against a real jj repository', () => {
       const revisions = BacklogSignals.parseLog(
         jj('log', '--no-graph', '--ignore-working-copy', '-r', 'ancestors(main, 50) ~ root()', '-T', BacklogSignals.logTemplate),
       )
-      expect(revisions.flatMap(revision => BacklogSignals.closedBy(revision.description))).toEqual([2, 3])
+      expect(revisions.flatMap(revision => BacklogSignals.closedBy(revision.description))).toEqual(['2', '3'])
       expect(revisions).toHaveLength(2)
     } finally {
       rmSync(root, { recursive: true, force: true })

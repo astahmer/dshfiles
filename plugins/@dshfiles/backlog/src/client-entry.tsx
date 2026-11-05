@@ -202,7 +202,7 @@ export default defineClient({
                 id: item.id,
                 handle,
                 sessionId: selection.sessionId,
-                text: mention.task || `Continue work on b:${String(item.id)}: ${item.title}.`,
+                text: mention.task || `Continue work on ${BacklogReference.labelOf(item)}: ${item.title}.`,
               })
               if (!queued.ok) return { kind: 'failed', reason: queued.error.message }
               if (open) {
@@ -215,7 +215,7 @@ export default defineClient({
               if (notificationDelivery === 'system' || notificationDelivery === 'both')
                 metadata?.plugin?.notifications.notify({
                   title: 'Backlog thread continued',
-                  body: `b:${item.id} · ${item.title}`,
+                  body: `${BacklogReference.labelOf(item)} · ${item.title}`,
                   onClick: () => ctx.uiWorkspace.openSession(queued.value.sessionId as SessionId),
                 })
               BacklogNotices.show({
@@ -245,7 +245,7 @@ export default defineClient({
         if (systemNotification)
           metadata?.plugin?.notifications.notify({
             title: 'Backlog thread started',
-            body: `b:${item.id} · ${item.title}`,
+            body: `${BacklogReference.labelOf(item)} · ${item.title}`,
             // SAFETY: startThread returns a Host-minted Session id, type-only branded by the session controller.
             onClick: () => ctx.uiWorkspace.openSession(started.sessionId as SessionId),
           })
@@ -290,7 +290,7 @@ export default defineClient({
         </AgentDispatchProvider>
       </PluginQueryProvider>
     )
-    const openInBacklog = (id: number): void => {
+    const openInBacklog = (id: number | string): void => {
       BacklogFocusModel.request(id)
       // SAFETY: this entry registers PANEL_ID as a main-slot key just below, so it is a live panel id.
       ctx.layout.selectPanel(PANEL_ID as MainPanelId)
@@ -299,8 +299,8 @@ export default defineClient({
       id: 'dshfiles-backlog.item',
       scheme: 'b',
       open: link => {
-        const id = BacklogReference.id(link.target)
-        if (id !== undefined) openInBacklog(id)
+        const ref = BacklogReference.parse(link.target)
+        if (ref !== undefined) openInBacklog(BacklogReference.requestId(ref))
       },
     })
     const NoticeOverlay = (): JSX.Element => (
@@ -309,13 +309,13 @@ export default defineClient({
       </PluginQueryProvider>
     )
     const ReferencePreview = (props: EntityPreviewProps): JSX.Element => {
-      const id = BacklogReference.id(props.id)
+      const ref = BacklogReference.parse(props.id)
       return (
         <PluginQueryProvider>
-          {id === undefined ? (
-            <p className="dshx:p-4 dshx:text-xs dshx:text-muted-foreground">This is not a backlog reference. Write one as b:12.</p>
+          {ref === undefined ? (
+            <p className="dshx:p-4 dshx:text-xs dshx:text-muted-foreground">This is not a backlog reference. Write one as b:k3f9, or b:12 for an older item.</p>
           ) : (
-            <BacklogReferencePreview id={id} close={props.close} openInBacklog={openInBacklog} />
+            <BacklogReferencePreview reference={ref} close={props.close} openInBacklog={openInBacklog} />
           )}
         </PluginQueryProvider>
       )

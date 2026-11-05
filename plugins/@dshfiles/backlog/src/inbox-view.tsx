@@ -14,6 +14,7 @@ import { ItemGlyphs } from './item-glyphs.js'
 import type { StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { BacklogReference } from './backlog-reference.js'
 
 const threadReasons = {
   completed: { label: 'finished and waits for review', Icon: CircleCheckIcon, tone: 'dshx:text-success' },
@@ -130,7 +131,7 @@ export const InboxView = (props: {
             >
               <li
                 tabIndex={-1}
-                aria-label={`Item b:${String(item.id)}`}
+                aria-label={`Item ${BacklogReference.labelOf(item)}`}
                 data-selected={selection.selected.has(item.id) || undefined}
                 aria-current={item.id === props.openId ? 'true' : undefined}
                 onClick={event => {
@@ -235,7 +236,7 @@ export const InboxView = (props: {
                         <ItemGlyphs.ProjectLabel project={item.project} />·
                       </>
                     )}
-                    <span className="dshx:font-mono!">b:{item.id}</span>· {ItemGlyphs.ago(item.lastActivityAt)}
+                    <span className="dshx:font-mono!">{BacklogReference.labelOf(item)}</span>· {ItemGlyphs.ago(item.lastActivityAt)}
                   </p>
                 </div>
                 {hasItemReason ? (

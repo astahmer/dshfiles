@@ -41,7 +41,7 @@ When('the composer sends {string}', async ({ page, $testInfo }: { page: Page; $t
   await materializeNonblankThread(page, 'Reference card thread', $testInfo)
   await page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/u }).fill(text)
   await page.getByRole('button', { name: 'Send message', exact: true }).click()
-  await expect(page.getByRole('button', { name: /^Backlog item b:\d+$/u }).last()).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('button', { name: /^Backlog item b:[0-9a-z]+$/u }).last()).toBeVisible({ timeout: 60_000 })
 })
 
 const sharedCard = (page: Page, kind: string) => page.locator(`[data-dshfiles-entity-preview="${kind}"]`)
@@ -53,7 +53,10 @@ When('the agent mention {string} is previewed', async ({ page }: { page: Page },
 
 When('the backlog reference {string} is previewed', async ({ page }: { page: Page }, label: string) => {
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: `Backlog item ${label}`, exact: true }).last().click()
+  await page
+    .getByRole('button', { name: `Backlog item ${label}`, exact: true })
+    .last()
+    .click()
 })
 
 Then('the shared reference card shows the {string} card with {string}', async ({ page }: { page: Page }, kind: string, text: string) => {

@@ -18,6 +18,7 @@ import type { StartThreadItem } from './start-thread.js'
 import { StatusFilterBar } from './status-filter-bar.js'
 import { BacklogText } from './item-text.js'
 import { useBacklogActions } from './use-backlog-actions.js'
+import { BacklogReference } from './backlog-reference.js'
 
 const DAY_MS = 86_400_000
 /** Like a chat history: the newest page is mounted first, older entries appear as the scroller reaches its top. */
@@ -81,7 +82,7 @@ const FeedEntry = (props: {
     >
       <article
         tabIndex={-1}
-        aria-label={`Item b:${String(item.id)}`}
+        aria-label={`Item ${BacklogReference.labelOf(item)}`}
         data-selected={props.selection.selected.has(item.id) || undefined}
         onClick={event => {
           if (props.selection.click(item.id, event)) return
@@ -107,11 +108,15 @@ const FeedEntry = (props: {
           <div className="dshx:flex dshx:items-baseline dshx:gap-2 dshx:text-xs">
             <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(author)}</span>
             <span className="dshx:text-muted-foreground">{new Date(item.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-            <span className="dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">b:{item.id}</span>
+            <span className="dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">{BacklogReference.labelOf(item)}</span>
           </div>
           <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
             <span onClick={event => event.stopPropagation()}>
-              <ItemPickers.Status id={item.id} status={item.status} onPick={status => actions.update.mutate({ id: item.id, status })} />
+              <ItemPickers.Status
+                itemLabel={BacklogReference.labelOf(item)}
+                status={item.status}
+                onPick={status => actions.update.mutate({ id: item.id, status })}
+              />
             </span>
             {item.kind === 'task' ? null : <ItemGlyphs.KindIcon kind={item.kind} />}
             {rename.renaming ? (

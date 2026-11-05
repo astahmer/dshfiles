@@ -13,6 +13,7 @@ import { ItemGlyphs } from './item-glyphs.js'
 import type { StartThreadItem } from './start-thread.js'
 import { BacklogQueries, type BacklogUpdateInput, useBacklogActions } from './use-backlog-actions.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { BacklogReference } from './backlog-reference.js'
 
 const DAY_MS = 86_400_000
 const NO_PROJECT = ''
@@ -97,7 +98,7 @@ const ItemLine = (props: {
     <li
       data-selected={props.selection.selected.has(props.item.id) || undefined}
       tabIndex={-1}
-      aria-label={`Item b:${String(props.item.id)}`}
+      aria-label={`Item ${BacklogReference.labelOf(props.item)}`}
       className="dshx:data-selected:bg-accent/70 dshx:rounded-md dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50"
     >
       <button
@@ -310,7 +311,7 @@ const Overview = (props: {
                   <li
                     data-selected={recentSelection.selected.has(item.id) || undefined}
                     tabIndex={-1}
-                    aria-label={`Item b:${String(item.id)}`}
+                    aria-label={`Item ${BacklogReference.labelOf(item)}`}
                     className="dshx:data-selected:bg-accent/70 dshx:flex dshx:gap-2.5 dshx:text-xs dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50"
                   >
                     <ItemGlyphs.ActorAvatar actorId={item.activity.last?.actor} className="dshx:mt-0.5" />

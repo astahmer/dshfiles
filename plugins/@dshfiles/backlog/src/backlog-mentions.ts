@@ -2,6 +2,7 @@ import type { InputTriggerCandidate, InputTriggerSource } from '@dshfiles/input-
 import { Option, Schema } from 'effect'
 
 import type { BacklogSummaryView } from './api.js'
+import { BacklogReference } from './backlog-reference.js'
 import { BacklogItems } from './item.js'
 import { formatBacklogMention } from './backlog-mention-text.js'
 
@@ -10,12 +11,19 @@ const MENTION_SCOPE = /^(thread|t|file|f|skill|mcp|backlog|b):/iu
 const MIXED_LIMIT = 5
 const SCOPED_LIMIT = 40
 
-const refSchema = Schema.Struct({
-  id: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
-  title: Schema.String.check(Schema.isMaxLength(BacklogItems.maxTitleChars)),
-})
+const titleSchema = Schema.String.check(Schema.isMaxLength(BacklogItems.maxTitleChars))
+/** A chip picked before short aliases carries the legacy number as `id`; it still reads as that item's ref. */
+const refSchema = Schema.Union([
+  Schema.Struct({ ref: Schema.String, title: titleSchema }),
+  Schema.Struct({ id: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)), title: titleSchema }),
+])
 
-const decodeRef = (ref: string): typeof refSchema.Type | null => Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(refSchema))(ref))
+const decodeRef = (value: string): { readonly ref: string; readonly title: string } | null => {
+  const decoded = Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(refSchema))(value))
+  if (decoded === null) return null
+  const ref = BacklogReference.parse('ref' in decoded ? decoded.ref : String(decoded.id))
+  return ref === undefined ? null : { ref, title: decoded.title }
+}
 
 /** The text after `@b:`/`@backlog:`, the whole query for plain `@`, or undefined while another source's scope is typed. */
 const scopedQuery = (query: string): { readonly text: string; readonly scoped: boolean } | undefined => {
@@ -25,15 +33,15 @@ const scopedQuery = (query: string): { readonly text: string; readonly scoped: b
 }
 
 const candidateOf = (item: BacklogSummaryView, section: string): InputTriggerCandidate => ({
-  name: `b:${String(item.id)}`,
+  name: BacklogReference.labelOf(item),
   label: item.title,
   description: `${item.kind} · ${item.status}`,
   section,
-  value: JSON.stringify({ id: item.id, title: item.title }),
+  value: JSON.stringify({ ref: BacklogReference.refOf(item), title: item.title }),
 })
 
 /**
- * `@` mentions of backlog items. A sent chip reads `b:<id>`, so the Host's thread signal links the thread and starts
+ * `@` mentions of backlog items. A sent chip reads `b:<ref>`, so the Host's thread signal links the thread and starts
  * the item exactly as if the user had typed the reference.
  */
 const createSource = (options: {
@@ -58,13 +66,18 @@ const createSource = (options: {
     const ref = decodeRef(candidate.value ?? '')
     if (ref === null) return undefined
     return {
-      insert: { source: 'backlog', ref: JSON.stringify(ref), label: `b:${String(ref.id)} ${ref.title}`, clipboardText: `b:${String(ref.id)} ${ref.title}` },
+      insert: {
+        source: 'backlog',
+        ref: JSON.stringify(ref),
+        label: `${BacklogReference.label(ref.ref)} ${ref.title}`,
+        clipboardText: `${BacklogReference.label(ref.ref)} ${ref.title}`,
+      },
     }
   },
   codec: {
     clipboardText(ref) {
       const value = decodeRef(ref)
-      return value === null ? 'Backlog item' : `b:${String(value.id)} ${value.title}`
+      return value === null ? 'Backlog item' : `${BacklogReference.label(value.ref)} ${value.title}`
     },
     async serialize(ref, signal) {
       signal.throwIfAborted()

@@ -549,10 +549,18 @@ export const BacklogPanel = (props: {
     draftKey,
     visible: props.visible !== false,
     onCapture: setCaptureRequest,
-    onFocus: itemId => {
-      setOpenId(itemId)
-      setCursorId(itemId)
-      setExpanded(false)
+    onFocus: key => {
+      const select = (itemId: number): void => {
+        setOpenId(itemId)
+        setCursorId(itemId)
+        setExpanded(false)
+      }
+      if (typeof key === 'number') return select(key)
+      const selectByRef = async (): Promise<void> => {
+        const result = await api.get({ id: key })
+        if (result.ok) select(result.value.item.id)
+      }
+      void selectByRef().catch(() => undefined)
     },
   })
   const projectFilters: (string | null)[] =

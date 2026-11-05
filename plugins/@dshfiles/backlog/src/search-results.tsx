@@ -11,6 +11,7 @@ import { ItemGlyphs } from './item-glyphs.js'
 import { StatusFilterBar } from './status-filter-bar.js'
 import type { StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
+import { BacklogReference } from './backlog-reference.js'
 
 type MatchField = NonNullable<BacklogSummaryView['match']>['fields'][number]
 
@@ -101,7 +102,7 @@ export const SearchResults = (props: {
             <li
               data-selected={selection.selected.has(item.id) || undefined}
               tabIndex={-1}
-              aria-label={`Item b:${String(item.id)}`}
+              aria-label={`Item ${BacklogReference.labelOf(item)}`}
               onClick={event => {
                 if (!selection.click(item.id, event)) props.select(item.id)
               }}
@@ -117,7 +118,7 @@ export const SearchResults = (props: {
             >
               <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-[13px]">
                 <ItemGlyphs.StatusIcon status={item.status} />
-                <span className="dshx:w-10 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">b:{item.id}</span>
+                <span className="dshx:w-12 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">{BacklogReference.labelOf(item)}</span>
                 <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">
                   <Highlight text={item.title} terms={terms} />
                 </span>

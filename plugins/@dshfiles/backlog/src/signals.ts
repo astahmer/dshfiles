@@ -1,17 +1,17 @@
+import { BacklogReference } from './backlog-reference.js'
+
 const MAX_REFERENCES = 20
 
-const mentionPattern = /(?<![\w/])b:(\d+)\b/g
-const closingPattern = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|complete[sd]?|implement(?:s|ed)?)\b[:\s]+((?:b:\d+(?:\s*(?:,|and)\s*)?)+)/gi
+const closingPattern = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|complete[sd]?|implement(?:s|ed)?)\b[:\s]+((?:b:[0-9A-Za-z]+(?:\s*(?:,|and)\s*)?)+)/gi
 
-/** Item ids mentioned anywhere in a message: `b:12`. */
-const mentionsIn = (text: string): number[] =>
-  [...new Set([...text.matchAll(mentionPattern)].map(match => Number(match[1])))].filter(id => id > 0).slice(0, MAX_REFERENCES)
+/** Item refs mentioned anywhere in a message: `b:k3f9`, or a legacy `b:12`. */
+const mentionsIn = (text: string): string[] => [...new Set(BacklogReference.matches(text).map(match => match.ref))].slice(0, MAX_REFERENCES)
 
 /**
- * Item ids a revision description closes, with the Linear and GitHub magic words: `Closes b:12`, `fixes b:3 and b:4`.
- * A bare mention (`part of b:12`) closes nothing.
+ * Item refs a revision description closes, with the Linear and GitHub magic words: `Closes b:k3f9`, `fixes b:3 and
+ * b:4`. A bare mention (`part of b:12`) closes nothing.
  */
-const closedBy = (description: string): number[] =>
+const closedBy = (description: string): string[] =>
   [...new Set([...description.matchAll(closingPattern)].flatMap(match => mentionsIn(match[1] ?? '')))].slice(0, MAX_REFERENCES)
 
 /** One `jj log` record per revision: change id, a tab, the full description, then a record separator. */

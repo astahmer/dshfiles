@@ -214,8 +214,8 @@ const importedCommentText = (backend: SyncBackendKind, comment: RemoteComment): 
   `${backendLabel(backend)} · ${comment.author}: ${comment.body}`.slice(0, BacklogItems.maxBodyChars)
 
 /** A local comment as it lands on the remote issue. */
-const exportedCommentText = (itemId: number, actor: string, text: string): string =>
-  `${text}\n\n— ${actor === 'user' ? 'you' : actor} on backlog b:${String(itemId)}`
+const exportedCommentText = (itemLabel: string, actor: string, text: string): string =>
+  `${text}\n\n— ${actor === 'user' ? 'you' : actor} on backlog ${itemLabel}`
 
 /** The tracker an issue reference names: `ENG-12` or a linear.app URL is Linear; `42`, `owner/repo#42` or a github.com URL is GitHub. */
 const backendOfReference = (reference: string): SyncBackendKind | undefined => {

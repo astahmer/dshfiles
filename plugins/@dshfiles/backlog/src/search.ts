@@ -1,4 +1,5 @@
 import { BacklogItems, type BacklogItem, type BacklogLink } from './item.js'
+import { BacklogReference } from './backlog-reference.js'
 
 const DAY_MS = 86_400_000
 const SNIPPET_RADIUS = 60
@@ -178,7 +179,7 @@ const sourcesOf = (item: BacklogItem): readonly (readonly [MatchField, readonly 
   const comments = item.events.filter(event => event.kind === 'commented').map(event => event.detail)
   const capture = item.events.find(event => event.kind === 'created')?.detail ?? ''
   return [
-    ['id', [`b:${String(item.id)}`, String(item.id)]],
+    ['id', [BacklogReference.labelOf(item), BacklogReference.refOf(item)]],
     ['title', [item.title]],
     ['tag', item.tags.map(tag => `#${tag}`)],
     ['project', [item.project ?? '']],

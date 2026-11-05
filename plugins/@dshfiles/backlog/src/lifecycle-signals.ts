@@ -61,8 +61,16 @@ export const LifecycleSignals = Layer.effectDiscard(
           Effect.orElseSucceed(() => ''),
         )
         for (const revision of BacklogSignals.parseLog(log))
-          for (const id of BacklogSignals.closedBy(revision.description))
-            yield* store.applySignal({ id, status: 'done', link: { type: 'revision', target: revision.changeId }, reason: `closed by jj:${revision.changeId}` })
+          for (const ref of BacklogSignals.closedBy(revision.description)) {
+            const id = yield* store.resolve(ref)
+            if (id !== undefined)
+              yield* store.applySignal({
+                id,
+                status: 'done',
+                link: { type: 'revision', target: revision.changeId },
+                reason: `closed by jj:${revision.changeId}`,
+              })
+          }
       }
     })
 
@@ -115,7 +123,7 @@ export const LifecycleSignals = Layer.effectDiscard(
         yield* store.settleAnsweredQuestion({ id: item.id, threadId: session.id, reason: 'the thread’s question was answered' })
     })
 
-    /** A user naming `b:12` in a thread is working on it: link the thread and start the item. */
+    /** A user naming `b:k3f9` (or a legacy `b:12`) in a thread is working on it: link the thread and start the item. */
     const onSessionEvent = (session: Session, event: SessionEvent) =>
       Effect.gen(function* () {
         if (!(yield* settings.get).lifecycleSignals) return
@@ -123,10 +131,15 @@ export const LifecycleSignals = Layer.effectDiscard(
         if (event.type !== 'user/message') return
         if (BacklogQuestionReply.isAnswer(event.data.source)) return yield* onQuestionAnswered(session)
         if (event.data.source.kind !== 'user') return
-        const ids = BacklogSignals.mentionsIn(event.data.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n'))
+        const refs = BacklogSignals.mentionsIn(event.data.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n'))
         yield* Effect.forEach(
-          ids,
-          id => store.applySignal({ id, status: 'doing', link: { type: 'thread', target: session.id }, reason: 'mentioned in a thread' }),
+          refs,
+          ref =>
+            Effect.flatMap(store.resolve(ref), id =>
+              id === undefined
+                ? Effect.void
+                : Effect.asVoid(store.applySignal({ id, status: 'doing', link: { type: 'thread', target: session.id }, reason: 'mentioned in a thread' })),
+            ),
           { concurrency: 'unbounded', discard: true },
         )
       }).pipe(Effect.catch(error => Effect.logWarning('backlog: a thread signal failed', error)))

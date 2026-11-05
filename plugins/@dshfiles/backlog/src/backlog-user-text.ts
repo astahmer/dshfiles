@@ -6,7 +6,7 @@ import { nextBacklogMention } from './backlog-mention-text.js'
 declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface UserTextDataMap {
     /** One item the user referenced when sending the message. */
-    backlog: { readonly id: number; readonly title: string | null }
+    backlog: { readonly ref: string; readonly title: string | null }
   }
 }
 
@@ -17,6 +17,6 @@ export const backlogUserTextRule: UserTextRule<'backlog'> = {
   match(text, from) {
     const mention = nextBacklogMention(text, from)
     if (mention === undefined) return undefined
-    return { id: 'backlog', start: mention.start, end: mention.end, data: { id: mention.id, title: mention.title } }
+    return { id: 'backlog', start: mention.start, end: mention.end, data: { ref: mention.ref, title: mention.title } }
   },
 }

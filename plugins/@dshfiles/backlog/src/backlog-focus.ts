@@ -2,7 +2,8 @@
  * The Backlog page is a separate slot tree from the reference card, so a request to open one item there travels through
  * this module store: the card asks, the panel reads and selects, and the request is dropped once it lands.
  */
-let focus: number | null = null
+/** An item's id, or its short ref when only the ref is known (a written `b:k3f9` link): the panel resolves it. */
+let focus: number | string | null = null
 let capture: { readonly id: number; readonly text: string } | null = null
 let nextCaptureId = 0
 const listeners = new Set<() => void>()
@@ -11,14 +12,14 @@ const notify = (): void => {
   for (const listener of listeners) listener()
 }
 
-const requestBacklogFocus = (id: number): void => {
+const requestBacklogFocus = (id: number | string): void => {
   focus = id
   notify()
 }
 
-const readBacklogFocus = (): number | null => focus
+const readBacklogFocus = (): number | string | null => focus
 
-const takeBacklogFocus = (id: number): number | null => {
+const takeBacklogFocus = (id: number | string): number | string | null => {
   if (focus !== id) return null
   focus = null
   notify()

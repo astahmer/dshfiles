@@ -48,7 +48,7 @@ const setup = async () => {
       client,
       send: async request => {
         await saveGate.promise
-        return runtime.runPromise(store.comment({ ...request, actor: user }))
+        return runtime.runPromise(store.comment({ ...request, id, actor: user }))
       },
     }),
   )

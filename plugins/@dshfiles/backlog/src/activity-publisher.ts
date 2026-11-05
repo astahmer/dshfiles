@@ -3,6 +3,7 @@ import { Effect, Layer, Stream } from 'effect'
 import { BacklogSettingsTag } from './backlog-settings.js'
 import type { BacklogEvent, BacklogItem } from './item.js'
 import { BacklogStore } from './store.js'
+import { BacklogReference } from './backlog-reference.js'
 
 type BacklogActivityType = 'backlog.created' | 'backlog.moved' | 'backlog.linked' | 'backlog.commented' | 'backlog.attention' | 'backlog.triaged'
 
@@ -57,7 +58,7 @@ export const backlogActivityPayload = (item: BacklogItem, event: BacklogEvent): 
       at: event.at,
       type,
       level,
-      summary: `${who} ${phrase} b:${String(item.id)} ${item.title}`.slice(0, 500),
+      summary: `${who} ${phrase} ${BacklogReference.labelOf(item)} ${item.title}`.slice(0, 500),
       detail: event.kind === 'commented' || event.kind === 'moved' ? event.detail.slice(0, 2_000) : null,
       itemId: item.id,
       sessionId,

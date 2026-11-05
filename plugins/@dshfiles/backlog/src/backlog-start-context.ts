@@ -3,6 +3,7 @@ import type { BacklogDetailView } from './api.js'
 import { Effect } from 'effect'
 import { StartContextInvalid } from './errors.js'
 import type { BacklogResult } from './store.js'
+import { BacklogReference } from './backlog-reference.js'
 
 type PromptImageMediaType = Extract<PromptContentPart, { readonly type: 'image' }>['mediaType']
 
@@ -98,7 +99,7 @@ const prepare = Effect.fn('backlog start context prepare')(function* (input: {
 
   for (const detail of input.details) {
     const item = detail.item
-    const itemSource = `b:${String(item.id)}`
+    const itemSource = `${BacklogReference.labelOf(item)}`
     yield* appendText(`\n\n## ${itemSource}: ${item.title}\nDescription:\n${item.body === '' ? '(empty)' : item.body}`)
     yield* appendAttachments(item.id, item.attachments, `${itemSource} item`)
     let replyNumber = 0

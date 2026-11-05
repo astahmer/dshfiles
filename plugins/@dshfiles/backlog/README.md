@@ -48,7 +48,7 @@ toolbar:
   registered workspace (`All projects` in the header, the project on the item). Typing `/project` in the
   text opens the same list inline; picking one removes the command and sets the chip.
 - `+` picks images or any files, or links a backlog item or a thread. Picked references land in the text as
-  `b:<n>` or a `session-…` id.
+  `b:<ref>` or a `session-…` id.
 - Status and kind chips are editable before sending; the kind chip otherwise follows the text prefix.
 - Files can be picked, pasted or dropped. An attached image inserted as `@Image N` is an atomic blue reference chip in capture, descriptions and replies; it stays tied to that attachment and becomes a rendered Markdown image reference on submit. Images are scaled to 1600 px and re-encoded as WebP; other files
   keep their bytes. The Host keeps the bytes as plain files beside its database, never in the item row. An item
@@ -63,7 +63,7 @@ Structure comes from the text:
 
 - `bug:`, `idea:`, `note:`, `question:`, `task:`/`todo:` set the kind; a first line ending in `?` is a
   question; anything else is a task. The first line is the title, the rest the markdown body.
-- `#tag` adds a tag; `b:<n>` links another item; `jj:<rev>` a revision; `branch:<name>`, `workspace:<path>`,
+- `#tag` adds a tag; `b:<ref>` links another item; `jj:<rev>` a revision; `branch:<name>`, `workspace:<path>`,
   a `session-…` id and URLs become typed links.
 - An agent capture links the calling thread, names the agent as owner and takes its working directory as
   the project. A thread running in its own jj workspace files under the project that workspace was cut from:
@@ -142,9 +142,21 @@ for agents, backlog items and threads, and images or files picked with the paper
 A description's files are kept with the item; a reply's files belong to that comment and open in the
 same gallery from the conversation. User-authored replies can be edited or deleted; their actions and the edit form are keyboard-operable, with visible focus and accessible labels. Reply cards have a little extra separation in the activity list.
 
+## Item references
+
+Every item has a reference written `b:<ref>`. An item created since short aliases gets a random four-character
+alias (`b:k3f9`): lowercase Crockford base32 (no `i`, `l`, `o`, `u`) with at least one letter, drawn once and fixed
+for life, and five characters once a fifth of the four-character space is used. Items created before keep their number
+(`b:12`) forever, so every existing thread, commit (`Closes b:12`) and comment still resolves. Digit-only means a legacy
+number and anything with a letter means a short alias, so the two never collide; an uppercase alias reads as lowercase.
+
+Each item also keeps a private number the panel and older callers use. Every agent tool that takes an item accepts the
+reference as written (`b:k3f9`, `k3f9`, `b:12`, `12`) or that number, and every output names items by their
+reference; a new item's number is never shown and `b:<number>` never names it.
+
 ## References in a conversation
 
-An Agent writes `b:<n>` in its markdown, the way `jj:<rev>` marks a revision: prose and inline code become
+An Agent writes `b:<ref>` in its markdown, the way `jj:<rev>` marks a revision: prose and inline code become
 links, while fenced code, existing links and words that merely contain the token stay as written. Clicking
 one opens an inline card with the item's title, kind, status, project and body. Image attachments appear as
 thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. **Open in Backlog**
@@ -167,8 +179,8 @@ home paths display as `~/...`. The first message is prefilled from
 the item (title plus preview) and can be cleared to create an empty thread instead.
 
 Starting hands the request over and closes the dialog at once: the thread is created in the background, so a slow jj
-workspace never holds the panel. The banner says `Starting a thread for b:<n>…` while the workspace and the Session are
-built, then reports `Thread started for b:<n>`. The Host selects the account/model on the thread, names it after the
+workspace never holds the panel. The banner says `Starting a thread for b:<ref>…` while the workspace and the Session are
+built, then reports `Thread started for b:<ref>`. The Host selects the account/model on the thread, names it after the
 item, and sends its first message when one is present. Clearing the message creates an empty thread. The item is linked
 to the thread (provenance `user`, or `agent` when an agent started it).
 
@@ -255,8 +267,8 @@ work.
 
 On by default (`lifecycleSignals`). Items move without anyone filing them:
 
-- A user message that mentions `b:12` links that thread to the item and moves it to In progress.
-- A revision on `main` whose description says `Closes b:12` (also `Fixes`, `Resolves`, `Completes`,
+- A user message that mentions `b:k3f9` (or a legacy `b:12`) links that thread to the item and moves it to In progress.
+- A revision on `main` whose description says `Closes b:k3f9` (also `Fixes`, `Resolves`, `Completes`,
   `Implements`; several ids with commas or `and`) links that revision and moves the item to Done. A bare
   mention such as `part of b:12` closes nothing.
 - A linked thread whose turn ended **blocked** or **failed** marks its open items as blocked, so they reach the
@@ -289,8 +301,8 @@ nothing.
 ## `@` mentions
 
 In any composer, `@b:` (or `@backlog:`) searches the backlog, and plain `@` shows up to five matching
-items next to threads and files. The chip is sent as `b:12 "title"`, so the thread signal above links the
-thread and starts the item, just as typing `b:12` does.
+items next to threads and files. The chip is sent as `b:k3f9 "title"`, so the thread signal above links the
+thread and starts the item, just as typing `b:k3f9` does.
 
 Every backlog text box — the capture composer, an item's description and its reply box — completes the same
 sources from one `@` menu: agents, backlog items, threads and projects. Typing `@project-name` offers known projects;
@@ -465,7 +477,7 @@ One SQLite file owned by the Host, `$DSH_HOME/plugins/backlog/backlog.db`, opene
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ops`           | The append-only op log, the source of truth: `op_id` (ULID), `item_id`, a hybrid logical clock (`hlc_wall` ms, `hlc_counter`, `hlc_host`), `origin` (the actor) and `op` JSON |
 | `items`         | Each item folded from its ops, a cache rebuilt from `ops` whenever the fold version changes; indexed by status, project, last activity and origin                             |
-| `aliases`       | `alias → item_id`: every `b:<n>` is a numeric alias of the item's canonical ULID                                                                                              |
+| `aliases`       | `alias → item_id` with its kind: `legacy` (the public `b:<n>` of an item created before short aliases), `short` (the `b:<ref>` of a newer one) and `key` (a newer item's private number) |
 | `attachments`   | Per item and attachment: the SHA-256, media type and size of the bytes                                                                                                       |
 | `sync_mappings` | One remote-sync mapping per linked item (remote id, last synced value of each side, carried-over comment ids, state, recent conflicts, last error), keyed by item id           |
 | `meta`          | The host id, the next item id, the fold version and the import receipt                                                                                                       |
@@ -483,8 +495,9 @@ returns that absolute path so an agent can read an image instead of a base64 str
 match over title, body, tags, project and link targets. Deleting an item writes its tombstone and removes its files
 and its sync mapping (the remote issue stays), so no later item inherits them.
 
-The next item id lives in `meta` and only moves forward: a restart takes the larger of that counter and the largest
-stored id plus one, so deleting the newest item never frees its `b:<n>`.
+The next item number lives in `meta` and only moves forward: a restart takes the larger of that counter and the largest
+stored number plus one, so deleting the newest item never frees its number. A short alias is never reused either: the
+draw skips every alias in `aliases`, deleted items' included.
 
 ### Import from the JSON storage domains
 

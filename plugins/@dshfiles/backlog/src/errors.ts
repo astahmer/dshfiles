@@ -1,10 +1,12 @@
 import { Schema } from 'effect'
 
-const itemRefs = (ids: readonly number[]): string => ids.map(id => `b:${String(id)}`).join(', ')
+const itemRefs = (ids: readonly (number | string)[]): string => ids.map(id => `b:${String(id).replace(/^b:/u, '')}`).join(', ')
+/** An item named by its ref when the caller knows it, else by its number. */
+const itemLabel = (error: { readonly itemId: number; readonly ref?: string | undefined }): string => `b:${error.ref ?? String(error.itemId)}`
 
 export class BacklogItemNotFound extends Schema.TaggedError<BacklogItemNotFound>()(
   'BacklogItemNotFound',
-  { ids: Schema.Array(Schema.Number) },
+  { ids: Schema.Array(Schema.Union([Schema.Number, Schema.String])) },
   { dshxWireCode: 'item-not-found' },
 ) {
   override get message(): string {
@@ -14,11 +16,11 @@ export class BacklogItemNotFound extends Schema.TaggedError<BacklogItemNotFound>
 
 export class BacklogWriteFailed extends Schema.TaggedError<BacklogWriteFailed>()(
   'BacklogWriteFailed',
-  { itemId: Schema.Number, operation: Schema.Literals(['put', 'delete']), cause: Schema.optional(Schema.Defect()) },
+  { itemId: Schema.Number, ref: Schema.optional(Schema.String), operation: Schema.Literals(['put', 'delete']), cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'backlog-write-failed' },
 ) {
   override get message(): string {
-    return `Backlog item b:${String(this.itemId)} could not be saved. Retry; if it keeps failing, check the Host log for the storage error.`
+    return `Backlog item ${itemLabel(this)} could not be saved. Retry; if it keeps failing, check the Host log for the storage error.`
   }
 }
 
@@ -61,11 +63,11 @@ export class EmptyReply extends Schema.TaggedError<EmptyReply>()('EmptyReply', {
 
 export class AttachmentExportFailed extends Schema.TaggedError<AttachmentExportFailed>()(
   'AttachmentExportFailed',
-  { itemId: Schema.Number, attachmentId: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { itemId: Schema.Number, ref: Schema.optional(Schema.String), attachmentId: Schema.String, cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'attachment-export-failed' },
 ) {
   override get message(): string {
-    return `Attachment ${this.attachmentId} of b:${String(this.itemId)} could not be written to a temporary file. Read it as a data URL instead.`
+    return `Attachment ${this.attachmentId} of ${itemLabel(this)} could not be written to a temporary file. Read it as a data URL instead.`
   }
 }
 
@@ -113,11 +115,11 @@ export class AgentDisabled extends Schema.TaggedError<AgentDisabled>()('AgentDis
 
 export class ThreadNotLinked extends Schema.TaggedError<ThreadNotLinked>()(
   'ThreadNotLinked',
-  { itemId: Schema.Number, sessionId: Schema.String },
+  { itemId: Schema.Number, ref: Schema.optional(Schema.String), sessionId: Schema.String },
   { dshxWireCode: 'thread-not-linked' },
 ) {
   override get message(): string {
-    return `Thread ${this.sessionId} is not linked to backlog item b:${String(this.itemId)}.`
+    return `Thread ${this.sessionId} is not linked to backlog item ${itemLabel(this)}.`
   }
 }
 
