@@ -280,7 +280,7 @@ every Host document, silently falling back to browser storage.
 
 Sidebar preferences live in DSH Settings under the Host-synced `thread-sidebar`
 namespace (`src/settings.ts`, registered by `src/host.ts`). The plugin draws its
-own **Settings › Thread sidebar** section (`src/settings-tab.tsx`, registered by
+own **Settings › Thread list** and **Settings › Thread notifications** sections (`src/settings-tab.tsx`, registered by
 `src/client-entry.tsx`) for the preferences the generated form cannot show. The
 generated Plugins page still carries the user-facing namespace fields
 (header style, density, icon-row overflow, recent-thread count, inactive
@@ -542,7 +542,7 @@ its own, and **Unmute** is always in the same menu. The **Muted** filter lists
 muted threads. Mutes follow child-thread action preferences and live in the
 Host-synced `mutedThreads` setting, so every browser stays quiet; mutes saved
 in this browser by older versions are copied there once. **Thread notifications**
-are configured in Settings › Thread sidebar, separately for approval requests,
+are configured in Settings › Notifications › Thread notifications, separately for approval requests,
 questions, completed turns, stopped turns, and failed turns. Each category can be
 off, in-app, system, or both, with an optional sound preset and volume. In-app
 notifications can be placed at any corner or center edge of the sidebar, dismissed

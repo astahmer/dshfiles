@@ -24,6 +24,24 @@ interface SettingsTabProps {
 const CHORD_KEYS = ['paletteChord', 'fileSearchChord', 'threadSearchChord', 'backChord', 'forwardChord'] as const
 type ChordKey = (typeof CHORD_KEYS)[number]
 
+/** Its own Settings section so the Notifications group holds it; the thread list section keeps rows and keys. */
+export const NotificationSettingsTab = (props: { readonly t: Translate }): JSX.Element => {
+  const { preferences, updatePreferences, storageWarning } = usePreferences()
+  return (
+    <div className="dshx-root dshx:@container dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-6 dshx:overflow-auto dshx:pb-6">
+      {storageWarning ? <Alert variant="warning">{props.t('threadSidebarStorageFailure')}</Alert> : null}
+      <ThreadNotificationSettings
+        categories={preferences.notificationCategories}
+        notificationPlacement={preferences.notificationPlacement}
+        notificationDurationSeconds={preferences.notificationDurationSeconds}
+        onChange={notificationCategories => updatePreferences({ notificationCategories, desktopNotificationsEnabled: false })}
+        onPresentationChange={updatePreferences}
+        t={props.t}
+      />
+    </div>
+  )
+}
+
 export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
   const { preferences, updatePreferences, storageWarning } = usePreferences()
   const hostShortcuts = useSyncExternalStore(props.hostShortcuts.subscribe, props.hostShortcuts.getSnapshot)
@@ -102,14 +120,6 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
   return (
     <div className="dshx-root dshx:@container dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-6 dshx:overflow-auto dshx:pb-6">
       {storageWarning ? <Alert variant="warning">{props.t('threadSidebarStorageFailure')}</Alert> : null}
-      <ThreadNotificationSettings
-        categories={preferences.notificationCategories}
-        notificationPlacement={preferences.notificationPlacement}
-        notificationDurationSeconds={preferences.notificationDurationSeconds}
-        onChange={notificationCategories => updatePreferences({ notificationCategories, desktopNotificationsEnabled: false })}
-        onPresentationChange={updatePreferences}
-        t={props.t}
-      />
       <FieldSet>
         <FieldLegend>{props.t('threadSidebarRowSection')}</FieldLegend>
         <FieldGroup className="dshx:gap-4">

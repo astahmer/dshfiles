@@ -1335,15 +1335,18 @@ Then('the selected attention color survives a browser reload', async ({ page }: 
  * rebuilds the settings navigation as the profile settles, and an unbounded click would otherwise wait
  * the whole test timeout instead of failing where the section never opened.
  */
-const openThreadSidebarSettingsSection = async (page: Page): Promise<Locator> => {
-  // Settings is one page in the stage; the thread sidebar's section is General › Thread list.
+const openThreadSidebarSettingsSection = async (page: Page, target: 'notifications' | 'thread-list' = 'notifications'): Promise<Locator> => {
+  // Settings is one page in the stage: Notifications › Thread notifications, and General › Thread list for rows and keys.
   const settingsDialog = settingsPage(page)
-  const notifications = settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
-  const section = settingsNavEntry(page, 'Thread list', 'Thread sidebar')
+  const sectionContent =
+    target === 'notifications'
+      ? settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
+      : settingsDialog.getByRole('button', { name: 'Move focus only', exact: true })
+  const section = target === 'notifications' ? settingsNavEntry(page, 'Thread notifications') : settingsNavEntry(page, 'Thread list', 'Thread sidebar')
   const providerPrompt = page.getByRole('dialog', { name: /^(Add an API key to get started|Get started)$/ })
   const deadline = Date.now() + 45_000
   while (Date.now() < deadline) {
-    if (await notifications.isVisible().catch(() => false)) return settingsDialog
+    if (await sectionContent.isVisible().catch(() => false)) return settingsDialog
     if (await providerPrompt.isVisible().catch(() => false)) {
       // The scratch Host raises this prompt over the app, and it can end up stacked under the Settings
       // modal, where each blocks the other's buttons. Close the top modal first, then the prompt itself.
@@ -1358,7 +1361,7 @@ const openThreadSidebarSettingsSection = async (page: Page): Promise<Locator> =>
     await openSettingsDialog(page, { timeoutMs: 4_000 }).catch(() => undefined)
     await section.click({ timeout: 4_000 }).catch(() => undefined)
   }
-  await expect(notifications).toBeVisible({ timeout: 10_000 })
+  await expect(sectionContent).toBeVisible({ timeout: 10_000 })
   return settingsDialog
 }
 
@@ -1713,7 +1716,7 @@ Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', asy
     await expect(page.getByTestId('thread-selection-bar')).toHaveCount(0)
   })
   await recordAssertion(page, 'thread-sidebar-keyboard-focus-only-setting', async () => {
-    const settingsDialog = await openThreadSidebarSettingsSection(page)
+    const settingsDialog = await openThreadSidebarSettingsSection(page, 'thread-list')
     await settingsDialog.getByRole('button', { name: 'Move focus only', exact: true }).click()
     await page.keyboard.press('Escape')
     await expect(settingsDialog).toBeHidden()
@@ -1722,7 +1725,7 @@ Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', asy
     await page.keyboard.press('ArrowDown')
     await expect.poll(() => currentThreadId(page)).toBe(beforeFocusOnly)
 
-    const reopenedSettings = await openThreadSidebarSettingsSection(page)
+    const reopenedSettings = await openThreadSidebarSettingsSection(page, 'thread-list')
     await reopenedSettings.getByRole('button', { name: 'Switch immediately', exact: true }).click()
     await page.keyboard.press('Escape')
     await expect(reopenedSettings).toBeHidden()

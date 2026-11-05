@@ -1424,7 +1424,7 @@
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
-        "click button \"Thread sidebar\"",
+        "click button \"Thread notifications\"",
         "expect group \"Thread notifications\"",
         "expect button \"Approval needed: Off\"",
         "expect button \"Turn stopped: Off\"",
@@ -1439,7 +1439,7 @@
       "surfaces": ["client", "host", "settings", "storage"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "settings: Thread sidebar › notifications",
+      "currentSurface": "settings: Notifications › Thread notifications",
       "configuration": [
         {
           "key": "notificationCategories",

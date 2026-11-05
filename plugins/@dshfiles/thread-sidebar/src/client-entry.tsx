@@ -56,7 +56,7 @@ import { PromptLinkModel, type PromptLink } from './prompt-link.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
 import { PaletteBridge } from './palette-bridge.js'
 import './client.css'
-import { SettingsTab } from './settings-tab.js'
+import { NotificationSettingsTab, SettingsTab } from './settings-tab.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createSkillMentionSource } from './skill-mention.js'
 import { followUpPrompt } from './follow-up.js'
@@ -529,6 +529,19 @@ export default defineClient({
           locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
         },
         decorate(({ t }: { t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> }) => <SettingsTab t={t} hostShortcuts={ctx.shortcuts.catalog} />),
+      ),
+    )
+    ctx.slots.inject('settings.section', () =>
+      ctx.slots.register(
+        {
+          name: 'settings.section',
+          registrant: '@dshfiles/thread-sidebar',
+          id: 'thread-notifications',
+          order: 41,
+          label: () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarNotifications'),
+          locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
+        },
+        decorate(({ t }: { t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> }) => <NotificationSettingsTab t={t} />),
       ),
     )
 
