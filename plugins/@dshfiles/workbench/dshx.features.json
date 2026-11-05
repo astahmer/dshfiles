@@ -627,7 +627,7 @@
         "seed tool-call-thread",
         "click button \"New tab\"",
         "expect group \"Thread panels\"",
-        "click button \"Cost*\"",
+        "click button \"route, cost per turn*\"",
         "expect text \"List-price estimates of this thread*\""
       ],
       "surfaces": ["client", "integration"],
