@@ -1,6 +1,9 @@
 import { describe, expect, it } from '@effect/vitest'
-import { decodeGitHubPullRequestJson } from '../src/github-cli.js'
+import { Schema } from 'effect'
+import { githubPullRequestJsonSchema } from '../src/github-cli.js'
 import { summarizePullRequest, transitionPullRequest, type PullRequestEvent, type PullRequestSnapshot } from '../src/pull-request-model.js'
+
+const decodeGitHubPullRequestJson = Schema.decodeUnknownSync(githubPullRequestJsonSchema)
 
 const snapshot = (overrides: Partial<PullRequestSnapshot> = {}): PullRequestSnapshot => ({
   state: 'OPEN',

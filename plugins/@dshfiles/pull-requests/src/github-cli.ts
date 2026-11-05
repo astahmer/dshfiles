@@ -160,10 +160,13 @@ export interface GitHubPullRequestCreate {
   readonly draft: boolean
 }
 
-export const decodeGitHubPullRequestJson = (text: string): GitHubPullRequestView => {
-  const json: unknown = JSON.parse(text)
-  return Schema.decodeUnknownSync(githubPullRequestViewSchema)(json)
-}
+/** `gh pr view` output, decoded from its JSON text. */
+export const githubPullRequestJsonSchema = Schema.fromJsonString(githubPullRequestViewSchema)
+
+const decodeGhJson =
+  <S extends Schema.Decoder<unknown>>(operation: GhOperation, schema: S) =>
+  (output: string): Effect.Effect<S['Type'], GhResponseInvalid, S['DecodingServices']> =>
+    Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(output).pipe(Effect.mapError(cause => new GhResponseInvalid({ operation, cause })))
 
 export class GitHubCli extends Context.Service<
   GitHubCli,
@@ -199,10 +202,7 @@ export class GitHubCli extends Context.Service<
           span: 'pull request gh repo',
           attributes: { 'dshx.plugin.package': '@dshfiles/pull-requests' },
         }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner))
-        return yield* Effect.try({
-          try: () => Schema.decodeUnknownSync(repositoryNameSchema)(JSON.parse(output)).nameWithOwner,
-          catch: cause => new GhResponseInvalid({ operation: 'repo-view', cause }),
-        })
+        return (yield* decodeGhJson('repo-view', repositoryNameSchema)(output)).nameWithOwner
       })
 
       const pullRequest = Effect.fn('pull-requests gh view')(function* (input: { readonly repo: string; readonly number: number; readonly cwd: string }) {
@@ -217,10 +217,7 @@ export class GitHubCli extends Context.Service<
             'github.pull_request.number': input.number,
           },
         }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner))
-        return yield* Effect.try({
-          try: () => decodeGitHubPullRequestJson(output),
-          catch: cause => new GhResponseInvalid({ operation: 'pr-view', cause }),
-        })
+        return yield* decodeGhJson('pr-view', githubPullRequestViewSchema)(output)
       })
 
       const pluginAttributes = { 'dshx.plugin.package': '@dshfiles/pull-requests' }
@@ -241,10 +238,7 @@ export class GitHubCli extends Context.Service<
             attributes: pluginAttributes,
           }),
         )
-        const decoded = yield* Effect.try({
-          try: () => Schema.decodeUnknownSync(repositoryInfoSchema)(JSON.parse(output)),
-          catch: cause => new GhResponseInvalid({ operation: 'repo-info', cause }),
-        })
+        const decoded = yield* decodeGhJson('repo-info', repositoryInfoSchema)(output)
         const defaultBranch = decoded.defaultBranchRef?.name ?? ''
         return { repo: decoded.nameWithOwner, defaultBranch: defaultBranch.length > 0 ? defaultBranch : null }
       })
@@ -259,10 +253,7 @@ export class GitHubCli extends Context.Service<
             attributes: { ...pluginAttributes, 'github.repository': input.repo },
           }),
         )
-        const listed = yield* Effect.try({
-          try: () => Schema.decodeUnknownSync(pullRequestListSchema)(JSON.parse(output)),
-          catch: cause => new GhResponseInvalid({ operation: 'pr-list', cause }),
-        })
+        const listed = yield* decodeGhJson('pr-list', pullRequestListSchema)(output)
         const url = listed[0]?.url
         return url !== undefined && PULL_REQUEST_URL.test(url) ? url : null
       })

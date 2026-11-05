@@ -5,6 +5,8 @@ import { Llm, LlmCallFailed } from '@dshfiles/dshx/effect/llm'
 import { SessionId } from '@dshfiles/dshx/ids'
 import { Context, Effect, Layer, Option, Schema } from 'effect'
 
+import { sessionQueryReads } from './session-query-promise.js'
+
 export interface ThreadMessage {
   readonly role: 'user' | 'assistant'
   readonly text: string
@@ -55,16 +57,17 @@ export class ThreadContext extends Context.Service<
         // Looked up per read: session query is optional and may register after this plugin.
         const sessionQuery = ctx.get('sessionQuery')
         if (Option.isNone(id) || sessionQuery === undefined) return EMPTY
-        const log = yield* Effect.tryPromise(() => sessionQuery.readSession(id.value)).pipe(Effect.option)
+        const reads = sessionQueryReads(sessionQuery)
+        const log = yield* reads.readSession(id.value).pipe(Effect.option)
         if (Option.isNone(log)) return EMPTY
         const events = log.value.events
         const header = events.findLast(event => event.type === 'request/header')
         const config = header?.type === 'request/header' ? header.data.header.config : undefined
         const route = config?.provider !== undefined && config.model !== undefined ? { provider: config.provider, model: config.model } : undefined
-        const titled = yield* Effect.tryPromise(() => sessionQuery.readTitle(id.value)).pipe(Effect.orElseSucceed(() => undefined))
-        const documents = yield* Effect.tryPromise(() =>
-          sessionQuery.filterEvents(id.value, [{ kind: 'type', values: ['user/message', 'assistant/message'] }]),
-        ).pipe(Effect.orElseSucceed(() => []))
+        const titled = yield* reads.readTitle(id.value).pipe(Effect.orElseSucceed(() => undefined))
+        const documents = yield* reads
+          .filterEvents(id.value, [{ kind: 'type', values: ['user/message', 'assistant/message'] }])
+          .pipe(Effect.orElseSucceed(() => []))
         const messages = documents
           .filter(document => document.text.trim().length > 0)
           .slice(-MAX_MESSAGES)
