@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "readable-web-fetch",
+      "title": "Answer ctx.web fetches across redirects with the readable article",
+      "summary": "A fetch backend for the web seam: follows cross-origin redirects with public-address revalidation and pinning on every hop, decodes JavaScript, YAML, TOML and sniffed untyped text, and reduces HTML to its Mozilla Readability article.",
+      "surfaces": ["host", "settings", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: dshfiles-web-fetch-readable",
+      "configuration": [],
+      "states": ["fetching", "redirecting", "extracted", "full-page", "blocked", "unsupported", "aborted"],
+      "failureModes": [
+        "A redirect to a non-public, non-HTTP or credentialed URL fails with WEB_BLOCKED_URL or WEB_INVALID_URL before it is requested.",
+        "More redirects than maxRedirects fail with WEB_REDIRECT_BLOCKED and name the setting.",
+        "A binary body fails with WEB_UNSUPPORTED_CONTENT_TYPE and points at bash curl -o.",
+        "A caller abort is WEB_ABORTED; the whole-fetch deadline is WEB_FETCH_TIMEOUT."
+      ],
+      "externalDependencies": [
+        {
+          "id": "public-web",
+          "boundary": "Anonymous GET of the requested URL and each redirect target, through the process proxy when one applies.",
+          "deterministicFake": "tests/provider.test.ts replaces the transport with a host table and runs the real address validation over its answers."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "web-fetch-readable.cross-origin-redirect",
+          "file": "plugins/@dshfiles/web-fetch-readable/tests/provider.test.ts",
+          "testName": "follows a cross-origin redirect and resolves and pins every hop afresh"
+        },
+        {
+          "kind": "unit-test",
+          "id": "web-fetch-readable.private-redirect",
+          "file": "plugins/@dshfiles/web-fetch-readable/tests/provider.test.ts",
+          "testName": "refuses a redirect whose target resolves to a private address"
+        },
+        {
+          "kind": "unit-test",
+          "id": "web-fetch-readable.invalid-redirect",
+          "file": "plugins/@dshfiles/web-fetch-readable/tests/provider.test.ts",
+          "testName": "refuses a redirect to a loopback literal, a non-HTTP scheme or embedded credentials"
+        },
+        {
+          "kind": "unit-test",
+          "id": "web-fetch-readable.redirect-cap",
+          "file": "plugins/@dshfiles/web-fetch-readable/tests/provider.test.ts",
+          "testName": "stops at the hop cap with a recovery hint"
+        },
+        {
+          "kind": "unit-test",
+          "id": "web-fetch-readable.text-types",
+          "file": "plugins/@dshfiles/web-fetch-readable/tests/provider.test.ts",
+          "testName": "decodes JavaScript, YAML and untyped UTF-8 text"
+        },
+        {
+          "kind": "unit-test",
+          "id": "web-fetch-readable.binary",
+          "file": "plugins/@dshfiles/web-fetch-readable/tests/provider.test.ts",
+          "testName": "refuses binary bodies and says how to get them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "web-fetch-readable.article",
+          "file": "plugins/@dshfiles/web-fetch-readable/tests/provider.test.ts",
+          "testName": "returns the article without navigation or footer, with links made absolute"
+        },
+        {
+          "kind": "unit-test",
+          "id": "web-fetch-readable.registration",
+          "file": "plugins/@dshfiles/web-fetch-readable/tests/host.test.ts",
+          "testName": "registers the readable fetch provider for the plugin lifetime and validates URLs with the current settings"
+        },
+        {
+          "kind": "gherkin",
+          "id": "web-fetch-readable.activates",
+          "featureFile": "tooling/dshx/e2e/features/web-fetch-readable.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "web fetch",
+          "file": "plugins/@dshfiles/web-fetch-readable/tests/provider.test.ts",
+          "testName": "records a web fetch span with hop counts and the extraction outcome, never the URL or body"
+        }
+      ]
+    }
+  ],
+  "ioDelegation": [
+    {
+      "file": "src/network.ts",
+      "tracedBy": "web fetch",
+      "reason": "ReadableFetchProvider.fetch opens the web fetch span around every resolution and request this transport makes."
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-web-fetch-readable
+      name: '@dshfiles/web-fetch-readable'
