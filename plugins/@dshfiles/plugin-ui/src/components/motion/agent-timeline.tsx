@@ -64,14 +64,29 @@ export interface AgentTimelineProps extends Omit<React.HTMLAttributes<HTMLElemen
   readonly handoffs?: readonly AgentTimelineHandoff[]
   /** Run length in seconds; defaults to the last segment end. */
   readonly duration?: number
+  /** Replay from the start on mount; false shows the finished run, and play still replays it. */
   readonly autoPlay?: boolean
   readonly speeds?: readonly number[]
+  /** What each bar style means; defaults to agent thinking, tool calls, waiting, handoffs and failures. */
+  readonly legend?: readonly LegendItem[]
+  readonly labels?: Partial<AgentTimelineLabels>
 }
+
+export interface AgentTimelineLabels {
+  readonly running: string
+  readonly done: string
+  readonly failed: string
+  readonly tokens: string
+  /** The accessible name of the lane list. */
+  readonly lanes: string
+}
+
+const defaultLabels: AgentTimelineLabels = { running: 'Running', done: 'Done', failed: 'Failed', tokens: 'tokens', lanes: 'Agents' }
 
 const ROW = 52
 const BAR = 22
 
-const legend: readonly LegendItem[] = [
+const defaultLegend: readonly LegendItem[] = [
   { label: 'Thinking', swatch: 'soft' },
   { label: 'Tool call', swatch: 'solid' },
   { label: 'Waiting', swatch: 'hatched' },
@@ -92,9 +107,12 @@ export function AgentTimeline({
   duration,
   autoPlay = true,
   speeds = [1, 2],
+  legend = defaultLegend,
+  labels: labelOverrides,
   className,
   ...props
 }: AgentTimelineProps) {
+  const labels = { ...defaultLabels, ...labelOverrides }
   const length = duration ?? segments.reduce((max, segment) => Math.max(max, segment.end), 0)
   const playback = usePlayback(length, { autoPlay })
   const now = playback.time
@@ -126,15 +144,15 @@ export function AgentTimeline({
         <h3 className="dshx:truncate dshx:text-base dshx:font-medium">{heading}</h3>
         <p className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-1.5 dshx:text-sm dshx:text-muted-foreground dshx:tabular-nums">
           {running ? (
-            <ShimmerText>Running</ShimmerText>
+            <ShimmerText>{labels.running}</ShimmerText>
           ) : (
-            <span className={failed ? 'dshx:text-destructive' : 'dshx:text-success'}>{failed ? 'Failed' : 'Done'}</span>
+            <span className={failed ? 'dshx:text-destructive' : 'dshx:text-success'}>{failed ? labels.failed : labels.done}</span>
           )}
           <span aria-hidden>·</span>
           <span className="dshx:min-w-[3.5ch] dshx:text-foreground">{formatDuration(now)}</span>
           <span aria-hidden>·</span>
           <span className="dshx:inline-flex dshx:gap-1">
-            <RollingNumber value={Math.round(tokens)} className="dshx:text-foreground" /> tokens
+            <RollingNumber value={Math.round(tokens)} className="dshx:text-foreground" /> {labels.tokens}
           </span>
           <span aria-hidden>·</span>
           <RollingNumber value={cost} format={formatCost} className="dshx:text-foreground" />
@@ -142,7 +160,7 @@ export function AgentTimeline({
       </header>
 
       <div className="dshx:flex dshx:min-w-0 dshx:gap-3">
-        <ol aria-label="Agents" className="dshx:flex dshx:w-40 dshx:shrink-0 dshx:flex-col dshx:@max-pane-compact:w-32 dshx:@max-pane-narrow:w-24">
+        <ol aria-label={labels.lanes} className="dshx:flex dshx:w-40 dshx:shrink-0 dshx:flex-col dshx:@max-pane-compact:w-32 dshx:@max-pane-narrow:w-24">
           {lanes.map(lane => {
             const done = segments.filter(segment => segment.laneId === lane.id && segment.end <= now).length
             return (

@@ -285,14 +285,15 @@ export interface Playback {
 
 /**
  * A replay clock for a recorded trace: `time` advances from 0 to `duration` every frame while playing, times `speed`.
- * Reduced motion starts at the end and does not autoplay; pressing play still replays.
+ * Without `autoPlay`, and under reduced motion, it starts at the end; pressing play still replays. Parked at the end, it
+ * follows a `duration` that grows (a run that gained a turn) instead of hiding the new part.
  */
 export function usePlayback(
   duration: number,
   { autoPlay = true, initialSpeed = 1 }: { readonly autoPlay?: boolean; readonly initialSpeed?: number } = {},
 ): Playback {
   const reduced = usePrefersReducedMotion()
-  const [time, setTime] = React.useState(() => (reduced ? duration : 0))
+  const [time, setTime] = React.useState(() => (reduced || !autoPlay ? duration : 0))
   const [playing, setPlaying] = React.useState(autoPlay && !reduced)
   const [speed, setSpeed] = React.useState(initialSpeed)
   const speedRef = React.useRef(speed)
@@ -308,6 +309,13 @@ export function usePlayback(
   React.useEffect(() => {
     if (playing && time >= duration) setPlaying(false)
   }, [playing, time, duration])
+
+  const previousDuration = React.useRef(duration)
+  React.useEffect(() => {
+    const previous = previousDuration.current
+    previousDuration.current = duration
+    if (!playing && duration > previous) setTime(current => (current >= previous ? duration : current))
+  }, [playing, duration])
 
   const done = time >= duration
   const state = React.useRef({ playing, time })
