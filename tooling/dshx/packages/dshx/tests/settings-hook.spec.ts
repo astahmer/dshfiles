@@ -65,8 +65,7 @@ function clientWith(options: {
   readonly scope: {
     getSnapshot(): Record<string, unknown>
     subscribe(listener: () => void): () => void
-    set(field: string, value: unknown): Promise<void>
-    unset(field: string): Promise<void>
+    mutate(ops: readonly unknown[]): Promise<boolean | void>
   }
   readonly mirror: Record<string, unknown>
 }): SettingsClientRuntime {
@@ -95,8 +94,8 @@ describe('useSettings', () => {
     hookRefs.length = 0
     const contract = defineSettings({ namespace: 'runtime-hook', schema: Schema.object({ enabled: Schema.boolean().default(true) }) })
     let resolveWrite: (() => void) | undefined
-    const set = vi.fn(
-      () =>
+    const mutate = vi.fn(
+      (_ops: readonly unknown[]) =>
         new Promise<void>(resolve => {
           resolveWrite = resolve
         }),
@@ -104,8 +103,7 @@ describe('useSettings', () => {
     const scope = {
       getSnapshot: () => ({ status: 'ready', value: { enabled: true }, base: { enabled: true }, user: {}, revision: 2, writable: true, mode: 'host' }),
       subscribe: () => () => undefined,
-      set,
-      unset: vi.fn(() => Promise.resolve()),
+      mutate,
     }
     currentClient = clientWith({
       scope,
@@ -120,6 +118,7 @@ describe('useSettings', () => {
     expect(initial.value).toEqual({ enabled: true })
     expect(initial.error).toBeNull()
     const write = initial.set('enabled', false)
+    expect(mutate).toHaveBeenLastCalledWith([{ op: 'set', path: ['enabled'], value: false }])
     expect(render(contract).mutation.pending).toBe(true)
     expect(render(contract).value).toEqual({ enabled: true })
     resolveWrite?.()
@@ -127,22 +126,25 @@ describe('useSettings', () => {
     expect(render(contract).mutation).toEqual({ pending: false })
 
     const failure = new Error('write failed')
-    set.mockRejectedValueOnce(failure)
+    mutate.mockRejectedValueOnce(failure)
     await expect(render(contract).set('enabled', false)).rejects.toBe(failure)
     expect(render(contract).mutation).toEqual({ pending: false })
+
+    mutate.mockResolvedValueOnce(undefined)
+    await render(contract).setMany({ enabled: false })
+    expect(mutate).toHaveBeenLastCalledWith([{ op: 'set', path: ['enabled'], value: false }])
   })
 
   it('distinguishes unregistered namespaces and refuses their writes', async () => {
     hookState.length = 0
     hookRefs.length = 0
     const contract = defineSettings({ namespace: 'missing-hook', schema: Schema.object({ enabled: Schema.boolean() }) })
-    const set = vi.fn(() => Promise.resolve())
+    const mutate = vi.fn(() => Promise.resolve(true))
     currentClient = clientWith({
       scope: {
         getSnapshot: () => ({ status: 'loading', value: undefined, base: undefined, user: undefined, revision: undefined, writable: false, mode: 'host' }),
         subscribe: () => () => undefined,
-        set,
-        unset: vi.fn(() => Promise.resolve()),
+        mutate,
       },
       mirror: { status: 'ready', view: { namespaces: [], writable: true }, error: null },
     })
@@ -151,7 +153,7 @@ describe('useSettings', () => {
     expect(state.writable).toBe(false)
     expect(state.error?.kind).toBe('namespace-unregistered')
     await expect(state.set('enabled', true)).rejects.toThrow('not registered')
-    expect(set).not.toHaveBeenCalled()
+    expect(mutate).not.toHaveBeenCalled()
   })
 
   it('distinguishes missing providers, decode failures, and mirror sync failures', () => {
@@ -165,8 +167,7 @@ describe('useSettings', () => {
       scope: {
         getSnapshot: () => ({ status: 'loading', value: undefined, base: undefined, user: undefined, revision: 4, writable: true, mode: 'host' }),
         subscribe: () => () => undefined,
-        set: vi.fn(() => Promise.resolve()),
-        unset: vi.fn(() => Promise.resolve()),
+        mutate: vi.fn(() => Promise.resolve(true)),
       },
       mirror: {
         status: 'ready',
@@ -180,8 +181,7 @@ describe('useSettings', () => {
       scope: {
         getSnapshot: () => ({ status: 'ready', value: { enabled: true }, base: {}, user: {}, revision: 4, writable: true, mode: 'host' }),
         subscribe: () => () => undefined,
-        set: vi.fn(() => Promise.resolve()),
-        unset: vi.fn(() => Promise.resolve()),
+        mutate: vi.fn(() => Promise.resolve(true)),
       },
       mirror: { status: 'ready', view: { namespaces: [], writable: true }, error: 'refresh failed' },
     })

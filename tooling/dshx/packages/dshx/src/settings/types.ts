@@ -67,5 +67,7 @@ export interface SettingsState<Value extends object, ClientValue extends object>
   readonly mutation: SettingsMutationState
   /** Resolves true on native Host acceptance, false on refusal; transport errors reject. */
   set<Key extends keyof Value & string>(field: Key, value: Value[Key]): Promise<boolean>
+  /** Writes several fields as one atomic Host mutation, so they share one round trip and land together. */
+  setMany(patch: Partial<Value>): Promise<boolean>
   unset<Key extends keyof Value & string>(field: Key): Promise<boolean>
 }

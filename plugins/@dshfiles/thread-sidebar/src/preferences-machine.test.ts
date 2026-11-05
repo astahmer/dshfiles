@@ -41,10 +41,11 @@ const createClient = (
 
 const startMachine = (client: SidebarPreferencesMachineClient) => createActor(SidebarPreferencesMachine.machine, { input: { client } }).start()
 
-const waitUntilIdle = (actor: ReturnType<typeof startMachine>) => waitFor(actor, snapshot => snapshot.matches('idle') && snapshot.context.queue.length === 0)
+const waitUntilSettled = (actor: ReturnType<typeof startMachine>) =>
+  waitFor(actor, snapshot => snapshot.matches('idle') && Object.keys(snapshot.context.pendingOperationIds).length === 0)
 
 describe('SidebarPreferencesMachine', () => {
-  it('serializes Host writes and keeps the newest pending value until its own write settles', async () => {
+  it('hands every edit to the Host at once and keeps the newest pending value until its own write settles', async () => {
     const firstWrite = deferred<boolean>()
     const secondWrite = deferred<boolean>()
     let writeCount = 0
@@ -57,20 +58,18 @@ describe('SidebarPreferencesMachine', () => {
     const actor = startMachine(harness.client)
 
     actor.send({ type: 'host.update', patch: { idleMinutes: 30 } })
-    await vi.waitFor(() => expect(writeCount).toBe(1))
     actor.send({ type: 'host.update', patch: { idleMinutes: 45 } })
+    expect(harness.hostWrites).toEqual([{ idleMinutes: 30 }, { idleMinutes: 45 }])
     expect(actor.getSnapshot().context.pending.idleMinutes).toBe(45)
 
     firstWrite.resolve(false)
-    await vi.waitFor(() => expect(writeCount).toBe(2))
+    await vi.waitFor(() => expect(actor.getSnapshot().context.hostWriteFailed).toBe(true))
     expect(actor.getSnapshot().context.pending.idleMinutes).toBe(45)
-    expect(actor.getSnapshot().context.hostWriteFailed).toBe(true)
 
     secondWrite.resolve(true)
-    await waitUntilIdle(actor)
+    await waitUntilSettled(actor)
     expect(actor.getSnapshot().context.pending).toEqual({})
     expect(actor.getSnapshot().context.hostWriteFailed).toBe(false)
-    expect(harness.hostWrites).toEqual([{ idleMinutes: 30 }, { idleMinutes: 45 }])
   })
 
   it('retains the browser copy after failed migration and removes it only after a successful retry', async () => {
@@ -116,7 +115,7 @@ describe('SidebarPreferencesMachine', () => {
     const actor = startMachine(harness.client)
 
     actor.send({ type: 'migration.requested' })
-    await waitFor(actor, snapshot => snapshot.matches('idle') && snapshot.context.queue.length === 0 && snapshot.context.nextOperationId === 1)
+    await waitFor(actor, snapshot => snapshot.matches('idle') && snapshot.context.migrationOperationId === null && snapshot.context.nextOperationId === 1)
     expect(actor.getSnapshot().context.migrationStatus).toBe('idle')
     expect(harness.getLocal()).toEqual(DEFAULT_PREFERENCES)
     expect(harness.getRemoveCount()).toBe(0)

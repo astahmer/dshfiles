@@ -67,6 +67,7 @@ const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', i
 const SETTINGS_CLIENT_PATH = fileURLToPath(new URL('../../settings/client.js', import.meta.url))
 const SETTINGS_PAGE_RENDERER_PATH = fileURLToPath(new URL('../../settings/page-renderer.js', import.meta.url))
 const SETTINGS_SECTION_ENTRIES_PATH = fileURLToPath(new URL('../../settings/section-entries.js', import.meta.url))
+const SETTINGS_WRITE_JOURNAL_PATH = fileURLToPath(new URL('../../settings/write-journal.js', import.meta.url))
 const SETTINGS_SECTION_ENTRIES_SCHEMA_PATH = fileURLToPath(new URL('../../settings/section-entries-schema.js', import.meta.url))
 const CONVERSATION_DEFINE_PATH = fileURLToPath(new URL('../../conversation/define.js', import.meta.url))
 
@@ -212,6 +213,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const settingsSearchEntries = SettingsSearchEntriesModel.current',
           'export const subscribeSettingsSearchEntries = SettingsSearchEntriesModel.subscribe',
           'export const publishSettingsSearchEntries = SettingsSearchEntriesModel.publish',
+          `export { SettingsWriteJournal } from ${JSON.stringify(SETTINGS_WRITE_JOURNAL_PATH)}`,
           '',
         ].join('\n')
       if (id === VIRTUAL_CLIENT_API_HOOKS) {

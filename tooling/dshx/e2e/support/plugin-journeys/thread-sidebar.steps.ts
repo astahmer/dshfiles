@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion, settingsPage, settingsNavEntry } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion, reloadPastProviderSetup, settingsPage, settingsNavEntry } from '../steps.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFolder } from '../threads.js'
 import { materializeNonblankThread } from '../thread-composer.js'
@@ -191,8 +191,7 @@ const selectBlankThreadAwayFrom = async (page: Page, excludedThreadId: string): 
  * Settings as a profile shows it: settings-shell's page in the stage, or — in a composition without settings-shell —
  * the native Settings dialog, whose accessible name is not "Settings". Both list the built-in plugins.
  */
-const settingsSurface = (page: Page): Locator =>
-  settingsPage(page).or(page.getByRole('dialog')).filter({ hasText: 'Built-in plugins' }).first()
+const settingsSurface = (page: Page): Locator => settingsPage(page).or(page.getByRole('dialog')).filter({ hasText: 'Built-in plugins' }).first()
 
 const openSidebarSettings = async (page: Page): Promise<void> => {
   await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
@@ -1414,16 +1413,21 @@ Then('previewing a notification sound plays a tone through the browser audio con
 })
 
 Then('the notification settings survive a browser reload', async ({ page }: { page: Page }) => {
-  await page.reload()
-  const settingsDialog = await openThreadSidebarSettingsSection(page)
-  const notificationSettings = settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
+  await reloadPastProviderSetup(page)
   await recordAssertion(page, 'thread-sidebar-notification-category-settings-survive-reload', async () => {
-    await expect(notificationSettings.getByRole('button', { name: 'Approval needed: In-app', exact: true })).toBeVisible()
-    await expect(notificationSettings.getByRole('checkbox', { name: 'Approval needed: Play a sound', exact: true })).toBeChecked()
-    await expect(notificationSettings.getByRole('button', { name: 'Approval needed Sound: Chime', exact: true })).toBeVisible()
-    await expect(notificationSettings.getByRole('button', { name: 'Turn stopped: System notification', exact: true })).toBeVisible()
-    await expect(notificationSettings.getByRole('button', { name: 'In-app notification position', exact: true })).toHaveText('Top right')
-    await expect(notificationSettings.getByRole('button', { name: 'In-app notification timeout', exact: true })).toHaveText('Until dismissed')
+    // The scratch Host's provider prompt can return after the reload and take Settings away with it; reopen the
+    // section on each attempt rather than mistake that for a lost setting.
+    await expect(async () => {
+      const settingsDialog = await openThreadSidebarSettingsSection(page)
+      const notificationSettings = settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
+      const timeout = 3_000
+      await expect(notificationSettings.getByRole('button', { name: 'Approval needed: In-app', exact: true })).toBeVisible({ timeout })
+      await expect(notificationSettings.getByRole('checkbox', { name: 'Approval needed: Play a sound', exact: true })).toBeChecked({ timeout })
+      await expect(notificationSettings.getByRole('button', { name: 'Approval needed Sound: Chime', exact: true })).toBeVisible({ timeout })
+      await expect(notificationSettings.getByRole('button', { name: 'Turn stopped: System notification', exact: true })).toBeVisible({ timeout })
+      await expect(notificationSettings.getByRole('button', { name: 'In-app notification position', exact: true })).toHaveText('Top right', { timeout })
+      await expect(notificationSettings.getByRole('button', { name: 'In-app notification timeout', exact: true })).toHaveText('Until dismissed', { timeout })
+    }).toPass({ timeout: 45_000 })
   })
   await finishJourneyAssertions(page)
 })

@@ -15,6 +15,7 @@ import {
   defineClient,
   provideSettingsPageRenderer,
   publishSettingsSearchEntries,
+  SettingsWriteJournal,
   settingsSearchEntries,
   subscribeSettingsSearchEntries,
   useApiQuery,
@@ -165,7 +166,22 @@ export default defineClient({
     }, 'settings-shell: follow the main view')
 
     const preferences = ctx.configForms.get<unknown>(SETTINGS_NAMESPACE)
-    const formFor = (ns: string): ConfigForm<unknown> => ctx.configForms.get<unknown>(ns)
+    const journaledForms = new Map<string, ConfigForm<unknown>>()
+    const formFor = (ns: string): ConfigForm<unknown> => {
+      const existing = journaledForms.get(ns)
+      if (existing !== undefined) return existing
+      const form = ctx.configForms.get<unknown>(ns)
+      const writes = SettingsWriteJournal.wrap(ns, form)
+      const journaled: ConfigForm<unknown> = {
+        getSnapshot: () => form.getSnapshot(),
+        subscribe: listener => form.subscribe(listener),
+        mutate: (ops, expectedRevision) => writes.mutate(ops, expectedRevision),
+        set: (field, value) => writes.set(field, value),
+        unset: field => writes.unset(field),
+      }
+      journaledForms.set(ns, journaled)
+      return journaled
+    }
     /**
      * Settings has one place: a page in the stage (plan `plans/ade-ux` §4.6). The gear, the rail, the palette, Mod+,
      * and other plugins' open requests all land there; the former dialog, expanded dialog and side-panel presentations

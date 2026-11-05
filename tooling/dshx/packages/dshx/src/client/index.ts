@@ -44,6 +44,8 @@ export const createApiClient = ApiRuntimeModel.createClient
 export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient
 export type { RegisteredApiSpec } from '../api/runtime.js'
 export { useSettings } from '../settings/client.js'
+export { SettingsWriteJournal } from '../settings/write-journal.js'
+export type { JournaledSettingsForm, SettingsWriteOp } from '../settings/write-journal.js'
 export type { SettingsMutationState, SettingsReadError, SettingsState } from '../settings/types.js'
 export type { HandleOf } from '@deepseek-ai/dsh-client-ui-slots'
 export { defineClientPlugin } from '../sdk/client.js'

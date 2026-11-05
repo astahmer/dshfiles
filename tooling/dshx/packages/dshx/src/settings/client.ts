@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type z from '@deepseek-ai/schemastery'
 import type { ConfigForms as OfficialConfigForms, ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsContract, SettingsReadError, SettingsState, SettingsValue } from './types.js'
+import { SettingsWriteJournal, type SettingsWriteOp } from './write-journal.js'
 
 type ReactRuntime = typeof import('react')
 declare const require: ((name: string) => ReactRuntime) | undefined
@@ -21,6 +22,7 @@ interface Scope<T> {
   subscribe(listener: () => void): () => void
   set(field: string, value: unknown): Promise<boolean>
   unset(field: string): Promise<boolean>
+  mutate(ops: readonly SettingsWriteOp[]): Promise<boolean>
 }
 
 interface NamespaceView {
@@ -103,6 +105,7 @@ function unavailableScope<T>(message: string): Scope<T> {
     subscribe: () => () => undefined,
     set: reject,
     unset: reject,
+    mutate: reject,
   }
 }
 
@@ -130,12 +133,18 @@ export function createSettingsClientRuntime(ctx: ContextLike): SettingsClientRun
       const existing = bindings.get(contract)
       if (existing !== undefined) return existing as Binding<T>
       const source = forms?.get<unknown>(contract.namespace) ?? unavailableScope<unknown>(missing)
+      const writes = SettingsWriteJournal.wrap(contract.namespace, {
+        getSnapshot: () => source.getSnapshot(),
+        subscribe: listener => source.subscribe(listener),
+        mutate: ops => source.mutate(ops),
+      })
       let previous: ConfigFormSnapshot<unknown> | undefined
       let snapshot: ScopeSnapshot<T>
       const scope: Scope<T> = {
         subscribe: listener => source.subscribe(listener),
-        set: (field, value) => source.set(field, value),
-        unset: field => source.unset(field),
+        set: (field, value) => writes.set(field, value),
+        unset: field => writes.unset(field),
+        mutate: ops => writes.mutate(ops),
         getSnapshot() {
           const next = source.getSnapshot()
           if (next !== previous) {
@@ -260,6 +269,15 @@ export function useSettings<Schema extends z<any, object>, ClientValue extends o
       }),
     [assertAvailable, binding, mutate],
   )
+  const setMany = runtime().useCallback(
+    (patch: Partial<SettingsValue<Schema>>) =>
+      mutate(async () => {
+        assertAvailable()
+        const ops = Object.entries(patch).flatMap(([field, value]): SettingsWriteOp[] => (value === undefined ? [] : [{ op: 'set', path: [field], value }]))
+        return ops.length === 0 ? true : binding.scope.mutate(ops)
+      }),
+    [assertAvailable, binding, mutate],
+  )
   const unset = runtime().useCallback(
     <Key extends keyof SettingsValue<Schema> & string>(field: Key) =>
       mutate(async () => {
@@ -279,6 +297,7 @@ export function useSettings<Schema extends z<any, object>, ClientValue extends o
     error,
     mutation: { pending: mutationPending },
     set,
+    setMany,
     unset,
   }
 }

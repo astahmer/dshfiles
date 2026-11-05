@@ -60,13 +60,7 @@ export const usePreferences = (): PreferencesSnapshot & {
         const current = settingsRef.current
         if (current === null || current.status !== 'ready' || !current.writable || current.value === undefined) return false
         if (SidebarPreferencesModel.decode(current.value) === null) return false
-        const writeKey = <Key extends keyof SidebarPreferences>(key: Key): Promise<boolean> => {
-          const value = patch[key]
-          return value === undefined ? Promise.resolve(true) : current.set(key, value)
-        }
-        const keys = Object.keys(patch).filter(SidebarPreferencesModel.isPreferenceKey)
-        const results = await Promise.all(keys.map(writeKey))
-        return !results.includes(false)
+        return current.setMany(patch)
       },
       removeLocal: () => storedPreferences.remove(),
     }),
