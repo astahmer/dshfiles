@@ -12,7 +12,7 @@ export const AccountConnectionSummary = (props: {
   readonly account: AccountProfile
   readonly editable: boolean
   readonly busy: boolean
-  readonly saveName: (name: string) => Promise<unknown>
+  readonly saveName: (name: string) => Promise<void>
 }): JSX.Element => {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(props.account.displayName)
