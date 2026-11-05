@@ -61,6 +61,17 @@ export const backlogMigrations = {
     const sql = yield* SqlClient.SqlClient
     yield* Effect.forEach(opLogSchema, statement => sql.unsafe(statement), { discard: true })
   }),
+  '2_shipped_summaries': Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`CREATE TABLE shipped_summaries (
+      cache_key TEXT PRIMARY KEY,
+      items_hash TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      model TEXT NOT NULL,
+      generated_at INTEGER NOT NULL
+    )`
+  }),
 }
 
 /** The backlog's SQLite file, through the shared store layer (WAL, migrations, `BEGIN IMMEDIATE`). */

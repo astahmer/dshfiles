@@ -88,3 +88,33 @@ describe('agent-item filter input', () => {
     expect(BacklogViews.hidingAgentItems({ query: 'x' }, true)).toEqual({ query: 'x', hideAgentItems: true })
   })
 })
+
+describe('shipped input', () => {
+  it('takes a unit period with an optional count, projects and time zone, or a custom range with both bounds in order', () => {
+    const schema = backlogApi.methods.shipped.input
+    if (schema === undefined) throw new Error('shipped takes an input')
+    const decode = Schema.decodeUnknownResult(schema)
+    expect(Result.isSuccess(decode({ period: 'day' }))).toBe(true)
+    expect(Result.isSuccess(decode({ period: 'hour', count: 24, projects: ['/repo/app', null], tzOffsetMinutes: -120 }))).toBe(true)
+    expect(Result.isSuccess(decode({ period: 'custom', from: 1, to: 2 }))).toBe(true)
+    expect(Result.isSuccess(decode({ period: 'custom', from: 1 }))).toBe(false)
+    expect(Result.isSuccess(decode({ period: 'custom', from: 2, to: 2 }))).toBe(false)
+    expect(Result.isSuccess(decode({ period: 'decade' }))).toBe(false)
+    expect(Result.isSuccess(decode({ period: 'week', count: 0 }))).toBe(false)
+    expect(Result.isSuccess(decode({ period: 'week', count: 61 }))).toBe(false)
+    expect(Result.isSuccess(decode({ period: 'day', tzOffsetMinutes: 900 }))).toBe(false)
+  })
+
+  it('decodes a digest from a Host without summaries as having none', () => {
+    const bucket = { start: 0, end: 1, count: 0, previousCount: 0, projects: [] }
+    expect(BacklogViews.shipped({ period: 'day', tzOffsetMinutes: 0, from: 0, to: 1, total: 0, buckets: [bucket] }).buckets[0]?.summary).toBeNull()
+  })
+
+  it('needs a summarize range in order', () => {
+    const schema = backlogApi.methods.summarizeShipped.input
+    if (schema === undefined) throw new Error('summarizeShipped takes an input')
+    const decode = Schema.decodeUnknownResult(schema)
+    expect(Result.isSuccess(decode({ period: 'week', start: 0, end: 10 }))).toBe(true)
+    expect(Result.isSuccess(decode({ period: 'week', start: 10, end: 10 }))).toBe(false)
+  })
+})

@@ -4,6 +4,7 @@ import { AgentConfirmation } from './agent-confirmation.js'
 import { BacklogBackfill } from './backfill.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogItems } from './item.js'
+import { BacklogShipped } from './shipped.js'
 import { BacklogSyncModel } from './sync-model.js'
 
 const idSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))
@@ -293,6 +294,69 @@ const renderSyncResults = (output: { readonly results: readonly (typeof syncResu
             : `${BacklogReference.labelOf({ id: result.itemId, ref: result.ref })}: ${result.error.message}`,
         )
         .join('\n')
+
+const epochMsSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+const tzOffsetSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(-840), Schema.isLessThanOrEqualTo(840))
+const shippedProjectsSchema = Schema.Array(Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars))))
+  .check(Schema.isMaxLength(50))
+  .pipe(Schema.optional)
+  .annotate({ description: 'Only these absolute project paths; null selects items without a project. Empty or omitted: every project.' })
+const shippedPeriodSchema = Schema.Literals(BacklogShipped.periods)
+const customRangeIssue = (input: { readonly period: string; readonly from?: number | undefined; readonly to?: number | undefined }): string | undefined => {
+  if (input.period !== 'custom') return undefined
+  if (input.from === undefined || input.to === undefined) return 'A custom period needs `from` and `to`.'
+  return input.from < input.to ? undefined : '`from` must be before `to`.'
+}
+const shippedInputSchema = Schema.Struct({
+  period: shippedPeriodSchema.annotate({
+    description: 'Bucket size: `hour`, `day`, `week` (Monday start), `month` or `year` back from now, or `custom` for one `from`–`to` range.',
+  }),
+  count: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(BacklogShipped.maxCount))
+    .pipe(Schema.optional)
+    .annotate({ description: 'How many periods, newest first, including the current one; defaults to 24 hours, 14 days, 12 weeks, 12 months or 5 years.' }),
+  from: epochMsSchema.pipe(Schema.optional).annotate({ description: 'Custom range start, epoch ms, inclusive. Required with `custom`.' }),
+  to: epochMsSchema.pipe(Schema.optional).annotate({ description: 'Custom range end, epoch ms, exclusive. Required with `custom`.' }),
+  projects: shippedProjectsSchema,
+  tzOffsetMinutes: tzOffsetSchema
+    .pipe(Schema.optional)
+    .annotate({ description: 'Minutes east of UTC that day, week, month and year boundaries follow; defaults to 0.' }),
+}).check(Schema.makeFilter(customRangeIssue))
+const shippedSummarySchema = Schema.Struct({
+  text: Schema.String,
+  generatedAt: epochMsSchema,
+  provider: Schema.String,
+  model: Schema.String,
+  stale: Schema.Boolean,
+})
+const shippedItemSchema = Schema.Struct({
+  id: idSchema,
+  ref: refOutputSchema,
+  title: Schema.String,
+  kind: BacklogItems.kindSchema,
+  project: Schema.NullOr(Schema.String),
+  doneAt: epochMsSchema,
+  doneBy: Schema.String,
+  byAgent: Schema.Boolean,
+  revisions: Schema.Array(Schema.String),
+  pullRequests: Schema.Array(Schema.String),
+})
+const shippedOutputSchema = Schema.Struct({
+  period: shippedPeriodSchema,
+  tzOffsetMinutes: tzOffsetSchema,
+  from: epochMsSchema,
+  to: epochMsSchema,
+  total: nonNegativeCountSchema,
+  buckets: Schema.Array(
+    Schema.Struct({
+      start: epochMsSchema,
+      end: epochMsSchema,
+      count: nonNegativeCountSchema,
+      previousCount: nonNegativeCountSchema,
+      projects: Schema.Array(Schema.Struct({ project: Schema.NullOr(Schema.String), items: Schema.Array(shippedItemSchema) })),
+      summary: Schema.NullOr(shippedSummarySchema).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null))),
+    }),
+  ),
+})
 
 const writeNote = 'Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.'
 
@@ -733,6 +797,26 @@ export const backlogApi = defineApi({
           `Exported ${String(output.items)} items${output.format === 'jsonl' && output.ops > 0 ? ` and ${String(output.ops)} ops` : ''} to ${output.path} (${String(output.bytes)} bytes).`,
       },
     }),
+    shipped: method({
+      input: shippedInputSchema,
+      output: shippedOutputSchema,
+      description:
+        "What shipped: items that reached `done` per hour, day, week, month or year (or one custom range), newest period first, grouped by project, with each item's linked revisions and pull requests, the previous period's count for the delta, and any cached AI summary. Only items done now count, once, at their last move to done; dropped items never count; agent-captured items count and say so. Read-only.",
+      tool: { name: 'backlog_shipped', readOnly: true, render: BacklogShipped.render },
+    }),
+    summarizeShipped: method({
+      input: Schema.Struct({
+        period: shippedPeriodSchema,
+        start: epochMsSchema.annotate({ description: 'The bucket `start` as `backlog_shipped` returns it.' }),
+        end: epochMsSchema.annotate({ description: 'The bucket `end` as `backlog_shipped` returns it.' }),
+        projects: shippedProjectsSchema,
+        regenerate: Schema.Boolean.pipe(Schema.optional).annotate({ description: 'Call the model again even when a current summary is cached.' }),
+      }).check(Schema.makeFilter(input => (input.start < input.end ? undefined : '`start` must be before `end`.'))),
+      output: Schema.Struct({ ...shippedSummarySchema.fields, cached: Schema.Boolean }),
+      description:
+        'A short AI summary of one shipped period, written by the configured triage model (Backlog settings › Triage) and cached per period, bucket and project filter; a cached summary whose items are unchanged is returned without a model call. Changes no item, but calls the model, so run it only when the user asked for a summary.',
+      tool: { name: 'backlog_summarize_shipped', readOnly: false, render: output => output.text },
+    }),
     deleteComment: method({
       input: Schema.Struct({ id: itemKeySchema, commentId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)) }),
       output: detailResultSchema,
@@ -750,6 +834,8 @@ export type BacklogBackfillResult = typeof backfillOutputSchema.Type
 export type BacklogSyncStatusView = typeof syncStatusSchema.Type
 export type BacklogSyncItemView = typeof syncItemSchema.Type
 export type BacklogSyncResultView = typeof syncResultSchema.Type
+export type BacklogShippedView = typeof shippedOutputSchema.Type
+export type BacklogShippedSummaryView = typeof shippedSummarySchema.Type
 
 export type BacklogSummaryInput = typeof summarySchema.Encoded
 export type BacklogListInput = typeof listOutputSchema.Encoded
@@ -773,6 +859,8 @@ export class BacklogViews {
 
   /** The projects input for a view: no input at all unless it hides agent items, so a Host that predates the filter answers. */
   static readonly projectsInput = (hidden: boolean): { readonly hideAgentItems: true } | undefined => (hidden ? { hideAgentItems: true } : undefined)
+
+  static readonly shipped = (value: typeof shippedOutputSchema.Encoded): BacklogShippedView => Schema.decodeUnknownSync(shippedOutputSchema)(value)
 
   static readonly detail = (value: BacklogDetailInput): BacklogDetailView => Schema.decodeUnknownSync(detailSchema)(value)
 

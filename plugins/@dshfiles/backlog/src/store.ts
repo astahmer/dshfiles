@@ -21,6 +21,7 @@ import {
   type BacklogStatus,
 } from './item.js'
 import { FieldRevert } from './field-revert.js'
+import { BacklogShipped, type ShippedDigest, type ShippedQuery } from './shipped.js'
 import { BacklogSearch, type SearchMatch } from './search.js'
 import { BacklogSearchIndex } from './search-index.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
@@ -518,6 +519,8 @@ export class BacklogStore extends Context.Service<
     readonly dismissProposal: (input: { readonly id: number; readonly actor: BacklogActor }) => Detailed
     /** Per-project counts over every item, so project progress never depends on how many rows a list returned. */
     readonly projects: (query: { readonly hideAgentItems?: boolean | undefined }) => Effect.Effect<ReturnType<typeof projectsIn>>
+    /** What reached `done` per period, read from the items' events as of now. */
+    readonly shipped: (query: ShippedQuery) => Effect.Effect<ShippedDigest>
     readonly list: (query: BacklogListQuery) => Effect.Effect<ReturnType<typeof listIn>>
     readonly get: (id: number) => Effect.Effect<BacklogResult<BacklogDetail>>
     /** How a log line or an error names an item: `b:<ref>`, or `b:<id>` once the item is gone. */
@@ -1135,6 +1138,7 @@ export class BacklogStore extends Context.Service<
         acknowledge,
         dismissProposal,
         projects: query => Effect.map(view, current => projectsIn(current, query)),
+        shipped: query => Effect.map(view, current => BacklogShipped.digest({ items: current.records.values(), query, now: current.at })),
         list: query => Effect.map(view, current => listIn(current, query, searchIndex)),
         get,
         resolve: key => Effect.map(Ref.get(state), current => resolveIn(current.records, key)),

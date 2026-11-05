@@ -205,3 +205,20 @@ export class TweetDescriptionFull extends Schema.TaggedError<TweetDescriptionFul
     return 'The backlog description has no room for tweet context. Shorten it before retrying.'
   }
 }
+
+/** A shipped summary needs the triage model, and none is picked. */
+export class ShippedSummaryUnconfigured extends Schema.TaggedError<ShippedSummaryUnconfigured>()(
+  'ShippedSummaryUnconfigured',
+  {},
+  { dshxWireCode: 'shipped-summary-unconfigured' },
+) {
+  override get message(): string {
+    return 'Summaries use the triage model, and none is set. Pick a triage provider and model in Backlog settings › Triage, then summarize again.'
+  }
+}
+
+export class ShippedSummaryEmpty extends Schema.TaggedError<ShippedSummaryEmpty>()('ShippedSummaryEmpty', {}, { dshxWireCode: 'shipped-summary-empty' }) {
+  override get message(): string {
+    return 'Nothing shipped in this period, so there is nothing to summarize. Pick a period with done items.'
+  }
+}

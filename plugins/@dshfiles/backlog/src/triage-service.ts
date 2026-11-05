@@ -22,6 +22,17 @@ export interface TriageSetup {
   readonly services: TriageServices
 }
 
+/** The triage provider and model, and a completion on that route with triage's timeout and error. */
+export interface TriageModel {
+  readonly provider: string
+  readonly model: string
+  readonly complete: (request: {
+    readonly system: string
+    readonly input: string
+    readonly maxTokens?: number | undefined
+  }) => Effect.Effect<string, LlmCompletionFailed>
+}
+
 /**
  * Triage of backlog items with Jev and/or a cheap model, and Jev's other backlog questions (thread resolution, reply
  * routing). A service that is not configured is skipped; a failing one never fails the item.
@@ -42,6 +53,8 @@ export class Triage extends Context.Service<
     /** Jev is on but no key resolves. */
     readonly jevNeedsSetup: Effect.Effect<boolean>
     readonly classifyReply: (text: string) => Effect.Effect<ReplyRouteResult>
+    /** The configured cheap triage model, for other short completions such as a shipped summary; none when unset. */
+    readonly model: Effect.Effect<Option.Option<TriageModel>>
   }
 >()('@dshfiles/backlog/Triage') {
   static readonly layer = Layer.effect(
@@ -96,7 +109,7 @@ export class Triage extends Context.Service<
           )
 
       const completeWith =
-        (current: BacklogSettings): NonNullable<TriageServices['complete']> =>
+        (current: BacklogSettings): TriageModel['complete'] =>
         request =>
           llm
             .complete({
@@ -104,7 +117,7 @@ export class Triage extends Context.Service<
               model: current.triageModel,
               system: request.system,
               input: request.input,
-              maxTokens: 512,
+              maxTokens: request.maxTokens ?? 512,
               purpose: 'compaction',
             })
             .pipe(
@@ -188,7 +201,13 @@ export class Triage extends Context.Service<
         )
       })
 
-      return Triage.of({ setup, pass, item, schedule, resolveThread, jevNeedsSetup, classifyReply })
+      const model = Effect.map(settings.get, current =>
+        current.triageProvider === '' || current.triageModel === ''
+          ? Option.none<TriageModel>()
+          : Option.some({ provider: current.triageProvider, model: current.triageModel, complete: completeWith(current) }),
+      )
+
+      return Triage.of({ setup, pass, item, schedule, resolveThread, jevNeedsSetup, classifyReply, model })
     }),
   )
 }

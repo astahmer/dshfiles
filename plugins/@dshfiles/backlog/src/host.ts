@@ -29,6 +29,7 @@ import { CaptureProjects } from './project-target.js'
 import { ReplyGenerator } from './reply-generator.js'
 import { backlogSettings } from './settings.js'
 import { BacklogSync, RemoteBackends, RemoteSyncLoop } from './sync-service.js'
+import { ShippedSummaries } from './shipped-summaries.js'
 import { SyncLocalProbes } from './sync-local-probes.js'
 import { BacklogSyncTables } from './sync-tables.js'
 import { BacklogStore } from './store.js'
@@ -53,7 +54,14 @@ const hostEdges = Layer.mergeAll(
   platform,
 )
 
-const backlogServices = Layer.mergeAll(ThreadStart.layer, TriageBackfill.layer, TweetImport.layer, ReplyGenerator.layer, BacklogSync.layer).pipe(
+const backlogServices = Layer.mergeAll(
+  ThreadStart.layer,
+  TriageBackfill.layer,
+  TweetImport.layer,
+  ReplyGenerator.layer,
+  BacklogSync.layer,
+  ShippedSummaries.layer,
+).pipe(
   Layer.provideMerge(Triage.layer),
   Layer.provideMerge(Layer.mergeAll(BacklogStore.layer, BacklogExport.layer, AiActivity.layer, CaptureProjects.layer, AttachmentExport.layer)),
   Layer.provideMerge(Layer.mergeAll(BacklogSyncTables.layer, RemoteBackends.layer)),
@@ -193,6 +201,8 @@ const backlogHandlers = Api.handlers(backlogApi, {
     AgentConfirmation.check({ callerKind: call.caller.kind, confirm, call: { tool: 'backlog_revert' } }).pipe(
       Effect.andThen(Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.revert({ ...resolved, actor: actorOf(call.caller) })))),
     ),
+  shipped: input => ShippedSummaries.use(summaries => summaries.digest(input)),
+  summarizeShipped: input => ShippedSummaries.use(summaries => AiActivity.use(activity => activity.track(summaries.summarize(input)))),
   deleteComment: (input, call) =>
     Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.deleteComment({ ...resolved, actor: actorOf(call.caller) }))),
 })
