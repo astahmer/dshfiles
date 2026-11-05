@@ -216,6 +216,7 @@ import {
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createNotificationSoundPaletteAction, createNotificationSnoozePaletteAction } from './notification-sound-palette-action.js'
 import { useThreadAttention } from './attention-client.js'
+import { useRowAgentHandles } from './use-row-agent-handles.js'
 import type { ThreadAttentionView } from './attention-api.js'
 import { threadSidebarAutoSettleApi } from './auto-settle-api.js'
 import {
@@ -567,7 +568,7 @@ interface ThreadRowProps {
   readonly workStatus?: ThreadStatus | undefined
   /** Each child's own status, for the nested subagent rows under a status-grouped parent. */
   readonly childStatuses?: ReadonlyMap<SessionSummary['id'], ThreadStatus> | undefined
-  /** The agent preset the thread runs, shown as a muted chip. */
+  /** The `@handle` of the agent that started the thread, else the agent preset it runs, shown as a muted chip. */
   readonly agent?: string | undefined
 }
 
@@ -601,7 +602,7 @@ const NO_CHILDREN: readonly SessionSummary[] = []
 
 /**
  * The agent preset a thread runs, from the Host's `agentPreset` projection; the deployment default reads as no agent.
- * A configured `@handle` per thread needs the agents plugin to provide it (plans/ade-ux/phase3b, follow-up).
+ * A configured `@handle` comes first, from the agents plugin through `ThreadRowDecorators`.
  */
 const BUILT_IN_PRESETS: ReadonlySet<string> = new Set(['default', 'standard', 'plan', 'ask', 'auto'])
 
@@ -1510,6 +1511,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const workspaceState = props.useWorkspaces(state => state)
   const { preferences, updatePreferences, storageWarning, hostBacked, threadViewWritePending, setSelectedThreadId, threadTitle } = useSidebarState()
   const attention = useThreadAttention({ enabled: sessionState.phase === 'ready' })
+  const agentHandleOf = useRowAgentHandles()
   const recoveryApi = useApi(threadSidebarRecoveryApi)
   const queryClient = useQueryClient()
   const recoveryQuery = useQuery({
@@ -4472,7 +4474,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         actions={rowActions}
         workStatus={stateGrouping ? (threadStatusById.get(session.id) ?? childStatusById.get(session.id)) : undefined}
         childStatuses={stateGrouping ? childStatusById : undefined}
-        agent={stateGrouping ? agentPresetOf(session) : undefined}
+        agent={stateGrouping ? (agentHandleOf(session.id) ?? agentPresetOf(session)) : undefined}
       />
     )
   }

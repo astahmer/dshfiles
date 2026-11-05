@@ -98,5 +98,15 @@ export const agentsApi = defineApi({
       description:
         'The agent that started one thread, by Session id, or null for a thread no agent started. Read-only; a cross-plugin lookup, not an agent tool.',
     }),
+    threadHandles: method({
+      input: Schema.Void,
+      output: Schema.Struct({
+        threads: Schema.Array(
+          Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_SESSION_CHARS)), handle: handleSchema }),
+        ),
+      }),
+      description:
+        'Every remembered thread a configured agent started, with its handle, so thread lists can name the agent. Read-only; agents_threads covers the agent tool.',
+    }),
   },
 })

@@ -5,7 +5,7 @@
     {
       "id": "agent-registry",
       "title": "Manage persistent agents",
-      "summary": "Create, edit, enable, duplicate and remove agents — handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort — from one Host-owned registry every browser and agent reads. The panel lists each agent with its glyph, handle, model and an enable switch; the editor groups identity, instructions, model and tools, delegation, and memory and routine, checks fields inline with a fix for each problem, and asks before dropping unsaved edits; a new agent can start from a template; removal asks first and offers Undo. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. On a phone the list and the editor take the whole pane in turn. A built-in @dsh agent ships with the harness defaults and cannot be deleted.",
+      "summary": "Create, edit, enable, duplicate and remove agents — handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort — from one Host-owned registry every browser and agent reads. The panel lists each agent with its glyph, handle, model and an enable switch; the editor groups identity, instructions, model and tools, delegation, and memory and routine, checks fields inline with a fix for each problem, and asks before dropping unsaved edits; a new agent can start from a template; removal asks first and offers Undo. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. On a phone the list and the editor take the whole pane in turn. A built-in @dsh agent ships with the harness defaults and cannot be deleted. Thread rows in the thread sidebar show the @handle of the agent that started the thread (agents.threadHandles), falling back to the preset chip.",
       "reach": [
         "click button \"Agents\"",
         "expect text \"Start from a template\"",
@@ -34,6 +34,11 @@
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agents.thread-row-handle",
+          "featureFile": "tooling/dshx/e2e/features/agents.feature"
+        },
         {
           "kind": "unit-test",
           "id": "agents.registry-handles-and-mentions",

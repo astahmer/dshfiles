@@ -2992,6 +2992,46 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "name": "threadHandles",
+      "description": "Every remembered thread a configured agent started, with its handle, so thread lists can name the agent. Read-only; agents_threads covers the agent tool.",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "handle": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                }
+              },
+              "required": [
+                "sessionId",
+                "handle"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "threads"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }

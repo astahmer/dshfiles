@@ -66,7 +66,7 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 519,
+  "apiMethods": 520,
   "apiToolBindings": 365,
   "apiToolNameCount": 365,
   "apiToolSchemas": 364,
@@ -493,7 +493,7 @@
     },
     {
       "name": "ai_accounts",
-      "description": "List the configured Codex and OpenCode Go accounts: their model routes, whether each holds a login, and how the pool currently spreads requests.",
+      "description": "List the configured AI accounts (Codex, Claude, Copilot, Mistral, OpenCode Go, Command Code, Cursor): their model routes, whether each holds a login, and how the pool currently spreads requests.",
       "parameters": {
         "type": "object",
         "properties": {},
@@ -731,7 +731,8 @@
               "opencode-go",
               "commandcode",
               "github-copilot",
-              "cursor"
+              "cursor",
+              "mistral"
             ]
           },
           "requestId": {
@@ -963,7 +964,8 @@
               "opencode-go",
               "commandcode",
               "github-copilot",
-              "cursor"
+              "cursor",
+              "mistral"
             ]
           },
           "requestId": {
@@ -1019,7 +1021,7 @@
     },
     {
       "name": "ai_accounts_quota",
-      "description": "Live subscription quota of every configured AI account (Codex, Copilot, OpenCode Go…): used and remaining windows and when each resets. Read-only; cached for a short while.",
+      "description": "Live subscription quota of every configured AI account (Codex, Copilot, Mistral, OpenCode Go…): used and remaining windows and when each resets. Read-only; cached for a short while.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -1157,7 +1159,8 @@
                   "opencode-go",
                   "commandcode",
                   "github-copilot",
-                  "cursor"
+                  "cursor",
+                  "mistral"
                 ]
               },
               "displayName": {

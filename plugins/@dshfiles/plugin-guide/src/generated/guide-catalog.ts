@@ -48,7 +48,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/client/index.ts:67",
+      "source": "tooling/dshx/packages/dshx/src/client/index.ts:69",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -68,7 +68,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/client/index.ts:66",
+      "source": "tooling/dshx/packages/dshx/src/client/index.ts:68",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -1855,6 +1855,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Additive: each contribution adds an entry; @dshfiles/thread-sidebar renders nothing for it when absent.",
       "details": [
         "Registry id: @dshfiles/thread-sidebar.row-action"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "PendingRestartSources",
+      "importFrom": "@dshfiles/thread-sidebar/restart-sources",
+      "owner": "@dshfiles/thread-sidebar",
+      "source": "plugins/@dshfiles/thread-sidebar/src/restart-sources.ts:20",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/thread-sidebar.pending-restart-source",
+      "kind": "registry",
+      "title": "PendingRestartSources",
+      "summary": "Providers contribute with `api.add(PendingRestartSources, { id, subscribe, packages })`.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(PendingRestartSources, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/thread-sidebar renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/thread-sidebar.pending-restart-source"
       ],
       "docs": "docs/plugin-boundaries.md",
       "command": null

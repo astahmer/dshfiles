@@ -44,6 +44,13 @@ Feature: Persistent agents
     And the browser page is reloaded with the Agents panel open
     Then the agent "reviewer" lists "Review the open pull requests" and counts 1 thread
 
+  @scenario:agents.thread-row-handle
+  Scenario: A thread an agent started shows its handle in the thread list
+    Given the isolated plugin composition of "@dshfiles/agents, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
+    Then the agent "Reviewer" is saved with instructions "Prefer small findings."
+    When a thread is started from the agent "reviewer" with "Review the row handle" in the thread list composition
+    Then its thread row shows "@reviewer"
+
   @scenario:agents.comment-autocomplete
   Scenario: Complete an agent handle inside an item's comment box
     Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/agents, @dshfiles/ai-accounts" is booted

@@ -7034,6 +7034,9 @@ importers:
       '@dshfiles/activity-timeline':
         specifier: workspace:*
         version: link:../activity-timeline
+      '@dshfiles/agents':
+        specifier: workspace:*
+        version: link:../agents
       '@dshfiles/ai-accounts':
         specifier: workspace:*
         version: link:../ai-accounts

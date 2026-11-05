@@ -60,6 +60,8 @@ export class AgentsRegistry extends Context.Service<
     readonly threadAgent: (sessionId: string) => Effect.Effect<Agent | null>
     /** The same read as `threadAgent`, for a synchronous Host guard that cannot run an Effect. */
     readonly threadAgentNow: (sessionId: string) => Agent | null
+    /** Every remembered thread with the handle of the configured agent that started it, for thread lists. */
+    readonly threadHandles: Effect.Effect<readonly { readonly sessionId: string; readonly handle: string }[]>
   }
 >()('@dshfiles/agents/AgentsRegistry') {
   static readonly layer = Layer.effect(
@@ -161,6 +163,9 @@ export class AgentsRegistry extends Context.Service<
         threads: handle => Effect.map(Ref.get(state), current => threadsOf(current.history, handle)),
         threadAgent: sessionId => Effect.map(Ref.get(state), current => agentOfThread(current, sessionId)),
         threadAgentNow: sessionId => agentOfThread(Ref.getUnsafe(state), sessionId),
+        threadHandles: Effect.map(Ref.get(state), current =>
+          [...current.history.values()].flatMap(thread => (current.records.has(thread.handle) ? [{ sessionId: thread.sessionId, handle: thread.handle }] : [])),
+        ),
       })
     }),
   )

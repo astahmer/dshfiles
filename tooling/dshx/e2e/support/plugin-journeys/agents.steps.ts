@@ -71,7 +71,7 @@ Then('the task {string} is queued in the selected thread', async ({ page }: { pa
 
 const openAgentsPanel = async (page: Page): Promise<void> => {
   await openGlobalPanel(page, 'Agents')
-  await expect(page.getByRole('heading', { name: 'Agents', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Agents', exact: true }).first()).toBeVisible()
 }
 
 const instructionsField = (page: Page) => page.getByRole('textbox', { name: /^Instructions/u })
@@ -138,6 +138,32 @@ When('a thread is started from the agent {string} with {string}', async ({ page 
   await dialog.getByRole('textbox', { name: 'Prompt', exact: true }).fill(prompt)
   await dialog.getByRole('button', { name: 'Start thread', exact: true }).click()
   await expect(page.getByRole('treeitem', { name: new RegExp(`^${prompt}\\b`, 'u') })).toHaveAttribute('aria-selected', 'true')
+})
+
+When(
+  'a thread is started from the agent {string} with {string} in the thread list composition',
+  async ({ page }: { page: Page }, handle: string, prompt: string) => {
+    await openAgentsPanel(page)
+    await agentRow(page, handle).click()
+    await page.getByRole('button', { name: 'Start thread', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: `Start a thread with @${handle}` })
+    await dialog.getByRole('textbox', { name: 'Prompt', exact: true }).fill(prompt)
+    await dialog.getByRole('button', { name: 'Start thread', exact: true }).click()
+    await expect(dialog).toBeHidden()
+  },
+)
+
+Then('its thread row shows {string}', async ({ page }: { page: Page }, handle: string) => {
+  await recordAssertion(page, 'agents-thread-row-shows-the-agent-handle', async () => {
+    const threads = page.getByRole('tablist', { name: 'Destinations', exact: true }).getByRole('tab', { name: 'Threads', exact: true })
+    if (await threads.isVisible()) await threads.click()
+    // The sidebar re-reads the agents registry on mount and every minute; a reload makes it read now.
+    await expect(async () => {
+      await page.reload()
+      await expect(page.getByRole('region', { name: 'Threads' }).getByTestId('thread-row-agent').filter({ hasText: handle })).toBeVisible({ timeout: 10_000 })
+    }).toPass({ timeout: 60_000 })
+  })
+  await finishJourneyAssertions(page)
 })
 
 When('the browser page is reloaded with the Agents panel open', async ({ page }: { page: Page }) => {
@@ -209,7 +235,7 @@ Then('the preview opens {string} in the Agents panel', async ({ page }: { page: 
   await agentPreview(page).getByRole('button', { name: 'Open in Agents', exact: true }).click()
   await recordAssertion(page, 'agents-mention-preview-opens-the-agent', async () => {
     await expect(agentPreview(page)).toHaveCount(0)
-    await expect(page.getByRole('heading', { name: 'Agents', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Agents', exact: true }).first()).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
   })
   await finishJourneyAssertions(page)

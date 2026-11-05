@@ -146,6 +146,7 @@ describe('AgentsRegistry', () => {
             expect((yield* restored.threadAgent('session-a'))?.handle).toBe('reviewer')
             expect(restored.threadAgentNow('session-a')?.handle).toBe('reviewer')
             expect(yield* restored.threadAgent('session-b')).toBeNull()
+            expect(yield* restored.threadHandles).toEqual([{ sessionId: 'session-a', handle: 'reviewer' }])
           }),
         )
       }),

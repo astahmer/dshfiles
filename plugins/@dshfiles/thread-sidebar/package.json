@@ -69,6 +69,7 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/activity-timeline": "workspace:*",
+    "@dshfiles/agents": "workspace:*",
     "@dshfiles/ai-accounts": "workspace:*",
     "@dshfiles/command-palette": "workspace:*",
     "@dshfiles/frame-layout": "workspace:*",

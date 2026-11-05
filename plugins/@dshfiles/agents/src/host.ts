@@ -41,6 +41,7 @@ export default DshxPlugin.make({
       recordUse: input => AgentsRegistry.use(registry => registry.recordUse(input.handle, input.thread)),
       threads: input => AgentsRegistry.use(registry => Effect.map(registry.threads(input.handle), threads => ({ threads }))),
       threadAgent: input => AgentsRegistry.use(registry => Effect.map(registry.threadAgent(input.sessionId), agent => ({ agent }))),
+      threadHandles: () => AgentsRegistry.use(registry => Effect.map(registry.threadHandles, threads => ({ threads: [...threads] }))),
     }),
   ],
 })
