@@ -10,10 +10,9 @@ import type { BacklogSettings } from './settings.js'
 import { BacklogStore } from './store.js'
 import { fakeGithub, fakeLinear } from './sync-fakes.js'
 import { SyncLocalProbes } from './sync-local-probes.js'
-import type { SyncMapping } from './sync-model.js'
 import { BacklogSync, RemoteBackends } from './sync-service.js'
 import { BacklogSyncTables } from './sync-tables.js'
-import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { backlogRows, backlogStoreLayer, type BacklogTestRows } from './test-support.js'
 
 type Row = BacklogSettings['syncBackends'][number]
 
@@ -24,16 +23,15 @@ const syncLayer = (input: {
   readonly client: HttpClient.HttpClient
   readonly rows?: readonly Row[]
   readonly secret?: string | undefined
-  readonly storage?: { readonly items: ReturnType<typeof backlogRows>; readonly mappings: Map<string, SyncMapping> }
+  readonly storage?: BacklogTestRows
   readonly probes?: { readonly repository?: string; readonly cliToken?: string }
 }) => {
-  const storage = input.storage ?? { items: backlogRows(), mappings: new Map<string, SyncMapping>() }
   return BacklogSync.layer.pipe(
     Layer.provideMerge(RemoteBackends.layer),
+    Layer.provideMerge(BacklogSyncTables.layer),
     Layer.provideMerge(
       Layer.mergeAll(
-        backlogStoreLayer({ rows: storage.items, settings: { syncBackends: [...(input.rows ?? [linearRow])] } }),
-        BacklogSyncTables.layerMemory(storage.mappings),
+        backlogStoreLayer({ rows: input.storage, settings: { syncBackends: [...(input.rows ?? [linearRow])] } }),
         Layer.succeed(HttpClient.HttpClient, input.client),
         SecretReferenceResolver.layerTest({ resolve: async () => input.secret ?? 'lin_test_key' }),
         SyncLocalProbes.layerTest(input.probes ?? {}),
@@ -224,7 +222,7 @@ describe('BacklogSync with Linear', () => {
 
   it.effect('deletes the remote mapping with the item, so a reused id never inherits its issue', () => {
     const linear = fakeLinear()
-    const storage = { items: backlogRows(), mappings: new Map<string, SyncMapping>() }
+    const storage = backlogRows()
     return Effect.gen(function* () {
       const store = yield* BacklogStore
       const sync = yield* BacklogSync
@@ -233,7 +231,7 @@ describe('BacklogSync with Linear', () => {
 
       expect(yield* sync.deleteItem({ id: created.item.id })).toEqual({ ok: true, value: undefined })
 
-      expect(storage.mappings.has(String(created.item.id))).toBe(false)
+      expect((yield* (yield* BacklogSyncTables).mappings.get(String(created.item.id)))._tag).toBe('None')
       expect((yield* sync.status({})).items).toEqual([])
       expect(linear.find('ENG-1')?.title).toBe('Linked then deleted')
       expect(yield* sync.deleteItem({ id: created.item.id })).toEqual({ ok: false, reason: 'not-found' })
@@ -242,7 +240,7 @@ describe('BacklogSync with Linear', () => {
 
   it.effect('keeps items and mappings across a Host restart', () => {
     const linear = fakeLinear()
-    const storage = { items: backlogRows(), mappings: new Map<string, SyncMapping>() }
+    const storage = backlogRows()
     return Effect.gen(function* () {
       const id = yield* Effect.gen(function* () {
         const created = yield* (yield* BacklogStore).capture({ text: 'Survives restarts', actor: { kind: 'user' } })
@@ -254,7 +252,10 @@ describe('BacklogSync with Linear', () => {
         return yield* (yield* BacklogSync).status({ ids: [id] })
       }).pipe(Effect.provide(syncLayer({ client: linear.client, storage })))
       expect(status.items[0]).toMatchObject({ itemId: id, remoteKey: 'ENG-1', state: 'synced' })
-      expect(storage.items.items.has(String(id))).toBe(true)
+      const reopened = yield* Effect.gen(function* () {
+        return yield* (yield* BacklogStore).get(id)
+      }).pipe(Effect.provide(syncLayer({ client: linear.client, storage })))
+      expect(reopened.ok).toBe(true)
     })
   })
 })

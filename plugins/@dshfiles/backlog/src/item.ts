@@ -6,7 +6,6 @@ const MAX_BODY_CHARS = 20_000
 const MAX_TARGET_CHARS = 500
 const MAX_TAGS = 20
 const MAX_LINKS = 100
-const MAX_EVENTS = 200
 const MAX_ATTACHMENTS = 8
 const MAX_FILE_BYTES = 16 * 1024 * 1024
 const attachmentKinds = ['image', 'file'] as const
@@ -111,7 +110,8 @@ const itemSchema = Schema.Struct({
   humanFields: Schema.Array(Schema.Literals(humanFieldNames)),
   createdAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   lastActivityAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
-  events: Schema.Array(eventSchema).check(Schema.isMaxLength(MAX_EVENTS)),
+  /** Every event since capture, derived from the op log: nothing is trimmed, a view condenses instead. */
+  events: Schema.Array(eventSchema),
   proposal: Schema.optionalKey(Schema.NullOr(proposalSchema)),
   attention: Schema.optionalKey(attentionSchema),
   acknowledgedAt: Schema.optionalKey(Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)))),
@@ -243,15 +243,6 @@ const freshness = (
   return limit > 0 && idleDays >= limit ? 'dormant' : 'fresh'
 }
 
-/** The `created` event names the item's author, so trimming the oldest events always keeps it. */
-const appendEvent = (events: readonly BacklogEvent[], event: BacklogEvent): BacklogEvent[] => {
-  const appended = [...events, event]
-  if (appended.length <= MAX_EVENTS) return appended
-  const [first] = appended
-  if (first?.kind !== 'created') return appended.slice(-MAX_EVENTS)
-  return [first, ...appended.slice(-(MAX_EVENTS - 1))]
-}
-
 /** The actor who captured the item: its owner, or the `created` event of a row that lost its owner entry. */
 const creatorOf = (item: Pick<BacklogItem, 'actors' | 'events'>): string | undefined =>
   item.actors.find(actor => actor.role === 'owner')?.id ?? item.events.find(event => event.kind === 'created')?.actor
@@ -291,6 +282,9 @@ export class BacklogItems {
   static readonly attachmentPayloadFields = attachmentPayloadFields
   static readonly attachmentFields = attachmentFields
   static readonly actorSchema = actorSchema
+  static readonly eventSchema = eventSchema
+  static readonly humanFieldSchema = Schema.Literals(humanFieldNames)
+  static readonly tagSchema = Schema.String.check(Schema.isMaxLength(60))
   static readonly attachmentSchema = attachmentSchema
   static readonly tweetContextUrlSchema = tweetContextUrlSchema
   static readonly itemSchema = itemSchema
@@ -308,7 +302,6 @@ export class BacklogItems {
   static readonly projectPath = projectPath
   static readonly projectOf = projectOf
   static readonly freshness = freshness
-  static readonly appendEvent = appendEvent
   static readonly creatorOf = creatorOf
   static readonly isUnclaimedAgentItem = isUnclaimedAgentItem
 }

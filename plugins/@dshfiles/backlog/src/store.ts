@@ -2,7 +2,7 @@ import { Clock, Context, Effect, Layer, Option, PubSub, Ref, Semaphore, Stream }
 import type { BacklogDetailView, BacklogSummaryView } from './api.js'
 import { BacklogBackfill, type BackfillScope, type BackfillSelection } from './backfill.js'
 import { BacklogSettingsTag } from './backlog-settings.js'
-import { BacklogTables, type BacklogFileRecord } from './backlog-tables.js'
+import { BacklogRepo } from './backlog-repo.js'
 import { BacklogWriteFailed } from './errors.js'
 import {
   BacklogItems,
@@ -28,8 +28,6 @@ type BacklogChange = { -readonly [K in keyof BacklogItem]?: BacklogItem[K] }
 /** The optional dimensions an upload carries; mutable while the attachment is assembled. */
 type AttachmentDimensions = { -readonly [K in 'width' | 'height']?: BacklogAttachment[K] }
 type ProposalDraft = { -readonly [K in keyof BacklogProposal]?: BacklogProposal[K] }
-
-const fileKey = (itemId: number, attachmentId: string): string => `${String(itemId)}:${attachmentId}`
 
 export type BacklogActor =
   | { readonly kind: 'user' }
@@ -72,7 +70,6 @@ export interface BacklogUpdate {
 
 export type BacklogResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly reason: 'not-found' }
 
-const ID_COUNTER_KEY = 'items'
 const DEFAULT_LIST_LIMIT = 100
 const MAX_LIST_LIMIT = 2_000
 
@@ -392,8 +389,9 @@ const isIdleNudge = (event: BacklogEvent): boolean => event.kind === 'commented'
 type Detailed = Effect.Effect<BacklogResult<BacklogDetail>, BacklogWriteFailed>
 
 /**
- * Every backlog item, mirrored in memory and written through to the Host storage domain. Writes run one at a time, so
- * a read-modify-write never interleaves with another and ids are never allocated twice.
+ * Every backlog item, mirrored in memory and written through to the SQLite op log: each write appends the ops that turn
+ * the stored item into the new one. Writes run one at a time, so a read-modify-write never interleaves with another
+ * and ids are never allocated twice.
  */
 export class BacklogStore extends Context.Service<
   BacklogStore,
@@ -484,14 +482,14 @@ export class BacklogStore extends Context.Service<
   static readonly layer = Layer.effect(
     BacklogStore,
     Effect.gen(function* () {
-      const tables = yield* BacklogTables
+      const repo = yield* BacklogRepo
       const settings = yield* BacklogSettingsTag
-      const loaded = yield* tables.items.entries.pipe(Effect.orDie)
-      const records = new Map(loaded.map(([, item]) => [item.id, withProject(item)]))
-      const storedCounter = yield* tables.counters.get(ID_COUNTER_KEY).pipe(Effect.orDie)
+      const loaded = yield* repo.loadItems.pipe(Effect.orDie)
+      const records = new Map(loaded.map(item => [item.id, withProject(item)]))
+      const storedNextId = yield* repo.nextId.pipe(Effect.orDie)
       const state = yield* Ref.make<StoreState>({
         records,
-        nextId: Math.max(Option.match(storedCounter, { onNone: () => 1, onSome: counter => counter.nextId }), Math.max(0, ...records.keys()) + 1),
+        nextId: Math.max(storedNextId, Math.max(0, ...records.keys()) + 1),
         revision: yield* Clock.currentTimeMillis,
       })
       const writes = yield* Semaphore.make(1)
@@ -509,8 +507,13 @@ export class BacklogStore extends Context.Service<
       const unchanged = (item: BacklogItem) => Effect.map(detailOf(item), found)
       const serialized = <A, E, R>(effect: Effect.Effect<A, E, R>) => writes.withPermit(effect)
 
-      const persist = Effect.fnUntraced(function* (item: BacklogItem) {
-        yield* tables.items.put(String(item.id), item).pipe(Effect.mapError(cause => new BacklogWriteFailed({ itemId: item.id, operation: 'put', cause })))
+      const writeFailed = (itemId: number, operation: BacklogWriteFailed['operation']) => (cause: unknown) =>
+        new BacklogWriteFailed({ itemId, operation, cause })
+
+      /** Appends the ops from the stored item to `item`, by `origin`, then serves the new item. */
+      const persist = Effect.fnUntraced(function* (item: BacklogItem, origin: string) {
+        const prev = (yield* Ref.get(state)).records.get(item.id)
+        if (prev !== undefined) yield* repo.append({ prev, next: item, origin }).pipe(Effect.mapError(writeFailed(item.id, 'put')))
         const at = yield* Clock.currentTimeMillis
         yield* Ref.update(state, current => ({
           ...current,
@@ -519,17 +522,18 @@ export class BacklogStore extends Context.Service<
         }))
       })
 
-      const putFile = (itemId: number, record: BacklogFileRecord) =>
-        tables.files
-          .put(fileKey(itemId, record.attachment.id), record)
-          .pipe(Effect.mapError(cause => new BacklogWriteFailed({ itemId, operation: 'put', cause })))
+      const putFile = (itemId: number, file: { readonly attachment: BacklogAttachment; readonly data: string }) =>
+        repo.putFile({ itemId, attachment: file.attachment, data: file.data }).pipe(Effect.mapError(writeFailed(itemId, 'put')))
 
       const deleteFile = (itemId: number, attachmentId: string) =>
-        tables.files.delete(fileKey(itemId, attachmentId)).pipe(Effect.mapError(cause => new BacklogWriteFailed({ itemId, operation: 'delete', cause })))
+        repo.deleteFile({ itemId, attachmentId }).pipe(Effect.mapError(writeFailed(itemId, 'delete')))
+
+      const filesOf = (input: readonly BacklogFileInput[], at: number) =>
+        input.slice(0, BacklogItems.maxAttachments).map(file => ({ attachment: attachmentOf(file, at), data: file.data }))
 
       const storeFiles = Effect.fnUntraced(function* (itemId: number, input: readonly BacklogFileInput[], at: number) {
-        const kept = input.slice(0, BacklogItems.maxAttachments).map(file => ({ attachment: attachmentOf(file, at), data: file.data }))
-        yield* Effect.forEach(kept, file => putFile(itemId, { itemId, attachment: file.attachment, data: file.data }), { discard: true })
+        const kept = filesOf(input, at)
+        yield* Effect.forEach(kept, file => putFile(itemId, file), { discard: true })
         return kept.map(file => file.attachment)
       })
 
@@ -552,9 +556,9 @@ export class BacklogStore extends Context.Service<
           ...change,
           actors: withActor(change.actors ?? item.actors, actorId, 'contributor'),
           lastActivityAt: at,
-          events: BacklogItems.appendEvent(item.events, { at, actor: actorId, ...event, ...(fieldChanges.length !== 0 && { fieldChanges }) }),
+          events: [...item.events, { at, actor: actorId, ...event, ...(fieldChanges.length !== 0 && { fieldChanges }) }],
         }
-        yield* persist(next)
+        yield* persist(next, actorId)
         const stored = next.events.at(-1)
         if (stored !== undefined) yield* PubSub.publish(notices, { item: next, event: stored })
         return yield* detailOf(next)
@@ -596,13 +600,10 @@ export class BacklogStore extends Context.Service<
         const { text, project, status, kind, actor } = input
         const at = yield* Clock.currentTimeMillis
         const id = (yield* Ref.get(state)).nextId
-        yield* tables.counters
-          .put(ID_COUNTER_KEY, { nextId: id + 1 })
-          .pipe(Effect.mapError(cause => new BacklogWriteFailed({ itemId: id, operation: 'put', cause })))
-        yield* Ref.update(state, current => ({ ...current, nextId: id + 1 }))
         const triaged = BacklogItems.triage(text)
         const actorId = actorIdOf(actor)
-        const attachments = yield* storeFiles(id, input.files ?? [], at)
+        const files = filesOf(input.files ?? [], at)
+        const attachments = files.map(file => file.attachment)
         const startedInThread = actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '' ? actor.sessionId : null
         const createdEvent: BacklogEvent =
           startedInThread === null
@@ -629,7 +630,9 @@ export class BacklogStore extends Context.Service<
           lastActivityAt: at,
           events: [createdEvent],
         }
-        yield* persist(item)
+        yield* repo.create({ item, origin: actorId, nextId: id + 1, files }).pipe(Effect.mapError(writeFailed(id, 'put')))
+        yield* Ref.update(state, current => ({ ...current, nextId: id + 1 }))
+        yield* persist(item, actorId)
         yield* PubSub.publish(notices, { item, event: createdEvent })
         return yield* detailOf(item)
       }, serialized)
@@ -643,7 +646,7 @@ export class BacklogStore extends Context.Service<
           Effect.gen(function* () {
             if (item.attachments.length >= BacklogItems.maxAttachments) return yield* unchanged(item)
             const attachment = attachmentOf(input.file, yield* Clock.currentTimeMillis)
-            yield* putFile(input.id, { itemId: input.id, attachment, data: input.file.data })
+            yield* putFile(input.id, { attachment, data: input.file.data })
             return found(
               yield* touch(item, input.actor, { kind: 'edited', detail: `attached ${attachment.name}` }, { attachments: [...item.attachments, attachment] }),
             )
@@ -683,9 +686,9 @@ export class BacklogStore extends Context.Service<
       const readFile = Effect.fn('backlog store read file')(function* (input: { readonly id: number; readonly attachmentId: string }) {
         const item = yield* find(input.id)
         if (item === undefined || attachmentOfItem(item, input.attachmentId) === undefined) return notFound
-        const stored = yield* tables.files.get(fileKey(input.id, input.attachmentId)).pipe(Effect.orDie)
+        const stored = yield* repo.readFile({ itemId: input.id, attachmentId: input.attachmentId }).pipe(Effect.orDie)
         if (Option.isNone(stored)) return notFound
-        return found({ dataUrl: `data:${stored.value.attachment.mediaType};base64,${stored.value.data}` })
+        return found({ dataUrl: `data:${stored.value.mediaType};base64,${stored.value.data}` })
       })
 
       const removeFile = Effect.fn('backlog store remove file')(function* (input: {
@@ -707,13 +710,7 @@ export class BacklogStore extends Context.Service<
       const remove = Effect.fn('backlog store delete')(function* (input: { readonly id: number }) {
         const item = yield* find(input.id)
         if (item === undefined) return notFound
-        const files = yield* tables.files.entries.pipe(Effect.orDie)
-        yield* Effect.forEach(
-          files.filter(([, record]) => record.itemId === input.id),
-          ([key]) => tables.files.delete(key).pipe(Effect.mapError(cause => new BacklogWriteFailed({ itemId: input.id, operation: 'delete', cause }))),
-          { discard: true },
-        )
-        yield* tables.items.delete(String(input.id)).pipe(Effect.mapError(cause => new BacklogWriteFailed({ itemId: input.id, operation: 'delete', cause })))
+        yield* repo.remove({ item, origin: 'user' }).pipe(Effect.mapError(writeFailed(input.id, 'delete')))
         const at = yield* Clock.currentTimeMillis
         yield* Ref.update(state, current => {
           const next = new Map(current.records)
@@ -845,10 +842,7 @@ export class BacklogStore extends Context.Service<
         const item = yield* find(id)
         if (item === undefined) return
         const at = yield* Clock.currentTimeMillis
-        yield* persist({
-          ...item,
-          events: BacklogItems.appendEvent(item.events, { at, actor: 'system', kind: 'triaged', detail: BacklogItems.triageNoChange }),
-        })
+        yield* persist({ ...item, events: [...item.events, { at, actor: 'system', kind: 'triaged', detail: BacklogItems.triageNoChange }] }, 'system')
       }, serialized)
 
       const propose = Effect.fn('backlog store propose')(function* (input: { readonly id: number; readonly proposal: BacklogProposal }) {
@@ -966,7 +960,7 @@ export class BacklogStore extends Context.Service<
       const acknowledge = Effect.fn('backlog store acknowledge')(function* (input: { readonly ids: readonly number[] }) {
         for (const id of input.ids) {
           const item = yield* find(id)
-          if (item !== undefined) yield* persist({ ...item, acknowledgedAt: yield* Clock.currentTimeMillis })
+          if (item !== undefined) yield* persist({ ...item, acknowledgedAt: yield* Clock.currentTimeMillis }, 'user')
         }
       }, serialized)
 

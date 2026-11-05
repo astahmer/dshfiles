@@ -18,7 +18,9 @@ import { backlogApi } from './api.js'
 import { AttachmentExport } from './attachment-file.js'
 import { backlogSettingsLayer, sharedJevSettingsLayer } from './backlog-settings.js'
 import { HostSpeech, hostEdgeLayer } from './host-edge-promise.js'
-import { BacklogTables } from './backlog-tables.js'
+import { BacklogDb, BacklogStorePaths } from './backlog-db.js'
+import { BacklogRepo } from './backlog-repo.js'
+import { LegacyBacklogTables } from './legacy-tables.js'
 import { LifecycleSignals } from './lifecycle-signals.js'
 import { CaptureProjects } from './project-target.js'
 import { ReplyGenerator } from './reply-generator.js'
@@ -51,7 +53,10 @@ const hostEdges = Layer.mergeAll(
 const backlogServices = Layer.mergeAll(ThreadStart.layer, TriageBackfill.layer, TweetImport.layer, ReplyGenerator.layer, BacklogSync.layer).pipe(
   Layer.provideMerge(Triage.layer),
   Layer.provideMerge(Layer.mergeAll(BacklogStore.layer, AiActivity.layer, CaptureProjects.layer, AttachmentExport.layer)),
-  Layer.provideMerge(Layer.mergeAll(BacklogTables.layer, BacklogSyncTables.layer, RemoteBackends.layer)),
+  Layer.provideMerge(Layer.mergeAll(BacklogSyncTables.layer, RemoteBackends.layer)),
+  Layer.provideMerge(BacklogRepo.layer),
+  Layer.provideMerge(Layer.mergeAll(BacklogDb.layer, LegacyBacklogTables.layer)),
+  Layer.provideMerge(BacklogStorePaths.fromDshHome),
   Layer.provideMerge(SyncLocalProbes.layer),
   Layer.provideMerge(Layer.mergeAll(Jev.layer, Jj.layer, VcsProviderService.layer)),
 )

@@ -1,7 +1,8 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Layer } from 'effect'
 import { TestClock } from 'effect/testing'
-import type { BacklogLink } from './item.js'
+import { BacklogRepo } from './backlog-repo.js'
+import type { BacklogItem, BacklogLink } from './item.js'
 import { BacklogItems } from './item.js'
 import { BacklogStore } from './store.js'
 import { backlogRows, backlogStoreLayer } from './test-support.js'
@@ -9,6 +10,26 @@ import { backlogRows, backlogStoreLayer } from './test-support.js'
 const DAY_MS = 86_400_000
 
 const openStore = (rows = backlogRows()) => Effect.map(Layer.build(backlogStoreLayer({ rows })), context => Context.get(context, BacklogStore))
+const openRepo = (rows: ReturnType<typeof backlogRows>) => Effect.map(Layer.build(backlogStoreLayer({ rows })), context => Context.get(context, BacklogRepo))
+
+/** An item the JSON storage domain held before the SQLite store. */
+const legacyItem = (fields: Partial<BacklogItem> & Pick<BacklogItem, 'id'>): BacklogItem => ({
+  title: 'legacy item',
+  body: '',
+  kind: 'task',
+  status: 'inbox',
+  project: null,
+  tags: [],
+  links: [],
+  attachments: [],
+  actors: [{ id: 'user', role: 'owner' }],
+  pinned: false,
+  humanFields: [],
+  createdAt: 9,
+  lastActivityAt: 9,
+  events: [{ at: 9, actor: 'user', kind: 'created', detail: 'legacy item' }],
+  ...fields,
+})
 
 const user = { kind: 'user' } as const
 const agent = { kind: 'agent', sessionId: 'session-abc123', cwd: '/work/dshfiles' } as const
@@ -153,7 +174,7 @@ describe('store', () => {
       yield* TestClock.adjust(10)
       yield* store.comment({ id: first.item.id, text: 'started a prototype', actor: user })
       expect((yield* store.list({})).items.map(item => item.id)).toEqual([1, 2])
-      expect([...rows.items.keys()].sort()).toEqual(['1', '2'])
+      expect((yield* (yield* openStore(rows)).list({})).items.map(item => item.id).sort()).toEqual([1, 2])
     }).pipe(Effect.scoped),
   )
 
@@ -268,11 +289,7 @@ describe('store', () => {
 
   it.effect('continues after the largest stored id when the counter lags behind it', () =>
     Effect.gen(function* () {
-      const rows = backlogRows()
-      const first = yield* openStore(rows)
-      yield* first.capture({ text: 'one', actor: user })
-      yield* first.capture({ text: 'two', actor: user })
-      rows.counters.clear()
+      const rows = backlogRows({ legacy: { items: [legacyItem({ id: 1 }), legacyItem({ id: 2 })], nextId: 2 } })
 
       const reopened = yield* openStore(rows)
       expect((yield* reopened.capture({ text: 'three', actor: user })).item.id).toBe(3)
@@ -657,12 +674,10 @@ describe('attention and inbox', () => {
 
   it.effect('keeps legacy closed items out of the Inbox despite stale flags', () =>
     Effect.gen(function* () {
-      const rows = backlogRows()
+      const rows = backlogRows({
+        legacy: { items: [legacyItem({ id: 1, title: 'already closed', status: 'done', humanFields: ['status'], attention: 'blocked' })] },
+      })
       yield* TestClock.setTime(9)
-      const firstStore = yield* openStore(rows)
-      const created = yield* firstStore.capture({ text: 'already closed', status: 'done', actor: user })
-      const stored = rows.items.get(String(created.item.id))
-      if (stored !== undefined) rows.items.set(String(created.item.id), { ...stored, attention: 'blocked' })
 
       yield* TestClock.setTime(8 * DAY_MS + 9)
 
@@ -738,7 +753,7 @@ describe('attention and inbox', () => {
 
       const removed = yield* store.removeFile({ id: detail.item.id, attachmentId: 'image-one-1234', actor: user })
       expect(removed.ok && removed.value.item.attachments.map(attachment => attachment.name)).toEqual(['spec.pdf'])
-      expect(rows.files.size).toBe(1)
+      expect((yield* (yield* openRepo(rows)).counts).attachments).toBe(1)
       expect(yield* store.readFile({ id: detail.item.id, attachmentId: 'image-one-1234' })).toEqual({ ok: false, reason: 'not-found' })
     }).pipe(Effect.scoped),
   )
@@ -777,7 +792,7 @@ describe('attention and inbox', () => {
       })
       expect(repeated.ok && repeated.value.item.body).not.toContain('duplicate context')
       expect(repeated.ok && repeated.value.item.attachments).toHaveLength(1)
-      expect(rows.files.size).toBe(1)
+      expect((yield* (yield* openRepo(rows)).counts).attachments).toBe(1)
     }).pipe(Effect.scoped),
   )
 
@@ -796,8 +811,9 @@ describe('attention and inbox', () => {
 
       expect(deleted).toEqual({ ok: true, value: undefined })
       expect(yield* store.get(created.item.id)).toEqual({ ok: false, reason: 'not-found' })
-      expect(rows.files.size).toBe(0)
-      expect(rows.items.size).toBe(0)
+      const repo = yield* openRepo(rows)
+      expect((yield* repo.counts).attachments).toBe(0)
+      expect(yield* repo.loadItems).toEqual([])
       expect(yield* store.delete({ id: created.item.id })).toEqual({ ok: false, reason: 'not-found' })
     }).pipe(Effect.scoped),
   )
@@ -877,16 +893,19 @@ describe('attention and inbox', () => {
 
   it.effect('keeps older user replies editable without stored comment ids', () =>
     Effect.gen(function* () {
-      const rows = backlogRows()
-      yield* TestClock.setTime(1_000)
-      const store = yield* openStore(rows)
-      yield* store.capture({ text: 'legacy reply', actor: user })
-      const captured = rows.items.get('1')
-      expect(captured).toBeDefined()
-      if (captured === undefined) return
-      rows.items.set('1', {
-        ...captured,
-        events: [...captured.events, { at: 500, actor: 'user', kind: 'commented', detail: 'written before reply editing' }],
+      const rows = backlogRows({
+        legacy: {
+          items: [
+            legacyItem({
+              id: 1,
+              title: 'legacy reply',
+              events: [
+                { at: 9, actor: 'user', kind: 'created', detail: 'legacy reply' },
+                { at: 500, actor: 'user', kind: 'commented', detail: 'written before reply editing' },
+              ],
+            }),
+          ],
+        },
       })
 
       yield* TestClock.setTime(1_000)

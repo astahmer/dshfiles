@@ -8,6 +8,7 @@ export default defineConfig({
     entry: 'src/host.ts',
     bundleDependencies: [
       '@dshfiles/credential-port',
+      '@dshfiles/sqlite-store',
       '@dshfiles/usage',
       '@dshfiles/tweet-context',
       '@dshfiles/vcs-provider-port',

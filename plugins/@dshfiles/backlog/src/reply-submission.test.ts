@@ -20,7 +20,7 @@ const deferred = <Value>() => {
 }
 
 const screenshot: ComposerFile = {
-  id: 'file-1',
+  id: 'screenshot-file-1',
   kind: 'image',
   name: 'screenshot.png',
   mediaType: 'image/png',

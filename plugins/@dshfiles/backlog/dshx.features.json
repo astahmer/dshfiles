@@ -64,6 +64,18 @@
           "testName": "continues ids after a Host restart"
         },
         {
+          "kind": "host-test",
+          "id": "backlog.capture-and-triage-host-op-log",
+          "file": "plugins/@dshfiles/backlog/src/backlog-repo.test.ts",
+          "testName": "folds back to exactly the items the store serves, after every kind of write and a restart"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.capture-and-triage-host-legacy-import",
+          "file": "plugins/@dshfiles/backlog/src/backlog-repo.test.ts",
+          "testName": "imports the JSON domains once, with their files, mappings and id counter, and records one bounded span"
+        },
+        {
           "kind": "gherkin",
           "id": "backlog.composer-autocomplete",
           "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
@@ -82,6 +94,12 @@
         {
           "kind": "automatic",
           "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "backlog legacy import",
+          "file": "plugins/@dshfiles/backlog/src/backlog-repo.test.ts",
+          "testName": "imports the JSON domains once, with their files, mappings and id counter, and records one bounded span"
         }
       ]
     },
