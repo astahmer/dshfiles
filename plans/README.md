@@ -67,7 +67,6 @@ Written plans for ideas that were scoped but not started:
 - [Capabilities hub](capabilities-hub.md): one launchpad for Skills, MCP and DSH plugin managers.
 - [External usage history](external-usage-history.md): opt-in cross-harness token usage in Usage.
 - [Plugin Guide](plugin-guide.md): a developer panel over a versioned catalog of public extension surfaces.
-- [Session reminders](session-reminders.md): same-Session reminders through the official Schedule bundle.
 
 Ideas that were investigated but never built. Their plan files were deleted; this line is what survives. Reopen one by
 writing a new plan.

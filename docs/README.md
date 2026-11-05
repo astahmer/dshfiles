@@ -31,6 +31,7 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [ADE interaction performance](ade-performance/README.md)     | Runtime audit, full-profile benchmarks, transcript prototype, architecture decision, and reversible roadmap.                                            |
 | [Self-improvement from Session history](self-improvement.md) | `/self-improve`: the weekly evidence review, mining past Sessions into candidate signals, deterministic harness validation, and the improvement ledger. |
 | [Observability](observability.md)                            | Which source answers which question; OpenTelemetry spans for turns, model calls, tools and plugin code, one trace.                                      |
+| [Session reminders](session-reminders.md)                    | Same-thread reminders through the official Schedule service: tools, limits, and the scratch journey that proves delivery.                               |
 | [Reference repositories](reference-repos.md)                 | Upstream and peer projects checked out locally for comparison, and why each is kept.                                                                    |
 | [Harness landscape](research/harness-landscape/README.md)    | Dated comparison of DSH against ten coding harnesses, one report per product.                                                                           |
 
