@@ -77,7 +77,15 @@ export const fakeLinear = () => {
     { id: 'l-sync', name: 'sync' },
   ]
   const requests: FakeRequest[] = []
-  const state = { now: 1_000, status: 200, issues: new Map<string, FakeLinearIssue>(), requests, nextNumber: 1, nextComment: 1 }
+  const state = {
+    now: 1_000,
+    status: 200,
+    issues: new Map<string, FakeLinearIssue>(),
+    requests,
+    nextNumber: 1,
+    nextComment: 1,
+    teams: [{ key: 'ENG', name: 'Engineering' }],
+  }
   const typeOf = (stateId: string) => states.find(candidate => candidate.id === stateId)?.type ?? 'backlog'
   const view = (issue: FakeLinearIssue) => ({
     id: issue.id,
@@ -115,6 +123,7 @@ export const fakeLinear = () => {
   }
 
   const answer = (query: string, variables: (typeof linearBody.Type)['variables']) => {
+    if (query.includes('query BacklogAccount')) return { data: { viewer: { name: 'Ada' }, teams: { nodes: state.teams } } }
     if (query.includes('query BacklogTeam'))
       return { data: { teams: { nodes: [{ id: 'team-1', key: 'ENG', states: { nodes: states } }] }, issueLabels: { nodes: labels } } }
     if (query.includes('query BacklogIssue')) {
@@ -224,6 +233,8 @@ export const fakeGithub = () => {
       requests.push({ method: request.method, url: request.url, authorization: request.headers['authorization'], body: text })
       const body = text === '' ? {} : Schema.decodeUnknownSync(githubBody)(text)
       const path = new URL(request.url).pathname
+      if (path === '/user') return json(request, 200, { login: 'octocat' })
+      if (path === '/repos/acme/app') return json(request, 200, { full_name: 'acme/app' })
       const match = /^\/repos\/acme\/app\/issues(?:\/(\d+))?(\/comments)?$/u.exec(path)
       if (match === null) return json(request, 404, { message: 'Not Found' })
       const number = match[1] === undefined ? undefined : Number(match[1])

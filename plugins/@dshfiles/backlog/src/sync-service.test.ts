@@ -1,13 +1,15 @@
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import { describe, expect, it } from '@effect/vitest'
+import { afterEach, beforeEach, describe, expect, it } from '@effect/vitest'
+import { vi } from 'vitest'
 import { Effect, Layer } from 'effect'
 import { HttpClient } from 'effect/http'
 import { TestClock } from 'effect/testing'
 import type { BacklogSettings } from './settings.js'
 import { BacklogStore } from './store.js'
 import { fakeGithub, fakeLinear } from './sync-fakes.js'
+import { SyncLocalProbes } from './sync-local-probes.js'
 import type { SyncMapping } from './sync-model.js'
 import { BacklogSync, RemoteBackends } from './sync-service.js'
 import { BacklogSyncTables } from './sync-tables.js'
@@ -23,6 +25,7 @@ const syncLayer = (input: {
   readonly rows?: readonly Row[]
   readonly secret?: string | undefined
   readonly storage?: { readonly items: ReturnType<typeof backlogRows>; readonly mappings: Map<string, SyncMapping> }
+  readonly probes?: { readonly repository?: string; readonly cliToken?: string }
 }) => {
   const storage = input.storage ?? { items: backlogRows(), mappings: new Map<string, SyncMapping>() }
   return BacklogSync.layer.pipe(
@@ -33,10 +36,18 @@ const syncLayer = (input: {
         BacklogSyncTables.layerMemory(storage.mappings),
         Layer.succeed(HttpClient.HttpClient, input.client),
         SecretReferenceResolver.layerTest({ resolve: async () => input.secret ?? 'lin_test_key' }),
+        SyncLocalProbes.layerTest(input.probes ?? {}),
       ),
     ),
   )
 }
+
+beforeEach(() => {
+  for (const name of ['LINEAR_API_KEY', 'GITHUB_TOKEN', 'GH_TOKEN']) vi.stubEnv(name, '')
+})
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
 
 describe('BacklogSync with Linear', () => {
   it.effect('creates a Linear issue from an item, maps status and labels, and records its spans', () => {
@@ -227,6 +238,122 @@ describe('BacklogSync with Linear', () => {
       expect(status.items[0]).toMatchObject({ itemId: id, remoteKey: 'ENG-1', state: 'synced' })
       expect(storage.items.items.has(String(id))).toBe(true)
     })
+  })
+})
+
+describe('Remote sync setup', () => {
+  it.effect('tests a Linear key without a team: names the account, lists the teams and uses the only one', () => {
+    const linear = fakeLinear()
+    return Effect.gen(function* () {
+      const sync = yield* BacklogSync
+      const report = yield* sync.testConnection({ backend: 'linear', project: '', target: '', secret: 'secret:LINEAR_KEY' })
+      expect(report).toEqual({
+        ok: true,
+        credential: 'reference',
+        account: 'Ada',
+        target: { key: 'ENG', name: 'Engineering' },
+        targetSource: 'only-team',
+        teams: [{ key: 'ENG', name: 'Engineering' }],
+        error: null,
+      })
+      expect(JSON.stringify(report)).not.toContain('lin_test_key')
+
+      const store = yield* BacklogStore
+      const created = yield* store.capture({ text: 'No team picked', actor: { kind: 'user' } })
+      const linked = yield* sync.link({ id: created.item.id, backend: 'linear', create: true, actor: { kind: 'user' } })
+      expect(linked.item?.remoteKey).toBe('ENG-1')
+    }).pipe(Effect.provide(syncLayer({ client: linear.client, rows: [{ ...linearRow, target: '' }] })))
+  })
+
+  it.effect('asks for a team when the Linear key sees several, and reports an unknown team key', () => {
+    const linear = fakeLinear()
+    linear.state.teams = [
+      { key: 'ENG', name: 'Engineering' },
+      { key: 'OPS', name: 'Operations' },
+    ]
+    vi.stubEnv('LINEAR_API_KEY', 'lin_env_key')
+    return Effect.gen(function* () {
+      const sync = yield* BacklogSync
+      const unpicked = yield* sync.testConnection({ backend: 'linear', project: '', target: '', secret: '' })
+      expect(unpicked).toMatchObject({ ok: false, credential: 'environment', account: 'Ada', teams: [{ key: 'ENG' }, { key: 'OPS' }] })
+      expect(unpicked.error).toMatchObject({ code: 'SyncTargetMissing' })
+      expect(unpicked.error?.message).toContain('pick a team')
+      const unknown = yield* sync.testConnection({ backend: 'linear', project: '', target: 'NOPE', secret: '' })
+      expect(unknown.error?.message).toContain('no team with key NOPE')
+      const picked = yield* sync.testConnection({ backend: 'linear', project: '', target: 'ops', secret: '' })
+      expect(picked).toMatchObject({ ok: true, target: { key: 'OPS' }, targetSource: 'setting' })
+
+      const store = yield* BacklogStore
+      const created = yield* store.capture({ text: 'Which team?', actor: { kind: 'user' } })
+      const failed = yield* Effect.flip(sync.link({ id: created.item.id, backend: 'linear', create: true, actor: { kind: 'user' } }))
+      expect(failed._tag).toBe('SyncTargetMissing')
+      expect(linear.state.requests.every(request => request.authorization === 'lin_env_key')).toBe(true)
+    }).pipe(Effect.provide(syncLayer({ client: linear.client, rows: [{ ...linearRow, target: '', secret: '' }] })))
+  })
+
+  it.effect("takes the GitHub repository from the project's git remote and the token from the gh CLI", () => {
+    const github = fakeGithub()
+    return Effect.gen(function* () {
+      const recorder = yield* Effect.acquireRelease(
+        Effect.sync(() => recordSpans()),
+        spans => Effect.sync(() => spans[Symbol.dispose]()),
+      )
+      const sync = yield* BacklogSync
+      const report = yield* sync.testConnection({ backend: 'github', project: '/work/app', target: '', secret: '' })
+      expect(recorder.span('backlog sync test connection').attributes['dshx.backlog.sync.backend']).toBe('github')
+      expect(report).toEqual({
+        ok: true,
+        credential: 'github-cli',
+        account: 'octocat',
+        target: { key: 'acme/app', name: 'acme/app' },
+        targetSource: 'git-remote',
+        teams: [],
+        error: null,
+      })
+      const everyProject = yield* sync.testConnection({ backend: 'github', project: '', target: '', secret: '' })
+      expect(everyProject).toMatchObject({ ok: true, target: null, targetSource: 'per-project' })
+      expect((yield* sync.status({})).backends[0]?.credential).toBe('github-cli')
+
+      const store = yield* BacklogStore
+      const created = yield* store.capture({ text: 'Detected repo', project: '/work/app', actor: { kind: 'user' } })
+      yield* sync.link({ id: created.item.id, backend: 'github', create: true, actor: { kind: 'user' } })
+      expect(github.state.issues.get(1)?.title).toBe('Detected repo')
+      expect(github.state.requests.every(request => request.authorization === 'Bearer gh_cli_token')).toBe(true)
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(DshxEffect.tracerLayer),
+      Effect.provide(
+        syncLayer({
+          client: github.client,
+          rows: [{ ...githubRow, target: '', secret: '' }],
+          probes: { repository: 'acme/app', cliToken: 'gh_cli_token' },
+        }),
+      ),
+    )
+  })
+
+  it.effect('names the missing repository and the missing key with their fixes', () => {
+    const github = fakeGithub()
+    return Effect.gen(function* () {
+      const sync = yield* BacklogSync
+      const noKey = yield* sync.testConnection({ backend: 'github', project: '/work/app', target: '', secret: '' })
+      expect(noKey).toMatchObject({ ok: false, credential: 'missing', error: { code: 'SyncCredentialMissing' } })
+      expect(noKey.error?.message).toContain('gh auth login')
+      expect(github.state.requests).toEqual([])
+    }).pipe(Effect.provide(syncLayer({ client: github.client, rows: [{ ...githubRow, target: '', secret: '' }] })))
+  })
+
+  it.effect('imports by URL or identifier without naming the tracker, and refuses text that names neither', () => {
+    const github = fakeGithub()
+    return Effect.gen(function* () {
+      const sync = yield* BacklogSync
+      github.seed({ title: 'From a URL' })
+      const imported = yield* sync.importRemote({ reference: 'https://github.com/acme/app/issues/1', actor: { kind: 'user' } })
+      expect(imported.detail.item.title).toBe('From a URL')
+      const unknown = yield* Effect.flip(sync.importRemote({ reference: 'not an issue', actor: { kind: 'user' } }))
+      expect(unknown._tag).toBe('SyncReferenceUnrecognized')
+      expect(unknown.message).toContain('ENG-12, #42')
+    }).pipe(Effect.provide(syncLayer({ client: github.client, rows: [{ ...githubRow, target: '' }], secret: 'gh_test_token' })))
   })
 })
 

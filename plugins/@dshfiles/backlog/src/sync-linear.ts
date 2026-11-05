@@ -1,8 +1,8 @@
 import { Effect, Option, Redacted, Ref, Schema } from 'effect'
 import { HttpClient, HttpClientRequest } from 'effect/http'
 import type { BacklogKind, BacklogStatus } from './item.js'
-import type { RemoteBackend, RemoteIssueDraft } from './sync-backend.js'
-import { SyncRemoteNotFound, SyncRemoteRejected, SyncResponseInvalid, SyncTransportFailed } from './sync-errors.js'
+import type { RemoteBackend, RemoteConnection, RemoteIssueDraft } from './sync-backend.js'
+import { SyncRemoteNotFound, SyncRemoteRejected, SyncResponseInvalid, SyncTargetMissing, SyncTransportFailed } from './sync-errors.js'
 import type { RemoteComment, RemoteIssue, SyncFieldValues } from './sync-model.js'
 
 const LINEAR_ENDPOINT = 'https://api.linear.app/graphql'
@@ -35,6 +35,11 @@ const teamSchema = Schema.Struct({
 })
 
 const labelSchema = Schema.Struct({ id: Schema.String, name: Schema.String })
+
+const accountSchema = Schema.Struct({
+  viewer: Schema.Struct({ name: Schema.String }),
+  teams: nodes(Schema.Struct({ key: Schema.String, name: Schema.String })),
+})
 
 const graphqlErrorSchema = Schema.Struct({ message: Schema.String })
 const envelope = <S extends Schema.Top>(data: S) =>
@@ -170,20 +175,40 @@ export const makeLinearBackend = Effect.fn('backlog linear backend')(function* (
       return decoded.data
     }).pipe(Effect.withSpan('linear request', { kind: 'client' }))
 
+  const account = request('BacklogAccount', 'query BacklogAccount { viewer { name } teams(first: 100) { nodes { key name } } }', {}, accountSchema)
+
+  /** The configured team key, or the only team the key can see. */
+  const teamKey = Effect.gen(function* () {
+    const configured = input.teamKey.trim()
+    if (configured !== '') return configured
+    const teams = (yield* account).teams.nodes
+    const only = teams.length === 1 ? teams[0] : undefined
+    if (only === undefined) return yield* new SyncTargetMissing({ backend: 'linear', project: null })
+    return only.key
+  })
+
+  const connection = Effect.map(account, (data): RemoteConnection => {
+    const configured = input.teamKey.trim().toUpperCase()
+    const teams = data.teams.nodes.map(team => ({ key: team.key, name: team.name }))
+    const target = configured === '' ? (teams.length === 1 ? teams[0] : undefined) : teams.find(team => team.key.toUpperCase() === configured)
+    return { account: data.viewer.name, target: target ?? null, teams }
+  })
+
   const team = Effect.gen(function* () {
     const cached = yield* Ref.get(teamCache)
     if (Option.isSome(cached)) return cached.value
+    const key = yield* teamKey
     const data = yield* request(
       'BacklogTeam',
       `query BacklogTeam($key: String!) {
         teams(filter: { key: { eq: $key } }, first: 1) { nodes { id key states(first: 100) { nodes { id type position } } } }
         issueLabels(first: 250, filter: { or: [{ team: { key: { eq: $key } } }, { team: { null: true } }] }) { nodes { id name } }
       }`,
-      { key: input.teamKey },
+      { key },
       Schema.Struct({ teams: nodes(teamSchema), issueLabels: nodes(labelSchema) }),
     )
     const found = data.teams.nodes[0]
-    if (found === undefined) return yield* new SyncRemoteRejected({ backend: 'linear', status: 404, detail: `no team with key ${input.teamKey}` })
+    if (found === undefined) return yield* new SyncRemoteRejected({ backend: 'linear', status: 404, detail: `no team with key ${key}` })
     const value = { team: found, labels: data.issueLabels.nodes }
     yield* Ref.set(teamCache, Option.some(value))
     return value
@@ -288,7 +313,7 @@ export const makeLinearBackend = Effect.fn('backlog linear backend')(function* (
             }),
     )
 
-  const backend: RemoteBackend = { kind: 'linear', target: input.teamKey, resolve, fetch: issueById, create, update, comment }
+  const backend: RemoteBackend = { kind: 'linear', target: input.teamKey, resolve, fetch: issueById, create, update, comment, connection }
   return backend
 })
 

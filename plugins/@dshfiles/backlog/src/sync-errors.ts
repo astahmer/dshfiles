@@ -23,7 +23,21 @@ export class SyncCredentialMissing extends Schema.TaggedError<SyncCredentialMiss
   { dshxWireCode: 'sync-credential-missing' },
 ) {
   override get message(): string {
-    return `The ${label(this.backend)} key does not resolve. ${settingsHint} and set its key to a Secret Catalog reference (secret:ALIAS), or set ${this.environmentVariable} in the DSH Host environment, then retry.`
+    const cli = this.backend === 'github' ? ', or run `gh auth login` on the Host' : ''
+    return `The ${label(this.backend)} key does not resolve. ${settingsHint} and set its key to a Secret Catalog reference (secret:ALIAS), set ${this.environmentVariable} in the DSH Host environment${cli}, then retry.`
+  }
+}
+
+/** The row names no team or repository, and none could be found on its own. */
+export class SyncTargetMissing extends Schema.TaggedError<SyncTargetMissing>()(
+  'SyncTargetMissing',
+  { backend: backendSchema, project: Schema.NullOr(Schema.String) },
+  { dshxWireCode: 'sync-target-missing' },
+) {
+  override get message(): string {
+    if (this.backend === 'linear') return `The Linear key sees several teams. ${settingsHint}, pick a team for this backend, then retry.`
+    const where = this.project === null ? 'Items without a project have' : `${this.project} has`
+    return `${where} no github.com git remote to take the repository from. ${settingsHint}, set the repository as owner/repo, then retry.`
   }
 }
 
@@ -78,6 +92,17 @@ export class SyncRemoteNotFound extends Schema.TaggedError<SyncRemoteNotFound>()
   }
 }
 
+/** The text names neither a Linear nor a GitHub issue. */
+export class SyncReferenceUnrecognized extends Schema.TaggedError<SyncReferenceUnrecognized>()(
+  'SyncReferenceUnrecognized',
+  { reference: Schema.String },
+  { dshxWireCode: 'sync-reference-unrecognized' },
+) {
+  override get message(): string {
+    return `“${this.reference.slice(0, 200)}” is not a Linear or GitHub issue. Paste ENG-12, #42, owner/repo#42 or the issue URL, then retry.`
+  }
+}
+
 /** The item is not linked to a remote issue yet. */
 export class SyncItemNotLinked extends Schema.TaggedError<SyncItemNotLinked>()(
   'SyncItemNotLinked',
@@ -111,4 +136,4 @@ export class SyncWriteFailed extends Schema.TaggedError<SyncWriteFailed>()(
   }
 }
 
-export type RemoteBackendError = SyncRemoteRejected | SyncTransportFailed | SyncResponseInvalid | SyncRemoteNotFound
+export type RemoteBackendError = SyncRemoteRejected | SyncTransportFailed | SyncResponseInvalid | SyncRemoteNotFound | SyncTargetMissing

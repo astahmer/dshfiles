@@ -1,7 +1,7 @@
 import { Effect, Redacted, Schema } from 'effect'
 import { HttpClient, HttpClientRequest, type HttpClientResponse } from 'effect/http'
 import type { BacklogStatus } from './item.js'
-import type { RemoteBackend, RemoteIssueDraft } from './sync-backend.js'
+import type { RemoteBackend, RemoteConnection, RemoteIssueDraft } from './sync-backend.js'
 import { SyncRemoteNotFound, SyncRemoteRejected, SyncResponseInvalid, SyncTransportFailed } from './sync-errors.js'
 import type { RemoteComment, RemoteIssue, SyncFieldValues } from './sync-model.js'
 
@@ -28,6 +28,8 @@ const commentSchema = Schema.Struct({
 })
 
 const errorSchema = Schema.Struct({ message: Schema.optionalKey(Schema.String) })
+const userSchema = Schema.Struct({ login: Schema.String })
+const repositorySchema = Schema.Struct({ full_name: Schema.String })
 
 /** The fields a PATCH writes; absent ones stay as they are. */
 interface GithubIssueUpdate {
@@ -50,6 +52,17 @@ const stateOf = (status: BacklogStatus): { readonly state: 'open' | 'closed'; re
       : { state: 'open' }
 
 const repositoryPattern = /^[\w.-]+\/[\w.-]+$/u
+
+/** The `owner/repo` an `owner/repo#42` reference or a github.com issue URL names, if any. */
+const repositoryOfReference = (reference: string): string | undefined => {
+  const trimmed = reference.trim()
+  const short = /^([\w.-]+\/[\w.-]+)#\d+$/u.exec(trimmed)
+  if (short?.[1] !== undefined) return short[1]
+  if (!URL.canParse(trimmed)) return undefined
+  const url = new URL(trimmed)
+  if (url.hostname !== 'github.com') return undefined
+  return /^\/([\w.-]+\/[\w.-]+)\/issues\/\d+\/?$/u.exec(url.pathname)?.[1]
+}
 
 /** `42`, `#42`, `owner/repo#42`, or a `github.com/owner/repo/issues/42` URL, within the configured repository. */
 const numberOf = (repository: string, reference: string): number | undefined => {
@@ -74,7 +87,8 @@ export const makeGithubBackend = Effect.fn('backlog github backend')(function* (
   readonly apiUrl?: string | undefined
 }) {
   const http = yield* HttpClient.HttpClient
-  const base = `${(input.apiUrl ?? GITHUB_API).replace(/\/+$/u, '')}/repos/${input.repository}`
+  const apiRoot = (input.apiUrl ?? GITHUB_API).replace(/\/+$/u, '')
+  const base = `${apiRoot}/repos/${input.repository}`
 
   const send = <S extends Schema.Top>(operation: string, request: HttpClientRequest.HttpClientRequest, schema: S, reference: string) =>
     Effect.gen(function* () {
@@ -195,7 +209,18 @@ export const makeGithubBackend = Effect.fn('backlog github backend')(function* (
       }),
     )
 
-  const backend: RemoteBackend = { kind: 'github', target: input.repository, resolve, fetch: fetchIssue, create, update, comment }
+  const connection = Effect.gen(function* () {
+    const user = yield* send('get user', HttpClientRequest.get(`${apiRoot}/user`), userSchema, 'user')
+    if (!repositoryPattern.test(input.repository)) return { account: user.login, target: null, teams: [] } satisfies RemoteConnection
+    const repository = yield* send('get repository', HttpClientRequest.get(base), repositorySchema, input.repository).pipe(
+      Effect.catchTag('SyncRemoteNotFound', () =>
+        Effect.fail(new SyncRemoteRejected({ backend: 'github', status: 404, detail: `no repository ${input.repository} visible to ${user.login}` })),
+      ),
+    )
+    return { account: user.login, target: { key: repository.full_name, name: repository.full_name }, teams: [] } satisfies RemoteConnection
+  })
+
+  const backend: RemoteBackend = { kind: 'github', target: input.repository, resolve, fetch: fetchIssue, create, update, comment, connection }
   return backend
 })
 
@@ -203,5 +228,6 @@ export class GithubMapping {
   static readonly apiUrl = GITHUB_API
   static readonly statusOf = statusOf
   static readonly numberOf = numberOf
+  static readonly repositoryOfReference = repositoryOfReference
   static readonly repositoryPattern = repositoryPattern
 }

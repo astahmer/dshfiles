@@ -1,4 +1,4 @@
-import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
+import { SecretReferenceResolver, type SecretReferenceResolverError } from '@dshfiles/credential-port/effect'
 import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Cause, Clock, Context, Effect, Layer, Option, Redacted, Ref, Schedule, Semaphore } from 'effect'
 import { HttpClient } from 'effect/http'
@@ -8,23 +8,49 @@ import { BacklogItemNotFound, type BacklogWriteFailed } from './errors.js'
 import { BacklogItems, type BacklogItem, type BacklogKind } from './item.js'
 import type { BacklogSettings } from './settings.js'
 import { BacklogStore, type BacklogActor } from './store.js'
-import type { RemoteBackend } from './sync-backend.js'
+import type { RemoteBackend, RemoteConnection } from './sync-backend.js'
 import {
   SyncAlreadyLinked,
   SyncBackendUnconfigured,
   SyncCredentialMissing,
   SyncItemNotLinked,
+  SyncReferenceUnrecognized,
+  SyncRemoteRejected,
+  SyncTargetMissing,
   SyncWriteFailed,
   type RemoteBackendError,
 } from './sync-errors.js'
-import { makeGithubBackend } from './sync-github.js'
+import { GithubMapping, makeGithubBackend } from './sync-github.js'
 import { makeLinearBackend } from './sync-linear.js'
+import { SyncLocalProbes } from './sync-local-probes.js'
 import { BacklogSyncModel, type RemoteIssue, type SyncBackendKind, type SyncConflict, type SyncField, type SyncMapping, type SyncState } from './sync-model.js'
 import { BacklogSyncTables } from './sync-tables.js'
 
 type BackendRow = BacklogSettings['syncBackends'][number]
 
-const environmentVariable = { linear: 'LINEAR_API_KEY', github: 'GITHUB_TOKEN' } as const satisfies Record<SyncBackendKind, string>
+/** Host environment variables read when a row binds no key, first set wins. */
+const environmentVariables = { linear: ['LINEAR_API_KEY'], github: ['GITHUB_TOKEN', 'GH_TOKEN'] } as const satisfies Record<SyncBackendKind, readonly string[]>
+
+type CredentialSource = 'reference' | 'environment' | 'github-cli'
+
+/** A row as the settings form holds it, before it is saved. */
+export interface SyncBackendDraft {
+  readonly backend: SyncBackendKind
+  readonly project: string
+  readonly target: string
+  readonly secret: string
+}
+
+/** What Test connection answers: never the key, only where it came from and what it reaches. */
+export interface SyncConnectionTest {
+  readonly ok: boolean
+  readonly credential: CredentialSource | 'missing'
+  readonly account: string | null
+  readonly target: { readonly key: string; readonly name: string } | null
+  readonly targetSource: 'setting' | 'git-remote' | 'only-team' | 'per-project' | null
+  readonly teams: readonly { readonly key: string; readonly name: string }[]
+  readonly error: { readonly code: string; readonly message: string } | null
+}
 
 /** One row's identity for the auto-sync schedule. */
 const rowKey = (row: BackendRow): string => `${row.backend}:${row.project}`
@@ -67,7 +93,7 @@ export interface SyncBackendView {
   readonly target: string
   readonly enabled: boolean
   readonly autoSyncMinutes: number
-  readonly credential: 'reference' | 'environment' | 'missing'
+  readonly credential: CredentialSource | 'missing'
 }
 
 export interface SyncStatusView {
@@ -75,38 +101,166 @@ export interface SyncStatusView {
   readonly items: readonly SyncItemView[]
 }
 
-type ConfigError = SyncBackendUnconfigured | SyncCredentialMissing
+type ConfigError = SyncBackendUnconfigured | SyncCredentialMissing | SyncTargetMissing
 type LinkError = ConfigError | RemoteBackendError | SyncAlreadyLinked | SyncWriteFailed | BacklogWriteFailed | BacklogItemNotFound
 
-/** Opens the backend a settings row names, with its credential resolved on the Host. */
+const projectOfRow = (project: string): string | null => (project.trim() === '' ? null : BacklogItems.projectPath(project))
+
+const errorView = (error: { readonly _tag: string; readonly message: string }) => ({ code: error._tag.slice(0, 64), message: error.message.slice(0, 1_000) })
+
+/**
+ * Opens the backend a settings row names, with its credential resolved on the Host: the bound reference, then the Host
+ * environment, then (GitHub) a signed-in `gh` CLI. A GitHub row without a repository takes it from the project's git
+ * remote; a Linear row without a team uses the key's only team.
+ */
 export class RemoteBackends extends Context.Service<
   RemoteBackends,
-  { readonly open: (row: BackendRow) => Effect.Effect<RemoteBackend, SyncCredentialMissing | SyncBackendUnconfigured> }
+  {
+    readonly open: (input: {
+      readonly row: BackendRow
+      readonly project: string | null
+      readonly repositoryHint?: string | undefined
+    }) => Effect.Effect<RemoteBackend, ConfigError>
+    readonly credentialSource: (row: Pick<BackendRow, 'backend' | 'secret'>) => Effect.Effect<CredentialSource | 'missing'>
+    readonly test: (draft: SyncBackendDraft) => Effect.Effect<SyncConnectionTest>
+  }
 >()('@dshfiles/backlog/RemoteBackends') {
   static readonly layer = Layer.effect(
     RemoteBackends,
     Effect.gen(function* () {
       const secrets = yield* SecretReferenceResolver
       const http = yield* HttpClient.HttpClient
+      const probes = yield* SyncLocalProbes
+
+      const environmentOf = (backend: SyncBackendKind) =>
+        environmentVariables[backend].map(name => ({ name, value: process.env[name] ?? '' })).find(variable => variable.value !== '')
+
+      const resolveCredential = Effect.fnUntraced(function* (
+        row: Pick<BackendRow, 'backend' | 'secret'>,
+      ): Effect.fn.Return<Option.Option<{ readonly key: Redacted.Redacted; readonly source: CredentialSource }>, SecretReferenceResolverError> {
+        const environment = environmentOf(row.backend)
+        const resolved = yield* secrets.resolveWithLabel({
+          referenceText: row.secret,
+          environmentValue: environment?.value,
+          environmentVariableName: environment?.name ?? environmentVariables[row.backend][0],
+        })
+        if (Option.isSome(resolved)) {
+          return Option.some({ key: Redacted.make(resolved.value.value), source: row.secret.trim() === '' ? 'environment' : 'reference' })
+        }
+        if (row.backend !== 'github' || row.secret.trim() !== '') return Option.none()
+        return Option.map(yield* probes.githubCliToken, key => ({ key, source: 'github-cli' as const }))
+      })
+
+      const credentialOrMissing = (row: BackendRow) =>
+        resolveCredential(row).pipe(
+          Effect.catch(error => Effect.as(Effect.logWarning('backlog sync: the credential could not be resolved', error), Option.none())),
+          Effect.flatMap(credential =>
+            Option.isSome(credential)
+              ? Effect.succeed(credential.value)
+              : Effect.fail(new SyncCredentialMissing({ backend: row.backend, environmentVariable: environmentVariables[row.backend][0] })),
+          ),
+        )
+
+      /** The repository a GitHub row serves for `project`: its own, the issue reference's, then the project's git remote. */
+      const repositoryOf = Effect.fnUntraced(function* (input: {
+        readonly target: string
+        readonly project: string | null
+        readonly hint?: string | undefined
+      }): Effect.fn.Return<Option.Option<{ readonly key: string; readonly source: 'setting' | 'git-remote' }>> {
+        const configured = input.target.trim()
+        if (configured !== '') return Option.some({ key: configured, source: 'setting' })
+        if (input.hint !== undefined) return Option.some({ key: input.hint, source: 'setting' })
+        if (input.project === null) return Option.none()
+        return Option.map(yield* probes.githubRepository(input.project), key => ({ key, source: 'git-remote' as const }))
+      })
+
       const open = Effect.fn('backlog sync open backend')(
-        function* (row: BackendRow) {
-          const variable = environmentVariable[row.backend]
-          const target = row.target.trim()
-          if (target === '') return yield* new SyncBackendUnconfigured({ backend: row.backend, project: row.project === '' ? null : row.project })
-          const credential = yield* secrets
-            .resolveWithLabel({ referenceText: row.secret, environmentValue: process.env[variable], environmentVariableName: variable })
-            .pipe(Effect.catch(error => Effect.as(Effect.logWarning('backlog sync: the credential could not be resolved', error), Option.none())))
-          if (Option.isNone(credential)) return yield* new SyncCredentialMissing({ backend: row.backend, environmentVariable: variable })
-          const key = Redacted.make(credential.value.value)
-          const backend =
-            row.backend === 'linear' ? yield* makeLinearBackend({ teamKey: target, apiKey: key }) : yield* makeGithubBackend({ repository: target, token: key })
-          return backend
+        function* (input: { readonly row: BackendRow; readonly project: string | null; readonly repositoryHint?: string | undefined }) {
+          const credential = yield* credentialOrMissing(input.row)
+          if (input.row.backend === 'linear') return yield* makeLinearBackend({ teamKey: input.row.target.trim(), apiKey: credential.key })
+          const project = projectOfRow(input.row.project) ?? input.project
+          const repository = yield* repositoryOf({ target: input.row.target, project, hint: input.repositoryHint })
+          if (Option.isNone(repository)) return yield* new SyncTargetMissing({ backend: 'github', project })
+          return yield* makeGithubBackend({ repository: repository.value.key, token: credential.key })
         },
         Effect.provideService(HttpClient.HttpClient, http),
       )
-      return RemoteBackends.of({ open })
+
+      const credentialSource = (row: Pick<BackendRow, 'backend' | 'secret'>): Effect.Effect<CredentialSource | 'missing'> => {
+        if (row.secret.trim() !== '') return Effect.succeed('reference')
+        if (environmentOf(row.backend) !== undefined) return Effect.succeed('environment')
+        if (row.backend === 'linear') return Effect.succeed('missing')
+        return Effect.map(probes.githubCliToken, token => (Option.isSome(token) ? 'github-cli' : 'missing'))
+      }
+
+      const failedTest = (input: {
+        readonly credential: SyncConnectionTest['credential']
+        readonly error: { readonly _tag: string; readonly message: string }
+      }) =>
+        ({
+          ok: false,
+          credential: input.credential,
+          account: null,
+          target: null,
+          targetSource: null,
+          teams: [],
+          error: errorView(input.error),
+        }) satisfies SyncConnectionTest
+
+      const test = Effect.fn('backlog sync test connection')(
+        function* (draft: SyncBackendDraft) {
+          yield* Effect.annotateCurrentSpan({ 'dshx.plugin.package': '@dshfiles/backlog', 'dshx.backlog.sync.backend': draft.backend })
+          const resolved = yield* Effect.result(resolveCredential(draft))
+          if (resolved._tag === 'Failure') return failedTest({ credential: 'reference', error: resolved.failure })
+          if (Option.isNone(resolved.success)) {
+            return failedTest({
+              credential: 'missing',
+              error: new SyncCredentialMissing({ backend: draft.backend, environmentVariable: environmentVariables[draft.backend][0] }),
+            })
+          }
+          const credential = resolved.success.value
+          const project = projectOfRow(draft.project)
+          const repository = draft.backend === 'github' ? yield* repositoryOf({ target: draft.target, project }) : Option.none()
+          const backend =
+            draft.backend === 'linear'
+              ? yield* makeLinearBackend({ teamKey: draft.target.trim(), apiKey: credential.key })
+              : yield* makeGithubBackend({ repository: Option.match(repository, { onNone: () => '', onSome: found => found.key }), token: credential.key })
+          const connection = yield* Effect.result(backend.connection)
+          if (connection._tag === 'Failure') return failedTest({ credential: credential.source, error: connection.failure })
+          return connectionReport({
+            draft,
+            project,
+            credential: credential.source,
+            connection: connection.success,
+            repositorySource: Option.getOrUndefined(repository)?.source,
+          })
+        },
+        Effect.provideService(HttpClient.HttpClient, http),
+      )
+
+      return RemoteBackends.of({ open, credentialSource, test })
     }),
   )
+}
+
+const connectionReport = (input: {
+  readonly draft: SyncBackendDraft
+  readonly project: string | null
+  readonly credential: CredentialSource
+  readonly connection: RemoteConnection
+  readonly repositorySource: 'setting' | 'git-remote' | undefined
+}): SyncConnectionTest => {
+  const base = { credential: input.credential, account: input.connection.account, target: input.connection.target, teams: input.connection.teams }
+  if (input.connection.target !== null) {
+    const targetSource = input.draft.backend === 'github' ? (input.repositorySource ?? 'setting') : input.draft.target.trim() === '' ? 'only-team' : 'setting'
+    return { ...base, ok: true, targetSource, error: null }
+  }
+  if (input.draft.backend === 'github' && input.project === null) return { ...base, ok: true, targetSource: 'per-project', error: null }
+  if (input.draft.backend === 'linear' && input.draft.target.trim() !== '') {
+    const missing = new SyncRemoteRejected({ backend: 'linear', status: 404, detail: `no team with key ${input.draft.target.trim()} visible to this key` })
+    return { ...base, ok: false, targetSource: null, error: errorView(missing) }
+  }
+  return { ...base, ok: false, targetSource: null, error: errorView(new SyncTargetMissing({ backend: input.draft.backend, project: input.project })) }
 }
 
 const errorRecord = (error: { readonly _tag: string; readonly message: string }, at: number) => ({
@@ -147,11 +301,12 @@ export class BacklogSync extends Context.Service<
       readonly actor: BacklogActor
     }) => Effect.Effect<{ readonly item: SyncItemView | null; readonly result: SyncItemResult | null }, LinkError>
     readonly importRemote: (input: {
-      readonly backend: SyncBackendKind
+      readonly backend?: SyncBackendKind | undefined
       readonly reference: string
       readonly project?: string | null | undefined
       readonly actor: BacklogActor
-    }) => Effect.Effect<{ readonly detail: BacklogDetailView; readonly created: boolean }, LinkError>
+    }) => Effect.Effect<{ readonly detail: BacklogDetailView; readonly created: boolean }, LinkError | SyncReferenceUnrecognized>
+    readonly testConnection: (draft: SyncBackendDraft) => Effect.Effect<SyncConnectionTest>
     /** One auto-sync round: every row with an interval that is due. */
     readonly autoSyncTick: Effect.Effect<void>
   }
@@ -175,11 +330,12 @@ export class BacklogSync extends Context.Service<
         tables.mappings.put(String(mapping.itemId), mapping).pipe(Effect.mapError(cause => new SyncWriteFailed({ itemId: mapping.itemId, cause })))
       const itemOf = (id: number) => Effect.map(store.get(id), found => (found.ok ? found.value.item : undefined))
 
-      const backendFor = (backend: SyncBackendKind, project: string | null) =>
+      const backendFor = (input: { readonly backend: SyncBackendKind; readonly project: string | null; readonly reference?: string | undefined }) =>
         Effect.gen(function* () {
-          const row = rowFor((yield* settings.get).syncBackends, backend, project)
-          if (row === undefined) return yield* new SyncBackendUnconfigured({ backend, project })
-          return yield* backends.open(row)
+          const row = rowFor((yield* settings.get).syncBackends, input.backend, input.project)
+          if (row === undefined) return yield* new SyncBackendUnconfigured({ backend: input.backend, project: input.project })
+          const repositoryHint = input.backend === 'github' && input.reference !== undefined ? GithubMapping.repositoryOfReference(input.reference) : undefined
+          return yield* backends.open({ row, project: input.project, repositoryHint })
         })
 
       const viewOf = (mapping: SyncMapping, item: BacklogItem | undefined): SyncItemView => ({
@@ -234,7 +390,7 @@ export class BacklogSync extends Context.Service<
       const passOf = Effect.fnUntraced(function* (mapping: SyncMapping) {
         const item = yield* itemOf(mapping.itemId)
         if (item === undefined) return yield* new BacklogItemNotFound({ ids: [mapping.itemId] })
-        const backend = yield* backendFor(mapping.backend, item.project)
+        const backend = yield* backendFor({ backend: mapping.backend, project: item.project, reference: mapping.url })
         const remote = yield* backend.fetch(mapping.remoteId)
         const at = yield* Clock.currentTimeMillis
         const plan = BacklogSyncModel.plan({ item, remote, base: mapping.base, at })
@@ -321,17 +477,17 @@ export class BacklogSync extends Context.Service<
         const wanted = input.ids === undefined ? undefined : new Set(input.ids)
         const all = (yield* mappings).filter(mapping => wanted === undefined || wanted.has(mapping.itemId))
         const items = yield* Effect.forEach(all, mapping => Effect.map(itemOf(mapping.itemId), item => viewOf(mapping, item)))
-        return {
-          backends: rows.map((row): SyncBackendView => ({
+        const views = yield* Effect.forEach(rows, row =>
+          Effect.map(backends.credentialSource(row), (credential): SyncBackendView => ({
             project: row.project === '' ? null : row.project,
             backend: row.backend,
             target: row.target,
             enabled: row.enabled,
             autoSyncMinutes: row.autoSyncMinutes,
-            credential: row.secret.trim() !== '' ? 'reference' : (process.env[environmentVariable[row.backend]] ?? '') !== '' ? 'environment' : 'missing',
+            credential,
           })),
-          items,
-        }
+        )
+        return { backends: views, items }
       })
 
       const syncNow = Effect.fn('backlog sync now')(function* (input: { readonly id?: number | undefined; readonly project?: string | null | undefined }) {
@@ -368,7 +524,7 @@ export class BacklogSync extends Context.Service<
         const item = yield* itemOf(input.id)
         if (item === undefined) return yield* new BacklogItemNotFound({ ids: [input.id] })
         const existing = yield* mappingOf(input.id)
-        const backend = yield* backendFor(input.backend, item.project)
+        const backend = yield* backendFor({ backend: input.backend, project: item.project, reference: input.reference })
         const at = yield* Clock.currentTimeMillis
         const remote = input.create === true ? undefined : yield* backend.resolve(input.reference ?? '')
         if (existing !== undefined && (remote === undefined || existing.remoteId !== remote.id || existing.backend !== input.backend)) {
@@ -406,22 +562,24 @@ export class BacklogSync extends Context.Service<
       })
 
       const importRemote = Effect.fn('backlog sync import')(function* (input: {
-        readonly backend: SyncBackendKind
+        readonly backend?: SyncBackendKind | undefined
         readonly reference: string
         readonly project?: string | null | undefined
         readonly actor: BacklogActor
       }) {
+        const tracker = input.backend ?? BacklogSyncModel.backendOfReference(input.reference)
+        if (tracker === undefined) return yield* new SyncReferenceUnrecognized({ reference: input.reference })
         const rows = (yield* settings.get).syncBackends
         const project =
           input.project === undefined
             ? (() => {
-                const row = rows.find(candidate => candidate.enabled && candidate.backend === input.backend)
+                const row = rows.find(candidate => candidate.enabled && candidate.backend === tracker)
                 return row === undefined || row.project === '' ? null : BacklogItems.projectPath(row.project)
               })()
             : BacklogItems.projectOf(input.project)
-        const backend = yield* backendFor(input.backend, project)
+        const backend = yield* backendFor({ backend: tracker, project, reference: input.reference })
         const remote = yield* backend.resolve(input.reference)
-        const known = (yield* mappings).find(mapping => mapping.backend === input.backend && mapping.remoteId === remote.id)
+        const known = (yield* mappings).find(mapping => mapping.backend === tracker && mapping.remoteId === remote.id)
         if (known !== undefined) {
           const found = yield* store.get(known.itemId)
           if (found.ok) return { detail: found.value, created: false }
@@ -441,7 +599,7 @@ export class BacklogSync extends Context.Service<
         const at = yield* Clock.currentTimeMillis
         const mapping: SyncMapping = {
           itemId: id,
-          backend: input.backend,
+          backend: tracker,
           remoteId: remote.id,
           remoteKey: remote.key,
           url: remote.url.slice(0, BacklogItems.maxTargetChars),
@@ -485,7 +643,7 @@ export class BacklogSync extends Context.Service<
         )
       })
 
-      return BacklogSync.of({ status, syncNow, link, importRemote, autoSyncTick })
+      return BacklogSync.of({ status, syncNow, link, importRemote, autoSyncTick, testConnection: backends.test })
     }),
   )
 }
@@ -503,5 +661,5 @@ export const RemoteSyncLoop = Layer.effectDiscard(
 
 export class BacklogSyncConfig {
   static readonly rowFor = rowFor
-  static readonly environmentVariable = environmentVariable
+  static readonly environmentVariables = environmentVariables
 }

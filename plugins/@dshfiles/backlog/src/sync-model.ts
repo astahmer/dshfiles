@@ -217,7 +217,20 @@ const importedCommentText = (backend: SyncBackendKind, comment: RemoteComment): 
 const exportedCommentText = (itemId: number, actor: string, text: string): string =>
   `${text}\n\n— ${actor === 'user' ? 'you' : actor} on backlog b:${String(itemId)}`
 
+/** The tracker an issue reference names: `ENG-12` or a linear.app URL is Linear; `42`, `owner/repo#42` or a github.com URL is GitHub. */
+const backendOfReference = (reference: string): SyncBackendKind | undefined => {
+  const trimmed = reference.trim()
+  if (/^[A-Za-z][A-Za-z0-9]{0,9}-\d+$/u.test(trimmed)) return 'linear'
+  if (/^(?:[\w.-]+\/[\w.-]+)?#?\d+$/u.test(trimmed)) return 'github'
+  if (!URL.canParse(trimmed)) return undefined
+  const hostname = new URL(trimmed).hostname
+  if (hostname === 'linear.app') return 'linear'
+  if (hostname === 'github.com') return 'github'
+  return undefined
+}
+
 export class BacklogSyncModel {
+  static readonly backendOfReference = backendOfReference
   static readonly backends = backends
   static readonly syncStates = syncStates
   static readonly syncedFields = syncedFields

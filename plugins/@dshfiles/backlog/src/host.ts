@@ -24,6 +24,7 @@ import { CaptureProjects } from './project-target.js'
 import { ReplyGenerator } from './reply-generator.js'
 import { backlogSettings } from './settings.js'
 import { BacklogSync, RemoteBackends, RemoteSyncLoop } from './sync-service.js'
+import { SyncLocalProbes } from './sync-local-probes.js'
 import { BacklogSyncTables } from './sync-tables.js'
 import { BacklogStore } from './store.js'
 import { actorOf, ThreadStart } from './thread-start.js'
@@ -51,6 +52,7 @@ const backlogServices = Layer.mergeAll(ThreadStart.layer, TriageBackfill.layer, 
   Layer.provideMerge(Triage.layer),
   Layer.provideMerge(Layer.mergeAll(BacklogStore.layer, AiActivity.layer, CaptureProjects.layer, AttachmentExport.layer)),
   Layer.provideMerge(Layer.mergeAll(BacklogTables.layer, BacklogSyncTables.layer, RemoteBackends.layer)),
+  Layer.provideMerge(SyncLocalProbes.layer),
   Layer.provideMerge(Layer.mergeAll(Jev.layer, Jj.layer, VcsProviderService.layer)),
 )
 
@@ -123,6 +125,8 @@ const backlogHandlers = Api.handlers(backlogApi, {
   syncNow: input => BacklogSync.use(sync => sync.syncNow(input)),
   linkRemote: (input, call) => BacklogSync.use(sync => sync.link({ ...input, actor: actorOf(call.caller) })),
   importRemote: (input, call) => BacklogSync.use(sync => sync.importRemote({ ...input, actor: actorOf(call.caller) })),
+  testSyncBackend: input =>
+    BacklogSync.use(sync => sync.testConnection({ ...input, project: input.project ?? '', target: input.target ?? '', secret: input.secret ?? '' })),
   editComment: (input, call) => BacklogStore.use(store => store.editComment({ ...input, actor: actorOf(call.caller) })),
   deleteComment: (input, call) => BacklogStore.use(store => store.deleteComment({ ...input, actor: actorOf(call.caller) })),
 })

@@ -12,6 +12,15 @@ export interface RemoteIssueDraft {
   readonly tags: readonly string[]
 }
 
+/** Who the key signs in as, and the team or repository it reaches. */
+export interface RemoteConnection {
+  readonly account: string
+  /** The team key or `owner/repo` in use, with its display name; null when none is set or reachable. */
+  readonly target: { readonly key: string; readonly name: string } | null
+  /** Every team the key can see (Linear); empty for GitHub. */
+  readonly teams: readonly { readonly key: string; readonly name: string }[]
+}
+
 /**
  * The sync port: one remote tracker, already bound to its team or repository and its credential. Every method answers
  * in backlog vocabulary, so the sync service never sees GraphQL or REST shapes; tests implement it over a fake server.
@@ -27,4 +36,6 @@ export interface RemoteBackend {
   /** Writes the given fields and answers the issue as it now is. */
   readonly update: (remoteId: string, change: Readonly<SyncFieldValues>) => Effect.Effect<RemoteIssue, RemoteBackendError>
   readonly comment: (remoteId: string, body: string) => Effect.Effect<RemoteComment, RemoteBackendError>
+  /** Reads the signed-in account and the target, writing nothing. */
+  readonly connection: Effect.Effect<RemoteConnection, RemoteBackendError>
 }

@@ -210,11 +210,27 @@ const syncStatusSchema = Schema.Struct({
       target: Schema.String,
       enabled: Schema.Boolean,
       autoSyncMinutes: nonNegativeCountSchema,
-      credential: Schema.Literals(['reference', 'environment', 'missing']),
+      credential: Schema.Literals(['reference', 'environment', 'github-cli', 'missing']),
     }),
   ),
   items: Schema.Array(syncItemSchema),
 })
+const syncTargetSchema = Schema.Struct({ key: Schema.String, name: Schema.String })
+const syncConnectionSchema = Schema.Struct({
+  ok: Schema.Boolean,
+  credential: Schema.Literals(['reference', 'environment', 'github-cli', 'missing']),
+  account: Schema.NullOr(Schema.String),
+  target: Schema.NullOr(syncTargetSchema),
+  targetSource: Schema.NullOr(Schema.Literals(['setting', 'git-remote', 'only-team', 'per-project'])),
+  teams: Schema.Array(syncTargetSchema),
+  error: Schema.NullOr(syncErrorViewSchema),
+})
+
+const renderSyncConnection = (output: typeof syncConnectionSchema.Type): string => {
+  if (output.error !== null) return output.error.message
+  const target = output.target === null ? (output.targetSource === 'per-project' ? "each project's git remote" : 'no target') : output.target.key
+  return `Connected as ${output.account ?? '?'} → ${target} (key: ${output.credential}).`
+}
 const remoteReferenceSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTargetChars)).annotate({
   description: 'The issue: a URL, a Linear identifier such as ENG-12, or a GitHub issue number such as 42.',
 })
@@ -513,9 +529,29 @@ export const backlogApi = defineApi({
       description: `Link one backlog item to a Linear or GitHub issue (adopting the issue's fields on the first sync, tags merged), create a new issue from it, or unlink it with \`remove: true\`. The issue URL is added to the item's links. Run only when the user asked; it writes to the remote tracker. ${writeNote}`,
       tool: { name: 'backlog_link_remote', readOnly: false },
     }),
-    importRemote: method({
+    testSyncBackend: method({
       input: Schema.Struct({
         backend: BacklogSyncModel.backendSchema,
+        project: Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars))
+          .pipe(Schema.optional)
+          .annotate({ description: 'Absolute project path the row serves; empty or omitted serves every other project.' }),
+        target: Schema.String.check(Schema.isMaxLength(200)).pipe(Schema.optional).annotate({
+          description: "Linear team key or GitHub owner/repo. Empty: Linear uses the key's only team; GitHub reads the project's github.com git remote.",
+        }),
+        secret: Schema.String.check(Schema.isMaxLength(400)).pipe(Schema.optional).annotate({
+          description: 'secret:ALIAS reference to the key. Empty: LINEAR_API_KEY, or GITHUB_TOKEN / GH_TOKEN / a signed-in gh CLI on the Host.',
+        }),
+      }),
+      output: syncConnectionSchema,
+      description:
+        'Test a Linear or GitHub sync backend (saved or not) on the Host: where its key comes from, the account it signs in as, the team or repository it reaches and, for Linear, every team the key can see. The key never leaves the Host. Read-only.',
+      tool: { name: 'backlog_sync_test_connection', readOnly: true, render: renderSyncConnection },
+    }),
+    importRemote: method({
+      input: Schema.Struct({
+        backend: BacklogSyncModel.backendSchema.pipe(Schema.optional).annotate({
+          description: 'Tracker of the issue; omit to read it from the reference (ENG-12 or linear.app is Linear; #42, owner/repo#42 or github.com is GitHub).',
+        }),
         reference: remoteReferenceSchema,
         project: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))
           .pipe(Schema.optional)

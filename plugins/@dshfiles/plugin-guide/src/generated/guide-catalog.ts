@@ -683,7 +683,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "backlogApi",
       "importFrom": "@dshfiles/backlog/api",
       "owner": "@dshfiles/backlog",
-      "source": "plugins/@dshfiles/backlog/src/api.ts:236",
+      "source": "plugins/@dshfiles/backlog/src/api.ts:252",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/backlog:backlog",
@@ -696,8 +696,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/backlog owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: list, revision, aiActivity, projects, get, getMany, referencing, capture, attachFile, readFile, removeFile, delete, speechStatus, jevSetupStatus, classifyReply, generateReply, transcribeSpeech, enrichTweet, update, link, agentContinuationCandidates, continueAgentThread, startThread, syncStatus, syncNow, linkRemote, importRemote, acknowledge, triage, backfillTriage, backfillTriageStatus, applyProposal, dismissProposal, comment, editComment, deleteComment",
-        "Agent tools: backlog_list (read-only), backlog_projects (read-only), backlog_get (read-only), backlog_get_many (read-only), backlog_referencing (read-only), backlog_capture, backlog_attach_file, backlog_read_file (read-only), backlog_remove_file, backlog_delete, backlog_enrich_tweet, backlog_update, backlog_link, backlog_start_thread, backlog_sync_status (read-only), backlog_sync_now, backlog_link_remote, backlog_import_remote, backlog_triage, backlog_triage_backfill, backlog_triage_backfill_status (read-only), backlog_accept_proposal, backlog_dismiss_proposal, backlog_comment"
+        "Methods: list, revision, aiActivity, projects, get, getMany, referencing, capture, attachFile, readFile, removeFile, delete, speechStatus, jevSetupStatus, classifyReply, generateReply, transcribeSpeech, enrichTweet, update, link, agentContinuationCandidates, continueAgentThread, startThread, syncStatus, syncNow, linkRemote, testSyncBackend, importRemote, acknowledge, triage, backfillTriage, backfillTriageStatus, applyProposal, dismissProposal, comment, editComment, deleteComment",
+        "Agent tools: backlog_list (read-only), backlog_projects (read-only), backlog_get (read-only), backlog_get_many (read-only), backlog_referencing (read-only), backlog_capture, backlog_attach_file, backlog_read_file (read-only), backlog_remove_file, backlog_delete, backlog_enrich_tweet, backlog_update, backlog_link, backlog_start_thread, backlog_sync_status (read-only), backlog_sync_now, backlog_link_remote, backlog_sync_test_connection (read-only), backlog_import_remote, backlog_triage, backlog_triage_backfill, backlog_triage_backfill_status (read-only), backlog_accept_proposal, backlog_dismiss_proposal, backlog_comment"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null

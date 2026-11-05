@@ -66,12 +66,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 518,
-  "apiToolBindings": 364,
-  "apiToolNameCount": 364,
-  "apiToolSchemas": 363,
+  "apiMethods": 519,
+  "apiToolBindings": 365,
+  "apiToolNameCount": 365,
+  "apiToolSchemas": 364,
   "definedTools": 24,
-  "tools": 387,
+  "tools": 388,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -2680,7 +2680,8 @@
             "enum": [
               "linear",
               "github"
-            ]
+            ],
+            "description": "Tracker of the issue; omit to read it from the reference (ENG-12 or linear.app is Linear; #42, owner/repo#42 or github.com is GitHub)."
           },
           "reference": {
             "description": "The issue: a URL, a Linear identifier such as ENG-12, or a GitHub issue number such as 42.",
@@ -2692,7 +2693,6 @@
           }
         },
         "required": [
-          "backend",
           "reference"
         ],
         "additionalProperties": false
@@ -3060,6 +3060,38 @@
             "description": "Only these items; omit for every linked item."
           }
         },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_sync_test_connection",
+      "description": "Test a Linear or GitHub sync backend (saved or not) on the Host: where its key comes from, the account it signs in as, the team or repository it reaches and, for Linear, every team the key can see. The key never leaves the Host. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "backend": {
+            "type": "string",
+            "enum": [
+              "linear",
+              "github"
+            ]
+          },
+          "project": {
+            "type": "string",
+            "description": "Absolute project path the row serves; empty or omitted serves every other project."
+          },
+          "target": {
+            "type": "string",
+            "description": "Linear team key or GitHub owner/repo. Empty: Linear uses the key's only team; GitHub reads the project's github.com git remote."
+          },
+          "secret": {
+            "type": "string",
+            "description": "secret:ALIAS reference to the key. Empty: LINEAR_API_KEY, or GITHUB_TOKEN / GH_TOKEN / a signed-in gh CLI on the Host."
+          }
+        },
+        "required": [
+          "backend"
+        ],
         "additionalProperties": false
       }
     },
