@@ -4,16 +4,20 @@ import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { useSyncExternalStore } from 'react'
 
-const VIEW_LABELS: Record<UsageQuotaView, string> = { accounts: 'Accounts', history: 'History', forecast: 'Forecast' }
+const VIEW_LABELS = { accounts: 'Accounts', history: 'History', forecast: 'Forecast' } satisfies Record<UsageQuotaView, string>
 
 /**
  * Where Usage › Quota stands: the view and the account a caller asked for. Module state, not a stored preference: the
  * last view is a session detail, and `open` comes from other plugins through the `UsageNavigation` contract.
  */
-interface QuotaLocation {
-  readonly view: UsageQuotaView
+/** The account a quota view opens on, when a caller named one. */
+interface QuotaAccount {
   readonly accountId?: string
   readonly displayName?: string
+}
+
+interface QuotaLocation extends QuotaAccount {
+  readonly view: UsageQuotaView
   /** Bumped on every navigation, so the same account opened twice still remounts its view. */
   readonly visit: number
 }
@@ -29,13 +33,14 @@ const set = (next: QuotaLocation): void => {
   for (const listener of listeners) listener()
 }
 
-const go = (target: UsageQuotaTarget = {}): void =>
-  set({
-    view: target.view ?? location.view,
-    ...(target.accountId === undefined ? {} : { accountId: target.accountId }),
-    ...(target.displayName === undefined ? {} : { displayName: target.displayName }),
-    visit: location.visit + 1,
-  })
+/** The account fields that are set, without carrying an explicit `undefined` into the location. */
+const accountOf = (source: { readonly accountId?: string | undefined; readonly displayName?: string | undefined }): QuotaAccount => {
+  const { accountId, displayName } = source
+  if (accountId === undefined) return displayName === undefined ? {} : { displayName }
+  return displayName === undefined ? { accountId } : { accountId, displayName }
+}
+
+const go = (target: UsageQuotaTarget = {}): void => set({ view: target.view ?? location.view, ...accountOf(target), visit: location.visit + 1 })
 
 /**
  * Usage › Quota: ai-accounts' quota views (one account, history, forecast) inside the Usage page. They come from
@@ -56,10 +61,7 @@ const QuotaTab = (): JSX.Element => {
           : 'Quota comes from the AI accounts plugin, which is not running. Turn it on in Settings › Plugins to see quota here.'}
       </EmptyState>
     )
-  const account = {
-    ...(current.accountId === undefined ? {} : { accountId: current.accountId }),
-    ...(current.displayName === undefined ? {} : { displayName: current.displayName }),
-  }
+  const account = accountOf(current)
   const View = current.view === 'accounts' ? views.value.Accounts : current.view === 'history' ? views.value.History : views.value.Forecast
   return (
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4" data-usage-quota={current.view}>
