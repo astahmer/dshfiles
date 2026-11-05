@@ -356,8 +356,34 @@
   white-space: nowrap;
 }
 
-.statusItem:empty {
+.statusItem:empty,
+.statusItem:has(> .statusItemButton:empty) {
   display: none;
+}
+
+.statusItemButton {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  height: 20px;
+  margin: 0 -4px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.statusItemButton:hover {
+  color: var(--dsw-alias-label-primary, currentColor);
+  background: var(--dsw-alias-interactive-bg-hover, transparent);
+}
+
+.statusItemButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-focus, currentColor);
+  outline-offset: 1px;
 }
 
 .statusChip {

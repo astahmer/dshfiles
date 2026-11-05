@@ -3,11 +3,20 @@
  * row collapses to one chip that opens the items as a list above it, so the strip never wraps or scrolls sideways.
  */
 import { useRegistry } from '@dshfiles/dshx/client'
-import { Component, useMemo, useState } from 'react'
-import type { ErrorInfo, ReactNode } from 'react'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
+import { Component, createContext, useContext, useMemo, useState } from 'react'
+import type { ComponentType, ErrorInfo, ReactNode } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { StatusItems, StatusStripModel, type StatusItem } from '../../status-strip.ts'
+import { openStatusBarSettings } from '../../status-bar.ts'
+import { StatusItems, type StatusItem } from '../../status-strip.ts'
+import { DEFAULT_STATUS_STRIP_PREFERENCES, StatusStripPreferencesModel } from '../../status-strip-preferences.ts'
+import { useStatusStripSettings, type StatusStripSettings } from '../../status-strip-settings.ts'
 import css from './AppFrame.module.css'
+
+export interface StatusStripProps {
+  readonly narrow: boolean
+  readonly useSessions: PropsRuntime<'root'>['useSessions']
+}
 
 /** One item that throws hides itself instead of the frame. */
 class ItemBoundary extends Component<{ readonly id: string; readonly children: ReactNode }, { readonly failed: boolean }> {
@@ -23,25 +32,58 @@ class ItemBoundary extends Component<{ readonly id: string; readonly children: R
   }
 }
 
-const renderItem = (item: StatusItem, props: { readonly compact: boolean; readonly useSessions: PropsRuntime<'root'>['useSessions'] }): ReactNode => {
+const StatusItemView = (props: {
+  readonly item: StatusItem
+  readonly compact: boolean
+  readonly useSessions: StatusStripProps['useSessions']
+  readonly settings: StatusStripSettings
+}): ReactNode => {
+  const { item, settings } = props
   const View = item.component
+  const content = (
+    <ItemBoundary id={item.id}>
+      <View compact={props.compact} useSessions={props.useSessions} />
+    </ItemBoundary>
+  )
+  const hide = settings.save
   return (
-    <span key={item.id} className={css.statusItem} data-status-item={item.id} data-status-side={item.side}>
-      <ItemBoundary id={item.id}>
-        <View compact={props.compact} useSessions={props.useSessions} />
-      </ItemBoundary>
-    </span>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <span className={css.statusItem} data-status-item={item.id} data-status-side={item.side}>
+          {item.open === undefined || item.controls === true ? (
+            content
+          ) : (
+            <button type="button" className={css.statusItemButton} onClick={item.open}>
+              {content}
+            </button>
+          )}
+        </span>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="dshx-root">
+        {item.open === undefined ? null : <ContextMenuItem onSelect={item.open}>Open {item.label}</ContextMenuItem>}
+        {hide === undefined ? null : (
+          <ContextMenuItem onSelect={() => hide(StatusStripPreferencesModel.setHidden({ preferences: settings.preferences, id: item.id, hidden: true }))}>
+            Hide this item
+          </ContextMenuItem>
+        )}
+        <ContextMenuItem onSelect={openStatusBarSettings}>Status bar settings…</ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 
-/** Renders nothing until a plugin adds an item, so a profile without providers keeps the frame exactly as before. */
-export function StatusStrip({ narrow, useSessions }: { readonly narrow: boolean; readonly useSessions: PropsRuntime<'root'>['useSessions'] }) {
+/** Renders nothing until a plugin adds a visible item, so a profile without providers keeps the frame exactly as before. */
+const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStripSettings }): ReactNode => {
   const items = useRegistry(StatusItems)
-  const arranged = useMemo(() => StatusStripModel.arrange(items), [items])
+  const preferences = props.settings.preferences
+  const arranged = useMemo(() => StatusStripPreferencesModel.visible(items, preferences), [items, preferences])
   const [open, setOpen] = useState(false)
   const count = arranged.global.length + arranged.thread.length
+  const renderItem = (item: StatusItem, compact: boolean): ReactNode => (
+    <StatusItemView key={item.id} item={item} compact={compact} useSessions={props.useSessions} settings={props.settings} />
+  )
   if (count === 0) return null
-  if (narrow) {
+  if (props.narrow) {
     return (
       <div className={css.statusStrip} data-status-strip="compact" role="status">
         <button type="button" className={css.statusChip} aria-expanded={open} onClick={() => setOpen(current => !current)}>
@@ -54,7 +96,7 @@ export function StatusStrip({ narrow, useSessions }: { readonly narrow: boolean;
             {[...arranged.global, ...arranged.thread].map(item => (
               <div key={item.id} role="listitem" className={css.statusSheetRow}>
                 <span className={css.statusSheetLabel}>{item.label}</span>
-                {renderItem(item, { compact: true, useSessions })}
+                {renderItem(item, true)}
               </div>
             ))}
           </div>
@@ -64,10 +106,25 @@ export function StatusStrip({ narrow, useSessions }: { readonly narrow: boolean;
   }
   return (
     <div className={css.statusStrip} data-status-strip="full" role="status" aria-label="Status">
-      <div className={css.statusSide}>{arranged.global.map(item => renderItem(item, { compact: false, useSessions }))}</div>
+      <div className={css.statusSide}>{arranged.global.map(item => renderItem(item, false))}</div>
       <div className={css.statusSide} data-side="thread">
-        {arranged.thread.map(item => renderItem(item, { compact: false, useSessions }))}
+        {arranged.thread.map(item => renderItem(item, false))}
       </div>
     </div>
   )
+}
+
+const DEFAULT_SETTINGS: StatusStripSettings = { preferences: DEFAULT_STATUS_STRIP_PREFERENCES, error: null }
+
+const DefaultStatusStrip = (props: StatusStripProps): ReactNode => <StatusStripRow {...props} settings={DEFAULT_SETTINGS} />
+
+/** The strip with the user's choices; the frame's client decorates it so `useSettings` reads this plugin's context. */
+export const SettingsStatusStrip = (props: StatusStripProps): ReactNode => <StatusStripRow {...props} settings={useStatusStripSettings()} />
+
+/** Which strip the frame renders: the decorated settings strip once the client provides it, the default order before. */
+export const StatusStripSeat = createContext<ComponentType<StatusStripProps>>(DefaultStatusStrip)
+
+export function StatusStrip(props: StatusStripProps) {
+  const Seat = useContext(StatusStripSeat)
+  return <Seat {...props} />
 }

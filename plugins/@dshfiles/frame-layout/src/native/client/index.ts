@@ -16,6 +16,8 @@ import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-clie
 import type { FrameBottomSeat, FrameSidebarSeat } from '../../regions.ts'
 import type { PanelInfo } from './service.ts'
 import { AppFrame } from './AppFrame.tsx'
+import { createElement, type ComponentProps, type ComponentType } from 'react'
+import { StatusStripSeat, type StatusStripProps } from './StatusStrip.tsx'
 import { createLayoutStore } from './stores.ts'
 import { LayoutController } from './service.ts'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
@@ -160,8 +162,11 @@ export const inject = ['slots', 'theme', 'locale', 'shortcuts']
  * into 'root' with its child-slot declarations, the layout store seat,
  * and the shared root instance supplying commands and the panel-info source.
  * @param ctx - client root context.
+ * @param statusStrip - local delta (dshfiles): the strip the frame renders, decorated so it reads the frame's settings.
  */
-export function apply(ctx: ClientContext): void {
+export function apply(ctx: ClientContext, statusStrip: ComponentType<StatusStripProps>): void {
+  const Frame = (props: ComponentProps<typeof AppFrame>) =>
+    createElement(StatusStripSeat.Provider, { value: statusStrip }, createElement(AppFrame, props))
   ctx.effect(() => ctx.locale.register('shortcuts.layout', { zh, en }), 'layout: command labels')
   const t = ctx.locale.bind('shortcuts.layout')
 
@@ -228,7 +233,7 @@ export function apply(ctx: ClientContext): void {
         'shell.leading': { kind: 'single', scope: 'root' },
       },
       store,
-    }, AppFrame)
+    }, Frame)
     const disposeShortcut = ctx.shortcuts.register({
       id: 'sidebar.left.toggle' as ShortcutCommandId, label: () => t('toggle'), aliases: ['sidebar', 'toggle left sidebar'],
       defaults: {

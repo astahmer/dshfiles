@@ -33,6 +33,10 @@ export interface StatusItem {
   readonly label: string
   /** Bind it with `api.bind(...)` so its hooks read the providing plugin's context. */
   readonly component: StatusItemComponent
+  /** Opens the item's full page; the frame renders the item as a button that calls it. */
+  readonly open?: () => void
+  /** The item draws its own buttons: the frame never wraps it in one and offers `open` from its context menu only. */
+  readonly controls?: boolean
 }
 
 /** Plugins contribute with `api.add(StatusItems, { id, side, label, component: api.bind(View) })`. */

@@ -8,6 +8,8 @@
 
 ![On a phone the strip is one Status chip that opens its items](docs/screenshots/status-strip-phone.png)
 
+![Settings › General › Status bar: show, hide and reorder the strip's items](docs/screenshots/status-bar-settings.png)
+
 DSH's three-column AppFrame, forked so the frame's dragged panel widths and collapsed sidebar survive a reload.
 
 ## Use
@@ -109,6 +111,16 @@ within a side and the first registration per `id` wins, so one plugin cannot fil
 hides only itself. The row is zero-height until an item is added. Below 640 px it collapses to one **Status** chip that
 opens the items as a list above it. frame-layout owns this registry because it depends on no plugin, so any provider
 (ai-accounts, thread-sidebar, hmr-gate) can depend on it without closing a cycle.
+
+An item may declare `open`: the strip renders it as a button that opens its full page (Working: the thread list on its
+Working view; Restart: the Plugins page). An item that draws its own buttons sets `controls: true` (Quota's meters keep
+their popover) and gets `open` only from its context menu. Right-clicking any item offers **Open …**, **Hide this
+item** and **Status bar settings…**.
+
+**Settings › General › Status bar** lists every registered item with a show switch and up/down buttons. The choice is
+stored in this plugin's `dshfiles-frame-layout` settings namespace as `hiddenStatusItems` and `statusItemOrder` (item
+ids), so `settings_set` writes it too. Ids nobody registers are ignored, and an item missing from the saved order keeps
+its default place right after the item that precedes it by default.
 
 ### The main-surface seat
 

@@ -281,6 +281,97 @@
           "reason": "Client-only layout: the strip renders registry items and does no Host work."
         }
       ]
+    },
+    {
+      "id": "status-bar-settings",
+      "title": "Show, hide and reorder status bar items",
+      "summary": "Settings › General › Status bar lists every registered status item with a show switch and up/down buttons; right-clicking an item in the strip offers Hide this item and Status bar settings…. The choice is stored in the dshfiles-frame-layout settings namespace as hiddenStatusItems and statusItemOrder (so settings_set covers agent writes); ids nobody registers are ignored and a newly added item appears at its default place.",
+      "reach": ["click tab \"Settings\"", "click button \"Status bar\"", "expect button \"Move Quota up\""],
+      "surfaces": ["client", "integration"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "Settings › General › Status bar",
+      "configuration": [
+        {
+          "key": "hiddenStatusItems",
+          "defaultValue": "[]",
+          "constraints": "Item ids (the providing package) the strip leaves out; unknown ids are ignored.",
+          "coveredBy": ["frame-layout.status-bar-hidden"]
+        },
+        {
+          "key": "statusItemOrder",
+          "defaultValue": "[]",
+          "constraints": "Item ids in the user order, applied per side; unknown ids are ignored and unlisted items keep their default place.",
+          "coveredBy": ["frame-layout.status-bar-order", "frame-layout.status-bar-new-item", "frame-layout.status-bar-move"]
+        }
+      ],
+      "states": ["default-order", "reordered", "item-hidden", "host-without-namespace"],
+      "failureModes": ["A Host that predates the namespace shows the list read-only with a restart hint; the strip keeps its default order."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.status-bar-order",
+          "file": "plugins/@dshfiles/frame-layout/src/status-strip-preferences.test.ts",
+          "testName": "applies the saved order and ignores ids nobody registered"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.status-bar-new-item",
+          "file": "plugins/@dshfiles/frame-layout/src/status-strip-preferences.test.ts",
+          "testName": "places an item missing from the saved order right after its default predecessor"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.status-bar-hidden",
+          "file": "plugins/@dshfiles/frame-layout/src/status-strip-preferences.test.ts",
+          "testName": "leaves hidden items out of the strip but lists them for Settings"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.status-bar-move",
+          "file": "plugins/@dshfiles/frame-layout/src/status-strip-preferences.test.ts",
+          "testName": "moves an item within its side and keeps saved ids of absent items"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "frame-layout.status-bar-settings-browser",
+          "reason": "Walked with dshx dev open frame-layout/status-bar-settings in a scratch DSH; no Gherkin scenario yet."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the list and context menu write through the native settings service, which owns the Host write."
+        }
+      ]
+    },
+    {
+      "id": "status-item-open",
+      "title": "Click a status item to open its page",
+      "summary": "A status item may declare open: the strip renders it as a button that opens its full page (Working: the thread list on its Working view; Restart: the Plugins page with the HMR updates row) and its context menu offers Open <label>. An item that draws its own buttons (Quota) declares controls, so its meters keep their popover and Open Quota (Usage › Quota) stays in the context menu.",
+      "reach": ["rightclick button \"AI accounts usage\"", "expect menuitem \"Hide this item\"", "click menuitem \"Open Quota\"", "expect radio \"Accounts\""],
+      "surfaces": ["client", "integration"],
+      "surface": "statusItem",
+      "destination": "none",
+      "currentSurface": "shell: status strip",
+      "configuration": [],
+      "states": ["plain", "button", "controls"],
+      "failureModes": ["An item whose component renders nothing leaves no empty button behind: the wrapper hides with it."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "frame-layout.status-item-open-browser",
+          "reason": "Walked with dshx dev open frame-layout/status-item-open in a scratch DSH; no Gherkin scenario yet."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: opening a page is a layout or sidebar selection."
+        }
+      ]
     }
   ]
 }
