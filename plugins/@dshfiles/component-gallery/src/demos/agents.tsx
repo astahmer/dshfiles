@@ -19,7 +19,6 @@ import { AgentQueue, type AgentQueueJob, type AgentQueueWorker } from '@dshfiles
 import { AgentRunSteps, type AgentRunStep } from '@dshfiles/plugin-ui/components/motion/agent-run-steps'
 import { DelegationBoard, type DelegationAgent, type DelegationTask } from '@dshfiles/plugin-ui/components/motion/delegation-board'
 import { RoutineList, type Routine } from '@dshfiles/plugin-ui/components/motion/routine-list'
-import { TestRunResults, type TestCase, type TestFile } from '@dshfiles/plugin-ui/components/motion/test-run-results'
 import type { AgentTone } from '@dshfiles/plugin-ui/components/motion/agent-avatar'
 import type { GalleryDemo } from './types.js'
 
@@ -574,165 +573,6 @@ function DelegationDemo() {
   return <DelegationBoard unassigned={board.unassigned} agents={board.agents} auto={auto} onAutoChange={setAuto} onAssign={assign} queuedCost={queuedCost} />
 }
 
-// ── Test run ─────────────────────────────────────────────────────────────────
-
-interface PlannedTest {
-  readonly file: string
-  readonly name: string
-  readonly outcome: 'passed' | 'failed' | 'skipped'
-  readonly durationMs: number
-}
-
-const FILES: readonly { path: string; suite: string; names: readonly string[] }[] = [
-  {
-    path: 'src/cart/pricing.test.ts',
-    suite: 'applyCoupon',
-    names: [
-      'takes 10% off the subtotal',
-      'applies a coupon only once',
-      'rejects expired coupons',
-      'stacks with free shipping',
-      'rounds to cents',
-      'keeps tax on the full price',
-    ],
-  },
-  {
-    path: 'src/cart/cart.test.ts',
-    suite: 'cart',
-    names: [
-      'adds an item',
-      'merges duplicate lines',
-      'removes the last item',
-      'keeps quantities positive',
-      'serializes to JSON',
-      'restores from storage',
-      'clears on checkout',
-      'caps at 99 per line',
-    ],
-  },
-  {
-    path: 'src/api/rate-limit.test.ts',
-    suite: 'rateLimit',
-    names: [
-      'allows 60 requests per minute',
-      'refills the bucket',
-      'keys by API key',
-      'returns 429 with retry-after',
-      'ignores health checks',
-      'survives a clock skew',
-    ],
-  },
-  {
-    path: 'src/auth/token.test.ts',
-    suite: 'token',
-    names: [
-      'issues a token',
-      'refreshes before expiry',
-      'revokes on logout',
-      'rejects a tampered token',
-      'rotates the signing key',
-      'expires idle tokens',
-      'binds to the user agent',
-      'logs an audit event',
-    ],
-  },
-  {
-    path: 'src/search/index.test.ts',
-    suite: 'search',
-    names: [
-      'indexes new docs',
-      'ranks exact matches first',
-      'handles accents',
-      'pages results',
-      'returns facets',
-      'drops stop words',
-      'highlights hits',
-      'times out slow queries',
-      'falls back to prefix',
-      'caches hot queries',
-      'is case-insensitive',
-      'skips private docs',
-      'reindexes on change',
-      'streams large results',
-    ],
-  },
-]
-
-const PLAN: readonly PlannedTest[] = FILES.flatMap(file =>
-  file.names.map((name, index) => ({
-    file: file.path,
-    name,
-    outcome: name === 'applies a coupon only once' ? 'failed' : name === 'survives a clock skew' || name === 'streams large results' ? 'skipped' : 'passed',
-    durationMs: name === 'times out slow queries' || name === 'rotates the signing key' ? 1240 + index * 37 : 2 + ((index * 7) % 9),
-  })),
-)
-
-const COUPON_ERROR: NonNullable<TestCase['error']> = {
-  type: 'AssertionError',
-  message: 'expected { subtotal: 4200, discount: 840, …(1) } to deeply equal { subtotal: 4200, discount: 420, …(1) }',
-  diff: [
-    { kind: 'same', text: 'Object {' },
-    { kind: 'expected', text: '  "discount": 420,' },
-    { kind: 'received', text: '  "discount": 840,' },
-    { kind: 'same', text: '  "subtotal": 4200,' },
-    { kind: 'expected', text: '  "total": 3780,' },
-    { kind: 'received', text: '  "total": 3360,' },
-    { kind: 'same', text: '}' },
-  ],
-  location: 'src/cart/pricing.test.ts:31:29',
-}
-
-function TestRunDemo() {
-  const [round, setRound] = React.useState(0)
-  const [count, setCount] = React.useState(0)
-  const [startedAt, setStartedAt] = React.useState(() => Date.now())
-  const [endedAt, setEndedAt] = React.useState<number | undefined>(undefined)
-  useScript(
-    after => {
-      setCount(0)
-      setStartedAt(Date.now())
-      setEndedAt(undefined)
-      PLAN.forEach((_, index) => after(400 + index * 140, () => setCount(index + 1)))
-      const end = 400 + PLAN.length * 140 + 300
-      after(end, () => setEndedAt(Date.now()))
-      after(end + 5000, () => setRound(value => value + 1))
-    },
-    [round],
-  )
-  const files: TestFile[] = FILES.map(file => {
-    const tests: TestCase[] = []
-    PLAN.forEach((test, index) => {
-      if (test.file !== file.path || index > count) return
-      const id = `${file.path}:${test.name}`
-      if (index === count) {
-        tests.push({ id, name: test.name, status: 'running' })
-        return
-      }
-      let finished: TestCase = { id, name: test.name, status: test.outcome }
-      if (test.outcome !== 'skipped') finished = { ...finished, durationMs: test.durationMs }
-      if (test.durationMs > 1000) finished = { ...finished, slow: true }
-      if (test.outcome === 'failed') finished = { ...finished, error: COUPON_ERROR }
-      tests.push(finished)
-    })
-    const duration = tests.reduce((sum, test) => sum + (test.durationMs ?? 0), 0)
-    return { id: file.path, path: file.path, suite: file.suite, tests, durationMs: duration }
-  }).filter(file => file.tests.length > 0)
-  const failed = PLAN.slice(0, count).some(test => test.outcome === 'failed')
-  return (
-    <div className="dshx:flex dshx:flex-col dshx:gap-3">
-      <div className="dshx:self-end dshx:rounded-2xl dshx:bg-muted dshx:px-3 dshx:py-1.5 dshx:text-sm">Run the tests and fix whatever’s failing.</div>
-      <p className="dshx:text-sm">I’ll run the suite first.</p>
-      <TestRunResults
-        status={endedAt === undefined ? 'running' : failed ? 'failed' : 'passed'}
-        total={PLAN.length}
-        files={files}
-        startedAt={startedAt}
-        {...(endedAt === undefined ? {} : { endedAt })}
-      />
-    </div>
-  )
-}
-
 export const agentsDemos: readonly GalleryDemo[] = [
   {
     id: 'agents-run-steps',
@@ -773,13 +613,5 @@ export const agentsDemos: readonly GalleryDemo[] = [
     source: "import { DelegationBoard } from '@dshfiles/plugin-ui/components/motion/delegation-board'",
     wide: true,
     render: () => <DelegationDemo />,
-  },
-  {
-    id: 'agents-test-run',
-    title: 'TestRunResults',
-    description: 'An agent’s test tool output streaming into the turn: rolling count, red/green progress, filters and an expected/received diff for failures.',
-    source: "import { TestRunResults } from '@dshfiles/plugin-ui/components/motion/test-run-results'",
-    wide: true,
-    render: () => <TestRunDemo />,
   },
 ]
