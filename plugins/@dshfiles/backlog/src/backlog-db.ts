@@ -72,6 +72,16 @@ export const backlogMigrations = {
       generated_at INTEGER NOT NULL
     )`
   }),
+  '3_leases': Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`CREATE TABLE leases (
+      item_id TEXT PRIMARY KEY,
+      holder TEXT NOT NULL,
+      acquired_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      heartbeat INTEGER NOT NULL
+    )`
+  }),
 }
 
 /** The backlog's SQLite file, through the shared store layer (WAL, migrations, `BEGIN IMMEDIATE`). */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { BacklogSummaryView } from './api.js'
+import { summaryRelationDefaults } from './summary-fixture.js'
 import { inboxRows, type InboxFilter } from './inbox-model.js'
 import { inboxThreadsFrom, type InboxThread } from './inbox-threads.js'
 
@@ -24,6 +25,7 @@ const item = (input: Partial<BacklogSummaryView> & Pick<BacklogSummaryView, 'id'
   snoozedUntil: null,
   activity: { count: 0, agents: 0, comments: 0, last: null },
   match: null,
+  ...summaryRelationDefaults,
   ...input,
 })
 

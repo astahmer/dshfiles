@@ -51,9 +51,12 @@ const setOpSchema = Schema.Union([
   setOf('actors', Schema.Array(BacklogItems.actorSchema)),
   setOf('attachments', Schema.Array(BacklogItems.attachmentSchema)),
   setOf('events', Schema.Array(eventSchema)),
+  setOf('priority', BacklogItems.prioritySchema),
+  setOf('parent', BacklogItems.itemRefSchema),
+  setOf('delegate', BacklogItems.delegateSchema),
 ])
 
-const optionalFields = ['proposal', 'attention', 'acknowledgedAt', 'snoozedUntil', 'tweetContextUrls'] as const
+const optionalFields = ['proposal', 'attention', 'acknowledgedAt', 'snoozedUntil', 'tweetContextUrls', 'priority', 'parent', 'delegate'] as const
 type OptionalField = (typeof optionalFields)[number]
 
 const memberOf = <const Kind extends 'add' | 'remove'>(kind: Kind) =>
@@ -181,6 +184,15 @@ const applySet = (item: MutableItem, op: typeof setOpSchema.Type): void => {
       return
     case 'events':
       item.events = op.value
+      return
+    case 'priority':
+      item.priority = op.value
+      return
+    case 'parent':
+      item.parent = op.value
+      return
+    case 'delegate':
+      item.delegate = op.value
   }
 }
 
@@ -200,6 +212,15 @@ const unsetField = (item: MutableItem, field: OptionalField): void => {
       return
     case 'tweetContextUrls':
       delete item.tweetContextUrls
+      return
+    case 'priority':
+      delete item.priority
+      return
+    case 'parent':
+      delete item.parent
+      return
+    case 'delegate':
+      delete item.delegate
   }
 }
 
@@ -299,6 +320,12 @@ const setOpFor = (
       return next.snoozedUntil === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.snoozedUntil }
     case 'tweetContextUrls':
       return next.tweetContextUrls === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.tweetContextUrls }
+    case 'priority':
+      return next.priority === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.priority }
+    case 'parent':
+      return next.parent === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.parent }
+    case 'delegate':
+      return next.delegate === undefined ? { kind: 'unset', field } : { kind: 'set', field, value: next.delegate }
   }
 }
 

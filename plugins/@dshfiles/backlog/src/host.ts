@@ -24,6 +24,7 @@ import { HostSpeech, hostEdgeLayer } from './host-edge-promise.js'
 import { BacklogDb, BacklogStorePaths } from './backlog-db.js'
 import { BacklogRepo } from './backlog-repo.js'
 import { LegacyBacklogTables } from './legacy-tables.js'
+import { LeaseSweep } from './lease-sweep.js'
 import { LifecycleSignals } from './lifecycle-signals.js'
 import { CaptureProjects } from './project-target.js'
 import { ReplyGenerator } from './reply-generator.js'
@@ -73,7 +74,7 @@ const backlogServices = Layer.mergeAll(
 )
 
 /** Every backlog service and background loop of one activation. */
-const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, BacklogAttention.layer, RemoteSyncLoop).pipe(
+const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, LeaseSweep, BacklogAttention.layer, RemoteSyncLoop).pipe(
   Layer.provideMerge(backlogServices),
   Layer.provideMerge(hostEdges),
 )
@@ -107,6 +108,12 @@ const backlogHandlers = Api.handlers(backlogApi, {
   aiActivity: () => AiActivity.use(activity => Effect.map(activity.isActive, active => ({ active }))),
   projects: input => BacklogStore.use(store => store.projects({ hideAgentItems: input?.hideAgentItems === true })),
   referencing: input => BacklogStore.use(store => store.referencing(input)),
+  ready: input =>
+    BacklogStore.use(store =>
+      store.list({ ready: true, freshness: 'all', limit: input.limit ?? 20, ...(input.project !== undefined && { project: input.project }) }),
+    ),
+  claim: (input, call) => Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.claim({ id, actor: actorOf(call.caller) }))),
+  release: (input, call) => Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.release({ id, actor: actorOf(call.caller) }))),
   capture: (input, call) =>
     Effect.gen(function* () {
       const store = yield* BacklogStore

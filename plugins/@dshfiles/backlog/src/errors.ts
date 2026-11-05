@@ -222,3 +222,38 @@ export class ShippedSummaryEmpty extends Schema.TaggedError<ShippedSummaryEmpty>
     return 'Nothing shipped in this period, so there is nothing to summarize. Pick a period with done items.'
   }
 }
+
+/** A `parent` that would nest an item under itself, into a loop, or deeper than sub-issues go. */
+export class BacklogParentInvalid extends Schema.TaggedError<BacklogParentInvalid>()(
+  'BacklogParentInvalid',
+  { reason: Schema.String },
+  { dshxWireCode: 'parent-invalid' },
+) {
+  override get message(): string {
+    return this.reason
+  }
+}
+
+/** Another agent holds a live claim on the item: claiming or releasing it would take that agent's work. */
+export class BacklogItemClaimed extends Schema.TaggedError<BacklogItemClaimed>()(
+  'BacklogItemClaimed',
+  { ref: Schema.String, holder: Schema.String, expiresAt: Schema.Number },
+  { dshxWireCode: 'item-claimed' },
+) {
+  override get message(): string {
+    return `b:${this.ref} is claimed by ${this.holder} until ${new Date(this.expiresAt).toISOString()} unless it writes again. Pick another item with backlog_ready, or ask the user to release it in the Backlog panel.`
+  }
+}
+
+/** A claim the item or the caller cannot take: closed items and callers that are not an agent thread. */
+export class BacklogClaimRefused extends Schema.TaggedError<BacklogClaimRefused>()(
+  'BacklogClaimRefused',
+  { ref: Schema.String, reason: Schema.Literals(['closed', 'not-agent']) },
+  { dshxWireCode: 'claim-refused' },
+) {
+  override get message(): string {
+    return this.reason === 'closed'
+      ? `b:${this.ref} is already done or dropped. Reopen it with backlog_update first, or pick another item with backlog_ready.`
+      : `Only an agent thread can claim b:${this.ref}. Start a thread for it instead, or set its status by hand.`
+  }
+}

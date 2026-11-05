@@ -4,6 +4,7 @@ import { Clock, Context, Effect, FileSystem, Layer, Option, Path, Ref, Schema } 
 import { SqlSchema } from 'effect/sql'
 import { BacklogDb, BacklogStorePaths } from './backlog-db.js'
 import { BacklogItems, type BacklogAttachment, type BacklogItem } from './item.js'
+import type { BacklogLease } from './item-relations.js'
 import { LegacyImport, type LegacyImportPlan } from './legacy-import.js'
 import { LegacyBacklogTables } from './legacy-tables.js'
 import { BacklogOps, type BacklogOp, type BacklogOpRecord, type Hlc } from './op-log.js'
@@ -58,6 +59,10 @@ const HlcRow = Schema.Struct({ hlc_wall: Schema.Number, hlc_counter: Schema.Numb
 const AttachmentRow = Schema.Struct({ sha256: Schema.String, media_type: Schema.String })
 const CountRow = Schema.Struct({ count: Schema.Number })
 const MappingRow = Schema.Struct({ key: Schema.String, mapping: Schema.String })
+const LeaseRow = Schema.Struct({ alias: Schema.String, holder: Schema.String, acquired_at: Schema.Number, expires_at: Schema.Number, heartbeat: Schema.Number })
+
+/** What a write does to the item's claim, in the same transaction as its ops. */
+export type LeaseWrite = { readonly kind: 'set'; readonly lease: BacklogLease } | { readonly kind: 'clear' }
 
 const chunks = <A>(values: readonly A[]): A[][] =>
   Array.from({ length: Math.ceil(values.length / INSERT_CHUNK) }, (_unused, index) => values.slice(index * INSERT_CHUNK, (index + 1) * INSERT_CHUNK))
@@ -88,8 +93,15 @@ export class BacklogRepo extends Context.Service<
       readonly nextId: number
       readonly files: readonly { readonly attachment: BacklogAttachment; readonly data: string }[]
     }) => Effect.Effect<void, unknown>
-    /** Appends the ops that turn `prev` into `next` and refreshes the cache row; nothing when they are equal. */
-    readonly append: (input: { readonly prev: BacklogItem; readonly next: BacklogItem; readonly origin: string }) => Effect.Effect<void, unknown>
+    /** Appends the ops that turn `prev` into `next` and refreshes the cache row, with its claim change, in one transaction. */
+    readonly append: (input: {
+      readonly prev: BacklogItem
+      readonly next: BacklogItem
+      readonly origin: string
+      readonly lease?: LeaseWrite | undefined
+    }) => Effect.Effect<void, unknown>
+    /** Every stored claim by the item's numeric id, live or expired; the sweep removes expired ones. */
+    readonly loadLeases: Effect.Effect<ReadonlyMap<number, BacklogLease>, unknown>
     /** A `delete` tombstone, then the item's attachment rows and any bytes no other attachment shares. */
     readonly remove: (input: { readonly item: BacklogItem; readonly origin: string }) => Effect.Effect<void, unknown>
     readonly putFile: (input: { readonly itemId: number; readonly attachment: BacklogAttachment; readonly data: string }) => Effect.Effect<void, unknown>
@@ -370,16 +382,46 @@ export class BacklogRepo extends Context.Service<
 
       const mintRef = Effect.flatMap(Ref.get(shortAliases), taken => Effect.sync(() => ShortAlias.mint({ taken })))
 
-      const append = Effect.fnUntraced(function* (input: { readonly prev: BacklogItem; readonly next: BacklogItem; readonly origin: string }) {
+      const writeLease = (itemId: string, lease: LeaseWrite) =>
+        lease.kind === 'clear'
+          ? sql`DELETE FROM leases WHERE item_id = ${itemId}`
+          : sql`INSERT INTO leases (item_id, holder, acquired_at, expires_at, heartbeat)
+              VALUES (${itemId}, ${lease.lease.holder}, ${lease.lease.acquiredAt}, ${lease.lease.expiresAt}, ${lease.lease.heartbeat})
+              ON CONFLICT (item_id) DO UPDATE SET holder = excluded.holder, acquired_at = excluded.acquired_at,
+                expires_at = excluded.expires_at, heartbeat = excluded.heartbeat`
+
+      const append = Effect.fnUntraced(function* (input: {
+        readonly prev: BacklogItem
+        readonly next: BacklogItem
+        readonly origin: string
+        readonly lease?: LeaseWrite | undefined
+      }) {
         const ops = BacklogOps.diff(input.prev, input.next)
-        if (ops.length === 0) return
+        if (ops.length === 0 && input.lease === undefined) return
         const itemId = yield* requireCanonical(input.next.id)
         const records = yield* stamp({ itemId, origin: input.origin, ops })
         yield* sql.withTransaction(
           Effect.gen(function* () {
-            yield* insertOps(records)
-            yield* writeItemRow({ itemId, item: input.next, deleted: false })
+            if (records.length > 0) {
+              yield* insertOps(records)
+              yield* writeItemRow({ itemId, item: input.next, deleted: false })
+            }
+            if (input.lease !== undefined) yield* writeLease(itemId, input.lease)
           }),
+        )
+      })
+
+      const loadLeases = Effect.gen(function* () {
+        const rows = yield* SqlSchema.findAll({
+          Request: Schema.Void,
+          Result: LeaseRow,
+          execute: () => sql`SELECT aliases.alias AS alias, leases.holder, leases.acquired_at, leases.expires_at, leases.heartbeat
+            FROM leases JOIN aliases ON aliases.item_id = leases.item_id AND aliases.kind IN ('legacy', 'key')`,
+        })(undefined)
+        return new Map(
+          rows.map(
+            row => [Number(row.alias), { holder: row.holder, acquiredAt: row.acquired_at, expiresAt: row.expires_at, heartbeat: row.heartbeat }] as const,
+          ),
         )
       })
 
@@ -396,6 +438,7 @@ export class BacklogRepo extends Context.Service<
             yield* insertOps(records)
             yield* writeItemRow({ itemId, item: input.item, deleted: true })
             yield* sql`DELETE FROM attachments WHERE item_id = ${itemId}`
+            yield* sql`DELETE FROM leases WHERE item_id = ${itemId}`
           }),
         )
         yield* Effect.forEach(shared, row => removeUnusedBlob(row.sha256), { discard: true })
@@ -499,6 +542,7 @@ export class BacklogRepo extends Context.Service<
         nextId: Effect.map(metaGet(META_NEXT_ID), row => Option.match(row, { onNone: () => 1, onSome: value => Number(value.value) })),
         create,
         append,
+        loadLeases,
         remove,
         putFile,
         readFile,

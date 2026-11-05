@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BacklogSummaryView } from './api.js'
+import { summaryRelationDefaults } from './summary-fixture.js'
 import type { BacklogStatus } from './item.js'
 import { FeedStatus } from './status-filter.js'
 
@@ -24,6 +25,7 @@ const summary = (id: number, status: BacklogStatus): BacklogSummaryView => ({
   snoozedUntil: null,
   activity: { count: 0, agents: 0, comments: 0, last: null },
   match: null,
+  ...summaryRelationDefaults,
 })
 
 describe('feed status filter', () => {

@@ -4,7 +4,7 @@ import { BacklogBackfill, type BackfillScope, type BackfillSelection } from './b
 import { BacklogSettingsTag } from './backlog-settings.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogRepo } from './backlog-repo.js'
-import { BacklogWriteFailed } from './errors.js'
+import { BacklogClaimRefused, BacklogItemClaimed, BacklogParentInvalid, BacklogWriteFailed } from './errors.js'
 import { BacklogOrigins } from './event-origin.js'
 import {
   BacklogItems,
@@ -17,9 +17,12 @@ import {
   type BacklogItem,
   type BacklogKind,
   type BacklogLink,
+  type BacklogPriority,
   type BacklogProposal,
   type BacklogStatus,
 } from './item.js'
+import { ItemRelations, type BacklogLease, type ItemRelationIndex } from './item-relations.js'
+import type { LeaseWrite } from './backlog-repo.js'
 import { FieldRevert } from './field-revert.js'
 import { BacklogShipped, type ShippedDigest, type ShippedQuery } from './shipped.js'
 import { BacklogSearch, type SearchMatch } from './search.js'
@@ -27,8 +30,14 @@ import { BacklogSearchIndex } from './search-index.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 import { BacklogTriage } from './triage.js'
 
-/** The fields one edit replaces, mutable because a handler assembles them before the record is rewritten. */
-type BacklogChange = { -readonly [K in keyof BacklogItem]?: BacklogItem[K] }
+/**
+ * The fields one edit replaces, mutable because a handler assembles them before the record is rewritten. `parent` and
+ * `delegate` take null to remove them.
+ */
+type BacklogChange = { -readonly [K in Exclude<keyof BacklogItem, 'parent' | 'delegate'>]?: BacklogItem[K] } & {
+  parent?: string | null
+  delegate?: string | null
+}
 /** The optional dimensions an upload carries; mutable while the attachment is assembled. */
 type AttachmentDimensions = { -readonly [K in 'width' | 'height']?: BacklogAttachment[K] }
 type ProposalDraft = { -readonly [K in keyof BacklogProposal]?: BacklogProposal[K] }
@@ -52,6 +61,8 @@ export interface BacklogListQuery {
   readonly inbox?: boolean | undefined
   /** Leaves out items an agent captured that the user never touched, unless they ask for attention or wait on a suggestion. */
   readonly hideAgentItems?: boolean | undefined
+  /** Only ready items (open, unblocked, no open sub-issue, unclaimed), urgent first then oldest. */
+  readonly ready?: boolean | undefined
   readonly limit?: number | undefined
 }
 
@@ -70,6 +81,9 @@ export interface BacklogUpdate {
   readonly attention?: BacklogAttention | undefined
   /** A time to hide the item until, or null to wake it now. */
   readonly snoozedUntil?: number | null | undefined
+  readonly priority?: BacklogPriority | undefined
+  /** The ref of the item to nest this one under, or null to make it top-level again. */
+  readonly parent?: string | null | undefined
 }
 
 export type BacklogResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly reason: 'not-found' }
@@ -133,7 +147,17 @@ const closedStateChange = (input: {
   return change
 }
 
-const summarize = (item: BacklogItem, now: number, match: SearchMatch | null = null, dormantDays = BacklogItems.defaultDormantDays): BacklogSummary => ({
+type Relations = ItemRelationIndex<BacklogItem>
+
+const leaseView = (lease: BacklogLease | null) => (lease === null ? null : { holder: lease.holder, acquiredAt: lease.acquiredAt, expiresAt: lease.expiresAt })
+
+const summarize = (
+  item: BacklogItem,
+  now: number,
+  relations: Relations,
+  match: SearchMatch | null = null,
+  dormantDays = BacklogItems.defaultDormantDays,
+): BacklogSummary => ({
   id: item.id,
   ref: BacklogReference.refOf(item),
   title: item.title,
@@ -156,6 +180,14 @@ const summarize = (item: BacklogItem, now: number, match: SearchMatch | null = n
   snoozedUntil: item.snoozedUntil ?? null,
   activity: activityOf(item),
   match: match === null || match.fields.length === 0 ? null : { fields: [...match.fields], snippet: match.snippet },
+  priority: item.priority ?? 'none',
+  parent: item.parent ?? null,
+  owner: BacklogItems.creatorOf(item) ?? 'user',
+  delegate: item.delegate ?? null,
+  children: relations.rollup(item),
+  ready: relations.isReady(item),
+  blockedBy: relations.openBlockersOf(item).map(blocker => BacklogReference.refOf(blocker)),
+  lease: leaseView(relations.leaseOf(item)),
 })
 
 /** Pinned first, then newest activity: the Discord order, where idle things sink on their own. */
@@ -176,17 +208,26 @@ export interface BacklogChangeNotice {
 
 interface StoreState {
   readonly records: ReadonlyMap<number, BacklogItem>
+  readonly leases: ReadonlyMap<number, BacklogLease>
   readonly nextId: number
   readonly revision: number
 }
 
-/** What a read sees: the records, the time it reads at and the dormancy thresholds of that moment. */
+/** What a read sees: the records, the time it reads at, the dormancy thresholds of that moment and how items relate. */
 interface StoreView {
   readonly records: ReadonlyMap<number, BacklogItem>
   readonly revision: number
   readonly at: number
   readonly dormantDays: Readonly<Record<BacklogKind, number>>
+  readonly relations: Relations
 }
+
+const searchContextOf = (relations: Relations) => ({
+  isReady: relations.isReady,
+  isBlockedByDeps: relations.isBlockedByDeps,
+  hasChildren: (item: BacklogItem) => relations.childrenOf(item).length > 0,
+  isClaimed: (item: BacklogItem) => relations.leaseOf(item) !== null,
+})
 
 /** A project is where the work happens, so one recorded in a jj workspace reads as the checkout it was cut from. */
 const withProject = (item: BacklogItem): BacklogItem => {
@@ -198,7 +239,7 @@ const referencingIn = (view: StoreView, link: BacklogLink): BacklogSummary[] =>
   [...view.records.values()]
     .filter(item => item.links.some(candidate => BacklogItems.sameLink(candidate, link)))
     .sort(byActivity)
-    .map(item => summarize(item, view.at, null, view.dormantDays))
+    .map(item => summarize(item, view.at, view.relations, null, view.dormantDays))
 
 const detailIn = (view: StoreView, item: BacklogItem): BacklogDetail => ({
   item: {
@@ -211,6 +252,12 @@ const detailIn = (view: StoreView, item: BacklogItem): BacklogDetail => ({
     freshness: BacklogItems.freshness(item, view.at, view.dormantDays),
   },
   backlinks: referencingIn(view, { type: 'item', target: BacklogReference.refOf(item) }),
+  children: view.relations
+    .childrenOf(item)
+    .sort(ItemRelations.byReadiness)
+    .map(child => summarize(child, view.at, view.relations, null, view.dormantDays)),
+  blockedBy: view.relations.openBlockersOf(item).map(blocker => summarize(blocker, view.at, view.relations, null, view.dormantDays)),
+  lease: leaseView(view.relations.leaseOf(item)),
 })
 
 const listIn = (view: StoreView, query: BacklogListQuery, index?: BacklogSearchIndex) => {
@@ -232,25 +279,30 @@ const listIn = (view: StoreView, query: BacklogListQuery, index?: BacklogSearchI
     .filter(item => query.tag === undefined || item.tags.includes(query.tag.toLowerCase().replace(/^#/, '')))
     .filter(item => query.actor === undefined || item.actors.some(actor => actor.id === query.actor))
     .filter(item => query.inbox !== true || wantsUser(item, at))
+    .filter(item => query.ready !== true || view.relations.isReady(item))
     .filter(item => query.inbox === true || freshnessFilter === 'all' || (item.snoozedUntil ?? 0) <= at)
     .filter(item => {
       if (freshnessFilter === 'all') return true
       const state = BacklogItems.freshness(item, at, view.dormantDays)
       return freshnessFilter === 'active' ? state === 'fresh' || state === 'stale' : state === freshnessFilter
     })
+  const context = searchContextOf(view.relations)
   const matched = matching.flatMap(item => {
-    const match = BacklogSearch.score(item, search, at)
+    const match = BacklogSearch.score(item, search, at, context)
     return match === null ? [] : [{ item, match }]
   })
   const scored = query.hideAgentItems === true ? matched.filter(entry => !BacklogItems.isUnclaimedAgentItem(entry.item)) : matched
-  // A text search ranks by relevance, then activity; browsing keeps the activity order.
-  scored.sort((left, right) => right.match.score - left.match.score || byActivity(left.item, right.item))
+  // A text search ranks by relevance, then activity; browsing keeps the activity order, and the ready queue its own.
+  scored.sort(
+    (left, right) =>
+      right.match.score - left.match.score || (query.ready === true ? ItemRelations.byReadiness(left.item, right.item) : byActivity(left.item, right.item)),
+  )
   const limit = Math.min(query.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT)
   return {
     revision: view.revision,
     total: scored.length,
     hiddenAgentItems: matched.length - scored.length,
-    items: scored.slice(0, limit).map(entry => summarize(entry.item, at, entry.match, view.dormantDays)),
+    items: scored.slice(0, limit).map(entry => summarize(entry.item, at, view.relations, entry.match, view.dormantDays)),
   }
 }
 
@@ -349,6 +401,14 @@ const updateChange = (item: BacklogItem, fields: Omit<BacklogUpdate, 'id'>) => {
     change.acknowledgedAt = null
     recordChange('attention')
   }
+  if (fields.priority !== undefined && fields.priority !== (item.priority ?? 'none')) {
+    change.priority = fields.priority
+    recordChange('priority')
+  }
+  if (fields.parent !== undefined && fields.parent !== (item.parent ?? null)) {
+    change.parent = fields.parent
+    recordChange('parent')
+  }
   if (fields.snoozedUntil !== undefined && fields.snoozedUntil !== (item.snoozedUntil ?? null)) change.snoozedUntil = fields.snoozedUntil
   const closedChange = closedStateChange({ item, status: change.status ?? item.status, attention: change.attention })
   if (closedChange.attention !== undefined) {
@@ -419,6 +479,25 @@ const resolveIn = (records: ReadonlyMap<number, BacklogItem>, key: number | stri
   return ref === undefined ? undefined : idOfRef(records, ref)
 }
 
+/** Sets `parent` or `delegate`, or removes it for null; undefined leaves it as it is. */
+const withOptional = (item: BacklogItem, field: 'parent' | 'delegate', value: string | null | undefined): BacklogItem => {
+  if (value === undefined) return item
+  const { parent, delegate, ...rest } = item
+  const kept: BacklogItem = {
+    ...rest,
+    ...(parent !== undefined && field !== 'parent' && { parent }),
+    ...(delegate !== undefined && field !== 'delegate' && { delegate }),
+  }
+  if (value === null) return kept
+  return field === 'parent' ? { ...kept, parent: value } : { ...kept, delegate: value }
+}
+
+/** What a revert writes for an optional field that had no value before the change. */
+const clearedValue = (field: BacklogHumanField): string | null | undefined => {
+  if (field === 'parent') return null
+  return field === 'attention' || field === 'priority' ? 'none' : undefined
+}
+
 const isIdleNudge = (event: BacklogEvent): boolean => event.kind === 'commented' && event.detail.startsWith('Thread idle nudge:')
 
 type Detailed = Effect.Effect<BacklogResult<BacklogDetail>, BacklogWriteFailed>
@@ -439,9 +518,12 @@ export class BacklogStore extends Context.Service<
       readonly project?: string | null | undefined
       readonly status?: BacklogStatus | undefined
       readonly kind?: BacklogKind | undefined
+      readonly priority?: BacklogPriority | undefined
+      /** The ref of the item this one is a sub-issue of. */
+      readonly parent?: string | undefined
       readonly files?: readonly BacklogFileInput[] | undefined
       readonly actor: BacklogActor
-    }) => Effect.Effect<BacklogDetail, BacklogWriteFailed>
+    }) => Effect.Effect<BacklogDetail, BacklogWriteFailed | BacklogParentInvalid>
     readonly attachFile: (input: { readonly id: number; readonly file: BacklogFileInput; readonly actor: BacklogActor }) => Detailed
     readonly importTweetContext: (input: {
       readonly id: number
@@ -453,7 +535,9 @@ export class BacklogStore extends Context.Service<
     readonly readFile: (input: { readonly id: number; readonly attachmentId: string }) => Effect.Effect<BacklogResult<{ readonly dataUrl: string }>>
     readonly removeFile: (input: { readonly id: number; readonly attachmentId: string; readonly actor: BacklogActor }) => Detailed
     readonly delete: (input: { readonly id: number }) => Effect.Effect<BacklogResult<void>, BacklogWriteFailed>
-    readonly update: (input: BacklogUpdate & { readonly actor: BacklogActor }) => Detailed
+    readonly update: (
+      input: BacklogUpdate & { readonly actor: BacklogActor },
+    ) => Effect.Effect<BacklogResult<BacklogDetail>, BacklogWriteFailed | BacklogParentInvalid>
     readonly link: (input: { readonly id: number; readonly link: BacklogLink; readonly remove?: boolean | undefined; readonly actor: BacklogActor }) => Detailed
     readonly comment: (input: {
       readonly id: number
@@ -480,7 +564,7 @@ export class BacklogStore extends Context.Service<
       readonly at: number
       readonly field: BacklogHumanField
       readonly actor: BacklogActor
-    }) => Effect.Effect<BacklogResult<BacklogDetail> | BacklogRevertStale, BacklogWriteFailed>
+    }) => Effect.Effect<BacklogResult<BacklogDetail> | BacklogRevertStale, BacklogWriteFailed | BacklogParentInvalid>
     /** The item and every other item, for a triage pass to read. */
     readonly triageInput: (id: number) => Effect.Effect<Option.Option<{ readonly item: BacklogItem; readonly others: readonly BacklogItem[] }>>
     /** What one backfill run should triage, oldest first, and how many eligible items it leaves for a later run. */
@@ -514,6 +598,27 @@ export class BacklogStore extends Context.Service<
      * attention set by hand, or raised by another thread, waits for its own owner.
      */
     readonly settleAnsweredQuestion: (input: { readonly id: number; readonly threadId: string; readonly reason: string }) => Detailed
+    /**
+     * Claims an item for the calling agent thread in one write: it becomes the delegate, the item moves to `doing`, the
+     * thread is linked and a lease starts. Refused while another agent holds a live claim, and for closed items.
+     */
+    readonly claim: (input: {
+      readonly id: number
+      readonly actor: BacklogActor
+    }) => Effect.Effect<BacklogResult<BacklogDetail>, BacklogWriteFailed | BacklogItemClaimed | BacklogClaimRefused>
+    /**
+     * Ends a claim: the lease goes, the delegate is cleared and an item still `doing` returns to `todo` so it is ready
+     * again. The holder, the user and the system may release; another agent only once the lease lapsed.
+     */
+    readonly release: (input: {
+      readonly id: number
+      readonly actor: BacklogActor
+      readonly reason?: string | undefined
+    }) => Effect.Effect<BacklogResult<BacklogDetail>, BacklogWriteFailed | BacklogItemClaimed>
+    /** Every stored claim, live or lapsed, with the item it holds: what the lease sweep reads. */
+    readonly leases: Effect.Effect<readonly { readonly id: number; readonly lease: BacklogLease }[]>
+    /** Hands an item to the agent of a thread started for it, without a lease: it shows who works on it. */
+    readonly delegateTo: (input: { readonly id: number; readonly sessionId: string; readonly actor: BacklogActor }) => Detailed
     /** Marks an item's request as seen; it stays in the Inbox until its attention is cleared. Not an activity. */
     readonly acknowledge: (input: { readonly ids: readonly number[] }) => Effect.Effect<void, BacklogWriteFailed>
     readonly dismissProposal: (input: { readonly id: number; readonly actor: BacklogActor }) => Detailed
@@ -540,8 +645,10 @@ export class BacklogStore extends Context.Service<
       const loaded = yield* repo.loadItems.pipe(Effect.orDie)
       const records = new Map(loaded.map(item => [item.id, withProject(item)]))
       const storedNextId = yield* repo.nextId.pipe(Effect.orDie)
+      const leases = yield* repo.loadLeases.pipe(Effect.orDie)
       const state = yield* Ref.make<StoreState>({
         records,
+        leases,
         nextId: Math.max(storedNextId, Math.max(0, ...records.keys()) + 1),
         revision: yield* Clock.currentTimeMillis,
       })
@@ -553,7 +660,8 @@ export class BacklogStore extends Context.Service<
         const current = yield* Ref.get(state)
         const at = yield* Clock.currentTimeMillis
         const dormantDays = (yield* settings.get).dormantAfterDays
-        return { records: current.records, revision: current.revision, at, dormantDays } satisfies StoreView
+        const relations = ItemRelations.build({ items: current.records.values(), leases: current.leases, now: at })
+        return { records: current.records, revision: current.revision, at, dormantDays, relations } satisfies StoreView
       })
       const find = (id: number) => Effect.map(Ref.get(state), current => current.records.get(id))
       /** Names an item id by its ref, for event wording that mentions another item. */
@@ -568,16 +676,32 @@ export class BacklogStore extends Context.Service<
       const writeFailed = (item: Pick<BacklogItem, 'id' | 'ref'>, operation: BacklogWriteFailed['operation']) => (cause: unknown) =>
         new BacklogWriteFailed({ itemId: item.id, ref: BacklogReference.refOf(item), operation, cause })
 
-      /** Appends the ops from the stored item to `item`, by `origin`, then serves the new item. */
-      const persist = Effect.fnUntraced(function* (item: BacklogItem, origin: string) {
-        const prev = (yield* Ref.get(state)).records.get(item.id)
-        if (prev !== undefined) yield* repo.append({ prev, next: item, origin }).pipe(Effect.mapError(writeFailed(item, 'put')))
+      /**
+       * What a write does to the item's claim when the caller says nothing: closing the item ends it, and any write by the
+       * holder renews it for another idle period.
+       */
+      const leaseAfter = Effect.fnUntraced(function* (item: BacklogItem, origin: string) {
+        const lease = (yield* Ref.get(state)).leases.get(item.id)
+        if (lease === undefined) return undefined
+        if (!ItemRelations.isOpen(item)) return { kind: 'clear' } satisfies LeaseWrite
+        if (lease.holder !== origin) return undefined
         const at = yield* Clock.currentTimeMillis
-        yield* Ref.update(state, current => ({
-          ...current,
-          records: new Map(current.records).set(item.id, item),
-          revision: Math.max(current.revision + 1, at),
-        }))
+        const idleMs = (yield* settings.get).leaseIdleMinutes * 60_000
+        return { kind: 'set', lease: { ...lease, heartbeat: at, expiresAt: at + idleMs } } satisfies LeaseWrite
+      })
+
+      /** Appends the ops from the stored item to `item`, by `origin`, with its claim change, then serves the new item. */
+      const persist = Effect.fnUntraced(function* (item: BacklogItem, origin: string, leaseWrite?: LeaseWrite) {
+        const prev = (yield* Ref.get(state)).records.get(item.id)
+        const lease = leaseWrite ?? (yield* leaseAfter(item, origin))
+        if (prev !== undefined) yield* repo.append({ prev, next: item, origin, lease }).pipe(Effect.mapError(writeFailed(item, 'put')))
+        const at = yield* Clock.currentTimeMillis
+        yield* Ref.update(state, current => {
+          const leases = new Map(current.leases)
+          if (lease?.kind === 'clear') leases.delete(item.id)
+          if (lease?.kind === 'set') leases.set(item.id, lease.lease)
+          return { ...current, records: new Map(current.records).set(item.id, item), leases, revision: Math.max(current.revision + 1, at) }
+        })
       })
 
       const putFile = (item: BacklogItem, file: { readonly attachment: BacklogAttachment; readonly data: string }) =>
@@ -596,12 +720,17 @@ export class BacklogStore extends Context.Service<
       })
 
       /** Applies a change and its event; touching an item is what keeps it fresh. */
-      const touch = Effect.fnUntraced(function* (item: BacklogItem, actor: BacklogActor, event: EventDraft, change: BacklogChange) {
+      const touch = Effect.fnUntraced(function* (item: BacklogItem, actor: BacklogActor, event: EventDraft, change: BacklogChange, leaseWrite?: LeaseWrite) {
         const at = yield* Clock.currentTimeMillis
         const actorId = actorIdOf(actor)
-        const fieldChanges = (['title', 'body', 'kind', 'status', 'project', 'tags', 'pinned', 'attention'] as const).flatMap(field => {
+        const fieldChanges = BacklogItems.humanFieldNames.flatMap(field => {
           const after = change[field]
-          if (after === undefined || (field === 'attention' && after === 'none' && item.attention === undefined)) return []
+          if (
+            after === undefined ||
+            (field === 'attention' && after === 'none' && item.attention === undefined) ||
+            (field === 'priority' && after === 'none' && item.priority === undefined)
+          )
+            return []
           const before = item[field]
           const display = (value: typeof after | typeof before): string =>
             value === null || value === undefined ? '' : Array.isArray(value) ? value.join(', ') : String(value)
@@ -609,14 +738,16 @@ export class BacklogStore extends Context.Service<
           const afterText = display(after)
           return beforeText === afterText ? [] : [{ field, before: beforeText, after: afterText }]
         })
-        const next: BacklogItem = {
+        const { parent, delegate, ...fields } = change
+        const merged: BacklogItem = {
           ...item,
-          ...change,
+          ...fields,
           actors: withActor(change.actors ?? item.actors, actorId, 'contributor'),
           lastActivityAt: at,
           events: [...item.events, { at, actor: actorId, origin: actorId, ...event, ...(fieldChanges.length !== 0 && { fieldChanges }) }],
         }
-        yield* persist(next, actorId)
+        const next = withOptional(withOptional(merged, 'parent', parent), 'delegate', delegate)
+        yield* persist(next, actorId, leaseWrite)
         const stored = next.events.at(-1)
         if (stored !== undefined) yield* PubSub.publish(notices, { item: next, event: stored })
         return yield* detailOf(next)
@@ -649,22 +780,49 @@ export class BacklogStore extends Context.Service<
       })
 
       /** One write against an item that must exist: runs alone, and answers `not-found` without writing when it does not. */
-      const withItem = (id: number, body: (item: BacklogItem) => Detailed): Detailed =>
+      const withItem = <E>(
+        id: number,
+        body: (item: BacklogItem) => Effect.Effect<BacklogResult<BacklogDetail>, E>,
+      ): Effect.Effect<BacklogResult<BacklogDetail>, E> =>
         serialized(Effect.flatMap(find(id), item => (item === undefined ? Effect.succeed(notFound) : body(item))))
+
+      /** The ref `parentRef` names, once it can hold `item`: refused when it is the item, under it, or too deep. */
+      const checkedParent = Effect.fnUntraced(function* (input: { readonly item: Pick<BacklogItem, 'id' | 'ref'>; readonly parentRef: string }) {
+        const current = yield* view
+        const ref = BacklogReference.parse(input.parentRef)
+        const target = ref === undefined ? undefined : idOfRef(current.records, ref)
+        const parent = target === undefined ? undefined : current.records.get(target)
+        const parentRef = parent === undefined ? (ref ?? input.parentRef) : BacklogReference.refOf(parent)
+        const problem = ItemRelations.parentProblem({
+          item: input.item.id === 0 ? { id: 0, ref: '' } : input.item,
+          parentRef,
+          byRef: candidate => current.relations.byRef(candidate),
+          childrenOf: candidate => {
+            const owner = current.relations.byRef(candidate)
+            return owner === undefined ? [] : current.relations.childrenOf(owner)
+          },
+        })
+        if (problem !== null) return yield* new BacklogParentInvalid({ reason: problem })
+        return parentRef
+      })
 
       const capture = Effect.fn('backlog store capture')(function* (input: {
         readonly text: string
         readonly project?: string | null | undefined
         readonly status?: BacklogStatus | undefined
         readonly kind?: BacklogKind | undefined
+        readonly priority?: BacklogPriority | undefined
+        readonly parent?: string | undefined
         readonly files?: readonly BacklogFileInput[] | undefined
         readonly actor: BacklogActor
       }) {
         const { text, project, status, kind, actor } = input
+        const parent = input.parent === undefined ? undefined : yield* checkedParent({ item: { id: 0 }, parentRef: input.parent })
         const at = yield* Clock.currentTimeMillis
         const id = (yield* Ref.get(state)).nextId
         const ref = yield* repo.mintRef
         const triaged = BacklogItems.triage(text)
+        const priority = input.priority ?? triaged.priority
         const actorId = actorIdOf(actor)
         const files = filesOf(input.files ?? [], at)
         const attachments = files.map(file => file.attachment)
@@ -690,10 +848,13 @@ export class BacklogStore extends Context.Service<
             ...(kind === undefined ? [] : (['kind'] as const)),
             ...(status === undefined ? [] : (['status'] as const)),
             ...(project === undefined ? [] : (['project'] as const)),
+            ...(input.priority === undefined ? [] : (['priority'] as const)),
           ],
           createdAt: at,
           lastActivityAt: at,
           events: [createdEvent],
+          ...(priority !== undefined && priority !== 'none' && { priority }),
+          ...(parent !== undefined && { parent }),
         }
         yield* repo.create({ item, origin: actorId, nextId: id + 1, files }).pipe(Effect.mapError(writeFailed(item, 'put')))
         yield* Ref.update(state, current => ({ ...current, nextId: id + 1 }))
@@ -786,9 +947,12 @@ export class BacklogStore extends Context.Service<
       }, serialized)
 
       const update = Effect.fn('backlog store update')(function* (input: BacklogUpdate & { readonly actor: BacklogActor }) {
-        const { id, actor, ...fields } = input
+        const { id, actor, ...requested } = input
         return yield* withItem(id, item =>
           Effect.gen(function* () {
+            const parent =
+              requested.parent === undefined || requested.parent === null ? requested.parent : yield* checkedParent({ item, parentRef: requested.parent })
+            const fields = { ...requested, parent }
             const { change, changed, userChanged } = updateChange(item, fields)
             const clearedSuggestion = change.proposal === null
             if (changed.length === 0 && change.snoozedUntil === undefined && !clearedSuggestion) return yield* unchanged(item)
@@ -931,11 +1095,75 @@ export class BacklogStore extends Context.Service<
         }
         const before = planned.before
         const change: BacklogChange = {}
-        Object.assign(change, { [input.field]: input.field === 'attention' && before === undefined ? 'none' : before })
+        const restored = before === undefined ? clearedValue(input.field) : before
+        if (input.field === 'parent' && typeof restored === 'string') yield* checkedParent({ item, parentRef: restored })
+        Object.assign(change, { [input.field]: restored })
         if (input.actor.kind === 'user') change.humanFields = [...new Set([...item.humanFields, input.field])]
         const kind = input.field === 'status' ? 'moved' : 'edited'
         return found(yield* touch(item, input.actor, { kind, detail: `reverted ${input.field}` }, change))
       }, serialized)
+
+      const claim = Effect.fn('backlog store claim')(function* (input: { readonly id: number; readonly actor: BacklogActor }) {
+        const item = yield* find(input.id)
+        if (item === undefined) return notFound
+        const ref = BacklogReference.refOf(item)
+        const actor = input.actor
+        if (actor.kind !== 'agent' || actor.sessionId === undefined || actor.sessionId === '')
+          return yield* new BacklogClaimRefused({ ref, reason: 'not-agent' })
+        if (!ItemRelations.isOpen(item)) return yield* new BacklogClaimRefused({ ref, reason: 'closed' })
+        const holder = actorIdOf(actor)
+        const at = yield* Clock.currentTimeMillis
+        const held = (yield* Ref.get(state)).leases.get(item.id)
+        const live = held !== undefined && held.expiresAt > at ? held : undefined
+        if (live !== undefined && live.holder !== holder) return yield* new BacklogItemClaimed({ ref, holder: live.holder, expiresAt: live.expiresAt })
+        const idleMs = (yield* settings.get).leaseIdleMinutes * 60_000
+        const lease: BacklogLease = { holder, acquiredAt: live?.acquiredAt ?? at, heartbeat: at, expiresAt: at + idleMs }
+        const change: BacklogChange = {
+          delegate: holder,
+          links: BacklogItems.uniqueLinks([...item.links, { type: 'thread', target: actor.sessionId, provenance: 'agent' }]),
+        }
+        if (item.status !== 'doing') change.status = 'doing'
+        const detail = change.status === undefined ? `claimed by ${holder}` : `${item.status} → doing (claimed by ${holder})`
+        return found(
+          yield* touch(item, actor, { kind: change.status === undefined ? 'edited' : 'moved', detail, threadId: actor.sessionId }, change, {
+            kind: 'set',
+            lease,
+          }),
+        )
+      }, serialized)
+
+      const release = Effect.fn('backlog store release')(function* (input: {
+        readonly id: number
+        readonly actor: BacklogActor
+        readonly reason?: string | undefined
+      }) {
+        const item = yield* find(input.id)
+        if (item === undefined) return notFound
+        const at = yield* Clock.currentTimeMillis
+        const held = (yield* Ref.get(state)).leases.get(item.id)
+        const caller = actorIdOf(input.actor)
+        if (input.actor.kind === 'agent' && held !== undefined && held.expiresAt > at && held.holder !== caller)
+          return yield* new BacklogItemClaimed({ ref: BacklogReference.refOf(item), holder: held.holder, expiresAt: held.expiresAt })
+        if (held === undefined && item.delegate === undefined) return yield* unchanged(item)
+        const change: BacklogChange = { delegate: null }
+        if (item.status === 'doing') change.status = 'todo'
+        const why = input.reason ?? `released by ${caller === 'user' ? 'you' : caller}`
+        const detail = change.status === undefined ? why : `doing → todo (${why})`
+        const leaseWrite: LeaseWrite | undefined = held === undefined ? undefined : { kind: 'clear' }
+        return found(yield* touch(item, input.actor, { kind: change.status === undefined ? 'edited' : 'moved', detail }, change, leaseWrite))
+      }, serialized)
+
+      const delegateTo = Effect.fn('backlog store delegate')(function* (input: {
+        readonly id: number
+        readonly sessionId: string
+        readonly actor: BacklogActor
+      }) {
+        return yield* withItem(input.id, item => {
+          const delegate = `agent:${input.sessionId}`
+          if (item.delegate === delegate || !ItemRelations.isOpen(item)) return unchanged(item)
+          return Effect.map(touch(item, input.actor, { kind: 'edited', detail: `delegated to ${delegate}`, threadId: input.sessionId }, { delegate }), found)
+        })
+      })
 
       const markTriaged = Effect.fn('backlog store mark triaged')(function* (id: number) {
         const item = yield* find(id)
@@ -1135,6 +1363,10 @@ export class BacklogStore extends Context.Service<
         applySignal,
         applyThreadAttention,
         settleAnsweredQuestion,
+        claim,
+        release,
+        leases: Effect.map(Ref.get(state), current => [...current.leases].map(([id, lease]) => ({ id, lease }))),
+        delegateTo,
         acknowledge,
         dismissProposal,
         projects: query => Effect.map(view, current => projectsIn(current, query)),

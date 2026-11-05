@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { BacklogSummaryView } from './api.js'
+import { summaryRelationDefaults } from './summary-fixture.js'
 import { inboxThreadsFrom, linkedThreadIds } from './inbox-threads.js'
 
 const item = (id: number, threads: readonly string[]): BacklogSummaryView => ({
@@ -24,6 +25,7 @@ const item = (id: number, threads: readonly string[]): BacklogSummaryView => ({
   snoozedUntil: null,
   activity: { count: 0, agents: 0, comments: 0, last: null },
   match: null,
+  ...summaryRelationDefaults,
 })
 
 const records = [

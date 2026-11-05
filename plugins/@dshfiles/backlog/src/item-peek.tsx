@@ -1451,6 +1451,26 @@ const PeekBody = (props: {
   )
 }
 
+/** The detail a list row already holds, shown while the full one loads; relations the row lacks start empty. */
+const placeholderDetail = (summary: BacklogSummaryView) => {
+  const { parent, delegate, children: _children, ready: _ready, blockedBy: _blockedBy, lease, owner: _owner, ...fields } = summary
+  return {
+    item: {
+      ...fields,
+      ...(parent !== null && { parent }),
+      ...(delegate !== null && { delegate }),
+      body: summary.preview,
+      tweetContextUrls: summary.tweetContextUrls ?? [],
+      humanFields: [],
+      events: [],
+    },
+    backlinks: [],
+    children: [],
+    blockedBy: [],
+    lease,
+  }
+}
+
 /** The selected item, editable in place: a side panel beside the list, or the whole panel when expanded. */
 const ITEM_PEEK_WIDTH = { min: 320, initial: 460 } as const
 
@@ -1479,13 +1499,7 @@ const ItemPeek = (props: {
   const resizeStart = useRef<{ readonly pointerId: number; readonly startX: number; readonly startWidth: number } | null>(null)
   const summary = props.summary
   // The list row already holds most of the item, so the inspector opens filled and the full detail swaps in.
-  const placeholder =
-    summary === undefined
-      ? undefined
-      : {
-          ok: true as const,
-          value: { item: { ...summary, body: summary.preview, tweetContextUrls: summary.tweetContextUrls ?? [], humanFields: [], events: [] }, backlinks: [] },
-        }
+  const placeholder = summary === undefined ? undefined : { ok: true as const, value: placeholderDetail(summary) }
   const detail = useQuery({
     queryKey: [BacklogQueries.key, 'item', props.id],
     queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: props.id }, { signal })),

@@ -19,7 +19,11 @@ const relations = ['related', 'depends-on', 'blocks', 'duplicates', 'implements'
 const provenances = ['user', 'agent', 'extracted', 'inferred'] as const
 const attentions = ['none', 'needs-input', 'blocked', 'waiting'] as const
 const freshnessStates = ['fresh', 'stale', 'dormant', 'archived'] as const
-const humanFieldNames = ['title', 'body', 'kind', 'status', 'project', 'tags', 'pinned', 'attention'] as const
+/** Linear's set, in its order: `none` is no priority, then urgent (1) to low (4). */
+const priorities = ['none', 'urgent', 'high', 'medium', 'low'] as const
+const humanFieldNames = ['title', 'body', 'kind', 'status', 'project', 'tags', 'pinned', 'attention', 'priority', 'parent'] as const
+/** Deepest parent chain: an item, its child and a grandchild. */
+const MAX_PARENT_DEPTH = 3
 const imageMediaTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const
 
 const kindSchema = Schema.Literals(kinds)
@@ -27,6 +31,11 @@ const statusSchema = Schema.Literals(statuses)
 const relationSchema = Schema.Literals(relations)
 const provenanceSchema = Schema.Literals(provenances)
 const attentionSchema = Schema.Literals(attentions)
+const prioritySchema = Schema.Literals(priorities)
+/** The `b:<ref>` of another item, without its `b:` prefix: a short alias or a legacy number. */
+const itemRefSchema = Schema.String.check(Schema.isPattern(/^([0-9a-hjkmnp-tv-z]{4,5}|[1-9]\d{0,9})$/))
+/** The agent an item is handed to: `agent:<sessionId>`. */
+const delegateSchema = Schema.String.check(Schema.isPattern(/^agent:[\w.-]+$/))
 /** `relation` and `provenance` came later: rows written before them decode as a plain related link. */
 const linkSchema = Schema.Struct({
   type: Schema.Literals(linkTypes),
@@ -126,8 +135,15 @@ const itemSchema = Schema.Struct({
   attention: Schema.optionalKey(attentionSchema),
   acknowledgedAt: Schema.optionalKey(Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)))),
   snoozedUntil: Schema.optionalKey(Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)))),
+  /** Absent is `none`, like every item written before priorities. */
+  priority: Schema.optionalKey(prioritySchema),
+  /** The ref of the item this one is a sub-issue of. */
+  parent: Schema.optionalKey(itemRefSchema),
+  /** The agent working on it for its owner, set by a claim or a thread started from it; the owner stays the creator. */
+  delegate: Schema.optionalKey(delegateSchema),
 })
 
+export type BacklogPriority = typeof prioritySchema.Type
 export type BacklogProposal = typeof proposalSchema.Type
 export type BacklogKind = typeof kindSchema.Type
 export type BacklogStatus = typeof statusSchema.Type
@@ -166,6 +182,20 @@ const linkPatterns: readonly { readonly type: BacklogLink['type']; readonly patt
 ]
 
 const tagPattern = /(?<![\w&#/])#([a-z][\w-]{0,59})/gi
+/** `!1` urgent … `!4` low, as a word of its own anywhere in the capture: Linear's P1–P4. */
+const priorityPattern = /(?<!\S)!([1-4])(?!\S)/
+const priorityByDigit = { '1': 'urgent', '2': 'high', '3': 'medium', '4': 'low' } as const satisfies Record<string, BacklogPriority>
+
+const priorityOf = (text: string): BacklogPriority | undefined => {
+  const digit = priorityPattern.exec(text)?.[1]
+  return digit === '1' || digit === '2' || digit === '3' || digit === '4' ? priorityByDigit[digit] : undefined
+}
+
+/** Urgent first and no priority last, the order a ready queue serves. */
+const priorityRank = (priority: BacklogPriority | undefined): number => {
+  const rank = priorities.indexOf(priority ?? 'none')
+  return rank === 0 ? priorities.length : rank
+}
 
 const sameLink = (left: Pick<BacklogLink, 'type' | 'target'>, right: Pick<BacklogLink, 'type' | 'target'>): boolean =>
   left.type === right.type && left.target === right.target
@@ -196,7 +226,10 @@ const triage = (text: string) => {
   const prefixKind = prefix?.[1] === undefined ? undefined : kindPrefixes.get(prefix[1].toLowerCase())
   const content = prefixKind === undefined || prefix === null ? trimmed : trimmed.slice(prefix[0].length)
   const [firstLine = '', ...rest] = content.split('\n')
-  const titleLine = firstLine.trim() === '' ? content.trim() : firstLine.trim()
+  const titleLine = (firstLine.trim() === '' ? content.trim() : firstLine.trim())
+    .replace(priorityPattern, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
   const titleWithoutTags = titleLine.replace(/(\s+#[a-z][\w-]{0,59})+$/i, '')
   const kind: BacklogKind = prefixKind ?? (titleLine.endsWith('?') ? 'question' : 'task')
   const bodyFromTitle = titleWithoutTags.slice(MAX_TITLE_CHARS)
@@ -210,6 +243,7 @@ const triage = (text: string) => {
     kind,
     tags: extractTags(trimmed),
     links: extractLinks(trimmed),
+    priority: priorityOf(firstLine === '' ? content : firstLine),
   }
 }
 
@@ -277,6 +311,12 @@ export class BacklogItems {
   static readonly relations = relations
   static readonly provenances = provenances
   static readonly attentions = attentions
+  static readonly priorities = priorities
+  static readonly prioritySchema = prioritySchema
+  static readonly priorityRank = priorityRank
+  static readonly itemRefSchema = itemRefSchema
+  static readonly delegateSchema = delegateSchema
+  static readonly maxParentDepth = MAX_PARENT_DEPTH
   static readonly attentionSchema = attentionSchema
   static readonly relationSchema = relationSchema
   static readonly defaultDormantDays = defaultDormantDays

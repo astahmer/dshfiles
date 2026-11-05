@@ -236,6 +236,10 @@ export class ThreadStart extends Context.Service<
               ),
             )
           if (result.ok) linked.push(detail.item.id)
+          if (result.ok)
+            yield* store
+              .delegateTo({ id: detail.item.id, sessionId, actor })
+              .pipe(Effect.catch((error: BacklogWriteFailed) => Effect.logWarning('backlog: an item was not handed to its thread', error)))
         }
         return { sessionId, linked, missing }
       })

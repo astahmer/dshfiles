@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { BacklogSummaryView } from './api.js'
+import { summaryRelationDefaults } from './summary-fixture.js'
 import { sortBacklogItems } from './backlog-sort.js'
 
 const item = (id: number, createdAt: number, lastActivityAt: number): BacklogSummaryView => ({
@@ -24,6 +25,7 @@ const item = (id: number, createdAt: number, lastActivityAt: number): BacklogSum
   snoozedUntil: null,
   activity: { count: 0, agents: 0, comments: 0, last: null },
   match: null,
+  ...summaryRelationDefaults,
 })
 
 const items = [item(1, 10, 30), item(2, 20, 10), item(3, 30, 20)]

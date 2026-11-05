@@ -38,6 +38,13 @@ export const backlogSettings = defineSettings({
       .max(3_650)
       .default(0)
       .description('Opt in to idle-thread nudges by setting a positive day count. Unfinished items on idle threads then ask for review.'),
+    leaseIdleMinutes: Schema.natural()
+      .min(1)
+      .max(1_440)
+      .default(30)
+      .description(
+        'How long an agent keeps an item it claimed with backlog_claim without writing to it again. The claim also ends when its thread is archived, settled or gone, and when the item is done.',
+      ),
     threadResolution: Schema.union([
       Schema.const('off').description('Off: a finished thread never suggests anything'),
       Schema.const('propose').description("Propose: ask Jev whether the thread's last reply resolved its open items, and leave a Done suggestion on each"),

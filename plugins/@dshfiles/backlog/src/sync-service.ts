@@ -426,7 +426,10 @@ export class BacklogSync extends Context.Service<
         const plan = BacklogSyncModel.plan({ item, remote, base: mapping.base, at })
         const pulled = Object.keys(plan.pull).filter((field): field is SyncField => BacklogSyncModel.syncedFields.some(known => known === field))
         const pushed = Object.keys(plan.push).filter((field): field is SyncField => BacklogSyncModel.syncedFields.some(known => known === field))
-        if (pulled.length > 0) yield* store.update({ id: item.id, ...plan.pull, actor: { kind: 'system' } })
+        if (pulled.length > 0)
+          yield* store
+            .update({ id: item.id, ...plan.pull, actor: { kind: 'system' } })
+            .pipe(Effect.catchTag('BacklogParentInvalid', error => Effect.die(error)))
         const remoteAfter = pushed.length > 0 ? yield* backend.update(mapping.remoteId, plan.push) : remote
         const comments = yield* syncComments(mapping, backend, remoteAfter)
         if (plan.conflicts.length > 0) {
@@ -615,17 +618,21 @@ export class BacklogSync extends Context.Service<
           const found = yield* store.get(known.itemId)
           if (found.ok) return { detail: found.value, created: false }
         }
-        const captured = yield* store.capture({ text: remote.title.replace(/\s+/gu, ' ').trim() || remote.key, project, actor: input.actor })
+        const captured = yield* store
+          .capture({ text: remote.title.replace(/\s+/gu, ' ').trim() || remote.key, project, actor: input.actor })
+          .pipe(Effect.catchTag('BacklogParentInvalid', error => Effect.die(error)))
         const id = captured.item.id
         const kind = kindOfTags(remote.tags)
-        yield* store.update({
-          id,
-          body: remote.body.slice(0, BacklogItems.maxBodyChars),
-          tags: remote.tags.slice(0, 20),
-          ...(remote.status !== null && { status: remote.status }),
-          ...(kind !== undefined && { kind }),
-          actor: { kind: 'system' },
-        })
+        yield* store
+          .update({
+            id,
+            body: remote.body.slice(0, BacklogItems.maxBodyChars),
+            tags: remote.tags.slice(0, 20),
+            ...(remote.status !== null && { status: remote.status }),
+            ...(kind !== undefined && { kind }),
+            actor: { kind: 'system' },
+          })
+          .pipe(Effect.catchTag('BacklogParentInvalid', error => Effect.die(error)))
         const item = (yield* itemOf(id)) ?? captured.item
         const at = yield* Clock.currentTimeMillis
         const mapping: SyncMapping = {

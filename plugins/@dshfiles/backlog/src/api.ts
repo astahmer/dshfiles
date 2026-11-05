@@ -65,6 +65,14 @@ const transcriptionSchema = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(false), reason: Schema.String.check(Schema.isMaxLength(500)) }),
 ])
 
+const leaseSchema = Schema.Struct({
+  holder: Schema.String,
+  acquiredAt: Schema.Number.check(Schema.isFinite()),
+  expiresAt: Schema.Number.check(Schema.isFinite()),
+})
+const nullDefault = <S extends Schema.Top>(schema: S) => Schema.NullOr(schema).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null)))
+const countSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+
 const summarySchema = Schema.Struct({
   id: idSchema,
   ref: refOutputSchema,
@@ -108,11 +116,29 @@ const summarySchema = Schema.Struct({
       snippet: Schema.NullOr(Schema.String),
     }),
   ),
+  /** The fields below came with priorities, sub-issues and claims; a Host that predates them answers without, and these defaults fill in. */
+  priority: BacklogItems.prioritySchema.pipe(Schema.withDecodingDefaultKey(Effect.succeed('none'))),
+  parent: nullDefault(Schema.String),
+  /** Who captured it: `user`, `system` or `agent:<sessionId>`. */
+  owner: Schema.String.pipe(Schema.withDecodingDefaultKey(Effect.succeed('user'))),
+  /** The agent working on it for its owner, `agent:<sessionId>`. */
+  delegate: nullDefault(Schema.String),
+  /** Direct sub-issues done out of those counted (dropped ones leave the total). */
+  children: Schema.Struct({ total: countSchema, done: countSchema }).pipe(Schema.withDecodingDefaultKey(Effect.succeed({ total: 0, done: 0 }))),
+  /** Open, unsnoozed, nothing open blocking it, no open sub-issue, and nobody holding a live claim. */
+  ready: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+  /** Refs of the open items it waits on (`depends-on` it, or `blocks` it). */
+  blockedBy: Schema.Array(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  /** The live claim on it, if any. */
+  lease: nullDefault(leaseSchema),
 })
 
 const detailSchema = Schema.Struct({
   item: Schema.Struct({ ...BacklogItems.itemSchema.fields, freshness: freshnessSchema }),
   backlinks: Schema.Array(summarySchema),
+  children: Schema.Array(summarySchema).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  blockedBy: Schema.Array(summarySchema).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  lease: nullDefault(leaseSchema),
 })
 
 const detailResultSchema = Schema.Union([
@@ -145,7 +171,7 @@ const actorFilterSchema = Schema.Union([Schema.Literal(''), BacklogItems.actorId
 const listInputSchema = Schema.Struct({
   query: Schema.String.check(Schema.isMaxLength(500)).pipe(Schema.optional).annotate({
     description:
-      'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent (touched by) created:me|agent|system (captured by) has:thread|revision|url updated:<7d updated:>30d. A leading - negates any operator or word (-created:agent, -kind:note, -#tag). Results rank by relevance and say which fields matched.',
+      'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent (touched by) created:me|agent|system (captured by) has:thread|revision|url|children|parent updated:<7d updated:>30d priority:urgent|high|medium|low|none parent:b:k3f9 is:ready is:blocked-by-deps is:delegated is:claimed delegate:agent. A leading - negates any operator or word (-created:agent, -kind:note, -#tag, -priority:none). Results rank by relevance and say which fields matched.',
   }),
   statuses: Schema.Array(BacklogItems.statusSchema).pipe(Schema.optional),
   kinds: Schema.Array(BacklogItems.kindSchema).pipe(Schema.optional),
@@ -167,6 +193,9 @@ const listInputSchema = Schema.Struct({
     description:
       'Leave out items an agent captured that the user never touched, unless they ask for attention or wait on a suggestion. Defaults to false: every item is listed.',
   }),
+  ready: Schema.Boolean.pipe(Schema.optional).annotate({
+    description: 'Only ready items (open, unsnoozed, unblocked, no open sub-issue, unclaimed), urgent first then oldest.',
+  }),
   limit: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(2_000)).pipe(Schema.optional),
 })
 
@@ -184,7 +213,7 @@ const previewText = (text: string): string => text.trim().replace(/\s+/g, ' ').s
 
 const renderItemPreview = (item: (typeof detailSchema.Type)['item']): string => {
   const body = previewText(item.body)
-  const status = `${item.kind} · ${item.status}`
+  const status = `${item.kind} · ${item.status}${(item.priority ?? 'none') === 'none' ? '' : ` · ${item.priority ?? ''}`}${item.parent === undefined ? '' : ` · under b:${item.parent}`}`
   const project = item.project === null ? '' : ` · ${item.project}`
   return [`${BacklogReference.labelOf(item)} — ${item.title}`, `${status}${project}`, ...(body === '' ? [] : [body])].join('\n')
 }
@@ -358,6 +387,21 @@ const shippedOutputSchema = Schema.Struct({
   ),
 })
 
+const renderReady = (output: typeof listOutputSchema.Type): string =>
+  output.items.length === 0
+    ? 'Nothing is ready: every open item is blocked, has open sub-issues, is claimed or snoozed.'
+    : output.items
+        .map(
+          item =>
+            `${BacklogReference.labelOf(item)} ${item.priority === 'none' ? '' : `[${item.priority}] `}${item.title}${item.project === null ? '' : ` · ${item.project}`}`,
+        )
+        .join('\n')
+
+const renderClaim = (result: typeof detailResultSchema.Type): string =>
+  result.ok
+    ? `${renderItemPreview(result.value.item)}\n${result.value.lease === null ? 'No claim held.' : `Claimed by ${result.value.lease.holder} until ${new Date(result.value.lease.expiresAt).toISOString()}; any write by it renews the claim.`}`
+    : 'No backlog item found.'
+
 const writeNote = 'Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.'
 
 /** No default: a bare agent request cannot run a guarded write. */
@@ -442,13 +486,17 @@ export const backlogApi = defineApi({
       input: Schema.Struct({
         text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxBodyChars)).annotate({
           description:
-            'Free text. First line is the title; a `bug:`/`idea:`/`note:`/`question:`/`task:` prefix sets the kind; `#tags`, `b:<ref>`, `jj:<rev>`, `branch:<name>`, session ids and URLs become links.',
+            'Free text. First line is the title; a `bug:`/`idea:`/`note:`/`question:`/`task:` prefix sets the kind; `!1` (urgent) to `!4` (low) sets the priority; `#tags`, `b:<ref>`, `jj:<rev>`, `branch:<name>`, session ids and URLs become links.',
         }),
         project: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))
           .pipe(Schema.optional)
           .annotate({ description: "Absolute project path; an agent's working directory by default." }),
         status: BacklogItems.statusSchema.pipe(Schema.optional).annotate({ description: 'Defaults to `inbox`.' }),
         kind: BacklogItems.kindSchema.pipe(Schema.optional).annotate({ description: 'Overrides the kind the text prefix would derive.' }),
+        priority: BacklogItems.prioritySchema
+          .pipe(Schema.optional)
+          .annotate({ description: 'urgent, high, medium, low or none; overrides a `!1`…`!4` written in the text.' }),
+        parent: refTextSchema.pipe(Schema.optional).annotate({ description: 'Capture it as a sub-issue of this item (`b:k3f9`); three levels deep at most.' }),
         files: Schema.Array(fileInputSchema)
           .check(Schema.isMaxLength(BacklogItems.maxAttachments))
           .pipe(Schema.optional)
@@ -551,10 +599,40 @@ export const backlogApi = defineApi({
         snoozedUntil: Schema.NullOr(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)))
           .pipe(Schema.optional)
           .annotate({ description: 'Hide the item until this epoch-ms time; null wakes it.' }),
+        priority: BacklogItems.prioritySchema.pipe(Schema.optional).annotate({ description: 'urgent, high, medium, low, or none to clear it.' }),
+        parent: Schema.NullOr(refTextSchema).pipe(Schema.optional).annotate({
+          description: 'Nest it under this item (`b:k3f9`) as a sub-issue, or null to make it top-level. Refused for itself, a loop, or a fourth level.',
+        }),
       }),
       output: detailResultSchema,
       description: `Edit or move one backlog item, or ask the user for input with \`attention\`. ${writeNote}`,
       tool: { name: 'backlog_update', readOnly: false, render: renderDetailPreview },
+    }),
+    ready: method({
+      input: Schema.Struct({
+        project: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxTargetChars)))
+          .pipe(Schema.optional)
+          .annotate({ description: 'Absolute project path; null lists ready items outside any project. Omit for every project.' }),
+        limit: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(200))
+          .pipe(Schema.optional)
+          .annotate({ description: 'How many to return; defaults to 20.' }),
+      }),
+      output: listOutputSchema,
+      description:
+        'The ready queue: open (inbox or todo) items nothing open blocks (`depends-on`/`blocks` links), with no open sub-issue, not snoozed and not claimed, urgent first then oldest. Pick the first and claim it with backlog_claim before working on it. Read-only.',
+      tool: { name: 'backlog_ready', readOnly: true, render: renderReady },
+    }),
+    claim: method({
+      input: Schema.Struct({ id: itemKeySchema }),
+      output: detailResultSchema,
+      description: `Claim one item for this thread before working on it: you become its delegate, it moves to \`doing\`, this thread is linked and a lease starts. Refused while another agent holds a live claim (the error names it) and for closed items. Any write you make to the item renews the lease; it ends after the idle time in Backlog settings, when this thread is archived or settled, when the item is done, or with backlog_release. ${writeNote}`,
+      tool: { name: 'backlog_claim', readOnly: false, render: renderClaim },
+    }),
+    release: method({
+      input: Schema.Struct({ id: itemKeySchema }),
+      output: detailResultSchema,
+      description: `Give up a claim without finishing: the lease ends, the delegate is cleared and an item still \`doing\` returns to \`todo\` so it is ready again. Only the holder may release a live claim; the user can release any from the panel. Say in a backlog_comment what is left. ${writeNote}`,
+      tool: { name: 'backlog_release', readOnly: false, render: renderDetailPreview },
     }),
     link: method({
       input: Schema.Struct({ id: itemKeySchema, link: BacklogItems.linkSchema, remove: Schema.Boolean.pipe(Schema.optional) }),

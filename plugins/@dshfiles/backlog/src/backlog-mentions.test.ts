@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { BacklogSummaryView } from './api.js'
+import { summaryRelationDefaults } from './summary-fixture.js'
 import { BacklogMentions } from './backlog-mentions.js'
 
 const summary = (id: number, title: string): BacklogSummaryView => ({
@@ -24,6 +25,7 @@ const summary = (id: number, title: string): BacklogSummaryView => ({
   snoozedUntil: null,
   activity: { count: 0, agents: 0, comments: 0, last: null },
   match: null,
+  ...summaryRelationDefaults,
 })
 
 const request = (query: string) => ({ query, quoted: false, signal: new AbortController().signal }) as const

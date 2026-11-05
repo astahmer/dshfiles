@@ -1,4 +1,4 @@
-import { BacklogItems, type BacklogItem, type BacklogLink } from './item.js'
+import { BacklogItems, type BacklogItem, type BacklogLink, type BacklogPriority } from './item.js'
 import { BacklogReference } from './backlog-reference.js'
 
 const DAY_MS = 86_400_000
@@ -10,6 +10,17 @@ type MatchField = 'id' | 'title' | 'tag' | 'body' | 'comment' | 'link' | 'projec
 const fieldWeights = { id: 12, title: 8, tag: 6, project: 3, link: 3, body: 2, capture: 1.5, comment: 1 } satisfies Record<MatchField, number>
 
 type ActorKind = 'user' | 'agent' | 'system'
+type SearchState = 'ready' | 'blocked-by-deps' | 'delegated' | 'claimed' | 'children' | 'parent'
+
+/** What an operator needs from the other items: readiness, blockers, sub-issues and claims are not on the item itself. */
+export interface SearchContext {
+  readonly isReady: (item: BacklogItem) => boolean
+  readonly isBlockedByDeps: (item: BacklogItem) => boolean
+  readonly hasChildren: (item: BacklogItem) => boolean
+  readonly isClaimed: (item: BacklogItem) => boolean
+}
+
+const noContext: SearchContext = { isReady: () => false, isBlockedByDeps: () => false, hasChildren: () => false, isClaimed: () => false }
 
 /** The operator part of a query: every list narrows on its own, and a negated copy excludes what it matches. */
 interface SearchFilters {
@@ -24,6 +35,13 @@ interface SearchFilters {
   /** Who captured it (`created:`). */
   readonly creators: readonly ActorKind[]
   readonly has: readonly BacklogLink['type'][]
+  readonly priorities: readonly BacklogPriority[]
+  /** Refs of the parents an item must sit under (`parent:b:k3f9`). */
+  readonly parents: readonly string[]
+  /** Derived states: `is:ready`, `is:blocked-by-deps`, `is:delegated`, `is:claimed`, `has:children`, `has:parent`. */
+  readonly states: readonly SearchState[]
+  /** Who an item is handed to (`delegate:agent`). */
+  readonly delegates: readonly ActorKind[]
   readonly updatedWithinDays: number | null
   readonly olderThanDays: number | null
 }
@@ -59,6 +77,12 @@ const hasWords = new Map<string, BacklogLink['type']>([
   ['link', 'url'],
   ['item', 'item'],
 ])
+const stateWords = new Map<string, SearchState>([
+  ['ready', 'ready'],
+  ['blocked-by-deps', 'blocked-by-deps'],
+  ['delegated', 'delegated'],
+  ['claimed', 'claimed'],
+])
 const actorWords = new Map<string, ActorKind>([
   ['me', 'user'],
   ['user', 'user'],
@@ -76,6 +100,10 @@ const emptyFilters = (): MutableFilters => ({
   actors: [],
   creators: [],
   has: [],
+  priorities: [],
+  parents: [],
+  states: [],
+  delegates: [],
   updatedWithinDays: null,
   olderThanDays: null,
 })
@@ -84,6 +112,7 @@ const addToken = (filters: MutableFilters, token: string): void => {
   const [key, ...rest] = token.split(':')
   const value = rest.join(':')
   const actor = actorWords.get(value)
+  const priority = BacklogItems.priorities.find(candidate => candidate === value)
   if (token.startsWith('#') && token.length > 1) filters.tags.push(token.slice(1))
   else if (key === 'kind' && kindWords.has(value)) filters.kinds.push(value)
   else if (key === 'status' && statusWords.has(value)) filters.statuses.push(value)
@@ -93,7 +122,12 @@ const addToken = (filters: MutableFilters, token: string): void => {
   else if (key === 'project' && value !== '') filters.projects.push(value)
   else if (key === 'by' && actor !== undefined) filters.actors.push(actor)
   else if (key === 'created' && actor !== undefined) filters.creators.push(actor)
+  else if (key === 'has' && (value === 'children' || value === 'parent')) filters.states.push(value)
   else if (key === 'has' && hasWords.has(value)) filters.has.push(hasWords.get(value) ?? 'url')
+  else if (key === 'is' && stateWords.has(value)) filters.states.push(stateWords.get(value) ?? 'ready')
+  else if (key === 'priority' && priority !== undefined) filters.priorities.push(priority)
+  else if (key === 'parent' && BacklogReference.parse(value) !== undefined) filters.parents.push(BacklogReference.parse(value) ?? '')
+  else if (key === 'delegate' && actor !== undefined) filters.delegates.push(actor)
   else if (key === 'updated' && /^[<>]\d+d$/.test(value)) {
     const days = Number(value.slice(1, -1))
     if (value.startsWith('<')) filters.updatedWithinDays = days
@@ -104,7 +138,8 @@ const addToken = (filters: MutableFilters, token: string): void => {
 /**
  * Free text plus operators, all optional and combinable: `kind:bug`, `status:doing`, `is:blocked` (kind, status or
  * attention), `#tag`, `project:welii`, `by:agent` (touched by), `created:me` (captured by), `has:thread`,
- * `updated:<7d`, `updated:>30d`. Quoted text is one term. A leading `-` negates any of them, words included.
+ * `updated:<7d`, `updated:>30d`, `priority:high`, `parent:b:k3f9`, `has:children`, `is:ready`, `is:blocked-by-deps`,
+ * `is:delegated`, `is:claimed`, `delegate:agent`. Quoted text is one term. A leading `-` negates any of them, words included.
  */
 const parse = (raw: string): SearchQuery => {
   const included = emptyFilters()
@@ -138,13 +173,31 @@ const createdBy = (item: BacklogItem, kind: ActorKind): boolean => {
   return creator !== undefined && isActor(creator, kind)
 }
 const hasLink = (item: BacklogItem, type: BacklogLink['type']): boolean => item.links.some(link => link.type === type)
+const priorityIs = (item: BacklogItem, priority: BacklogPriority): boolean => (item.priority ?? 'none') === priority
+const delegatedTo = (item: BacklogItem, kind: ActorKind): boolean => item.delegate !== undefined && isActor(item.delegate, kind)
+const inState = (item: BacklogItem, state: SearchState, context: SearchContext): boolean => {
+  switch (state) {
+    case 'ready':
+      return context.isReady(item)
+    case 'blocked-by-deps':
+      return context.isBlockedByDeps(item)
+    case 'delegated':
+      return item.delegate !== undefined
+    case 'claimed':
+      return context.isClaimed(item)
+    case 'children':
+      return context.hasChildren(item)
+    case 'parent':
+      return item.parent !== undefined
+  }
+}
 const updatedWithin = (item: BacklogItem, days: number, now: number): boolean => now - item.lastActivityAt <= days * DAY_MS
 const idleFor = (item: BacklogItem, days: number, now: number): boolean => now - item.lastActivityAt >= days * DAY_MS
 const termHits = (item: BacklogItem, term: string): boolean =>
   sourcesOf(item).some(([field, texts]) => (field === 'id' ? texts.includes(term) : texts.some(text => text.toLowerCase().includes(term))))
 
 /** Whether the item passes every operator; free-text terms are scored separately. */
-const passesFilters = (item: BacklogItem, query: SearchQuery, now: number): boolean => {
+const passesFilters = (item: BacklogItem, query: SearchQuery, now: number, context: SearchContext): boolean => {
   if (query.kinds.length > 0 && !query.kinds.includes(item.kind)) return false
   if (query.statuses.length > 0 && !query.statuses.includes(item.status)) return false
   if (query.attentions.length > 0 && !query.attentions.includes(item.attention ?? 'none')) return false
@@ -153,12 +206,16 @@ const passesFilters = (item: BacklogItem, query: SearchQuery, now: number): bool
   if (query.actors.some(kind => !touchedBy(item, kind))) return false
   if (query.creators.length > 0 && !query.creators.some(kind => createdBy(item, kind))) return false
   if (query.has.some(type => !hasLink(item, type))) return false
+  if (query.priorities.length > 0 && !query.priorities.some(priority => priorityIs(item, priority))) return false
+  if (query.parents.length > 0 && !query.parents.includes(item.parent ?? '')) return false
+  if (query.states.some(state => !inState(item, state, context))) return false
+  if (query.delegates.some(kind => !delegatedTo(item, kind))) return false
   if (query.updatedWithinDays !== null && !updatedWithin(item, query.updatedWithinDays, now)) return false
   if (query.olderThanDays !== null && !idleFor(item, query.olderThanDays, now)) return false
-  return !isExcluded(item, query.excluded, now)
+  return !isExcluded(item, query.excluded, now, context)
 }
 
-const isExcluded = (item: BacklogItem, excluded: SearchFilters, now: number): boolean =>
+const isExcluded = (item: BacklogItem, excluded: SearchFilters, now: number, context: SearchContext): boolean =>
   excluded.kinds.includes(item.kind) ||
   excluded.statuses.includes(item.status) ||
   excluded.attentions.includes(item.attention ?? 'none') ||
@@ -167,6 +224,10 @@ const isExcluded = (item: BacklogItem, excluded: SearchFilters, now: number): bo
   excluded.actors.some(kind => touchedBy(item, kind)) ||
   excluded.creators.some(kind => createdBy(item, kind)) ||
   excluded.has.some(type => hasLink(item, type)) ||
+  excluded.priorities.some(priority => priorityIs(item, priority)) ||
+  excluded.parents.includes(item.parent ?? '') ||
+  excluded.states.some(state => inState(item, state, context)) ||
+  excluded.delegates.some(kind => delegatedTo(item, kind)) ||
   (excluded.updatedWithinDays !== null && updatedWithin(item, excluded.updatedWithinDays, now)) ||
   (excluded.olderThanDays !== null && idleFor(item, excluded.olderThanDays, now)) ||
   excluded.terms.some(term => termHits(item, term))
@@ -194,8 +255,8 @@ const sourcesOf = (item: BacklogItem): readonly (readonly [MatchField, readonly 
  * Scores one item against a query, or null when it does not match. Every free-text term must hit some field; the
  * score adds each hit's field weight, and the result says which fields matched with a snippet of the best text hit.
  */
-const score = (item: BacklogItem, query: SearchQuery, now: number): SearchMatch | null => {
-  if (!passesFilters(item, query, now)) return null
+const score = (item: BacklogItem, query: SearchQuery, now: number, context: SearchContext = noContext): SearchMatch | null => {
+  if (!passesFilters(item, query, now, context)) return null
   if (query.terms.length === 0) return { score: 0, fields: [], snippet: null }
   const sources = sourcesOf(item)
   let total = 0
