@@ -399,3 +399,51 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+/*
+ * Touch targets (plans/ade-ux §8 phase 6; Apple HIG 44pt, prior-art §3.2 rule 3). On a coarse pointer every kit
+ * button, toggle and toggle-group item gets a hit area of at least 44px, centred on it, without changing its drawn
+ * size or the layout: the dense desktop layout stays as it is and a 24px icon button is still easy to hit on a phone.
+ * Base layer, so a positioning utility on the control (`absolute`, `fixed`) still wins and is itself the containing
+ * block. Tabs triggers are left out: their `after:` draws the active underline.
+ */
+@layer base {
+  @media (pointer: coarse) {
+    :where([data-slot='button'], [data-slot='toggle'], [data-slot='toggle-group-item']) {
+      position: relative;
+    }
+
+    :where([data-slot='button'], [data-slot='toggle'], [data-slot='toggle-group-item'])::after {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
+    }
+
+    /* Page tabs draw their active underline with ::after, so their hit area uses ::before. */
+    :where([data-slot='tabs-trigger']) {
+      position: relative;
+    }
+
+    :where([data-slot='tabs-trigger'])::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
+    }
+
+    /* Menu rows are full width already; give them a 44px row instead of the 28px desktop row. */
+    :where(
+      [data-slot='dropdown-menu-item'],
+      [data-slot='dropdown-menu-checkbox-item'],
+      [data-slot='dropdown-menu-radio-item'],
+      [data-slot='dropdown-menu-sub-trigger'],
+      [data-slot='context-menu-item'],
+      [data-slot='context-menu-checkbox-item'],
+      [data-slot='context-menu-radio-item'],
+      [data-slot='context-menu-sub-trigger'],
+      [data-slot='select-item'],
+      [data-slot='command-item']
+    ) {
+      min-height: 44px;
+    }
+  }
+}

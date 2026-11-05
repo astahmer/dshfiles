@@ -139,6 +139,38 @@
           "reason": "Client-only: Debounce fast-changing client input renders browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "touch-targets",
+      "title": "Give kit controls a 44px touch target",
+      "summary": "On a coarse pointer every kit button, toggle and toggle-group item gets a hit area of at least 44px centred on it through an absolutely positioned ::after (page tabs through ::before, since ::after draws their underline), and menu, select and command rows get a 44px row. The drawn size and the layout do not change, so the dense desktop layout is identical and a 24px icon button is still easy to hit on a phone. The rule sits in the base layer, so a positioning utility on a control still wins.",
+      "surfaces": ["client"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "client: library",
+      "configuration": [],
+      "states": ["coarse-pointer", "fine-pointer"],
+      "failureModes": ["A control inside an overflow-clipped parent keeps only the part of its hit area the parent shows."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.touch-targets-rules",
+          "file": "plugins/@dshfiles/plugin-ui/tests/touch-targets.test.ts",
+          "testName": "widens kit buttons, toggles and page tabs to a 44px hit area on a coarse pointer only"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "plugin-ui.touch-targets-browser",
+          "reason": "Pointer media queries need a touch browser: the WebKit iPhone audit plans/ade-ux/phase6/capture/audit.mjs measures each control's hit area (drawn box plus ::after) and reports any under 44px."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only stylesheet rules; no Host work."
+        }
+      ]
     }
   ]
 }
