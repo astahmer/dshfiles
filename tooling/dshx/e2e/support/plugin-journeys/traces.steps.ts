@@ -526,6 +526,11 @@ Then("the thread Traces tab summarizes only this thread's telemetry", async ({ p
     await expect(summary.locator('[data-stat="statTokens"]')).toContainText('1.2K · 80')
     await expect(sessionView(page).locator('tr[data-trace-id]')).toHaveCount(1)
   })
+  await recordAssertion(page, 'traces-thread-tab-timeline', async () => {
+    const timeline = sessionView(page).getByRole('region', { name: 'Turn timeline', exact: true })
+    await expect(timeline).toBeVisible()
+    await expect(timeline.getByRole('list', { name: 'Timeline lanes', exact: true }).getByRole('listitem')).toHaveCount(3)
+  })
 })
 
 Then('a turn opens its span waterfall with the plugin span nested under the tool call', async ({ page }: { page: Page }) => {

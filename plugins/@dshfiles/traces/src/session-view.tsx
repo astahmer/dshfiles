@@ -1,5 +1,6 @@
 import type { ConvViewOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { AgentTimeline } from '@dshfiles/plugin-ui/components/motion/agent-timeline'
 import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
 import { ChatFocusModel } from '@dshfiles/chat/chat-focus'
 import { useApi } from '@dshfiles/dshx/client'
@@ -9,8 +10,8 @@ import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowLeftIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { errorMessage, keepPreviousData, useInfiniteQuery, useQuery } from '@dshfiles/plugin-ui/query'
-import { useEffect, useState, type ReactNode } from 'react'
+import { errorMessage, keepPreviousData, useInfiniteQuery, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Types } from 'effect'
 import { tracesApi, type LogsInput } from './api.js'
 import type { OpenThread } from './open-thread.js'
@@ -20,13 +21,17 @@ import type { TracesLocaleKey, TracesTranslate } from './locales.js'
 import { LogRow, type LogCorrelation } from './log-list.js'
 import { tracesQueries } from './queries.js'
 import { EmptyStoreGuide, receiverEndpoint } from './receiver-status.js'
+import { SessionTimelineModel } from './session-timeline.js'
 import { TraceDetailView } from './trace-detail.js'
 import { TraceList } from './trace-list.js'
-import type { SessionSummary } from './types.js'
+import type { SessionSummary, TraceDetail } from './types.js'
 
 const countFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 const TURN_TRACE_RETRY_MS = 1_500
 const TURN_TRACE_WAIT_MS = 20_000
+/** The newest traces the turn timeline draws; older turns stay one click away in the list below it. */
+const TIMELINE_TRACES = 20
+const TIMELINE_STALE_MS = 30_000
 
 const pair = (left: number | null, right: number | null): string =>
   `${left === null ? '–' : TraceFormat.duration(left)} · ${right === null ? '–' : TraceFormat.duration(right)}`
@@ -71,6 +76,40 @@ const SummaryGrid = (props: { readonly summary: SessionSummary; readonly t: Trac
       {/* An older Host omits costUsd until it restarts. */}
       {(summary.costUsd ?? null) === null ? null : <Stat label="statCost" value={TraceFormat.usd(summary.costUsd)} t={props.t} />}
     </section>
+  )
+}
+
+/** A stable combine keeps one array while no trace query changed, so the timeline memo holds. */
+const loadedTraces = (results: readonly { readonly data?: TraceDetail | undefined }[]): readonly TraceDetail[] =>
+  results.flatMap(result => (result.data === undefined ? [] : [result.data]))
+
+/** The thread's newest traces as one timeline of turns, model calls and tool calls. */
+const TurnTimeline = (props: { readonly traces: readonly TraceDetail[]; readonly t: TracesTranslate }): JSX.Element | null => {
+  const t = props.t
+  const timeline = useMemo(
+    () =>
+      SessionTimelineModel.build({
+        traces: props.traces,
+        laneNames: { turns: t('sectionTurns'), model: t('statModelCalls'), tools: t('statToolCalls') },
+      }),
+    [props.traces, t],
+  )
+  if (timeline.segments.length === 0) return null
+  return (
+    <AgentTimeline
+      heading={t('sessionTimeline')}
+      lanes={timeline.lanes}
+      segments={timeline.segments}
+      duration={timeline.duration}
+      autoPlay={false}
+      legend={[
+        { label: t('statModelCalls'), swatch: 'soft' },
+        { label: t('statToolCalls'), swatch: 'solid' },
+        { label: t('statErrors'), swatch: 'failed' },
+      ]}
+      labels={{ running: t('timelineRunning'), done: t('timelineDone'), failed: t('timelineFailed'), tokens: t('timelineTokens'), lanes: t('timelineLanes') }}
+      data-testid="traces-session-timeline"
+    />
   )
 }
 
@@ -143,6 +182,16 @@ export const SessionTracesView = (
     enabled: section === 'turns' && traceId === null,
   })
   const traceQuery = useQuery({ ...tracesQueries.trace(client, traceId ?? ''), enabled: traceId !== null })
+  const timelineIds = (listQuery.data?.pages.flatMap(page => page.traces) ?? []).slice(0, TIMELINE_TRACES).map(trace => trace.traceId)
+  const timelineTraces = useQueries({
+    queries: timelineIds.map(id => ({
+      ...tracesQueries.trace(client, id),
+      refetchInterval: false as const,
+      staleTime: TIMELINE_STALE_MS,
+      enabled: section === 'turns' && traceId === null,
+    })),
+    combine: loadedTraces,
+  })
   // dshx API payloads refuse undefined values, so absent filters are omitted rather than sent as undefined.
   const logFilters: Types.Mutable<Omit<LogsInput, 'cursor'>> = { sessionId: props.sessionId, limit: 50 }
   if (correlation !== null) {
@@ -228,6 +277,7 @@ export const SessionTracesView = (
                     </AlertDescription>
                   </Alert>
                 ) : null}
+                <TurnTimeline traces={timelineTraces} t={t} />
                 <TraceList
                   traces={traces}
                   hasMore={listQuery.hasNextPage}

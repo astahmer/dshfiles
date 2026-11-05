@@ -273,7 +273,7 @@
     {
       "id": "thread-traces-tab",
       "title": "Per-thread Traces tab",
-      "summary": "A Traces tab in the conversation view, after Trajectory, shows only the open thread's telemetry: traces with a span carrying its dsh.session.id (agent turn, model and tool spans and the plugin spans nested under them), a summary of spans, errors, model and tool calls, total and p50/p95 durations and gen_ai.usage token totals and list-price cost, a turn list that opens the span waterfall, and the thread's correlated logs. A Requests tab follows and reuses Usage's request log scoped to the open Session id. With nothing stored it says why, from the receiver's diagnosis.",
+      "summary": "A Traces tab in the conversation view, after Trajectory, shows only the open thread's telemetry: traces with a span carrying its dsh.session.id (agent turn, model and tool spans and the plugin spans nested under them), a summary of spans, errors, model and tool calls, total and p50/p95 durations and gen_ai.usage token totals and list-price cost, a turn timeline (the plugin-ui AgentTimeline) laying its newest traces, model calls and tool calls on three lanes with idle time squeezed out, a turn list that opens the span waterfall, and the thread's correlated logs. A Requests tab follows and reuses Usage's request log scoped to the open Session id. With nothing stored it says why, from the receiver's diagnosis.",
       "reach": [
         "seed tool-call-thread",
         "seed otlp-session-turns",
@@ -305,6 +305,12 @@
           "kind": "gherkin",
           "id": "traces.thread-tab-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/traces.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.session-timeline-lanes",
+          "file": "plugins/@dshfiles/traces/src/session-timeline.test.ts",
+          "testName": "lays turns, model calls and tool calls on three lanes with idle time squeezed out"
         },
         {
           "kind": "unit-test",
