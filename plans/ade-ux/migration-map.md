@@ -49,7 +49,6 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | Review | Thread panel | pulls-review/ai-scope-summaries → Thread panel (threadFacet)<br>pulls-review/batch-reviewed-marks → Thread panel (threadFacet)<br>pulls-review/thread-review-scopes → Thread panel (threadFacet) |
 | Revision graph | Land, No place of its own | jujutsu/graph-navigation → Land (destinationSection)<br>jujutsu/panel-scopes → No place of its own (infrastructure)<br>jujutsu/previewed-revision-mutations → Land (rowAction)<br>jujutsu/revision-detail-and-diff → Land (detail)<br>jujutsu/revision-graph → Land (destinationSection)<br>jujutsu/workspace-at-revision → Land (rowAction)<br>jujutsu/workspace-cleanup → Land (command)<br>jujutsu/workspace-overflow → Land (rowAction)<br>jujutsu/workspace-removal → Land (rowAction) |
 | Secrets | Settings | secret-catalog/alias-mutations → Settings (settingsSection)<br>secret-catalog/bounded-secret-reveal → Settings (settingsSection)<br>secret-catalog/inline-quick-add → Settings (settingsSection)<br>secret-catalog/scoped-alias-catalog → Settings (settingsSection) |
-| Settings | Settings | capabilities-hub/capabilities-hub → Settings (destinationSection)<br>plugin-guide/plugin-guide → Settings (destinationSection) |
 | Source control | Land | jujutsu/source-control → Land (destinationSection) |
 | Thread Sidebar: Board | Threads | thread-sidebar/thread-classification → Threads (destinationSection) |
 | Traces: Explorer | Inbox, Observe | traces/alert-rules → Inbox (attentionProvider)<br>traces/boards-and-saved-views → Observe (destinationSection)<br>traces/log-explorer → Observe (destinationSection)<br>traces/metric-charts → Observe (destinationSection)<br>traces/service-map → Observe (destinationSection)<br>traces/trace-explorer → Observe (destinationSection)<br>traces/trace-insights → Observe (destinationSection) |
@@ -75,13 +74,13 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | Host contract | 1 | Inbox 1 |
 | Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
 | keyboard | 3 | No place of its own 3 |
-| left-nav | 91 | Observe 21, Work 16, Settings 15, Land 13, Inbox 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
+| left-nav | 89 | Observe 21, Work 16, Land 13, Settings 13, Inbox 12, Agents 4, Knowledge 4, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 10 | No place of its own 7, Thread panel 2, Settings 1 |
 | observe | 2 | Observe 2 |
 | overlay | 4 | Agents 1, Knowledge 1, No place of its own 1, Work 1 |
 | palette | 13 | No place of its own 13 |
 | plugins-page | 2 | No place of its own 1, Settings 1 |
-| rail | 1 | Work 1 |
+| rail | 3 | Settings 2, Work 1 |
 | right-pane | 7 | Thread panel 5, No place of its own 2 |
 | settings | 24 | Settings 22, No place of its own 2 |
 | shell | 8 | No place of its own 5, Threads 3 |
@@ -264,8 +263,8 @@ rail destination (bottom); 46 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| capabilities-hub/capabilities-hub: Open the manager for skills, MCP servers or plugins from one page | destinationSection | left-nav: Settings › Capabilities hub |
-| plugin-guide/plugin-guide: Browse where a plugin can extend DSH | destinationSection | left-nav: Settings › Plugin guide |
+| capabilities-hub/capabilities-hub: Open the manager for skills, MCP servers or plugins from one page | destinationSection | rail: Settings › Capabilities hub (already on the rail) |
+| plugin-guide/plugin-guide: Browse where a plugin can extend DSH | destinationSection | rail: Settings › Plugin guide (already on the rail) |
 | mcp-servers/batch-server-actions: Batch enable, disable and remove MCP servers | rowAction | left-nav: MCP Servers: Servers › batch actions |
 | ai-accounts/account-lifecycle: Manage provider account drafts | settingsSection | left-nav: AI Accounts: Accounts |
 | ai-accounts/failure-recovery: Recover failed account requests per failure kind | settingsSection | settings: AI Accounts › failure recovery |

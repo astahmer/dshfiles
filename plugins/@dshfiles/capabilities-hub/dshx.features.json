@@ -10,7 +10,7 @@
       "surfaces": ["client", "host", "api", "tool"],
       "surface": "destinationSection",
       "destination": "settings",
-      "currentSurface": "left-nav: Settings › Capabilities hub",
+      "currentSurface": "rail: Settings › Capabilities hub (already on the rail)",
       "configuration": [],
       "states": ["counting", "counted", "owner-missing", "manager-missing", "command-copied"],
       "failureModes": [

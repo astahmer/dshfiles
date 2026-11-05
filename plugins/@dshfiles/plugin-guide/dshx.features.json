@@ -10,7 +10,7 @@
       "surfaces": ["client", "host", "api", "tool"],
       "surface": "destinationSection",
       "destination": "settings",
-      "currentSurface": "left-nav: Settings › Plugin guide",
+      "currentSurface": "rail: Settings › Plugin guide (already on the rail)",
       "configuration": [],
       "states": ["loading", "current", "stale", "filtered", "no-match", "drafted"],
       "failureModes": [

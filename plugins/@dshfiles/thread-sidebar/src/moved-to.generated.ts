@@ -25,7 +25,6 @@ export const FORMER_NAVIGATION: readonly FormerNavigationEntry[] = [
   { entry: 'Review', destinations: ['thread-panel'] },
   { entry: 'Revision graph', destinations: ['land', 'none'] },
   { entry: 'Secrets', destinations: ['settings'] },
-  { entry: 'Settings', destinations: ['settings'] },
   { entry: 'Source control', destinations: ['land'] },
   { entry: 'Thread Sidebar: Board', destinations: ['threads'] },
   { entry: 'Traces: Explorer', destinations: ['inbox', 'observe'] },
