@@ -1,5 +1,8 @@
 # Backlog
 
+Next: [Backlog v2](v2.md) (storage, ids, agent noise, multi-source sync) supersedes the open steps below where they
+overlap; its decisions replace "No GitHub/Linear sync" and "One global store" under Decisions.
+
 Resume here: the backlinks chip (step 6b, needs thread-sidebar), then steps 7 and 8. Steps 1–6, the FTS half of 6b,
 the redesign ([redesign.md](redesign.md)) and its journeys landed in `@dshfiles/backlog`; see its README.
 
