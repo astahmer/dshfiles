@@ -7,7 +7,7 @@ import { BacklogSettingsTag } from './backlog-settings.js'
 import { BacklogItemNotFound, type BacklogWriteFailed } from './errors.js'
 import { BacklogItems, type BacklogItem, type BacklogKind } from './item.js'
 import type { BacklogSettings } from './settings.js'
-import { BacklogStore, type BacklogActor } from './store.js'
+import { BacklogStore, type BacklogActor, type BacklogResult } from './store.js'
 import type { RemoteBackend, RemoteConnection } from './sync-backend.js'
 import {
   SyncAlreadyLinked,
@@ -313,6 +313,11 @@ export class BacklogSync extends Context.Service<
     }>
     /** One auto-sync round: every row with an interval that is due. */
     readonly autoSyncTick: Effect.Effect<void>
+    /**
+     * Deletes an item, its attachments and its remote mapping, so a later item can never inherit the deleted one's
+     * issue. The remote issue itself is left alone.
+     */
+    readonly deleteItem: (input: { readonly id: number }) => Effect.Effect<BacklogResult<void>, BacklogWriteFailed | SyncWriteFailed>
   }
 >()('@dshfiles/backlog/BacklogSync') {
   static readonly layer = Layer.effect(
@@ -664,7 +669,13 @@ export class BacklogSync extends Context.Service<
         return { results }
       })
 
-      return BacklogSync.of({ status, syncNow, link, importRemote, autoSyncTick, testConnection: backends.test, testSaved })
+      const deleteItem = Effect.fn('backlog sync delete item')(function* (input: { readonly id: number }) {
+        const deleted = yield* store.delete(input)
+        yield* tables.mappings.delete(String(input.id)).pipe(Effect.mapError(cause => new SyncWriteFailed({ itemId: input.id, cause })))
+        return deleted
+      }, lock.withPermit)
+
+      return BacklogSync.of({ status, syncNow, link, importRemote, autoSyncTick, testConnection: backends.test, testSaved, deleteItem })
     }),
   )
 }

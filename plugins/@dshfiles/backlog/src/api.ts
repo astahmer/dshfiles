@@ -382,7 +382,7 @@ export const backlogApi = defineApi({
       }),
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true) }), Schema.Struct({ ok: Schema.Literal(false), reason: Schema.Literal('not-found') })]),
       description:
-        'Permanently delete a backlog item and its attachments. This cannot be undone; use it only when the user explicitly asked for deletion and pass confirm: true. Use it when the user asked, never to rewrite items unrelated to the task.',
+        'Permanently delete a backlog item, its attachments and its remote-issue link (the remote issue itself stays). This cannot be undone; use it only when the user explicitly asked for deletion and pass confirm: true. Use it when the user asked, never to rewrite items unrelated to the task.',
       tool: { name: 'backlog_delete', readOnly: false },
     }),
     speechStatus: method({

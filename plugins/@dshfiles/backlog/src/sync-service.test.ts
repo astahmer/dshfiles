@@ -222,6 +222,24 @@ describe('BacklogSync with Linear', () => {
     }).pipe(Effect.provide(syncLayer({ client: linear.client })))
   })
 
+  it.effect('deletes the remote mapping with the item, so a reused id never inherits its issue', () => {
+    const linear = fakeLinear()
+    const storage = { items: backlogRows(), mappings: new Map<string, SyncMapping>() }
+    return Effect.gen(function* () {
+      const store = yield* BacklogStore
+      const sync = yield* BacklogSync
+      const created = yield* store.capture({ text: 'Linked then deleted', actor: { kind: 'user' } })
+      yield* sync.link({ id: created.item.id, backend: 'linear', create: true, actor: { kind: 'user' } })
+
+      expect(yield* sync.deleteItem({ id: created.item.id })).toEqual({ ok: true, value: undefined })
+
+      expect(storage.mappings.has(String(created.item.id))).toBe(false)
+      expect((yield* sync.status({})).items).toEqual([])
+      expect(linear.find('ENG-1')?.title).toBe('Linked then deleted')
+      expect(yield* sync.deleteItem({ id: created.item.id })).toEqual({ ok: false, reason: 'not-found' })
+    }).pipe(Effect.provide(syncLayer({ client: linear.client, storage })))
+  })
+
   it.effect('keeps items and mappings across a Host restart', () => {
     const linear = fakeLinear()
     const storage = { items: backlogRows(), mappings: new Map<string, SyncMapping>() }

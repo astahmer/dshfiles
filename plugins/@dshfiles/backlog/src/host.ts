@@ -99,7 +99,7 @@ const backlogHandlers = Api.handlers(backlogApi, {
       return { ok: true as const, value: { dataUrl: result.value.dataUrl, path } }
     }),
   removeFile: (input, call) => BacklogStore.use(store => store.removeFile({ ...input, actor: actorOf(call.caller) })),
-  delete: input => BacklogStore.use(store => Effect.map(store.delete({ id: input.id }), result => (result.ok ? { ok: true as const } : result))),
+  delete: input => BacklogSync.use(sync => Effect.map(sync.deleteItem({ id: input.id }), result => (result.ok ? { ok: true as const } : result))),
   speechStatus: () => HostSpeech.use(speech => speech.status),
   jevSetupStatus: () => Triage.use(triage => Effect.map(triage.jevNeedsSetup, needsSetup => ({ needsSetup }))),
   classifyReply: input => Triage.use(triage => triage.classifyReply(input.text)),
