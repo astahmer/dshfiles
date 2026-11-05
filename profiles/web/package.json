@@ -17,6 +17,7 @@
     "@dshfiles/background-jobs": "link:../../plugins/@dshfiles/background-jobs",
     "@dshfiles/backlog": "link:../../plugins/@dshfiles/backlog",
     "@dshfiles/btw": "link:../../plugins/@dshfiles/btw",
+    "@dshfiles/capabilities-hub": "link:../../plugins/@dshfiles/capabilities-hub",
     "@dshfiles/chat": "link:../../plugins/@dshfiles/chat",
     "@dshfiles/command-palette": "link:../../plugins/@dshfiles/command-palette",
     "@dshfiles/context-compaction": "link:../../plugins/@dshfiles/context-compaction",
@@ -43,6 +44,7 @@
     "@dshfiles/model-selection": "link:../../plugins/@dshfiles/model-selection",
     "@dshfiles/multi-host": "link:../../plugins/@dshfiles/multi-host",
     "@dshfiles/policies": "link:../../plugins/@dshfiles/policies",
+    "@dshfiles/plugin-guide": "link:../../plugins/@dshfiles/plugin-guide",
     "@dshfiles/pull-requests": "link:../../plugins/@dshfiles/pull-requests",
     "@dshfiles/project-automations": "link:../../plugins/@dshfiles/project-automations",
     "@dshfiles/project-checks": "link:../../plugins/@dshfiles/project-checks",
@@ -74,6 +76,7 @@
     "@dshfiles/usage": "link:../../plugins/@dshfiles/usage",
     "@dshfiles/user-questions": "link:../../plugins/@dshfiles/user-questions",
     "@dshfiles/web-search-brave": "link:../../plugins/@dshfiles/web-search-brave",
+    "@dshfiles/web-fetch-readable": "link:../../plugins/@dshfiles/web-fetch-readable",
     "@dshfiles/workbench": "link:../../plugins/@dshfiles/workbench",
     "@dshfiles/workspace-folder-picker": "link:../../plugins/@dshfiles/workspace-folder-picker",
     "@dshfiles/workspace-nav": "link:../../plugins/@dshfiles/workspace-nav",
@@ -163,7 +166,10 @@
         "@dshfiles/references",
         "@dshfiles/policies",
         "@dshfiles/session-undo",
-        "@dshfiles/hmr-gate"
+        "@dshfiles/hmr-gate",
+        "@dshfiles/capabilities-hub",
+        "@dshfiles/plugin-guide",
+        "@dshfiles/web-fetch-readable"
       ]
     }
   }
