@@ -40,7 +40,7 @@ import {
 import type { NavigationRecord } from './navigation-api.js'
 import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard } from './phone-shell.js'
 
-const ICONS: Record<DestinationIcon, LucideIcon> = {
+const ICONS = {
   'messages-square': MessagesSquareIcon,
   inbox: InboxIcon,
   'git-merge': GitMergeIcon,
@@ -49,7 +49,7 @@ const ICONS: Record<DestinationIcon, LucideIcon> = {
   activity: ActivityIcon,
   library: LibraryIcon,
   settings: SettingsIcon,
-}
+} satisfies Record<DestinationIcon, LucideIcon>
 
 /** The palette's "Go to …" commands ask the left column to show one destination's list. */
 export const SHOW_DESTINATION_EVENT = 'dshfiles:thread-sidebar-show-destination'
@@ -65,10 +65,13 @@ const memoryStorage = {
  * Which destination's list the left column shows. Presentation only and per page load: every load starts at Threads,
  * the home of the ADE, and the list then follows the page the stage shows.
  */
+/** Every page load starts at Threads. */
+const HOME_DESTINATION: DestinationId = 'threads'
+
 const storedDestination = createStoredValue({
   key: 'dshfiles.thread-sidebar.destination.v1',
   schema: Schema.Literals(DESTINATION_IDS),
-  fallback: 'threads' as DestinationId,
+  fallback: HOME_DESTINATION,
   storage: () => memoryStorage,
 })
 
@@ -222,7 +225,10 @@ const SectionButton = (props: {
       )}
     >
       {props.icon === undefined || props.icon === null ? null : (
-        <span className="dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true">
+        <span
+          className="dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
+          aria-hidden="true"
+        >
           {props.icon}
         </span>
       )}
@@ -269,7 +275,9 @@ const DestinationIndex = (props: {
           </EmptyState>
         ) : (
           <nav aria-label={`${props.destination.label} pages`} className="dshx:flex dshx:flex-col dshx:gap-0.5">
-            {settings === null ? null : <SectionButton label="All settings" description="Appearance, models, agents, tools and more." selected={false} onSelect={settings} />}
+            {settings === null ? null : (
+              <SectionButton label="All settings" description="Appearance, models, agents, tools and more." selected={false} onSelect={settings} />
+            )}
             {mapped.map(section => (
               <SectionButton
                 key={section.panelId}
@@ -338,7 +346,12 @@ const ListPane = (
       {props.searchThreads === null && props.customizeThreads === undefined ? null : (
         <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:px-2 dshx:pb-2">
           {props.searchThreads === null ? null : (
-            <Button size="sm" variant="outline" className="dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:font-normal dshx:text-muted-foreground" onClick={props.searchThreads}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:font-normal dshx:text-muted-foreground"
+              onClick={props.searchThreads}
+            >
               <SearchIcon className="dshx:size-3.5" aria-hidden="true" />
               {props.labels.searchThreads}
             </Button>
@@ -416,7 +429,8 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
     props.selectPanel(panelId)
     props.record({ destination: destination.id, section: panelId, surface })
   }
-  if (phone) return <PhoneNavigation {...props} destinations={destinations} destination={destination} setDestination={setDestination} openSection={openSection} />
+  if (phone)
+    return <PhoneNavigation {...props} destinations={destinations} destination={destination} setDestination={setDestination} openSection={openSection} />
   const choose = (next: ResolvedDestination): void => {
     setDestination(next.id)
     if (props.collapsed) props.toggleSidebar()
@@ -450,13 +464,22 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
     <div className="dshx:flex dshx:min-h-0 dshx:w-full dshx:min-w-0 dshx:flex-1" data-destination-shell="">
       <nav
         aria-label="Destinations"
-        className={cn('dshx:flex dshx:min-h-0 dshx:shrink-0 dshx:flex-col dshx:overflow-y-auto dshx:pb-2 dshx:[scrollbar-width:none]', props.collapsed ? 'dshx:w-full dshx:px-2' : 'dshx:w-16 dshx:px-1')}
+        className={cn(
+          'dshx:flex dshx:min-h-0 dshx:shrink-0 dshx:flex-col dshx:overflow-y-auto dshx:pb-2 dshx:[scrollbar-width:none]',
+          props.collapsed ? 'dshx:w-full dshx:px-2' : 'dshx:w-16 dshx:px-1',
+        )}
       >
         {/* Expanded, New thread sits in the header row; collapsed, the rail keeps it reachable. */}
         {props.collapsed && props.showNewThread ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label={props.labels.newThread} className="dshx:mb-1 dshx:w-full dshx:shrink-0" onClick={props.startSession}>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={props.labels.newThread}
+                className="dshx:mb-1 dshx:w-full dshx:shrink-0"
+                onClick={props.startSession}
+              >
                 <SquarePenIcon className="dshx:size-[18px]" aria-hidden="true" />
               </Button>
             </TooltipTrigger>
@@ -469,7 +492,12 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
         </div>
       </nav>
       {props.collapsed ? null : (
-        <div id={listId} role="tabpanel" aria-label={destination.label} className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:border-l dshx:border-border/60">
+        <div
+          id={listId}
+          role="tabpanel"
+          aria-label={destination.label}
+          className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:border-l dshx:border-border/60"
+        >
           <ListPane {...props} destination={destination} openSection={openSection} />
         </div>
       )}
@@ -493,6 +521,7 @@ const PhoneNavigation = (
     readonly openSection: (panelId: string, surface?: NavigationRecord['surface']) => void
   },
 ): JSX.Element => {
+  const { toggleSidebar } = props
   const listOpen = !props.collapsed
   const [moreOpen, setMoreOpen] = useState(false)
   useLayoutEffect(() => {
@@ -528,9 +557,9 @@ const PhoneNavigation = (
     shown.current = { thread: props.selectedThreadId, panel: props.activePanelId, stage: props.stageThreadId ?? null }
     if (changed && listOpen) {
       setMoreOpen(false)
-      props.toggleSidebar()
+      toggleSidebar()
     }
-  }, [props.selectedThreadId, props.activePanelId, props.stageThreadId, listOpen, props.toggleSidebar, props.destinations])
+  }, [props.selectedThreadId, props.activePanelId, props.stageThreadId, listOpen, toggleSidebar, props.destinations])
   const open = (next: DestinationId): void => {
     props.setDestination(next)
     setMoreOpen(false)
@@ -554,7 +583,15 @@ const PhoneNavigation = (
     if (!listOpen) props.toggleSidebar()
   }
   const stageOwner = Destinations.owning(props.destinations, props.activePanelId)?.id
-  const current: PhoneTab | null = !listOpen ? (stageOwner === 'inbox' ? 'inbox' : null) : moreOpen || !['threads', 'inbox'].includes(props.destination.id) ? 'more' : props.destination.id === 'inbox' ? 'inbox' : 'threads'
+  const current: PhoneTab | null = !listOpen
+    ? stageOwner === 'inbox'
+      ? 'inbox'
+      : null
+    : moreOpen || !['threads', 'inbox'].includes(props.destination.id)
+      ? 'more'
+      : props.destination.id === 'inbox'
+        ? 'inbox'
+        : 'threads'
   const select = (tab: PhoneTab): void => {
     if (tab === 'new') {
       props.startSession()
@@ -578,7 +615,7 @@ const PhoneNavigation = (
     }
     open(tab)
   }
-  const tabLabel: Record<PhoneTab, string> = { threads: 'Threads', inbox: 'Inbox', new: 'New', more: 'More' }
+  const tabLabel = { threads: 'Threads', inbox: 'Inbox', new: 'New', more: 'More' } satisfies Record<PhoneTab, string>
   const tabIcon = (tab: PhoneTab): ReactNode => {
     if (tab === 'new') return <PlusIcon className="dshx:size-5" />
     if (tab === 'more') return <EllipsisIcon className="dshx:size-5" />
@@ -646,7 +683,10 @@ const PhoneNavigation = (
               <span className="dshx:min-w-0 dshx:truncate">{bar.back.label}</span>
             </button>
           )}
-          <h1 data-phone-title="" className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[15px] dshx:leading-tight dshx:font-semibold', bar.back === null && 'dshx:pl-2.5')}>
+          <h1
+            data-phone-title=""
+            className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[15px] dshx:leading-tight dshx:font-semibold', bar.back === null && 'dshx:pl-2.5')}
+          >
             {bar.title}
           </h1>
           {bar.thread && togglePanels !== null ? (
@@ -676,7 +716,11 @@ const PhoneNavigation = (
                   <EntityRow
                     key={candidate.id}
                     data-destination={candidate.id}
-                    leading={<span className="dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center dshx:text-muted-foreground">{destinationIcon(props, candidate, false)}</span>}
+                    leading={
+                      <span className="dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center dshx:text-muted-foreground">
+                        {destinationIcon(props, candidate, false)}
+                      </span>
+                    }
                     heading={candidate.label}
                     description={candidate.description}
                     trailing={<ChevronRightIcon className="dshx:size-4 dshx:text-muted-foreground" aria-hidden="true" />}
