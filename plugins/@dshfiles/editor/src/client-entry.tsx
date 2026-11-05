@@ -11,6 +11,7 @@ import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { WORKBENCH_MAIN_PANEL_ID, workbenchPanels } from '@dshfiles/workbench/registry'
+import { threadOnScreen } from '@dshfiles/workbench/thread-on-screen'
 import { useEffect, useSyncExternalStore } from 'react'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
@@ -23,6 +24,7 @@ import { OpenFileAddress, fileLinkParamsSchema, GO_TO_LINE_EVENT, goToLineReques
 import { openFileLinksPreference } from './open-file-links-preference.js'
 import { EDITOR_SETTINGS_NAMESPACE } from './settings-namespace.js'
 import { editorSettings } from './settings.js'
+import { createFollowedSession } from './followed-session.js'
 import { createSessionScreen } from './session-screen.js'
 import { createWorkspaceFileIndex } from './workspace-files.js'
 
@@ -114,23 +116,10 @@ export default defineClient({
     )
 
     // The workbench lives in the main slot where no session is on screen, so both surfaces follow the last one shown.
-    let lastSessionId = ctx.sidebarRight.mounted.getSnapshot()
-    const sessionListeners = new Set<() => void>()
-    ctx.effect(
-      () =>
-        ctx.sidebarRight.mounted.subscribe(() => {
-          const next = ctx.sidebarRight.mounted.getSnapshot()
-          if (next === undefined || next === lastSessionId) return
-          lastSessionId = next
-          for (const listener of sessionListeners) listener()
-        }),
-      'dshfiles-editor: follow the session on screen',
-    )
-    const subscribeSession = (listener: () => void): (() => void) => {
-      sessionListeners.add(listener)
-      return () => sessionListeners.delete(listener)
-    }
-    const currentSession = (): SessionId | undefined => lastSessionId
+    const followedSession = createFollowedSession(threadOnScreen({ mounted: ctx.sidebarRight.mounted, sessionDrafts: () => ctx.get('sessionDrafts') }))
+    ctx.effect(() => followedSession.start(), 'dshfiles-editor: follow the session on screen')
+    const subscribeSession = followedSession.subscribe
+    const currentSession = followedSession.get
 
     const SessionEditorPanel = (): JSX.Element => {
       const sessionId = useSyncExternalStore(subscribeSession, currentSession, noSession)
@@ -196,6 +185,7 @@ export default defineClient({
           // SAFETY: the id comes from a Host-built address for this Client's Sessions.
           const sessionId = parsed.sessionId as SessionId
           store.open(sessionId, line === undefined ? { path: parsed.path } : { path: parsed.path, line })
+          followedSession.show(sessionId)
           showEditor()
         }
         actions.close()

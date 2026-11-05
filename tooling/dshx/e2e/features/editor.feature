@@ -40,3 +40,10 @@ Feature: Workspace editor
     Then Go to file lists workspace sources but not dependency or version-control files
     And SessionScreen indexes "README.md" and "src/hello.ts" for the mounted session
     And SessionScreen lists "src/hello.ts" under "src" and its search finds "src/hello.ts"
+
+  @scenario:editor.file-links-open-once
+  Scenario: A Workspace files row opens its file in the editor and focuses that tab when opened again
+    Given the isolated plugin composition of "@dshfiles/editor, @dshfiles/workspace-folder-picker, @dshfiles/command-palette, @dshfiles/workbench, @dshfiles/frame-layout, @dshfiles/sidebar-right" is booted
+    When a disposable workspace with source, dependency and version-control files has a thread
+    And "README.md" is opened twice from the Workspace files page
+    Then the editor shows "README.md" in one tab with its disk content

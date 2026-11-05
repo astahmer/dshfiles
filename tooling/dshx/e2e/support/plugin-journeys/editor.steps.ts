@@ -82,6 +82,21 @@ When('{string} is opened with Go to file', async ({ page }: { page: Page }, file
   await expect(editorTab(page, fileName)).toHaveAttribute('aria-selected', 'true')
 })
 
+const workspaceFilesRow = (page: Page, fileName: string) =>
+  page.locator('[data-files-body]').filter({ visible: true }).getByRole('button', { name: fileName, exact: true })
+
+When('{string} is opened twice from the Workspace files page', async ({ page }: { page: Page }, fileName: string) => {
+  const pane = page.locator('[data-workbench-region="main"]').first()
+  await pane.getByRole('button', { name: 'New tab', exact: true }).first().click()
+  const chooser = pane.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })
+  await chooser.getByRole('button', { name: /^Workspace files/ }).click()
+  await workspaceFilesRow(page, fileName).click()
+  await expect(editorTab(page, fileName)).toHaveAttribute('aria-selected', 'true')
+  await page.getByRole('tab', { name: 'Files', exact: true }).first().click()
+  await workspaceFilesRow(page, fileName).click()
+  await expect(editorTab(page, fileName)).toHaveAttribute('aria-selected', 'true')
+})
+
 When('the editor placement is set to {string} in the plugin settings', async ({ page }: { page: Page }, placement: string) => {
   await openGlobalPanel(page, 'Plugins')
   await page.getByRole('button', { name: 'View @dshfiles/editor', exact: true }).click()
@@ -180,6 +195,14 @@ Then('{string} opens in the {string} editor with its disk content', async ({ pag
     )
     await expect(saveState(page)).toHaveText('Saved')
   })
+})
+
+Then('the editor shows {string} in one tab with its disk content', async ({ page }: { page: Page }, fileName: string) => {
+  await recordAssertion(page, 'editor-file-link-focuses-the-open-tab', () => expect(editorTab(page, fileName)).toHaveCount(1))
+  await recordAssertion(page, 'editor-file-link-shows-disk-content', () =>
+    expect(editorPanel(page).locator('[data-editor-surface] .view-lines')).toContainText('Editor workspace'),
+  )
+  await finishJourneyAssertions(page)
 })
 
 Then('the first save asks for approval and writes the edit to disk', async ({ page }: { page: Page }) => {

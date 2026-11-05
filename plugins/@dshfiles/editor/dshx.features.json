@@ -129,6 +129,58 @@
       ]
     },
     {
+      "id": "file-links",
+      "title": "Open file links in the editor",
+      "summary": "A file row in the native Workspace files page, a tool-call path or a composer reference opens that file in the editor surface, focusing its existing tab instead of opening a second one. The editor shows the session the file belongs to, and keeps the last thread's files while a New-thread draft the Host has not created yet is on screen.",
+      "surfaces": ["client", "integration"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "main-tabs: New tab › Workspace files › file row",
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"Collapse sidebar\"",
+        "click button \"New tab\"",
+        "click button \"Workspace files*\"",
+        "click text \"README.md\"",
+        "expect tab \"README.md\""
+      ],
+      "configuration": [],
+      "states": ["opened", "focused-existing", "draft-on-screen"],
+      "failureModes": ["With Open file links off, the Host text preview opens the file instead."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "editor.file-links-open-once",
+          "featureFile": "tooling/dshx/e2e/features/editor.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.file-links-draft-keeps-thread",
+          "file": "plugins/@dshfiles/editor/src/followed-session.test.ts",
+          "testName": "keeps the last thread while a New-thread draft is mounted, then shows the sent thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.file-links-show-link-session",
+          "file": "plugins/@dshfiles/editor/src/followed-session.test.ts",
+          "testName": "shows the session of an opened file link until another thread comes on screen, even while a draft is typed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.file-links-one-tab-per-file",
+          "file": "plugins/@dshfiles/editor/src/editor-store.test.ts",
+          "testName": "opens one tab for relative, ./ and absolute spellings under the session cwd"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: routing a file address to the editor tab; the file read carries its own api-dispatch span."
+        }
+      ]
+    },
+    {
       "id": "workspace-file-index",
       "title": "Index workspace files with bounded traversal",
       "summary": "Traverse breadth-first with concurrency and entry limits, skipping VCS and dependency directories while surfacing partial results.",
