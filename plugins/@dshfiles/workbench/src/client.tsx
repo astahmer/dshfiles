@@ -101,7 +101,24 @@ export default defineClient({
     const facetThread = threadOnScreen({ mounted: ctx.sidebarRight.mounted, sessionDrafts: () => ctx.get('sessionDrafts') })
     const threadFacets = ThreadFacets.create({
       guide: { subscribe: listener => ctx.sidebarRightTabs.subscribe(listener), getSnapshot: () => ctx.sidebarRightTabs.guide() },
-      onScreen: facetThread,
+      onScreen: ThreadFacets.threadOnScreen({
+        mounted: facetThread,
+        open: {
+          subscribe: listener => {
+            const offTabs = workbenchTabs().subscribe(listener)
+            const offMode = ctx.get('mainSurface')?.subscribe(listener)
+            return () => {
+              offTabs()
+              offMode?.()
+            }
+          },
+          getSnapshot: () => {
+            const tabs = workbenchTabs().getSnapshot()
+            if (ctx.get('mainSurface')?.mode() !== 'workbench' || !tabs.enabled) return undefined
+            return tabs.tabs.flatMap(tab => (tab.target.kind === 'thread' ? [tab.target.sessionId] : []))
+          },
+        },
+      }),
       registry,
       admission: facetAdmission,
     })

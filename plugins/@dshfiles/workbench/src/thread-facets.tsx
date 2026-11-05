@@ -43,6 +43,32 @@ export class ThreadFacets {
     return [...facets.values()].sort((left, right) => left.order - right.order)
   }
 
+  /**
+   * The thread a facet pick opens for. Native SidebarRight keeps the last selected Session mounted after its Workbench
+   * tab closed, so the mounted Session counts only while a tab still has it open. `open` lists the Sessions of open
+   * thread tabs; undefined when the Workbench tabs do not own the main region.
+   */
+  static threadOnScreen(input: {
+    readonly mounted: ThreadFacetObservable<string | undefined>
+    readonly open: ThreadFacetObservable<readonly string[] | undefined>
+  }): ThreadFacetObservable<string | undefined> {
+    return {
+      subscribe: listener => {
+        const offMounted = input.mounted.subscribe(listener)
+        const offOpen = input.open.subscribe(listener)
+        return () => {
+          offMounted()
+          offOpen()
+        }
+      },
+      getSnapshot: () => {
+        const mounted = input.mounted.getSnapshot()
+        const open = input.open.getSnapshot()
+        return mounted === undefined || open === undefined || open.includes(mounted) ? mounted : undefined
+      },
+    }
+  }
+
   /** Whether a projected native record is a facet page that should follow the on-screen thread. */
   static follows(record: Pick<SidebarResourcePanel, 'kind' | 'address'>, facetKinds: ReadonlySet<string>): boolean {
     return facetKinds.has(record.kind) && SidebarResourcePanelModel.isPage(record)

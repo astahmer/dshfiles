@@ -1,6 +1,6 @@
 import type { SidebarRightGuideBox } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { SidebarResourcePanels } from '@dshfiles/sidebar-right/resource-panels'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createDockview, type DockviewApi } from 'dockview-react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createNativePageAdmission } from './native-page-admission.js'
@@ -118,6 +118,55 @@ describe('ThreadFacets', () => {
     stop()
     expect(registry.get(ThreadFacets.sourceId('cost'))).toBeUndefined()
     expect(registry.get(ThreadFacets.sourceId('jobs'))).toBeUndefined()
+  })
+
+  it('counts the mounted thread as on screen only while a Workbench tab still has it open', () => {
+    const mounted = observable<string | undefined>('thread-a')
+    const open = observable<readonly string[] | undefined>(undefined)
+    const onScreen = ThreadFacets.threadOnScreen({ mounted, open })
+    const changes = vi.fn()
+    const unsubscribe = onScreen.subscribe(changes)
+    expect(onScreen.getSnapshot()).toBe('thread-a')
+
+    open.set(['thread-b', 'thread-a'])
+    expect(onScreen.getSnapshot()).toBe('thread-a')
+
+    open.set(['thread-b'])
+    expect(onScreen.getSnapshot()).toBeUndefined()
+
+    open.set([])
+    mounted.set(undefined)
+    expect(onScreen.getSnapshot()).toBeUndefined()
+    expect(changes).toHaveBeenCalledTimes(4)
+
+    unsubscribe()
+    mounted.set('thread-b')
+    expect(changes).toHaveBeenCalledTimes(4)
+  })
+
+  it('disables Thread panels and refuses a pick once the mounted thread has no open tab', () => {
+    const registry = createWorkbenchPanelRegistry()
+    const guide = observable<readonly SidebarRightGuideBox[]>([box('jobs', 60, 'Jobs')])
+    const mounted = observable<string | undefined>('thread-a')
+    const open = observable<readonly string[] | undefined>(['thread-a'])
+    const openPage = vi.fn<NonNullable<SidebarResourcePanels['openPage']>>(() => true)
+    const source = ThreadFacets.create({
+      guide,
+      onScreen: ThreadFacets.threadOnScreen({ mounted, open }),
+      registry,
+      admission: createNativePageAdmission({ openPage, close: vi.fn() }, registry),
+    })
+    source.start()
+    render(<NewViewChooser definitions={registry.list()} onSelect={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /^Jobs/u }).hasAttribute('disabled')).toBe(false)
+
+    act(() => open.set([]))
+    expect(screen.getByRole('button', { name: /^Jobs/u }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByText('Open a thread to show its panels here.')).toBeDefined()
+    const jobs = registry.get(ThreadFacets.sourceId('jobs'))
+    if (jobs === undefined) throw new Error('missing Jobs launcher')
+    expect(source.open(jobs, surface())).toBe(false)
+    expect(openPage).not.toHaveBeenCalled()
   })
 
   it('lists facets under Thread panels with their description, disabled until a thread is on screen', () => {
