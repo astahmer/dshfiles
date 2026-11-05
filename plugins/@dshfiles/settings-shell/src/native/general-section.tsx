@@ -2,6 +2,7 @@
  * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2 (MIT): `GeneralSection.js`,
  * `CurrentVersionRow.js`, `DeveloperToolsRow.js` and `chrome.js`.
  */
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import { IconSettingsOutlineMedium, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
@@ -30,7 +31,17 @@ export const GeneralSection = (
     revealSettingsEntry({ container: column.current, entryId: props.target })
   }, [props.target])
   return (
-    <div className="dshx:flex dshx:w-full dshx:flex-col dshx:[&>[data-slot='settings.general.item']>:last-child]:border-b-0" ref={column}>
+    // Narrow pane (a phone): a native row's label and description need at least 12rem before its control, otherwise
+    // the control wraps under them; without this the text squeezed to one word per line beside the selector. The
+    // native rows are unlayered module CSS, so the basis must be important to beat their own `flex`.
+    <div
+      className={cn(
+        "dshx:flex dshx:w-full dshx:flex-col dshx:[&>[data-slot='settings.general.item']>:last-child]:border-b-0",
+        "dshx:@max-pane-narrow:[&_[class$=row]]:flex-wrap dshx:@max-pane-narrow:[&_[class$=row]]:gap-y-2",
+        "dshx:@max-pane-narrow:[&_[class$=rowText]]:min-w-0! dshx:@max-pane-narrow:[&_[class$=rowText]]:flex-[1_1_12rem]!",
+      )}
+      ref={column}
+    >
       {props.renderSlot('settings.general.item', {})}
     </div>
   )
