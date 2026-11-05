@@ -74,6 +74,23 @@ describe('Git', () => {
     }).pipe(Effect.scoped),
   )
 
+  it.live('runs ssh in batch mode with prompts off, but keeps a user ssh command', () =>
+    Effect.gen(function* () {
+      const directory = yield* temporaryDirectory
+      const fake = join(directory, 'env-git')
+      writeFileSync(fake, '#!/bin/sh\nprintf "%s|%s" "$GIT_SSH_COMMAND" "$GIT_TERMINAL_PROMPT"\n')
+      chmodSync(fake, 0o755)
+      const read = (environment: Record<string, string | undefined>) =>
+        Git.use(git => git.exec({ args: ['fetch'], cwd: directory })).pipe(
+          Effect.provide(Git.layerWith({ executable: fake, environment }).pipe(Layer.provide(NodeServices.layer))),
+        )
+      expect(yield* read({})).toBe('ssh -o BatchMode=yes|0')
+      // The child inherits the real environment, so only the absence of the forced batch command is asserted.
+      expect(yield* read({ GIT_SSH_COMMAND: 'ssh -i ~/.ssh/deploy' })).toBe(`${process.env['GIT_SSH_COMMAND'] ?? ''}|0`)
+      expect(yield* read({ GIT_SSH: '/usr/bin/my-ssh' })).toBe(`${process.env['GIT_SSH_COMMAND'] ?? ''}|0`)
+    }).pipe(Effect.scoped),
+  )
+
   it('keeps flag values and credentials out of errors', () => {
     expect(GitArgs.redact(['commit', '-m', 'private message', '--format=%H'])).toEqual(['commit', '-m', '<redacted>', '--format=<redacted>'])
     expect(redactGitStderr("fatal: unable to access 'https://user:token@example.com/repo.git/'")).toBe(

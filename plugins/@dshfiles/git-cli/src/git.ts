@@ -33,6 +33,8 @@ export interface GitOptions {
   readonly timeout?: Duration.Input | undefined
   readonly maxStdoutBytes?: number | undefined
   readonly maxStderrBytes?: number | undefined
+  /** The environment git inherits, read once to keep a user's own ssh command; defaults to `process.env`. */
+  readonly environment?: Readonly<Record<string, string | undefined>> | undefined
 }
 
 const DEFAULT_TIMEOUT = Duration.minutes(2)
@@ -41,6 +43,12 @@ const DEFAULT_MAX_STDERR_BYTES = 64 * 1024
 const KILL_GRACE = Duration.millis(1_500)
 /** Never prompt for credentials, an editor or a pager: a Host process has no terminal to answer them. */
 const NON_INTERACTIVE = { GIT_TERMINAL_PROMPT: '0', GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true', GIT_PAGER: 'cat' }
+/** ssh opens /dev/tty for a passphrase or host-key prompt even with stdin ignored; batch mode fails fast instead. */
+const BATCH_SSH = { GIT_SSH_COMMAND: 'ssh -o BatchMode=yes' }
+
+/** A user's own `GIT_SSH_COMMAND` or `GIT_SSH` is kept: replacing it would drop their key or proxy. */
+const nonInteractiveEnvironment = (environment: Readonly<Record<string, string | undefined>>): Readonly<Record<string, string>> =>
+  environment['GIT_SSH_COMMAND'] === undefined && environment['GIT_SSH'] === undefined ? { ...NON_INTERACTIVE, ...BATCH_SSH } : NON_INTERACTIVE
 
 const collectBounded = <E>(stream: Stream.Stream<Uint8Array, E>, maxBytes: number) =>
   Stream.runFold(
@@ -82,6 +90,7 @@ export class Git extends Context.Service<
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const executable = options.executable ?? 'git'
     const maxStderrBytes = options.maxStderrBytes ?? DEFAULT_MAX_STDERR_BYTES
+    const baseEnvironment = nonInteractiveEnvironment(options.environment ?? process.env)
 
     const bounded = (command: GitCommand): Effect.Effect<GitOutput, GitRunFailed> => {
       const args = ['-c', 'core.quotePath=false', ...command.args]
@@ -96,7 +105,7 @@ export class Git extends Context.Service<
               stdin: 'ignore',
               forceKillAfter: KILL_GRACE,
               extendEnv: true,
-              env: { ...NON_INTERACTIVE, ...command.env },
+              env: { ...baseEnvironment, ...command.env },
             }),
           )
           .pipe(Effect.mapError(cause => new GitRunFailed({ verb, reason: 'spawn-failed', cause })))

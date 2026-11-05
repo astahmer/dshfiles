@@ -121,10 +121,11 @@ const fetchGitUntraced = Effect.fnUntraced(function* (input: {
   const ancestor = yield* runGit(['merge-base', '--is-ancestor', local.value, remoteTip.value], repoRoot)
   if (ancestor.exitCode !== 0) return { status: 'fetched', repoRoot, bookmarkMoved: false } satisfies FetchOutcome
   const worktrees = yield* runGit(['worktree', 'list', '--porcelain'], repoRoot)
+  // A prunable worktree's folder is gone: it cannot fast-forward, and the branch ref moves on its own instead.
   const holder = worktrees.stdout
     .split('\n\n')
     .map(block => block.split('\n'))
-    .find(lines => lines.includes(`branch refs/heads/${input.bookmark}`))
+    .find(lines => lines.includes(`branch refs/heads/${input.bookmark}`) && !lines.some(line => line === 'prunable' || line.startsWith('prunable ')))
     ?.find(line => line.startsWith('worktree '))
     ?.slice('worktree '.length)
   const moved =

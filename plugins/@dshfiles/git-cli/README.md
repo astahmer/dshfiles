@@ -27,6 +27,10 @@ Every run:
 
 - runs `git -c core.quotePath=false …` with stdin ignored and `GIT_TERMINAL_PROMPT=0`, no editor and no pager, so it
   never waits for a terminal; `command.env` adds variables over the spawner's environment (a scratch `GIT_INDEX_FILE`);
+- sets `GIT_SSH_COMMAND='ssh -o BatchMode=yes'` unless the Host environment already has `GIT_SSH_COMMAND` or `GIT_SSH`,
+  so an ssh passphrase or host-key prompt fails fast instead of waiting on `/dev/tty` until the timeout. git lets this
+  variable win over `core.sshCommand`: if you set a custom ssh command in git config, set `GIT_SSH_COMMAND` (with
+  `-o BatchMode=yes`) in DSH's environment instead, and load keys into `ssh-agent` so batch mode can use them;
 - caps stdout at 512 KB (`maxStdoutBytes`; a longer one fails as `output-truncated`, or with `onStdoutLimit: 'truncate'`
   keeps the head and sets `stdoutTruncated`) and stderr at 64 KB;
 - stops after two minutes (`timeout` per command or layer) and kills the process, with a 1.5 s grace;

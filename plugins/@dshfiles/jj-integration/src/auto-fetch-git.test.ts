@@ -71,6 +71,21 @@ describe.skipIf(!gitAvailable)('auto fetch against real git', () => {
       }).pipe(Effect.scoped),
     )
 
+    it.effect('moves the branch ref when the only worktree holding it is prunable', () =>
+      Effect.gen(function* () {
+        const { root, origin, clone } = yield* repositories
+        git(clone, 'switch', '-q', '-c', 'work')
+        const side = join(root, 'side')
+        git(clone, 'worktree', 'add', '-q', side, 'main')
+        rmSync(side, { recursive: true, force: true })
+        const before = git(clone, 'rev-parse', 'main')
+        advanceOrigin(origin, 'two')
+        const tip = git(origin, 'rev-parse', 'main')
+        expect(yield* fetch({ clone, fastForward: true })).toEqual({ status: 'fast-forwarded', repoRoot: clone, from: before, to: tip })
+        expect(git(clone, 'rev-parse', 'main')).toBe(tip)
+      }).pipe(Effect.scoped),
+    )
+
     it.effect('keeps a local branch with its own commits where it is', () =>
       Effect.gen(function* () {
         const { origin, clone } = yield* repositories
