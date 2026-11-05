@@ -124,6 +124,7 @@ describe('Workbench scene scope ownership', () => {
   it('keeps a fresh project:none window anchored when its first known Host project arrives', () => {
     const tabs = start(null)
     tabs.host('a', 'a')
+    tabs.actor.send({ type: 'tab.keep', tabId: 'thread:a' })
     tabs.actor.send({ type: 'tab.new' })
     tabs.actor.send({ type: 'tab.select', tabId: 'thread:a' })
     tabs.actor.send({ type: 'tab.open', target: thread('b'), newTab: false })

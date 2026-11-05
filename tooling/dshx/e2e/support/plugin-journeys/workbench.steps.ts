@@ -702,6 +702,13 @@ const newWorkbenchThread = async (page: Page, prompt: string): Promise<string> =
 }
 
 const threadRow = (page: Page, id: string) => page.locator(`article[data-thread-id="${id}"]`)
+/** A plain click opens a reusable preview tab; the row's double-click keeps it, VS Code style. */
+const keepThreadRow = async (page: Page, id: string): Promise<void> => {
+  await openThreadRow(page, id)
+  await threadRow(page, id)
+    .locator('button[data-thread-main-action]')
+    .dblclick({ position: { x: 24, y: 16 } })
+}
 const openThreadRow = async (page: Page, id: string): Promise<void> => {
   const observation = await page.evaluateHandle(eventName => {
     const requests: Array<{ sessionId: unknown; newTab: unknown; defaultPrevented: boolean; cancelable: boolean }> = []
@@ -774,7 +781,8 @@ const openThreadRow = async (page: Page, id: string): Promise<void> => {
             const clips = []
             for (let parent = element.parentElement; parent !== null && clips.length < 4; parent = parent.parentElement) {
               const style = getComputedStyle(parent)
-              if (style.overflowY !== 'visible' || style.overflowX !== 'visible') clips.push({ tag: parent.tagName, cls: parent.className.toString().slice(0, 120), overflow: style.overflowY, ...bounds(parent) })
+              if (style.overflowY !== 'visible' || style.overflowX !== 'visible')
+                clips.push({ tag: parent.tagName, cls: parent.className.toString().slice(0, 120), overflow: style.overflowY, ...bounds(parent) })
             }
             return clips
           })(),
@@ -853,7 +861,7 @@ Then('Main tabs settings still show disabled tabs and Preview opening', async ({
   await expect(settings).toHaveCount(0)
 })
 
-When('two real Workbench threads are opened normally from the sidebar', async ({ page }: { page: Page }) => {
+When('two real Workbench threads are previewed then kept from the sidebar', async ({ page }: { page: Page }) => {
   await createWorkbenchWorkspace(page)
   const first = await newWorkbenchThread(page, threadPrompt('first'))
   const second = await newWorkbenchThread(page, threadPrompt('second'))
@@ -861,14 +869,20 @@ When('two real Workbench threads are opened normally from the sidebar', async ({
   await page.getByRole('button', { name: 'All threads', exact: true }).click()
   await expect(threadRow(page, first)).toBeVisible()
   await expect(threadRow(page, second)).toBeVisible()
-  // Creation may already have opened fixed tabs. Close them so sidebar opening itself must create both tabs.
-  // No modifier, double-click, Keep open, chooser occurrence or synthetic runtime action is used here.
+  // Creation may already have opened kept tabs. Close them so sidebar opening itself must create both tabs.
   for (const index of ['first', 'second'] as const) {
     const tab = threadDockTab(page, index)
     if ((await tab.count()) > 0) await tab.getByRole('button', { name: `Close ${threadPrompt(index)}`, exact: true }).click()
   }
-  await openThreadRow(page, first)
-  await openThreadRow(page, second)
+  await recordAssertion(page, acceptanceId(page, 'plain-sidebar-open-replaces-preview'), async () => {
+    await openThreadRow(page, first)
+    await expect(threadDockTab(page, 'first').locator('[data-preview]')).toHaveCount(1)
+    await openThreadRow(page, second)
+    await expect(threadDockTab(page, 'first')).toHaveCount(0)
+    await expect(threadDockTab(page, 'second').locator('[data-preview]')).toHaveCount(1)
+  })
+  await keepThreadRow(page, first)
+  await keepThreadRow(page, second)
 })
 
 const fixedConversation = async (page: Page, index: 'first' | 'second'): Promise<Locator> => {
@@ -948,10 +962,10 @@ Then('ordinary sidebar opens focus fixed tabs and close-all reopens their comple
     }
     await assertNoGlobalConversationAliases(page)
     await expect(mainSeat(page).locator('[data-conversation-session]').filter({ visible: true })).toHaveCount(0)
-    await openThreadRow(page, ids.first)
+    await keepThreadRow(page, ids.first)
     await assertCompleteFixedConversation(page, 'first')
     await expect(threadDockTab(page, 'first')).toHaveCount(1)
-    await openThreadRow(page, ids.second)
+    await keepThreadRow(page, ids.second)
     await assertCompleteFixedConversation(page, 'second')
     await openThreadRow(page, ids.first)
     await assertCompleteFixedConversation(page, 'first')

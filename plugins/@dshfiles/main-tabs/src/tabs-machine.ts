@@ -28,8 +28,6 @@ export interface TabPreferences {
   readonly maxTabs: number
   readonly openMode: OpenMode
   readonly persistence: TabPersistence
-  /** Derived surface policy: Workbench conversations stay open independently of panel previews. */
-  readonly keepConversations?: boolean
   /** Derived surface policy: Session navigation cannot replace the adopted Workbench scene scope. */
   readonly keepScope?: boolean
 }
@@ -181,15 +179,14 @@ const openTarget = (input: {
   if (set.tabs.some(tab => tab.id === id)) {
     return { tabs: set.tabs.map(tab => (tab.id === id ? (title === undefined ? { ...tab, usedAt } : { ...tab, usedAt, title }) : tab)), activeTabId: id }
   }
-  const openMode = target.kind === 'thread' && preferences.keepConversations ? 'new' : preferences.openMode
+  const openMode = preferences.openMode
   const candidate: Tab = { id, target, pinned: false, preview: openMode === 'preview', usedAt }
   const opened: Tab = title === undefined ? candidate : { ...candidate, title }
-  const canReplace = (tab: Tab): boolean => !tab.pinned && !(preferences.keepConversations && tab.target.kind === 'thread')
   const replaced =
     openMode === 'preview'
-      ? set.tabs.find(tab => tab.preview && canReplace(tab))
+      ? set.tabs.find(tab => tab.preview && !tab.pinned)
       : openMode === 'replace'
-        ? set.tabs.find(tab => tab.id === set.activeTabId && canReplace(tab))
+        ? set.tabs.find(tab => tab.id === set.activeTabId && !tab.pinned)
         : undefined
   if (replaced !== undefined) {
     return evictPastLimit({ tabs: set.tabs.map(tab => (tab.id === replaced.id ? opened : tab)), activeTabId: id }, preferences.maxTabs, input.busyTabIds)
@@ -531,7 +528,14 @@ export const tabsMachine = setup({
                 clock,
                 ...withSet(
                   context,
-                  openTarget({ set: currentSet(context), target: event.target, preferences, usedAt: clock, busyTabIds: context.busyTabIds, title: event.title }),
+                  openTarget({
+                    set: currentSet(context),
+                    target: event.target,
+                    preferences,
+                    usedAt: clock,
+                    busyTabIds: context.busyTabIds,
+                    title: event.title,
+                  }),
                 ),
               }
             }),

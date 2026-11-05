@@ -126,10 +126,10 @@ Feature: Workbench layouts
 
   @scenario:workbench.legacy-disabled-conversation-tabs
   @scenario:main-tabs.workbench-legacy-disabled-conversation-tabs
-  Scenario: Legacy disabled preview preferences still keep two sidebar conversations through reload
+  Scenario: Legacy disabled preview preferences preview sidebar conversations and keep double-clicked ones through reload
     Given an isolated Workbench profile with legacy disabled preview tabs is booted
     Then Main tabs settings still show disabled tabs and Preview opening
-    When two real Workbench threads are opened normally from the sidebar
+    When two real Workbench threads are previewed then kept from the sidebar
     Then both sidebar conversations have their own kept fixed-session tabs
     When each fixed-session conversation receives its own draft
     Then switching conversation tabs preserves distinct messages and drafts

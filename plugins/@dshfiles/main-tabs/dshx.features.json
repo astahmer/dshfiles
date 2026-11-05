@@ -6,7 +6,7 @@
       "id": "workbench-semantics-provider",
       "title": "One tab semantics provider for Workbench and standalone fallback",
       "reach": ["seed tool-call-thread", "click button \"Collapse sidebar\"", "click button \"New tab\"", "expect region \"Choose a view\""],
-      "summary": "The declared main-tabs/workbench-tabs public module re-exports the canonical workbench/tabs page-global snapshot/subscribe/actions bridge. Workbench adopts the existing actor's current set, computed status/unread/preview/pin/title/availability and scoped targets without opening tabs again. User actions drive that same actor; workbench aside moves preserve the actor tab and only accepted native independent-pane moves close the source. The owned stack always uses Workbench pane chrome, with no native-layout opt-out; its conversation actor stays enabled despite a legacy disabled standalone-strip preference. Normal sidebar opens keep separate Session-bound conversation tabs without a disposable preview, while panel opening modes remain configurable. The fullheight right pane retains its tabs while collapsed. The native strip and mount observer are removed without hiding shell.main; their original route remains only for absent-Workbench deployments. Semantic Start shows the same Choose a view / Search views chooser as a group's New tab, including one Settings Shell: Settings hub and qualified plugin views, but no separate Rich Composer/current-conversation clone. The thread list explicitly opens or focuses fixed Session-bound chat-and-editor tabs, including same-native-current reopen after closing all tabs; standalone fallback Start suggestions remain unchanged.",
+      "summary": "The declared main-tabs/workbench-tabs public module re-exports the canonical workbench/tabs page-global snapshot/subscribe/actions bridge. Workbench adopts the existing actor's current set, computed status/unread/preview/pin/title/availability and scoped targets without opening tabs again. User actions drive that same actor; workbench aside moves preserve the actor tab and only accepted native independent-pane moves close the source. The owned stack always uses Workbench pane chrome, with no native-layout opt-out; its conversation actor stays enabled despite a legacy disabled standalone-strip preference. Conversations and panels follow the configured opening mode: by default a sidebar open shows a reusable italic preview tab, VS Code style, which typing in it, double-clicking, pinning or dragging keeps. The fullheight right pane retains its tabs while collapsed. The native strip and mount observer are removed without hiding shell.main; their original route remains only for absent-Workbench deployments. Semantic Start shows the same Choose a view / Search views chooser as a group's New tab, including one Settings Shell: Settings hub and qualified plugin views, but no separate Rich Composer/current-conversation clone. The thread list explicitly opens or focuses fixed Session-bound chat-and-editor tabs, including same-native-current reopen after closing all tabs; standalone fallback Start suggestions remain unchanged.",
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -169,18 +169,19 @@
           "key": "maxTabs",
           "defaultValue": "10",
           "constraints": "Integer 0\u201350; past it the least recently used tab closes, skipping pinned, active and still-working (running or waiting for you) tabs. 0 keeps every tab.",
-          "coveredBy": ["main-tabs.machine-unit-tab-limit"]
+          "coveredBy": ["main-tabs.machine-unit-tab-limit", "main-tabs.machine-unit-tab-limit-busy", "main-tabs.machine-unit-tab-limit-unlimited"]
         },
         {
           "key": "openMode",
           "defaultValue": "preview",
-          "constraints": "Panels and standalone conversations use preview, new or replace. Workbench conversations are kept independently even with a saved preview or replace mode; panel previews are unchanged.",
+          "constraints": "Conversations and panels use preview, new or replace, in Workbench and the standalone strip. A preview tab shows an italic title and is kept by typing in it, double-click, pin or drag; new opens one tab per conversation.",
           "choices": ["preview", "new", "replace"],
           "coveredBy": [
             "main-tabs.panels-and-threads",
             "main-tabs.machine-unit-preview",
             "main-tabs.machine-unit-replace",
             "main-tabs.workbench-panel-preview",
+            "main-tabs.workbench-preview-keep-on-edit",
             "main-tabs.workbench-legacy-disabled-conversation-tabs"
           ]
         }
@@ -229,13 +230,19 @@
           "kind": "unit-test",
           "id": "main-tabs.workbench-effective-preferences",
           "file": "plugins/@dshfiles/main-tabs/src/tab-preferences-policy.test.ts",
-          "testName": "enables Workbench conversation retention without mutating saved native preferences"
+          "testName": "enables the Workbench tab owner and holds its scene without mutating saved native preferences"
         },
         {
           "kind": "unit-test",
           "id": "main-tabs.workbench-panel-preview",
           "file": "plugins/@dshfiles/main-tabs/src/tab-preferences-policy.test.ts",
-          "testName": "keeps Workbench conversations while preserving panel preview replacement"
+          "testName": "keeps a conversation the user kept, while the next opens replace the preview"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.workbench-preview-keep-on-edit",
+          "file": "plugins/@dshfiles/workbench/src/tab-panels.test.tsx",
+          "testName": "keeps a preview tab once the user types inside it (preview=$preview)"
         },
         {
           "kind": "gherkin",
@@ -360,6 +367,18 @@
           "id": "main-tabs.machine-unit-tab-limit",
           "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
           "testName": "closes the least recently used unpinned tab past the limit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-tab-limit-busy",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "skips still-working tabs when closing past the limit, and evicts them once they settle"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-tab-limit-unlimited",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "keeps every tab when the limit is 0"
         },
         {
           "kind": "unit-test",

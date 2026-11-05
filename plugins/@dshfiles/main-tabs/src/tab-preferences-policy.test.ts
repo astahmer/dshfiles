@@ -25,14 +25,13 @@ afterEach(() => {
 })
 
 describe('effectiveTabPreferences', () => {
-  it('enables Workbench conversation retention without mutating saved native preferences', () => {
+  it('enables the Workbench tab owner and holds its scene without mutating saved native preferences', () => {
     const preferences: TabPreferences = Object.freeze({ ...legacyPreferences, maxTabs: 23, persistence: 'global' })
     expect(effectiveTabPreferences(preferences, 'workbench')).toEqual({
       enabled: true,
       openMode: 'preview',
       maxTabs: 23,
       persistence: 'global',
-      keepConversations: true,
       keepScope: true,
     })
     expect(preferences).toEqual({ enabled: false, openMode: 'preview', maxTabs: 23, persistence: 'global' })
@@ -43,7 +42,7 @@ describe('effectiveTabPreferences', () => {
     expect(effectiveTabPreferences(preferences, 'native')).toBe(preferences)
   })
 
-  it.each([false, true])('keeps A and B as fixed Workbench tabs with legacy enabled=%s and preview mode', enabled => {
+  it.each([false, true])('previews Workbench conversations VS Code style with legacy enabled=%s', enabled => {
     const tabs = start()
     tabs.actor.send({ type: 'preferences.changed', preferences: effectiveTabPreferences({ ...legacyPreferences, enabled }, 'workbench') })
     tabs.host('a')
@@ -51,39 +50,44 @@ describe('effectiveTabPreferences', () => {
     tabs.host('b')
 
     expect(tabs.actor.getSnapshot().matches('on')).toBe(true)
-    expect(tabs.ids()).toEqual(['thread:a', 'thread:b'])
-    expect(tabs.set()?.tabs.map(tab => tab.preview)).toEqual([false, false])
-    expect(tabs.saved.at(-1)?.sets['project:none']?.tabs.map(tab => tab.id)).toEqual(['thread:a', 'thread:b'])
+    expect(tabs.ids()).toEqual(['thread:b'])
+    expect(tabs.set()?.tabs[0]?.preview).toBe(true)
   })
 
-  it('keeps Workbench conversations while preserving panel preview replacement', () => {
+  it('keeps a conversation the user kept, while the next opens replace the preview', () => {
     const tabs = start()
     tabs.actor.send({ type: 'preferences.changed', preferences: effectiveTabPreferences({ ...legacyPreferences, enabled: true }, 'workbench') })
     tabs.host('a')
+    tabs.actor.send({ type: 'tab.keep', tabId: 'thread:a' })
     tabs.host('b')
-    tabs.actor.send({ type: 'host.navigated', target: { kind: 'panel', panelId: 'jujutsu' }, projectId: 'one' })
     tabs.actor.send({ type: 'host.navigated', target: { kind: 'panel', panelId: 'usage' }, projectId: 'one' })
 
-    expect(tabs.ids()).toEqual(['thread:a', 'thread:b', 'panel:usage'])
-    expect(tabs.set()?.tabs.map(tab => tab.preview)).toEqual([false, false, true])
+    expect(tabs.ids()).toEqual(['thread:a', 'panel:usage'])
+    expect(tabs.set()?.tabs.map(tab => tab.preview)).toEqual([false, true])
   })
 
-  it.each(['preview', 'replace'] as const)('protects restored legacy conversation previews from panel %s replacement', openMode => {
+  it('opens every Workbench conversation in its own tab when the open mode is new', () => {
+    const tabs = start()
+    tabs.actor.send({ type: 'preferences.changed', preferences: effectiveTabPreferences({ ...legacyPreferences, openMode: 'new' }, 'workbench') })
+    tabs.host('a')
+    tabs.host('b')
+
+    expect(tabs.ids()).toEqual(['thread:a', 'thread:b'])
+    expect(tabs.set()?.tabs.map(tab => tab.preview)).toEqual([false, false])
+  })
+
+  it('replaces a restored conversation preview with the next opened panel', () => {
     const restored = { id: 'thread:a', target: thread('a'), pinned: false, preview: true, usedAt: 1 }
     const tabs = start({ lastProjectKey: 'project:one', sets: { 'project:one': { tabs: [restored], activeTabId: restored.id } } })
-    tabs.actor.send({ type: 'preferences.changed', preferences: effectiveTabPreferences({ ...legacyPreferences, openMode }, 'workbench') })
+    tabs.actor.send({ type: 'preferences.changed', preferences: effectiveTabPreferences(legacyPreferences, 'workbench') })
     tabs.actor.send({ type: 'host.navigated', target: { kind: 'panel', panelId: 'jujutsu' }, projectId: 'one' })
-    expect(tabs.ids()).toEqual(['thread:a', 'panel:jujutsu'])
 
-    tabs.actor.send({ type: 'host.navigated', target: { kind: 'panel', panelId: 'editor' }, projectId: 'one' })
-    expect(tabs.ids()).toEqual(['thread:a', 'panel:editor'])
-    expect(tabs.set()?.tabs[0]).toEqual(restored)
-    expect(tabs.saved.at(-1)?.sets['project:one']?.tabs[0]).toEqual(restored)
+    expect(tabs.ids()).toEqual(['panel:jujutsu'])
   })
 
-  it.each(['preview', 'replace'] as const)('keeps fixed identities and reopens the current thread after close-all with %s preferences', openMode => {
+  it('keeps fixed identities and reopens the current thread after close-all in new-tab mode', () => {
     const tabs = start()
-    tabs.actor.send({ type: 'preferences.changed', preferences: effectiveTabPreferences({ ...legacyPreferences, openMode }, 'workbench') })
+    tabs.actor.send({ type: 'preferences.changed', preferences: effectiveTabPreferences({ ...legacyPreferences, openMode: 'new' }, 'workbench') })
     tabs.host('a')
     tabs.actor.send({ type: 'tab.open', target: thread('b'), newTab: false })
     tabs.host('b')
