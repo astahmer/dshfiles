@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { classifyTurn, globalInstallPlan, healthCheck } from './cli.mjs'
+import { classifyTurn, globalInstallPlan, healthCheck, planSessionImport } from './cli.mjs'
 
 /**
  * The property that matters: an incomplete candidate is refused rather than
@@ -155,6 +155,43 @@ test('a live install without pnpm state approves no builds and carries no patche
       false,
     )
     assert.deepEqual(plan.patches, [])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('imports only recovery threads the live home lacks and reports diverged ones', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-lkg-import-'))
+  const write = (home, path, text) => {
+    mkdirSync(join(root, home, path, '..'), { recursive: true })
+    writeFileSync(join(root, home, path), text)
+  }
+  try {
+    write('live', 'sessions/--p--/shared/session.v4.jsonl.zstd', 'live copy')
+    write('live', 'sessions/--p--/same/session.v4.jsonl.zstd', 'same')
+    write('live', 'attachments/v1/objects/aa/known', 'known')
+    write('recover', 'sessions/--p--/shared/session.v4.jsonl.zstd', 'continued in recovery')
+    write('recover', 'sessions/--p--/same/session.v4.jsonl.zstd', 'same')
+    write('recover', 'sessions/--p--/same/session.lock', 'lock')
+    write('recover.prev', 'sessions/--q--/fresh/session.v4.jsonl.zstd', 'created in recovery')
+    write('recover.prev', 'attachments/v1/objects/aa/known', 'known')
+    write('recover.prev', 'attachments/v1/objects/bb/new', 'new')
+    const sources = [join(root, 'recover'), join(root, 'recover.prev')]
+
+    const plan = planSessionImport({ sources, liveHome: join(root, 'live') })
+
+    assert.deepEqual(
+      plan.imports.map(session => [session.id, session.target]),
+      [['fresh', join(root, 'live', 'sessions', '--q--', 'fresh')]],
+    )
+    assert.deepEqual(
+      plan.diverged.map(session => session.id),
+      ['shared'],
+    )
+    assert.deepEqual(plan.attachments, [
+      { from: join(root, 'recover.prev', 'attachments/v1/objects/bb/new'), to: join(root, 'live', 'attachments/v1/objects/bb/new') },
+    ])
+    assert.equal(planSessionImport({ sources, liveHome: join(root, 'live'), since: Date.now() + 60_000 }).imports.length, 0)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

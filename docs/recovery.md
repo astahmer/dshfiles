@@ -54,6 +54,11 @@ The recovery script supports:
 | `DSH_LKG_LIVE_HOME` | Select the source DSH home        |
 | `DSH_LKG_PORT`      | Select the recovery listener port |
 
+Threads started during a recovery stay in its state, and the next recovery start
+drops the previous state. `scripts/dsh-lkg/cli.mjs import-sessions` lists them,
+and `--apply` copies the ones the live home lacks back into it; see
+[the LKG README](../scripts/dsh-lkg/README.md#bring-recovery-threads-back-to-the-live-home).
+
 Use the URL actually printed by the selected recovery launcher; never publish
 its launch token. APFS clone support and macOS immutable flags are platform
 features, not cross-platform guarantees. Read the implementation's platform

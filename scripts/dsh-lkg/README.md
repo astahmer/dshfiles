@@ -163,6 +163,24 @@ a recovery stays in the recovery state, and the previous one is kept once as
 `DSH_LKG_LIVE_HOME` picks another source, `DSH_LKG_HOME` another state
 directory, `DSH_LKG_PORT` another port.
 
+### Bring recovery threads back to the live home
+
+Threads started during a recovery live only in its state, and the next
+`dsh-recover` start deletes `state/recover.prev`: after two restarts they are
+gone. Copy them into the live home before that:
+
+```sh
+node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs import-sessions --since 24 --titles   # dry run
+node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs import-sessions --since 24 --apply
+```
+
+It reads `state/recover` and `state/recover.prev`, and copies every thread log
+(subagent threads included) whose Session id the live `~/.dsh/sessions` lacks,
+plus the attachment objects the live home lacks. A thread both homes changed
+since the clone is listed as diverged and never overwritten. Plugin storage
+(thread order, pins, workspace links) is not copied. Restart the live DSH host
+process if an imported thread does not show up in its list.
+
 ## Immutability
 
 Two independent layers, because instructions are not enforcement:

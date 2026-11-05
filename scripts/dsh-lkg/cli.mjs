@@ -920,6 +920,128 @@ const status = () => {
   log(`state:    ${STATE}`)
 }
 
+const sessionDirsOf = home => {
+  const root = join(home, 'sessions')
+  if (!existsSync(root)) return []
+  return readdirSync(root, { withFileTypes: true })
+    .filter(project => project.isDirectory())
+    .flatMap(project =>
+      readdirSync(join(root, project.name), { withFileTypes: true })
+        .filter(session => session.isDirectory())
+        .map(session => ({ project: project.name, id: session.name, path: join(root, project.name, session.name) })),
+    )
+}
+
+const newestChange = path => {
+  const stats = statSync(path)
+  if (!stats.isDirectory()) return stats.mtimeMs
+  return Math.max(stats.mtimeMs, ...readdirSync(path).map(entry => newestChange(join(path, entry))))
+}
+
+const treeDigest = path => {
+  const hash = createHash('sha256')
+  const visit = current => {
+    for (const entry of readdirSync(current, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+      if (entry.name === 'session.lock') continue
+      const child = join(current, entry.name)
+      hash.update(relative(path, child))
+      if (entry.isDirectory()) visit(child)
+      else hash.update(readFileSync(child))
+    }
+  }
+  visit(path)
+  return hash.digest('hex')
+}
+
+const attachmentObjectsOf = home => {
+  const root = join(home, 'attachments')
+  if (!existsSync(root)) return []
+  const found = []
+  const visit = current => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const child = join(current, entry.name)
+      if (entry.isDirectory()) visit(child)
+      else found.push(relative(home, child))
+    }
+  }
+  visit(root)
+  return found
+}
+
+/**
+ * Plan copying recovery-state threads back into the live DSH_HOME. Recovery state starts as a clone of the live
+ * home, so a Session id the live home lacks was created during recovery; one it has with different content was
+ * continued on both sides and is reported, never overwritten. Attachments are content-addressed, so missing
+ * objects are always safe to add.
+ */
+const planSessionImport = ({ sources, liveHome, since }) => {
+  const live = new Map(sessionDirsOf(liveHome).map(session => [session.id, session]))
+  const candidates = new Map()
+  for (const source of sources) {
+    for (const session of sessionDirsOf(source)) {
+      const changedAt = newestChange(session.path)
+      const known = candidates.get(session.id)
+      if (known === undefined || changedAt > known.changedAt) candidates.set(session.id, { ...session, source, changedAt })
+    }
+  }
+  const imports = []
+  const diverged = []
+  for (const candidate of candidates.values()) {
+    if (since !== undefined && candidate.changedAt < since) continue
+    const existing = live.get(candidate.id)
+    if (existing === undefined) imports.push({ ...candidate, target: join(liveHome, 'sessions', candidate.project, candidate.id) })
+    else if (treeDigest(existing.path) !== treeDigest(candidate.path)) diverged.push({ ...candidate, live: existing.path })
+  }
+  const liveAttachments = new Set(attachmentObjectsOf(liveHome))
+  const attachments = new Map()
+  for (const source of sources) {
+    for (const object of attachmentObjectsOf(source)) {
+      if (!liveAttachments.has(object) && !attachments.has(object)) attachments.set(object, join(source, object))
+    }
+  }
+  imports.sort((left, right) => right.changedAt - left.changedAt)
+  return { imports, diverged, attachments: [...attachments].map(([object, from]) => ({ from, to: join(liveHome, object) })) }
+}
+
+const sessionTitleOf = path => {
+  const log = join(path, 'session.v4.jsonl.zstd')
+  if (!existsSync(log)) return undefined
+  const decoded = run(['sh', '-c', 'zstd -dcq "$1" 2>/dev/null || nix run nixpkgs#zstd -- -dcq "$1"', 'sh', log], { maxBuffer: 512 * 1024 * 1024 })
+  const titles = decoded.stdout.split('\n').filter(line => line.includes('"type":"session/title"'))
+  try {
+    return JSON.parse(titles.at(-1) ?? 'null')?.data?.title
+  } catch {
+    return undefined
+  }
+}
+
+const importSessions = ({ sinceHours, apply, titles }) => {
+  const liveHome = resolve(process.env.DSH_LKG_LIVE_HOME?.trim() || join(homedir(), '.dsh'))
+  const recoverHome = resolve(process.env.DSH_LKG_HOME?.trim() || join(STATE, 'recover'))
+  const sources = [recoverHome, `${recoverHome}.prev`].filter(existsSync)
+  if (sources.length === 0) fail(`no recovery state at ${recoverHome}; nothing to import`)
+  const since = sinceHours === undefined ? undefined : Date.now() - sinceHours * 3_600_000
+  const plan = planSessionImport({ sources, liveHome, since })
+  for (const session of plan.imports) {
+    const title = titles ? sessionTitleOf(session.path) : undefined
+    log(`${apply ? 'import' : 'would import'} ${session.id}  ${new Date(session.changedAt).toISOString()}  ${session.project}${title ? `  "${title}"` : ''}`)
+    log(`  from ${session.path}`)
+  }
+  for (const session of plan.diverged) log(`skip diverged ${session.id}: changed in recovery and live; compare ${session.path} with ${session.live}`)
+  log(`${String(plan.imports.length)} thread logs, ${String(plan.attachments.length)} attachments to add; ${String(plan.diverged.length)} diverged skipped`)
+  if (!apply) {
+    if (plan.imports.length > 0) log('dry run: re-run with --apply to copy them into the live home')
+    return
+  }
+  requireOperator()
+  for (const session of plan.imports) {
+    cloneTree(session.path, session.target)
+    run(['find', session.target, '-name', 'session.lock', '-delete'])
+  }
+  for (const attachment of plan.attachments) cloneTree(attachment.from, attachment.to)
+  if (plan.imports.length > 0) log(`dsh-lkg: imported into ${liveHome}; restart the live DSH host process if the threads do not appear in its list`)
+}
+
 const usage = () => {
   log(`dsh-lkg <command>
 
@@ -939,8 +1061,12 @@ const usage = () => {
   unlock <id>                 clear immutable flags for maintenance
   remove <id>                 drop one version (never the current one)
   status                      where the store lives
+  import-sessions [--since <hours>] [--titles] [--apply]
+                              list threads created during recovery (state and
+                              state.prev) that the live home lacks; --apply
+                              copies them and their attachments into it
 
-Operator commands (snapshot, upgrade, reap, unlock) refuse to run from a DSH agent
+Operator commands (snapshot, upgrade, reap, unlock, import-sessions --apply) refuse to run from a DSH agent
 session unless DSH_LKG_ADMIN=1 is set.`)
 }
 
@@ -950,7 +1076,7 @@ const main = async () => {
     const index = rest.indexOf(name)
     return index === -1 ? undefined : rest[index + 1]
   }
-  const flagValues = new Set(['--label', '--keep', '--turn-model'].flatMap(name => (flag(name) === undefined ? [] : [flag(name)])))
+  const flagValues = new Set(['--label', '--keep', '--turn-model', '--since'].flatMap(name => (flag(name) === undefined ? [] : [flag(name)])))
   const positional = () => rest.find(value => !value.startsWith('--') && !flagValues.has(value))
   const turnModel = () => {
     const model = flag('--turn-model')
@@ -982,6 +1108,12 @@ const main = async () => {
     case 'status':
       status()
       return
+    case 'import-sessions': {
+      const sinceHours = flag('--since') === undefined ? undefined : Number(flag('--since'))
+      if (sinceHours !== undefined && !(sinceHours > 0)) fail('--since takes a positive number of hours')
+      importSessions({ sinceHours, apply: rest.includes('--apply'), titles: rest.includes('--titles') })
+      return
+    }
     default:
       usage()
       process.exitCode = command === undefined ? 0 : 1
@@ -990,4 +1122,4 @@ const main = async () => {
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main()
 
-export { classifyTurn, cloneTree, globalInstallPlan, healthCheck, snapshot }
+export { classifyTurn, cloneTree, globalInstallPlan, healthCheck, planSessionImport, snapshot }
