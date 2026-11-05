@@ -10,7 +10,6 @@ import {
   StateDot,
   Tooltip as NativeTooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { HostSnapshotsModel } from '../snapshots.js'
 import { NS } from './locales.js'
@@ -350,12 +349,9 @@ function CatalogRows({
                   <span className={css.metrics}>
                     {tokenMetric !== undefined && <span className={css.metricToken}>{tokenMetric}</span>}
                     {durationMetric !== undefined && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className={css.metricDuration}>{durationMetric.compact}</span>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">{t('duration.exactTitle', { duration: durationMetric.exact })}</TooltipContent>
-                      </Tooltip>
+                      <NativeTooltip label={t('duration.exactTitle', { duration: durationMetric.exact })} side="bottom">
+                        <span className={css.metricDuration}>{durationMetric.compact}</span>
+                      </NativeTooltip>
                     )}
                   </span>
                 )}

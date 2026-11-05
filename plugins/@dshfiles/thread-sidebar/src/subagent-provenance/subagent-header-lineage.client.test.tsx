@@ -165,4 +165,16 @@ describe('SubagentHeaderLineage route provenance', () => {
     expect(within(activeRow).getByRole('status').textContent).toBe('Running')
     expect(within(inactiveRow).queryByRole('status')).toBeNull()
   })
+
+  it('opens a catalog whose rows show a duration without an ambient tooltip provider', () => {
+    const timed: SessionListState = {
+      ...sessionList,
+      byId: { [CHILD]: { ...childSummary, projectionValues: { ...childSummary.projectionValues, subagentTiming: { settledMs: 65_000 } } } },
+    }
+    render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(timed)} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /subagent/ }))
+    const row = screen.getByRole('treeitem', { name: /^worker / })
+    expect(row.textContent).toContain('duration.')
+  })
 })
