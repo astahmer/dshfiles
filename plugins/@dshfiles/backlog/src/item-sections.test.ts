@@ -30,7 +30,9 @@ describe('item sections', () => {
       expect(listed.map(criterion => criterion.text)).toEqual(['criteria stored', 'plan stored'])
 
       yield* store.update({ id, criteriaChecks: [{ id: listed[0]?.id ?? '', done: true }], actor: agent })
-      const rewritten = detailOf(yield* store.update({ id, criteria: [{ text: 'plan stored' }, { text: 'criteria stored' }, { text: 'summary stored' }], actor: user }))
+      const rewritten = detailOf(
+        yield* store.update({ id, criteria: [{ text: 'plan stored' }, { text: 'criteria stored' }, { text: 'summary stored' }], actor: user }),
+      )
       expect(rewritten.item.criteria?.map(criterion => [criterion.text, criterion.done])).toEqual([
         ['plan stored', false],
         ['criteria stored', true],

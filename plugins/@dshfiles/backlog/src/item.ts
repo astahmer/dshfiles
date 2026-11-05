@@ -376,9 +376,8 @@ const criteriaFromText = (text: string, known: readonly BacklogCriterion[] = [])
     .slice(0, MAX_CRITERIA)
     .map((criterion, index) => ({ id: known.find(own => own.text === criterion.text)?.id ?? criterionId(criterion.text, index), ...criterion }))
 
-
 /** How an event shows a field change: lists and criteria as short text, never `[object Object]`. */
-const displayValue = (value: unknown): string => {
+const displayValue = (value: BacklogItem[BacklogHumanField] | null): string => {
   if (value === null || value === undefined) return ''
   if (Array.isArray(value))
     return value

@@ -272,7 +272,11 @@ export class BacklogTemplateNotFound extends Schema.TaggedError<BacklogTemplateN
 }
 
 /** A merge that cannot run as asked: the same item twice, or nothing left to merge. */
-export class BacklogMergeInvalid extends Schema.TaggedError<BacklogMergeInvalid>()('BacklogMergeInvalid', { reason: Schema.String }, { dshxWireCode: 'merge-invalid' }) {
+export class BacklogMergeInvalid extends Schema.TaggedError<BacklogMergeInvalid>()(
+  'BacklogMergeInvalid',
+  { reason: Schema.String },
+  { dshxWireCode: 'merge-invalid' },
+) {
   override get message(): string {
     return this.reason
   }

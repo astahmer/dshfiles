@@ -11,7 +11,21 @@ type MatchField = 'id' | 'title' | 'tag' | 'body' | 'comment' | 'link' | 'projec
 const fieldWeights = { id: 12, title: 8, tag: 6, project: 3, link: 3, body: 2, capture: 1.5, comment: 1 } satisfies Record<MatchField, number>
 
 type ActorKind = 'user' | 'agent' | 'system'
-type SearchState = 'ready' | 'blocked-by-deps' | 'delegated' | 'claimed' | 'children' | 'parent' | 'criteria' | 'plan' | 'summary' | 'plan-pending' | 'overdue' | 'due' | 'gated' | 'gates'
+type SearchState =
+  | 'ready'
+  | 'blocked-by-deps'
+  | 'delegated'
+  | 'claimed'
+  | 'children'
+  | 'parent'
+  | 'criteria'
+  | 'plan'
+  | 'summary'
+  | 'plan-pending'
+  | 'overdue'
+  | 'due'
+  | 'gated'
+  | 'gates'
 
 /** What an operator needs from the other items: readiness, blockers, sub-issues and claims are not on the item itself. */
 export interface SearchContext {
@@ -25,7 +39,14 @@ export interface SearchContext {
   readonly today: string
 }
 
-const noContext: SearchContext = { isReady: () => false, isBlockedByDeps: () => false, hasChildren: () => false, isClaimed: () => false, isGated: () => false, today: '' }
+const noContext: SearchContext = {
+  isReady: () => false,
+  isBlockedByDeps: () => false,
+  hasChildren: () => false,
+  isClaimed: () => false,
+  isGated: () => false,
+  today: '',
+}
 
 /** The operator part of a query: every list narrows on its own, and a negated copy excludes what it matches. */
 interface SearchFilters {

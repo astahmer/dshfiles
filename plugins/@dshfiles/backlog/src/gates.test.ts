@@ -47,7 +47,14 @@ describe('gates', () => {
 
       const resolved = yield* store.resolveGates({ id, resolved: [{ gateId: prGate?.id ?? '', detail: 'merged' }] })
       expect(resolved.ok && resolved.value.item.gates?.find(gate => gate.kind === 'pr')).toEqual(expect.objectContaining({ detail: 'merged', resolvedAt: now }))
-      const kept = yield* store.update({ id, gates: [{ kind: 'pr', target: pull }, { kind: 'date', target: tomorrow }], actor: user })
+      const kept = yield* store.update({
+        id,
+        gates: [
+          { kind: 'pr', target: pull },
+          { kind: 'date', target: tomorrow },
+        ],
+        actor: user,
+      })
       expect(kept.ok && kept.value.item.gates?.find(gate => gate.kind === 'pr')?.resolvedAt).toBe(now)
       expect((yield* store.list({ ready: true })).total).toBe(0)
 

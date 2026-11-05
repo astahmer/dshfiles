@@ -15,7 +15,20 @@ import {
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { CalendarClockIcon, CalendarIcon, CopyIcon, FolderIcon, MergeIcon, RepeatIcon, LinkIcon, LockOpenIcon, MessagesSquareIcon, PinIcon, Trash2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  CalendarClockIcon,
+  CalendarIcon,
+  CopyIcon,
+  FolderIcon,
+  MergeIcon,
+  RepeatIcon,
+  LinkIcon,
+  LockOpenIcon,
+  MessagesSquareIcon,
+  PinIcon,
+  Trash2Icon,
+  WandSparklesIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
 
@@ -32,7 +45,7 @@ import { BacklogTweetContext } from './backlog-tweet-context.js'
 import { BacklogNotices } from './notices.js'
 import { BacklogSyncControls } from './sync-controls.js'
 import { BacklogReference } from './backlog-reference.js'
-import { DueDates } from './due-date.js'
+import { useToday } from './due-date-hooks.js'
 import { Recurrence } from './recurrence.js'
 import { nightlyTiming } from './scheduled-rule-timing.js'
 
@@ -65,6 +78,7 @@ export const BacklogItemMenu = (props: {
   const item = props.item
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
+  const today = useToday()
   const [survivorRef, setSurvivorRef] = useState('')
   const [linkBinding, setLinkBinding] = useState<string | null>(null)
   const actions = useBacklogActions()
@@ -206,7 +220,7 @@ export const BacklogItemMenu = (props: {
               Due date
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="dshx-root dshx:min-w-52">
-              {ItemPickers.dueShortcuts(DueDates.dateOf(Date.now())).map(shortcut => (
+              {ItemPickers.dueShortcuts(today).map(shortcut => (
                 <ContextMenuItem key={shortcut.label} className="dshx:gap-2 dshx:text-[13px]" onSelect={() => update({ due: shortcut.due })}>
                   {shortcut.label}
                   <ContextMenuShortcut>{shortcut.due}</ContextMenuShortcut>
@@ -381,7 +395,9 @@ export const BacklogItemMenu = (props: {
       <Dialog open={mergeOpen} onOpenChange={open => (actions.merge.isPending ? undefined : setMergeOpen(open))}>
         <DialogContent className="dshx-root">
           <DialogHeader>
-            <DialogTitle>{many ? `Merge ${String(selection.length)} items into another` : `Merge ${BacklogReference.labelOf(item)} into another item`}</DialogTitle>
+            <DialogTitle>
+              {many ? `Merge ${String(selection.length)} items into another` : `Merge ${BacklogReference.labelOf(item)} into another item`}
+            </DialogTitle>
             <DialogDescription>
               Comments, links, tags, files and sub-issues move to the item you name; {many ? 'these items are' : 'this item is'} dropped as a duplicate and{' '}
               {many ? 'their references open' : 'its reference opens'} that item from now on.
@@ -415,7 +431,9 @@ export const BacklogItemMenu = (props: {
               className="dshx:h-9 dshx:w-full dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:font-mono! dshx:text-sm"
             />
           </form>
-          {actions.merge.error === null ? null : <p className="dshx:text-xs dshx:text-destructive">{errorMessage(actions.merge.error, 'The items were not merged.')}</p>}
+          {actions.merge.error === null ? null : (
+            <p className="dshx:text-xs dshx:text-destructive">{errorMessage(actions.merge.error, 'The items were not merged.')}</p>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setMergeOpen(false)} disabled={actions.merge.isPending}>
               Cancel

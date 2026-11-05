@@ -172,8 +172,13 @@ export class ThreadStart extends Context.Service<
         const context = yield* BacklogStartContext.prepare({ details: items, readFile: store.readFile })
         const raw = input.message ?? StartThreadForm.message(details)
         const brief = raw === '' ? context.text : `${raw}\n\n${context.text}`
-        const guided = [...new Map(items.flatMap(detail => (detail.item.project === null || detail.guidance === null ? [] : [[detail.item.project, detail.guidance] as const]))).entries()]
-        const task = guided.length === 0 ? brief : `${ProjectGuidance.preamble(guided.map(([project, guidance]) => ({ project, guidance })))}\n\n---\n\n${brief}`
+        const guided = [
+          ...new Map(
+            items.flatMap(detail => (detail.item.project === null || detail.guidance === null ? [] : [[detail.item.project, detail.guidance] as const])),
+          ).entries(),
+        ]
+        const task =
+          guided.length === 0 ? brief : `${ProjectGuidance.preamble(guided.map(([project, guidance]) => ({ project, guidance })))}\n\n---\n\n${brief}`
         const message = agent === null ? task : AgentComments.opening(agent, task)
         const placement = StartThreadPlacementPlan.of({
           workspaceId: input.workspaceId,

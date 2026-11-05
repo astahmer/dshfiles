@@ -46,7 +46,12 @@ const headline = (item: BacklogSummaryView): ReactNode => {
     )
   if (item.attention === 'blocked') return <>{title} is blocked</>
   if (item.attention === 'waiting') return <>{title} is waiting</>
-  if (item.proposal === null && item.overdue) return <>{title} is overdue (due {item.due})</>
+  if (item.proposal === null && item.overdue)
+    return (
+      <>
+        {title} is overdue (due {item.due})
+      </>
+    )
   return <>Triage has a suggestion for {title}</>
 }
 

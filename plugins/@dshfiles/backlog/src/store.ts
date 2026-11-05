@@ -701,7 +701,8 @@ const withClearable = (item: BacklogItem, change: ClearableChange): BacklogItem 
         set: (next, recurrence) => ({ ...next, recurrence }),
         remove: ({ recurrence: _recurrence, ...rest }) => rest,
       }),
-    (base: BacklogItem) => clearOrSet({ item: base, value: change.gates, set: (next, gates) => ({ ...next, gates }), remove: ({ gates: _gates, ...rest }) => rest }),
+    (base: BacklogItem) =>
+      clearOrSet({ item: base, value: change.gates, set: (next, gates) => ({ ...next, gates }), remove: ({ gates: _gates, ...rest }) => rest }),
   ].reduce((next, apply) => apply(next), item)
 
 const isClearable = (field: string): field is ClearableField => clearableFields.some(candidate => candidate === field)
@@ -1027,7 +1028,10 @@ export class BacklogStore extends Context.Service<
           done,
           { kind: 'system' },
           { kind: 'edited', detail: `recurs as ${BacklogReference.label(nextRef)}${due === null ? '' : ` due ${due}`}` },
-          { recurrence: null, links: BacklogItems.uniqueLinks([...done.links, { type: 'item', target: nextRef, relation: 'related', provenance: 'inferred' }]) },
+          {
+            recurrence: null,
+            links: BacklogItems.uniqueLinks([...done.links, { type: 'item', target: nextRef, relation: 'related', provenance: 'inferred' }]),
+          },
         )
       })
 
@@ -1087,7 +1091,10 @@ export class BacklogStore extends Context.Service<
         const prefix = template?.titlePrefix ?? ''
         const title = prefix === '' || triaged.title.startsWith(prefix) ? triaged.title : `${prefix}${triaged.title}`.slice(0, BacklogItems.maxTitleChars)
         const ownBody = input.fields?.body?.slice(0, BacklogItems.maxBodyChars) ?? triaged.body
-        const body = [ownBody, template?.body.trim() ?? ''].filter(part => part !== '').join('\n\n').slice(0, BacklogItems.maxBodyChars)
+        const body = [ownBody, template?.body.trim() ?? '']
+          .filter(part => part !== '')
+          .join('\n\n')
+          .slice(0, BacklogItems.maxBodyChars)
         const ownTags = input.fields?.tags === undefined ? triaged.tags : [...new Set(input.fields.tags)].slice(0, 20)
         const tags = [...new Set([...ownTags, ...(template?.tags ?? []).map(tag => tag.toLowerCase().replace(/^#/, ''))])].slice(0, 20)
         const criteria = input.criteria ?? template?.criteria.map(text => ({ text }))
@@ -1467,6 +1474,7 @@ export class BacklogStore extends Context.Service<
         const room = Math.max(0, BacklogItems.maxAttachments - survivor.attachments.length)
         const candidates = duplicate.attachments.filter(attachment => !survivor.attachments.some(own => own.id === attachment.id)).slice(0, room)
         const copied: BacklogAttachment[] = []
+        // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- one serialized merge write, and `copied` keeps the files the survivor actually received.
         for (const attachment of candidates) if (yield* copyFile({ from: duplicate, to: survivor, attachment })) copied.push(attachment)
         const comments = duplicate.events.filter(event => event.kind === 'commented')
         for (const attachment of comments.flatMap(event => event.attachments ?? [])) yield* copyFile({ from: duplicate, to: survivor, attachment })
@@ -1494,10 +1502,17 @@ export class BacklogStore extends Context.Service<
         const others = [...(yield* Ref.get(state)).records.values()].filter(item => item.id !== duplicate.id)
         for (const child of others.filter(item => item.parent === duplicateRef)) {
           const parent = child.id === survivor.id ? (duplicate.parent ?? null) : survivorRef
-          yield* touch(child, { kind: 'system' }, { kind: 'edited', detail: `parent ${duplicateLabel} → ${parent === null ? 'none' : BacklogReference.label(parent)} (merged)` }, { parent })
+          yield* touch(
+            child,
+            { kind: 'system' },
+            { kind: 'edited', detail: `parent ${duplicateLabel} → ${parent === null ? 'none' : BacklogReference.label(parent)} (merged)` },
+            { parent },
+          )
         }
         for (const other of others.filter(item => item.id !== survivor.id && item.links.some(link => link.type === 'item' && link.target === duplicateRef))) {
-          const rewritten = BacklogItems.uniqueLinks(other.links.map(link => (link.type === 'item' && link.target === duplicateRef ? { ...link, target: survivorRef } : link)))
+          const rewritten = BacklogItems.uniqueLinks(
+            other.links.map(link => (link.type === 'item' && link.target === duplicateRef ? { ...link, target: survivorRef } : link)),
+          )
           yield* touch(other, { kind: 'system' }, { kind: 'linked', detail: `${duplicateLabel} → ${survivorLabel} (merged)` }, { links: rewritten })
         }
         const at = yield* Clock.currentTimeMillis
@@ -1514,7 +1529,8 @@ export class BacklogStore extends Context.Service<
         if (survivor === undefined) return notFound
         const label = BacklogReference.labelOf(survivor)
         const ids = [...new Set(input.duplicateIds)]
-        if (ids.includes(survivor.id)) return yield* new BacklogMergeInvalid({ reason: `${label} cannot be merged into itself. Name the duplicates apart from the item that stays.` })
+        if (ids.includes(survivor.id))
+          return yield* new BacklogMergeInvalid({ reason: `${label} cannot be merged into itself. Name the duplicates apart from the item that stays.` })
         const current = yield* Ref.get(state)
         const duplicates = ids.flatMap(id => current.records.get(id) ?? [])
         if (duplicates.length !== ids.length) return notFound

@@ -15,7 +15,7 @@ import { BacklogItems, type BacklogAttention, type BacklogKind, type BacklogPrio
 import { WorkGlyphs } from './work-glyphs.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogProjects, ProjectPicker } from './project-picker.js'
-import { DueDates } from './due-date.js'
+import { DueDates, useToday } from './due-date-hooks.js'
 import { Recurrence } from './recurrence.js'
 
 const triggerClass =
@@ -213,7 +213,7 @@ const DuePicker = (props: {
   readonly onPick: (due: string | null) => void
 }): JSX.Element => {
   const [open, setOpen] = useState(false)
-  const today = DueDates.dateOf(Date.now())
+  const today = useToday()
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
@@ -263,7 +263,11 @@ const DuePicker = (props: {
 const recurrencePresets = ['daily', 'weekly', 'monthly'] as const
 
 /** How an item repeats: finishing it creates the next occurrence on the Host. */
-const RecurrencePicker = (props: { readonly itemLabel: string; readonly recurrence: string | null; readonly onPick: (recurrence: string | null) => void }): JSX.Element => {
+const RecurrencePicker = (props: {
+  readonly itemLabel: string
+  readonly recurrence: string | null
+  readonly onPick: (recurrence: string | null) => void
+}): JSX.Element => {
   const [open, setOpen] = useState(false)
   const [cron, setCron] = useState(props.recurrence?.startsWith('cron:') === true ? props.recurrence.slice(5) : '')
   return (

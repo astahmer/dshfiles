@@ -36,7 +36,8 @@ const pullRequestPattern = /^https:\/\/(github\.com)\/([\w.-]+\/[\w.-]+)\/pull\/
 const pullRequestOf = (url: string): { readonly host: 'github' | 'gitlab'; readonly repo: string; readonly number: number; readonly url: string } | null => {
   const match = pullRequestPattern.exec(url.trim())
   if (match === null) return null
-  if (match[1] !== undefined) return { host: 'github', repo: match[2] ?? '', number: Number(match[3]), url: `https://github.com/${match[2] ?? ''}/pull/${match[3] ?? ''}` }
+  if (match[1] !== undefined)
+    return { host: 'github', repo: match[2] ?? '', number: Number(match[3]), url: `https://github.com/${match[2] ?? ''}/pull/${match[3] ?? ''}` }
   return { host: 'gitlab', repo: match[5] ?? '', number: Number(match[6]), url: url.trim() }
 }
 

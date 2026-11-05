@@ -154,7 +154,8 @@ const GuidanceCard = (props: { readonly project: string }): JSX.Element => {
             actions.scheduleRule.mutate(
               { rule: 'triage', project: props.project, timing: nightlyTiming() },
               {
-                onSuccess: output => BacklogNotices.show({ text: `Scheduled “${output.title}” nightly. Manage it in Automations.`, kind: 'success', sessionId: null }),
+                onSuccess: output =>
+                  BacklogNotices.show({ text: `Scheduled “${output.title}” nightly. Manage it in Automations.`, kind: 'success', sessionId: null }),
                 onError: BacklogNotices.failure('The triage rule was not scheduled.'),
               },
             )

@@ -82,6 +82,7 @@ export const GateWatch = Layer.effectDiscard(
       yield* Effect.annotateCurrentSpan({ 'dshx.backlog.repositories': repositories.length })
       for (const item of gated) {
         const resolved: Resolution[] = []
+        // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- the repositories are tried in order and the first that has the revision on main wins.
         for (const gate of item.gates.filter(candidate => candidate.open && candidate.kind === 'revision' && revisionPattern.test(candidate.target))) {
           const candidates = item.project === null ? repositories : [item.project, ...repositories.filter(repository => repository !== item.project)]
           for (const repository of candidates)
@@ -126,7 +127,9 @@ export const GateWatch = Layer.effectDiscard(
       Effect.sleep('1 minute').pipe(
         Effect.andThen(
           Effect.repeat(
-            tick.pipe(Effect.catchCause(cause => (Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.logWarning('backlog gate watch failed', cause)))),
+            tick.pipe(
+              Effect.catchCause(cause => (Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.logWarning('backlog gate watch failed', cause))),
+            ),
             Schedule.spaced('1 minute'),
           ),
         ),

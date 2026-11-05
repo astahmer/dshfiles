@@ -410,10 +410,10 @@ export const Composer = (props: {
       kind: kind ?? undefined,
       project: project ?? undefined,
       files: submitted.files.length > 0 ? submitted.files.map(fileInput) : undefined,
-      // Only sent when picked: a Host older than templates refuses the key.
-      ...(submitted.template === '' ? {} : { template: submitted.template }),
     }
-    actions.capture.mutate(payload, {
+    // Only sent when picked: a Host older than templates refuses the key.
+    const request = submitted.template === '' ? payload : { ...payload, template: submitted.template }
+    actions.capture.mutate(request, {
       onSuccess: () => captureProject.set(CaptureProject.remembered({ sent: submitted.project, reuse: reuseProject })),
       onError: error => {
         setFailed(errorMessage(error, 'The item was not saved.'))
@@ -708,8 +708,8 @@ export const Composer = (props: {
             <code>bug:</code> <code>idea:</code> <code>note:</code> set the kind
           </span>
           <span>
-            <HashIcon aria-hidden className="dshx:inline dshx:size-3" /> tags · <code>@</code> items, threads and projects · <code>/project</code> · <code>/template</code> · paste or
-            drop a file
+            <HashIcon aria-hidden className="dshx:inline dshx:size-3" /> tags · <code>@</code> items, threads and projects · <code>/project</code> ·{' '}
+            <code>/template</code> · paste or drop a file
           </span>
         </p>
       ) : null}

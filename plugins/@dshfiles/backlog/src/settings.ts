@@ -164,7 +164,9 @@ export const backlogSettings = defineSettings({
         name: Schema.string().required().description('What the capture picker and `/template <name>` call it.'),
         titlePrefix: Schema.string().default('').description('Put before the captured title, such as "[Bug] ".'),
         kind: Schema.union([Schema.const('task'), Schema.const('bug'), Schema.const('idea'), Schema.const('note'), Schema.const('question')]).default('task'),
-        priority: Schema.union([Schema.const('none'), Schema.const('urgent'), Schema.const('high'), Schema.const('medium'), Schema.const('low')]).default('none'),
+        priority: Schema.union([Schema.const('none'), Schema.const('urgent'), Schema.const('high'), Schema.const('medium'), Schema.const('low')]).default(
+          'none',
+        ),
         tags: Schema.array(Schema.string()).default([]),
         body: Schema.string().default('').description('Appended after what you typed: headings to fill in, a checklist.'),
         criteria: Schema.array(Schema.string()).default([]).description('Acceptance criteria the item starts with, unchecked.'),

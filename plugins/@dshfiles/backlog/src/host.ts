@@ -122,7 +122,10 @@ const itemIdsOf = (keys: readonly (number | string)[]) =>
   )
 
 /** Asks the pull-requests plugin to watch a PR through the newest thread linked to the item, so its state stays live. */
-const withWatch = <Result extends { readonly ok: boolean }>(result: Result & ({ readonly ok: false } | { readonly ok: true; readonly value: BacklogDetailView }), url: string) =>
+const withWatch = <Result extends { readonly ok: boolean }>(
+  result: Result & ({ readonly ok: false } | { readonly ok: true; readonly value: BacklogDetailView }),
+  url: string,
+) =>
   Effect.gen(function* () {
     if (!result.ok) return result
     const thread = [...result.value.item.links].reverse().find(link => link.type === 'thread')
@@ -138,6 +141,7 @@ const moveExternalRefs = (input: { readonly survivorId: number; readonly refs: r
   SyncSources.use(sources =>
     Effect.gen(function* () {
       const taken = new Set((yield* sources.refsOf(input.survivorId)).map(ref => ref.bindingId))
+      // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- each move claims its binding before the next one is checked.
       for (const ref of input.refs) {
         if (taken.has(ref.bindingId)) continue
         taken.add(ref.bindingId)
@@ -166,7 +170,13 @@ const backlogHandlers = Api.handlers(backlogApi, {
       )
       const guidance = ProjectGuidance.mapOf((yield* BacklogSettingsTag.use(settings => settings.get)).projectGuidance)
       const projects = [...new Set(listed.items.flatMap(item => (item.project === null ? [] : [item.project])))]
-      return { ...listed, guidance: projects.flatMap(project => { const text = guidance.get(project); return text === undefined ? [] : [{ project, guidance: text }] }) }
+      return {
+        ...listed,
+        guidance: projects.flatMap(project => {
+          const text = guidance.get(project)
+          return text === undefined ? [] : [{ project, guidance: text }]
+        }),
+      }
     }),
   setProjectGuidance: input =>
     Effect.gen(function* () {
@@ -330,7 +340,10 @@ const backlogHandlers = Api.handlers(backlogApi, {
       const found = yield* Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.get(id)))
       if (!found.ok) return { available: yield* PullRequestState.use(pulls => pulls.available), pullRequests: [] }
       const item = found.value.item
-      const urls = [...item.links.filter(link => link.type === 'url').map(link => link.target), ...(item.gates ?? []).filter(gate => gate.kind === 'pr').map(gate => gate.target)]
+      const urls = [
+        ...item.links.filter(link => link.type === 'url').map(link => link.target),
+        ...(item.gates ?? []).filter(gate => gate.kind === 'pr').map(gate => gate.target),
+      ]
       return yield* PullRequestState.use(pulls => pulls.of([...new Set(urls)]))
     }),
   linkPullRequest: (keyed, call) =>

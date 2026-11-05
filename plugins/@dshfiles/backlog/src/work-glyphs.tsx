@@ -20,7 +20,7 @@ import type { BacklogSummaryView } from './api.js'
 import type { AgentRunState } from './agent-run-state.js'
 import type { BacklogPriority } from './item.js'
 import { actorName } from './actor-name.js'
-import { DueDates } from './due-date.js'
+import { DueDates, useToday } from './due-date-hooks.js'
 import { BacklogGates } from './gates.js'
 
 const priorityLabels = { none: 'No priority', urgent: 'Urgent', high: 'High', medium: 'Medium', low: 'Low' } satisfies Record<BacklogPriority, string>
@@ -86,7 +86,10 @@ const CriteriaBadge = (props: { readonly progress: { readonly total: number; rea
   const complete = props.progress.done === props.progress.total
   return (
     <WithTooltip tip={`${String(props.progress.done)} of ${String(props.progress.total)} acceptance criteria met`}>
-      <span aria-label="Acceptance criteria" className={cn(chip, complete ? 'dshx:bg-success/12 dshx:text-success' : 'dshx:bg-muted dshx:text-muted-foreground')}>
+      <span
+        aria-label="Acceptance criteria"
+        className={cn(chip, complete ? 'dshx:bg-success/12 dshx:text-success' : 'dshx:bg-muted dshx:text-muted-foreground')}
+      >
         <ListChecksIcon aria-hidden className="dshx:size-3" />
         {props.progress.done}/{props.progress.total}
       </span>
@@ -108,7 +111,7 @@ const PlanPendingBadge = (props: { readonly approval: 'pending' | 'approved' | n
 /** The due date, relative to today: red once an open item is past it. */
 const DueChip = (props: { readonly due: string | null; readonly overdue: boolean; readonly compact?: boolean }): JSX.Element | null => {
   if (props.due === null) return null
-  const today = DueDates.dateOf(Date.now())
+  const today = useToday()
   const soon = !props.overdue && DueDates.daysBetween(today, props.due) <= 1
   return (
     <WithTooltip tip={`${props.overdue ? 'Overdue: was due' : 'Due'} ${props.due}`}>
@@ -116,7 +119,11 @@ const DueChip = (props: { readonly due: string | null; readonly overdue: boolean
         aria-label={`${props.overdue ? 'Overdue' : 'Due'} ${props.due}`}
         className={cn(
           chip,
-          props.overdue ? 'dshx:bg-destructive/12 dshx:text-destructive' : soon ? 'dshx:bg-warning/12 dshx:text-warning' : 'dshx:bg-muted dshx:text-muted-foreground',
+          props.overdue
+            ? 'dshx:bg-destructive/12 dshx:text-destructive'
+            : soon
+              ? 'dshx:bg-warning/12 dshx:text-warning'
+              : 'dshx:bg-muted dshx:text-muted-foreground',
         )}
       >
         <CalendarIcon aria-hidden className="dshx:size-3" />

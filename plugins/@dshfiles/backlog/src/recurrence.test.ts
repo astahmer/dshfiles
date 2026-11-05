@@ -38,7 +38,14 @@ describe('recurrence', () => {
       expect(occurrences).toHaveLength(1)
       const next = occurrences[0]
       expect(next).toEqual(
-        expect.objectContaining({ status: 'todo', due: DueDates.addDays(today, 7), recurrence: 'weekly', priority: 'high', tags: ['ops'], criteriaProgress: { total: 1, done: 0 } }),
+        expect.objectContaining({
+          status: 'todo',
+          due: DueDates.addDays(today, 7),
+          recurrence: 'weekly',
+          priority: 'high',
+          tags: ['ops'],
+          criteriaProgress: { total: 1, done: 0 },
+        }),
       )
       expect(done.ok && done.value.item.links.some(link => link.type === 'item' && link.target === next?.ref)).toBe(true)
 

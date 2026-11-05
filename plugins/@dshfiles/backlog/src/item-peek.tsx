@@ -73,7 +73,7 @@ import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import { submitReply } from './reply-submission.js'
 import type { AgentContinuationSelection, AgentContinuationThread } from './agent-dispatch.js'
 import { ItemPickers } from './item-pickers.js'
-import { DueDates } from './due-date.js'
+import { DueDates, useToday } from './due-date-hooks.js'
 import { PeekSections } from './peek-sections.js'
 import { BacklogNotices } from './notices.js'
 import { PeekWork } from './peek-work.js'
@@ -1200,6 +1200,7 @@ const PeekBody = (props: {
   readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
+  const today = useToday()
   const [agentReplying, setAgentReplying] = useState(false)
   const item = props.detail.item
   const scroller = useRef<HTMLDivElement | null>(null)
@@ -1335,7 +1336,7 @@ const PeekBody = (props: {
                 <ItemPickers.Due
                   itemLabel={BacklogReference.labelOf(item)}
                   due={item.due ?? null}
-                  overdue={DueDates.isOverdue({ due: item.due, status: item.status, today: DueDates.dateOf(Date.now()) })}
+                  overdue={DueDates.isOverdue({ due: item.due, status: item.status, today })}
                   onPick={due => actions.update.mutate({ id: item.id, due }, { onError: BacklogNotices.failure('The due date was not saved.') })}
                 />
                 <ItemPickers.Recurrence

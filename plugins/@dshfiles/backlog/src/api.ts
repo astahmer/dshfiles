@@ -195,8 +195,9 @@ const pullRequestUrlSchema = Schema.String.check(
 const renderPullRequests = (output: typeof pullRequestsOutputSchema.Type): string =>
   !output.available
     ? 'The pull-requests plugin is not loaded: PR links stay plain URLs.'
-    : output.pullRequests.map(pull => `${pull.repo}#${String(pull.number)} ${pull.state} · checks ${pull.checks}${pull.watched ? '' : ' · not watched'}`).join('\n') ||
-      'No pull requests linked.'
+    : output.pullRequests
+        .map(pull => `${pull.repo}#${String(pull.number)} ${pull.state} · checks ${pull.checks}${pull.watched ? '' : ' · not watched'}`)
+        .join('\n') || 'No pull requests linked.'
 
 const revertResultSchema = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(true), value: detailSchema }),
@@ -661,12 +662,10 @@ export const backlogApi = defineApi({
           .annotate({ description: 'urgent, high, medium, low or none; overrides a `!1`…`!4` written in the text.' }),
         parent: refTextSchema.pipe(Schema.optional).annotate({ description: 'Capture it as a sub-issue of this item (`b:k3f9`); three levels deep at most.' }),
         due: DueDates.schema.pipe(Schema.optional).annotate({ description: 'The date it is due, YYYY-MM-DD with no time.' }),
-        template: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120))
-          .pipe(Schema.optional)
-          .annotate({
-            description:
-              'Start from a template in Backlog settings (by name, such as `Bug report`): it adds its title prefix, kind, priority, tags, body and acceptance criteria where the capture left them out. `/template <name>` in the text does the same.',
-          }),
+        template: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)).pipe(Schema.optional).annotate({
+          description:
+            'Start from a template in Backlog settings (by name, such as `Bug report`): it adds its title prefix, kind, priority, tags, body and acceptance criteria where the capture left them out. `/template <name>` in the text does the same.',
+        }),
         recurrence: Recurrence.schema
           .pipe(Schema.optional)
           .annotate({ description: '`daily`, `weekly`, `monthly` or `cron:<expr>`: finishing it creates the next occurrence.' }),
@@ -789,31 +788,27 @@ export const backlogApi = defineApi({
         plan: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars)))
           .pipe(Schema.optional)
           .annotate({ description: 'How the work will be done (markdown); null or empty removes it.' }),
-        planApproval: Schema.NullOr(BacklogItems.planApprovalSchema)
-          .pipe(Schema.optional)
-          .annotate({
-            description:
-              '`pending` asks the user to approve the plan before you start: the item asks for input until they approve. Only the user can set `approved`; wait for it.',
-          }),
+        planApproval: Schema.NullOr(BacklogItems.planApprovalSchema).pipe(Schema.optional).annotate({
+          description:
+            '`pending` asks the user to approve the plan before you start: the item asks for input until they approve. Only the user can set `approved`; wait for it.',
+        }),
         due: Schema.NullOr(DueDates.schema)
           .pipe(Schema.optional)
           .annotate({ description: 'The date it is due, YYYY-MM-DD with no time, or null to clear it. Open items past it show as overdue in the Inbox.' }),
         gates: Schema.NullOr(
-          Schema.Array(Schema.Struct({ kind: Schema.Literals(BacklogGates.kinds), target: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(500)) })).check(
-            Schema.isMaxLength(BacklogGates.max),
-          ),
+          Schema.Array(
+            Schema.Struct({ kind: Schema.Literals(BacklogGates.kinds), target: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(500)) }),
+          ).check(Schema.isMaxLength(BacklogGates.max)),
         )
           .pipe(Schema.optional)
           .annotate({
             description:
               'Outside conditions it waits on, replacing the list: `pr` (a pull request URL, open until merged), `revision` (a jj change or commit id, open until it is on main), `check` (a project-check action id, open until it passes in a thread linked to the item), `date` (YYYY-MM-DD, open until that day). The item is not ready while a gate is open; gates resolve on their own. null removes them.',
           }),
-        recurrence: Schema.NullOr(Recurrence.schema)
-          .pipe(Schema.optional)
-          .annotate({
-            description:
-              '`daily`, `weekly`, `monthly` or `cron:<min hour dom month dow>`: when the item is done the Host creates the next occurrence with the next due date (criteria unchecked). null stops repeating.',
-          }),
+        recurrence: Schema.NullOr(Recurrence.schema).pipe(Schema.optional).annotate({
+          description:
+            '`daily`, `weekly`, `monthly` or `cron:<min hour dom month dow>`: when the item is done the Host creates the next occurrence with the next due date (criteria unchecked). null stops repeating.',
+        }),
         summary: Schema.NullOr(Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars)))
           .pipe(Schema.optional)
           .annotate({ description: 'Final summary of what was done, written when closing the item; Shipped shows it.' }),
@@ -1120,7 +1115,9 @@ export const backlogApi = defineApi({
     }),
     setProjectGuidance: method({
       input: Schema.Struct({
-        project: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTargetChars)).annotate({ description: 'Absolute project path.' }),
+        project: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(BacklogItems.maxTargetChars)).annotate({
+          description: 'Absolute project path.',
+        }),
         guidance: Schema.String.check(Schema.isMaxLength(BacklogItems.maxBodyChars)).annotate({
           description: 'Markdown instructions for agents working on this project’s items; empty removes them.',
         }),
@@ -1143,7 +1140,12 @@ export const backlogApi = defineApi({
           description: 'When it runs: { kind: daily, time, timeZone }, weekly with weekdays, cron with an expression, or every N seconds.',
         }),
       }),
-      output: Schema.Struct({ automationId: Schema.String, title: Schema.String, schedule: Schema.NullOr(Schema.String), projectTitle: Schema.NullOr(Schema.String) }),
+      output: Schema.Struct({
+        automationId: Schema.String,
+        title: Schema.String,
+        schedule: Schema.NullOr(Schema.String),
+        projectTitle: Schema.NullOr(Schema.String),
+      }),
       description:
         'Schedule a backlog rule as a project automation (via @dshfiles/project-automations): each run starts a thread in the project whose prompt calls backlog tools. For an item that simply repeats, prefer its `recurrence` field. Run only when the user asked; manage or delete the automation with automation_list / automation_delete.',
       tool: {
@@ -1156,7 +1158,7 @@ export const backlogApi = defineApi({
       input: Schema.Struct({ id: itemKeySchema }),
       output: pullRequestsOutputSchema,
       description:
-        "The pull requests an item links (URL links and PR gates) with their live state (open, merged, closed) and checks, read from the pull-requests plugin. A PR no thread watches shows `unknown`; `available: false` when that plugin is not loaded. Read-only.",
+        'The pull requests an item links (URL links and PR gates) with their live state (open, merged, closed) and checks, read from the pull-requests plugin. A PR no thread watches shows `unknown`; `available: false` when that plugin is not loaded. Read-only.',
       tool: { name: 'backlog_pull_requests', readOnly: true, render: renderPullRequests },
     }),
     linkPullRequest: method({
@@ -1182,11 +1184,12 @@ export const backlogApi = defineApi({
       }),
       output: mergeResultSchema,
       description:
-        'Merge duplicate items into one: their comments (quoted, keeping who wrote them), links, tags, files, sub-issues and remote links where the survivor has none for that binding move to the survivor, links from other items are rewritten to it, and each duplicate is dropped with a `duplicates` link. `b:<duplicate>` references keep working and open the survivor. Every step is in both items\' history. Run only when the user asked; an agent must pass `confirm: true`.',
+        "Merge duplicate items into one: their comments (quoted, keeping who wrote them), links, tags, files, sub-issues and remote links where the survivor has none for that binding move to the survivor, links from other items are rewritten to it, and each duplicate is dropped with a `duplicates` link. `b:<duplicate>` references keep working and open the survivor. Every step is in both items' history. Run only when the user asked; an agent must pass `confirm: true`.",
       tool: {
         name: 'backlog_merge',
         readOnly: false,
-        render: result => (result.ok ? `${renderItemPreview(result.value.item)}\nMerged ${result.merged.map(ref => `b:${ref}`).join(', ')} into it.` : 'No backlog item found.'),
+        render: result =>
+          result.ok ? `${renderItemPreview(result.value.item)}\nMerged ${result.merged.map(ref => `b:${ref}`).join(', ')} into it.` : 'No backlog item found.',
       },
     }),
     export: method({

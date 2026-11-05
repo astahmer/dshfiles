@@ -10,7 +10,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
 
 import { backlogApi, type BacklogDetailView } from './api.js'
-import { DueDates } from './due-date.js'
+import { useToday } from './due-date-hooks.js'
 import { BacklogGates, type BacklogGate, type BacklogGateKind } from './gates.js'
 import { BacklogItems, type BacklogCriterion } from './item.js'
 import { BacklogNotices } from './notices.js'
@@ -19,9 +19,9 @@ import { useBacklogActions, type BacklogUpdateInput } from './use-backlog-action
 const inputClass =
   'dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-xs dshx:outline-none dshx:focus-visible:border-ring'
 
-const Heading = (props: { readonly title: string; readonly children?: JSX.Element | null }): JSX.Element => (
+const Heading = (props: { readonly label: string; readonly children?: JSX.Element | null }): JSX.Element => (
   <div className="dshx:flex dshx:h-6 dshx:items-center dshx:gap-2">
-    <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.title}</h4>
+    <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.label}</h4>
     {props.children}
   </div>
 )
@@ -40,7 +40,7 @@ const Criteria = (props: { readonly id: number; readonly criteria: readonly Back
     save({ id: props.id, criteria: criteria.length === 0 ? null : criteria }, 'The criteria were not saved.')
   return (
     <section aria-label="Acceptance criteria" className="dshx:flex dshx:flex-col dshx:gap-1.5">
-      <Heading title="Acceptance criteria">
+      <Heading label="Acceptance criteria">
         {rollup.total === 0 ? null : (
           <>
             <span className="dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">
@@ -53,7 +53,10 @@ const Criteria = (props: { readonly id: number; readonly criteria: readonly Back
       {props.criteria.length === 0 ? null : (
         <ul className="dshx:flex dshx:flex-col dshx:gap-0.5">
           {props.criteria.map(criterion => (
-            <li key={criterion.id} className="dshx:group/criterion dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1 dshx:hover:bg-accent/40">
+            <li
+              key={criterion.id}
+              className="dshx:group/criterion dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1 dshx:hover:bg-accent/40"
+            >
               <Checkbox
                 aria-label={criterion.text}
                 checked={criterion.done}
@@ -61,7 +64,13 @@ const Criteria = (props: { readonly id: number; readonly criteria: readonly Back
                   save({ id: props.id, criteriaChecks: [{ id: criterion.id, done: checked === true }] }, 'The criterion was not updated.')
                 }
               />
-              <span className={criterion.done ? 'dshx:min-w-0 dshx:flex-1 dshx:text-[13px] dshx:text-muted-foreground dshx:line-through' : 'dshx:min-w-0 dshx:flex-1 dshx:text-[13px]'}>
+              <span
+                className={
+                  criterion.done
+                    ? 'dshx:min-w-0 dshx:flex-1 dshx:text-[13px] dshx:text-muted-foreground dshx:line-through'
+                    : 'dshx:min-w-0 dshx:flex-1 dshx:text-[13px]'
+                }
+              >
                 {criterion.text}
               </span>
               <Button
@@ -87,7 +96,13 @@ const Criteria = (props: { readonly id: number; readonly criteria: readonly Back
           setDraft('')
         }}
       >
-        <input aria-label="New criterion" placeholder="Add a criterion" className={inputClass} value={draft} onChange={event => setDraft(event.currentTarget.value)} />
+        <input
+          aria-label="New criterion"
+          placeholder="Add a criterion"
+          className={inputClass}
+          value={draft}
+          onChange={event => setDraft(event.currentTarget.value)}
+        />
         <Button type="submit" size="icon-xs" variant="ghost" aria-label="Add criterion" disabled={draft.trim() === ''}>
           <PlusIcon />
         </Button>
@@ -97,7 +112,12 @@ const Criteria = (props: { readonly id: number; readonly criteria: readonly Back
 }
 
 /** A markdown section edited in place: the draft saves on blur, and an empty draft removes the section. */
-const SectionText = (props: { readonly label: string; readonly value: string; readonly placeholder: string; readonly save: (text: string) => void }): JSX.Element => {
+const SectionText = (props: {
+  readonly label: string
+  readonly value: string
+  readonly placeholder: string
+  readonly save: (text: string) => void
+}): JSX.Element => {
   const [draft, setDraft] = useState(props.value)
   const [seen, setSeen] = useState(props.value)
   if (seen !== props.value) {
@@ -126,7 +146,7 @@ const Plan = (props: { readonly detail: BacklogDetailView }): JSX.Element => {
   const [open, setOpen] = useState(false)
   if (item.plan === undefined && !open)
     return (
-      <Heading title="Plan">
+      <Heading label="Plan">
         <Button size="xs" variant="ghost" className="dshx:ml-auto" onClick={() => setOpen(true)}>
           <PlusIcon /> Plan
         </Button>
@@ -134,7 +154,7 @@ const Plan = (props: { readonly detail: BacklogDetailView }): JSX.Element => {
     )
   return (
     <section aria-label="Plan" className="dshx:flex dshx:flex-col dshx:gap-1.5">
-      <Heading title="Plan">
+      <Heading label="Plan">
         {item.planApproval === 'pending' ? (
           <>
             <span className="dshx:rounded-full dshx:bg-warning/15 dshx:px-1.5 dshx:text-[11px] dshx:text-warning">Waiting for your approval</span>
@@ -169,7 +189,7 @@ const Summary = (props: { readonly detail: BacklogDetailView }): JSX.Element | n
   const [open, setOpen] = useState(false)
   if (item.summary === undefined && !closed && !open)
     return (
-      <Heading title="Summary">
+      <Heading label="Summary">
         <Button size="xs" variant="ghost" className="dshx:ml-auto" onClick={() => setOpen(true)}>
           <PlusIcon /> Summary
         </Button>
@@ -177,7 +197,7 @@ const Summary = (props: { readonly detail: BacklogDetailView }): JSX.Element | n
     )
   return (
     <section aria-label="Summary" className="dshx:flex dshx:flex-col dshx:gap-1.5">
-      <Heading title="Summary" />
+      <Heading label="Summary" />
       <SectionText
         label="Summary"
         value={item.summary ?? ''}
@@ -192,28 +212,33 @@ const gateKindLabels = { pr: 'Pull request merged', revision: 'Revision on main'
   BacklogGateKind,
   string
 >
-const gatePlaceholders = { pr: 'https://github.com/owner/repo/pull/12', revision: 'jj change id', check: 'project-check action id', date: '2026-12-01' } satisfies Record<
-  BacklogGateKind,
-  string
->
+const gatePlaceholders = {
+  pr: 'https://github.com/owner/repo/pull/12',
+  revision: 'jj change id',
+  check: 'project-check action id',
+  date: '2026-12-01',
+} satisfies Record<BacklogGateKind, string>
 
 /** What the item waits on outside the backlog; each gate resolves on its own, a date gate on the calendar. */
 const Gates = (props: { readonly id: number; readonly gates: readonly BacklogGate[] }): JSX.Element => {
   const save = useSave()
   const [kind, setKind] = useState<BacklogGateKind>('pr')
   const [target, setTarget] = useState('')
-  const today = DueDates.dateOf(Date.now())
+  const today = useToday()
   const replace = (gates: readonly { readonly kind: BacklogGateKind; readonly target: string }[]) =>
     save({ id: props.id, gates: gates.length === 0 ? null : gates.map(gate => ({ kind: gate.kind, target: gate.target })) }, 'The gates were not saved.')
   return (
     <section aria-label="Gates" className="dshx:flex dshx:flex-col dshx:gap-1.5">
-      <Heading title="Waits on" />
+      <Heading label="Waits on" />
       {props.gates.length === 0 ? null : (
         <ul className="dshx:flex dshx:flex-col dshx:gap-0.5">
           {props.gates.map(gate => {
             const open = BacklogGates.isOpen(gate, today)
             return (
-              <li key={gate.id} className="dshx:group/gate dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1 dshx:text-[13px] dshx:hover:bg-accent/40">
+              <li
+                key={gate.id}
+                className="dshx:group/gate dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1 dshx:text-[13px] dshx:hover:bg-accent/40"
+              >
                 {open ? (
                   <HourglassIcon aria-label="Open" className="dshx:size-3.5 dshx:shrink-0 dshx:text-warning" />
                 ) : (
@@ -296,13 +321,15 @@ const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Elemen
     queryFn: ({ signal }) => api.pullRequests({ id: item.id }, { signal }),
     retry: false,
   })
-  const pulls = states.data?.pullRequests ?? urls.flatMap(url => {
-    const pull = BacklogGates.pullRequestOf(url)
-    return pull === null ? [] : [{ url: pull.url, repo: pull.repo, number: pull.number, state: 'unknown' as const, checks: 'none' as const, watched: false }]
-  })
+  const pulls =
+    states.data?.pullRequests ??
+    urls.flatMap(url => {
+      const pull = BacklogGates.pullRequestOf(url)
+      return pull === null ? [] : [{ url: pull.url, repo: pull.repo, number: pull.number, state: 'unknown' as const, checks: 'none' as const, watched: false }]
+    })
   return (
     <section aria-label="Pull requests" className="dshx:flex dshx:flex-col dshx:gap-1.5">
-      <Heading title="Pull requests" />
+      <Heading label="Pull requests" />
       {pulls.length === 0 ? null : (
         <ul className="dshx:flex dshx:flex-col dshx:gap-0.5">
           {pulls.map(pull => {
@@ -331,7 +358,13 @@ const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Elemen
           setDraft('')
         }}
       >
-        <input aria-label="Pull request URL" placeholder="Link PR… https://github.com/owner/repo/pull/12" className={inputClass} value={draft} onChange={event => setDraft(event.currentTarget.value)} />
+        <input
+          aria-label="Pull request URL"
+          placeholder="Link PR… https://github.com/owner/repo/pull/12"
+          className={inputClass}
+          value={draft}
+          onChange={event => setDraft(event.currentTarget.value)}
+        />
         <Button type="submit" size="icon-xs" variant="ghost" aria-label="Link pull request" disabled={BacklogGates.pullRequestOf(draft) === null}>
           <PlusIcon />
         </Button>
