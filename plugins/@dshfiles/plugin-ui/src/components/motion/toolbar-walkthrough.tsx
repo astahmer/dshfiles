@@ -48,7 +48,7 @@ export function ToolbarWalkthrough({ tools, steps, step, onStepChange, onClose, 
   const current = step === null ? undefined : steps[step]
   const activeId = current?.toolId
   const lastStep = React.useRef<number | null>(step)
-  const direction = step === null || lastStep.current === null ? 0 : step > lastStep.current ? 1 : step < lastStep.current ? -1 : 0
+  const direction = step === null || lastStep.current === null ? 0 : Math.sign(step - lastStep.current)
   React.useEffect(() => {
     lastStep.current = step
   }, [step])

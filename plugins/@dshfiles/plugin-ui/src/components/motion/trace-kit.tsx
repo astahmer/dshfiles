@@ -130,13 +130,18 @@ export const formatTick = (seconds: number): string => {
 
 /* ---------------------------------------------------------------- axis */
 
+const niceMantissa = (n: number): number => {
+  if (n <= 1) return 1
+  if (n <= 2) return 2
+  if (n <= 5) return 5
+  return 10
+}
+
 /** A 1-2-5 step that splits `span` into about `target` intervals. */
 export const niceStep = (span: number, target = 4): number => {
   const raw = Math.max(span, 1e-6) / target
   const power = 10 ** Math.floor(Math.log10(raw))
-  const n = raw / power
-  const m = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10
-  return m * power
+  return niceMantissa(raw / power) * power
 }
 
 /** Ticks from 0 up to `domain` (inclusive when it lands on a step). */

@@ -172,6 +172,33 @@ function IdlePanel({ steps }: { readonly steps: readonly PipelineStep[] }) {
   )
 }
 
+function statusChipContent(status: PipelineRunStatus, step: number, total: number, doneLabel: string): React.ReactNode {
+  switch (status) {
+    case 'running':
+      return (
+        <>
+          <span aria-hidden className="dshx:size-1.5 dshx:rounded-full dshx:bg-current" />
+          Step {step}
+          <span className="dshx:opacity-60">/{total}</span>
+        </>
+      )
+    case 'done':
+      return (
+        <>
+          <CheckIcon aria-hidden /> {doneLabel}
+        </>
+      )
+    case 'failed':
+      return (
+        <>
+          <XIcon aria-hidden /> Failed
+        </>
+      )
+    case 'idle':
+      return 'Not started'
+  }
+}
+
 function StatusChip({
   status,
   step,
@@ -196,23 +223,7 @@ function StatusChip({
         status === 'idle' && 'dshx:border-border dshx:bg-background dshx:text-muted-foreground',
       )}
     >
-      {status === 'running' ? (
-        <>
-          <span aria-hidden className="dshx:size-1.5 dshx:rounded-full dshx:bg-current" />
-          Step {step}
-          <span className="dshx:opacity-60">/{total}</span>
-        </>
-      ) : status === 'done' ? (
-        <>
-          <CheckIcon aria-hidden /> {doneLabel}
-        </>
-      ) : status === 'failed' ? (
-        <>
-          <XIcon aria-hidden /> Failed
-        </>
-      ) : (
-        'Not started'
-      )}
+      {statusChipContent(status, step, total, doneLabel)}
     </span>
   )
 }

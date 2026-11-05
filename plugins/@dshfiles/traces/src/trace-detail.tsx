@@ -192,7 +192,6 @@ export const TraceDetailView = (props: {
     )
     return () => controls.complete()
     // Replays per trace, not on collapse or selection.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trace.traceId])
   const toggle = (spanId: string): void =>
     setCollapsed(current => {

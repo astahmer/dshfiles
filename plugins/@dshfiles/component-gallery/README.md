@@ -3,7 +3,7 @@
 ![Browse every shared component on one page](docs/screenshots/component-gallery-page.png)
 
 One page that renders every shared `@dshfiles/plugin-ui` component live: the animated agent, trace, usage, revision
-and interaction components, the motion primitives and the base kit. Open **Component Gallery: Components** from the
+and interaction components, the motion primitives and the base kit. Open **Knowledge › Component gallery** from the
 sidebar. Tabs switch categories; the filter matches titles, descriptions and import paths; **Replay** restarts one
 card and **Replay all** restarts the page. Each card shows the import a plugin writes to use the component.
 

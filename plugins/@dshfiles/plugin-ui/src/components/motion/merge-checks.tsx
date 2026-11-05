@@ -94,6 +94,19 @@ const CheckChip = React.forwardRef<HTMLDivElement, { readonly check: MergeCheck 
   )
 })
 
+function statusIcon(status: MergeCheckStatus): React.ReactNode {
+  switch (status) {
+    case 'passed':
+      return <CheckIcon className="dshx:size-3.5 dshx:text-success" strokeWidth={2.5} />
+    case 'failed':
+      return <XIcon className="dshx:size-3.5 dshx:text-destructive" strokeWidth={2.5} />
+    case 'running':
+      return <LoaderCircleIcon className="dshx:size-3.5 dshx:animate-spin dshx:text-info dshx:motion-reduce:animate-none" />
+    case 'queued':
+      return <CircleDashedIcon className="dshx:size-3.5 dshx:text-muted-foreground" />
+  }
+}
+
 function StatusGlyph({ status }: { readonly status: MergeCheckStatus }) {
   const ref = React.useRef<HTMLSpanElement>(null)
   const first = React.useRef(true)
@@ -108,16 +121,51 @@ function StatusGlyph({ status }: { readonly status: MergeCheckStatus }) {
   }, [status])
   return (
     <span ref={ref} aria-hidden className="dshx:flex dshx:size-3.5 dshx:items-center dshx:justify-center">
-      {status === 'passed' ? (
-        <CheckIcon className="dshx:size-3.5 dshx:text-success" strokeWidth={2.5} />
-      ) : status === 'failed' ? (
-        <XIcon className="dshx:size-3.5 dshx:text-destructive" strokeWidth={2.5} />
-      ) : status === 'running' ? (
-        <LoaderCircleIcon className="dshx:size-3.5 dshx:animate-spin dshx:text-info dshx:motion-reduce:animate-none" />
-      ) : (
-        <CircleDashedIcon className="dshx:size-3.5 dshx:text-muted-foreground" />
-      )}
+      {statusIcon(status)}
     </span>
+  )
+}
+
+function footerLabel(state: MergeState, failed: number, pending: number, into: string): React.ReactNode {
+  if (state === 'merged')
+    return (
+      <>
+        <CheckIcon className="dshx:size-3.5 dshx:shrink-0 dshx:text-success" />
+        <span className="dshx:min-w-0 dshx:truncate">
+          Merged into <code className="dshx:font-mono dshx:text-xs">{into}</code>
+        </span>
+      </>
+    )
+  if (state === 'merging')
+    return (
+      <>
+        <LoaderCircleIcon className="dshx:size-3.5 dshx:shrink-0 dshx:animate-spin dshx:text-muted-foreground dshx:motion-reduce:animate-none" />
+        <ShimmerText className="dshx:min-w-0 dshx:truncate">Merging into {into}</ShimmerText>
+      </>
+    )
+  if (state === 'ready')
+    return (
+      <>
+        <CheckIcon className="dshx:size-3.5 dshx:shrink-0 dshx:text-success" />
+        <span className="dshx:min-w-0 dshx:truncate">Ready to merge</span>
+      </>
+    )
+  if (failed > 0)
+    return (
+      <>
+        <XIcon className="dshx:size-3.5 dshx:shrink-0 dshx:text-destructive" />
+        <span className="dshx:min-w-0 dshx:truncate dshx:text-destructive">
+          {failed} {failed === 1 ? 'check' : 'checks'} failed
+        </span>
+      </>
+    )
+  return (
+    <>
+      <LoaderCircleIcon className="dshx:size-3.5 dshx:shrink-0 dshx:animate-spin dshx:text-muted-foreground dshx:motion-reduce:animate-none" />
+      <ShimmerText className="dshx:min-w-0 dshx:truncate">
+        Waiting for {pending} {pending === 1 ? 'check' : 'checks'}
+      </ShimmerText>
+    </>
   )
 }
 
@@ -153,39 +201,7 @@ function MergeFooter({
     }
   }, [state])
 
-  const label =
-    state === 'merged' ? (
-      <>
-        <CheckIcon className="dshx:size-3.5 dshx:shrink-0 dshx:text-success" />
-        <span className="dshx:min-w-0 dshx:truncate">
-          Merged into <code className="dshx:font-mono dshx:text-xs">{into}</code>
-        </span>
-      </>
-    ) : state === 'merging' ? (
-      <>
-        <LoaderCircleIcon className="dshx:size-3.5 dshx:shrink-0 dshx:animate-spin dshx:text-muted-foreground dshx:motion-reduce:animate-none" />
-        <ShimmerText className="dshx:min-w-0 dshx:truncate">Merging into {into}</ShimmerText>
-      </>
-    ) : state === 'ready' ? (
-      <>
-        <CheckIcon className="dshx:size-3.5 dshx:shrink-0 dshx:text-success" />
-        <span className="dshx:min-w-0 dshx:truncate">Ready to merge</span>
-      </>
-    ) : failed > 0 ? (
-      <>
-        <XIcon className="dshx:size-3.5 dshx:shrink-0 dshx:text-destructive" />
-        <span className="dshx:min-w-0 dshx:truncate dshx:text-destructive">
-          {failed} {failed === 1 ? 'check' : 'checks'} failed
-        </span>
-      </>
-    ) : (
-      <>
-        <LoaderCircleIcon className="dshx:size-3.5 dshx:shrink-0 dshx:animate-spin dshx:text-muted-foreground dshx:motion-reduce:animate-none" />
-        <ShimmerText className="dshx:min-w-0 dshx:truncate">
-          Waiting for {pending} {pending === 1 ? 'check' : 'checks'}
-        </ShimmerText>
-      </>
-    )
+  const label = footerLabel(state, failed, pending, into)
 
   return (
     <div className="dshx:relative dshx:flex dshx:h-10 dshx:items-center dshx:gap-2 dshx:overflow-hidden dshx:rounded-lg dshx:px-1.5">

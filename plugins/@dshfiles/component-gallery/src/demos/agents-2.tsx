@@ -106,10 +106,18 @@ function DelegatorBoardDemo() {
 
 const trailScript = ['Pulled 24 sources', 'Wrote cost overview', 'Writing the provider section'] as const
 
+function trailStage(tick: number): number {
+  if (tick < 2) return 0
+  if (tick < 4) return 1
+  if (tick < 9) return 2
+  if (tick < 11) return 3
+  return 4
+}
+
 function StepTrailDemo() {
   const tick = useTick(900) % 14
   const status = (index: number): TrailStep['status'] => {
-    const stage = tick < 2 ? 0 : tick < 4 ? 1 : tick < 9 ? 2 : tick < 11 ? 3 : 4
+    const stage = trailStage(tick)
     if (index < stage) return 'done'
     if (index === stage) return index === 4 ? 'gated' : 'active'
     return index === 4 ? 'gated' : 'pending'
@@ -508,7 +516,7 @@ function WorkflowRunDemo() {
       status: statusAt(2),
       seconds: tick < 2 ? 0 : tick === 2 ? 1.4 : 3.2,
       fields: [
-        { key: 'file', value: 'auth/session.ts' },
+        { key: 'file', value: 'auth/token.ts' },
         { key: 'test', value: 'refresh.test.ts' },
         { key: 'severity', value: 'high' },
       ],
@@ -517,7 +525,7 @@ function WorkflowRunDemo() {
       id: 'related',
       stepId: 'related',
       label: 'Found 2 threads',
-      detail: 'Session refresh rework, Cookie domain fix',
+      detail: 'Token refresh rework, Cookie domain fix',
       status: statusAt(5),
       seconds: tick <= 5 ? 0.4 : 1.1,
     },

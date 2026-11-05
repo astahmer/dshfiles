@@ -7,7 +7,7 @@ const gallery = (page: Page) => page.getByRole('heading', { name: 'Components', 
 const cards = (page: Page, category: string) => page.getByRole('list', { name: `${category} components`, exact: true }).getByRole('listitem')
 
 When('the component gallery is opened', async ({ page }: { page: Page }) => {
-  await openGlobalPanel(page, 'Component Gallery: Components')
+  await openGlobalPanel(page, 'Component gallery')
   await expect(gallery(page)).toBeVisible()
 })
 

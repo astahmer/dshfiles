@@ -295,23 +295,29 @@ function FileRow({ file, tests }: { readonly file: TestFile; readonly tests: rea
   )
 }
 
+function caseIcon(status: TestCaseStatus): React.ReactNode {
+  switch (status) {
+    case 'passed':
+      return <CheckIcon aria-label="Passed" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
+    case 'failed':
+      return <XIcon aria-label="Failed" className="dshx:size-3.5 dshx:shrink-0 dshx:text-destructive" />
+    case 'skipped':
+      return <MinusIcon aria-label="Skipped" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground/60" />
+    case 'running':
+      return (
+        <LoaderCircleIcon
+          aria-label="Running"
+          className="dshx:size-3.5 dshx:shrink-0 dshx:animate-spin dshx:text-muted-foreground dshx:motion-reduce:animate-none"
+        />
+      )
+  }
+}
+
 function CaseRow({ test }: { readonly test: TestCase }) {
   const failed = test.status === 'failed'
   const [open, setOpen] = React.useState(failed)
   const bodyId = React.useId()
-  const icon =
-    test.status === 'passed' ? (
-      <CheckIcon aria-label="Passed" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-    ) : test.status === 'failed' ? (
-      <XIcon aria-label="Failed" className="dshx:size-3.5 dshx:shrink-0 dshx:text-destructive" />
-    ) : test.status === 'skipped' ? (
-      <MinusIcon aria-label="Skipped" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground/60" />
-    ) : (
-      <LoaderCircleIcon
-        aria-label="Running"
-        className="dshx:size-3.5 dshx:shrink-0 dshx:animate-spin dshx:text-muted-foreground dshx:motion-reduce:animate-none"
-      />
-    )
+  const icon = caseIcon(test.status)
   const label = (
     <>
       {icon}

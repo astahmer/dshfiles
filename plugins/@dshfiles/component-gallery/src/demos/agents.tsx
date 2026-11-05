@@ -623,15 +623,15 @@ const FILES: readonly { path: string; suite: string; names: readonly string[] }[
     ],
   },
   {
-    path: 'src/auth/session.test.ts',
-    suite: 'session',
+    path: 'src/auth/token.test.ts',
+    suite: 'token',
     names: [
       'issues a token',
       'refreshes before expiry',
       'revokes on logout',
       'rejects a tampered token',
       'rotates the signing key',
-      'expires idle sessions',
+      'expires idle tokens',
       'binds to the user agent',
       'logs an audit event',
     ],

@@ -8,9 +8,7 @@
  *
  * Use the presets below instead of ad-hoc numbers so every animated component in DSH moves with one feel.
  */
-import { animate, animateLayout, frame, cancelFrame, type AnimationOptions, type AnimationPlaybackControls, type ValueAnimationTransition } from 'motion'
-
-export {
+import {
   animate,
   animateLayout,
   animateView,
@@ -26,8 +24,14 @@ export {
   stagger,
   styleEffect,
   transform,
+  type AnimationOptions,
+  type AnimationPlaybackControls,
+  type ValueAnimationTransition,
 } from 'motion'
-export type { AnimationOptions, AnimationPlaybackControls, AnimationSequence, DOMKeyframesDefinition, MotionValue, SpringOptions } from 'motion'
+import type { AnimationSequence, DOMKeyframesDefinition, MotionValue, SpringOptions } from 'motion'
+
+export { animate, animateLayout, animateView, cancelFrame, frame, hover, inView, mix, motionValue, press, scroll, spring, stagger, styleEffect, transform }
+export type { AnimationOptions, AnimationPlaybackControls, AnimationSequence, DOMKeyframesDefinition, MotionValue, SpringOptions }
 
 /** Spring feels. `snappy` for UI chrome, `smooth` for content and layout, `bouncy` for playful confirmation, `gentle` for big surfaces. */
 export const springs = {

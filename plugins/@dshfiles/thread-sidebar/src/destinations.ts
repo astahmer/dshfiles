@@ -103,6 +103,7 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
   { panelId: 'dshfiles-multi-host-hosts', destination: 'observe', label: 'Hosts', description: 'Machines threads run on.', order: 8, formerLabels: ['Multi-host: Hosts', 'Hosts'] },
   { panelId: 'dshfiles-memory-panel', destination: 'knowledge', label: 'Memory', description: 'Notes and thread digests.', order: 1, formerLabels: ['Memory: Browser', 'Memory'] },
   { panelId: 'dshfiles-resources', destination: 'knowledge', label: 'Resources', description: 'Resource packs and their properties.', order: 2, formerLabels: ['Resource Packs: Resources'] },
+  { panelId: 'component-gallery', destination: 'knowledge', label: 'Component gallery', description: 'Every shared plugin component, live.', order: 3, formerLabels: ['Component Gallery: Components', 'Component gallery'] },
   { panelId: 'ai-accounts', destination: 'settings', label: 'AI accounts', description: 'Accounts, models and routing.', order: 1, formerLabels: ['AI Accounts: Accounts'] },
   { panelId: 'mcp-servers', destination: 'settings', label: 'MCP servers', description: 'Tool servers agents connect to.', order: 2, formerLabels: ['MCP Servers: Servers'] },
   { panelId: 'secret-catalog', destination: 'settings', label: 'Secrets', description: 'Credential aliases, never values.', order: 3, formerLabels: ['Secret Catalog: Secrets', 'Secrets'] },

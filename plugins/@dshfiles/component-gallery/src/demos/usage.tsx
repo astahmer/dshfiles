@@ -122,6 +122,15 @@ const landingScript: readonly {
   },
 ]
 
+function landingStepState(status: PipelineRunStatus, index: number, stepIndex: number): PipelineStep['state'] {
+  if (status === 'idle') return 'pending'
+  if (index < stepIndex) return 'done'
+  if (index > stepIndex) return 'pending'
+  if (status === 'running') return 'running'
+  if (status === 'failed') return 'failed'
+  return 'done'
+}
+
 function PipelineRunDemo() {
   const [status, setStatus] = React.useState<PipelineRunStatus>('idle')
   const [stepIndex, setStepIndex] = React.useState(0)
@@ -173,18 +182,7 @@ function PipelineRunDemo() {
 
   const steps: PipelineStep[] = landingScript.map((entry, index) => {
     const duration = durations[index]
-    const state =
-      status === 'idle'
-        ? 'pending'
-        : index < stepIndex
-          ? 'done'
-          : index > stepIndex
-            ? 'pending'
-            : status === 'running'
-              ? 'running'
-              : status === 'failed'
-                ? 'failed'
-                : 'done'
+    const state = landingStepState(status, index, stepIndex)
     return duration === undefined ? { id: entry.id, label: entry.label, state } : { id: entry.id, label: entry.label, state, durationSeconds: duration }
   })
   const lines: PipelineLogLine[] = (script?.lines ?? []).slice(0, lineCount).map((line, index, all) => ({
@@ -989,7 +987,7 @@ export const usageDemos: readonly GalleryDemo[] = [
   {
     id: 'usage-pipeline-run',
     title: 'PipelineRun',
-    description: 'Landing a thread workspace step by step (rebase, typecheck, test, build, move main) with a live log and a settled summary.',
+    description: 'Landing a thread workspace step by step (rebase, typecheck, test, build, move main) with a live log and a final summary.',
     source: "import { PipelineRun } from '@dshfiles/plugin-ui/components/motion/pipeline-run'",
     render: () => <PipelineRunDemo />,
   },

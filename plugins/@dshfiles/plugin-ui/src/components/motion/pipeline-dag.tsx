@@ -59,6 +59,20 @@ const barTone = {
   failed: 'dshx:bg-destructive',
   skipped: 'dshx:bg-muted-foreground/40',
 } as const satisfies Record<PipelineStepState, string>
+const nodeTone = {
+  pending: 'dshx:border-[1.5px] dshx:border-muted-foreground/70 dshx:bg-card',
+  running: 'dshx:bg-info',
+  ok: 'dshx:bg-success',
+  failed: 'dshx:bg-destructive',
+  skipped: 'dshx:border-[1.5px] dshx:border-muted-foreground/70 dshx:bg-card',
+} as const satisfies Record<PipelineStepState, string>
+
+function rowTone(running: boolean, selected: boolean, selectable: boolean): string {
+  if (running) return 'dshx:bg-info/8'
+  if (selected) return 'dshx:bg-accent'
+  if (selectable) return 'dshx:hover:bg-accent/60'
+  return ''
+}
 
 /**
  * A run of a pipeline drawn the way a DAG that is mostly a list should be: one table row per step, a lane gutter whose
@@ -236,23 +250,10 @@ function StepRow({
 
   const start = step.start
   const end = step.state === 'running' ? elapsed : step.end
-  const tone = stateTone[step.state]
   const nodeEl = (
     <span className="dshx:relative dshx:flex dshx:size-2.5 dshx:items-center dshx:justify-center">
       {step.state === 'running' ? <span ref={pulse} className="dshx:absolute dshx:inset-0 dshx:rounded-full dshx:bg-info" /> : null}
-      <span
-        ref={node}
-        className={cn(
-          'dshx:relative dshx:size-2.5 dshx:rounded-full dshx:transition-colors dshx:duration-300',
-          step.state === 'pending' || step.state === 'skipped'
-            ? 'dshx:border-[1.5px] dshx:border-muted-foreground/70 dshx:bg-card'
-            : tone === 'success'
-              ? 'dshx:bg-success'
-              : tone === 'destructive'
-                ? 'dshx:bg-destructive'
-                : 'dshx:bg-info',
-        )}
-      />
+      <span ref={node} className={cn('dshx:relative dshx:size-2.5 dshx:rounded-full dshx:transition-colors dshx:duration-300', nodeTone[step.state])} />
     </span>
   )
   const Wrapper = onSelect ? 'button' : 'div'
@@ -262,7 +263,7 @@ function StepRow({
         {...(onSelect ? { type: 'button' as const, onClick: () => onSelect(step.id), 'aria-pressed': selected } : {})}
         className={cn(
           'dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:text-left dshx:outline-none dshx:transition-colors dshx:duration-300 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
-          step.state === 'running' ? 'dshx:bg-info/8' : selected ? 'dshx:bg-accent' : onSelect ? 'dshx:hover:bg-accent/60' : '',
+          rowTone(step.state === 'running', selected, onSelect !== undefined),
         )}
         style={{ height: ROW }}
       >

@@ -70,6 +70,40 @@ export function ShapeshiftCard({
 
   const contentKey = isDone ? 'done' : phase === 'view' && view != null ? `view:${view.key}` : phase
 
+  let content: React.ReactNode = null
+  if (isDone) content = <DoneMark heading={done.title} detail={done.detail} />
+  else if (phase === 'thinking')
+    content = (
+      <div className="dshx:border-t dshx:border-border dshx:px-4 dshx:py-3 dshx:text-sm">
+        <ShimmerText>{thinkingLabel}</ShimmerText>
+      </div>
+    )
+  else if (phase === 'view' && view != null)
+    content = (
+      <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:border-t dshx:border-border dshx:px-4 dshx:pt-3 dshx:pb-4">
+        <div
+          data-shape-part
+          className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:font-medium dshx:text-foreground dshx:[&_svg]:size-4 dshx:[&_svg]:text-muted-foreground"
+        >
+          {view.icon}
+          <span className="dshx:min-w-0 dshx:truncate">{view.title}</span>
+        </div>
+        <div data-shape-part className="dshx:min-w-0">
+          {view.body}
+        </div>
+        {view.actions !== undefined ? (
+          <div data-shape-part className="dshx:flex dshx:justify-end dshx:gap-2">
+            {view.actions}
+          </div>
+        ) : null}
+        {onDismiss !== undefined ? (
+          <div data-shape-part className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
+            <kbd className="dshx:rounded dshx:border dshx:border-border dshx:bg-muted dshx:px-1.5 dshx:font-sans">Esc</kbd> to dismiss
+          </div>
+        ) : null}
+      </div>
+    )
+
   return (
     <section
       ref={rootRef}
@@ -112,38 +146,7 @@ export function ShapeshiftCard({
             </button>
           </form>
         )}
-        <Shape key={contentKey}>
-          {isDone ? (
-            <DoneMark heading={done.title} detail={done.detail} />
-          ) : phase === 'thinking' ? (
-            <div className="dshx:border-t dshx:border-border dshx:px-4 dshx:py-3 dshx:text-sm">
-              <ShimmerText>{thinkingLabel}</ShimmerText>
-            </div>
-          ) : phase === 'view' && view != null ? (
-            <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:border-t dshx:border-border dshx:px-4 dshx:pt-3 dshx:pb-4">
-              <div
-                data-shape-part
-                className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:font-medium dshx:text-foreground dshx:[&_svg]:size-4 dshx:[&_svg]:text-muted-foreground"
-              >
-                {view.icon}
-                <span className="dshx:min-w-0 dshx:truncate">{view.title}</span>
-              </div>
-              <div data-shape-part className="dshx:min-w-0">
-                {view.body}
-              </div>
-              {view.actions !== undefined ? (
-                <div data-shape-part className="dshx:flex dshx:justify-end dshx:gap-2">
-                  {view.actions}
-                </div>
-              ) : null}
-              {onDismiss !== undefined ? (
-                <div data-shape-part className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
-                  <kbd className="dshx:rounded dshx:border dshx:border-border dshx:bg-muted dshx:px-1.5 dshx:font-sans">Esc</kbd> to dismiss
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </Shape>
+        <Shape key={contentKey}>{content}</Shape>
       </AutoHeight>
     </section>
   )

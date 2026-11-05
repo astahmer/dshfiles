@@ -90,15 +90,15 @@ function RevisionScrubberDemo() {
 const baseRevisions: readonly MergeRevision[] = [
   {
     id: 'd29f50',
-    title: 'Add session refresh tests',
-    bookmark: 'feat/session-refresh',
+    title: 'Add token refresh tests',
+    bookmark: 'feat/token-refresh',
     hash: 'd29f50',
     author: 'You',
     age: 'now',
     lane: 1,
     parents: ['c70a92'],
   },
-  { id: 'c70a92', title: 'Refresh sessions near expiry', hash: 'c70a92', author: 'You', age: '25m', lane: 1, parents: ['1f8e3b'] },
+  { id: 'c70a92', title: 'Refresh tokens near expiry', hash: 'c70a92', author: 'You', age: '25m', lane: 1, parents: ['1f8e3b'] },
   {
     id: 'e83c51',
     title: 'Add analytics consent banner',
@@ -110,7 +110,7 @@ const baseRevisions: readonly MergeRevision[] = [
     parents: ['62b0e4'],
     muted: true,
   },
-  { id: '1f8e3b', title: 'Read session expiry from the token', hash: '1f8e3b', author: 'You', age: '40m', lane: 1, parents: ['9c2d4a'] },
+  { id: '1f8e3b', title: 'Read token expiry from the token', hash: '1f8e3b', author: 'You', age: '40m', lane: 1, parents: ['9c2d4a'] },
   { id: '62b0e4', title: 'Track checkout funnel events', hash: '62b0e4', author: 'Sam', age: '2h', lane: 2, parents: ['9c2d4a'], muted: true },
   { id: '9c2d4a', title: 'Bump next to 16.3', hash: '9c2d4a', author: 'Sam', age: '3h', lane: 0, parents: [], muted: true },
 ]
@@ -138,7 +138,7 @@ function conflictScene(phase: number): ConflictScene {
   const mainMoved: MergeRevision[] = [
     {
       id: '5be27d',
-      title: 'Read sessions with the current key',
+      title: 'Read tokens with the current key',
       bookmark: 'main',
       hash: '5be27d',
       author: 'Lena',
@@ -151,7 +151,7 @@ function conflictScene(phase: number): ConflictScene {
     },
     {
       id: 'a3f9c1',
-      title: 'Rotate session keys',
+      title: 'Rotate token keys',
       hash: 'a3f9c1',
       author: 'Lena',
       age: '18m',
@@ -167,8 +167,8 @@ function conflictScene(phase: number): ConflictScene {
   if (phase >= 2) {
     const merge = {
       id: 'merge',
-      title: 'Merge main into feat/session-refresh',
-      bookmark: 'feat/session-refresh',
+      title: 'Merge main into feat/token-refresh',
+      bookmark: 'feat/token-refresh',
       hash: '7e0c3b',
       author: 'You',
       age: 'now',
@@ -192,7 +192,7 @@ function MergeConflictGraphDemo() {
   const conflicts = scene.revisions.reduce((sum, rev) => sum + (rev.resolved ? 0 : (rev.conflicts ?? 0)), 0)
   return (
     <MergeConflictGraph
-      heading="Refresh sessions in the auth middleware"
+      heading="Refresh tokens in the auth middleware"
       number="#128"
       target={{ label: 'Merge into main', status: scene.status, conflicts }}
       revisions={scene.revisions}
@@ -212,8 +212,8 @@ function withoutBookmark(rev: MergeRevision): MergeRevision {
 const landedRevisions: readonly MergeRevision[] = [
   {
     id: 'merge',
-    title: 'Merge main into feat/session-refresh',
-    bookmark: 'feat/session-refresh',
+    title: 'Merge main into feat/token-refresh',
+    bookmark: 'feat/token-refresh',
     hash: '7e0c3b',
     author: 'You',
     age: 'now',
@@ -221,10 +221,10 @@ const landedRevisions: readonly MergeRevision[] = [
     parents: ['d29f50', '5be27d'],
     node: 'ring',
   },
-  { id: 'd29f50', title: 'Add session refresh tests', hash: 'd29f50', author: 'You', age: 'now', lane: 1, parents: ['c70a92'] },
+  { id: 'd29f50', title: 'Add token refresh tests', hash: 'd29f50', author: 'You', age: 'now', lane: 1, parents: ['c70a92'] },
   {
     id: '5be27d',
-    title: 'Read sessions with the current key',
+    title: 'Read tokens with the current key',
     bookmark: 'main',
     hash: '5be27d',
     author: 'Lena',
@@ -233,8 +233,8 @@ const landedRevisions: readonly MergeRevision[] = [
     parents: ['a3f9c1'],
     muted: true,
   },
-  { id: 'a3f9c1', title: 'Rotate session keys', hash: 'a3f9c1', author: 'Lena', age: '18m', lane: 0, parents: ['9c2d4a'], muted: true },
-  { id: 'c70a92', title: 'Refresh sessions near expiry', hash: 'c70a92', author: 'You', age: '25m', lane: 1, parents: ['9c2d4a'] },
+  { id: 'a3f9c1', title: 'Rotate token keys', hash: 'a3f9c1', author: 'Lena', age: '18m', lane: 0, parents: ['9c2d4a'], muted: true },
+  { id: 'c70a92', title: 'Refresh tokens near expiry', hash: 'c70a92', author: 'You', age: '25m', lane: 1, parents: ['9c2d4a'] },
   { id: '9c2d4a', title: 'Bump next to 16.3', hash: '9c2d4a', author: 'Sam', age: '3h', lane: 0, parents: [], muted: true },
 ]
 
@@ -257,12 +257,18 @@ function checksScene(phase: number): ChecksScene {
       label: 'Preview',
       status: at(5, 3),
       detail: phase >= 5 ? 'ready' : 'deploying',
-      summary: 'Deployed to session-refresh.preview',
+      summary: 'Deployed to token-refresh.preview',
       duration: '1m 4s',
     },
   ]
-  const state: MergeState = phase >= 7 ? 'merged' : phase === 6 ? 'merging' : phase === 5 ? 'ready' : 'blocked'
-  return { checks, state }
+  return { checks, state: mergeStateAt(phase) }
+}
+
+function mergeStateAt(phase: number): MergeState {
+  if (phase >= 7) return 'merged'
+  if (phase === 6) return 'merging'
+  if (phase === 5) return 'ready'
+  return 'blocked'
 }
 
 function MergeChecksDemo() {
@@ -271,7 +277,7 @@ function MergeChecksDemo() {
   const merged = scene.state === 'merged'
   return (
     <MergeConflictGraph
-      heading="Refresh sessions in the auth middleware"
+      heading="Refresh tokens in the auth middleware"
       number="#128"
       state={merged ? { label: 'Merged', tone: 'violet' } : { label: 'Open', tone: 'success' }}
       target={{ label: 'Merge into main', status: merged ? 'merged' : 'ready' }}
@@ -308,6 +314,13 @@ const landingPlan: readonly Planned[] = [
   { id: 'record', label: 'Record review range', lane: 1, after: ['land', 'park'], start: 16, end: 17.5, log: 'review range saved for thread' },
 ]
 
+function plannedStepState(plan: Planned, t: number): PipelineStep['state'] {
+  if (plan.skipped) return t >= plan.start ? 'skipped' : 'pending'
+  if (t < plan.start) return 'pending'
+  if (t < plan.end) return 'running'
+  return 'ok'
+}
+
 function PipelineRun({ onDone }: { readonly onDone: () => void }) {
   const raw = useElapsed(true)
   const t = raw * 1.2
@@ -316,7 +329,7 @@ function PipelineRun({ onDone }: { readonly onDone: () => void }) {
     if (t >= end) onDone()
   }, [t, onDone])
   const steps: PipelineStep[] = landingPlan.map(plan => {
-    const state = plan.skipped ? (t >= plan.start ? 'skipped' : 'pending') : t < plan.start ? 'pending' : t < plan.end ? 'running' : 'ok'
+    const state = plannedStepState(plan, t)
     const fraction = Math.max(0, Math.min(1, (t - plan.start) / Math.max(0.01, plan.end - plan.start)))
     const base = { id: plan.id, label: plan.label, lane: plan.lane, after: plan.after, state } satisfies PipelineStep
     const labelled = plan.prefix ? { ...base, prefix: plan.prefix } : base
@@ -622,7 +635,7 @@ export const revisionsDemos: readonly GalleryDemo[] = [
   {
     id: 'revisions-merge-checks',
     title: 'MergeChecks',
-    description: "Checks before a thread's work integrates into main: chips flip as tests, lint and types pass, then Merge pops in and sweeps to merged.",
+    description: "Checks before a thread's work lands on main: chips flip as tests, lint and types pass, then Merge pops in and sweeps to merged.",
     source: "import { MergeChecks } from '@dshfiles/plugin-ui/components/motion/merge-checks'",
     wide: true,
     render: () => <MergeChecksDemo />,

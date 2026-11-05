@@ -46,7 +46,7 @@ function useScript(steps: readonly (readonly [number, () => void])[], enabled: b
 // Bulk select
 
 const files: readonly BulkSelectItem[] = [
-  { id: 'a', title: 'session-controller.ts', meta: '2.4 KB · Edited by @luna', tag: 'TS', tone: 'info' },
+  { id: 'a', title: 'token-store.ts', meta: '2.4 KB · Edited by @luna', tag: 'TS', tone: 'info' },
   { id: 'b', title: 'Release notes 0.2.1.md', meta: 'Edited by you · 2h ago', tag: 'MD', tone: 'violet' },
   { id: 'c', title: 'trace-export.json', meta: '5.1 MB · Subagent output', tag: 'JSON', tone: 'warning' },
   { id: 'd', title: 'probe-profile.log', meta: '86 KB · Yesterday', tag: 'LOG', tone: 'success' },
@@ -101,7 +101,7 @@ function BulkSelectDemo() {
 const runPlan: readonly Omit<AgentRunStep, 'startedAt'>[] = [
   { id: 'read', label: 'Reading 12 files', icon: FileSearchIcon },
   { id: 'plan', label: 'Planning the change', icon: BotIcon },
-  { id: 'edit', label: 'Editing session-controller.ts', icon: FileTextIcon },
+  { id: 'edit', label: 'Editing token-store.ts', icon: FileTextIcon },
   { id: 'test', label: 'Running focused tests', icon: TerminalIcon },
   { id: 'jj', label: 'Describing the revision', icon: GitBranchIcon },
   { id: 'sum', label: 'Writing the summary', icon: BotIcon },
@@ -157,7 +157,7 @@ function AgentRunStatusDemo() {
   return (
     <div className="dshx:mx-auto dshx:w-full dshx:max-w-md">
       <AgentRunStatus
-        heading="Fix the flaky session-controller test"
+        heading="Fix the flaky token-store test"
         model="DeepSeek V4 · @luna"
         steps={steps}
         totalSteps={runPlan.length}
@@ -216,6 +216,13 @@ const approvalPlan: readonly ApprovalRunStep[] = [
   { id: 's8', label: 'scale_app', tool: 'fly', detail: 'webhook-consumer', status: 'pending', durationSeconds: 7 },
 ]
 
+function approvalRunState(finished: boolean, paused: boolean, waiting: boolean): ApprovalRunState {
+  if (finished) return 'done'
+  if (paused) return 'paused'
+  if (waiting) return 'waiting'
+  return 'working'
+}
+
 function ApprovalRunDemo() {
   const [cursor, setCursor] = React.useState(3)
   const [progress, setProgress] = React.useState(0.1)
@@ -267,7 +274,7 @@ function ApprovalRunDemo() {
     return step
   })
   const visible = steps.slice(0, 8)
-  const state: ApprovalRunState = finished ? 'done' : paused ? 'paused' : waiting ? 'waiting' : 'working'
+  const state = approvalRunState(finished, paused, waiting)
 
   return (
     <div className="dshx:mx-auto dshx:w-full dshx:max-w-xl">
@@ -484,7 +491,7 @@ const tourSteps: readonly WalkthroughStep[] = [
   {
     toolId: 'widgets',
     title: 'Add widgets',
-    body: 'Pin a trace waterfall, a cost meter or the merge queue next to the conversation.',
+    body: 'Pin a trace waterfall, a cost meter or the merge queue next to the thread.',
     preview: <MiniStat label="Open traces" value="7" />,
   },
 ]

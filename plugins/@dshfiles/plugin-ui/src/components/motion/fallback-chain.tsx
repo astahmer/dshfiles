@@ -256,8 +256,16 @@ export function FallbackChain({ heading, route, attempts, startedAt, endedAt, cl
 
 type PathKind = 'idle' | 'live' | 'failed' | 'win'
 
-const leftKind = (status: FallbackAttemptStatus): PathKind =>
-  status === 'trying' ? 'live' : status === 'failed' ? 'failed' : status === 'answered' ? 'win' : 'idle'
+const pathKindByStatus = {
+  trying: 'live',
+  next: 'idle',
+  waiting: 'idle',
+  skipped: 'idle',
+  failed: 'failed',
+  answered: 'win',
+} as const satisfies Record<FallbackAttemptStatus, PathKind>
+
+const leftKind = (status: FallbackAttemptStatus): PathKind => pathKindByStatus[status]
 
 function FlowPath({ d, kind }: { readonly d: string; readonly kind: PathKind }) {
   const ref = React.useRef<SVGPathElement>(null)
@@ -287,6 +295,24 @@ function FlowPath({ d, kind }: { readonly d: string; readonly kind: PathKind }) 
     />
   )
 }
+
+const badgeVariant = {
+  trying: 'info',
+  next: 'muted',
+  waiting: 'muted',
+  skipped: 'muted',
+  failed: 'outline',
+  answered: 'success',
+} as const satisfies Record<FallbackAttemptStatus, string>
+
+const badgeLabel = {
+  trying: 'Trying',
+  next: 'Queued',
+  waiting: 'Queued',
+  skipped: 'Skipped',
+  failed: 'Failed',
+  answered: 'Answered',
+} as const satisfies Record<FallbackAttemptStatus, string>
 
 const AttemptCard = React.forwardRef<HTMLLIElement, { readonly attempt: FallbackAttempt; readonly index: number; readonly elapsed: number }>(
   function AttemptCard({ attempt, index, elapsed }, ref) {
@@ -387,19 +413,8 @@ const AttemptCard = React.forwardRef<HTMLLIElement, { readonly attempt: Fallback
                 <span className="dshx:truncate dshx:text-sm dshx:font-medium">{attempt.provider}</span>
                 {attempt.region ? <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{attempt.region}</span> : null}
               </span>
-              <Badge
-                variant={status === 'answered' ? 'success' : status === 'trying' ? 'info' : status === 'failed' ? 'outline' : 'muted'}
-                className={status === 'failed' ? 'dshx:text-destructive' : undefined}
-              >
-                {status === 'trying'
-                  ? 'Trying'
-                  : status === 'answered'
-                    ? 'Answered'
-                    : status === 'failed'
-                      ? 'Failed'
-                      : status === 'skipped'
-                        ? 'Skipped'
-                        : 'Queued'}
+              <Badge variant={badgeVariant[status]} className={status === 'failed' ? 'dshx:text-destructive' : undefined}>
+                {badgeLabel[status]}
               </Badge>
             </div>
             <dl className="dshx:grid dshx:grid-cols-[auto_1fr] dshx:gap-x-4 dshx:gap-y-1 dshx:text-xs">
@@ -442,14 +457,16 @@ const statusText = (attempt: FallbackAttempt): string => {
   }
 }
 
-const statusTone = (status: FallbackAttemptStatus): string =>
-  status === 'failed'
-    ? 'dshx:text-destructive'
-    : status === 'answered'
-      ? 'dshx:text-success'
-      : status === 'trying'
-        ? 'dshx:text-info'
-        : 'dshx:text-muted-foreground'
+const statusToneByStatus = {
+  trying: 'dshx:text-info',
+  next: 'dshx:text-muted-foreground',
+  waiting: 'dshx:text-muted-foreground',
+  skipped: 'dshx:text-muted-foreground',
+  failed: 'dshx:text-destructive',
+  answered: 'dshx:text-success',
+} as const satisfies Record<FallbackAttemptStatus, string>
+
+const statusTone = (status: FallbackAttemptStatus): string => statusToneByStatus[status]
 
 const ResponseNode = React.forwardRef<HTMLDivElement, { readonly answered: FallbackAttempt | undefined; readonly failed: boolean }>(function ResponseNode(
   { answered, failed },

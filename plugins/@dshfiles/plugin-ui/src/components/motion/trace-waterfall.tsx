@@ -216,6 +216,8 @@ export function TraceWaterfall({ subtitle, spans, live, startedAt, selectedId, o
 /** A bar inside a box that starts at `left`%: its width relative to what remains of the column. */
 const relativeWidth = (left: number, width: number) => (left >= 100 ? 0 : (Math.min(width, 100 - left) / (100 - left)) * 100)
 
+const kindTone = { agent: 'neutral', model: 'violet', tool: 'teal' } as const satisfies Record<TraceSpanKind, keyof typeof toneTint>
+
 function WaterfallBar({
   span,
   left,
@@ -244,7 +246,7 @@ function WaterfallBar({
     return () => controls.complete()
   }, [slowest])
   const failed = span.error !== undefined
-  const tone = failed ? 'destructive' : span.kind === 'model' ? 'violet' : span.kind === 'tool' ? 'teal' : 'neutral'
+  const tone = failed ? 'destructive' : kindTone[span.kind]
   return (
     <div className="dshx:absolute dshx:inset-y-0 dshx:flex dshx:items-center dshx:gap-1.5" style={{ left: `${left}%`, right: 0 }}>
       <span

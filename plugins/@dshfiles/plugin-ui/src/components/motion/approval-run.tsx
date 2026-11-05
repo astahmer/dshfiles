@@ -317,8 +317,13 @@ function GatePanel({
   )
 }
 
+function stepIconKind(status: ApprovalStepStatus, gate: ApprovalGate | undefined): 'done' | 'running' | ApprovalGate | 'pending' {
+  if (status === 'done' || status === 'running') return status
+  return gate ?? 'pending'
+}
+
 function StepIcon({ status, gate, paused }: { readonly status: ApprovalStepStatus; readonly gate: ApprovalGate | undefined; readonly paused: boolean }) {
-  const kind = status === 'done' ? 'done' : status === 'running' ? 'running' : gate === 'approval' ? 'approval' : gate === 'answer' ? 'answer' : 'pending'
+  const kind = stepIconKind(status, gate)
   return (
     <PopKey popKey={kind} className="dshx:mt-px dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden>
       {kind === 'done' ? <CircleCheckIcon className="dshx:size-4 dshx:text-muted-foreground" /> : null}

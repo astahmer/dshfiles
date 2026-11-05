@@ -14,9 +14,7 @@ export default defineClientPlugin({
   uses: ['ui'],
   setup(api) {
     const RootPanel = (): JSX.Element => <GalleryPage categories={galleryCategories} />
-    api.ui.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 90, label: () => 'Component Gallery: Components' }, () => (
-      <ShapesIcon aria-hidden size={18} />
-    ))
+    api.ui.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 90, label: () => 'Component gallery' }, () => <ShapesIcon aria-hidden size={18} />)
     api.ui.register({ name: 'main', key: PANEL_ID }, RootPanel)
   },
 })
