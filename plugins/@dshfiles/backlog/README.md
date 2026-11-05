@@ -34,6 +34,8 @@
 
 ![Pull the next ready item from the Ready view](docs/screenshots/ready-queue.png)
 
+![Acceptance criteria, plan, gates and pull requests in the item detail](docs/screenshots/acceptance-criteria.png)
+
 One capture feed for notes, tasks, bugs, ideas and questions, shared by the user and every agent. It
 replaces a "TODO" chat channel: adding something costs one line, the feed stays ordered by activity so
 idle things sink, and the tracker parts (status, actors, links, search, board) come for free.
@@ -199,6 +201,67 @@ Agents pull work from the backlog the way Beads' `bd ready` and Linear's agent d
 
 A Host older than these fields answers without them: every item reads as no priority, unclaimed and not ready, and
 writes that need them are refused with a hint to restart the DSH Host process.
+
+## Planning: sections, templates, dates, gates and merges
+
+Structure an item carries in fields of its own (set and unset ops in the log, so every change shows under Show
+changes and can be reverted), never parsed out of its description.
+
+- **Acceptance criteria**: a checklist in the inspector; each criterion checks off on its own, the heading and the
+  row show `3/5`. Agents send the whole list with `backlog_update` `criteria` (a criterion with the same text keeps its
+  id and check) or check one with `criteriaChecks: [{ id, done }]`.
+- **Plan**: how the work will be done, written by you or an agent. An agent that sets `planApproval: "pending"` asks
+  for your go-ahead: the item asks for input (Inbox) and shows **Waiting for your approval** with **Approve plan**
+  until you approve. Only you can approve; an agent's `approved` is ignored.
+- **Summary**: what was done, written when the item closes. The Shipped rows and its AI summary show it.
+- **Templates**: Backlog settings › `templates` holds named templates (title prefix, kind, priority, tags, a body to
+  fill in, acceptance criteria); **Bug report**, **Feature spec** and **Research question** ship by default. Pick one
+  with the capture box's **Template** chip, write `/template <name>` anywhere in a capture, or pass
+  `backlog_capture` `template`. The Host fills only what the capture left out and appends the template body.
+- **Due date**: date only, no time. Set it from the inspector's **Due date** picker (Today, Tomorrow, In a week, In a
+  month, or any date), the item menu, `backlog_capture` or `backlog_update` `due`. Rows and cards show a chip that warns
+  a day ahead and turns red once an open item is past it. Items sorts by due date and groups by **Due date**
+  (Overdue, Today, Next 7 days, Later, No due date). Overdue is derived on read from the Host calendar, never stored:
+  an open overdue item lands in the Inbox under its own **Overdue** tab.
+- **Recurring items**: **Repeat** (inspector) or **Make recurring** (item menu) sets `recurrence` to daily, weekly,
+  monthly or `cron:<min hour day month weekday>`. When the item reaches done the Host itself creates the next
+  occurrence: same title, body, kind, priority, tags, project and parent, criteria unchecked, due one step after the
+  previous due date and past today. The rule moves to the new item and both link each other, so reopening and closing
+  the old one never creates a second occurrence. No automation is involved.
+- **Gates** (**Waits on**): an item can wait on a pull request merging, a jj revision reaching `main`, a project check
+  passing in a thread linked to the item, or a date. An open gate keeps it out of the Ready view (`is:gated`) and shows
+  an hourglass chip. A Host gate watch resolves them on the `revisionPollMinutes` cadence from what the Host already
+  watches: pull-request state through `@dshfiles/pull-requests`, one `jj log` per repository for `main`, and
+  `@dshfiles/project-checks` receipts. A date gate follows the calendar and is never stored as met.
+- **Pull requests**: GitHub pull and GitLab merge-request URLs are PR links. **Link PR…** in the inspector or
+  `backlog_link_pr` links one as `fixes` (or `implements` with `closes: false`) and asks `@dshfiles/pull-requests` to
+  watch it through the item's newest thread; the inspector and `backlog_pull_requests` show open, merged or closed and
+  the checks. A fixing PR that merges moves its item to done unless you set its status by hand. Without the
+  pull-requests plugin a PR link is a plain link. That plugin exposes no PR description, so `Closes b:k3f9` written in a
+  PR body is not read; commits saying it still close the item once they land on `main`.
+- **Duplicate merge**: **Merge into…** on the item menu (one item or a selection) and **Merge into b:…** on a triage
+  duplicate suggestion, or `backlog_merge` (an agent passes `confirm: true`), move each duplicate's comments (quoted,
+  keeping who wrote them), links, tags, files and sub-issues into the survivor, rewrite links other items held to the
+  duplicate, move its remote links where the survivor has none on that binding, and drop it with a `duplicates` link.
+  The `alias_redirects` table makes `b:<duplicate>` keep opening the survivor (its number still opens the duplicate).
+  Every step is an event on the items it touched.
+- **Agent guidance per project**: the project overview in **Projects** holds markdown guidance for agents (settings
+  `projectGuidance`, or `backlog_set_project_guidance`). A thread started from items opens its first message with
+  their projects' guidance; `backlog_get` returns it with the item and `backlog_ready` with the queue.
+- **Scheduled rules**: **Schedule nightly triage** (item menu, project overview) and `backlog_schedule_rule` create a
+  `@dshfiles/project-automations` automation of the item's project whose prompt calls backlog tools, so the backlog
+  runs no scheduler of its own. `triage` runs `backlog_triage_backfill` and reports what still waits on you; `recreate`
+  captures a fresh copy of an item. Manage them with Automations, `automation_list` and `automation_delete`. Without
+  that plugin the call is refused with how to enable it; an agent can also write one directly:
+
+  ```json
+  {
+    "title": "Backlog triage · dshfiles",
+    "projectId": "<from automation_projects>",
+    "prompt": "Call backlog_triage_backfill with limit 25 and confirm: true, then list what still waits on the user.",
+    "trigger": { "kind": "schedule", "timing": { "kind": "daily", "time": "02:00", "timeZone": "Europe/Paris" } }
+  }
+  ```
 
 ## Item references
 
@@ -387,50 +450,55 @@ dropping the rest of the draft.
 
 ## Agent tools
 
-| Tool                             | Kind                                                                                                                          |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `backlog_list`                   | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`, `hideAgentItems`)                       |
-| `backlog_get`                    | read: one item with history and backlinks                                                                                     |
-| `backlog_get_many`               | read: up to 50 items at once, unknown ids listed separately                                                                   |
-| `backlog_referencing`            | read: items linking to a thread, revision, branch, workspace, URL or item                                                     |
-| `backlog_capture`                | write; `priority` and `parent` (a sub-issue) besides the text                                                                 |
-| `backlog_update`                 | write: edit or move; `priority`, `parent` (null makes it top-level)                                                           |
-| `backlog_ready`                  | read: the ready queue, urgent first then oldest; `project`, `limit` (20)                                                      |
-| `backlog_claim`                  | write: claim an item for this thread (delegate, `doing`, thread link, lease); refused while another agent holds it            |
-| `backlog_release`                | write: give up a claim; the item returns to `todo`                                                                            |
-| `backlog_link`                   | write: link or unlink                                                                                                         |
-| `backlog_comment`                | write, optionally with images or files                                                                                        |
-| `backlog_attach_file`            | write: keep one base64 image or file with an item                                                                             |
-| `backlog_read_file`              | read: one image or file as a data URL; `save: true` also returns a temp file path                                             |
-| `backlog_remove_file`            | write: remove one image or file                                                                                               |
-| `backlog_revert`                 | write: put back the value a field held before one recorded change; refused when it changed again since; needs `confirm: true` |
-| `backlog_export`                 | write a new file: JSONL (items, optionally the op log) or an SQLite copy; changes no item                                     |
-| `backlog_triage`                 | write: run triage on one item now                                                                                             |
-| `backlog_triage_backfill`        | write: triage items captured before triage was set up, oldest first; over 5 items needs `confirm: true`                       |
-| `backlog_start_thread`           | write: start one thread for items, in the item project's own jj workspace, linked                                             |
-| `backlog_projects`               | read: per-project counts, who needs you, people; `hideAgentItems` counts like the views                                       |
-| `backlog_shipped`                | read: items that reached done per hour/day/week/month/year or a custom range, by project, with the previous count             |
-| `backlog_summarize_shipped`      | write (model call): a cached short summary of one shipped period by the triage model; `regenerate` writes a new one           |
-| `backlog_accept_proposal`        | write                                                                                                                         |
-| `backlog_dismiss_proposal`       | write                                                                                                                         |
-| `backlog_sync_status`            | read: providers, connections, bindings and each linked item's binding, remote key, state, last sync and errors                |
-| `backlog_sync_now`               | write: sync one linked item, or (with `confirm: true`) a binding, a project's or every linked item now                        |
-| `backlog_link_remote`            | write: link an item through a binding (several per item), create a remote item from it, or unlink it                          |
-| `backlog_import_remote`          | write: import one remote item as a linked item, through the binding serving the project                                       |
-| `backlog_sync_import_all`        | write (`confirm: true`): import every open remote item of a binding nobody linked yet                                         |
-| `backlog_sync_connections`       | read: providers, connections (key source, never the key) and bindings                                                         |
-| `backlog_sync_connection_save`   | write: add, rename or change a connection (key as `secret:ALIAS` only)                                                        |
-| `backlog_sync_connection_move`   | write: move a connection earlier or later                                                                                     |
-| `backlog_sync_connection_remove` | write (`confirm: true`): remove a connection with its bindings and their links                                                |
-| `backlog_sync_binding_save`      | write: add or change a binding; fields left out keep their value                                                              |
-| `backlog_sync_binding_remove`    | write (`confirm: true`): remove a binding and its links                                                                       |
-| `backlog_sync_discover`          | read: the containers (teams, repositories) a connection can bind                                                              |
-| `backlog_sync_test_connection`   | read: a connection's key source, signed-in account and containers                                                             |
-| `backlog_sync_test_all`          | read: the same report for every saved connection                                                                              |
+| Tool                             | Kind                                                                                                                                     |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `backlog_list`                   | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`, `hideAgentItems`)                                  |
+| `backlog_get`                    | read: one item with history and backlinks                                                                                                |
+| `backlog_get_many`               | read: up to 50 items at once, unknown ids listed separately                                                                              |
+| `backlog_referencing`            | read: items linking to a thread, revision, branch, workspace, URL or item                                                                |
+| `backlog_capture`                | write; `priority`, `parent` (a sub-issue), `due`, `recurrence` and `template` besides the text                                           |
+| `backlog_update`                 | write: edit or move; `priority`, `parent`, `criteria`, `criteriaChecks`, `plan`, `planApproval`, `summary`, `due`, `recurrence`, `gates` |
+| `backlog_merge`                  | write (`confirm: true`): merge duplicates into a survivor; their references keep resolving to it                                         |
+| `backlog_link_pr`                | write: link a pull request as `fixes` (or `implements`), optionally as a gate, and watch it                                              |
+| `backlog_pull_requests`          | read: an item's pull requests with live state and checks                                                                                 |
+| `backlog_set_project_guidance`   | write: one project's markdown guidance for agents                                                                                        |
+| `backlog_schedule_rule`          | write: a project automation that triages the inbox or recreates an item on a schedule                                                    |
+| `backlog_ready`                  | read: the ready queue, urgent first then oldest; `project`, `limit` (20)                                                                 |
+| `backlog_claim`                  | write: claim an item for this thread (delegate, `doing`, thread link, lease); refused while another agent holds it                       |
+| `backlog_release`                | write: give up a claim; the item returns to `todo`                                                                                       |
+| `backlog_link`                   | write: link or unlink                                                                                                                    |
+| `backlog_comment`                | write, optionally with images or files                                                                                                   |
+| `backlog_attach_file`            | write: keep one base64 image or file with an item                                                                                        |
+| `backlog_read_file`              | read: one image or file as a data URL; `save: true` also returns a temp file path                                                        |
+| `backlog_remove_file`            | write: remove one image or file                                                                                                          |
+| `backlog_revert`                 | write: put back the value a field held before one recorded change; refused when it changed again since; needs `confirm: true`            |
+| `backlog_export`                 | write a new file: JSONL (items, optionally the op log) or an SQLite copy; changes no item                                                |
+| `backlog_triage`                 | write: run triage on one item now                                                                                                        |
+| `backlog_triage_backfill`        | write: triage items captured before triage was set up, oldest first; over 5 items needs `confirm: true`                                  |
+| `backlog_start_thread`           | write: start one thread for items, in the item project's own jj workspace, linked                                                        |
+| `backlog_projects`               | read: per-project counts, who needs you, people; `hideAgentItems` counts like the views                                                  |
+| `backlog_shipped`                | read: items that reached done per hour/day/week/month/year or a custom range, by project, with the previous count                        |
+| `backlog_summarize_shipped`      | write (model call): a cached short summary of one shipped period by the triage model; `regenerate` writes a new one                      |
+| `backlog_accept_proposal`        | write                                                                                                                                    |
+| `backlog_dismiss_proposal`       | write                                                                                                                                    |
+| `backlog_sync_status`            | read: providers, connections, bindings and each linked item's binding, remote key, state, last sync and errors                           |
+| `backlog_sync_now`               | write: sync one linked item, or (with `confirm: true`) a binding, a project's or every linked item now                                   |
+| `backlog_link_remote`            | write: link an item through a binding (several per item), create a remote item from it, or unlink it                                     |
+| `backlog_import_remote`          | write: import one remote item as a linked item, through the binding serving the project                                                  |
+| `backlog_sync_import_all`        | write (`confirm: true`): import every open remote item of a binding nobody linked yet                                                    |
+| `backlog_sync_connections`       | read: providers, connections (key source, never the key) and bindings                                                                    |
+| `backlog_sync_connection_save`   | write: add, rename or change a connection (key as `secret:ALIAS` only)                                                                   |
+| `backlog_sync_connection_move`   | write: move a connection earlier or later                                                                                                |
+| `backlog_sync_connection_remove` | write (`confirm: true`): remove a connection with its bindings and their links                                                           |
+| `backlog_sync_binding_save`      | write: add or change a binding; fields left out keep their value                                                                         |
+| `backlog_sync_binding_remove`    | write (`confirm: true`): remove a binding and its links                                                                                  |
+| `backlog_sync_discover`          | read: the containers (teams, repositories) a connection can bind                                                                         |
+| `backlog_sync_test_connection`   | read: a connection's key source, signed-in account and containers                                                                        |
+| `backlog_sync_test_all`          | read: the same report for every saved connection                                                                                         |
 
 Bulk or destructive agent writes take an explicit `confirm: true` with no default: `backlog_delete`, `backlog_revert`,
 `backlog_triage_backfill` over more than 5 items (the default run is 25), `backlog_sync_now` without an `id`,
-`backlog_sync_import_all`, `backlog_sync_connection_remove` and `backlog_sync_binding_remove`. An
+`backlog_sync_import_all`, `backlog_sync_connection_remove`, `backlog_sync_binding_remove` and `backlog_merge`. An
 agent call without it is refused with `BacklogConfirmationRequired`, whose message says to ask the user and call again
 with `confirm: true`. The panel never passes it.
 
@@ -550,6 +618,9 @@ clears them. Words must all match; `"quoted phrases"` stay whole. Operators comb
 | sub-issues              | `parent:b:k3f9`, `has:children`, `has:parent`                          |
 | work queue              | `is:ready`, `is:blocked-by-deps`, `is:claimed`                         |
 | delegate                | `is:delegated`, `delegate:agent`                                       |
+| sections                | `has:criteria`, `has:plan`, `has:summary`, `is:plan-pending`           |
+| due date                | `has:due`, `is:overdue`, `due:<7d`, `due:>30d`                         |
+| gates                   | `has:gate`, `is:gated`                                                 |
 | leave out (any of them) | `-by:agent`, `-created:agent`, `-kind:note`, `-#tag`, `-priority:none` |
 
 `created:` reads the item's owner (who captured it), while `by:` matches anyone who touched it. A leading `-`
@@ -641,6 +712,7 @@ One SQLite file owned by the Host, `$DSH_HOME/plugins/backlog/backlog.db`, opene
 | `ops`               | The append-only op log, the source of truth: `op_id` (ULID), `item_id`, a hybrid logical clock (`hlc_wall` ms, `hlc_counter`, `hlc_host`), `origin` (the actor) and `op` JSON            |
 | `items`             | Each item folded from its ops, a cache rebuilt from `ops` whenever the fold version changes; indexed by status, project, last activity and origin                                        |
 | `aliases`           | `alias → item_id` with its kind: `legacy` (the public `b:<n>` of an item created before short aliases), `short` (the `b:<ref>` of a newer one) and `key` (a newer item's private number) |
+| `alias_redirects`   | `alias → target` for merged duplicates: a duplicate's `b:<ref>` resolves to the survivor's (migration `5_alias_redirects`)                                                               |
 | `attachments`       | Per item and attachment: the SHA-256, media type and size of the bytes                                                                                                                   |
 | `sync_mappings`     | The per-item remote mappings of the sync before bindings; read once by the migration to external refs, written no more                                                                   |
 | `sync_connections`  | Remote sync connections in panel order: provider kind, name, `secret:ALIAS` key reference, base URL and the last tested identity                                                         |

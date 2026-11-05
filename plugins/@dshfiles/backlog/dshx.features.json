@@ -3179,6 +3179,437 @@
           "reason": "Client-only: the chip derives from the session list and thread-attention records the panel already reads, and starts no Host work."
         }
       ]
+    },
+    {
+      "id": "acceptance-criteria",
+      "title": "Check off acceptance criteria, write a plan and a final summary",
+      "surface": "destinationSection",
+      "surfaces": ["client", "host", "tool"],
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › item detail",
+      "summary": "An item carries an acceptance checklist that rolls up as 3/5 on the item and its row, a plan an agent writes and may ask the user to approve (the item asks for input until approved; only the user approves), and a final summary written when it closes, which the Shipped view and its AI digest show. They are fields in the op log, revertible, edited in the item detail and through backlog_update (criteria, criteriaChecks, plan, planApproval, summary), and searchable with has:criteria, has:plan, has:summary and is:plan-pending.",
+      "states": ["no-sections", "criteria-partial", "criteria-complete", "plan-pending", "plan-approved", "summary-written", "host-predates-sections"],
+      "failureModes": [
+        "A Host older than the sections refuses the new update keys: the notice says to restart the DSH Host process.",
+        "An agent setting planApproval to approved is ignored: only the user approves a plan."
+      ],
+      "configuration": [],
+      "externalDependencies": [],
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Ship structured sections #backlog !2\"",
+        "press Enter",
+        "click button \"Items\"",
+        "click text \"b:#1\"",
+        "fill textbox \"New criterion\" \"Stored as fields in the op log\"",
+        "press Enter",
+        "fill textbox \"New criterion\" \"Editable in the peek\"",
+        "press Enter",
+        "fill textbox \"New criterion\" \"Searchable with has:criteria\"",
+        "press Enter",
+        "click checkbox \"Stored as fields in the op log\"",
+        "fill textbox \"Pull request URL\" \"https://github.com/astahmer/dshfiles/pull/579\"",
+        "press Enter",
+        "expect region \"Acceptance criteria\""
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.acceptance-criteria",
+          "featureFile": "tooling/dshx/e2e/features/backlog-planning.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.plan-approval",
+          "file": "plugins/@dshfiles/backlog/src/item-sections.test.ts",
+          "testName": "asks for input while a plan waits for approval, and only the user approves it"
+        }
+      ]
+    },
+    {
+      "id": "capture-templates",
+      "title": "Start a capture from a template",
+      "surface": "destinationSection",
+      "surfaces": ["client", "host", "tool"],
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › capture box",
+      "summary": "Named templates in Backlog settings (Bug report, Feature spec and Research question ship by default) carry a title prefix, kind, priority, tags, a body to fill in and acceptance criteria. A capture picks one with the Template chip, by writing /template <name> in its text, or with backlog_capture template; the Host fills only what the capture left out. An unknown name is refused with the names that exist.",
+      "states": ["no-template", "template-picked", "template-command", "unknown-template", "host-predates-templates"],
+      "failureModes": [
+        "An unknown template name is refused with the configured names and where to add one.",
+        "A Host older than templates refuses the template key: the capture fails with the restart notice and the text stays in the box."
+      ],
+      "configuration": [
+        {
+          "key": "dshfiles-backlog.templates",
+          "defaultValue": "Bug report, Feature spec, Research question",
+          "constraints": "Each template has a name, title prefix, kind, priority, tags, body and acceptance criteria; a capture names one by name, ignoring case.",
+          "coveredBy": ["backlog.template-capture", "backlog.template-fill"]
+        }
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Login fails on Safari /template Bug report\"",
+        "press Enter",
+        "click button \"Items\"",
+        "click text \"b:#1\"",
+        "expect region \"Acceptance criteria\""
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.template-capture",
+          "featureFile": "tooling/dshx/e2e/features/backlog-planning.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.template-fill",
+          "file": "plugins/@dshfiles/backlog/src/templates.test.ts",
+          "testName": "fills kind, prefix, tags, body and unchecked criteria where the capture left them out"
+        }
+      ]
+    },
+    {
+      "id": "due-dates",
+      "title": "Give items a due date and see what is overdue",
+      "surface": "destinationSection",
+      "surfaces": ["client", "host", "tool"],
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › item detail, Items, Inbox",
+      "summary": "A date-only due date set from the item detail, the item menu, backlog_capture or backlog_update. Rows and cards show a chip that warns when it is close and turns red once an open item is past it; the list sorts by due date and groups into Overdue, Today, Next 7 days, Later and No due date. Overdue is derived on read from the Host calendar, never stored: an open overdue item lands in the Inbox with its own reason and Overdue tab. Search: has:due, is:overdue, due:<7d, due:>30d.",
+      "states": ["no-due-date", "due-later", "due-soon", "overdue", "closed-after-due"],
+      "failureModes": ["A date that does not exist (2026-02-30) is refused with an example of a valid one."],
+      "configuration": [],
+      "externalDependencies": [],
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Renew the certificate\"",
+        "press Enter",
+        "click button \"Items\"",
+        "click text \"b:#1\"",
+        "click button \"Due date of b:#1\"",
+        "expect menuitem \"Tomorrow\""
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.due-overdue",
+          "featureFile": "tooling/dshx/e2e/features/backlog-planning.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.due-overdue-inbox",
+          "file": "plugins/@dshfiles/backlog/src/due-date.test.ts",
+          "testName": "flags an open item past its date as overdue, lists it in the Inbox and finds it by due operators"
+        }
+      ]
+    },
+    {
+      "id": "recurring-items",
+      "title": "Repeat an item when it is done",
+      "surface": "destinationSection",
+      "surfaces": ["client", "host", "tool"],
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › item detail › Repeat",
+      "summary": "An item with recurrence daily, weekly, monthly or cron:<expr> creates its next occurrence on the Host when it reaches done: same title, body, kind, priority, tags, project and parent, criteria unchecked, due one step after the previous due date and past today. The rule moves to the new item, so reopening and closing the old one never makes a second occurrence. Set from the Repeat picker, Make recurring on the item menu, backlog_capture or backlog_update.",
+      "states": ["not-repeating", "repeating", "next-occurrence-created", "cron-never-matches"],
+      "failureModes": [
+        "A malformed cron rule is refused with an example of a valid one.",
+        "A cron rule that never matches within five years creates the next occurrence without a due date."
+      ],
+      "configuration": [],
+      "externalDependencies": [],
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Water the plants\"",
+        "press Enter",
+        "click button \"Items\"",
+        "click text \"b:#1\"",
+        "click button \"Repeat b:#1\"",
+        "expect menuitem \"Weekly\""
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.recurrence-next",
+          "featureFile": "tooling/dshx/e2e/features/backlog-planning.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.recurrence-once",
+          "file": "plugins/@dshfiles/backlog/src/recurrence.test.ts",
+          "testName": "creates the next occurrence when a recurring item is done, once, with criteria unchecked"
+        }
+      ]
+    },
+    {
+      "id": "duplicate-merge",
+      "title": "Merge duplicate items into one",
+      "surface": "destinationSection",
+      "surfaces": ["client", "host", "tool"],
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › item menu › Merge into…, triage duplicate suggestion",
+      "summary": "Merge into… on the item menu (for one item or a selection) and on a triage duplicate suggestion, and backlog_merge (an agent must pass confirm: true), move each duplicate's comments (quoted, keeping who wrote them), links, tags, files and sub-issues into the survivor, rewrite links other items held to it, move its remote links where the survivor has none on that binding, and drop it with a duplicates link. An alias redirect makes b:<duplicate> keep opening the survivor; its number still opens the duplicate. Every step is an event on the items it touched.",
+      "states": ["merged", "already-merged", "self-merge-refused", "agent-unconfirmed"],
+      "failureModes": [
+        "Merging an item into itself, or a duplicate merged before, is refused with what to do instead.",
+        "An agent call without confirm: true is refused and says to ask the user first."
+      ],
+      "configuration": [],
+      "externalDependencies": [],
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Composer drops chips\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"Chips vanish on paste\"",
+        "press Enter",
+        "click button \"Items\"",
+        "rightclick text \"Chips vanish on paste\"",
+        "click menuitem \"Merge into…\"",
+        "expect dialog \"Merge b:#2 into another item\""
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.duplicate-merge",
+          "featureFile": "tooling/dshx/e2e/features/backlog-planning.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.merge-redirect",
+          "file": "plugins/@dshfiles/backlog/src/merge.test.ts",
+          "testName": "moves comments, links, tags and sub-issues to the survivor, drops the duplicate and redirects its reference"
+        }
+      ]
+    },
+    {
+      "id": "gates-and-pull-requests",
+      "title": "Wait on a PR, a revision, a check or a date, and see linked PRs live",
+      "surface": "destinationSection",
+      "surfaces": ["client", "host", "tool"],
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › item detail › Waits on, Pull requests",
+      "summary": "Gates hold an item out of the ready queue until a pull request merges, a jj revision lands on main, a project check passes in a thread linked to the item, or a date arrives (is:gated, has:gate, a chip on rows and cards). A Host gate watch resolves them on the revision poll cadence from the pull-requests contract, one jj read per repository and project-check receipts; a date gate follows the calendar. GitHub pull and GitLab merge-request URLs are PR links: Link PR in the detail or backlog_link_pr links one as fixes and asks pull-requests to watch it through the item's newest thread; the detail and backlog_pull_requests show open, merged or closed and checks, and a fixing PR that merges closes its item unless its status was set by hand. Without the pull-requests plugin they stay plain URLs.",
+      "states": ["no-gates", "gated", "gate-met", "date-gate-open", "pr-unwatched", "pr-open", "pr-merged", "pull-requests-absent"],
+      "failureModes": [
+        "Without the pull-requests plugin, PR gates never resolve on their own and PR links show as plain links; remove the gate or install the plugin.",
+        "A revision gate whose id no repository knows stays open; check the id with jj log."
+      ],
+      "configuration": [
+        {
+          "key": "dshfiles-backlog.revisionPollMinutes",
+          "defaultValue": "5",
+          "constraints": "Minutes between gate watch passes, shared with the main revision poll; lifecycleSignals off stops both.",
+          "coveredBy": ["backlog.gates-ready"]
+        }
+      ],
+      "externalDependencies": [
+        {
+          "id": "pull-requests-plugin",
+          "boundary": "Pull-request state read through the @dshfiles/pull-requests Host API (list, watch); absent, PR links stay plain URLs.",
+          "deterministicFake": "Store-level tests resolve PR gates and apply the merge signal directly in src/gates.test.ts."
+        },
+        {
+          "id": "jj",
+          "boundary": "One jj log per repository asks whether a gated revision is an ancestor of main.",
+          "deterministicFake": "Revision resolution is exercised through resolveGates in src/gates.test.ts."
+        }
+      ],
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Ship after the PR\"",
+        "press Enter",
+        "click button \"Items\"",
+        "click text \"b:#1\"",
+        "expect region \"Gates\""
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "jj"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.gates-ready",
+          "featureFile": "tooling/dshx/e2e/features/backlog-planning.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.gates-ready-store",
+          "file": "plugins/@dshfiles/backlog/src/gates.test.ts",
+          "testName": "keeps a gated item out of the ready queue until every gate is met, and a date gate opens on the calendar"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.pr-merge-closes",
+          "file": "plugins/@dshfiles/backlog/src/gates.test.ts",
+          "testName": "closes an item whose fixing pull request merged, but never over a status set by hand"
+        }
+      ]
+    },
+    {
+      "id": "scheduled-rules",
+      "title": "Schedule backlog rules as project automations",
+      "surface": "destinationSection",
+      "surfaces": ["client", "host", "tool"],
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › item menu › Schedule nightly triage; Projects › overview",
+      "summary": "backlog_schedule_rule and Schedule nightly triage (item menu, project overview) create a project automation through the project-automations contract whose prompt calls backlog tools: triage runs backlog_triage_backfill and reports what still waits on the user; recreate captures a fresh copy of an item. No backlog scheduler: automations run them, and automation_list / automation_delete manage them.",
+      "states": ["scheduled", "automations-absent", "project-unregistered"],
+      "failureModes": [
+        "Without the Project automations plugin, or for a project DSH has not registered, the rule is refused with how to enable it or to use automation_save."
+      ],
+      "configuration": [],
+      "externalDependencies": [
+        {
+          "id": "project-automations-plugin",
+          "boundary": "Automations created through the @dshfiles/project-automations Host API (projects, save).",
+          "deterministicFake": "The tool contract is checked in src/api-tools.test.ts; the automation call itself needs the plugin."
+        }
+      ],
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Triage the inbox nightly\"",
+        "press Enter",
+        "click button \"Items\"",
+        "rightclick text \"Triage the inbox nightly\"",
+        "expect menuitem \"Make recurring\""
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.scheduled-rule-absent",
+          "featureFile": "tooling/dshx/e2e/features/backlog-planning.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.schedule-rule-tool",
+          "file": "plugins/@dshfiles/backlog/src/api-tools.test.ts",
+          "testName": "every panel verb a human can take is a named tool"
+        }
+      ]
+    },
+    {
+      "id": "project-agent-guidance",
+      "title": "Give agents per-project guidance",
+      "surface": "destinationSection",
+      "surfaces": ["client", "host", "tool"],
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › Projects › project overview › Agent guidance",
+      "summary": "Each project can hold markdown guidance for agents, edited in the project overview or with backlog_set_project_guidance. A thread started from items opens its first message with their projects' guidance; backlog_get returns it with the item and backlog_ready with the queue. A thread workspace folds to its project, so guidance for the checkout applies there.",
+      "states": ["no-guidance", "guidance-set", "guidance-cleared"],
+      "failureModes": ["A Host older than guidance answers without it: the overview editor saves nothing and the notice says to restart the DSH Host process."],
+      "configuration": [
+        {
+          "key": "dshfiles-backlog.projectGuidance",
+          "defaultValue": "[]",
+          "constraints": "One markdown guidance per absolute project path; an empty guidance removes the entry.",
+          "coveredBy": ["backlog.project-guidance-start", "backlog.guidance-detail"]
+        }
+      ],
+      "externalDependencies": [],
+      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Projects\"", "expect heading \"Projects\""],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.project-guidance-start",
+          "featureFile": "tooling/dshx/e2e/features/backlog-planning.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.guidance-detail",
+          "file": "plugins/@dshfiles/backlog/src/project-guidance.test.ts",
+          "testName": "returns the guidance of the item project with its detail"
+        }
+      ]
     }
   ],
   "kind": "bundle"
