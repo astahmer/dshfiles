@@ -44,6 +44,7 @@ const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
   general: { group: 'general', order: 0 },
   'thread-sidebar': { group: 'general', label: 'Thread list', order: 20 },
   'archived-sessions': { group: 'general', label: 'Archived threads', order: 40 },
+  'thread-notifications': { group: 'notifications', label: 'Thread notifications', order: 0 },
   account: { group: 'models', order: 0 },
   models: { group: 'models', order: 10 },
   'ai-accounts': { group: 'models', label: 'AI accounts', order: 5 },

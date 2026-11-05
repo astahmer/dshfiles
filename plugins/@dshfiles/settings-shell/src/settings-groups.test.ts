@@ -139,6 +139,17 @@ describe('settings groups', () => {
     expect(threadList?.pages[0]?.fields.map(each => each.key)).toEqual(['maxChildren'])
   })
 
+  it('shows Notifications only once a section lands in it', () => {
+    const withNotifications = SettingsGroups.group({
+      sections: [...sections, { id: 'thread-notifications', order: 41, label: 'Thread notifications' }],
+      pages,
+      panels,
+    })
+    const notifications = withNotifications.find(group => group.group.id === 'notifications')
+    expect(notifications?.entries.map(entry => [entry.id, entry.label])).toEqual([['thread-notifications', 'Thread notifications']])
+    expect(grouped.some(group => group.group.id === 'notifications')).toBe(false)
+  })
+
   it('keeps settings a native section draws searchable without a second row', () => {
     expect(all.some(entry => entry.pages.some(current => current.ns === 'ui-theme'))).toBe(false)
     expect(SettingsGroups.entryFor(grouped, 'plugin:ui-theme')?.id).toBe('general')
