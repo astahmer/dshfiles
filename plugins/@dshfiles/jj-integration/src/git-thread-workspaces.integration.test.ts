@@ -235,6 +235,86 @@ describe.skipIf(!gitAvailable)('thread workspaces in a git-only repository', () 
     await expect(linked.discard({ repoRoot: repo, name: '../repo', force: true })).rejects.toThrow()
   })
 
+  it('keeps listing the other threads when one cannot be read, and never shows the unreadable one as clean', async () => {
+    const good = await threads.provision(repo)
+    const bad = await threads.provision(repo)
+    writeFileSync(join(git(bad.path, 'rev-parse', '--absolute-git-dir'), 'index'), 'not an index')
+
+    expect((await threads.list(repo)).map(entry => entry.name)).toEqual([good.name])
+    await expect(threads.status(repo, bad.name)).rejects.toThrow()
+  })
+
+  it('reads a very dirty tree and a very long thread without failing on output size, capping the unlanded list', async () => {
+    const thread = await threads.provision(repo)
+    const head = git(thread.path, 'rev-parse', 'HEAD')
+    // 1,005 empty commits on the thread branch in one fast-import; the tree stays the base's, so the worktree is clean.
+    const stream = Array.from(
+      { length: 1_005 },
+      (_, index) =>
+        `commit refs/heads/dsh/${thread.name}\ncommitter Test <test@example.com> ${String(1_700_000_000 + index)} +0000\ndata <<END\nfeat: step ${String(index)}\nEND\n${index === 0 ? `from ${head}\n` : ''}\n`,
+    ).join('')
+    execFileSync('git', ['fast-import', '--quiet'], { cwd: repo, input: stream, env: gitEnv })
+    expect((await threads.status(repo, thread.name)).unlanded).toHaveLength(1_000)
+
+    // Over 512 KB of porcelain: the full listing used to fail the read as output-truncated. The files sit at the top
+    // level, because the default untracked mode collapses an untracked folder into one line.
+    for (let index = 0; index < 9_000; index++) writeFileSync(join(thread.path, `${'f'.repeat(60)}-${String(index)}.txt`), '')
+    expect(git(thread.path, 'status', '--porcelain=v1', '--untracked-files=normal').length).toBeGreaterThan(512 * 1024)
+    const status = await threads.status(repo, thread.name)
+    expect(status.unlanded[0]?.changeId).toBe('working-tree')
+    expect((await threads.discard({ repoRoot: repo, name: thread.name, force: false })).status).toBe('has-work')
+  })
+
+  it('refuses to integrate over a rebase the user left in progress, and keeps that rebase', async () => {
+    const thread = await threads.provision(repo)
+    commit(thread.path, 'shared.txt', 'thread\n', 'feat: thread edit')
+    commit(repo, 'shared.txt', 'main\n', 'fix: main edit')
+    expect(spawnSync('git', ['rebase', 'main'], { cwd: thread.path, env: gitEnv }).status).not.toBe(0)
+    const rebaseState = join(git(thread.path, 'rev-parse', '--absolute-git-dir'), 'rebase-merge')
+    expect(existsSync(rebaseState)).toBe(true)
+
+    await expect(threads.land(thread.path)).rejects.toThrow(/rebase is already in progress.*git rebase --continue/u)
+    expect(existsSync(rebaseState)).toBe(true)
+  })
+
+  it('reads a fresh thread cut from an old commit as just changed, not idle since that commit', async () => {
+    const old = { ...gitEnv, GIT_COMMITTER_DATE: '2001-01-01T00:00:00Z', GIT_AUTHOR_DATE: '2001-01-01T00:00:00Z' }
+    execFileSync('git', ['commit', '-q', '--amend', '--no-edit'], { cwd: repo, env: old })
+    const startedAt = Date.now()
+    const thread = await threads.provision(repo)
+
+    const changedAt = (await threads.workingCopyChangedAt(repo)).get(thread.name)
+    expect(changedAt).toBeGreaterThanOrEqual(startedAt - 5_000)
+  })
+
+  it('says how to clear a stale worktree registration when git cannot add the thread worktree', async () => {
+    const thread = await threads.provision(repo)
+    rmSync(thread.path, { recursive: true, force: true })
+    git(repo, 'update-ref', '-d', `refs/heads/dsh/${thread.name}`)
+
+    await expect(threads.provision(repo, undefined, thread.name)).rejects.toThrow(/git worktree prune/u)
+  })
+
+  it('keeps only the newest snapshot refs and explains a snapshot that is gone', async () => {
+    const thread = await threads.provision(repo)
+    const old = { ...gitEnv, GIT_COMMITTER_DATE: '2001-01-01T00:00:00Z' }
+    const oldSnapshot = execFileSync('git', ['commit-tree', git(repo, 'rev-parse', 'HEAD^{tree}'), '-m', 'old snapshot'], {
+      cwd: repo,
+      env: old,
+      encoding: 'utf8',
+    }).trim()
+    // 210 older snapshot refs; their names only need the shape of a commit id, so they share one old commit.
+    const names = Array.from({ length: 210 }, (_, index) => `refs/dsh/snapshots/${index.toString(16).padStart(40, '0')}`)
+    execFileSync('git', ['update-ref', '--stdin'], { cwd: repo, env: gitEnv, input: names.map(name => `create ${name} ${oldSnapshot}\n`).join('') })
+
+    const snapshot = await threads.snapshotFiles(thread.path)
+
+    const kept = git(repo, 'for-each-ref', '--format=%(refname)', 'refs/dsh/snapshots/').split('\n')
+    expect(kept).toHaveLength(200)
+    expect(kept).toContain(`refs/dsh/snapshots/${snapshot}`)
+    await expect(threads.restoreFiles(thread.path, 'f'.repeat(40))).rejects.toThrow(/no longer in this repository.*Undo a more recent turn/u)
+  })
+
   it('refuses a bookmark that looks like an option or names no branch, with a recovery hint', async () => {
     await expect(threads.provision(repo, '--output=/tmp/x')).rejects.toThrow(/Settings/)
     await expect(threads.provision(repo, 'no-such-branch')).rejects.toThrow(/Settings/)

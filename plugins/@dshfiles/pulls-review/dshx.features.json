@@ -16,7 +16,8 @@
         "A missing workspace, a workspace without a jj repository, no resolvable base bookmark, or a missing jj binary is reported with its own reason instead of an empty diff.",
         "jj stderr never reaches the client; a failed command is classified, not quoted.",
         "A patch larger than the Host cap, or one with more files than one message carries, is flagged as truncated and clipped rather than silently shortened or rejected.",
-        "In a git-only repository the same reasons apply with git wording; a saved range holds commit ids, and a revision that would read as a git option is refused as a missing base."
+        "In a git-only repository the same reasons apply with git wording; a saved range holds commit ids, and a revision that would read as a git option is refused as a missing base.",
+        "A git read failure names the commands to see the error in the thread folder (git status, git diff <base>) and says to refresh the review once it is fixed."
       ],
       "externalDependencies": [
         {
@@ -107,6 +108,12 @@
           "id": "pulls-review.thread-review-scopes-git-refusals",
           "file": "plugins/@dshfiles/pulls-review/tests/git-output.spec.ts",
           "testName": "lists git base branches when the base is missing and refuses a revision that looks like an option"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.thread-review-scopes-git-read-failure",
+          "file": "plugins/@dshfiles/pulls-review/tests/git-output.spec.ts",
+          "testName": "says how to see and fix a git read failure instead of a dead end"
         },
         {
           "kind": "unit-test",

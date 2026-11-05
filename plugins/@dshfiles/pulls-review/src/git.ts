@@ -78,9 +78,10 @@ export class ReviewGit extends Context.Service<ReviewGit, ReviewBackend>()('@dsh
         commit,
         diff,
         messages: {
-          missing: 'git is not available to the Host; install git.',
-          notARepository: 'That thread workspace is not a git repository.',
-          failed: 'git could not read this workspace.',
+          missing: 'git is not available to the Host; install git, make sure DSH can find it on PATH, then reopen the review.',
+          notARepository: 'That thread workspace is not a git repository. Open the review from a thread inside a git or jj checkout.',
+          failed:
+            'git could not read this workspace. Run `git status` and `git diff <base>` in the thread folder to see the error (a missing base branch, a lock file or a corrupt index), fix it, then refresh the review.',
         },
       })
     }),

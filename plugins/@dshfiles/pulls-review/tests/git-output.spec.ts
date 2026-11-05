@@ -94,4 +94,15 @@ describe.skipIf(!gitAvailable)('git review scopes', () => {
       expect(option).toMatchObject({ status: 'failed', reason: 'no-base' })
     }),
   )
+
+  it.effect('says how to see and fix a git read failure instead of a dead end', () =>
+    Effect.gen(function* () {
+      // A base with no common history: merge-base exits non-zero, so the read fails as a whole.
+      const orphan = git(repo, 'commit-tree', git(repo, 'rev-parse', 'HEAD^{tree}'), '-m', 'unrelated root')
+      git(repo, 'branch', '-f', 'unrelated', orphan)
+      const failed = yield* reviewWithRealGit({ path: thread, base: 'unrelated' })
+      expect(failed).toMatchObject({ status: 'failed', reason: 'jj-failed' })
+      expect(failed.status === 'failed' ? failed.message : '').toMatch(/Run `git status`.*then refresh the review/u)
+    }),
+  )
 })

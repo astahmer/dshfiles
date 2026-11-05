@@ -28,11 +28,7 @@
         "expect button \"Remove image red.png\"",
         "expect button \"Remove file note.txt\""
       ],
-      "surfaces": [
-        "host",
-        "client",
-        "integration"
-      ],
+      "surfaces": ["host", "client", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: run row Workspace segment",
@@ -41,41 +37,28 @@
           "key": "isolateByDefault",
           "defaultValue": "false",
           "constraints": "Initial workspace toggle for new threads in a jj repository.",
-          "coveredBy": [
-            "jj-integration.provision"
-          ]
+          "coveredBy": ["jj-integration.provision"]
         },
         {
           "key": "bookmark",
           "defaultValue": "main",
           "constraints": "Existing local bookmark new threads start from.",
-          "coveredBy": [
-            "jj-integration.provision"
-          ]
+          "coveredBy": ["jj-integration.provision"]
         },
         {
           "key": "threadsDirectory",
           "defaultValue": "unset",
           "constraints": "Empty uses <repository>-threads beside the repository.",
-          "coveredBy": [
-            "jj-integration.provision"
-          ]
+          "coveredBy": ["jj-integration.provision"]
         },
         {
           "key": "removeFinishedThreads",
           "defaultValue": "true",
           "constraints": "Removes a thread workspace only when every thread in it is archived and it has no revisions to rebase.",
-          "coveredBy": [
-            "jj-integration.discard"
-          ]
+          "coveredBy": ["jj-integration.discard"]
         }
       ],
-      "states": [
-        "shared-checkout",
-        "isolated",
-        "finished",
-        "missing"
-      ],
+      "states": ["shared-checkout", "isolated", "finished", "missing"],
       "failureModes": [
         "A folder outside a jj or git repository offers no bookmark or isolation.",
         "A thread workspace with revisions to rebase is never removed by the sweep."
@@ -187,7 +170,15 @@
         "A rebase conflict is aborted and reported with its files; the worktree is left as it was.",
         "When the target branch is checked out with edits that block a fast-forward, landing fails with a recovery hint and the branch does not move.",
         "dshx checkout sync after a land is skipped in a git repository: the checked-out branch already fast-forwarded.",
-        "Automatic fetch in a git repository never moves a local branch with its own commits; a failed fetch reports git's redacted error and the git command to rerun."
+        "Automatic fetch in a git repository never moves a local branch with its own commits; a failed fetch reports git's redacted error and the git command to rerun.",
+        "Automatic fetch moves the branch ref itself when the only worktree holding the branch is prunable; ssh runs in batch mode, so a passphrase or host-key prompt fails fast instead of hanging.",
+        "A plain git worktree of a colocated jj repository routes to jj, never to the git adapter; symlinks are resolved before detection.",
+        "Status, list and discard read at most 1,000 unlanded commits and a bounded dirty check, so a huge history or tree never fails the view on output size.",
+        "A thread git cannot read is left out of the repository list with a logged warning naming the folder to run git status in; the other threads still list and the unreadable one is never shown as clean.",
+        "A rebase the user left in progress in a thread is refused with git rebase --continue / --abort as the next step, never aborted; a failed abort is reported.",
+        "Cleanup age uses the latest of the HEAD commit time, the worktree index and folder modification time, so a fresh thread cut from an old commit is not idle.",
+        "A git worktree add failure names git worktree prune for a stale registration; an unresolvable bookmark names the branch check, fetch and the Settings bookmark.",
+        "Snapshot refs stay bounded: the newest 200 per repository are kept, older ones are deleted 20 per snapshot, and undoing a pruned snapshot says so with git reflog as the fallback."
       ],
       "externalDependencies": [
         {
@@ -261,6 +252,66 @@
           "id": "jj-integration.git-auto-fetch-keeps-local",
           "file": "plugins/@dshfiles/jj-integration/src/auto-fetch-git.test.ts",
           "testName": "keeps a local branch with its own commits where it is"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-auto-fetch-prunable-holder",
+          "file": "plugins/@dshfiles/jj-integration/src/auto-fetch-git.test.ts",
+          "testName": "moves the branch ref when the only worktree holding it is prunable"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-cli-batch-ssh",
+          "file": "plugins/@dshfiles/git-cli/src/git.test.ts",
+          "testName": "runs ssh in batch mode with prompts off, but keeps a user ssh command"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.vcs-detector-colocated-worktree",
+          "file": "plugins/@dshfiles/vcs-provider-port/src/detect.test.ts",
+          "testName": "routes a plain git worktree of a colocated jj repository to jj, but one of a git-only repository to git"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.vcs-detector-symlinks",
+          "file": "plugins/@dshfiles/vcs-provider-port/src/detect.test.ts",
+          "testName": "resolves symlinks before walking, so a link into a colocated repository reads as jj"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-list-isolates-errors",
+          "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
+          "testName": "keeps listing the other threads when one cannot be read, and never shows the unreadable one as clean"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-bounded-reads",
+          "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
+          "testName": "reads a very dirty tree and a very long thread without failing on output size, capping the unlanded list"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-rebase-in-progress",
+          "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
+          "testName": "refuses to integrate over a rebase the user left in progress, and keeps that rebase"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-cleanup-age",
+          "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
+          "testName": "reads a fresh thread cut from an old commit as just changed, not idle since that commit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-worktree-add-recovery",
+          "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
+          "testName": "says how to clear a stale worktree registration when git cannot add the thread worktree"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-snapshot-pruning",
+          "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
+          "testName": "keeps only the newest snapshot refs and explains a snapshot that is gone"
         }
       ],
       "telemetry": [
@@ -309,19 +360,12 @@
         "expect button \"Choose workspace\"",
         "expect button \"Workspace: Own workspace*\""
       ],
-      "surfaces": [
-        "host",
-        "client",
-        "integration"
-      ],
+      "surfaces": ["host", "client", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: new-thread destination bar",
       "configuration": [],
-      "states": [
-        "previous-thread-workspace",
-        "project-checkout"
-      ],
+      "states": ["previous-thread-workspace", "project-checkout"],
       "failureModes": [
         "With isolation off, a blank new thread retains its previous thread workspace instead of returning to its owning project checkout.",
         "With isolation on, a blank thread reuses its previous thread workspace as its own destination on the first send instead of getting a fresh one.",
@@ -410,21 +454,12 @@
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"prepared while writing\"",
         "expect text \"prepared while writing\""
       ],
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: New thread draft",
       "configuration": [],
-      "states": [
-        "opening",
-        "deferred",
-        "preparing",
-        "committing",
-        "switching",
-        "settled"
-      ],
+      "states": ["opening", "deferred", "preparing", "committing", "switching", "settled"],
       "failureModes": [
         "Arriving creates no jj workspace and opens none; only a draft claims the destination it is about to send into.",
         "The send takes the prepared workspace and Session when they are ready, so it no longer provisions or connects; a failed preparation keeps the draft and shows the send failure.",
@@ -596,20 +631,12 @@
         "expect button \"Open thread workspaces in side panel\"",
         "expect button \"Download thread log\""
       ],
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
       "currentSurface": "thread-header: Current thread workspace menu",
       "configuration": [],
-      "states": [
-        "thread-workspace",
-        "shared-checkout",
-        "to-rebase",
-        "blocked",
-        "session-log-in-menu"
-      ],
+      "states": ["thread-workspace", "shared-checkout", "to-rebase", "blocked", "session-log-in-menu"],
       "failureModes": [
         "The control stays mounted while the thread's workspace data loads, so the header never loses the entry point.",
         "Integrate is disabled with the reason when a thread session is running or a user question waits; unavailable activity is reported as unverified, not active.",
@@ -659,13 +686,7 @@
         "expect text \"Landed 1 revision(s) on main.\"",
         "expect button \"Mark this landed thread done\""
       ],
-      "surfaces": [
-        "host",
-        "tool",
-        "command",
-        "client",
-        "integration"
-      ],
+      "surfaces": ["host", "tool", "command", "client", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
       "currentSurface": "thread-header: Current thread workspace › Integrate",
@@ -674,17 +695,13 @@
           "key": "askAgentToFixLanding",
           "defaultValue": "true",
           "constraints": "Queues a message to the thread's latest unarchived Session when Rebase stops.",
-          "coveredBy": [
-            "jj-integration.rebase-conflict"
-          ]
+          "coveredBy": ["jj-integration.rebase-conflict"]
         },
         {
           "key": "syncWorkspaceAfterLand",
           "defaultValue": "default",
           "constraints": "jj workspace synced onto the bookmark after a successful rebase; empty disables it.",
-          "coveredBy": [
-            "jj-integration.checkout-sync"
-          ]
+          "coveredBy": ["jj-integration.checkout-sync"]
         }
       ],
       "states": [
@@ -845,20 +862,12 @@
         "click button \"Current thread workspace: thread-*\"",
         "expect text \"Nothing to land\""
       ],
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
       "currentSurface": "transcript: turn tail › Land on main",
       "configuration": [],
-      "states": [
-        "offer-shown",
-        "offer-hidden-without-work",
-        "offer-hidden-blocked",
-        "offer-hidden-queued",
-        "landing-from-turn-end"
-      ],
+      "states": ["offer-shown", "offer-hidden-without-work", "offer-hidden-blocked", "offer-hidden-queued", "landing-from-turn-end"],
       "failureModes": [
         "Only the newest completed turn offers it; older turns keep their dated notices, so a long thread never grows a column of stale buttons.",
         "A shared checkout, an archived thread, a queued or running integration, an unverified activity check, or work the control center calls blocked never shows the row.",
@@ -915,16 +924,10 @@
           "key": "autoIntegrationExcludedRepositories",
           "defaultValue": "empty",
           "constraints": "Absolute repository paths whose finished thread work is never integrated automatically; a manual Integrate on a row still works.",
-          "coveredBy": [
-            "jj-integration.auto-integration-repository-exclusion"
-          ]
+          "coveredBy": ["jj-integration.auto-integration-repository-exclusion"]
         }
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "surface": "destinationSection",
       "destination": "land",
       "currentSurface": "left-nav: Land",
@@ -1067,19 +1070,12 @@
         "click button \"All*\"",
         "expect button \"Conflicts*\""
       ],
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "land",
       "currentSurface": "left-nav: Land › Needs you",
       "configuration": [],
-      "states": [
-        "attention-default",
-        "all-view",
-        "completed-count",
-        "lifecycle-filter"
-      ],
+      "states": ["attention-default", "all-view", "completed-count", "lifecycle-filter"],
       "failureModes": [
         "The default view falls back to listing every workspace instead of prioritising conflicts, ready work and blocked rows.",
         "Integration state and lifecycle are collapsed into one filter, so a finished thread with pending work disappears.",
@@ -1119,20 +1115,12 @@
         "click button \"View details\"",
         "expect button \"Preview\""
       ],
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "detail",
       "destination": "land",
       "currentSurface": "left-nav: Land › row details",
       "configuration": [],
-      "states": [
-        "details-collapsed",
-        "details-expanded",
-        "single-blocker",
-        "multiple-blockers",
-        "preview-open"
-      ],
+      "states": ["details-collapsed", "details-expanded", "single-blocker", "multiple-blockers", "preview-open"],
       "failureModes": [
         "A blocked row states one specific primary blocker without needing the details panel.",
         "Multiple blockers remain reachable in the expanded row instead of being collapsed into one generic message.",
@@ -1163,26 +1151,14 @@
       "id": "thread-integration-empty",
       "title": "Thread integration with no thread workspaces",
       "summary": "A registered project with no thread workspace shows one plain sentence instead of empty groups, banners or filter tabs: the page never fabricates work, and the counts only appear once a workspace exists.",
-      "reach": [
-        "click tab \"Land\"",
-        "click button \"Workspaces\"",
-        "expect heading \"Land\"",
-        "expect text \"No thread workspaces.\""
-      ],
-      "surfaces": [
-        "client"
-      ],
+      "reach": ["click tab \"Land\"", "click button \"Workspaces\"", "expect heading \"Land\"", "expect text \"No thread workspaces.\""],
+      "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "land",
       "currentSurface": "left-nav: Land › empty state",
       "configuration": [],
-      "states": [
-        "no-threads",
-        "no-filter-bar"
-      ],
-      "failureModes": [
-        "An empty project still renders group cards or a ready banner instead of one sentence."
-      ],
+      "states": ["no-threads", "no-filter-bar"],
+      "failureModes": ["An empty project still renders group cards or a ready banner instead of one sentence."],
       "externalDependencies": [],
       "verification": [
         {
@@ -1209,23 +1185,13 @@
         "expect tab \"Projects\"",
         "expect option \"No folder*\""
       ],
-      "surfaces": [
-        "host",
-        "client"
-      ],
+      "surfaces": ["host", "client"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: Choose workspace",
       "configuration": [],
-      "states": [
-        "projects",
-        "everything",
-        "workspaces"
-      ],
-      "failureModes": [
-        "Removed thread workspaces whose folders are gone are listed as projects.",
-        "Thread workspaces are listed on the default Projects tab."
-      ],
+      "states": ["projects", "everything", "workspaces"],
+      "failureModes": ["Removed thread workspaces whose folders are gone are listed as projects.", "Thread workspaces are listed on the default Projects tab."],
       "externalDependencies": [],
       "verification": [
         {
@@ -1257,27 +1223,13 @@
       "id": "land-inbox-items",
       "title": "Blocked and ready-to-land workspaces in the Inbox",
       "summary": "A thread workspace whose revisions conflict, or whose queued land stopped, is a Failed Inbox item (Land blocked) with Retry; an idle workspace with described revisions not on the bookmark is a Ready item with Land. Land and Retry run the same guarded land as the Land view, only when the user chooses them; items resolve when the workspace lands, the conflict goes away or nothing is left to land. A land from a client view (the thread's Changes facet, the Land view) re-reads the workspaces at once, so its item resolves without waiting for the provider's safety tick.",
-      "reach": [
-        "click tab \"Inbox\"",
-        "expect heading \"Inbox\""
-      ],
-      "surfaces": [
-        "host",
-        "integration"
-      ],
+      "reach": ["click tab \"Inbox\"", "expect heading \"Inbox\""],
+      "surfaces": ["host", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › jj-integration.land-blocked / jj-integration.ready-to-land",
       "configuration": [],
-      "states": [
-        "conflicted",
-        "queued-land-failed",
-        "ready-to-land",
-        "busy",
-        "queued",
-        "landed",
-        "inbox-absent"
-      ],
+      "states": ["conflicted", "queued-land-failed", "ready-to-land", "busy", "queued", "landed", "inbox-absent"],
       "failureModes": [
         "Without the inbox (activity-timeline) loaded, landing works exactly as before; the provider reconciles when the inbox announces it is ready.",
         "Retry or Land on a workspace that still conflicts, is busy or has undescribed revisions lands nothing and returns the same recovery text as the Land view.",

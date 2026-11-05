@@ -456,7 +456,8 @@ an Effect service whose two adapters are layers of their own:
 | `GitThreadWorkspaces` ([source](src/git-thread-workspaces.ts)) | a repository with `.git` and no `.jj`      | a git worktree `thread-xxxxxx` on branch `dsh/<name>` |
 
 `VcsDetector` picks the adapter from the nearest `.jj` or `.git` above the path (filesystem only, no process), jj first
-when one folder holds both; the router (`ThreadWorkspaces.layer`) forwards each call. Shared state, the threads
+when one folder holds both, after resolving symlinks; a plain `git worktree` of a colocated jj repository reads as jj,
+so the git adapter never manages it. The router (`ThreadWorkspaces.layer`) forwards each call. Shared state, the threads
 directory and the land records behind review ranges, lives in `ThreadMetadata`, so both backends read the same files.
 Git runs through the shared [`@dshfiles/git-cli`](../git-cli/README.md) (also used by git-worktrees): non-interactive (`GIT_TERMINAL_PROMPT=0`, no editor), bounded
 output, a two-minute timeout and one `git <verb>` span per run.
@@ -465,18 +466,26 @@ In a git repository the tools, API and UI keep their jj names and behave as foll
 
 - **Isolate / provision**: `git worktree add -b dsh/<name>` from the bookmark (the local branch, else `origin/<name>`).
   No spare is prewarmed; a git worktree checks out quickly enough without one.
-- **Status**: unlanded work is the thread branch's commits the bookmark lacks, plus one undescribed `working-tree`
-  revision when the worktree has uncommitted edits.
+- **Status**: unlanded work is the thread branch's commits the bookmark lacks (the newest 1,000 at most), plus one
+  undescribed `working-tree` revision when the worktree has uncommitted edits. Reads stay bounded on any history or
+  tree size. A thread git cannot read (a corrupt index, a lock) is left out of the repository list with a logged
+  warning naming the folder to run `git status` in, never shown as clean; the other threads still list.
+- **Cleanup age**: a thread's last change is the latest of its HEAD commit time, its worktree index and its folder's
+  modification time, so a fresh thread cut from an old bookmark is not read as idle since that commit.
 - **Integrate (land)**: uncommitted edits stop it as _needs description_ (commit them first). Otherwise the thread
   branch rebases onto the bookmark; a conflict is aborted and reported with its files, leaving the worktree as it
-  was. The bookmark then moves forward only: where it is checked out (usually the main worktree) that worktree
+  was. A rebase the user left in progress in the thread is refused with `git rebase --continue` / `--abort` as the
+  next step, never aborted for them; an abort that fails is reported instead of being ignored. The bookmark then moves forward only: where it is checked out (usually the main worktree) that worktree
   fast-forwards so its files follow; elsewhere the ref moves with compare-and-swap. `dshx checkout sync` is skipped.
 - **Verified automatic integration**: the same Project Checks gate; `git cherry` reports work the bookmark already
   holds as _already integrated_ or _patch-equivalent work_.
 - **Discard / cleanup**: removes the worktree and its `dsh/<name>` branch; work is kept unless forced. Other git
   worktrees are _secondary_ workspaces, removed only when clean and fully landed. Git has no dangling empty revisions.
 - **Snapshots** (session undo): the same scratch-index commits under `refs/dsh/snapshots/` that
-  [`@dshfiles/git-worktrees`](../git-worktrees/README.md) takes; neither HEAD nor the index moves.
+  [`@dshfiles/git-worktrees`](../git-worktrees/README.md) takes; neither HEAD nor the index moves. The refs are shared
+  by every worktree of the repository and kept bounded: after each snapshot the newest 200 stay and up to 20 older ones
+  are deleted, so a backlog drains over later snapshots. Undoing a turn older than that says so and points at the
+  thread's commits and `git reflog` instead.
 - **Review ranges**: land records hold commit ids (git has no change id that survives a rebase).
 
 ## VCS provider

@@ -26,6 +26,14 @@ const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
 const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u
 const STATUS_READ_CONCURRENCY = 8
 const MAX_BEHIND_REVISIONS = 1_000
+/** Status, list and discard read at most this many unlanded commits: enough to show the work, bounded on any history. */
+const MAX_UNLANDED_REVISIONS = 1_000
+/** Session-undo snapshot refs kept per repository; older ones are deleted a batch at a time after each new snapshot. */
+const MAX_SNAPSHOT_REFS = 200
+const SNAPSHOT_PRUNE_BATCH = 20
+const SNAPSHOT_REFS = 'refs/dsh/snapshots/'
+/** Enough of `for-each-ref` to see far past the kept snapshots; a longer listing converges over later snapshots. */
+const SNAPSHOT_LISTING_BYTES = 128 * 1024
 const MAX_CONFLICT_FILES = 50
 const LAND_ATTEMPTS = 3
 const GRAPH_REVISIONS = 20
@@ -109,19 +117,35 @@ const make = Effect.gen(function* () {
   /** The library's failures become this plugin's `git-failed` wire code, with the redacted detail as the message. */
   const asGitFailed = (cause: GitRunFailed | GitCommandFailed) => new GitFailed({ detail: cause.message, cause })
   const git = (args: readonly string[], cwd: string, env?: Readonly<Record<string, string>>) => cli.exec({ args, cwd, env }).pipe(Effect.mapError(asGitFailed))
+  /** Keeps the first `maxStdoutBytes` of a long listing instead of failing it as `output-truncated`. */
+  const gitHead = (args: readonly string[], cwd: string, maxStdoutBytes?: number) =>
+    cli.exec({ args, cwd, maxStdoutBytes, onStdoutLimit: 'truncate' }).pipe(Effect.mapError(asGitFailed))
   const run = (args: readonly string[], cwd: string, env?: Readonly<Record<string, string>>) => cli.run({ args, cwd, env }).pipe(Effect.mapError(asGitFailed))
   const lines = (stdout: string): readonly string[] => stdout.split('\n').filter(line => line.length > 0)
 
+  /**
+   * Commits in `range`, newest first. Landing reads the whole range (it must see every commit it moves); a bounded read
+   * stops at `maxCount` and keeps the head of an over-long listing, its cut-off last record dropped by the parser.
+   */
   const revisions = (range: string, cwd: string, maxCount?: number) =>
-    Effect.map(git(['log', ...(maxCount === undefined ? [] : [`--max-count=${String(maxCount)}`]), REVISION_FORMAT, range, '--'], cwd), parseRevisions)
+    maxCount === undefined
+      ? Effect.map(git(['log', REVISION_FORMAT, range, '--'], cwd), parseRevisions)
+      : Effect.map(gitHead(['log', `--max-count=${String(maxCount)}`, REVISION_FORMAT, range, '--'], cwd), parseRevisions)
 
   const headOf = Effect.fnUntraced(function* (cwd: string) {
     const head = (yield* git(['rev-parse', '--verify', 'HEAD^{commit}'], cwd)).trim()
-    if (!isObjectId(head)) return yield* gitFailed('Could not resolve the checked-out commit.')
+    if (!isObjectId(head))
+      return yield* gitFailed(
+        `Could not resolve the checked-out commit in ${cwd}. Run \`git status\` there; a branch without a first commit needs one before DSH can use it.`,
+      )
     return head
   })
 
-  const isDirty = (cwd: string) => Effect.map(git(['status', '--porcelain=v1', '--untracked-files=normal'], cwd), output => output.trim().length > 0)
+  /**
+   * Any porcelain line means dirty, so only its head is kept: a tree with thousands of edits reads as cheaply. A line
+   * can start with a space (` M file`), so the head is long enough to hold the status letters and a path.
+   */
+  const isDirty = (cwd: string) => Effect.map(gitHead(['status', '--porcelain=v1', '--untracked-files=normal'], cwd, 64), output => output.trim().length > 0)
 
   /** The ref the target bookmark names: the local branch, else `origin/<name>`, else the name as written. */
   const targetRef = Effect.fnUntraced(function* (cwd: string, name?: string) {
@@ -139,7 +163,10 @@ const make = Effect.gen(function* () {
 
   const commitOf = Effect.fnUntraced(function* (cwd: string, ref: string) {
     const commit = (yield* git(['rev-parse', '--verify', `${ref}^{commit}`], cwd)).trim()
-    if (!isObjectId(commit)) return yield* gitFailed(`Could not resolve ${ref}.`)
+    if (!isObjectId(commit))
+      return yield* gitFailed(
+        `Could not resolve ${ref} to a commit in ${cwd}. Check that the branch exists (\`git branch --list\`), fetch it, or set the bookmark in Settings › Workspaces, then retry.`,
+      )
     return commit
   })
 
@@ -175,7 +202,9 @@ const make = Effect.gen(function* () {
 
   /** Commits of the thread the target lacks, newest first, after the uncommitted edits when there are any. */
   const unlandedIn = Effect.fnUntraced(function* (workspacePath: string, target: string) {
-    const [committed, dirty] = yield* Effect.all([revisions(`${target}..HEAD`, workspacePath), isDirty(workspacePath)], { concurrency: 'unbounded' })
+    const [committed, dirty] = yield* Effect.all([revisions(`${target}..HEAD`, workspacePath, MAX_UNLANDED_REVISIONS), isDirty(workspacePath)], {
+      concurrency: 'unbounded',
+    })
     return dirty ? [workingTreeRevision, ...committed] : committed
   })
 
@@ -197,7 +226,7 @@ const make = Effect.gen(function* () {
       present || hasBranch
         ? yield* Effect.all(
             [
-              present ? unlandedIn(input.workspacePath, input.target) : revisions(`${input.target}..${tip}`, cwd),
+              present ? unlandedIn(input.workspacePath, input.target) : revisions(`${input.target}..${tip}`, cwd, MAX_UNLANDED_REVISIONS),
               revisions(`${tip}..${input.target}`, cwd, MAX_BEHIND_REVISIONS + 1),
             ],
             { concurrency: 'unbounded' },
@@ -226,14 +255,24 @@ const make = Effect.gen(function* () {
     const [records, entries, target] = yield* Effect.all([threadWorktrees(repoRoot), metadata.read(repoRoot), targetRef(repoRoot)], {
       concurrency: 'unbounded',
     })
-    return yield* Effect.forEach(
+    // One unreadable thread (a corrupt index, a lock, a timeout) must not hide every other thread of the repository. It
+    // is left out of this list, never shown as clean, so cleanup cannot offer it; its own status read keeps the error.
+    const statuses = yield* Effect.forEach(
       records,
       record => {
         const name = path.basename(record.path)
-        return statusOf({ repoRoot, name, workspacePath: record.path, target, entry: entries[name] })
+        return statusOf({ repoRoot, name, workspacePath: record.path, target, entry: entries[name] }).pipe(
+          Effect.catch(error =>
+            Effect.as(
+              Effect.logWarning(`Skipped thread ${name} in ${repoRoot}: ${error.message} Run \`git status\` in ${record.path} to see and fix the error.`),
+              undefined,
+            ),
+          ),
+        )
       },
       { concurrency: STATUS_READ_CONCURRENCY },
     )
+    return statuses.filter((entry): entry is ThreadStatus => entry !== undefined)
   })
 
   const status = Effect.fn('git thread workspaces status')(function* (repoRoot: string, name: string) {
@@ -266,6 +305,18 @@ const make = Effect.gen(function* () {
       return (yield* isFreeThreadName(repoRoot, name)) ? name : yield* freeThreadName(repoRoot, undefined)
     })
 
+  /** `git worktree add`, its failure carrying what to run when a stale registration or a lock blocks the path. */
+  const addWorktree = (repoRoot: string, workspacePath: string, args: readonly string[]) =>
+    cli.exec({ args: ['worktree', 'add', ...args], cwd: repoRoot }).pipe(
+      Effect.mapError(
+        cause =>
+          new GitFailed({
+            detail: `Could not create the thread worktree ${workspacePath}: ${cause.message} If a deleted worktree still holds the path or branch, run \`git worktree prune\` in ${repoRoot} (and \`git worktree list\` to check), then retry.`,
+            cause,
+          }),
+      ),
+    )
+
   const provision = Effect.fn('git thread workspaces provision')(function* (repoRoot: string, base?: string, requestedName?: string) {
     return yield* locks.withRepo(repoRoot)(
       Effect.gen(function* () {
@@ -274,7 +325,7 @@ const make = Effect.gen(function* () {
         const name = yield* freeThreadName(repoRoot, requestedName)
         const workspacePath = path.join(directory, name)
         yield* fileSystem.makeDirectory(directory, { recursive: true }).pipe(Effect.mapError(filesFailed(`Could not create ${directory}.`)))
-        yield* git(['worktree', 'add', '--no-track', '-b', threadBranch(name), workspacePath, start], repoRoot)
+        yield* addWorktree(repoRoot, workspacePath, ['--no-track', '-b', threadBranch(name), workspacePath, start])
         return { name, path: workspacePath }
       }),
     )
@@ -296,19 +347,40 @@ const make = Effect.gen(function* () {
           .pipe(Effect.mapError(filesFailed(`Could not create ${path.dirname(workspacePath)}.`)))
         yield* git(['worktree', 'prune'], repoRoot)
         // The thread branch keeps its commits after the folder is gone; only a never-committed thread starts over.
-        if (yield* branchExists(repoRoot, name)) yield* git(['worktree', 'add', workspacePath, threadBranch(name)], repoRoot)
-        else yield* git(['worktree', 'add', '--no-track', '-b', threadBranch(name), workspacePath, yield* targetRef(repoRoot)], repoRoot)
+        if (yield* branchExists(repoRoot, name)) yield* addWorktree(repoRoot, workspacePath, [workspacePath, threadBranch(name)])
+        else yield* addWorktree(repoRoot, workspacePath, ['--no-track', '-b', threadBranch(name), workspacePath, yield* targetRef(repoRoot)])
       }),
     )
   })
 
+  /**
+   * A rebase the user started in the thread (stopped on a conflict or an `edit`) is theirs: landing would fail on it,
+   * and its cleanup abort would throw their resolution away. Integration refuses until it is finished or dropped.
+   */
+  const refuseRebaseInProgress = Effect.fnUntraced(function* (cwd: string) {
+    const state = lines(yield* git(['rev-parse', '--path-format=absolute', '--git-path', 'rebase-merge', '--git-path', 'rebase-apply'], cwd))
+    const inProgress = yield* Effect.forEach(state, exists, { concurrency: 'unbounded' })
+    if (inProgress.some(Boolean))
+      return yield* gitFailed(
+        `A git rebase is already in progress in ${cwd}. Finish it with \`git rebase --continue\` or drop it with \`git rebase --abort\` there, then integrate again.`,
+      )
+  })
+
   /** Rebase the thread branch onto `base`; a conflict is aborted, so the worktree is left exactly as it was. */
   const rebaseOnto = Effect.fnUntraced(function* (cwd: string, base: string) {
+    yield* refuseRebaseInProgress(cwd)
     const rebased = yield* run(['rebase', '--no-autostash', '--no-update-refs', base], cwd)
     if (rebased.exitCode === 0) return { status: 'rebased' as const }
     const files = lines(yield* git(['diff', '--name-only', '--diff-filter=U'], cwd).pipe(Effect.orElseSucceed(() => ''))).slice(0, MAX_CONFLICT_FILES)
-    yield* run(['rebase', '--abort'], cwd)
-    if (files.length === 0) return yield* gitFailed(`git rebase failed: ${rebased.stderr.trim().slice(0, 400)}`)
+    const aborted = yield* run(['rebase', '--abort'], cwd)
+    if (aborted.exitCode !== 0)
+      return yield* gitFailed(
+        `git rebase stopped in ${cwd} and \`git rebase --abort\` failed: ${aborted.stderr.trim().slice(0, 300)} Run \`git status\` there, then finish or abort the rebase by hand before integrating again.`,
+      )
+    if (files.length === 0)
+      return yield* gitFailed(
+        `git rebase failed: ${rebased.stderr.trim().slice(0, 400)} Run \`git rebase ${base}\` in ${cwd} to see the full error, then integrate again.`,
+      )
     return { status: 'conflicted' as const, files }
   })
 
@@ -350,6 +422,8 @@ const make = Effect.gen(function* () {
           const name = input.bookmark ?? (yield* bookmark)
           for (let attempt = 1; ; attempt++) {
             yield* progress('rebasing')
+            // Before the dirty check: a rebase stopped on a conflict leaves edits, and committing them is not the fix.
+            yield* refuseRebaseInProgress(cwd)
             if (yield* isDirty(cwd)) return { status: 'needs-description', revisions: [workingTreeRevision] } satisfies LandOutcome
             const base = yield* commitOf(cwd, yield* targetRef(cwd, name))
             const work = yield* revisions(`${base}..HEAD`, cwd)
@@ -404,6 +478,7 @@ const make = Effect.gen(function* () {
         for (let attempt = 1; ; attempt++) {
           if (yield* cancelled) return cancelledOutcome
           if (!(yield* authorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
+          yield* refuseRebaseInProgress(cwd)
           if (yield* isDirty(cwd)) return { status: 'needs-description', revisions: [workingTreeRevision] } satisfies VerifiedLandOutcome
           const base = yield* commitOf(cwd, yield* targetRef(cwd, name))
           const work = yield* revisions(`${base}..HEAD`, cwd)
@@ -468,7 +543,7 @@ const make = Effect.gen(function* () {
     const work = present
       ? yield* unlandedIn(workspaceRoot, input.target)
       : hasBranch
-        ? yield* revisions(`${input.target}..${threadBranch(input.name)}`, input.repoRoot)
+        ? yield* revisions(`${input.target}..${threadBranch(input.name)}`, input.repoRoot, MAX_UNLANDED_REVISIONS)
         : []
     if (work.length > 0 && !input.force) return { status: 'has-work', revisions: work } satisfies DiscardOutcome
     if (present) yield* git(['worktree', 'remove', '--force', workspaceRoot], input.repoRoot)
@@ -578,13 +653,33 @@ const make = Effect.gen(function* () {
 
   const workingCopyChangedAt = Effect.fn('git thread workspaces working copy times')(function* (repoRoot: string) {
     const present = (yield* threadWorktrees(repoRoot)).filter(record => !record.prunable)
+    const modifiedAt = (target: string) =>
+      fileSystem.stat(target).pipe(
+        Effect.map(info => Option.match(info.mtime, { onNone: () => Number.NaN, onSome: date => date.getTime() })),
+        Effect.orElseSucceed(() => Number.NaN),
+      )
+    // HEAD's commit time alone reads a fresh thread cut from an old bookmark as idle since that commit. The worktree's
+    // index (written by checkout, add and status refreshes) and its folder (files added or removed) move with use.
+    const changedAt = Effect.fnUntraced(function* (worktreePath: string) {
+      const [seconds, indexPath] = yield* Effect.all(
+        [
+          git(['log', '-1', '--format=%ct', 'HEAD'], worktreePath).pipe(Effect.orElseSucceed(() => '')),
+          git(['rev-parse', '--path-format=absolute', '--git-path', 'index'], worktreePath).pipe(Effect.orElseSucceed(() => '')),
+        ],
+        { concurrency: 'unbounded' },
+      )
+      const [index, folder] = yield* Effect.all(
+        [indexPath.trim().length > 0 ? modifiedAt(indexPath.trim()) : Effect.succeed(Number.NaN), modifiedAt(worktreePath)],
+        {
+          concurrency: 'unbounded',
+        },
+      )
+      const candidates = [Number.parseInt(seconds.trim(), 10) * 1000, index, folder].filter(Number.isFinite)
+      return candidates.length === 0 ? Number.NaN : Math.max(...candidates)
+    })
     const times = yield* Effect.forEach(
       present,
-      record =>
-        Effect.map(git(['log', '-1', '--format=%ct', 'HEAD'], record.path).pipe(Effect.orElseSucceed(() => '')), (seconds): readonly [string, number] => [
-          path.basename(record.path),
-          Number.parseInt(seconds.trim(), 10) * 1000,
-        ]),
+      record => Effect.map(changedAt(record.path), (at): readonly [string, number] => [path.basename(record.path), at]),
       { concurrency: STATUS_READ_CONCURRENCY },
     )
     return new Map(times.filter(([, at]) => Number.isFinite(at))) satisfies ReadonlyMap<string, number>
@@ -653,6 +748,20 @@ const make = Effect.gen(function* () {
     )
 
   /**
+   * Keeps the newest `MAX_SNAPSHOT_REFS` snapshot refs of the repository (refs are shared by all its worktrees) and
+   * deletes at most `SNAPSHOT_PRUNE_BATCH` older ones per call, so a backlog drains over later snapshots without one
+   * snapshot paying for it. Best effort: a failed prune never fails the snapshot that triggered it.
+   */
+  const pruneSnapshots = (cwd: string) =>
+    Effect.gen(function* () {
+      const listing = yield* gitHead(['for-each-ref', '--sort=-creatordate', '--format=%(refname)', SNAPSHOT_REFS], cwd, SNAPSHOT_LISTING_BYTES)
+      // A truncated listing may end mid-name; only whole snapshot ref names are deleted.
+      const refs = lines(listing).filter(ref => ref.startsWith(SNAPSHOT_REFS) && isObjectId(ref.slice(SNAPSHOT_REFS.length)))
+      const expired = refs.slice(MAX_SNAPSHOT_REFS).slice(-SNAPSHOT_PRUNE_BATCH)
+      yield* Effect.forEach(expired, ref => git(['update-ref', '-d', ref], cwd), { discard: true })
+    }).pipe(Effect.ignore)
+
+  /**
    * A commit of every tracked and untracked, non-ignored file under `refs/dsh/snapshots/`, built in a throwaway
    * index so neither the real index nor HEAD moves (the same snapshots `@dshfiles/git-worktrees` takes).
    */
@@ -664,7 +773,8 @@ const make = Effect.gen(function* () {
         const tree = (yield* git(['write-tree'], workspaceRoot, index)).trim()
         const commit = (yield* git(['commit-tree', tree, '-m', 'dsh file snapshot'], workspaceRoot, SNAPSHOT_AUTHOR)).trim()
         if (!isObjectId(commit)) return yield* gitFailed('git commit-tree returned no commit id.')
-        yield* git(['update-ref', `refs/dsh/snapshots/${commit}`, commit], workspaceRoot)
+        yield* git(['update-ref', `${SNAPSHOT_REFS}${commit}`, commit], workspaceRoot)
+        yield* pruneSnapshots(workspaceRoot)
         return commit
       }),
     )
@@ -679,6 +789,10 @@ const make = Effect.gen(function* () {
     return yield* locks.withRepo(location.repoRoot)(
       Effect.gen(function* () {
         const workspaceRoot = location.workspaceRoot
+        if ((yield* run(['cat-file', '-e', `${snapshot}^{commit}`], workspaceRoot)).exitCode !== 0)
+          return yield* gitFailed(
+            `That snapshot is no longer in this repository: DSH keeps the newest ${String(MAX_SNAPSHOT_REFS)} file snapshots per repository, and git may have collected older ones. Undo a more recent turn, or recover the files from the thread's commits (\`git log\`, \`git reflog\`).`,
+          )
         const previous = yield* snapshotOf(workspaceRoot)
         const added = (yield* git(['diff', '--name-only', '-z', '--diff-filter=A', snapshot, previous], workspaceRoot))
           .split('\0')

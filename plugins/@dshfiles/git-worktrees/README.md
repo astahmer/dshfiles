@@ -15,7 +15,8 @@ Plain git repositories as a [VCS provider](../vcs-provider-port/README.md), the 
   branch). With both plugins in a profile, a backlog item's thread and session-undo snapshots in a plain git
   repository therefore go through jj-integration: isolation follows jj-integration's `isolateByDefault`, not this
   plugin's `isolate`, and threads land on `<repository>-threads/thread-xxxxxx` on a `dsh/thread-xxxxxx` branch from
-  the configured bookmark rather than `HEAD`. Snapshots are the same `refs/dsh/snapshots/` commits either way. This
+  the configured bookmark rather than `HEAD`. Snapshots are the same `refs/dsh/snapshots/` commits either way, but
+  jj-integration keeps only the newest 200 of them per repository (see its README); this plugin alone never prunes them. This
   plugin answers only when jj-integration is not loaded; to keep the old behaviour, remove jj-integration from the
   profile.
 
