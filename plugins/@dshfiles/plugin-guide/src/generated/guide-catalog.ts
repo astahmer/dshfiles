@@ -1862,7 +1862,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/workbench/registry",
       "summary": "The workbench's own `main` panel key; a contributor checks the slot ledger for it to know the workbench is loaded.",
-      "publicSymbol": "WORKBENCH_MAIN_PANEL_ID, WorkbenchPanelProps, WorkbenchPanelDefinition, WorkbenchPanelPreference, WorkbenchPanelRegistry, createWorkbenchPanelRegistry",
+      "publicSymbol": "WORKBENCH_MAIN_PANEL_ID, WorkbenchPanelProps, ThreadFacetObservable, ThreadFacet, WorkbenchPanelDefinition, WorkbenchPanelPreference",
       "importFrom": "@dshfiles/workbench/registry",
       "owner": "@dshfiles/workbench",
       "scope": "client or host",
@@ -1873,7 +1873,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: NativeAsideOwners, workbenchPanels, PanelTitle, withoutPluginPrefix, panelTabTitle"
+        "Also exports: WorkbenchPanelRegistry, createWorkbenchPanelRegistry, NativeAsideOwners, workbenchPanels, PanelTitle, withoutPluginPrefix, panelTabTitle"
       ],
       "source": "plugins/@dshfiles/workbench/src/registry.ts",
       "docs": "docs/plugin-boundaries.md",
@@ -2106,7 +2106,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/btw › btw-side-chat"
       ],
       "details": [
-        "Used by 23 catalog feature(s)",
+        "Used by 24 catalog feature(s)",
         "Destinations in use: thread-panel"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2211,11 +2211,11 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [
         "@dshfiles/agent-plan › plan-card",
         "@dshfiles/agent-plan › failure-card",
-        "@dshfiles/agent-questions › question-card-layout",
-        "@dshfiles/ai-accounts › credential-recovery"
+        "@dshfiles/agent-questions › root-timed-questions",
+        "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 20 catalog feature(s)",
+        "Used by 21 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2299,7 +2299,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 41 catalog feature(s)",
+        "Used by 42 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

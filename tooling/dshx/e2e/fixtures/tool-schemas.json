@@ -1,5 +1,5 @@
 {
-  "hostBundles": 57,
+  "hostBundles": 59,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -14,6 +14,7 @@
     "@dshfiles/attachment-gallery",
     "@dshfiles/background-jobs",
     "@dshfiles/backlog",
+    "@dshfiles/capabilities-hub",
     "@dshfiles/command-palette",
     "@dshfiles/context-compaction",
     "@dshfiles/diff-viewed",
@@ -30,6 +31,7 @@
     "@dshfiles/memory",
     "@dshfiles/model-effort-picker",
     "@dshfiles/multi-host",
+    "@dshfiles/plugin-guide",
     "@dshfiles/policies",
     "@dshfiles/preview",
     "@dshfiles/project-automations",
@@ -59,12 +61,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 482,
-  "apiToolBindings": 335,
-  "apiToolNameCount": 335,
-  "apiToolSchemas": 334,
+  "apiMethods": 485,
+  "apiToolBindings": 337,
+  "apiToolNameCount": 337,
+  "apiToolSchemas": 336,
   "definedTools": 24,
-  "tools": 358,
+  "tools": 360,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -2954,6 +2956,15 @@
         "required": [
           "feedbackId"
         ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "capabilities_hub_overview",
+      "description": "Where each kind of capability is managed in DSH: agent skills, MCP servers and DSH plugins, with the trust each grants, the page and agent tools that own it, and the skills.sh link plus the telemetry-off CLI command a user can run. Makes no network call and installs nothing. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
         "additionalProperties": false
       }
     },
@@ -6135,6 +6146,34 @@
       "parameters": {
         "type": "object",
         "properties": {}
+      }
+    },
+    {
+      "name": "plugin_guide_search",
+      "description": "Search the DSH plugin extension surfaces a plugin may use: dshx SDK entry points, native Client slots, owned registries, client contracts, Host APIs, shared modules and feature-catalog surfaces. Each entry names its import, scope, mode, registration shape, additive-or-replacement risk, source file and docs. Static build-time catalog, never live occupancy. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sdk",
+              "slot",
+              "registry",
+              "contract",
+              "api",
+              "module",
+              "surface"
+            ]
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
       }
     },
     {
