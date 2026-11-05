@@ -51,7 +51,7 @@ toolbar:
   `b:<n>` or a `session-…` id.
 - Status and kind chips are editable before sending; the kind chip otherwise follows the text prefix.
 - Files can be picked, pasted or dropped. An attached image inserted as `@Image N` is an atomic blue reference chip in capture, descriptions and replies; it stays tied to that attachment and becomes a rendered Markdown image reference on submit. Images are scaled to 1600 px and re-encoded as WebP; other files
-  keep their bytes. The Host keeps the bytes in their own storage domain, never in the item row. An item
+  keep their bytes. The Host keeps the bytes as plain files beside its database, never in the item row. An item
   shows images as a thumbnail grid and other files as download rows; a feed row shows a paperclip count.
   At most eight files, 16 MB each (20 MB before an image is shrunk).
 - The microphone records a 16 kHz mono WAV and transcribes it through the Host voice-input bundle
@@ -458,20 +458,54 @@ Board 208–269 ms, Feed 243–405 ms, search 82–550 ms, Projects 458–775 ms
 
 ## Storage
 
-Host-owned storage-domain `backlog`, table `items` keyed by id, so every browser and agent reads the same
-rows. Search is an in-memory token match over title, body, tags, project and link targets. Attachment bytes
-live in the separate `backlog_files` domain, keyed by item and attachment; `backlog_read_file` returns a
-data URL for the UI, and `save: true` writes a copy under `$TMPDIR/dsh-backlog-attachments/<item>-<attachment>.<ext>`
-and returns that absolute path so an agent can read an image instead of a base64 string.
-Remote sync keeps its mappings (remote id, the last synced value of each side, carried-over comment ids, state,
-recent conflicts and the last error) in a third domain, `backlog_sync` v1, keyed by item id, so the `items`
-rows stay at v1 and turning sync on or off never rewrites or loses an item. Deleting an item removes its files and
-its sync mapping (the remote issue stays), so no later item inherits them.
+One SQLite file owned by the Host, `$DSH_HOME/plugins/backlog/backlog.db`, opened through `@dshfiles/sqlite-store`
+(WAL, migrations, `BEGIN IMMEDIATE`), so every browser and agent reads the same rows:
 
-The next item id lives in `backlog_meta` v1 (`counters` row `items`) and only moves forward: a restart takes the
-larger of that counter and the largest stored id plus one, so deleting the newest item never frees its `b:<n>`.
+| Table           | Holds                                                                                                                                                                        |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ops`           | The append-only op log, the source of truth: `op_id` (ULID), `item_id`, a hybrid logical clock (`hlc_wall` ms, `hlc_counter`, `hlc_host`), `origin` (the actor) and `op` JSON |
+| `items`         | Each item folded from its ops, a cache rebuilt from `ops` whenever the fold version changes; indexed by status, project, last activity and origin                             |
+| `aliases`       | `alias → item_id`: every `b:<n>` is a numeric alias of the item's canonical ULID                                                                                              |
+| `attachments`   | Per item and attachment: the SHA-256, media type and size of the bytes                                                                                                       |
+| `sync_mappings` | One remote-sync mapping per linked item (remote id, last synced value of each side, carried-over comment ids, state, recent conflicts, last error), keyed by item id           |
+| `meta`          | The host id, the next item id, the fold version and the import receipt                                                                                                       |
 
-An item keeps its newest 200 events; trimming always keeps the first `created` event, which names who captured it.
+Op kinds: `create`, `set {field, value}`, `unset`, `add`/`remove {field: tags | links | actors, value}`, `attach`/`detach`,
+`event` (moved, linked, triaged, edited and the rest of the activity), `comment`, `comment-edit`, `comment-delete` and
+`delete` (a tombstone). Each write appends the ops that turn the stored item into the new one; the diff is folded back
+and compared before it is written, and falls back to whole-field `set`s for any change it cannot express, so the log
+always reproduces the item exactly. An item's events are every event since capture: nothing is trimmed.
+
+Attachment bytes are plain files under `$DSH_HOME/plugins/backlog/files/<sha256[0:2]>/<sha256>` (mode `0600`):
+identical bytes are stored once, and a file goes when no attachment uses it. `backlog_read_file` returns a data URL
+for the UI, and `save: true` writes a copy under `$TMPDIR/dsh-backlog-attachments/<item>-<attachment>.<ext>` and
+returns that absolute path so an agent can read an image instead of a base64 string. Search is an in-memory token
+match over title, body, tags, project and link targets. Deleting an item writes its tombstone and removes its files
+and its sync mapping (the remote issue stays), so no later item inherits them.
+
+The next item id lives in `meta` and only moves forward: a restart takes the larger of that counter and the largest
+stored id plus one, so deleting the newest item never frees its `b:<n>`.
+
+### Import from the JSON storage domains
+
+Before the SQLite store the backlog lived in the storage-domain JSON files `backlog` (items), `backlog_files` (base64
+bytes), `backlog_sync` (mappings) and `backlog_meta` (the id counter). On the first open with an empty `ops` table the
+Host reads them once and writes, in one transaction: one `create` per item with its capture event, `add`/`attach` ops
+for its tags, links, actors and files, then one op per stored event in its original order, time and actor; the files as
+content-addressed bytes; the mappings and the counter; and an import receipt in `meta`, which stops it from ever
+running again. The JSON files are never written or deleted: they stay as the rollback. The import is one
+`backlog legacy import` span carrying its counts.
+
+Rehearse it against a copy of a live store (never the live files):
+
+```sh
+mkdir -p "$TMPDIR/backlog-rehearsal/storages"
+cp ~/.dsh/storages/backlog.json ~/.dsh/storages/backlog_files.json "$TMPDIR/backlog-rehearsal/storages/"
+BACKLOG_REHEARSAL_DIR="$TMPDIR/backlog-rehearsal" pnpm --dir plugins/@dshfiles/backlog exec vitest run src/legacy-import.rehearsal.test.ts
+```
+
+It compares every item, folded and served, with what the JSON store served, checks each attachment's SHA-256 and each
+mapping, and writes `report.json` beside the copy.
 
 ## Secret references
 
