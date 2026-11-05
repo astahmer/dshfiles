@@ -1316,9 +1316,12 @@ export default defineClient({
 
     // The bottom panel: the same panels in the frame's full-width row, opened
     // and closed through the frame's seat so its height belongs to the frame.
+    // The experimental inspector also claims this single seat at priority 0
+    // once its socket connects; ranking below it keeps boot independent of
+    // which registration lands first.
     ctx.slots.inject('shell.bottom', () =>
       ctx.slots.register(
-        { name: 'shell.bottom', locale: WORKBENCH_LOCALE_NAMESPACE },
+        { name: 'shell.bottom', locale: WORKBENCH_LOCALE_NAMESPACE, priority: -1 },
         decorate(props => {
           useDockviewSheet()
           useDemoPanels()
