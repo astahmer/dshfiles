@@ -6,7 +6,7 @@ import { ContextGraph, type GraphNode } from '@dshfiles/plugin-ui/components/mot
 import { DelegatorBoard, type DelegatorItem, type DelegatorSection } from '@dshfiles/plugin-ui/components/motion/delegator-board'
 import { ShapeshiftCard, type ShapeshiftPhase, type ShapeshiftView } from '@dshfiles/plugin-ui/components/motion/shapeshift-card'
 import { StepTrail, type TrailStep } from '@dshfiles/plugin-ui/components/motion/step-trail'
-import { RollingNumber, Typewriter } from '@dshfiles/plugin-ui/components/motion/text'
+import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
 import { WorkflowRun, type FlowStep, type RunEntry } from '@dshfiles/plugin-ui/components/motion/workflow-run'
 import {
   BookMarkedIcon,
@@ -329,7 +329,7 @@ function ContextGraphDemo() {
               </span>
             </div>
             <div className="dshx:min-h-12 dshx:rounded-lg dshx:bg-muted/50 dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
-              <Typewriter key={repo.id} text={`Ask about ${repo.name.split('/')[1] ?? repo.name}, or type / for skills and tools.`} speed={0.025} />
+              <span key={repo.id}>{`Ask about ${repo.name.split('/')[1] ?? repo.name}, or type / for skills and tools.`}</span>
             </div>
             <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
               <MicIcon aria-hidden className="dshx:size-3.5" />

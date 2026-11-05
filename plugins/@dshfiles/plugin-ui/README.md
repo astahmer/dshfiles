@@ -145,7 +145,7 @@ Every animated component uses one engine and one feel, and every one is visible 
 import { animate, springs, presets, motionSafe, enter, flip, drawStroke, everyFrame } from '@dshfiles/plugin-ui/motion'
 import { useAnimate, useEnter, useFlip, useCountUp, useElapsed, useInView } from '@dshfiles/plugin-ui/motion/react'
 import { PresenceList } from '@dshfiles/plugin-ui/components/motion/presence-list'
-import { RollingNumber, ShimmerText, Typewriter } from '@dshfiles/plugin-ui/components/motion/text'
+import { RollingNumber, ShimmerText } from '@dshfiles/plugin-ui/components/motion/text'
 ```
 
 - **Engine: [Motion](https://motion.dev)'s framework-free core** (`motion`, MIT): springs, keyframes, stagger,
