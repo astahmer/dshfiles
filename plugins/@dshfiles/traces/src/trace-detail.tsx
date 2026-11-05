@@ -2,12 +2,15 @@ import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { CallStackTree } from '@dshfiles/plugin-ui/components/motion/call-stack-tree'
 import { TraceWaterfall } from '@dshfiles/plugin-ui/components/motion/trace-waterfall'
+import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { CopyIcon, MessageSquareIcon, ScrollTextIcon } from '@dshfiles/plugin-ui/icons'
 import { useMemo, useState } from 'react'
 import { TraceFormat } from './format.js'
 import type { TracesTranslate } from './locales.js'
 import type { OpenThread } from './open-thread.js'
+import { StackFrames } from './stack-frames.js'
 import { ThreadLinks } from './thread-links.js'
 import { ServiceDot } from './trace-list.js'
 import type { AttributeValue, SpanRow, TraceDetail } from './types.js'
@@ -43,6 +46,60 @@ export const AttributeTable = (props: {
       )}
     </section>
   )
+}
+
+const STACKTRACE_KEY = 'exception.stacktrace'
+
+/** An exception event's `exception.stacktrace` as call frames, with the raw text one toggle away. */
+const StackTraceView = (props: { readonly stacktrace: string; readonly heading: string; readonly t: TracesTranslate }): JSX.Element => {
+  const t = props.t
+  const frames = useMemo(() => StackFrames.parse(props.stacktrace), [props.stacktrace])
+  const [view, setView] = useState<'frames' | 'raw'>('frames')
+  const showFrames = view === 'frames' && frames.length > 0
+  const files = new Set(frames.map(frame => frame.file)).size
+  return (
+    <section className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2" aria-label={t('stackTrace')} data-testid="span-stack-trace">
+      <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
+        <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{t('stackTrace')}</h4>
+        {frames.length === 0 ? null : (
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            aria-label={t('stackView')}
+            value={view}
+            onValueChange={value => {
+              if (value === 'frames' || value === 'raw') setView(value)
+            }}
+          >
+            <ToggleGroupItem value="frames">{t('stackFrames')}</ToggleGroupItem>
+            <ToggleGroupItem value="raw">{t('stackRaw')}</ToggleGroupItem>
+          </ToggleGroup>
+        )}
+      </div>
+      {showFrames ? (
+        <CallStackTree
+          heading={props.heading}
+          roots={frames}
+          spacedRoots={false}
+          listLabel={t('stackFrames')}
+          summary={<span>{t('stackSummary', { frames: frames.length, files })}</span>}
+          className="dshx:p-3"
+        />
+      ) : (
+        <pre className="dshx:max-h-80 dshx:overflow-auto dshx:rounded dshx:bg-muted/40 dshx:p-2 dshx:font-mono dshx:text-[11px] dshx:leading-4 dshx:whitespace-pre">
+          {props.stacktrace}
+        </pre>
+      )}
+    </section>
+  )
+}
+
+const exceptionHeading = (attributes: Readonly<Record<string, AttributeValue>>, fallback: string): string => {
+  const type = attributes['exception.type']
+  const message = attributes['exception.message']
+  const parts = [type, message].filter((part): part is string => typeof part === 'string' && part.length > 0)
+  return parts.length === 0 ? fallback : parts.join(': ')
 }
 
 const SpanDetailPanel = (props: {
@@ -147,15 +204,21 @@ const SpanDetailPanel = (props: {
       {span.events.length === 0 ? null : (
         <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label={props.t('events')}>
           <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.t('events')}</h4>
-          {span.events.map((event, index) => (
-            <div key={`${event.name}-${String(index)}`} className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded dshx:bg-muted/40 dshx:p-2">
-              <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:text-xs">
-                <span className="dshx:font-medium">{event.name}</span>
-                <span className="dshx:font-mono dshx:text-muted-foreground">+{TraceFormat.duration(event.offsetMs)}</span>
+          {span.events.map((event, index) => {
+            const stacktrace = event.attributes[STACKTRACE_KEY]
+            const hasStack = typeof stacktrace === 'string' && stacktrace.trim().length > 0
+            const attributes = hasStack ? Object.fromEntries(Object.entries(event.attributes).filter(([key]) => key !== STACKTRACE_KEY)) : event.attributes
+            return (
+              <div key={`${event.name}-${String(index)}`} className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:rounded dshx:bg-muted/40 dshx:p-2">
+                <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:text-xs">
+                  <span className="dshx:font-medium">{event.name}</span>
+                  <span className="dshx:font-mono dshx:text-muted-foreground">+{TraceFormat.duration(event.offsetMs)}</span>
+                </div>
+                {Object.keys(attributes).length === 0 ? null : <AttributeTable label={props.t('attributes')} values={attributes} t={props.t} />}
+                {hasStack ? <StackTraceView stacktrace={stacktrace} heading={exceptionHeading(event.attributes, props.t('stackTrace'))} t={props.t} /> : null}
               </div>
-              {Object.keys(event.attributes).length === 0 ? null : <AttributeTable label={props.t('attributes')} values={event.attributes} t={props.t} />}
-            </div>
-          ))}
+            )
+          })}
         </section>
       )}
       <AttributeTable label={props.t('resource')} values={span.resource} t={props.t} />

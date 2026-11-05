@@ -61,7 +61,19 @@ const syntheticExport = (traceId: string, clientId: string) => {
                 startTimeUnixNano: at(10),
                 endTimeUnixNano: at(90),
                 attributes: [attribute('peer.service', 'e2e-payments')],
-                events: [{ name: 'exception', timeUnixNano: at(80), attributes: [attribute('exception.type', 'CardDeclined')] }],
+                events: [
+                  {
+                    name: 'exception',
+                    timeUnixNano: at(80),
+                    attributes: [
+                      attribute('exception.type', 'CardDeclined'),
+                      attribute(
+                        'exception.stacktrace',
+                        'CardDeclined: card declined 4012\n    at PaymentClient.charge (/srv/payments/src/client.ts:42:11)\n    at async checkout (/srv/payments/src/checkout.ts:17:5)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)',
+                      ),
+                    ],
+                  },
+                ],
                 status: { code: 2, message: 'card declined 4012' },
               },
             ],
@@ -177,6 +189,21 @@ Then('selecting a span shows its attributes and resource attributes', async ({ p
     await expect(detail).toContainText('CardDeclined')
   })
   await finishJourneyAssertions(page)
+})
+
+Then("the failing span's stack trace reads as frames and as raw text", async ({ page }: { page: Page }) => {
+  const stack = page.getByRole('complementary', { name: 'Span detail' }).getByRole('region', { name: 'Stack trace', exact: true })
+  await recordAssertion(page, 'traces-span-stack-trace-frames', async () => {
+    const frames = stack.getByRole('list', { name: 'Frames', exact: true }).getByRole('listitem')
+    await expect(frames).toHaveCount(3)
+    await expect(frames.first()).toContainText('PaymentClient.charge()')
+    await expect(frames.first()).toContainText('client.ts:42')
+  })
+  await stack.getByRole('radio', { name: 'Raw', exact: true }).click()
+  await recordAssertion(page, 'traces-span-stack-trace-raw', () =>
+    expect(stack.locator('pre')).toContainText('at async checkout (/srv/payments/src/checkout.ts:17:5)'),
+  )
+  await stack.getByRole('radio', { name: 'Frames', exact: true }).click()
 })
 
 Then('the span detail panel stays visible while scrolling the trace view', async ({ page }: { page: Page }) => {

@@ -186,7 +186,7 @@
     {
       "id": "trace-explorer",
       "title": "Trace list and span waterfall",
-      "summary": "A Traces panel lists stored traces newest first with filters (text, service, error status, minimum duration) kept across reloads; opening one shows a collapsible, keyboard-navigable span waterfall (the plugin-ui TraceWaterfall) on a time axis, colored by service with errors in red, totals of duration, cost, tokens, model and tool calls, and a side panel with the selected span's attributes, events and resource attributes, plus an Open thread link when a span carries dsh.session.id.",
+      "summary": "A Traces panel lists stored traces newest first with filters (text, service, error status, minimum duration) kept across reloads; opening one shows a collapsible, keyboard-navigable span waterfall (the plugin-ui TraceWaterfall) on a time axis, colored by service with errors in red, totals of duration, cost, tokens, model and tool calls, and a side panel with the selected span's attributes, events (an exception.stacktrace read as call frames with the plugin-ui CallStackTree, or as raw text) and resource attributes, plus an Open thread link when a span carries dsh.session.id.",
       "reach": [
         "seed otlp-sample-trace",
         "click tab \"Observe\"",
@@ -202,7 +202,7 @@
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Traces",
       "configuration": [],
-      "states": ["empty", "listed", "filtered", "paged", "trace-open", "span-selected", "collapsed", "trace-missing"],
+      "states": ["empty", "listed", "filtered", "paged", "trace-open", "span-selected", "collapsed", "stack-frames", "stack-raw", "trace-missing"],
       "failureModes": [
         "A span whose parent never arrived is shown as a root rather than dropped.",
         "A trace pruned while open reports that it is no longer stored.",
@@ -257,6 +257,18 @@
           "id": "traces.waterfall-cycles",
           "file": "plugins/@dshfiles/traces/src/waterfall-spans.test.ts",
           "testName": "keeps a parent cycle the Host listed flat as roots"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.stack-frames-v8",
+          "file": "plugins/@dshfiles/traces/src/stack-frames.test.ts",
+          "testName": "reads a V8 stack innermost first and marks library frames"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.stack-frames-unknown",
+          "file": "plugins/@dshfiles/traces/src/stack-frames.test.ts",
+          "testName": "gives no frames for text it cannot read"
         }
       ],
       "telemetry": [

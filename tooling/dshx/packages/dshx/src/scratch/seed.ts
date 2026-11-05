@@ -812,6 +812,7 @@ const otlpSampleExport = () => {
     readonly to: number
     readonly attributes?: readonly ReturnType<typeof text>[]
     readonly status?: { readonly code: number; readonly message?: string }
+    readonly exception?: { readonly at: number; readonly type: string; readonly stacktrace: string }
   }) => ({
     traceId: OTLP_SAMPLE_TRACE_ID,
     spanId: input.spanId,
@@ -822,6 +823,15 @@ const otlpSampleExport = () => {
     endTimeUnixNano: at(input.to),
     attributes: input.attributes ?? [],
     status: input.status ?? { code: 1 },
+    ...(input.exception !== undefined && {
+      events: [
+        {
+          name: 'exception',
+          timeUnixNano: at(input.exception.at),
+          attributes: [text('exception.type', input.exception.type), text('exception.stacktrace', input.exception.stacktrace)],
+        },
+      ],
+    }),
   })
   return {
     resourceSpans: [
@@ -858,6 +868,18 @@ const otlpSampleExport = () => {
                 to: 210,
                 attributes: [text('peer.service', 'dshx-payments'), text('error.type', 'CardDeclined')],
                 status: { code: 2, message: 'card declined' },
+                exception: {
+                  at: 205,
+                  type: 'CardDeclined',
+                  stacktrace: [
+                    'CardDeclined: card declined',
+                    '    at PaymentClient.charge (/srv/sample/src/payments/client.ts:42:11)',
+                    '    at async chargeCard (/srv/sample/src/orders/checkout.ts:58:5)',
+                    '    at async placeOrder (/srv/sample/src/orders/checkout.ts:21:3)',
+                    '    at Layer.handle (/srv/sample/node_modules/express/lib/router/layer.js:95:5)',
+                    '    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)',
+                  ].join('\n'),
+                },
               }),
             ],
           },
