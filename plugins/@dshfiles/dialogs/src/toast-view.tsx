@@ -4,12 +4,12 @@ import { XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ToastEntry, ToastStack } from './toast-stack.js'
 
-const toneClass: Record<ToastTone, string> = {
+const toneClass = {
   info: 'dshx:border-l-border',
   success: 'dshx:border-l-success',
   warning: 'dshx:border-l-warning',
   danger: 'dshx:border-l-destructive',
-}
+} satisfies Record<ToastTone, string>
 
 const Toast = (props: { readonly entry: ToastEntry; readonly onDismiss: () => void }): JSX.Element => {
   const { input } = props.entry
