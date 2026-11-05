@@ -22,6 +22,7 @@ const createClient = (
   const host = options.host === undefined ? DEFAULT_PREFERENCES : options.host
   const hostWrites: Partial<SidebarPreferences>[] = []
   let removeCount = 0
+  const archived: SidebarPreferences[] = []
 
   const client: SidebarPreferencesMachineClient = {
     readLocal: () => local,
@@ -34,9 +35,13 @@ const createClient = (
       removeCount += 1
       local = null
     },
+    archiveLocal: value => {
+      archived.push(value)
+      local = null
+    },
   }
 
-  return { client, hostWrites, getLocal: () => local, getRemoveCount: () => removeCount }
+  return { client, hostWrites, archived, getLocal: () => local, getRemoveCount: () => removeCount }
 }
 
 const startMachine = (client: SidebarPreferencesMachineClient) => createActor(SidebarPreferencesMachine.machine, { input: { client } }).start()
@@ -134,6 +139,25 @@ describe('SidebarPreferencesMachine', () => {
     expect(harness.hostWrites).toEqual([])
     expect(harness.getLocal()).toBeNull()
     expect(harness.getRemoveCount()).toBe(1)
+  })
+
+  it('keeps a browser copy whose values the customized Host would otherwise discard', async () => {
+    // Host and browser each customized idleMinutes differently; only the browser changed hideBrandLogo.
+    const host: SidebarPreferences = { ...DEFAULT_PREFERENCES, idleMinutes: DEFAULT_PREFERENCES.idleMinutes + 60 }
+    const local: SidebarPreferences = {
+      ...DEFAULT_PREFERENCES,
+      idleMinutes: DEFAULT_PREFERENCES.idleMinutes + 30,
+      hideBrandLogo: !DEFAULT_PREFERENCES.hideBrandLogo,
+    }
+    const harness = createClient({ local, host })
+    const actor = startMachine(harness.client)
+
+    actor.send({ type: 'migration.requested' })
+    await waitFor(actor, snapshot => snapshot.context.migrationStatus === 'done')
+    expect(harness.hostWrites).toEqual([{ hideBrandLogo: local.hideBrandLogo }])
+    expect(harness.archived).toEqual([local])
+    expect(harness.getRemoveCount()).toBe(0)
+    expect(harness.getLocal()).toBeNull()
   })
 
   it('records synchronous local storage results as warning state', () => {
