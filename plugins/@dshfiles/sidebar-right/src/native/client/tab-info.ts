@@ -52,7 +52,7 @@ export const tabInfoFactory: SlotHookFactory<'sidebar.right.pane.tab', UseSideba
           refreshShortcut: shortcuts.find(row => row.id === 'page.refresh'),
         },
       }
-    }, [layout, navigation])
+    }, [layout, navigation, active, embedded, title, fullscreen, signal, actions, shortcuts])
   }
 }
 
