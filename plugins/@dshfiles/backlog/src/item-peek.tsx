@@ -560,6 +560,8 @@ const TimelineRuns = (props: {
   readonly projects: readonly string[]
   readonly threadLabel: ThreadLabel
   readonly openThread: OpenThread
+  /** The other Host that wrote an event, for the work log; undefined for this Host's own events. */
+  readonly hostOf?: ((event: BacklogEvent) => string | undefined) | undefined
   readonly children?: ReactNode
 }): JSX.Element => {
   const attention = props.attention
@@ -684,6 +686,7 @@ const TimelineRuns = (props: {
                           openThread={props.openThread}
                         />{' '}
                         · {ItemGlyphs.ago(event.at)}
+                        {props.hostOf?.(event) === undefined ? null : ` · on ${props.hostOf(event) ?? ''}`}
                       </p>
                       {event.fieldChanges?.length ? (
                         <>
@@ -785,6 +788,16 @@ const Conversation = (props: {
   readonly agentReplying: boolean
 }): JSX.Element => {
   const [workLogOpen, setWorkLogOpen] = useState(false)
+  const api = useApi(backlogApi)
+  const eventHosts = useQuery({
+    queryKey: ['dshfiles-backlog', 'event-hosts', props.itemId, props.events.length],
+    queryFn: () => api.eventHosts({ id: props.itemId }),
+    enabled: workLogOpen,
+    staleTime: 60_000,
+    retry: false,
+  })
+  const hosts = new Map((eventHosts.data?.events ?? []).map(entry => [`${String(entry.at)}:${entry.actor}`, entry.host] as const))
+  const hostOf = hosts.size === 0 ? undefined : (event: BacklogEvent) => hosts.get(`${String(event.at)}:${event.actor}`)
   const threadIdsByEvent = new Map<BacklogEvent, string>()
   for (const [eventIndex, event] of props.events.entries()) {
     const threadId = BacklogActivityReferences.threadIdOf({ event, eventIndex, events: props.events, links: props.links })
@@ -811,7 +824,7 @@ const Conversation = (props: {
             <span className="dshx:min-w-0 dshx:truncate">{workSummary}</span>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <TimelineRuns label="Work log" events={lanes.work} {...shared} />
+            <TimelineRuns label="Work log" events={lanes.work} hostOf={hostOf} {...shared} />
           </CollapsibleContent>
         </Collapsible>
       )}
