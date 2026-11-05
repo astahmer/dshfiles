@@ -113,6 +113,26 @@ export const backlogSettings = defineSettings({
     ])
       .default('failures')
       .description("Which threads from the sidebar's unread list also appear in the Inbox, next to the backlog items they work on."),
+    peers: Schema.array(
+      Schema.object({
+        runtimeId: Schema.string().required(),
+        enabled: Schema.boolean().default(false),
+      }),
+    )
+      .default([])
+      .hidden()
+      .description('Multi-host runtimes whose backlog this Host pulls. Turn them on in Backlog settings › Hosts.'),
+    peerPullSeconds: Schema.natural()
+      .min(10)
+      .max(3_600)
+      .default(60)
+      .description('How often each enabled peer Host is asked for backlog changes. Hosts that are offline are skipped and caught up later.'),
+    automationHost: Schema.string()
+      .default('')
+      .hidden()
+      .description(
+        'The backlog Host that runs gate checks and main polling when Hosts share the backlog. Empty: this Host. Pick it in Backlog settings › Hosts.',
+      ),
     publishActivity: Schema.boolean()
       .default(true)
       .description('Report item moves, links and requests for input to the Activity timeline, so the shared activity room shows backlog work.'),

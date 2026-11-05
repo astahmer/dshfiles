@@ -6,6 +6,7 @@ import { Cause, Clock, Effect, Layer, Ref, Schedule } from 'effect'
 import type { BacklogSummaryView } from './api.js'
 import { BacklogSettingsTag } from './backlog-settings.js'
 import { BacklogGates } from './gates.js'
+import { AutomationHost } from './peer-replication.js'
 import { PullRequestState } from './pull-request-state.js'
 import { BacklogStore } from './store.js'
 
@@ -36,6 +37,7 @@ export const GateWatch = Layer.effectDiscard(
     const jj = yield* Jj
     const apis = yield* HostApis
     const checks = apis.client(projectChecksApi)
+    const automation = yield* AutomationHost
     const lastPoll = yield* Ref.make(0)
 
     const resolvePulls = Effect.fn('backlog gate pull requests')(function* (items: readonly BacklogSummaryView[]) {
@@ -117,6 +119,8 @@ export const GateWatch = Layer.effectDiscard(
       const now = yield* Clock.currentTimeMillis
       if (!current.lifecycleSignals || now - (yield* Ref.get(lastPoll)) < current.revisionPollMinutes * 60_000) return
       yield* Ref.set(lastPoll, now)
+      // Hosts that share the backlog would each resolve the same gate; only the automation Host writes it.
+      if (!(yield* automation.here)) return yield* Effect.annotateCurrentSpan('dshx.backlog.automation', 'elsewhere')
       const items = (yield* store.list({ freshness: 'all', statuses: [...openStatuses], limit: 2_000 })).items
       yield* resolvePulls(items)
       yield* resolveRevisions(items, current.revisionRepositories)

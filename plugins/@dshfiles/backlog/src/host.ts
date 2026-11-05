@@ -47,6 +47,8 @@ import type { ExternalRef } from './sync-model.js'
 import { ShippedSummaries } from './shipped-summaries.js'
 import { SyncLocalProbes } from './sync-local-probes.js'
 import { BacklogStore } from './store.js'
+import { AutomationHost, BacklogPeers } from './peer-replication.js'
+import { PeerTransport } from './peer-transport.js'
 import { actorOf, ThreadStart } from './thread-start.js'
 import { TriageBackfill } from './triage-backfill.js'
 import { Triage } from './triage-service.js'
@@ -69,6 +71,7 @@ const hostEdges = Layer.mergeAll(
 )
 
 const backlogServices = Layer.mergeAll(
+  BacklogPeers.layer,
   ScheduledRules.layer,
   ThreadStart.layer,
   TriageBackfill.layer,
@@ -88,6 +91,8 @@ const backlogServices = Layer.mergeAll(
       AttachmentExport.layer,
       SyncSources.layer,
       PullRequestState.layer,
+      PeerTransport.layer,
+      AutomationHost.layer,
     ),
   ),
   Layer.provideMerge(builtInProviderRegistry),
@@ -100,7 +105,7 @@ const backlogServices = Layer.mergeAll(
 )
 
 /** Every backlog service and background loop of one activation. */
-const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, GateWatch, LeaseSweep, BacklogAttention.layer, RemoteSyncLoop).pipe(
+const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, GateWatch, LeaseSweep, BacklogAttention.layer, RemoteSyncLoop, BacklogPeers.loop).pipe(
   Layer.provideMerge(backlogServices),
   Layer.provideMerge(hostEdges),
 )
@@ -225,7 +230,13 @@ const backlogHandlers = Api.handlers(backlogApi, {
   readFile: keyed =>
     Effect.gen(function* () {
       const input = yield* withItemId(keyed)
-      const result = yield* BacklogStore.use(store => store.readFile(input))
+      const store = yield* BacklogStore
+      const local = yield* store.readFile(input)
+      // An attachment another Host added arrives as metadata only: its bytes come from a peer the first time it is opened.
+      const result =
+        local.ok || !(yield* BacklogPeers.use(peers => peers.fetchFile({ id: input.id, attachmentId: input.attachmentId })))
+          ? local
+          : yield* store.readFile(input)
       if (!result.ok || input.save !== true) return result
       const path = yield* AttachmentExport.use(files => files.write({ id: input.id, attachmentId: input.attachmentId, dataUrl: result.value.dataUrl }))
       return { ok: true as const, value: { dataUrl: result.value.dataUrl, path } }
@@ -385,6 +396,13 @@ const backlogHandlers = Api.handlers(backlogApi, {
   summarizeShipped: input => ShippedSummaries.use(summaries => AiActivity.use(activity => activity.track(summaries.summarize(input)))),
   deleteComment: (input, call) =>
     Effect.flatMap(withItemId(input), resolved => BacklogStore.use(store => store.deleteComment({ ...resolved, actor: actorOf(call.caller) }))),
+  peerInfo: () => BacklogPeers.use(peers => peers.info),
+  peerOpsSince: input => BacklogPeers.use(peers => peers.opsSince(input)),
+  peerFiles: input => BacklogPeers.use(peers => peers.files(input)),
+  peerStatus: () => BacklogPeers.use(peers => peers.status),
+  peerSync: input => BacklogPeers.use(peers => peers.sync(input)),
+  configurePeers: input => BacklogPeers.use(peers => peers.configure(input)),
+  eventHosts: input => Effect.flatMap(itemIdOf(input.id), id => BacklogPeers.use(peers => peers.eventHosts(id))),
 })
 
 /**

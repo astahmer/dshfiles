@@ -11,6 +11,7 @@ import { BacklogItems } from './item.js'
 import { BacklogShipped } from './shipped.js'
 import { BacklogProviders } from './provider-port.js'
 import { BacklogSyncModel } from './sync-model.js'
+import { BacklogPeerWire } from './peer-wire.js'
 
 const idSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))
 const refTextSchema = Schema.String.check(
@@ -574,6 +575,37 @@ const writeNote = 'Use it when the user asked, or to record and progress work th
 
 /** No default: a bare agent request cannot run a guarded write. */
 const confirmSchema = Schema.Boolean.pipe(Schema.optional).annotate({ description: AgentConfirmation.confirmDescription })
+
+const peerIdSchema = BacklogPeerWire.idSchema
+const peerViewSchema = Schema.Struct({
+  runtimeId: peerIdSchema,
+  name: Schema.String,
+  connected: Schema.Boolean,
+  enabled: Schema.Boolean,
+  remoteHostId: Schema.NullOr(Schema.String),
+  cursor: nonNegativeCountSchema,
+  /** Ops the peer holds that this Host has not pulled yet, as of the last pull. */
+  lag: nonNegativeCountSchema,
+  pulled: nonNegativeCountSchema,
+  lastPullAt: Schema.NullOr(epochMsSchema),
+  lastSuccessAt: Schema.NullOr(epochMsSchema),
+  /** The automation Host the peer reported, so a disagreement between Hosts shows. */
+  automationHostId: Schema.NullOr(Schema.String),
+  error: Schema.NullOr(Schema.Struct({ code: Schema.String, message: Schema.String })),
+})
+const peerStatusSchema = Schema.Struct({
+  /** Whether `@dshfiles/multi-host` is loaded; without it there are no peers. */
+  available: Schema.Boolean,
+  hostId: peerIdSchema,
+  intervalSeconds: nonNegativeCountSchema,
+  /** The Host chosen to run gate checks and main polling, or null for this one. */
+  automationHostId: Schema.NullOr(Schema.String),
+  /** Whether gate checks and main polling run on this Host. */
+  automationHere: Schema.Boolean,
+  /** Why automation is skipped here, or what to decide, for the Hosts panel. */
+  automationNote: Schema.NullOr(Schema.String),
+  peers: Schema.Array(peerViewSchema),
+})
 
 /** One backlog every browser and agent shares, owned by the Host. */
 export const backlogApi = defineApi({
@@ -1247,6 +1279,63 @@ export const backlogApi = defineApi({
       output: detailResultSchema,
       description: 'Delete one of the current user’s previous replies in the backlog panel.',
     }),
+    peerInfo: method({
+      input: Schema.Void,
+      output: BacklogPeerWire.infoSchema,
+      description: 'Who this backlog Host is for a peer Host: its id, peer protocol, op and storage schema versions, and automation Host. Not an agent tool.',
+    }),
+    peerOpsSince: method({
+      input: Schema.Struct({
+        cursor: nonNegativeCountSchema,
+        limit: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(2_000)).pipe(Schema.optional),
+      }),
+      output: BacklogPeerWire.opsPageSchema,
+      description:
+        'Ops this Host stored after `cursor`, in its own storing order, every op it holds whatever Host wrote it: what a peer Host pulls to replicate the backlog. Bounded in count and size; `more` says another page waits. Not an agent tool.',
+    }),
+    peerFiles: method({
+      input: BacklogPeerWire.filesInputSchema,
+      output: BacklogPeerWire.filesOutputSchema,
+      description: 'The stored bytes of attachments a peer Host lacks, by item id and attachment id, with their SHA-256; bounded per call. Not an agent tool.',
+    }),
+    peerStatus: method({
+      input: Schema.Void,
+      output: peerStatusSchema,
+      description:
+        'Backlog replication across Hosts: the multi-host runtimes this Host can pull the backlog from, whether each is on, how far it was pulled, the ops still to pull, its last error, and which Host runs gate checks and main polling. Read-only.',
+      tool: { name: 'backlog_peer_status', readOnly: true },
+    }),
+    peerSync: method({
+      input: Schema.Struct({
+        runtimeId: peerIdSchema.pipe(Schema.optional).annotate({ description: 'One runtime to pull now; omit to pull every enabled one.' }),
+      }),
+      output: peerStatusSchema,
+      description:
+        'Pull backlog changes from enabled peer Hosts now instead of at the next interval, then return the replication status. It adds the peers’ ops to this backlog; run it only when the user asked to sync.',
+      tool: { name: 'backlog_peer_sync', readOnly: false },
+    }),
+    configurePeers: method({
+      input: Schema.Struct({
+        peers: Schema.Array(Schema.Struct({ runtimeId: peerIdSchema, enabled: Schema.Boolean }))
+          .pipe(Schema.optional)
+          .annotate({
+            description:
+              'Runtimes to turn backlog replication on or off for; others keep their setting. Turning one off stops pulling and keeps what was pulled.',
+          }),
+        automationHost: Schema.String.check(Schema.isMaxLength(128)).pipe(Schema.optional).annotate({
+          description: 'The backlog Host id (from `backlog_peer_status`) that runs gate checks and main polling; an empty string means this Host.',
+        }),
+      }),
+      output: peerStatusSchema,
+      description:
+        'Turn backlog replication on or off per multi-host runtime and choose the Host that runs gate checks and main polling. It changes Backlog settings; run it only when the user asked.',
+      tool: { name: 'backlog_peers_configure', readOnly: false },
+    }),
+    eventHosts: method({
+      input: Schema.Struct({ id: itemKeySchema }),
+      output: Schema.Struct({ events: Schema.Array(Schema.Struct({ at: epochMsSchema, actor: Schema.String, host: Schema.String })) }),
+      description: "Which other Host wrote each of an item's events, for its work log; events this Host wrote are left out. Not an agent tool.",
+    }),
   },
 })
 
@@ -1267,6 +1356,7 @@ export type BacklogSyncItemView = typeof syncItemSchema.Type
 export type BacklogSyncResultView = typeof syncResultSchema.Type
 export type BacklogShippedView = typeof shippedOutputSchema.Type
 export type BacklogShippedSummaryView = typeof shippedSummarySchema.Type
+export type BacklogPeerStatusView = typeof peerStatusSchema.Type
 
 export type BacklogSummaryInput = typeof summarySchema.Encoded
 export type BacklogListInput = typeof listOutputSchema.Encoded

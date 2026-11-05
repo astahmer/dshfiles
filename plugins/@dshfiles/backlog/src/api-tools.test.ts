@@ -72,6 +72,9 @@ describe('backlog tool exposure', () => {
       'backlog_link_remote',
       'backlog_list',
       'backlog_merge',
+      'backlog_peer_status',
+      'backlog_peer_sync',
+      'backlog_peers_configure',
       'backlog_projects',
       'backlog_pull_requests',
       'backlog_read_file',
@@ -113,6 +116,7 @@ describe('backlog tool exposure', () => {
       'backlog_get',
       'backlog_get_many',
       'backlog_list',
+      'backlog_peer_status',
       'backlog_projects',
       'backlog_pull_requests',
       'backlog_read_file',
@@ -205,6 +209,8 @@ describe('backlog tool exposure', () => {
 
   test('sync configuration writes say the user must ask, and removals take an explicit confirm', () => {
     for (const name of [
+      'peerSync',
+      'configurePeers',
       'saveSyncConnection',
       'removeSyncConnection',
       'moveSyncConnection',
@@ -220,7 +226,18 @@ describe('backlog tool exposure', () => {
   })
 
   test('presentation and transport methods stay untooled on purpose', () => {
-    for (const name of ['revision', 'speechStatus', 'jevSetupStatus', 'classifyReply', 'transcribeSpeech', 'acknowledge'] as const) {
+    for (const name of [
+      'revision',
+      'speechStatus',
+      'jevSetupStatus',
+      'classifyReply',
+      'transcribeSpeech',
+      'acknowledge',
+      'peerInfo',
+      'peerOpsSince',
+      'peerFiles',
+      'eventHosts',
+    ] as const) {
       expect(backlogApi.methods[name].tool).toBeUndefined()
     }
   })

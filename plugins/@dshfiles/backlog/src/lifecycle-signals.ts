@@ -8,6 +8,7 @@ import { HostSessions } from './host-edge-promise.js'
 import { BacklogQuestionReply } from './question-reply.js'
 import { BacklogSignals } from './signals.js'
 import { BacklogStore } from './store.js'
+import { AutomationHost } from './peer-replication.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 import { Triage } from './triage-service.js'
 
@@ -39,6 +40,7 @@ export const LifecycleSignals = Layer.effectDiscard(
     const seenMain = yield* Ref.make<ReadonlyMap<string, string>>(new Map())
     const lastPoll = yield* Ref.make(0)
     const lastNudge = yield* Ref.make(0)
+    const automation = yield* AutomationHost
 
     const readJj = (cwd: string, args: readonly string[]) =>
       jj.exec({ cwd, args: ['--ignore-working-copy', ...args], timeout: '20 seconds', maxStdoutBytes: 400_000 }).pipe(Effect.map(output => output.stdout))
@@ -96,6 +98,8 @@ export const LifecycleSignals = Layer.effectDiscard(
       const now = yield* Clock.currentTimeMillis
       if (!current.lifecycleSignals || now - (yield* Ref.get(lastPoll)) < current.revisionPollMinutes * 60_000) return
       yield* Ref.set(lastPoll, now)
+      // Every Host sharing the backlog would close the same items from the same main; only the automation Host polls it.
+      if (!(yield* automation.here)) return
       yield* pollRevisions()
     })
 

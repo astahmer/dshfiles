@@ -52,6 +52,7 @@
     "@dshfiles/jev": "workspace:*",
     "@dshfiles/jj-cli": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
+    "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-automations": "workspace:*",
     "@dshfiles/project-checks": "workspace:*",
