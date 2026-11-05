@@ -26,8 +26,12 @@ type Source = MessageImagesProps['images'][number]
 type Loader = MessageImagesProps['loadImage']
 
 /** jsdom has no IntersectionObserver: record observed elements and let a test bring some into view. */
-class FakeIntersectionObserver {
+class FakeIntersectionObserver implements IntersectionObserver {
   static readonly instances = new Set<FakeIntersectionObserver>()
+  readonly root = null
+  readonly rootMargin = '0px'
+  readonly scrollMargin = '0px'
+  readonly thresholds: readonly number[] = [0]
   readonly targets = new Set<Element>()
   constructor(private readonly callback: IntersectionObserverCallback) {
     FakeIntersectionObserver.instances.add(this)
@@ -45,35 +49,45 @@ class FakeIntersectionObserver {
   takeRecords(): IntersectionObserverEntry[] {
     return []
   }
+  private static visibleEntry(target: Element): IntersectionObserverEntry {
+    const bounds = target.getBoundingClientRect()
+    return { target, isIntersecting: true, intersectionRatio: 1, boundingClientRect: bounds, intersectionRect: bounds, rootBounds: null, time: 0 }
+  }
   static reveal(predicate: (element: Element) => boolean): void {
     for (const observer of [...FakeIntersectionObserver.instances]) {
       const hits = [...observer.targets].filter(predicate)
       if (hits.length === 0) continue
-      observer.callback(
-        hits.map(target => ({ target, isIntersecting: true }) as unknown as IntersectionObserverEntry),
-        observer as unknown as IntersectionObserver,
-      )
+      observer.callback(hits.map(FakeIntersectionObserver.visibleEntry), observer)
     }
   }
 }
 
 function attachments(count: number): Source[] {
+  // SAFETY: attachment ids are opaque to the gallery, which only hands them back to the test loader; the plain strings
+  // stand in for the branded AttachmentId this plugin cannot mint without depending on @deepseek-ai/dsh-attachment.
   return Array.from({ length: count }, (_, index) => ({
-    attachment: { kind: 'image', attachmentId: `att-${index}`, name: `shot-${index}.png`, mediaType: 'image/png', width: 800, height: 600 },
-  })) as unknown as Source[]
+    attachment: { attachmentId: `att-${index}`, name: `shot-${index}.png`, mediaType: 'image/png', bytes: 1024, width: 800, height: 600 },
+  })) as Source[]
 }
 
-function loader(): { load: Loader; calls: string[]; resolveAll: () => void } {
+/** A loader that records each request and settles them all on demand. */
+interface TestLoader {
+  readonly load: Loader
+  readonly calls: string[]
+  readonly resolveAll: () => void
+}
+
+function loader(): TestLoader {
   const calls: string[] = []
   const pending: Array<() => void> = []
-  const load = vi.fn((attachment: { attachmentId: string }) => {
+  const load = vi.fn<Loader>(attachment => {
     calls.push(attachment.attachmentId)
     return new Promise<string>(resolve => {
       pending.push(() => {
         resolve(`blob:${attachment.attachmentId}`)
       })
     })
-  }) as unknown as Loader
+  })
   return {
     load,
     calls,
