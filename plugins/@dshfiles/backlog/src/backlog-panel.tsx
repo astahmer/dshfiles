@@ -40,6 +40,7 @@ import {
   PlayIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useAutosave } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, keepPreviousData, useIsMutating, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Effect, Schema } from 'effect'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
@@ -383,33 +384,25 @@ const openJevKeySettings = (): void => {
   )
 }
 
+type JevSettingsDraft = { readonly jevEnabled: boolean; readonly autoTriage: boolean }
+
 const BacklogSettingsPanel = (): JSX.Element => {
   const settings = useSettings(backlogSettings)
-  const [jevEnabled, setJevEnabled] = useState(settings.value?.jevEnabled ?? false)
-  const [autoTriage, setAutoTriage] = useState(settings.value?.autoTriage ?? false)
-  const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
-  const [dirty, setDirty] = useState(false)
-
-  useEffect(() => {
-    if (dirty || settings.status !== 'ready') return
-    setJevEnabled(settings.value?.jevEnabled ?? false)
-    setAutoTriage(settings.value?.autoTriage ?? false)
-  }, [dirty, settings.status, settings.value?.autoTriage, settings.value?.jevEnabled])
-
-  const save = async (): Promise<void> => {
-    setError(null)
-    setSaved(false)
-    try {
+  const autosave = useAutosave<JevSettingsDraft>({
+    initial: { jevEnabled: settings.value?.jevEnabled ?? false, autoTriage: settings.value?.autoTriage ?? false },
+    save: async draft => {
       if (settings.status !== 'ready' || !settings.writable) throw new Error('Backlog settings are not writable right now.')
-      if (!(await settings.set('jevEnabled', jevEnabled))) throw new Error('Backlog could not save Jev settings.')
-      if (!(await settings.set('autoTriage', autoTriage))) throw new Error('Backlog could not save automatic triage settings.')
-      setDirty(false)
-      setSaved(true)
-    } catch (cause) {
-      setError(errorMessage(cause, 'Could not save Jev settings.'))
-    }
-  }
+      if (!(await settings.set('jevEnabled', draft.jevEnabled))) throw new Error('Backlog could not save Jev settings.')
+      if (!(await settings.set('autoTriage', draft.autoTriage))) throw new Error('Backlog could not save automatic triage settings.')
+    },
+  })
+  const loadedJevEnabled = settings.value?.jevEnabled ?? false
+  const loadedAutoTriage = settings.value?.autoTriage ?? false
+  const { draft, error, send, state } = autosave
+  useEffect(() => {
+    if (settings.status !== 'ready') return
+    send({ type: 'sync', value: { jevEnabled: loadedJevEnabled, autoTriage: loadedAutoTriage } })
+  }, [loadedAutoTriage, loadedJevEnabled, send, settings.status])
 
   return (
     <section className="dshx-root dshx:mx-auto dshx:w-full dshx:max-w-2xl dshx:p-5 dshx:@max-pane-narrow:p-3" aria-labelledby="backlog-jev-settings-title">
@@ -423,20 +416,16 @@ const BacklogSettingsPanel = (): JSX.Element => {
         className="dshx:mt-5 dshx:flex dshx:flex-col dshx:gap-4"
         onSubmit={event => {
           event.preventDefault()
-          void save()
+          send({ type: 'flush' })
         }}
       >
         <label className="dshx:flex dshx:items-start dshx:gap-3 dshx:text-sm">
           <input
             type="checkbox"
             aria-label="Enable Jev"
-            checked={jevEnabled}
+            checked={draft.jevEnabled}
             disabled={!settings.writable || settings.status !== 'ready'}
-            onChange={event => {
-              setJevEnabled(event.currentTarget.checked)
-              setDirty(true)
-              setSaved(false)
-            }}
+            onChange={event => send({ type: 'edit', value: { ...draft, jevEnabled: event.currentTarget.checked } })}
             className="dshx:mt-0.5"
           />
           <span className="dshx:flex dshx:flex-col dshx:gap-1">
@@ -448,13 +437,9 @@ const BacklogSettingsPanel = (): JSX.Element => {
           <input
             type="checkbox"
             aria-label="Triage new items automatically"
-            checked={autoTriage}
+            checked={draft.autoTriage}
             disabled={!settings.writable || settings.status !== 'ready'}
-            onChange={event => {
-              setAutoTriage(event.currentTarget.checked)
-              setDirty(true)
-              setSaved(false)
-            }}
+            onChange={event => send({ type: 'edit', value: { ...draft, autoTriage: event.currentTarget.checked } })}
             className="dshx:mt-0.5"
           />
           <span className="dshx:flex dshx:flex-col dshx:gap-1">
@@ -474,10 +459,10 @@ const BacklogSettingsPanel = (): JSX.Element => {
         </div>
         {error === null ? null : (
           <p className="dshx:text-sm dshx:text-destructive" role="alert">
-            {error}
+            {errorMessage(error, 'Could not save Jev settings.')}
           </p>
         )}
-        {saved ? (
+        {state === 'saved' ? (
           <p className="dshx:text-sm dshx:text-success" role="status">
             Jev settings saved.
           </p>

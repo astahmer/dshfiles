@@ -42,6 +42,7 @@ import {
   Undo2Icon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useAutosave } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import {
   useEffect,
@@ -265,87 +266,78 @@ const BodyField = (props: {
   readonly projects: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
-  const [editing, setEditing] = useState(false)
-  const [body, setBody] = useState(props.body)
-  const [failed, setFailed] = useState<string | null>(null)
-  const saved = useRef(false)
-  const attachments = useComposerFiles({ onError: setFailed })
-  useEffect(() => {
-    if (!editing) setBody(props.body)
-  }, [props.body, editing])
-  useEffect(() => {
-    if (editing) saved.current = false
-  }, [editing])
-  const save = async (): Promise<void> => {
-    if (saved.current) return
-    saved.current = true
-    setEditing(false)
-    setFailed(null)
-    const pending = [...attachments.files]
-    attachments.clear()
-    const submittedBody = ImageAttachmentReferenceModel.markdownImageReferences(body, pending)
-    if (submittedBody !== props.body) actions.update.mutate({ id: props.id, body: submittedBody })
-    for (const file of pending) {
+  const autosave = useAutosave<string>({
+    initial: props.body,
+    save: async body => {
+      const pending = [...attachments.files]
+      attachments.clear()
+      const submittedBody = ImageAttachmentReferenceModel.markdownImageReferences(body, pending)
+      if (submittedBody !== props.body) actions.update.mutate({ id: props.id, body: submittedBody })
       try {
-        await actions.attachFile.mutateAsync({ id: props.id, file: fileInput(file) })
+        for (const file of pending) await actions.attachFile.mutateAsync({ id: props.id, file: fileInput(file) })
       } catch (error) {
-        setFailed(errorMessage(error, 'That attachment could not be saved.'))
-        return
+        attachments.restore(pending)
+        throw error
       }
-    }
+    },
+  })
+  const attachments = useComposerFiles({ onError: error => autosave.send({ type: 'error', error }) })
+  const begin = (): void => {
+    autosave.send({ type: 'begin', value: props.body })
+  }
+  const save = (): void => {
+    autosave.send({ type: 'flush' })
   }
   const cancel = (): void => {
-    saved.current = true
-    setBody(props.body)
     attachments.clear()
-    setFailed(null)
-    setEditing(false)
+    autosave.send({ type: 'cancel' })
   }
-  if (editing)
+  if (autosave.state === 'synced' || autosave.state === 'saved') {
+    if (props.body === '')
+      return (
+        <button
+          type="button"
+          aria-label="Edit description"
+          onClick={begin}
+          className="dshx:-mx-2 dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent/40"
+        >
+          Add a description…
+        </button>
+      )
     return (
-      <div className="dshx:flex dshx:flex-col dshx:gap-1">
-        <BacklogTextBox
-          ariaLabel="Body"
-          placeholder="Add a description… Markdown, b:12 and jj:rev add links; @ mentions items, threads, projects and agents; paste or drop an image."
-          value={body}
-          onChange={setBody}
-          threads={props.threads}
-          projects={props.projects}
-          attachments={attachments}
-          variant="body"
-          autoFocus
-          onBlur={() => void save()}
-          onCancel={cancel}
-          onSubmit={() => void save()}
+      <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-1">
+        <BacklogText
+          text={props.body}
+          onActivate={begin}
+          className="dshx:-mx-2 dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:transition-colors dshx:hover:bg-accent/40"
         />
-        {failed === null ? null : (
-          <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
-            {failed}
-          </p>
-        )}
+        <Button aria-label="Edit description" className="dshx:mt-1 dshx:shrink-0" onClick={begin} size="icon-xs" type="button" variant="ghost">
+          <PencilIcon aria-hidden />
+        </Button>
       </div>
     )
-  if (props.body === '')
-    return (
-      <button
-        type="button"
-        aria-label="Edit description"
-        onClick={() => setEditing(true)}
-        className="dshx:-mx-2 dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent/40"
-      >
-        Add a description…
-      </button>
-    )
+  }
   return (
-    <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-1">
-      <BacklogText
-        text={props.body}
-        onActivate={() => setEditing(true)}
-        className="dshx:-mx-2 dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:transition-colors dshx:hover:bg-accent/40"
+    <div className="dshx:flex dshx:flex-col dshx:gap-1">
+      <BacklogTextBox
+        ariaLabel="Body"
+        placeholder="Add a description… Markdown, b:12 and jj:rev add links; @ mentions items, threads, projects and agents; paste or drop an image."
+        value={autosave.draft}
+        onChange={value => autosave.send({ type: 'edit', value })}
+        threads={props.threads}
+        projects={props.projects}
+        attachments={attachments}
+        variant="body"
+        autoFocus
+        onBlur={save}
+        onCancel={cancel}
+        onSubmit={save}
       />
-      <Button aria-label="Edit description" className="dshx:mt-1 dshx:shrink-0" onClick={() => setEditing(true)} size="icon-xs" type="button" variant="ghost">
-        <PencilIcon aria-hidden />
-      </Button>
+      {autosave.error === null ? null : (
+        <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
+          {errorMessage(autosave.error, 'That attachment could not be saved.')}
+        </p>
+      )}
     </div>
   )
 }
