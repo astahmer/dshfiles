@@ -104,7 +104,9 @@ const Handlers = SearchWorkerRpcs.toLayer(
           slowestIngestMs: Math.max(current.slowestIngestMs, elapsed),
         }))
         return outcome.success.backfilled && result.complete && result.ingested === 0 ? IDLE_SLEEP : BUSY_SLEEP
-      })
+      }).pipe(
+        Effect.ensuring(Ref.update(progress, current => (current.ingesting ? { ...current, ingesting: false } : current))),
+      )
 
     const ingestLoop = Effect.forever(
       Effect.gen(function* () {
