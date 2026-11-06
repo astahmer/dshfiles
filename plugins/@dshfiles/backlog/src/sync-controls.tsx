@@ -13,7 +13,13 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
-import { ContextMenuItem } from '@dshfiles/plugin-ui/components/ui/context-menu'
+import {
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+} from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
@@ -50,6 +56,7 @@ import { BacklogItems } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogNotices } from './notices.js'
 import { BacklogProviders, type ProviderDescriptor } from './provider-port.js'
+import { SyncBatch, type SyncBatchItem } from './sync-batch.js'
 import { BacklogSyncModel, type SyncBinding, type SyncConflictPolicy, type SyncFieldDirection, type SyncFieldRule, type SyncState } from './sync-model.js'
 import { BacklogQueries } from './use-backlog-actions.js'
 
@@ -201,13 +208,7 @@ const bindingLabel = (view: BacklogSyncBindingView): string =>
   `${view.connectionLabel} · ${view.binding.container === '' ? 'from project' : view.binding.container}`
 
 /** The bindings an item can link through: enabled, run here, and scoped to its project or to every project. */
-const bindingsFor = (status: BacklogSyncStatusView | undefined, project: string | null | undefined): readonly BacklogSyncBindingView[] =>
-  (status?.bindings ?? []).filter(
-    view =>
-      view.binding.enabled &&
-      view.owned &&
-      (view.binding.scope === null || project === undefined || (project !== null && view.binding.scope === BacklogItems.projectPath(project))),
-  )
+const bindingsFor = SyncBatch.bindingsFor
 
 const descriptorOf = (status: BacklogSyncStatusView | undefined, kind: string): ProviderDescriptor | undefined =>
   status?.providers?.find(provider => provider.kind === kind)
@@ -486,6 +487,59 @@ const SyncMenuItems = (props: {
           </ContextMenuItem>
         </Fragment>
       ))}
+    </>
+  )
+}
+
+/** Creates one remote item per selected item through one binding, one call at a time so a provider's rate limit holds. */
+const useBatchCreate = () => {
+  const api = useApi(backlogApi)
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { readonly bindingId: string; readonly label: string; readonly ids: readonly number[] }) => {
+      const failures: string[] = []
+      for (const id of input.ids) {
+        try {
+          await api.linkRemote({ id, binding: input.bindingId, create: true })
+        } catch (error) {
+          failures.push(`${BacklogReference.labelOf({ id })}: ${failureText(error, 'the remote item was not created')}`)
+        }
+      }
+      return { label: input.label, total: input.ids.length, failures }
+    },
+    onSuccess: run => BacklogNotices.show({ ...SyncBatch.notice(run), sessionId: null }),
+    onSettled: () => client.invalidateQueries({ queryKey: [BacklogQueries.key] }),
+  })
+}
+
+/** A selection's remote create: one entry per binding, each creating every selected item that binding does not mirror yet. */
+const BatchMenuItems = (props: { readonly items: readonly SyncBatchItem[] }): JSX.Element | null => {
+  const status = useSyncStatus()
+  const create = useBatchCreate()
+  const targets = SyncBatch.targets({ status: status.data, items: props.items })
+  if (targets.length === 0) return null
+  return (
+    <>
+      <ContextMenuSeparator />
+      <ContextMenuSub>
+        <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+          <CloudIcon aria-hidden className="dshx:size-3.5" />
+          Create in…
+        </ContextMenuSubTrigger>
+        <ContextMenuSubContent className="dshx-root dshx:min-w-52">
+          {targets.map(target => (
+            <ContextMenuItem
+              key={target.view.binding.id}
+              className="dshx:gap-2 dshx:text-[13px]"
+              disabled={create.isPending}
+              onSelect={() => create.mutate({ bindingId: target.view.binding.id, label: bindingLabel(target.view), ids: target.itemIds })}
+            >
+              <PlusIcon aria-hidden className="dshx:size-3.5" />
+              Create {String(target.itemIds.length)} in {bindingLabel(target.view)}
+            </ContextMenuItem>
+          ))}
+        </ContextMenuSubContent>
+      </ContextMenuSub>
     </>
   )
 }
@@ -1187,6 +1241,7 @@ const RemoteSyncSettings = (props: { readonly projectPaths: readonly string[] })
 export class BacklogSyncControls {
   static readonly Chip = SyncChips
   static readonly MenuItems = SyncMenuItems
+  static readonly BatchMenuItems = BatchMenuItems
   static readonly LinkDialog = LinkRemoteDialog
   static readonly Settings = RemoteSyncSettings
   static readonly stateLabels = stateLabels

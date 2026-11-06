@@ -29,6 +29,20 @@ Feature: Backlog
     And item b:1 is synced from its sync chip
     Then item b:1 is titled "Edited in an editor"
 
+  @scenario:backlog.remote-sync-batch
+  Scenario: Create one remote item for each of several selected items
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And the Backlog settings are opened
+    And a markdown files connection is bound to a scratch folder
+    And the Backlog views are shown again
+    And "First batch mirror" is captured
+    And "Second batch mirror" is captured
+    And the Items view selects two items to mirror
+    Then the context menu offers a batch create for the files binding
+    When the batch create is clicked for both selected items
+    Then the scratch folder holds a file for each selected item
+
   @scenario:backlog.remote-sync-settings
   Scenario: A Linear sync row saved before connections opens as a connection with its binding
     Given the isolated plugin profile "@dshfiles/backlog" is booted with a saved Linear sync row for team "ENG"

@@ -2039,7 +2039,7 @@
     {
       "id": "remote-sync",
       "title": "Mirror backlog items in Linear, GitHub Issues, markdown files or a plugin provider",
-      "summary": "Link an item to a remote item through any binding that serves its project, create one from it, or unlink it from its row menu or its sync chips in the item detail; an item may be linked through several bindings, one chip each. Each binding's field map decides which of title, description, status, labels, priority, parent and relations flow which way, with remote status names mapped per status; a field both sides changed is settled by the binding's conflict policy (last change wins, backlog wins, remote wins, or flag) with a conflict note on the item. Statuses compare by equivalence so an item in progress stays in progress against an open GitHub issue. A binding pass pulls what changed since its cursor (Linear updatedAt pages, GitHub since= with ETags, a full scan of a markdown folder), writes remote changes as remote:<bindingId> ops, pushes local changes, carries new comments once each way when the provider supports them, drops items whose remote file is gone, and can import every open remote item. Agents read the same state with backlog_sync_status and act with backlog_sync_now, backlog_link_remote and backlog_sync_import_all when the user asked. Comments agents write stay local unless the binding pushes them.",
+      "summary": "Link an item to a remote item through any binding that serves its project, create one from it, or create one for each of several selected items at once, or unlink it from its row menu or its sync chips in the item detail; an item may be linked through several bindings, one chip each. Each binding's field map decides which of title, description, status, labels, priority, parent and relations flow which way, with remote status names mapped per status; a field both sides changed is settled by the binding's conflict policy (last change wins, backlog wins, remote wins, or flag) with a conflict note on the item. Statuses compare by equivalence so an item in progress stays in progress against an open GitHub issue. A binding pass pulls what changed since its cursor (Linear updatedAt pages, GitHub since= with ETags, a full scan of a markdown folder), writes remote changes as remote:<bindingId> ops, pushes local changes, carries new comments once each way when the provider supports them, drops items whose remote file is gone, and can import every open remote item. Agents read the same state with backlog_sync_status and act with backlog_sync_now, backlog_link_remote and backlog_sync_import_all when the user asked. Comments agents write stay local unless the binding pushes them.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2058,7 +2058,7 @@
       "surfaces": ["client", "host", "storage", "tool", "integration"],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › row menu › Link to … / Create in … / item detail › sync chips",
+      "currentSurface": "left-nav: Backlog: Items › row menu › Link to … / Create in … / row selection › Create in… per binding / item detail › sync chips",
       "configuration": [],
       "states": ["not-linked", "synced", "pending", "conflict", "flagged", "error", "removed-remotely", "tombstoned", "unlinked", "imported"],
       "failureModes": [
@@ -2095,6 +2095,11 @@
         {
           "kind": "gherkin",
           "id": "backlog.remote-sync-link",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.remote-sync-batch",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
         {

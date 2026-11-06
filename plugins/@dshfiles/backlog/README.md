@@ -526,7 +526,12 @@ sync** lists **connections**, each with its **bindings**:
 
 Linking is always your action: an item's row menu and its detail offer **Link to …** and **Create in …** for every
 binding that serves its project, and **Sync now** / **Unlink** per linked source. An item may be linked through several
-bindings, one chip each. **Import** in the settings turns one remote item into a linked item (one already linked
+bindings, one chip each. A selection of several items offers **Create in…** instead: one entry per binding that can still
+create for at least one of them — items already mirrored through that binding, and items outside its project scope, are
+left out of its count — and one click creates a remote item per remaining item, sequentially, then reports in a single
+notice how many were created and which item failed with what (retry that one from its own menu). The selection stays, so
+another binding can be created in next.
+**Import** in the settings turns one remote item into a linked item (one already linked
 returns its item), reading the provider from what you paste; **Import all open** imports every open remote item of a
 binding nobody linked yet, idempotently, with parents and relations resolved once all of them are in (comments arrive
 on each item's next sync).

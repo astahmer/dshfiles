@@ -7,7 +7,14 @@ import { fileURLToPath } from 'node:url'
 import { bootComposedPluginProfile } from '../boot.js'
 import { Given, Then, When } from '../bdd.js'
 import { backlogLabel, backlogRef, withBacklogRefs } from './backlog-refs.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion, restartScratchProfileInBrowser, settingsNavEntry, visitIsolatedPluginProfile } from '../steps.js'
+import {
+  finishJourneyAssertions,
+  openSettingsDialog,
+  recordAssertion,
+  restartScratchProfileInBrowser,
+  settingsNavEntry,
+  visitIsolatedPluginProfile,
+} from '../steps.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { openActivity } from './activity-timeline.steps.js'
@@ -184,10 +191,17 @@ const legacyLinearRowPatch = (team: string) => `- id: dshfiles-backlog
         pushAgentComments: false
 `
 
-Given('the isolated plugin profile {string} is booted with a saved Linear sync row for team {string}', async ({ page }: { page: Page }, packageId: string, team: string) => {
-  const profile = await bootComposedPluginProfile({ packageIds: [packageId], profileLabel: `${packageId}-legacy-sync-row`, cordisPatch: legacyLinearRowPatch(team) })
-  await visitIsolatedPluginProfile(page, profile)
-})
+Given(
+  'the isolated plugin profile {string} is booted with a saved Linear sync row for team {string}',
+  async ({ page }: { page: Page }, packageId: string, team: string) => {
+    const profile = await bootComposedPluginProfile({
+      packageIds: [packageId],
+      profileLabel: `${packageId}-legacy-sync-row`,
+      cordisPatch: legacyLinearRowPatch(team),
+    })
+    await visitIsolatedPluginProfile(page, profile)
+  },
+)
 
 const remoteSync = (page: Page) => page.getByRole('region', { name: 'Remote sync' })
 const scratchFolders = new WeakMap<Page, string>()
@@ -256,7 +270,9 @@ When('the file of item b:{int} is edited to the title {string}', async ({ page }
 })
 
 When('item b:{int} is synced from its sync chip', async ({ page }: { page: Page }, _id: number) => {
-  await peek(page).getByRole('button', { name: /^Remote sync: .+\.md, /u }).click()
+  await peek(page)
+    .getByRole('button', { name: /^Remote sync: .+\.md, /u })
+    .click()
   await page.getByRole('dialog').getByRole('button', { name: 'Sync now', exact: true }).click()
   await page.keyboard.press('Escape')
 })
@@ -267,6 +283,45 @@ Then('item b:{int} is titled {string}', async ({ page }: { page: Page }, id: num
     await expect(feed(page)).toContainText(title)
   })
   expect(await backlogLabel(page, id)).toMatch(/^b:/u)
+  await finishJourneyAssertions(page)
+})
+
+When('the Items view selects two items to mirror', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Items', exact: true }).click()
+  const checkboxFor = async (id: number) =>
+    page.getByRole('row', { name: `Item ${await backlogLabel(page, id)}` }).getByRole('checkbox', { name: `Select ${await backlogLabel(page, id)}` })
+  await (await checkboxFor(1)).click()
+  await (await checkboxFor(2)).click({ modifiers: ['ControlOrMeta'] })
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
+})
+
+Then('the context menu offers a batch create for the files binding', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-sync-batch-submenu', async () => {
+    const row = page.getByRole('row', { name: `Item ${await backlogLabel(page, 2)}`, exact: true })
+    await row.click({ button: 'right' })
+    await expect(contextMenu(page)).toContainText('2 selected')
+    await contextMenu(page).getByRole('menuitem', { name: 'Create in…', exact: true }).hover()
+    await expect(
+      page
+        .getByRole('menu')
+        .last()
+        .getByRole('menuitem', { name: /^Create 2 in Markdown files · /u }),
+    ).toBeVisible()
+  })
+})
+
+When('the batch create is clicked for both selected items', async ({ page }: { page: Page }) => {
+  await page.getByRole('menuitem', { name: /^Create 2 in Markdown files · /u }).click()
+  await expect(page.getByRole('alert')).toContainText('Created 2 remote items in Markdown files', { timeout: 15_000 })
+})
+
+Then('the scratch folder holds a file for each selected item', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-sync-batch-created', async () => {
+    for (const [index, title] of ['First batch mirror', 'Second batch mirror'].entries()) {
+      const text = await readFile(await fileOfItem(page, index + 1), 'utf8')
+      expect(text).toContain(`title: ${title}`)
+    }
+  })
   await finishJourneyAssertions(page)
 })
 
@@ -305,7 +360,9 @@ Then('backlog item b:{int} offers {string} in its context menu', async ({ page }
 When('backlog item b:{int} is linked through {string} to {string}', async ({ page }: { page: Page }, id: number, binding: string, issue: string) => {
   const target = await contextTarget(page, id, 'feed')
   await target.click({ button: 'right' })
-  await contextMenu(page).getByRole('menuitem', { name: `Link to ${binding}…`, exact: true }).click()
+  await contextMenu(page)
+    .getByRole('menuitem', { name: `Link to ${binding}…`, exact: true })
+    .click()
   const dialog = page.getByRole('dialog', { name: `Link ${await backlogLabel(page, id)} through ${binding}` })
   await dialog.getByRole('textbox', { name: 'Remote item', exact: true }).fill(issue)
   await dialog.getByRole('button', { name: 'Link', exact: true }).click()
