@@ -30,8 +30,11 @@ export interface TabHookContext {
  */
 export const tabInfoFactory: SlotHookFactory<'sidebar.right.pane.tab', UseSidebarRightTabInfo> = (standard, context) => {
   const { sessionId } = standard
-  const { tabId, title, fullscreen, active, embedded, signal, actions, useStore, useTabNavigation, shortcuts } = context
+  const { tabId, useStore, useTabNavigation } = context
   return function useTabInfo() {
+    // The renderer rebinds this hook at the same position when the occurrence changes, so the context values are
+    // read here, as hook-scope values the memo depends on, not captured once by the factory.
+    const { title, fullscreen, active, embedded, signal, actions, shortcuts } = context
     const layout = useStore(state => state.bySession[sessionId]?.layout)
     const navigation = useTabNavigation(tabId)
     return useMemo(() => {

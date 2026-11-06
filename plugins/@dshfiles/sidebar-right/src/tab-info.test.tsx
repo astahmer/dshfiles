@@ -41,10 +41,10 @@ it('re-reads tab visibility when its occurrence becomes active after mounting hi
     useStore,
     useTabNavigation: () => navigation,
   }
+  // SAFETY: tabInfoFactory reads only sessionId from the standard props.
+  const standard = { sessionId } as Parameters<typeof tabInfoFactory>[0]
   // The renderer rebinds the factory whenever the occurrence's hook context changes, at the same hook position.
   const Probe = (props: { readonly active: boolean }) => {
-    // SAFETY: tabInfoFactory reads only sessionId from the standard props.
-    const standard = { sessionId } as Parameters<typeof tabInfoFactory>[0]
     const useTabInfo = useMemo(() => tabInfoFactory(standard, { ...baseContext, active: props.active }), [props.active])
     return <output data-visible={String(useTabInfo().tab.visible)} />
   }
