@@ -11,7 +11,7 @@ refer to it.
 
 ## Resume here
 
-WP1, WP2 and WP3 are done on this line (WP3: device sign-in, autosave and hover-intent built; the shared poll actor closed as obsolete because H25 and M29 own their polls inside their machines). WP4 is nearly done (20 of 22; subprocess-local M53 and workspace-folder-picker M69 are in the last WP4 lane), WP5 and WP6 are in flight in parallel lanes, and WP7 has 10 of its 14 fixes done with L18 left and the L1-L80 walk recorded.
+WP1, WP2, WP3, WP4 and WP6 are done on this line. WP4: 22 of 22. WP6: 16 of 17 fixed, M54 left (already a stable page-wide single-flight store that TanStack cannot share across plugin bundles). WP5 is down to M65 (user-questions claim) and M67 (workbench facet follow) in the last lane. WP7 has 10 of its 14 fixes done, L18 left, and the L1-L80 walk recorded. Then: full verification, the `complete-plan` skill, and landing.
 
 ## Progress
 
@@ -20,9 +20,9 @@ WP1, WP2 and WP3 are done on this line (WP3: device sign-in, autosave and hover-
 | 1   | Real bugs with small fixes                     | 12                   | done (11 fixed, H5 obsolete)                          |
 | 2   | Wire the machines we already have              | 17                   | done (16 fixed, L51 left)                             |
 | 3   | Shared building blocks                         | 4 blocks, 10 callers | done (3 built, poll actor obsolete)                   |
-| 4   | Host lifecycles                                | 22                   | in progress (20 of 22)                                |
-| 5   | Client flows that need a machine               | 34                   | in progress                                           |
-| 6   | Query, mutation or union instead of hand state | 17                   | in progress                                           |
+| 4   | Host lifecycles                                | 22                   | done (22 fixed)                                       |
+| 5   | Client flows that need a machine               | 34                   | in progress (32 fixed; M65, M67 in the last lane)     |
+| 6   | Query, mutation or union instead of hand state | 17                   | done (16 fixed, M54 left)                             |
 | 7   | Low-severity triage                            | 80 (14 to fix)       | in progress (10 of 14 fixed, L18 left, walk recorded) |
 
 Update a row's status and the "Resume here" line after each milestone commit.
