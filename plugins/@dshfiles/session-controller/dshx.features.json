@@ -58,6 +58,11 @@
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "session-controller.cli-thread-model",
+          "featureFile": "tooling/dshx/e2e/features/session-controller.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "session-controller.thread-local-no-default",
           "file": "plugins/@dshfiles/session-controller/tests/host/thread-model-commands.test.ts",

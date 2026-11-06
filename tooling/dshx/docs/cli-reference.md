@@ -369,7 +369,11 @@ package spec names without installing it. `bundles install/remove` use DSH's
 package manager; Ctrl-C sends its cancellation request, and a cancelled install
 restores the profile manifest and lockfile. `models list` shows currently
 routable models and provider lookup failures. `models select` selects a model
-for a Session; DSH may also persist it as the new default. `presets list/show`
+for one Session's upcoming requests through `@dshfiles/session-controller`'s
+`thread-model` API and leaves the default model unchanged; it fails when that
+API is not served. It refuses a thread mirrored from another DSH (run it against
+that DSH's launch URL instead) and a thread whose queued input has not settled
+(retry once the turn has picked it up). `presets list/show`
 reads Agent preset declarations. `skills list --session` returns only the
 user-invocable skill metadata visible to that Session, never skill bodies.
 
