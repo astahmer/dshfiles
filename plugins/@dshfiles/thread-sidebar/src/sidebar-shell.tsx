@@ -357,60 +357,26 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       .catch(error => setFanOutCatalogError(error instanceof Error ? error.message : 'Could not load model catalog.'))
   }, [fanOutOpen, loadModelCatalog])
   const [restartSnapshot, sendRestart] = useRestartMachine(restartApi)
-  const restartRequestPending = restartSnapshot.matches('requesting')
+  const restartRequestPending = restartSnapshot.matches('requesting') || restartSnapshot.matches('requestingIdle')
   const restartRequestFailed = restartSnapshot.matches('failed')
   const restartWaitingHost = restartSnapshot.matches('restarting')
   const restartStalled = restartSnapshot.matches('stalled')
-  const restartDialogOpen = !restartSnapshot.matches('closed')
+  const restartDialogOpen = restartSnapshot.context.dialogOpen
   const restartAvailability = useApiQuery(threadSidebarRestartApi, 'availability')
   const restartAvailable = restartAvailability.data?.available === true
-  const restartPending = restartAvailability.data?.pending ?? null
-  const restartRun = restartAvailability.data?.run
-  const restartAvailabilityFailed = restartAvailability.error !== null
-  const refetchRestartAvailability = restartAvailability.refetch
+  const restartPending = restartSnapshot.context.pending
+  const reportedPendingRestart = restartAvailability.data?.pending
+  // A restart waiting for idle that this page never asked for still ends with a new Host to watch.
   useEffect(() => {
-    if (restartPending === null) return
-    const timer = globalThis.setInterval(() => void refetchRestartAvailability(), 3_000)
-    return () => globalThis.clearInterval(timer)
-  }, [restartPending, refetchRestartAvailability])
-  // A restart waiting for idle ends when the Host drops its pending state or stops answering: from then on the page
-  // waits for the new Host like a Restart now does, and says so when it does not come back.
-  const idleRestartSeen = useRef<{ run: string | undefined } | null>(null)
-  const idleRestartCanceled = useRef(false)
-  useEffect(() => {
-    if (restartPending !== null && !restartAvailabilityFailed) {
-      idleRestartSeen.current = { run: restartRun }
-      return
+    if (reportedPendingRestart !== null && reportedPendingRestart !== undefined) {
+      sendRestart({ type: 'pendingSeen', pending: reportedPendingRestart })
     }
-    const seen = idleRestartSeen.current
-    if (seen === null) return
-    idleRestartSeen.current = null
-    if (idleRestartCanceled.current) {
-      idleRestartCanceled.current = false
-      return
-    }
-    sendRestart({ type: 'watch', run: seen.run })
-  }, [restartPending, restartAvailabilityFailed, restartRun, sendRestart])
-  const [idleRestartFailed, setIdleRestartFailed] = useState(false)
+  }, [reportedPendingRestart, sendRestart])
   const restartWhenIdle = (): void => {
-    setIdleRestartFailed(false)
-    void restartApi
-      .requestRestartWhenIdle()
-      .then(() => {
-        sendRestart({ type: 'cancel' })
-        void refetchRestartAvailability()
-      })
-      .catch(() => {
-        setIdleRestartFailed(true)
-        sendRestart({ type: 'open' })
-      })
+    sendRestart({ type: 'whenIdle' })
   }
   const cancelPendingRestart = (): void => {
-    idleRestartCanceled.current = true
-    void restartApi
-      .cancelPendingRestart()
-      .catch(() => undefined)
-      .then(() => void refetchRestartAvailability())
+    sendRestart({ type: 'cancelWhenIdle' })
   }
   const restartPendingLabel =
     restartPending === null
@@ -1890,7 +1856,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 </ul>
               </div>
             )}
-            {restartRequestFailed || idleRestartFailed ? (
+            {restartRequestFailed ? (
               <p role="alert" className="dshx:px-6 dshx:text-sm dshx:text-destructive">
                 {text(props.t, 'threadSidebarRestartFailure')}
               </p>

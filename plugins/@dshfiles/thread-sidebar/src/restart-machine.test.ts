@@ -1,34 +1,56 @@
 import { createActor, waitFor } from '@dshfiles/plugin-ui/machine'
 import { describe, expect, it, vi } from 'vitest'
-import { provideRestartMachine, waitForNewHost, type RestartClient } from './restart-machine.js'
+import { provideRestartMachine, waitForNewHost, type RestartClient, type RestartPending } from './restart-machine.js'
 
 type Availability = Awaited<ReturnType<RestartClient['availability']>>
 
+const PENDING: RestartPending = { since: 1, running: 1 }
+
 /** A Host whose `run` the test changes; `down` makes availability fail like a Host that stopped answering. */
 const fakeHosts = (initialRun: string | undefined) => {
-  const state = { run: initialRun, down: false }
+  const state: { run: string | undefined; down: boolean; pending: RestartPending | null } = { run: initialRun, down: false, pending: null }
   const availability: RestartClient['availability'] = async () => {
     if (state.down) throw new Error('unreachable')
-    const answer: Availability = { available: true, pending: null }
+    const answer: Availability = { available: true, pending: state.pending }
     return state.run === undefined ? answer : { ...answer, run: state.run }
   }
   return { state, availability }
 }
 
-const startRestart = (requestRestart: RestartClient['requestRestart'], availability: RestartClient['availability'] = fakeHosts('old').availability) =>
-  createActor(provideRestartMachine(), { input: { client: { requestRestart, availability }, pollMs: 1, stallMs: 10_000 } }).start()
+const startRestart = (input: {
+  readonly requestRestart?: RestartClient['requestRestart']
+  readonly requestRestartWhenIdle?: RestartClient['requestRestartWhenIdle']
+  readonly cancelPendingRestart?: RestartClient['cancelPendingRestart']
+  readonly availability?: RestartClient['availability']
+  readonly stallMs?: number
+}) =>
+  createActor(provideRestartMachine(), {
+    input: {
+      client: {
+        requestRestart: input.requestRestart ?? (async () => ({ accepted: true })),
+        requestRestartWhenIdle: input.requestRestartWhenIdle ?? (async () => ({ accepted: true })),
+        cancelPendingRestart: input.cancelPendingRestart ?? (async () => ({ canceled: true })),
+        availability: input.availability ?? fakeHosts('old').availability,
+      },
+      pollMs: 1,
+      stallMs: input.stallMs ?? 10_000,
+    },
+  }).start()
 
 describe('restartMachine', () => {
   it('opens the confirmation and cancels without requesting a restart', () => {
     let requests = 0
-    const actor = startRestart(async () => {
-      requests += 1
-      return { accepted: true }
+    const actor = startRestart({
+      requestRestart: async () => {
+        requests += 1
+        return { accepted: true }
+      },
     })
     actor.send({ type: 'open' })
-    expect(actor.getSnapshot().matches('confirming')).toBe(true)
+    expect(actor.getSnapshot().matches('idle')).toBe(true)
+    expect(actor.getSnapshot().context.dialogOpen).toBe(true)
     actor.send({ type: 'cancel' })
-    expect(actor.getSnapshot().matches('closed')).toBe(true)
+    expect(actor.getSnapshot().context.dialogOpen).toBe(false)
     expect(requests).toBe(0)
     actor.stop()
   })
@@ -37,55 +59,155 @@ describe('restartMachine', () => {
     const hosts = fakeHosts('old')
     let requestSignal: AbortSignal | undefined
     let signalWasAbortedAtCall: boolean | undefined
-    const actor = startRestart(async (_input, options) => {
-      requestSignal = options?.signal
-      signalWasAbortedAtCall = options?.signal?.aborted
-      hosts.state.down = true
-      return { accepted: true }
-    }, hosts.availability)
+    const actor = startRestart({
+      requestRestart: async (_input, options) => {
+        requestSignal = options?.signal
+        signalWasAbortedAtCall = options?.signal?.aborted
+        hosts.state.down = true
+        return { accepted: true }
+      },
+      availability: hosts.availability,
+    })
     actor.send({ type: 'open' })
     actor.send({ type: 'confirm' })
     await waitFor(actor, snapshot => snapshot.matches('restarting'))
     expect(actor.getSnapshot().context.previousRun).toBe('old')
+    expect(actor.getSnapshot().context.dialogOpen).toBe(true)
     expect(requestSignal).toBeInstanceOf(AbortSignal)
     expect(signalWasAbortedAtCall).toBe(false)
     hosts.state.down = false
     hosts.state.run = 'new'
-    await waitFor(actor, snapshot => snapshot.matches('closed'))
+    await waitFor(actor, snapshot => snapshot.matches('idle'))
+    expect(actor.getSnapshot().context.dialogOpen).toBe(false)
     actor.stop()
   })
 
   it('says the Host did not come back after the stall limit, and keeps waiting when asked', async () => {
     const hosts = fakeHosts('old')
-    const actor = createActor(provideRestartMachine(), {
-      input: { client: { requestRestart: async () => ({ accepted: true }), availability: hosts.availability }, pollMs: 1, stallMs: 20 },
-    }).start()
+    const actor = startRestart({
+      requestRestart: async () => ({ accepted: true }),
+      availability: hosts.availability,
+      stallMs: 20,
+    })
     actor.send({ type: 'open' })
     actor.send({ type: 'confirm' })
     await waitFor(actor, snapshot => snapshot.matches('stalled'))
     actor.send({ type: 'retry' })
     expect(actor.getSnapshot().matches('restarting')).toBe(true)
     hosts.state.run = 'new'
-    await waitFor(actor, snapshot => snapshot.matches('closed'))
+    await waitFor(actor, snapshot => snapshot.matches('idle'))
     actor.stop()
   })
 
-  it('watches a restart started elsewhere (Restart when idle) like its own', async () => {
+  // Before this flow lived in the machine, the page watched it through refs keyed on the availability query.
+  it('asks the Host to restart when idle, follows the pending restart and watches the new Host once it drains', async () => {
     const hosts = fakeHosts('old')
-    const actor = startRestart(async () => ({ accepted: true }), hosts.availability)
-    actor.send({ type: 'watch', run: 'old' })
-    expect(actor.getSnapshot().matches('restarting')).toBe(true)
+    let idleRequests = 0
+    const actor = startRestart({
+      requestRestartWhenIdle: async () => {
+        idleRequests += 1
+        return { accepted: true }
+      },
+      availability: hosts.availability,
+    })
+    actor.send({ type: 'open' })
+    actor.send({ type: 'whenIdle' })
+    await waitFor(actor, snapshot => snapshot.matches('draining'))
+    expect(idleRequests).toBe(1)
+    expect(actor.getSnapshot().context.dialogOpen).toBe(false)
+
+    hosts.state.pending = PENDING
+    await vi.waitFor(() => expect(actor.getSnapshot().context.pending).toEqual(PENDING))
+
+    hosts.state.pending = null
     hosts.state.run = 'new'
-    await waitFor(actor, snapshot => snapshot.matches('closed'))
+    await waitFor(actor, snapshot => snapshot.matches('restarting'))
+    expect(actor.getSnapshot().context.previousRun).toBe('old')
+    await waitFor(actor, snapshot => snapshot.matches('idle'))
+    expect(actor.getSnapshot().context.pending).toBeNull()
+    actor.stop()
+  })
+
+  it('opens and closes the dialog over a pending restart without losing the wait', async () => {
+    const hosts = fakeHosts('old')
+    const actor = startRestart({ availability: hosts.availability })
+    actor.send({ type: 'open' })
+    actor.send({ type: 'whenIdle' })
+    await waitFor(actor, snapshot => snapshot.matches('draining'))
+    hosts.state.pending = PENDING
+    await vi.waitFor(() => expect(actor.getSnapshot().context.pending).toEqual(PENDING))
+
+    actor.send({ type: 'open' })
+    await waitFor(actor, snapshot => snapshot.matches({ draining: 'prompted' }))
+    expect(actor.getSnapshot().context.dialogOpen).toBe(true)
+    actor.send({ type: 'cancel' })
+    await waitFor(actor, snapshot => snapshot.matches({ draining: 'dismissed' }))
+    expect(actor.getSnapshot().context.dialogOpen).toBe(false)
+
+    hosts.state.pending = null
+    hosts.state.run = 'new'
+    await waitFor(actor, snapshot => snapshot.matches('restarting'))
+    actor.stop()
+  })
+
+  it('calls off a restart waiting for idle without watching for a new Host', async () => {
+    const hosts = fakeHosts('old')
+    let canceled = 0
+    const actor = startRestart({
+      availability: hosts.availability,
+      cancelPendingRestart: async () => {
+        canceled += 1
+        return { canceled: true }
+      },
+    })
+    actor.send({ type: 'open' })
+    actor.send({ type: 'whenIdle' })
+    await waitFor(actor, snapshot => snapshot.matches('draining'))
+    hosts.state.pending = PENDING
+    await vi.waitFor(() => expect(actor.getSnapshot().context.pending).toEqual(PENDING))
+
+    actor.send({ type: 'open' })
+    await waitFor(actor, snapshot => snapshot.matches({ draining: 'prompted' }))
+    actor.send({ type: 'cancelWhenIdle' })
+    await waitFor(actor, snapshot => snapshot.matches('idle'))
+    expect(canceled).toBe(1)
+    expect(actor.getSnapshot().context.pending).toBeNull()
+    expect(actor.getSnapshot().context.dialogOpen).toBe(true)
+    actor.stop()
+  })
+
+  it('follows a pending restart this page did not request', async () => {
+    const hosts = fakeHosts('old')
+    hosts.state.pending = PENDING
+    const actor = startRestart({ availability: hosts.availability })
+    actor.send({ type: 'pendingSeen', pending: PENDING })
+    await waitFor(actor, snapshot => snapshot.matches('draining'))
+    expect(actor.getSnapshot().context.pending).toEqual(PENDING)
+    hosts.state.pending = null
+    hosts.state.run = 'new'
+    await waitFor(actor, snapshot => snapshot.matches('restarting'))
+    actor.stop()
+  })
+
+  it('opens the dialog with the failure when the Host refuses a restart when idle', async () => {
+    const actor = startRestart({ requestRestartWhenIdle: async () => Promise.reject(new Error('unavailable')) })
+    actor.send({ type: 'open' })
+    actor.send({ type: 'whenIdle' })
+    await waitFor(actor, snapshot => snapshot.matches('failed'))
+    expect(actor.getSnapshot().context.dialogOpen).toBe(true)
+    actor.send({ type: 'retry' })
+    expect(actor.getSnapshot().matches('failed')).toBe(true)
     actor.stop()
   })
 
   it('shows failure and permits one explicit retry', async () => {
     let attempts = 0
-    const actor = startRestart(async () => {
-      attempts += 1
-      if (attempts === 1) throw new Error('restart unavailable')
-      return { accepted: true }
+    const actor = startRestart({
+      requestRestart: async () => {
+        attempts += 1
+        if (attempts === 1) throw new Error('restart unavailable')
+        return { accepted: true }
+      },
     })
     actor.send({ type: 'open' })
     actor.send({ type: 'confirm' })
@@ -99,11 +221,13 @@ describe('restartMachine', () => {
   it('aborts a pending request when the actor stops and ignores its late completion', async () => {
     let requestSignal: AbortSignal | undefined
     let resolveRequest: (() => void) | undefined
-    const actor = startRestart((_input, options) => {
-      requestSignal = options?.signal
-      return new Promise(resolve => {
-        resolveRequest = () => resolve({ accepted: true })
-      })
+    const actor = startRestart({
+      requestRestart: (_input, options) => {
+        requestSignal = options?.signal
+        return new Promise(resolve => {
+          resolveRequest = () => resolve({ accepted: true })
+        })
+      },
     })
     actor.send({ type: 'open' })
     actor.send({ type: 'confirm' })
