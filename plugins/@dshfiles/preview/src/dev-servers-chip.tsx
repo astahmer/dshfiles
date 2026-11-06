@@ -3,11 +3,12 @@ import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { Browser, useApi, useApiEvent, useContract } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
-import { ExternalLinkIcon, GlobeIcon, SquareIcon } from '@dshfiles/plugin-ui/icons'
+import { ExternalLinkIcon, GlobeIcon, PanelRightIcon, SquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { previewApi, type DevServerView, type PreviewPageView } from './api.js'
 import { DevServerPoll } from './dev-server-poll.js'
+import { PreviewOpener } from './preview-opener.js'
 
 const revealed = new Set<string>()
 
@@ -26,8 +27,10 @@ export const DevServersChip = (props: { readonly sessionId: string }) => {
   const [armed, setArmed] = useState<number | null>(null)
   const key = useMemo(() => DevServerPoll.serversKey(props.sessionId), [props.sessionId])
   const pagesKey = useMemo(() => DevServerPoll.pagesKey(props.sessionId), [props.sessionId])
-  const canOpen = browser.status === 'active' && browser.value.available.get()
-  const openInTab = (url: string): void => {
+  const opener = PreviewOpener.use()
+  const OpenIcon = opener.paneAvailable ? PanelRightIcon : ExternalLinkIcon
+  // An agent's reveal is not a click, so a new tab would be blocked: it only goes to the pane.
+  const revealInPane = (url: string): void => {
     if (browser.status === 'active') browser.value.open(url)
   }
 
@@ -39,7 +42,7 @@ export const DevServersChip = (props: { readonly sessionId: string }) => {
     const id = `${props.sessionId}:${reveal.pageId}:${String(reveal.requestedAt)}`
     if (revealed.has(id)) return
     revealed.add(id)
-    openInTab(reveal.url)
+    revealInPane(reveal.url)
   })
   useEffect(() => {
     if (events === 'live') {
@@ -99,14 +102,8 @@ export const DevServersChip = (props: { readonly sessionId: string }) => {
                 <span className="dshx:truncate dshx:text-muted-foreground dshx:text-xs">{server.command}</span>
               </div>
               {server.ports[0] === undefined ? null : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="dshx:h-6 dshx:px-2 dshx:text-xs"
-                  disabled={!canOpen}
-                  onClick={() => openInTab(server.ports[0]?.url ?? '')}
-                >
-                  <ExternalLinkIcon className="dshx:size-3" />
+                <Button variant="outline" size="sm" className="dshx:h-6 dshx:px-2 dshx:text-xs" onClick={() => opener.open(server.ports[0]?.url ?? '')}>
+                  <OpenIcon className="dshx:size-3" />
                   Open
                 </Button>
               )}
@@ -130,8 +127,8 @@ export const DevServersChip = (props: { readonly sessionId: string }) => {
                   {page.pageId} · {page.url}
                 </span>
               </div>
-              <Button variant="outline" size="sm" className="dshx:h-6 dshx:px-2 dshx:text-xs" disabled={!canOpen} onClick={() => openInTab(page.url)}>
-                <ExternalLinkIcon className="dshx:size-3" />
+              <Button variant="outline" size="sm" className="dshx:h-6 dshx:px-2 dshx:text-xs" onClick={() => opener.open(page.url)}>
+                <OpenIcon className="dshx:size-3" />
                 Open
               </Button>
             </div>
@@ -139,7 +136,6 @@ export const DevServersChip = (props: { readonly sessionId: string }) => {
           {stop.isError ? (
             <p className="dshx:px-1 dshx:text-destructive dshx:text-xs">{errorMessage(stop.error, 'Stopping failed.')} Refresh the list and try again.</p>
           ) : null}
-          {canOpen ? null : <p className="dshx:px-1 dshx:text-muted-foreground dshx:text-xs">Open needs the browser tab of the thread on screen.</p>}
         </section>
       </PopoverContent>
     </Popover>

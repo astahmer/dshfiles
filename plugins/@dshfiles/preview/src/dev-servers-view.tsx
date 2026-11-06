@@ -1,14 +1,15 @@
 import type { ProcessPageViewProps, ProcessThreadViewProps } from '@dshfiles/background-jobs/process-views'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import { Browser, useApi, useContract } from '@dshfiles/dshx/client'
+import { useApi } from '@dshfiles/dshx/client'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { EmptyState, PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ExternalLinkIcon, SquareIcon } from '@dshfiles/plugin-ui/icons'
+import { ExternalLinkIcon, PanelRightIcon, SquareIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, queryOptions, useMutation, useQueries, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import { previewApi, type DevServerView } from './api.js'
 import { DevServerPoll } from './dev-server-poll.js'
+import { PreviewOpener } from './preview-opener.js'
 
 /**
  * Dev servers in Observe › Processes and in the thread panel's Jobs facet (plans/ade-ux §6 "Processes in 3 boards").
@@ -16,10 +17,10 @@ import { DevServerPoll } from './dev-server-poll.js'
  */
 const ServerRows = (props: { readonly sessionId: string; readonly servers: readonly DevServerView[] }): JSX.Element => {
   const api = useApi(previewApi)
-  const browser = useContract(Browser)
+  const opener = PreviewOpener.use()
+  const OpenIcon = opener.paneAvailable ? PanelRightIcon : ExternalLinkIcon
   const queryClient = useQueryClient()
   const [armed, setArmed] = useState<number | null>(null)
-  const canOpen = browser.status === 'active' && browser.value.available.get()
   const stop = useMutation({
     mutationFn: (server: DevServerView) => api.stopDevServer({ sessionId: props.sessionId, pid: server.pid, startedAt: server.startedAt, confirm: true }),
     onSettled: () => {
@@ -38,15 +39,8 @@ const ServerRows = (props: { readonly sessionId: string; readonly servers: reado
             trailing={
               <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
                 {server.ports[0] === undefined ? null : (
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    disabled={!canOpen}
-                    onClick={() => {
-                      if (browser.status === 'active') browser.value.open(server.ports[0]?.url ?? '')
-                    }}
-                  >
-                    <ExternalLinkIcon aria-hidden />
+                  <Button variant="outline" size="xs" onClick={() => opener.open(server.ports[0]?.url ?? '')}>
+                    <OpenIcon aria-hidden />
                     Open
                   </Button>
                 )}
@@ -67,7 +61,6 @@ const ServerRows = (props: { readonly sessionId: string; readonly servers: reado
       {stop.isError ? (
         <p className="dshx:text-xs dshx:text-destructive">{errorMessage(stop.error, 'Stopping failed.')} Refresh the list and try again.</p>
       ) : null}
-      {canOpen ? null : <p className="dshx:text-xs dshx:text-muted-foreground">Open needs the browser tab of the thread on screen.</p>}
     </>
   )
 }
@@ -105,7 +98,7 @@ const DevServersTab = (props: ProcessPageViewProps): JSX.Element => {
   const failed = results.find(result => result.isError && !isApiOwnerMissing(result.error))
   return (
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4" data-process-view="dev-servers">
-      <PageSection heading="Dev servers" description="Ports your threads' processes listen on. Open one in the thread's browser tab, or stop it." />
+      <PageSection heading="Dev servers" description="Ports your threads' processes listen on. Open one beside its thread, or stop it." />
       {failed === undefined ? null : (
         <p className="dshx:text-xs dshx:text-destructive">{errorMessage(failed.error, 'Dev servers could not be read.')} Try again in a moment.</p>
       )}
