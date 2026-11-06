@@ -34,7 +34,8 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject, type React
 import { backlogApi, BacklogViews } from './api.js'
 import { CaptureProject } from './capture-project.js'
 import { AttachmentTray, threadMentionText, useComposerFiles, useFileDrop } from './composer-attachments.js'
-import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-audio.js'
+import { audioBase64, startVoiceCapture } from './composer-audio.js'
+import { useVoiceCapture } from './composer-voice.js'
 import { useComposerDraft } from './composer-draft.js'
 import { composerLinkLabel } from './composer-link-label.js'
 import { BacklogImageEditor } from './image-reference-editor.js'
@@ -212,13 +213,9 @@ export const Composer = (props: {
     CaptureProject.initial({ filter: props.projectFilter ?? null, remembered: storedProject, reuse: reuseProject }),
   )
   const [projectPickerOpen, setProjectPickerOpen] = useState(false)
-  const [recording, setRecording] = useState(false)
-  const [transcribing, setTranscribing] = useState(false)
   const [referenceMode, setReferenceMode] = useState<ReferenceMode | null>(null)
   const ownRef = useRef<BacklogImageEditorHandle | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const captureRef = useRef<VoiceCapture | null>(null)
-  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const input = props.inputRef ?? ownRef
 
   useEffect(() => {
@@ -240,14 +237,6 @@ export const Composer = (props: {
     if (props.projectFilter === undefined) return
     setProject(CaptureProject.initial({ filter: props.projectFilter, remembered: captureProject.get(), reuse: reuseProject }))
   }, [props.projectFilter, reuseProject])
-
-  useEffect(
-    () => () => {
-      if (stopTimerRef.current !== null) clearTimeout(stopTimerRef.current)
-      void captureRef.current?.cancel()
-    },
-    [],
-  )
 
   const projectCommand = BacklogProjectCommand.at(text, caret)
   const mention = useMentionCompletion({ text, caret, threads: props.threads, projects: props.projects, tags: props.tags, files: attachments.files })
@@ -328,16 +317,19 @@ export const Composer = (props: {
   })
   const addFromPicker = (): void => fileInputRef.current?.click()
 
-  const stopVoice = async (): Promise<void> => {
-    const capture = captureRef.current
-    if (capture === null) return
-    captureRef.current = null
-    if (stopTimerRef.current !== null) clearTimeout(stopTimerRef.current)
-    stopTimerRef.current = null
-    setRecording(false)
-    setTranscribing(true)
+  const voice = useVoiceCapture({
+    start: startVoiceCapture,
+    transcribe: recording => transcribeVoice(recording),
+    onStarted: () => setFailed(null),
+    onStartFailed: error => setFailed(errorMessage(error, 'Microphone access was refused.')),
+    maxDurationMs: 120_000,
+  })
+  const recording = voice.phase === 'recording'
+  const transcribing = voice.phase === 'transcribing'
+
+  const transcribeVoice = async (recorded: () => Promise<Uint8Array>): Promise<void> => {
     try {
-      const audio = await capture.stop()
+      const audio = await recorded()
       const result = await api.transcribeSpeech({ audioBase64: audioBase64(audio) })
       if (!result.ok) {
         setFailed(result.reason)
@@ -350,37 +342,22 @@ export const Composer = (props: {
       appendText(`${result.text.trim()} `)
     } catch (error) {
       setFailed(errorMessage(error, 'The recording could not be transcribed.'))
-    } finally {
-      setTranscribing(false)
-    }
-  }
-
-  const startVoice = async (): Promise<void> => {
-    const status = speech.data
-    if (status === undefined || !status.available) {
-      setFailed(status?.reason ?? 'The voice-input bundle is not loaded.')
-      return
-    }
-    if (!status.ready) {
-      setFailed(status.reason ?? 'Open Plugins → Voice input to prepare the recognizer.')
-      return
-    }
-    try {
-      const capture = await startVoiceCapture()
-      captureRef.current = capture
-      setRecording(true)
-      setFailed(null)
-      stopTimerRef.current = setTimeout(() => {
-        void stopVoice()
-      }, 120_000)
-    } catch (error) {
-      setFailed(errorMessage(error, 'Microphone access was refused.'))
     }
   }
 
   const toggleVoice = (): void => {
-    if (recording) void stopVoice()
-    else void startVoice()
+    if (voice.phase === 'idle') {
+      const status = speech.data
+      if (status === undefined || !status.available) {
+        setFailed(status?.reason ?? 'The voice-input bundle is not loaded.')
+        return
+      }
+      if (!status.ready) {
+        setFailed(status.reason ?? 'Open Plugins → Voice input to prepare the recognizer.')
+        return
+      }
+    }
+    voice.toggle()
   }
 
   const submit = (): void => {
