@@ -13,16 +13,26 @@ interface WriteOutput {
   readonly accepted: boolean
 }
 
-interface ApiKeySetupContext {
+export interface ApiKeySetupContext {
   readonly operation: ApiKeySetupOperation | null
   readonly operationId: number
   readonly write: ApiKeySetupWriter | null
+  readonly manualValue: string
+  readonly selectedCatalogKey: string
+  readonly folderPickerOpen: boolean
+  readonly cwd: string | null
 }
 
 type ApiKeySetupEvent =
   | { readonly type: 'manual.submit'; readonly write: ApiKeySetupWriter }
   | { readonly type: 'catalog.submit'; readonly write: ApiKeySetupWriter; readonly requiresConfirmation: boolean }
   | { readonly type: 'catalog.confirm' }
+  | { readonly type: 'manual.changed'; readonly value: string }
+  | { readonly type: 'catalog.changed'; readonly key: string }
+  | { readonly type: 'folder.open' }
+  | { readonly type: 'folder.close' }
+  | { readonly type: 'folder.chosen'; readonly cwd: string }
+  | { readonly type: 'cwd.cleared' }
   | { readonly type: 'reset' }
 
 interface WriteCompletionEvent {
@@ -77,13 +87,51 @@ const apiKeySetupMachine = setup({
     ),
     clearWriter: assign({ write: null }),
     clearOperation: assign(({ context }) => ({ operation: null, operationId: context.operationId + 1, write: null })),
+    clearFields: assign({ manualValue: '', selectedCatalogKey: '', folderPickerOpen: false, cwd: null }),
+    openFolderPicker: assign(({ context }) => ({
+      operation: null,
+      operationId: context.operationId + 1,
+      write: null,
+      manualValue: '',
+      selectedCatalogKey: '',
+      folderPickerOpen: true,
+    })),
+    chooseFolder: assign(({ context, event }) => ({
+      operation: null,
+      operationId: context.operationId + 1,
+      write: null,
+      manualValue: '',
+      selectedCatalogKey: '',
+      folderPickerOpen: false,
+      cwd: event.type === 'folder.chosen' ? event.cwd : context.cwd,
+    })),
+    clearCatalog: assign(({ context, event }) => ({
+      operation: null,
+      operationId: context.operationId + 1,
+      write: null,
+      selectedCatalogKey: '',
+      cwd: event.type === 'cwd.cleared' ? null : context.cwd,
+    })),
+    selectCatalogEntry: assign(({ context, event }) => ({
+      operation: null,
+      operationId: context.operationId + 1,
+      write: null,
+      selectedCatalogKey: event.type === 'catalog.changed' ? event.key : context.selectedCatalogKey,
+    })),
+    clearFailedManualValue: assign(({ context }) => (context.operation === 'manual' ? { manualValue: '' } : {})),
   },
 }).createMachine({
   id: 'apiKeySetup',
   initial: 'idle',
-  context: { operation: null, operationId: 0, write: null },
+  context: { operation: null, operationId: 0, write: null, manualValue: '', selectedCatalogKey: '', folderPickerOpen: false, cwd: null },
   on: {
-    reset: { target: '#apiKeySetup.idle', actions: 'clearOperation' },
+    reset: { target: '#apiKeySetup.idle', actions: ['clearOperation', 'clearFields'] },
+    'manual.changed': { actions: assign({ manualValue: ({ event }) => (event.type === 'manual.changed' ? event.value : '') }) },
+    'catalog.changed': { actions: 'selectCatalogEntry' },
+    'folder.open': { actions: 'openFolderPicker' },
+    'folder.close': { actions: assign({ folderPickerOpen: false }) },
+    'folder.chosen': { actions: 'chooseFolder' },
+    'cwd.cleared': { actions: 'clearCatalog' },
   },
   states: {
     idle: {
@@ -127,6 +175,7 @@ const apiKeySetupMachine = setup({
     },
     success: {},
     error: {
+      entry: 'clearFailedManualValue',
       on: {
         'manual.submit': { target: 'saving', actions: 'captureManualWrite' },
         'catalog.submit': [
