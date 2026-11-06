@@ -100,7 +100,7 @@ export const summarizeHar = ({ har, channelOwners, top = 15 }) => {
         status,
         sent: status !== 0,
         abortedInQueue: status === 0 && wait === 0,
-        requestBytes: Buffer.byteLength(entry.request.postData?.text ?? ''),
+        requestBytes: entry.request.postData?._bodyBytes ?? Buffer.byteLength(entry.request.postData?.text ?? ''),
         responseBytes: responseBytes(entry),
         digest: crypto
           .createHash('sha1')
@@ -246,6 +246,10 @@ const formatText = summary => {
   }
   return lines.join('\n')
 }
+
+/** Text summary of one HAR file, for har-capture.mjs --summary. */
+export const summarizeHarFile = async harPath =>
+  formatText(summarizeHar({ har: JSON.parse(fs.readFileSync(harPath, 'utf8')), channelOwners: await buildChannelOwners() }))
 
 const main = async () => {
   const [harPath, ...flags] = process.argv.slice(2)

@@ -21,13 +21,20 @@ MATCH='^Exact thread title' DUMP=snap.json node $S/switch-probe.mjs 1 && node $S
 node $S/host-cpu-profile.mjs "${DSH_HOST_PID:?set the verified Host PID}" 60   # SIGUSR1 inspector, closed afterwards
 ```
 
-For a page load or anything the probes do not drive, ask the user for a HAR (DevTools › Network › Fetch/XHR ›
-Export HAR) and summarize it:
+For a page load, record the HAR yourself instead of asking the user for one. `har-capture.mjs` loads the live GUI
+read-only in a headless Chromium (the same `~/.dsh/runtime/web-url` entry the probes read) and writes a redacted HAR:
+no headers, cookies, query strings or response bodies, request bodies replaced by digests, mode 600:
 
 ```sh
-node $S/har-summary.mjs ~/Downloads/<capture>.har            # --json for the raw summary, --top N for more methods
-node --test $S/har-summary.test.mjs
+node $S/har-capture.mjs --seconds 60 --summary                 # one fresh load, summarized
+node $S/har-capture.mjs --tabs 3 --seconds 60 --out $SCRATCH/three-tabs.har   # three pages share one socket pool
+node $S/har-summary.mjs <capture>.har                        # --json for the raw summary, --top N for more methods
+node --test $S/har-capture.test.mjs $S/har-summary.test.mjs
 ```
+
+A headless capture has no other user tabs or their event streams, so it measures the page itself; `--tabs N`
+reproduces several tabs. The user's own browser state (extensions, every open tab) still needs their DevTools export
+when the two disagree. Status `-1` marks reads still open when the capture ended.
 
 It prints requests, how long until the first request left the browser queue, `blocked` (queue) and `wait` (server)
 p50/p95, requests aborted before being sent, duplicate method + body calls, bytes, and the top methods with the plugin
