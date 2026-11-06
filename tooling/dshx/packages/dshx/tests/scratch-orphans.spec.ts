@@ -1,12 +1,14 @@
 import { spawn, type ChildProcess } from 'node:child_process'
+import { once } from 'node:events'
 import type { Readable } from 'node:stream'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { decodeJson, jsonObjectSchema } from '../src/json.js'
 import { guardedCommand } from '../src/scratch/guarded-spawn.js'
-import { ScratchRegistry, type ScratchOwner } from '../src/scratch/registry.js'
+import { ScratchRegistry, type ScratchOwner, type ScratchRecord } from '../src/scratch/registry.js'
+import { listProcesses, sweepScratch } from '../src/scratch/sweep.js'
 
 let workRoot = ''
 const started = new Set<number>()
@@ -202,5 +204,87 @@ describe('scratch registry', () => {
     await writeFile(join(directory, '2.json'), JSON.stringify({ hostPid: 2 }))
     await writeFile(join(directory, 'notes.txt'), 'x')
     expect(await ScratchRegistry.readRecords(directory)).toEqual([])
+  })
+})
+
+describe('scratch sweep', () => {
+  const startFakeHost = async (): Promise<number> => {
+    const host = spawn(process.execPath, ['-e', "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)", '--', '--profile', 'dshx-boot'], {
+      detached: true,
+      stdio: 'ignore',
+    })
+    const pid = host.pid ?? 0
+    started.add(pid)
+    await waitUntil(() => ScratchRegistry.processStartedAt(pid) !== undefined, 2_000)
+    return pid
+  }
+
+  const writeRecord = async (directory: string, record: ScratchRecord): Promise<void> => {
+    await mkdir(directory, { recursive: true })
+    await writeFile(join(directory, `${String(record.hostPid)}.json`), JSON.stringify(record), { mode: 0o600 })
+  }
+
+  it('stops Hosts whose owner is gone, keeps owned ones, drops records of exited Hosts and honours --dry-run', async () => {
+    const registryDir = join(workRoot, 'sweep-registry')
+    const stateRoot = join(workRoot, 'sweep-state')
+    const orphan = await startFakeHost()
+    const owned = await startFakeHost()
+    const deadOwner = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' })
+    await once(deadOwner, 'exit')
+    const me = ScratchRegistry.currentOwner(workRoot)
+    const base = { workspace: workRoot, kind: 'e2e', command: 'node --profile dshx-boot' } as const
+    await writeRecord(registryDir, {
+      ...base,
+      hostPid: orphan,
+      hostStartedAt: ScratchRegistry.processStartedAt(orphan) ?? 1,
+      ownerPid: deadOwner.pid ?? 1,
+      ownerStartedAt: 1_000,
+    })
+    await writeRecord(registryDir, {
+      ...base,
+      hostPid: owned,
+      hostStartedAt: ScratchRegistry.processStartedAt(owned) ?? 1,
+      ownerPid: me.ownerPid,
+      ownerStartedAt: me.ownerStartedAt,
+    })
+    await writeRecord(registryDir, { ...base, hostPid: 999_998, hostStartedAt: 1_000, ownerPid: me.ownerPid, ownerStartedAt: me.ownerStartedAt })
+    const ours = (): ReturnType<typeof listProcesses> => listProcesses().filter(entry => entry.pid === orphan || entry.pid === owned)
+
+    const preview = await sweepScratch({ dryRun: true, registryDir, stateRoot, graceMs: 300, processes: ours() })
+    expect(preview.actions.map(action => `${action.kind} ${String(action.pid)}`).sort()).toEqual([`drop-record 999998`, `stop-orphan ${String(orphan)}`])
+    expect(isAlive(orphan)).toBe(true)
+    expect((await readdir(registryDir)).length).toBe(3)
+
+    const swept = await sweepScratch({ dryRun: false, registryDir, stateRoot, graceMs: 300, processes: ours() })
+    expect(swept.leftRunning).toEqual([])
+    expect(swept.live.map(record => record.hostPid)).toEqual([owned])
+    await waitUntil(() => !isAlive(orphan), 2_000)
+    expect(isAlive(owned)).toBe(true)
+    expect((await readdir(registryDir)).sort()).toEqual([`${String(owned)}.json`])
+  })
+
+  it('stops legacy orphans with no record only past the age floor, and never a parent-guard', async () => {
+    const legacy = spawn(
+      'sh',
+      ['-c', `${JSON.stringify(process.execPath)} -e "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)" -- --profile dshx-boot & echo $!`],
+      {
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    )
+    const pid = Number(await firstChunk(legacy.stdout))
+    started.add(pid)
+    await waitUntil(() => listProcesses().some(entry => entry.pid === pid && entry.ppid === 1), 3_000)
+    const registryDir = join(workRoot, 'legacy-registry')
+    const stateRoot = join(workRoot, 'legacy-state')
+    const ours = (): ReturnType<typeof listProcesses> => listProcesses().filter(entry => entry.pid === pid)
+
+    const young = await sweepScratch({ dryRun: true, registryDir, stateRoot, processes: ours() })
+    expect(young.actions).toEqual([])
+    const disguised = ours().map(entry => ({ ...entry, command: `${entry.command} parent-guard.js` }))
+    expect((await sweepScratch({ dryRun: true, registryDir, stateRoot, legacyMinAgeMs: 0, processes: disguised })).actions).toEqual([])
+
+    const swept = await sweepScratch({ dryRun: false, registryDir, stateRoot, legacyMinAgeMs: 0, graceMs: 300, processes: ours() })
+    expect(swept.actions.map(action => [action.kind, action.pid])).toEqual([['stop-legacy', pid]])
+    await waitUntil(() => !isAlive(pid), 2_000)
   })
 })

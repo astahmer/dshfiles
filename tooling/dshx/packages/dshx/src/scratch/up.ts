@@ -11,6 +11,7 @@ import { registerScratchWorkspace } from '../project/scratch-workspace.js'
 import { spawnGuardedDetached } from './guarded-spawn.js'
 import { ScratchReaperRuntime, type ReapedScratch, type WarnedScratch } from './reaper.js'
 import { ScratchRegistry } from './registry.js'
+import { sweepScratch, type SweepAction } from './sweep.js'
 import { ScratchSeedRuntime } from './seed.js'
 import { LIVE_DSH_HOME, LIVE_DSH_PORT, ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
 import { decodeJson } from '../json.js'
@@ -112,6 +113,7 @@ export const scratchUp = async (
   readonly state: ScratchState
   readonly swept: readonly ReapedScratch[]
   readonly warned: readonly WarnedScratch[]
+  readonly orphans: readonly SweepAction[]
 }> => {
   const executable = await resolveDshExecutable()
   if (options.port === LIVE_DSH_PORT) {
@@ -138,6 +140,8 @@ export const scratchUp = async (
     extraStateDirs: [options.stateDir],
   })
   for (const reaped of swept) options.onProgress(`stopped stale scratch "${reaped.name}" (${reaped.reason})`)
+  const orphans = (await sweepScratch({ dryRun: false })).actions.filter(action => action.kind === 'stop-orphan' || action.kind === 'stop-legacy')
+  for (const orphan of orphans) options.onProgress(`stopped orphaned scratch Host ${orphan.target} (${orphan.reason})`)
   for (const warning of warned)
     options.onProgress(
       `scratch "${warning.name}" is in its warning grace (${ScratchStateRuntime.formatMinutes(warning.warning.minutesLeft)} left); keep it with "dshx dev keep --name ${warning.name}"`,
@@ -296,7 +300,7 @@ export const scratchUp = async (
     state.watchdog = { pid: watchdogPid, signature: [watchdogScript, options.stateDir] }
     await ScratchStateRuntime.write(state)
     for (const release of releases) release()
-    return { state, swept, warned }
+    return { state, swept, warned, orphans }
   } catch (error) {
     if (watchdogPid !== undefined) await stopGroup(watchdogPid)
     if (browserPid !== undefined) await stopGroup(browserPid)

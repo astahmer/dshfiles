@@ -83,6 +83,15 @@ if (reaped.length > 0) {
   )
 }
 
+// Then stop scratch Hosts from any workspace whose owner (the Playwright worker, the dshx dev watchdog) is gone, and
+// pre-registry orphans: `--profile dshx-boot`, parent pid 1, over 2 h old. A dshx build that predates the sweep skips it.
+const scratchSweep = await import('../tooling/dshx/packages/dshx/dist/scratch/sweep.js').catch(() => undefined)
+if (scratchSweep !== undefined) {
+  const stopped = (await scratchSweep.sweepScratch({ dryRun: false })).actions.filter(action => action.kind === 'stop-orphan' || action.kind === 'stop-legacy')
+  if (stopped.length > 0)
+    console.log(`check-browser ${mode}: stopped ${String(stopped.length)} orphaned scratch Host(s): ${stopped.map(action => action.target).join(', ')}`)
+}
+
 const { filters, buildTargets } = await resolveBrowserSelection({ names, mode })
 
 const jj = spawnSync('jj', ['--version'], { encoding: 'utf8' })

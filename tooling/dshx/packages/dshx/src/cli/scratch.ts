@@ -285,7 +285,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
       if (!Number.isSafeInteger(warnMinutes) || warnMinutes < 0)
         return fail(new ScratchError('usage', '--warn-minutes requires a whole number of minutes (0 = stop at once).', 'Run "dshx dev up --help".'))
       const { scratchUp } = await import('../scratch/up.js')
-      const { state, swept, warned } = await scratchUp({
+      const { state, swept, warned, orphans } = await scratchUp({
         name: name.success,
         stateDir,
         plugins: Array.isArray(values.plugin) ? values.plugin : [],
@@ -315,6 +315,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
         {
           ...shown,
           swept: swept.map(reaped => ({ name: reaped.name, stateDir: reaped.stateDir, reason: reaped.reason, leftRunning: reaped.leftRunning })),
+          orphans,
           warned: warned.map(entry => ({
             name: entry.name,
             stateDir: entry.stateDir,

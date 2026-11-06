@@ -9,6 +9,7 @@ import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/pro
 import { resolveDshExecutable } from '../../packages/dshx/src/project/dsh-executable.js'
 import { guardedCommand } from '../../packages/dshx/src/scratch/guarded-spawn.js'
 import { ScratchRegistry, type ScratchOwner } from '../../packages/dshx/src/scratch/registry.js'
+import { sweepScratch } from '../../packages/dshx/src/scratch/sweep.js'
 import { recordScratchProcess, scratchLedgerPath } from '../../scripts/reap-scratch-processes.mjs'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
 import { createScratchHostLifecycle, type ScratchHostInstance } from './scratch-host-lifecycle.js'
@@ -139,6 +140,25 @@ const waitForHostUrl = (host: ChildProcess, output: () => string, profile: strin
 let workerOwner: ScratchOwner | undefined
 const scratchOwner = (): ScratchOwner => (workerOwner ??= ScratchRegistry.currentOwner(DSHFILES_ROOT))
 
+/**
+ * Once per worker, before its first Host: stop scratch Hosts whose owner died (a run killed before the guard existed).
+ * `DSHX_SCRATCH_SWEEP=0` skips it for specs that mock the Host.
+ */
+let orphanSweep: Promise<void> | undefined
+const sweepOrphansOnce = (): Promise<void> =>
+  process.env.DSHX_SCRATCH_SWEEP === '0'
+    ? Promise.resolve()
+    : (orphanSweep ??= sweepScratch({ dryRun: false }).then(
+        result => {
+          const stopped = result.actions.filter(action => action.kind === 'stop-orphan' || action.kind === 'stop-legacy')
+          if (stopped.length > 0)
+            process.stderr.write(
+              `[scratch-sweep] stopped ${String(stopped.length)} orphaned scratch Host(s): ${stopped.map(action => action.target).join(', ')}\n`,
+            )
+        },
+        () => undefined,
+      ))
+
 export const startScratchProfile = async (
   prepared: PreparedBootProfile,
   profileLabel: string,
@@ -149,6 +169,7 @@ export const startScratchProfile = async (
   executableOverride?: string,
 ): Promise<BootedProfile> => {
   const executable = await resolveDshExecutable(executableOverride, process.env, DSHFILES_ROOT)
+  await sweepOrphansOnce()
   const validatedAt = Date.now()
   const compositionKey = await compositionKeyFor(prepared, executable)
   const known = compositionValidations.get(compositionKey)
