@@ -26,6 +26,8 @@ import type { UserQuestionPanels, UserQuestionRecord } from '@deepseek-ai/dsh-cl
 import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { createWaterfallRequest, PendingQuestion, type QuestionRpcChannel } from './contract/slots.ts'
+import { createCardSeat } from '../card-visibility.ts'
+import { createForegroundRequest } from '../foreground-request.ts'
 import { createQuestionDraftStore } from './draft-store.ts'
 import { QuestionComposer } from './QuestionComposer.tsx'
 import { questionReplyDefinition } from './question-reply.ts'
@@ -136,24 +138,17 @@ class QuestionCards {
     }
     // Republishing is how a revealed card reaches the seat: the registry keeps
     // the last entry of equal precedence, and it rejects a duplicate key.
-    let unpublish: (() => void) | undefined = publish ? this.publish(pending, delegate) : undefined
+    const seat = createCardSeat({ published: publish, publish: () => this.publish(pending, delegate) })
     const card: QuestionCard = {
       pending,
-      hide: () => {
-        unpublish?.()
-        unpublish = undefined
-      },
-      reveal: () => {
-        unpublish?.()
-        unpublish = this.publish(pending, delegate)
-      },
+      hide: seat.hide,
+      reveal: seat.reveal,
       remove: () => {
         /* v8 ignore next -- a card leaves the registry once; no caller holds a card the registry already replaced. */
         if (this.#cards.get(pending.key) !== card) return
         this.#cards.delete(pending.key)
         pending.close()
-        unpublish?.()
-        unpublish = undefined
+        seat.remove()
       },
       trackRequest: (completion) => {
         requests.add(completion)
@@ -229,67 +224,28 @@ async function answerQuestion(
   if (sessionId === undefined) return next()
   const callId = request.wait?.callId
   const card = cards.ensure(sessionId, request.questions, callId)
-  const claimLifetime = new AbortController()
-  const claimSignal = request.signal === undefined ? claimLifetime.signal
-    : AbortSignal.any([claimLifetime.signal, request.signal])
-  let claim: ReturnType<typeof ctx.remote.userQuestions.attachWait> | undefined
-  let claimEnded: Promise<never> | undefined
-  let delegateRequest: (() => void) | undefined
-  const releaseClaim = request.wait?.timed === true && callId !== undefined
-    ? ctx.effect(() => {
-      claim = ctx.remote.userQuestions.attachWait(sessionId, callId, claimSignal)
-      return async () => {
-        delegateRequest?.()
-        claimLifetime.abort()
-        claim?.dispose()
-        if (claimEnded !== undefined) await Promise.allSettled([claimEnded])
-      }
-    }, 'ui-user-questions: foreground claim')
+  const claim = request.wait?.timed === true && callId !== undefined
+    ? {
+      attach: (signal: AbortSignal) => ctx.remote.userQuestions.attachWait(sessionId, callId, signal),
+      own: (body: () => () => Promise<void>, label: string) => ctx.effect(body, label),
+    }
     : undefined
-  const completed = Promise.withResolvers<void>()
-  const finishRequest = card.trackRequest(completed.promise)
-  try {
-    const iterator = claim?.[Symbol.asyncIterator]()
-    const opening = iterator === undefined ? undefined : await iterator.next()
-    if (opening?.done === true) return await next()
-    const waterfall = createWaterfallRequest(
-      opening === undefined ? undefined : Date.now() + opening.value.remainingMs,
-      claimSignal,
+  return createForegroundRequest({
+    callId,
+    signal: request.signal,
+    claim,
+    next,
+    createWaterfall: ({ remainingMs, signal }) => createWaterfallRequest(
+      remainingMs === undefined ? undefined : Date.now() + remainingMs,
+      signal,
       (channel) => { card.pending.detachWaterfall(channel) },
-    )
-    // Cancellation may win between the first claim frame and this continuation.
-    // The request has already settled, so its channel must never reach the card.
-    if (claimSignal.aborted) return await waterfall.result
-    delegateRequest = () => { waterfall.channel.delegate() }
-    card.pending.attachWaterfall(waterfall.channel)
-    if (iterator !== undefined) {
-      claimEnded = (async () => {
-        await iterator.next()
-        throw new Error('the foreground question wait ended')
-      })()
-    }
-    try {
-      return await (claimEnded === undefined ? waterfall.result : Promise.race([waterfall.result, claimEnded]))
-    } catch (error) {
-      if (waterfall.isDelegation(error)) {
-        await releaseClaim?.()
-        return await next()
-      }
-      throw error
-    }
-  } finally {
-    if (releaseClaim === undefined) claimLifetime.abort()
-    else if (claimEnded === undefined) await releaseClaim()
-    else {
-      // The Host closes the claim after accepting the waterfall outcome.
-      // A local return precedes transmission and cannot release that claim.
-      void Promise.allSettled([claimEnded]).then(() => { void releaseClaim() })
-    }
-    // A blocking request without a call id is not in the projection; its card ends with its waterfall.
-    if (callId === undefined) card.remove()
-    completed.resolve()
-    finishRequest()
-  }
+    ),
+    card: {
+      attachWaterfall: (channel) => { card.pending.attachWaterfall(channel) },
+      remove: () => { card.remove() },
+      trackRequest: (completion) => card.trackRequest(completion),
+    },
+  })()
 }
 
 /**
