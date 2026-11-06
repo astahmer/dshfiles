@@ -71,7 +71,6 @@ import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject }
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import * as Schema from 'effect/Schema'
 import { REVISION_PAGE_SIZE, type GraphLandmark, type Mutation, type ReadFailure, type Revision } from './api.js'
-import { ChatReferenceModel } from './chat-reference.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { RevisionGraphModel, reverseHexChangeId, type RevisionGraphRow } from './graph.js'
 import { GraphPagingModel } from './graph-paging.js'
@@ -80,6 +79,7 @@ import { useAutoRefresh } from './auto-refresh.js'
 import { useOpenInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from './revision-list.js'
 import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin, STALE_REVISION_ERROR } from './revision-action-machine.js'
+import { revisionLocateMachine } from './revision-locate-machine.js'
 import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, RevisionDropModel, REVISION_MIME, WORKSPACE_MIME } from './revision-drop.js'
 import { repositoryLoadingState } from './repository-loading.js'
 import { repositoryRegistrationMachine } from './repository-registration-machine.js'
@@ -285,7 +285,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         registeredPaths: props.projects.map(project => project.canonicalPath),
       }),
   )
-  const [pendingReferenceRequest, setPendingReferenceRequest] = useState(initialRequest?.reference ?? null)
+  const [locateSnapshot, sendLocate] = useMachine(revisionLocateMachine)
+  useEffect(() => {
+    const reference = initialRequest?.reference
+    if (reference !== undefined) sendLocate({ type: 'reference', reference })
+  }, [initialRequest, sendLocate])
   const [repoHistory, setRepoHistory] = useState(() => storedRepoHistory.get().slice(0, REPO_HISTORY_LIMIT))
   const [pickerOpen, setPickerOpen] = useState(false)
   const [chosenView, setView] = usePanelScopeState<View | null>(scope, 'view', () => PanelScopes.persisted(scope).view ?? null)
@@ -516,6 +520,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     revisions: graphRowsInput,
   })
   const allRevisions = useMemo(() => mergeGraphRevisions(navigation.extraRevisions, graphRowsInput), [navigation.extraRevisions, graphRowsInput])
+  const revisionsLoaded = state !== undefined
+  useEffect(() => {
+    sendLocate({ type: 'revisions', revisions: allRevisions, loaded: revisionsLoaded })
+  }, [allRevisions, revisionsLoaded, sendLocate])
   const editTimeCommitIds = useMemo(
     () =>
       preferences.revisionDate === 'created' && fromDate === '' && toDate === ''
@@ -538,16 +546,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     combine: editTimesByCommitId,
   })
   const selectedRevision = navigation.selectedRevision
-  const [locateRequest, setLocateRequest] = useState<Revision | null>(null)
-  const [pendingLocateId, setPendingLocateId] = useState<string | null>(null)
-  const [locatedId, setLocatedId] = useState<string | null>(null)
-  const pendingReferenceSearch = useRef('')
   useEffect(() => {
-    setLocateRequest(null)
+    sendLocate({ type: 'reset' })
     setComparisonSelection(null)
-    setPendingLocateId(null)
-    setLocatedId(null)
-  }, [repoId, setComparisonSelection])
+  }, [repoId, sendLocate, setComparisonSelection])
 
   const detailsQuery = useQuery({
     queryKey: jujutsuQueryKeys.details(path, selectedRevision?.commitId ?? ''),
@@ -573,11 +575,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   useEffect(() => {
     if (!sidePanel) return
     return sidePanelRepository.onRequest(requested => {
-      if (requested.reference !== undefined) setPendingReferenceRequest(requested.reference)
+      if (requested.reference !== undefined) sendLocate({ type: 'reference', reference: requested.reference })
       if (shownRootRef.current !== null && containsPath(shownRootRef.current, requested.path)) return
       sendRegistration({ type: 'register', path: requested.path })
     })
-  }, [sidePanel, sendRegistration])
+  }, [sidePanel, sendRegistration, sendLocate])
 
   useEffect(() => {
     const selectedPath = path.trim()
@@ -776,40 +778,30 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const locateRevision = useCallback(
     (revision: Revision): void => {
-      setLocateRequest(null)
-      const listed = visibleRevisions.some(row => row.commitId === revision.commitId)
-      if (!listed) {
-        setLocateRequest(revision)
-        return
-      }
-      setCollapsedDays(current => new Set([...current].filter(day => day !== dayLabel(revision.committerTime ?? revision.authorTime))))
-      setPendingLocateId(revision.commitId)
+      const visible = visibleRevisions.some(row => row.commitId === revision.commitId)
+      if (visible) setCollapsedDays(current => new Set([...current].filter(day => day !== dayLabel(revision.committerTime ?? revision.authorTime))))
+      sendLocate({ type: 'locate', revision, visible })
     },
-    [setCollapsedDays, visibleRevisions],
+    [sendLocate, setCollapsedDays, visibleRevisions],
   )
 
+  // The reference resolved to a revision: show the graph that holds it, then let the machine locate its row. A graph
+  // filtered away from the revision shows the machine's banner instead, exactly as the old locate check did.
   useEffect(() => {
-    if (pendingReferenceRequest === null || state === undefined) return
-    const match = ChatReferenceModel.resolve({ reference: pendingReferenceRequest, revisions: allRevisions })
-    if (match === undefined) {
-      const searchKey = `${repoId ?? ''}:${pendingReferenceRequest.kind}:${pendingReferenceRequest.value}`
-      if (pendingReferenceSearch.current !== searchKey) {
-        pendingReferenceSearch.current = searchKey
-        setTextFilter(pendingReferenceRequest.value)
-      }
-      return
-    }
-    pendingReferenceSearch.current = ''
-    setPendingReferenceRequest(null)
+    if (!locateSnapshot.matches('applying')) return
+    const match = locateSnapshot.context.target
+    if (match === null) return
     setView('graph')
     setSelection({ commitId: match.commitId, changeId: match.changeId })
-    if (pendingReferenceRequest.behavior === 'path') {
+    if (locateSnapshot.context.behavior === 'path') {
       setComparisonSelection({ commitId: match.commitId, changeId: match.changeId })
       navigation.beginComparison()
       navigation.applySlice(match, 'history')
     }
-    locateRevision(match)
-  }, [allRevisions, locateRevision, navigation, pendingReferenceRequest, repoId, setComparisonSelection, setSelection, setTextFilter, setView, state])
+    sendLocate({ type: 'locate', revision: match, visible: visibleRevisions.some(row => row.commitId === match.commitId) })
+  }, [locateSnapshot, navigation, sendLocate, setComparisonSelection, setSelection, setView, visibleRevisions])
+
+  const offscreenLocate = locateSnapshot.matches('offscreen') ? locateSnapshot.context.target : null
 
   const resetGraphView = (): void => {
     navigation.reset()
@@ -820,12 +812,15 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     setFromDate('')
     setToDate('')
     setCollapsedDays(new Set())
-    setLocateRequest(null)
+    sendLocate({ type: 'reset' })
   }
 
+  // The row the machine is locating: scroll it to the middle and focus it, then hand the flash back to the machine.
   useEffect(() => {
-    if (pendingLocateId === null) return
-    const index = listItems.findIndex(item => item.kind === 'revision' && item.revision.commitId === pendingLocateId)
+    if (!locateSnapshot.matches('locating')) return
+    const commitId = locateSnapshot.context.target?.commitId
+    if (commitId === undefined) return
+    const index = listItems.findIndex(item => item.kind === 'revision' && item.revision.commitId === commitId)
     if (index < 0) return
     scrolledToWorkingCopy.current = repoId
     clearRowAnchor()
@@ -833,15 +828,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const target = listScrollRef.current?.querySelector<HTMLElement>(`[data-index="${index}"] [data-row-focus]`)
     if (target === null || target === undefined) return
     target.focus({ preventScroll: true })
-    setLocatedId(pendingLocateId)
-    setPendingLocateId(null)
-  }, [pendingLocateId, listItems, listVirtualizer, repoId, virtualItems])
-
-  useEffect(() => {
-    if (locatedId === null) return
-    const timeout = window.setTimeout(() => setLocatedId(null), 1800)
-    return () => window.clearTimeout(timeout)
-  }, [locatedId])
+    sendLocate({ type: 'located' })
+  }, [locateSnapshot, listItems, listVirtualizer, repoId, virtualItems, sendLocate])
 
   useEffect(() => {
     if (repoId === null || workingCopyIndex < 0 || listScrollRef.current === null || scrolledToWorkingCopy.current === repoId) return
@@ -1604,15 +1592,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           ]}
           onReset={resetGraphView}
         />
-        {locateRequest !== null && (
+        {offscreenLocate !== null && (
           <div className="dshx:flex dshx:flex-none dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-2 dshx:text-xs" role="status">
-            <span>{locateRequest.shortestChangeId} is outside the current view.</span>
+            <span>{offscreenLocate.shortestChangeId} is outside the current view.</span>
             <Button
               onClick={() => {
-                navigation.reveal(locateRequest)
+                navigation.reveal(offscreenLocate)
                 setCollapsedDays(new Set())
-                setPendingLocateId(locateRequest.commitId)
-                setLocateRequest(null)
+                sendLocate({ type: 'revealed', revision: offscreenLocate })
               }}
               size="xs"
               type="button"
@@ -1623,8 +1610,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             <Button
               onClick={() => {
                 resetGraphView()
-                navigation.reveal(locateRequest)
-                setPendingLocateId(locateRequest.commitId)
+                navigation.reveal(offscreenLocate)
+                sendLocate({ type: 'revealed', revision: offscreenLocate })
               }}
               size="xs"
               type="button"
@@ -1632,7 +1619,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             >
               Clear filters and locate
             </Button>
-            <Button onClick={() => setLocateRequest(null)} size="xs" type="button" variant="ghost">
+            <Button onClick={() => sendLocate({ type: 'cancel' })} size="xs" type="button" variant="ghost">
               Cancel
             </Button>
           </div>
@@ -1732,7 +1719,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       bookmarkMenu={bookmarkMenu}
                       workspaceMenu={workspaceMenu}
                       connectionDimmed={connectionIds !== null && !connectionIds.has(item.revision.commitId)}
-                      highlighted={locatedId === item.revision.commitId || connectionIds?.has(item.revision.commitId) === true}
+                      highlighted={locateSnapshot.context.highlighted === item.revision.commitId || connectionIds?.has(item.revision.commitId) === true}
                       dimmed={movingBranch?.has(item.revision.commitId) === true || previewBranchIds.has(item.revision.commitId)}
                       dropTarget={dropTarget === item.revision.commitId || rowDropPresentation !== null}
                       expanded={
