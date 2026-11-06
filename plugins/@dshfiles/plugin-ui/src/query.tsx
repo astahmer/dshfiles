@@ -1,5 +1,7 @@
+import { apiResource, resourceStore, type ApiResourceOptions } from '@dshfiles/dshx/client'
+import type { AnyApiMethodDefinition, ApiClient, ApiClientInput, ApiClientOutput } from '@dshfiles/dshx/api'
 import { keepPreviousData, QueryClient } from '@tanstack/query-core'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider, queryOptions, type QueryKey } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { retryOnceUnlessTimedOut } from './lib/host-request.js'
 
@@ -29,6 +31,30 @@ export const pluginQueryClient = (): QueryClient => {
 export const PluginQueryProvider = (props: { readonly client?: QueryClient; readonly children: ReactNode }): JSX.Element => (
   <QueryClientProvider client={props.client ?? pluginQueryClient()}>{props.children}</QueryClientProvider>
 )
+
+/**
+ * TanStack options whose `queryFn` reads through the page-wide dshx resource store, so a `useQuery` site shares one
+ * cached read with every other bundle reading the same method and input. Polling and retries stay on the query; move
+ * the site to `useResource` to let the store own the poll.
+ */
+export const resourceQueryOptions = <const Methods extends Record<string, AnyApiMethodDefinition>, K extends keyof Methods & string>(input: {
+  readonly queryKey: QueryKey
+  readonly client: ApiClient<Methods>
+  readonly method: K
+  readonly input?: ApiClientInput<Methods[K]>
+  readonly resource?: ApiResourceOptions<ApiClientOutput<Methods[K]>>
+}) => {
+  const key = apiResource({
+    client: input.client,
+    method: input.method,
+    ...(input.input !== undefined && { input: input.input }),
+    ...(input.resource !== undefined && { options: input.resource }),
+  })
+  return queryOptions({
+    queryKey: input.queryKey,
+    queryFn: ({ signal }) => resourceStore().ensure<ApiClientOutput<Methods[K]>>(key, { signal }),
+  })
+}
 
 /** Readable message for a failed query or mutation, without leaking non-Error values. */
 export const errorMessage = (error: unknown, fallback: string): string => (error instanceof Error && error.message.length > 0 ? error.message : fallback)

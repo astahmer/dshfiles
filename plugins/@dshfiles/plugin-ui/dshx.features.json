@@ -26,6 +26,12 @@
           "id": "plugin-ui.query-client-identity",
           "file": "plugins/@dshfiles/plugin-ui/tests/query.test.tsx",
           "testName": "is one client per bundle"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.resource-query-bridge",
+          "file": "plugins/@dshfiles/plugin-ui/tests/resource-query.test.tsx",
+          "testName": "reads through the page-wide store, so two bundles share one in-flight read"
         }
       ],
       "telemetry": [
