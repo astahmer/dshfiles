@@ -80,10 +80,11 @@ describe('Mistral model catalog', () => {
         object: 'list',
         data: [
           { id: 'devstral-latest', capabilities: chat, max_context_length: null },
+          { id: 'codestral-latest', capabilities: { ...chat, vision: false } },
           { id: 'open-mistral-7b', capabilities: chat, deprecation: '2025-03-30T12:00:00Z' },
         ],
       }),
-    ).toEqual([{ id: 'devstral-latest', vision: false }])
+    ).toEqual([{ id: 'devstral-latest' }, { id: 'codestral-latest', vision: false }])
     expect(() => parseMistralCatalog({ unexpected: true })).toThrow()
   })
 
@@ -94,7 +95,7 @@ describe('Mistral model catalog', () => {
         : Response.json({ data: [{ id: 'mistral-medium-latest', capabilities: chat }] }),
     )
     vi.stubGlobal('fetch', fetchMock)
-    expect(await fetchMistralCatalog('key')).toEqual([{ id: 'mistral-medium-latest', vision: false }])
+    expect(await fetchMistralCatalog('key')).toEqual([{ id: 'mistral-medium-latest' }])
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
       'https://api.mistral.ai/v1/model-catalog?surface=vibe-code',
       'https://api.mistral.ai/v1/models',
@@ -108,6 +109,13 @@ describe('Mistral model catalog', () => {
     expect(mistralTemplateId('mistral-vibe-cli-fast', known)).toBe('mistral-small-latest')
     expect(mistralTemplateId('devstral-2604', known)).toBe('devstral-latest')
     expect(mistralTemplateId('unknown-model', known)).toBe('mistral-medium-latest')
+  })
+
+  it('templates a variant on its catalogued base model and GLM aliases on GLM 5.3', () => {
+    const known = ['mistral-large-4', 'mistral-large-latest', 'mistral-medium-latest', 'zai-glm-5-2', 'zai-glm-5-3']
+    expect(mistralTemplateId('mistral-large-4-0', known)).toBe('mistral-large-4')
+    expect(mistralTemplateId('zai-glm-5-3-flash', known)).toBe('zai-glm-5-3')
+    expect(mistralTemplateId('zai-glm-latest', known)).toBe('zai-glm-5-3')
   })
 })
 

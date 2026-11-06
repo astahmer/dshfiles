@@ -1,10 +1,11 @@
+import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-llm'
 import { Context, Effect, Exit, Fiber, HashMap, Layer, Option, Ref } from 'effect'
 import type { KeyedRoute } from './provider-routes.js'
 
 /** A discovered catalog is only valid for the keyed route it was fetched for. */
 export interface DiscoveredCatalog {
   readonly route: KeyedRoute
-  readonly modelIds: readonly string[]
+  readonly models: readonly LlmDiscoveredModel[]
 }
 
 export const CATALOG_REFRESH_TIMEOUT = '15 seconds'
@@ -18,9 +19,9 @@ export const CATALOG_REFRESH_TIMEOUT = '15 seconds'
 export class ModelCatalogs extends Context.Service<
   ModelCatalogs,
   {
-    /** The ids discovered for this account, synchronously: route building reads it while it builds profiles. */
-    readonly discovered: (instanceId: string) => readonly string[] | undefined
-    readonly record: (input: { readonly instanceId: string; readonly route: KeyedRoute; readonly modelIds: readonly string[] }) => Effect.Effect<void>
+    /** The models discovered for this account, synchronously: route building reads them while it builds profiles. */
+    readonly discovered: (instanceId: string) => readonly LlmDiscoveredModel[] | undefined
+    readonly record: (input: { readonly instanceId: string; readonly route: KeyedRoute; readonly models: readonly LlmDiscoveredModel[] }) => Effect.Effect<void>
     readonly forget: (instanceId: string) => Effect.Effect<void>
     /** Drop every catalog whose route no longer matches, as a route rebuild does. */
     readonly retain: (matches: (input: { readonly instanceId: string; readonly route: KeyedRoute }) => boolean) => Effect.Effect<void>
@@ -37,9 +38,9 @@ export class ModelCatalogs extends Context.Service<
     const record = Effect.fn('ai-accounts model catalog record')(function* (input: {
       readonly instanceId: string
       readonly route: KeyedRoute
-      readonly modelIds: readonly string[]
+      readonly models: readonly LlmDiscoveredModel[]
     }) {
-      yield* Ref.update(discovered, current => HashMap.set(current, input.instanceId, { route: input.route, modelIds: input.modelIds }))
+      yield* Ref.update(discovered, current => HashMap.set(current, input.instanceId, { route: input.route, models: input.models }))
     })
 
     /** Only the run that still owns the account drops its entry; a replaced run leaves the newer one in place. */
@@ -76,7 +77,7 @@ export class ModelCatalogs extends Context.Service<
     })
 
     return ModelCatalogs.of({
-      discovered: instanceId => Option.map(HashMap.get(Ref.getUnsafe(discovered), instanceId), catalog => catalog.modelIds).pipe(Option.getOrUndefined),
+      discovered: instanceId => Option.map(HashMap.get(Ref.getUnsafe(discovered), instanceId), catalog => catalog.models).pipe(Option.getOrUndefined),
       record,
       forget: instanceId => Ref.update(discovered, current => HashMap.remove(current, instanceId)),
       retain: matches =>

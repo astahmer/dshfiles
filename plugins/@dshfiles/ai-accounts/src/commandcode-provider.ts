@@ -9,6 +9,7 @@ import {
   type SimpleStreamOptions,
   type TranscriptContext,
 } from '@earendil-works/pi-ai'
+import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-llm'
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import * as Schema from 'effect/Schema'
@@ -364,6 +365,6 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
   return {
     ...provider,
     /** A model discovered after boot, with this model's own capabilities rather than a template's. */
-    describeModel: (id: string, contextWindow?: number): Model<string> => commandCodeModel(id, root, contextWindow),
+    describeModel: (id: string, discovered?: LlmDiscoveredModel): Model<string> => commandCodeModel(id, root, discovered?.contextWindow),
   }
 }

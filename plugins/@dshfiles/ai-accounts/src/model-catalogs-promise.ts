@@ -1,8 +1,9 @@
+import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-llm'
 import { Effect, Exit, Fiber, Option, Schema, type Context } from 'effect'
 import type { ModelCatalogs } from './model-catalogs.js'
 import type { KeyedRoute } from './provider-routes.js'
 
-/** One account's model discovery failed; the catalog keeps its previous ids. */
+/** One account's model discovery failed; the catalog keeps its previous models. */
 export class ModelCatalogRefreshFailed extends Schema.TaggedError<ModelCatalogRefreshFailed>()('ModelCatalogRefreshFailed', {
   instanceId: Schema.String,
   cause: Schema.optional(Schema.Defect()),
@@ -12,12 +13,15 @@ export class ModelCatalogRefreshFailed extends Schema.TaggedError<ModelCatalogRe
   }
 }
 
-/** What the unported Host route code reads: the discovered ids synchronously, and one account's refresh to await. */
+/** What the unported Host route code reads: the discovered models synchronously, and one account's refresh to await. */
 export interface ModelCatalogsPromise {
-  readonly discovered: (instanceId: string) => readonly string[] | undefined
+  readonly discovered: (instanceId: string) => readonly LlmDiscoveredModel[] | undefined
   /** Refresh one account's catalog, interrupting the run already in flight for it; `undefined` when it found nothing. */
-  readonly refresh: (instanceId: string, task: (signal: AbortSignal) => Promise<readonly string[]>) => Promise<readonly string[] | undefined>
-  readonly record: (input: { readonly instanceId: string; readonly route: KeyedRoute; readonly modelIds: readonly string[] }) => void
+  readonly refresh: (
+    instanceId: string,
+    task: (signal: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>,
+  ) => Promise<readonly LlmDiscoveredModel[] | undefined>
+  readonly record: (input: { readonly instanceId: string; readonly route: KeyedRoute; readonly models: readonly LlmDiscoveredModel[] }) => void
   readonly forget: (instanceId: string) => void
   readonly retain: (matches: (input: { readonly instanceId: string; readonly route: KeyedRoute }) => boolean) => void
 }

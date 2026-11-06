@@ -6,6 +6,7 @@ import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
 import { FastModeService } from './codex-fast-mode.js'
 import { createCommandCodeProvider } from './commandcode-provider.js'
+import { createMistralProvider } from './mistral-provider.js'
 import { ProviderProfileModel, EffortPinnedAdapter } from './provider-profile.js'
 import { AccountModelSettingsModel, type AccountModelSettings } from './account-model-settings.js'
 import { AccountDraftModel } from './account-draft.js'
@@ -171,6 +172,48 @@ describe('account provider profiles', () => {
     const glm = models.find(model => model.id === 'zai-org/GLM-5.2')
     expect(glm).toMatchObject({ api: 'commandcode', provider: 'commandcode-work', reasoning: true, thinkingLevelMap: { low: null, high: 'high', max: 'max' } })
     expect(models.find(model => model.id === 'vendor/unknown-model')).toMatchObject({ api: 'commandcode', reasoning: false })
+  })
+
+  it('offers Mistral account models only the reasoning efforts Mistral accepts', async () => {
+    const profile = ProviderProfileModel.buildProfile({
+      upstream: createMistralProvider(),
+      provider: 'mistral-work',
+      displayName: 'Mistral Work',
+      additionalModelIds: ['zai-glm-5-3-flash', 'deepseek-v4-1-flash-1017'],
+    })
+    const adapter = new EffortPinnedAdapter(
+      {
+        profiles: () => new Map([['mistral-work', profile]]),
+        resolveApiKey: async () => undefined,
+        auth: {
+          credentials: { read: async () => undefined, list: async () => [], modify: async () => undefined, delete: async () => undefined },
+          authContext: { env: async () => undefined, fileExists: async () => false },
+        },
+      },
+      { reasoningDefaults: new Map(), fastMode: disabledFastMode },
+    )
+    const efforts = async (model: string) => (await adapter.resolveModel('mistral-work', model)).reasoning?.efforts.map(effort => effort.id)
+    expect(await efforts('mistral-large-4')).toEqual(['low', 'medium', 'high'])
+    expect(await efforts('zai-glm-5-3-flash')).toEqual(['low', 'high', 'max'])
+    expect(await efforts('deepseek-v4-1-flash-1017')).toEqual(['low', 'high', 'max'])
+  })
+
+  it('keeps the context window and image input a provider catalog reports', () => {
+    const profile = ProviderProfileModel.buildProfile({
+      upstream: createMistralProvider(),
+      provider: 'mistral-work',
+      displayName: 'Mistral Work',
+      additionalModelIds: [],
+      discoveredModels: [
+        { id: 'deepseek-v4-1-flash-1017', contextWindow: 1_048_576, inputModalities: ['text', 'image'] },
+        { id: 'mistral-vibe-cli-latest', inputModalities: ['text'] },
+        { id: 'mistral-vibe-cli-fast' },
+      ],
+    })
+    const model = (id: string) => modelsFor(profile).find(candidate => candidate.id === id)
+    expect(model('deepseek-v4-1-flash-1017')).toMatchObject({ contextWindow: 1_048_576, input: ['text', 'image'] })
+    expect(model('mistral-vibe-cli-latest')?.input).toEqual(['text'])
+    expect(model('mistral-vibe-cli-fast')?.input).toEqual(['text', 'image'])
   })
 
   it('retries a content-free settlement instead of ending the turn', () => {

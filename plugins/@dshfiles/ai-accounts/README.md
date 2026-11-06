@@ -173,7 +173,13 @@ other Mistral subscription path (t3code and Zed run Vibe over ACP instead).
 - **Requests.** pi-ai's Mistral transport: `https://api.mistral.ai/v1/chat/completions` with the account's bearer key and
   `x-affinity` set to the conversation for prompt caching.
 - **Models.** The Vibe plan catalog (`/v1/model-catalog?surface=vibe-code`, e.g. `mistral-vibe-cli-latest`), falling back
-  to the documented `/v1/models`; only tool-capable chat models are offered.
+  to the documented `/v1/models`; only tool-capable chat models are offered, each with the context window and image
+  input Mistral reports for it.
+- **Reasoning.** Each model offers the `reasoning_effort` values
+  [Mistral accepts](https://docs.mistral.ai/studio/conversations/reasoning): Large 4 low/medium/high; GLM 5.3,
+  GLM 5.3 Flash and `zai-glm-latest` low/high/max; DeepSeek V4.1 Flash low/high/max (undocumented, as a live account
+  serves it). None of them accepts `none`, so they offer no Off and a request without an effort omits `reasoning_effort`.
+  Other models keep pi-ai's catalog levels.
 - **Quota.** The monthly Vibe allowance and plan name from `/v1/billing/budget` and `/v1/billing/subscription`, the reads
   Mistral Vibe's footer uses. They are not in Mistral's public API reference: a key without a plan allowance, or a member
   without the usage permission, shows **Quota unavailable**, never a guessed percentage.
