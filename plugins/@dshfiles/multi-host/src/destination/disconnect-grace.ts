@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useReducer } from 'react'
 
 type HostTone = 'online' | 'idle' | 'error'
 type HostToneState = { readonly tone: HostTone; readonly label: string }
@@ -12,26 +12,59 @@ const RECONNECTING: HostToneState = { tone: 'idle', label: 'Reconnecting…' }
 const graceRemaining = (input: { readonly lastOnlineAt: number; readonly now: number }): number =>
   Math.max(0, input.lastOnlineAt + DISCONNECT_GRACE_MS - input.now)
 
+/** Where a host stands in the grace window: it never answered, it answered inside the window, or the window closed. */
+export type GracePhase =
+  | { readonly phase: 'unseen' }
+  | { readonly phase: 'grace'; readonly lastOnlineAt: number }
+  | { readonly phase: 'failed'; readonly lastOnlineAt: number }
+
+/** One host observation, or the timer announcing the window is over. */
+export type GraceEvent = { readonly kind: 'online'; readonly at: number } | { readonly kind: 'failure'; readonly at: number } | { readonly kind: 'elapsed' }
+
+const UNSEEN: GracePhase = { phase: 'unseen' }
+
+/** Advance the window: a good answer refreshes it, a failure keeps it while time remains, and elapsed closes it. */
+export const graceTransition = (phase: GracePhase, event: GraceEvent): GracePhase => {
+  if (event.kind === 'online') return { phase: 'grace', lastOnlineAt: event.at }
+  if (phase.phase === 'unseen') return phase
+  if (event.kind === 'elapsed') return { phase: 'failed', lastOnlineAt: phase.lastOnlineAt }
+  return phase.phase === 'grace' && graceRemaining({ lastOnlineAt: phase.lastOnlineAt, now: event.at }) > 0
+    ? phase
+    : { phase: 'failed', lastOnlineAt: phase.lastOnlineAt }
+}
+
+/** The host state to show: a failure still inside a recently refreshed window reads as reconnecting. */
+export const graceDisplay = (input: { readonly state: HostToneState; readonly phase: GracePhase; readonly now: number }): HostToneState =>
+  input.state.tone === 'error' && input.phase.phase === 'grace' && graceRemaining({ lastOnlineAt: input.phase.lastOnlineAt, now: input.now }) > 0
+    ? RECONNECTING
+    : input.state
+
 /** The host state, reading as reconnecting while a host that was online moments ago starts failing. */
 const useDisconnectGrace = (state: HostToneState): HostToneState => {
-  const [lastOnlineAt, setLastOnlineAt] = useState<number | undefined>(undefined)
-  const [graceOver, setGraceOver] = useState(false)
+  const [phase, dispatch] = useReducer(graceTransition, UNSEEN)
+  // Every online observation moves the window: a host that keeps answering keeps the full grace period.
   useEffect(() => {
-    if (state.tone !== 'online') return
-    setLastOnlineAt(Date.now())
-    setGraceOver(false)
-  }, [state.tone])
+    if (state.tone === 'online') dispatch({ kind: 'online', at: Date.now() })
+    else if (state.tone === 'error') dispatch({ kind: 'failure', at: Date.now() })
+  }, [state.tone, state.label])
   useEffect(() => {
-    if (state.tone !== 'error' || lastOnlineAt === undefined) return
-    const remaining = graceRemaining({ lastOnlineAt, now: Date.now() })
-    const timer = setTimeout(() => setGraceOver(true), remaining)
-    return () => clearTimeout(timer)
-  }, [state.tone, lastOnlineAt])
-  return state.tone === 'error' && lastOnlineAt !== undefined && !graceOver ? RECONNECTING : state
+    if (state.tone !== 'error' || phase.phase !== 'grace') return
+    const remaining = graceRemaining({ lastOnlineAt: phase.lastOnlineAt, now: Date.now() })
+    if (remaining === 0) return
+    const timer = setTimeout(() => {
+      dispatch({ kind: 'elapsed' })
+    }, remaining)
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [state.tone, phase])
+  return graceDisplay({ state, phase, now: Date.now() })
 }
 
 export class DisconnectGrace {
   static readonly windowMs = DISCONNECT_GRACE_MS
   static readonly remaining = graceRemaining
+  static readonly transition = graceTransition
+  static readonly display = graceDisplay
   static readonly use = useDisconnectGrace
 }
