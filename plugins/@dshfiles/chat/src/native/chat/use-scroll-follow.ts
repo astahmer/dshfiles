@@ -18,6 +18,27 @@ export function scrollMetrics(element: HTMLElement): ViewportMetrics {
   return { top: element.scrollTop, height, floor: Math.max(0, element.scrollHeight - height) }
 }
 
+/** The follow intent one scroll controller reads and adopts; the caller owns the single value. */
+export interface FollowIntent {
+  /** @returns whether content growth should follow the floor. */
+  readonly following: boolean
+  /** Adopt follow intent; the controller stops its own animation target when following ends. */
+  setFollowing(following: boolean): void
+}
+
+/** Follow intent for a scrollport that no reading policy owns, such as one capped process body. */
+export class LocalFollowIntent implements FollowIntent {
+  private active: boolean
+
+  constructor(initial: boolean) {
+    this.active = initial
+  }
+
+  get following(): boolean { return this.active }
+
+  setFollowing(following: boolean): void { this.active = following }
+}
+
 /** One scrollport's follow intent; native animation progress does not count as reader movement. */
 export class ScrollFollow {
   private static readonly owners = new WeakMap<HTMLElement, ScrollFollow>()
@@ -25,10 +46,10 @@ export class ScrollFollow {
   private sampledTop: number | undefined
 
   /**
-   * @param following - initial follow intent.
+   * @param intent - the single follow intent this controller reads and adopts.
    * @param threshold - accepted distance from the floor, in pixels.
    */
-  constructor(private following: boolean, private readonly threshold: number) {}
+  constructor(private readonly intent: FollowIntent, private readonly threshold: number) {}
 
   /**
    * Find the mounted controller for reading-position compensation.
@@ -51,7 +72,7 @@ export class ScrollFollow {
    * Expose follow intent independently of the current offset.
    * @returns whether content growth should follow the floor.
    */
-  get active(): boolean { return this.following }
+  get active(): boolean { return this.intent.following }
 
   /**
    * Expose outstanding native motion before accepting reader input.
@@ -71,7 +92,7 @@ export class ScrollFollow {
    * @param active - externally committed follow intent.
    */
   setFollowing(active: boolean): void {
-    this.following = active
+    this.intent.setFollowing(active)
     if (!active) this.target = null
   }
 
@@ -90,7 +111,7 @@ export class ScrollFollow {
   sample(metrics: ViewportMetrics, movedByReader = this.sampledTop === undefined
     || Math.abs(metrics.top - this.sampledTop) > 0.5): boolean {
     this.sampledTop = metrics.top
-    if (!this.animating && movedByReader) this.following = this.nearBottom(metrics)
+    if (!this.animating && movedByReader) this.intent.setFollowing(this.nearBottom(metrics))
     return this.active
   }
 
@@ -121,7 +142,7 @@ export class ScrollFollow {
     else if (target !== metrics.top) element.scrollTop = target
     const landed = { ...metrics, top: element.scrollTop }
     this.sampledTop = landed.top
-    this.following = this.nearBottom(landed)
+    this.intent.setFollowing(this.nearBottom(landed))
     return landed
   }
 
@@ -136,7 +157,7 @@ export class ScrollFollow {
    * @returns current geometry; smooth requests retain their starting position until native scroll delivery.
    */
   toBottom(element: HTMLElement, metrics: ViewportMetrics, behavior: 'instant' | 'smooth'): ViewportMetrics {
-    this.following = true
+    this.intent.setFollowing(true)
     if (metrics.top === metrics.floor) return this.jump(element, metrics, metrics.floor)
     if (behavior === 'instant' && this.animating) {
       // Content grew under an outstanding animation: retarget it instead of cutting to the floor.
@@ -172,11 +193,11 @@ export class ScrollFollow {
 
 /**
  * Retain one independent follow controller without React updates for scroll samples.
- * @param initial - initial follow intent.
+ * @param intent - the single follow intent this controller reads and adopts.
  * @param threshold - accepted distance from the floor, in pixels.
  * @returns the stable controller shared by the caller's scroll and resize handlers.
  */
-export function useScrollFollow(initial: boolean, threshold: number): ScrollFollow {
-  const [follow] = useState(() => new ScrollFollow(initial, threshold))
+export function useScrollFollow(intent: FollowIntent, threshold: number): ScrollFollow {
+  const [follow] = useState(() => new ScrollFollow(intent, threshold))
   return follow
 }
