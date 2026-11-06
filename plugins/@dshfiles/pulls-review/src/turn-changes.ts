@@ -1,3 +1,4 @@
+import { retryOnceUnlessTimedOut } from '@dshfiles/plugin-ui/lib/host-request'
 import { Option, Schema } from 'effect'
 
 /**
@@ -95,7 +96,19 @@ const patchOf = (diff: TurnFileDiff): string => {
   return `${[...header, ...hunks].join('\n')}\n`
 }
 
+export class TurnChangesReadError extends Error {
+  constructor(readonly status: number) {
+    super(`The Host answered ${String(status)} for this turn's changes; it keeps them only while the thread is loaded.`)
+    this.name = 'TurnChangesReadError'
+  }
+}
+
+/** A 404 means the Host no longer holds this turn's snapshot; asking again gets the same answer. */
+const retryRead = (failureCount: number, error: unknown): boolean =>
+  !(error instanceof TurnChangesReadError && error.status === 404) && retryOnceUnlessTimedOut(failureCount, error)
+
 export class TurnChangesModel {
+  static readonly retryRead = retryRead
   static readonly events = turnEvents
   static readonly summaryUrl = summaryUrl
   static readonly diffUrl = diffUrl

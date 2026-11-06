@@ -20,7 +20,7 @@ import { pullsReviewApi } from './api.js'
 import { FacetSessionStateModel, type FacetSessionPatch } from './changes-facet-state.js'
 import { ChangesScopeModel, changesScopeSchema, type ChangesRequest, type ChangesScope } from './changes-scope.js'
 import { LandCard } from './land-card.js'
-import { TurnChangesModel, type TurnChangesEvent } from './turn-changes.js'
+import { TurnChangesModel, TurnChangesReadError, type TurnChangesEvent } from './turn-changes.js'
 import { useRangeViewedMarks, useTurnViewedMarks, type ViewedMarksView } from './viewed-marks.js'
 import { Schema } from 'effect'
 
@@ -88,7 +88,7 @@ const useThreadSummary = (sessions: ISessions, sessionId: string | undefined) =>
 /** Fetch one document-relative Host route as JSON; a non-2xx answer is an error the facet can show. */
 const fetchJson = async (url: string, signal: AbortSignal): Promise<unknown> => {
   const response = await fetch(url, { signal })
-  if (!response.ok) throw new Error(`The Host answered ${String(response.status)} for this turn's changes; it keeps them only while the thread is loaded.`)
+  if (!response.ok) throw new TurnChangesReadError(response.status)
   return response.json()
 }
 
@@ -175,6 +175,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
     queryKey: ['pulls-review', 'facet-turn', props.sessionId, activeSeq],
     enabled: activeScope === 'turn' && props.sessionId !== undefined && activeSeq !== undefined,
     staleTime: Number.POSITIVE_INFINITY,
+    retry: TurnChangesModel.retryRead,
     queryFn: ({ signal }) => readTurnDiff({ sessionId: props.sessionId ?? '', seq: activeSeq ?? 0, signal }),
   })
 
