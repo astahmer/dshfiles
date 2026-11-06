@@ -341,6 +341,15 @@ export type InputEvent =
   | { readonly type: 'sink-settled'; readonly attempt: SubmitAttempt; readonly ok: boolean; readonly outcome?: SubmitOutcome; readonly message?: string }
   /** Commit an attachment-only send whose empty draft did not need an attempt. */
   | { readonly type: 'send-committed' }
+  /** A restored draft carried this command token; start the claim resolution when the pipeline can answer. */
+  | { readonly type: 'restore-request'; readonly token: string; readonly rev: number }
+  /** Ask for the pending restore's claim resolution (the machine mints its abort signal). */
+  | { readonly type: 'restore-start' }
+  /** The resolved claim for the restore that requested it. */
+  | { readonly type: 'restore-resolved'; readonly token: string; readonly rev: number; readonly claim: CommandClaim }
+  /** The restore could not resolve a claim; the literal token stays and Enter still adjudicates it. */
+  | { readonly type: 'restore-failed'; readonly token: string; readonly rev: number }
+  | { readonly type: 'restore-cancel' }
   | { readonly type: 'release' }
 
 /**
@@ -366,3 +375,7 @@ export type InputEffect =
    * sends have no draft to retain).
    */
   | { readonly type: 'commit-draft'; readonly retainSuffixOf: string | null }
+  /** Resolve one restored command token through the trigger pipeline (the signal aborts with the restore). */
+  | { readonly type: 'resolve-claim'; readonly token: string; readonly rev: number; readonly signal: AbortSignal }
+  /** Rebuild the restored command chip at the revision its restore produced. */
+  | { readonly type: 'apply-claim'; readonly claim: CommandClaim; readonly token: string; readonly rev: number }

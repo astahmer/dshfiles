@@ -47,6 +47,8 @@
     "src/native/conversation/live-bindings.ts",
     "src/native/image-attachment-references.test.ts",
     "src/native/image-attachment-references.ts",
+    "src/native/input/detached-sends.test.ts",
+    "src/native/input/detached-sends.ts",
     "src/native/input/editor/keymap.test.ts",
     "src/native/input/editor/reference-activation.test.ts",
     "src/native/input/machine.test.ts",
