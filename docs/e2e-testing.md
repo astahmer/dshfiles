@@ -295,7 +295,17 @@ checkout. The supervised `dsh web` process additionally sweeps every JJ
 workspace ledger every 10 minutes, reaping only recorded hosts at least one hour
 old. The same script supports `--all-workspaces` and `--dry-run`; its `--patterns`
 mode remains the blunt instrument for a one-off cleanup and can match a live
-`dshx dev up` Host. A `dshx dev up` instance stops itself instead: its watchdog
+`dshx dev up` Host.
+
+The ledger only helps the next run. Every scratch Host now starts under a
+parent-death guard that holds a pipe from its Playwright worker: when the worker
+dies — SIGKILL included, which never reaches `close()` or an exit handler — the
+pipe closes and the guard stops the Host's process group (SIGTERM, SIGKILL after
+3 s). The Host also carries `DSHX_SCRATCH_OWNER` and a record in
+`$TMPDIR/dshx-scratch/`, and `dshx scratch sweep` (run by `check-browser.mjs`
+and by each worker's first boot) stops any recorded Host whose owner is gone,
+from every workspace. See the [CLI reference](../tooling/dshx/docs/cli-reference.md).
+A `dshx dev up` instance stops itself instead: its watchdog
 warns after 30 idle minutes, runs `down` once a 10 min grace ends with no keep
 (`dshx dev keep`, or any dshx command that reaches it), or as soon as its Host
 exits, and the next `up` sweeps any state left behind.

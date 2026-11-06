@@ -109,6 +109,19 @@ warning and renews the lease — `--forever` pins it — and so does any `dshx d
 command that reaches the instance; `doctor` lists a pending warning with its
 remaining grace.
 
+Each scratch process runs under a parent-death guard owned by that watchdog
+(`up` holds the pipe until it hands over), so killing the watchdog, or `up`
+dying mid-start, stops the Host and Chromium too. Leaked Hosts from other runs:
+
+```sh
+dshx scratch sweep --dry-run   # orphans (owner gone), pre-registry leaks (pid 1, > 2 h), old state dirs
+dshx scratch sweep [--json]    # stop them (SIGTERM, then SIGKILL) and prune; never touches the live DSH
+```
+
+`up` and `pnpm check:e2e` run the same sweep first. Records live in
+`$TMPDIR/dshx-scratch/<host-pid>.json`; each Host's env carries
+`DSHX_SCRATCH_OWNER=<pid>:<startedAtMs>:<workspace>`.
+
 ## Journeys
 
 `dshx dev` walks one feature; the Gherkin journeys walk them all. `pnpm check`

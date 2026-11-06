@@ -52,7 +52,9 @@ If none applies, stop: **Clean**.
    `up` runs `down` on other agents' stale instances under the state root. A
    spec or live pass that exercises the lease, warning grace, watchdog or sweep
    sets `DSHX_DEV_STATE_ROOT` to its own temp dir (`dev-scratch.spec.ts` does),
-   so it can never stop an instance in `$TMPDIR/dshx-dev`. A startup warning is
+   so it can never stop an instance in `$TMPDIR/dshx-dev`; a spec of the
+   scratch registry sweep sets `DSHX_SCRATCH_REGISTRY_DIR` and passes its own
+   `processes` (`scratch-orphans.spec.ts`), so it never stops a real Host. A startup warning is
    the two-phase stop, not drift: `doctor` reports the answered warning, and
    `dshx dev keep --forever` pins an instance a long pass must keep.
    A `reach` not walked green in this session stays unverified; say so.
