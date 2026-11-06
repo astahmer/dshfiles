@@ -22,14 +22,20 @@ import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
 import { presetOptions, readRoster } from './settings-store.ts'
 import type { AgentPresetOption } from './settings-store.ts'
 
+/** A selection the Host refused, kept with its preset so the chip can name what failed. */
+export interface PresetRefusal {
+  readonly preset: AgentPresetOption
+  readonly reason: string
+}
+
 /** Hero-chip snapshot. */
 export interface AgentPresetSeatState {
   /** Presets the deployment supplies; empty means the chip renders nothing. */
   options: readonly AgentPresetOption[]
   /** The staged choice, empty until the roster loads. */
   current: string
-  /** An error message; explicit selection failures also carry the preset for a Toast. */
-  error: string | { readonly preset: AgentPresetOption; readonly reason: string } | null
+  /** The error of the seat's phase: a refusal object while it announces, its reason after. */
+  error: string | PresetRefusal | null
   busy: boolean
   /**
    * One-shot cue that the chip should introduce itself (the creator-draft
@@ -43,15 +49,73 @@ const INITIAL: AgentPresetSeatState = {
   options: [], current: '', error: null, busy: false, introduce: false,
 }
 
-/** Mutable one-shot preset choice shared across Provider-bound seat controllers. */
-export interface AgentPresetStage {
-  /** Preset awaiting application; absence means no staged choice. */
-  id: string | undefined
-  /** Whether the receiving chip should announce the applied choice once. */
-  introduce: boolean
-  /** Creator navigation must not spend its stage on the previous blank. */
-  sourceSessionId?: SessionSummary['id'] | undefined
+/**
+ * The next session's pick, as one value every seat reads.
+ *
+ * The stage used to be a mutable object shared by every controller and edited
+ * in place by the page's Developer-tools gate. Taking it is now a single
+ * `consume()` that only one caller can win, which is what keeps a pick from
+ * being spent twice when a list and a draft notification both land.
+ */
+export type AgentPresetStage =
+  | { readonly kind: 'empty' }
+  | {
+    readonly kind: 'staged'
+    readonly preset: string
+    readonly introduce: boolean
+    /** Creator navigation must not spend its stage on the previous blank. */
+    readonly sourceSessionId: SessionSummary['id'] | null
+  }
+
+/** Where a staged pick waits; see {@link AgentPresetStage}. */
+export class AgentPresetStageStore {
+  private currentStage: AgentPresetStage = { kind: 'empty' }
+
+  read(): AgentPresetStage {
+    return this.currentStage
+  }
+
+  stage(input: {
+    readonly preset: string
+    readonly introduce?: boolean
+    readonly sourceSessionId?: SessionSummary['id'] | null
+  }): void {
+    this.currentStage = {
+      kind: 'staged',
+      preset: input.preset,
+      introduce: input.introduce ?? false,
+      sourceSessionId: input.sourceSessionId ?? null,
+    }
+  }
+
+  /** Take the stage out; the caller that receives it is the one that may apply it. */
+  consume(): Extract<AgentPresetStage, { kind: 'staged' }> | null {
+    const stage = this.currentStage
+    if (stage.kind === 'empty') return null
+    this.currentStage = { kind: 'empty' }
+    return stage
+  }
+
+  introduced(): void {
+    if (this.currentStage.kind === 'staged' && this.currentStage.introduce) {
+      this.currentStage = { ...this.currentStage, introduce: false }
+    }
+  }
+
+  clear(): void {
+    this.currentStage = { kind: 'empty' }
+  }
 }
+
+/**
+ * The seat is idle, applying one Host selection, or announcing a refusal. The
+ * chip snapshot is derived from this, so "busy" and a refusal can never show
+ * together.
+ */
+type SeatPhase =
+  | { readonly kind: 'idle'; readonly error: string | null }
+  | { readonly kind: 'applying'; readonly settled: Promise<void> }
+  | { readonly kind: 'refused'; readonly refusal: PresetRefusal }
 
 /** Stages the next session's preset and applies it when one appears. */
 export class AgentPresetSeatController {
@@ -63,11 +127,13 @@ export class AgentPresetSeatController {
    * re-reading the roster.
    */
   private fallback = ''
+  private options: readonly AgentPresetOption[] = []
+  private phase: SeatPhase = { kind: 'idle', error: null }
+  /** The one-shot introduction cue: armed by a stage from another screen, played once by the chip. */
+  private cue = false
 
   /** Only the newest roster read may publish after overlapping refreshes. */
-  private loadGeneration = 0
-  /** Completion of the active Host selection; Settings choices wait before staging. */
-  private pendingSelection: Promise<undefined> | undefined
+  private loadToken: object | null = null
 
   constructor(
     private readonly ctx: ClientContext,
@@ -76,17 +142,19 @@ export class AgentPresetSeatController {
       SessionSummary,
       'id' | 'blank' | 'projectionValues'
     > | undefined,
-    private readonly staged: AgentPresetStage = { id: undefined, introduce: false },
+    private readonly stages: AgentPresetStageStore = new AgentPresetStageStore(),
   ) {}
 
-  private set(patch: Partial<AgentPresetSeatState>): void {
-    this.store.set({ ...this.store.getSnapshot(), ...patch })
-  }
-
-  private clearStage(): void {
-    this.staged.id = undefined
-    this.staged.introduce = false
-    this.staged.sourceSessionId = undefined
+  private publish(input: { readonly current?: string } = {}): void {
+    const stage = this.stages.read()
+    const phase = this.phase
+    this.store.set({
+      options: this.options,
+      current: input.current ?? (stage.kind === 'staged' ? stage.preset : this.presetFor(this.currentSession())),
+      error: phase.kind === 'refused' ? phase.refusal : phase.kind === 'idle' ? phase.error : null,
+      busy: phase.kind === 'applying',
+      introduce: this.cue,
+    })
   }
 
   private presetFor(session: ReturnType<AgentPresetSeatController['currentSession']>): string {
@@ -98,33 +166,29 @@ export class AgentPresetSeatController {
 
   /**
    * Read the roster and open the chip on the Host-effective default.
-  * @returns once the snapshot reflects the host.
-  */
+   * @returns once the snapshot reflects the host.
+   */
   async load(): Promise<void> {
-    const generation = ++this.loadGeneration
+    const token = {}
+    this.loadToken = token
     const roster = await readRoster(this.ctx)
-    if (generation !== this.loadGeneration) return
-    // A roster refresh can finish after a selection; leave its announcement for the chip.
-    const error = this.store.getSnapshot().error
+    if (this.loadToken !== token) return
     if (!roster.ok) {
-      if (typeof error !== 'object' || error === null) this.set({ error: roster.error })
+      // A roster refresh can finish after a selection; leave its announcement for the chip.
+      if (this.phase.kind === 'idle') this.phase = { kind: 'idle', error: roster.error }
+      this.publish()
       return
     }
     const { presets } = roster.value
     this.fallback = presets.find(preset => preset.isDefault)?.id ?? presets[0]?.id ?? ''
-    const session = this.currentSession()
-    this.set({
-      options: presetOptions(presets),
-      // Staged pick first, then the composition the current session
-      // already carries, then the Host-effective default. The middle term is
-      // what keeps a late-landing load from regressing the display after
-      // an applied stage was consumed — the chip mounts (and loads) only
-      // once the flow's session is current, so the reply can arrive after
-      // apply() already composed it.
-      current: this.staged.id ?? this.presetFor(session),
-      error: typeof error === 'object' ? error : null,
-      introduce: this.staged.introduce,
-    })
+    this.options = presetOptions(presets)
+    // A stage that landed from another screen still owes its introduction on this chip.
+    const staged = this.stages.read()
+    this.cue = staged.kind === 'staged' ? staged.introduce : false
+    // A late-landing load must not regress the display after an applied stage was consumed: the chip mounts (and
+    // loads) only once the flow's session is current, so a successful read clears a plain message and keeps a refusal.
+    if (this.phase.kind === 'idle') this.phase = { kind: 'idle', error: null }
+    this.publish()
     await this.apply()
   }
 
@@ -138,7 +202,7 @@ export class AgentPresetSeatController {
    * @returns the refusal text, or undefined once the pick settled.
    */
   async select(id: string): Promise<string | undefined> {
-    if (this.store.getSnapshot().busy) return undefined
+    if (this.phase.kind === 'applying') return undefined
     this.stage(id)
     return await this.apply()
   }
@@ -155,19 +219,20 @@ export class AgentPresetSeatController {
    * chip should announce itself on the session it lands on.
    */
   stage(id: string, introduce = false): void {
-    this.staged.id = id
-    this.staged.introduce = introduce
-    this.staged.sourceSessionId = introduce ? this.currentSession()?.id : undefined
-    this.set({ current: id, error: null, introduce })
+    this.cue = introduce
+    this.stages.stage({ preset: id, introduce, sourceSessionId: introduce ? this.currentSession()?.id ?? null : null })
+    if (this.phase.kind !== 'applying') this.phase = { kind: 'idle', error: null }
+    this.publish({ current: id })
   }
 
   /** Acknowledge a displayed refusal without dismissing a newer attempt.
    * @param refusal - the selection error whose Toast finished.
    */
   dismissRefusal(refusal: AgentPresetSeatState['error']): void {
-    if (refusal !== null && typeof refusal === 'object' && this.store.getSnapshot().error === refusal) {
-      this.set({ error: refusal.reason })
-    }
+    if (refusal === null || typeof refusal !== 'object') return
+    if (this.phase.kind !== 'refused' || this.phase.refusal !== refusal) return
+    this.phase = { kind: 'idle', error: refusal.reason }
+    this.publish()
   }
 
   /**
@@ -190,7 +255,7 @@ export class AgentPresetSeatController {
     expectedSessionId: SessionSummary['id'],
     id: string,
   ): Promise<string | undefined> {
-    while (this.pendingSelection !== undefined) await this.pendingSelection
+    while (this.phase.kind === 'applying') await this.phase.settled
     const session = this.currentSession()
     if (session === undefined || !session.blank || session.id !== expectedSessionId) return undefined
     this.stage(id)
@@ -199,9 +264,10 @@ export class AgentPresetSeatController {
 
   /** Acknowledge the introduction cue once the chip has played it. */
   introduced(): void {
-    if (!this.store.getSnapshot().introduce) return
-    this.staged.introduce = false
-    this.set({ introduce: false })
+    if (!this.cue) return
+    this.cue = false
+    this.stages.introduced()
+    this.publish()
   }
 
   /**
@@ -213,45 +279,48 @@ export class AgentPresetSeatController {
    * @returns this attempt's Host refusal, or undefined when successful or no switch starts.
    */
   async apply(): Promise<string | undefined> {
-    if (this.store.getSnapshot().busy) return
-    const staged = this.staged.id
+    if (this.phase.kind === 'applying') return undefined
+    const stage = this.stages.read()
     const session = this.currentSession()
-    if (staged === undefined) {
-      const current = this.presetFor(session)
-      const shown = this.store.getSnapshot()
-      if (current !== shown.current) this.set({ current })
-      return
+    if (stage.kind === 'empty') {
+      this.publish()
+      return undefined
     }
-    if (session === undefined || this.staged.sourceSessionId === session.id) return
+    if (session === undefined || stage.sourceSessionId === session.id) return undefined
+    const target = stage.preset
     if (session.blank && this.ctx.sessionDrafts.list.getSnapshot()[session.id]?.local) {
-      // Clear before publishing: metadata subscribers can re-enter apply synchronously.
-      const introduce = this.staged.introduce
-      this.clearStage()
-      if (this.ctx.sessionDrafts.stagePreset(session.id, staged)) {
-        this.set({ current: staged, error: null, introduce })
-        return
+      // Consume before publishing: metadata subscribers can re-enter apply synchronously.
+      const consumed = this.stages.consume()
+      if (consumed !== null) this.cue = consumed.introduce
+      if (consumed !== null && this.ctx.sessionDrafts.stagePreset(session.id, consumed.preset)) {
+        this.phase = { kind: 'idle', error: null }
+        this.publish()
+        return undefined
       }
       // Materialization may have won the identity. Only then use the native Host path.
     }
     // A started session's history was produced under its own composition; the
     // host refuses the swap, so the stage is no longer meaningful.
-    if (!session.blank || presetOf(session) === staged) {
-      this.clearStage()
-      return
+    if (!session.blank || presetOf(session) === target) {
+      this.stages.clear()
+      return undefined
     }
-    const completion = Promise.withResolvers<undefined>()
-    this.pendingSelection = completion.promise
-    this.clearStage()
-    const refuse = (reason: string) => {
-      this.set({
-        error: { reason, preset: this.store.getSnapshot().options.find(option => option.id === staged) ?? { id: staged } },
-        current: this.staged.id ?? presetOf(session) ?? '',
-      })
+    const settled = Promise.withResolvers<void>()
+    // Keep showing the pick while the Host answers; the stage itself is spent.
+    const shown = this.store.getSnapshot().current
+    this.phase = { kind: 'applying', settled: settled.promise }
+    this.stages.clear()
+    this.publish({ current: shown })
+    const refuse = (reason: string): string => {
+      this.phase = {
+        kind: 'refused',
+        refusal: { reason, preset: this.options.find(option => option.id === target) ?? { id: target } },
+      }
+      this.publish({ current: presetOf(session) ?? '' })
       return reason
     }
     try {
-      this.set({ busy: true, error: null })
-      const result = await this.ctx.remote.agentPresets.select(session.id, staged)
+      const result = await this.ctx.remote.agentPresets.select(session.id, target)
       if (!result.ok) {
         const { error } = result
         // Prefer the bare cause; the Toast already names the rejected preset.
@@ -260,13 +329,12 @@ export class AgentPresetSeatController {
           : error.message
         return refuse(refusal)
       }
-      this.set({ current: this.staged.id ?? result.value })
+      this.phase = { kind: 'idle', error: null }
+      this.publish({ current: result.value })
     } catch (error) {
       return refuse(error instanceof Error ? error.message : String(error))
     } finally {
-      this.pendingSelection = undefined
-      this.set({ busy: false })
-      completion.resolve(undefined)
+      settled.resolve()
     }
   }
 }

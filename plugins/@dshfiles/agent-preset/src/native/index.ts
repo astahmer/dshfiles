@@ -41,7 +41,7 @@ import { AgentPresetSeat } from './AgentPresetSeat.tsx'
 import type { AgentPresetSeatInjected } from './AgentPresetSeat.tsx'
 import { AgentPresetSection } from './AgentPresetSection.tsx'
 import type { AgentPresetSectionInjected } from './AgentPresetSection.tsx'
-import { AgentPresetSeatController, type AgentPresetStage } from './seat-store.ts'
+import { AgentPresetSeatController, AgentPresetStageStore } from './seat-store.ts'
 import { AgentPresetSectionController } from './section-store.ts'
 import { en, zh, type AgentPresetSettingsKey } from './locales.ts'
 import { AGENT_PRESET_SETTINGS_NS, AgentPresetSettingsController, markRosterChanged } from './settings-store.ts'
@@ -77,13 +77,13 @@ export function apply(ctx: ClientContext): void {
   // Host preferences start at false before their first accepted document.
   const codingToolsDisabled = (): boolean => active && toolsSettings.getSnapshot().value?.enabled === false
   const controller = new AgentPresetSettingsController(ctx)
-  const staged: AgentPresetStage = { id: undefined, introduce: false }
+  const stages = new AgentPresetStageStore()
   const seats = new WeakMapWithValues<SessionBinding, AgentPresetSeatController>()
   const boundSeatDisposers = new Set<() => Promise<void>>()
   ctx.effect(() => async () => {
     await Promise.all([...boundSeatDisposers].map(dispose => dispose()))
   }, 'ui-agent-preset: bound selections')
-  const unboundSeat = new AgentPresetSeatController(ctx, () => undefined, staged)
+  const unboundSeat = new AgentPresetSeatController(ctx, () => undefined, stages)
   const seatFor = (binding: SessionBinding): AgentPresetSeatController => {
     const existing = seats.get(binding)
     if (existing !== undefined) return existing
@@ -94,7 +94,7 @@ export function apply(ctx: ClientContext): void {
         && (ctx.sessions.retainInfo(binding.sessionId).getSnapshot().retainedBy.mainView ?? 0) > 0
         ? summary
         : undefined
-    }, staged)
+    }, stages)
     seats.set(binding, seat)
     const dispose = binding.ctx.effect(() => {
       const stop = ctx.sessions.list.subscribe(() => { void seat.apply() })
@@ -114,8 +114,7 @@ export function apply(ctx: ClientContext): void {
   const developerTools = ctx.configForms.developerTools.enabled
   ctx.effect(() => developerTools.subscribe(() => {
     if (developerTools.getSnapshot()) return
-    staged.id = undefined
-    staged.introduce = false
+    stages.clear()
     void unboundSeat.apply()
     for (const seat of seats.values) void seat.apply()
   }), 'ui-agent-preset: Developer tools gate')
