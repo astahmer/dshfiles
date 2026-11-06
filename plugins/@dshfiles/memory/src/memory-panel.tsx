@@ -187,10 +187,11 @@ export const MemoryPanel = (props: { readonly openThread: (sessionId: string) =>
     const timer = window.setTimeout(MemoryFocusModel.clear, 0)
     return () => window.clearTimeout(timer)
   }, [focus])
-  useEffect(() => {
+  const chooseProject = (next: string): void => {
+    setProject(next)
     setSelectedNoteId(null)
     setSelectedThreadId(null)
-  }, [project])
+  }
   const projectItems = useMemo(
     () =>
       props.projectPaths.map(projectPath => {
@@ -229,7 +230,7 @@ export const MemoryPanel = (props: { readonly openThread: (sessionId: string) =>
                   {usage.data.retrieval.reason === null ? null : <TooltipContent>{usage.data.retrieval.reason}</TooltipContent>}
                 </Tooltip>
               )}
-              <Select value={project === '' ? 'all' : project} onValueChange={value => setProject(value === 'all' ? '' : value)}>
+              <Select value={project === '' ? 'all' : project} onValueChange={value => chooseProject(value === 'all' ? '' : value)}>
                 <SelectTrigger aria-label="Memory project" className={projectTrigger} size="sm">
                   <SelectValue>
                     {selectedProject === undefined ? 'All projects' : `${PanelFormat.projectName(selectedProject.project)} · ${selectedProject.notes}`}
