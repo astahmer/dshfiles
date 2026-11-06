@@ -3,13 +3,13 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { ArrowLeftIcon } from '@dshfiles/plugin-ui/icons'
-import { useMachine, waitFor } from '@dshfiles/plugin-ui/machine'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useEffect, useRef, useState, useSyncExternalStore, type JSX } from 'react'
+import { useEffect, useState, useSyncExternalStore, type JSX } from 'react'
 import { boardSyncMachine } from './board-sync-machine.js'
-import type { EditorHandle, EditorModule } from './editor-contract.js'
+import type { EditorModule } from './editor-contract.js'
 import { loadEditor } from './editor-loader.js'
-import type { Board, PendingSource } from './model.js'
+import type { Board } from './model.js'
 import { type WhiteboardClient, WhiteboardUi } from './ui-model.js'
 
 const REMOTE_POLL_MS = 4_000
@@ -39,41 +39,35 @@ function BoardEditor(props: {
   readonly onBack: () => void
 }): JSX.Element {
   const { api, editor, board } = props
+  const onBack = props.onBack
   const queryClient = useQueryClient()
   const theme = useSyncExternalStore(darkTheme.subscribe, darkTheme.read, darkTheme.read)
   const [snapshot, send, actor] = useMachine(boardSyncMachine, {
-    input: { boardId: board.board.id, revision: board.board.revision, save: WhiteboardUi.saveWith(api) },
+    input: {
+      boardId: board.board.id,
+      revision: board.board.revision,
+      pending: board.pending,
+      save: WhiteboardUi.saveWith(api),
+      read: (boardId: string, signal: AbortSignal) => api.read({ boardId }, { signal }),
+      convert: ({ editor, pending }) => props.editor.convertPending(pending).then(converted => editor.appendElements(converted)),
+    },
   })
-  const [handle, setHandle] = useState<EditorHandle | null>(null)
   const [title, setTitle] = useState(board.board.title)
   const [renaming, setRenaming] = useState(false)
-  const [conversionError, setConversionError] = useState<string | null>(null)
-  const converting = useRef<PendingSource | null>(null)
   const state = String(snapshot.value)
 
   useEffect(() => {
-    const subscription = actor.on('saved', () => void queryClient.invalidateQueries({ queryKey: WhiteboardUi.keys.list(board.board.project) }))
-    return () => subscription.unsubscribe()
-  }, [actor, board.board.project, queryClient])
+    const saved = actor.on('saved', () => void queryClient.invalidateQueries({ queryKey: WhiteboardUi.keys.list(board.board.project) }))
+    const adopted = actor.on('adopted', event => setTitle(event.title))
+    const left = actor.on('left', () => onBack())
+    return () => {
+      saved.unsubscribe()
+      adopted.unsubscribe()
+      left.unsubscribe()
+    }
+  }, [actor, board.board.project, onBack, queryClient])
 
-  /** Agent-queued source converts once per board version, after the editor is ready. */
-  const convert = (pending: PendingSource, target: EditorHandle): void => {
-    if (converting.current === pending) return
-    converting.current = pending
-    setConversionError(null)
-    editor.convertPending(pending).then(
-      converted => send({ type: 'CONVERTED', scene: target.appendElements(converted) }),
-      (cause: unknown) => setConversionError(errorMessage(cause, 'The queued diagram could not be converted.')),
-    )
-  }
-  // The latest `convert`, so the effects below re-run on data changes only, not on every render's new closure.
-  const convertLatest = useRef(convert)
-  convertLatest.current = convert
-  useEffect(() => {
-    if (handle !== null && board.pending !== null) convertLatest.current(board.pending, handle)
-  }, [handle, board.pending])
-
-  // A write by an agent or another tab: adopt it while nothing local is unsaved, else the next save reports a conflict.
+  // A write by an agent or another tab: the machine adopts it while nothing local is unsaved, else the next save reports a conflict.
   const summary = useQuery({
     queryKey: WhiteboardUi.keys.list(board.board.project),
     // No abort signal: a poll is tiny, and cancelling it when the board closes would only leave an aborted request.
@@ -85,22 +79,8 @@ function BoardEditor(props: {
   const remoteRevision = summary.data?.boards.find(candidate => candidate.id === boardId)?.revision
   const revision = snapshot.context.revision
   useEffect(() => {
-    if (handle === null || remoteRevision === undefined || remoteRevision <= revision || state !== 'clean') return
-    let current = true
-    void api.read({ boardId }).then(
-      next => {
-        if (!current || actor.getSnapshot().value !== 'clean') return
-        handle.replaceScene(next.scene)
-        setTitle(next.board.title)
-        send({ type: 'SYNCED', revision: next.board.revision })
-        if (next.pending !== null) convertLatest.current(next.pending, handle)
-      },
-      () => undefined,
-    )
-    return () => {
-      current = false
-    }
-  }, [actor, api, boardId, handle, remoteRevision, revision, send, state])
+    if (remoteRevision !== undefined) send({ type: 'REMOTE_REVISION', revision: remoteRevision })
+  }, [remoteRevision, send])
 
   // Leaving the board saves what is still waiting for the debounce. The actor stops with this component, so the
   // last save runs outside it, unaborted.
@@ -131,23 +111,10 @@ function BoardEditor(props: {
     },
   })
 
-  /** Back to the list only once the drawing is saved; a failed or conflicting save keeps the board open with its alert. */
-  const leave = (): void => {
-    if (actor.getSnapshot().value === 'clean') return props.onBack()
-    actor.send({ type: 'FLUSH' })
-    void waitFor(actor, current => current.value === 'clean' || current.value === 'failed' || current.value === 'conflict', { timeout: 30_000 }).then(
-      settled => (settled.value === 'clean' ? props.onBack() : undefined),
-      () => undefined,
-    )
-  }
+  /** Back to the list once the drawing is saved; a failed or conflicting save keeps the board open with its alert. */
+  const leave = (): void => send({ type: 'LEAVE' })
 
-  const reloadTheirs = (): void => {
-    void api.read({ boardId: board.board.id }).then(next => {
-      handle?.replaceScene(next.scene)
-      setTitle(next.board.title)
-      send({ type: 'SYNCED', revision: next.board.revision })
-    })
-  }
+  const reloadTheirs = (): void => send({ type: 'RELOAD' })
 
   return (
     <div className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col">
@@ -172,7 +139,7 @@ function BoardEditor(props: {
               type="button"
               className="dshx:block dshx:max-w-full dshx:truncate dshx:text-left dshx:text-sm dshx:font-medium dshx:disabled:cursor-default"
               aria-label={`Rename ${title}`}
-              disabled={state !== 'clean'}
+              disabled={state !== 'clean' && state !== 'converting' && state !== 'adopting'}
               onClick={() => setRenaming(true)}
             >
               <h1 className="dshx:truncate">{title}</h1>
@@ -215,20 +182,12 @@ function BoardEditor(props: {
           <AlertDescription>{errorMessage(rename.error, 'The board could not be renamed.')} Wait for “Saved”, then rename again.</AlertDescription>
         </Alert>
       ) : null}
-      {conversionError === null ? null : (
+      {snapshot.context.conversionError === null ? null : (
         <Alert variant="warning" className="dshx:rounded-none dshx:border-x-0 dshx:border-t-0">
           <AlertTitle>The queued diagram could not be drawn</AlertTitle>
           <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            {conversionError} Ask the agent to fix the source with whiteboard_write, or discard it.
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                if (handle === null) return
-                setConversionError(null)
-                send({ type: 'CONVERTED', scene: handle.scene() })
-              }}
-            >
+            {snapshot.context.conversionError} Ask the agent to fix the source with whiteboard_write, or discard it.
+            <Button size="sm" variant="outline" onClick={() => send({ type: 'DISCARD_PENDING' })}>
               Discard queued diagram
             </Button>
           </AlertDescription>
@@ -236,7 +195,12 @@ function BoardEditor(props: {
       )}
 
       <div className="dshx:relative dshx:min-h-0 dshx:flex-1" data-testid="whiteboard-canvas">
-        <editor.WhiteboardCanvas initialScene={board.scene} theme={theme} onChange={scene => send({ type: 'EDIT', scene })} onReady={setHandle} />
+        <editor.WhiteboardCanvas
+          initialScene={board.scene}
+          theme={theme}
+          onChange={scene => send({ type: 'EDIT', scene })}
+          onReady={editor => send({ type: 'EDITOR_READY', editor })}
+        />
       </div>
     </div>
   )
