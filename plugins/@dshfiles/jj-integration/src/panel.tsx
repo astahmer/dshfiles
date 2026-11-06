@@ -52,7 +52,6 @@ import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { sessionPreviewMessages } from './session-preview.js'
 import { useDiscardConfirmation } from './discard-machine.js'
-import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { integrationQueueMachine, type IntegrationJob, type IntegrationJobPhase } from './integration-queue-machine.js'
@@ -812,7 +811,6 @@ export const ThreadWorkspacesPanel = (props: {
       toast.show({ text: errorMessage(error, t('autoIntegrationSaveFailed')), success: false })
     }
   }
-  const [notice, setNotice] = useState<{ readonly tone: 'default' | 'destructive'; readonly text: string } | null>(null)
   const repositories = useQuery({
     queryKey: threadQueryKeys.repositories,
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 60_000, request: hostSignal => api.repositories({}, { signal: hostSignal }) }),
@@ -853,44 +851,30 @@ export const ThreadWorkspacesPanel = (props: {
             })),
           }
         })
-        setNotice(null)
         toast.show({ text: t('integrationComplete', { count: result.revisions.length, bookmark: result.bookmark }), success: true })
         return
       }
-      setNotice({
-        tone: result.status === 'nothing-to-land' ? 'default' : 'destructive',
-        text: result.status === 'nothing-to-land' ? t('upToDateNoChanges') : describeLandResult(t, result),
-      })
     },
-    onError: error =>
-      IntegrationRecovery.isQueued(error)
-        ? setNotice({ tone: 'default', text: t('integrationQueuedHint', { bookmark: props.bookmark }) })
-        : setNotice({ tone: 'destructive', text: errorMessage(error, t('loadFailed')) }),
     onSettled: refreshAfterChange,
   })
   const [queueSnapshot, queueSend] = useMachine(integrationQueueMachine, {
-    input: { client: { land: ({ path, signal }) => rebase.mutateAsync({ path, signal }) } },
+    input: {
+      client: {
+        land: ({ path, signal }) => rebase.mutateAsync({ path, signal }),
+        integrationProgress: ({ path, signal }) =>
+          runHostRequest({ signal, timeoutMs: 15_000, request: hostSignal => api.integrationProgress({ path }, { signal: hostSignal }) }),
+      },
+    },
   })
-  const activeIntegrationPath = queueSnapshot.context.activePath
-  const integrationProgress = useQuery({
-    queryKey: ['jj-integration', 'integration-progress', activeIntegrationPath],
-    enabled: activeIntegrationPath !== null,
-    retry: false,
-    queryFn: ({ signal }) =>
-      activeIntegrationPath === null
-        ? Promise.resolve({ progress: null })
-        : runHostRequest({
-            signal,
-            timeoutMs: 15_000,
-            request: hostSignal => api.integrationProgress({ path: activeIntegrationPath }, { signal: hostSignal }),
-          }),
-    refetchInterval: query => (activeIntegrationPath !== null && query.state.status !== 'error' ? 350 : false),
-  })
-  useEffect(() => {
-    if (activeIntegrationPath === null || integrationProgress.data?.progress === null || integrationProgress.data?.progress === undefined) return
-    queueSend({ type: 'progress', path: activeIntegrationPath, phase: integrationProgress.data.progress.phase })
-  }, [activeIntegrationPath, integrationProgress.data?.progress, queueSend])
   const integrationJobs = queueSnapshot.context.jobs
+  const integrationNotice = queueSnapshot.context.notice
+  const noticeOf = (pending: NonNullable<typeof integrationNotice>): { tone: 'default' | 'destructive'; text: string } => {
+    if (pending.kind === 'queued') return { tone: 'default', text: t('integrationQueuedHint', { bookmark: props.bookmark }) }
+    if (pending.kind === 'failed') return { tone: 'destructive', text: pending.message.length > 0 ? pending.message : t('loadFailed') }
+    if (pending.result.status === 'nothing-to-land') return { tone: 'default', text: t('upToDateNoChanges') }
+    return { tone: 'destructive', text: describeLandResult(t, pending.result) }
+  }
+  const notice = integrationNotice === null ? null : noticeOf(integrationNotice)
   const queueBusy = queueSnapshot.hasTag('busy')
   const discard = useDiscardConfirmation({
     client: {
@@ -995,7 +979,6 @@ export const ThreadWorkspacesPanel = (props: {
   const selectedEligiblePaths = eligibleEntries.filter(entry => selectedPaths.has(entry.thread.path)).map(entry => entry.thread.path)
   const startIntegration = (paths: readonly string[]): void => {
     if (queueBusy || rebasesPending) return
-    for (const path of paths) void queryClient.removeQueries({ queryKey: ['jj-integration', 'integration-progress', path] })
     queueSend({ type: 'start', paths })
     setSelectedPaths(new Set())
   }
@@ -1103,6 +1086,7 @@ export const ThreadWorkspacesPanel = (props: {
     { id: 'missing', label: t('lifecycleMissing') },
   ]
   const lifecycleComboboxOptions: readonly ComboboxOption[] = lifecycleOptions.map(option => ({ value: option.id, label: option.label }))
+  const activeIntegrationPath = queueSnapshot.context.activePath
   const queuedCount = Math.max(queueSnapshot.context.queue.length - (activeIntegrationPath === null ? 0 : 1), 0)
   const failedPaths = [...integrationJobs.entries()].filter(([, job]) => job.phase === 'failed').map(([path]) => path)
   const activeTitle = activeIntegrationPath === null ? undefined : entries.find(entry => entry.thread.path === activeIntegrationPath)?.thread
