@@ -8,6 +8,7 @@ import { GhCommandFailed, GhResponseInvalid, GitHubCli } from './github-cli.js'
 import {
   summarizePullRequest,
   transitionPullRequest,
+  PullRequestWatcher,
   type PullRequestEvent,
   type PullRequestLinkInput,
   type PullRequestRecord,
@@ -254,7 +255,11 @@ export class PullRequestMonitor extends Context.Service<
         const beforePoll = yield* store.watched
         const initialWatchers = beforePoll.filter(record => samePullRequest(record, { repo: input.repo, number: input.number }))
         if (initialWatchers.length === 0) return
-        if (!input.force && initialWatchers.every(record => record.retryAfterAt !== null && record.retryAfterAt > now)) return
+        const inBackoff = initialWatchers.every(record => {
+          const status = PullRequestWatcher.statusOf(record, now)
+          return status.kind === 'backoff'
+        })
+        if (!input.force && inBackoff) return
 
         const firstWatcher = initialWatchers[0]
         if (firstWatcher === undefined) return
@@ -264,16 +269,9 @@ export class PullRequestMonitor extends Context.Service<
           const errorTag = result.error._tag === 'GhResponseInvalid' ? 'invalid-response' : 'gh-command-failed'
           const currentWatchers = (yield* store.watched).filter(record => samePullRequest(record, firstWatcher))
           const count = rateLimited ? Math.max(...currentWatchers.map(record => record.consecutiveRateLimits), 0) + 1 : 0
-          const retryAfterAt = rateLimited ? now + backoffDelay(count) : null
-          for (const watcher of currentWatchers) {
-            yield* store.updateIfWatching(watcher.id, current => ({
-              ...current,
-              lastCheckedAt: now,
-              lastError: errorTag,
-              retryAfterAt,
-              consecutiveRateLimits: count,
-            }))
-          }
+          const retryAfterAt = now + backoffDelay(count)
+          const outcome = rateLimited ? ({ kind: 'rate-limited', now, retryAfterAt, count } as const) : ({ kind: 'failed', now, error: errorTag } as const)
+          for (const watcher of currentWatchers) yield* store.updateIfWatching(watcher.id, current => PullRequestWatcher.afterPoll(current, outcome))
           if (rateLimited) {
             yield* Effect.logWarning('pull-requests: GitHub rate limit detected; watcher backoff extended', {
               repo: firstWatcher.repo,
@@ -289,16 +287,7 @@ export class PullRequestMonitor extends Context.Service<
         const currentWatchers = (yield* store.watched).filter(record => samePullRequest(record, firstWatcher))
         for (const watcher of currentWatchers) {
           const transitions = transitionPullRequest(watcher.lastKnownState ?? undefined, snapshot)
-          const terminal = snapshot.state === 'MERGED' || snapshot.state === 'CLOSED'
-          const updated = yield* store.updateIfWatching(watcher.id, current => ({
-            ...current,
-            watching: terminal ? false : true,
-            lastKnownState: snapshot,
-            lastCheckedAt: now,
-            retryAfterAt: null,
-            consecutiveRateLimits: 0,
-            lastError: null,
-          }))
+          const updated = yield* store.updateIfWatching(watcher.id, current => PullRequestWatcher.afterPoll(current, { kind: 'ok', snapshot, now }))
           if (updated === undefined) continue
           if (transitions.length > 0) yield* promptThread(updated, snapshot, transitions)
           if (snapshot.state === 'MERGED' || snapshot.state === 'CLOSED') yield* settleThread(updated, snapshot.state)
