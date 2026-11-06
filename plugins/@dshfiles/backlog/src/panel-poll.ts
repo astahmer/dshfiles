@@ -1,21 +1,19 @@
+import type { ApiResourceOptions, ResourceSnapshot } from '@dshfiles/dshx/client'
+
 /**
- * A Backlog panel stays mounted while another main panel is shown, so its polls only run while it is visible.
- * The revision read notices any write, and the AI-activity read drives the working indicator.
+ * A Backlog panel stays mounted while another main panel is shown; the resource store polls only while it is visible
+ * and reads once when it is shown again. The revision read notices any write: the Host's `changed` event re-reads it at
+ * once, so while that event is live the poll is only a slow safety net. The AI-activity read drives the working
+ * indicator and stops polling after a failure until the panel is shown again.
  */
-const REVISION_POLL_MS = 5_000
-const AI_ACTIVITY_POLL_MS = 1_000
+const revision = { pollInterval: 5_000, livePollInterval: 60_000 } satisfies ApiResourceOptions<number>
 
-const revisionPollMs = (input: { readonly visible: boolean }): number | false => (input.visible ? REVISION_POLL_MS : false)
-
-const aiActivityPollMs = (input: { readonly visible: boolean; readonly failed: boolean }): number | false =>
-  input.visible && !input.failed ? AI_ACTIVITY_POLL_MS : false
-
-/** Hidden → visible: the polls were paused, so read both once instead of waiting for the next tick. */
-const shouldRefreshOnReveal = (input: { readonly wasVisible: boolean | undefined; readonly visible: boolean }): boolean =>
-  input.wasVisible === false && input.visible
+const aiActivity = {
+  pollInterval: 1_000,
+  shouldPoll: (snapshot: ResourceSnapshot<{ readonly active: boolean }>) => snapshot.status !== 'error',
+} satisfies ApiResourceOptions<{ readonly active: boolean }>
 
 export class BacklogPanelPoll {
-  static readonly revisionMs = revisionPollMs
-  static readonly aiActivityMs = aiActivityPollMs
-  static readonly shouldRefreshOnReveal = shouldRefreshOnReveal
+  static readonly revision = revision
+  static readonly aiActivity = aiActivity
 }

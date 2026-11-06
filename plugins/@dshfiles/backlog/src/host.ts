@@ -12,6 +12,7 @@ import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer } from 'effect'
 import { FetchHttpClient } from 'effect/http'
 import { ActivityPublisher } from './activity-publisher.js'
+import { RevisionEvents } from './revision-events.js'
 import { AgentConfirmation } from './agent-confirmation.js'
 import { AiActivity } from './ai-activity.js'
 import { BacklogAttention } from './attention-provider.js'
@@ -105,10 +106,16 @@ const backlogServices = Layer.mergeAll(
 )
 
 /** Every backlog service and background loop of one activation. */
-const BacklogLive = Layer.mergeAll(ActivityPublisher, LifecycleSignals, GateWatch, LeaseSweep, BacklogAttention.layer, RemoteSyncLoop, BacklogPeers.loop).pipe(
-  Layer.provideMerge(backlogServices),
-  Layer.provideMerge(hostEdges),
-)
+const BacklogLive = Layer.mergeAll(
+  ActivityPublisher,
+  RevisionEvents,
+  LifecycleSignals,
+  GateWatch,
+  LeaseSweep,
+  BacklogAttention.layer,
+  RemoteSyncLoop,
+  BacklogPeers.loop,
+).pipe(Layer.provideMerge(backlogServices), Layer.provideMerge(hostEdges))
 
 /** No item has id 0, so a reference that names nothing reaches each verb as an id it answers `not-found` for. */
 const NO_ITEM = 0

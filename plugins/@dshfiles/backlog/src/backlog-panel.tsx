@@ -1,5 +1,5 @@
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import { useApi, useSettings } from '@dshfiles/dshx/client'
+import { useApi, useResource, useSettings } from '@dshfiles/dshx/client'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
@@ -587,30 +587,10 @@ export const BacklogPanel = (props: {
   const queryClient = useQueryClient()
   const visible = props.visible !== false
   // A cheap number that changes with any write; lists and details refetch only when it moves.
-  // Agents write from other threads; a short poll keeps the visible panel current without a push channel.
-  const revision = useQuery({
-    queryKey: ['dshfiles-backlog-revision'],
-    queryFn: ({ signal }) => api.revision(undefined, { signal }),
-    refetchInterval: BacklogPanelPoll.revisionMs({ visible }),
-  })
-  const aiActivity = useQuery({
-    queryKey: [BacklogQueries.key, 'ai-activity'],
-    queryFn: ({ signal }) => api.aiActivity(undefined, { signal }),
-    retry: false,
-    refetchInterval: query => BacklogPanelPoll.aiActivityMs({ visible, failed: query.state.error !== null }),
-  })
-  const wasVisible = useRef<boolean | undefined>(undefined)
-  const refetchRevision = revision.refetch
-  const refetchAiActivity = aiActivity.refetch
-  useEffect(() => {
-    if (BacklogPanelPoll.shouldRefreshOnReveal({ wasVisible: wasVisible.current, visible })) {
-      void refetchRevision()
-      void refetchAiActivity()
-    }
-    wasVisible.current = visible
-  }, [visible, refetchRevision, refetchAiActivity])
+  const revision = useResource(backlogApi, 'revision', undefined, { ...BacklogPanelPoll.revision, visible })
+  const aiActivity = useResource(backlogApi, 'aiActivity', undefined, { ...BacklogPanelPoll.aiActivity, visible })
   const aiWorking =
-    triagePending || (aiActivity.error === null && aiActivity.data?.active === true) || backfillJobState === 'queued' || backfillJobState === 'running'
+    triagePending || (aiActivity.status !== 'error' && aiActivity.data?.active === true) || backfillJobState === 'queued' || backfillJobState === 'running'
   const lastRevision = useRef<number | undefined>(undefined)
   useEffect(() => {
     if (revision.data === undefined) return

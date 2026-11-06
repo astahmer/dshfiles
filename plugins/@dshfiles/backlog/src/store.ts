@@ -748,6 +748,8 @@ export class BacklogStore extends Context.Service<
     readonly revision: Effect.Effect<number>
     /** Every stored event, after it is durable, for the Activity timeline. */
     readonly changes: Stream.Stream<BacklogChangeNotice>
+    /** Every new revision, after the write that moved it, including deletes and peer pulls that `changes` leaves out. */
+    readonly revisions: Stream.Stream<number>
     readonly capture: (input: BacklogCaptureInput) => Effect.Effect<BacklogDetail, BacklogWriteFailed | BacklogParentInvalid>
     readonly attachFile: (input: { readonly id: number; readonly file: BacklogFileInput; readonly actor: BacklogActor }) => Detailed
     readonly importTweetContext: (input: {
@@ -908,6 +910,8 @@ export class BacklogStore extends Context.Service<
       const writes = yield* Semaphore.make(1)
       const searchIndex = new BacklogSearchIndex()
       const notices = yield* PubSub.unbounded<BacklogChangeNotice>()
+      const revisions = yield* PubSub.sliding<number>(1)
+      const announceRevision = Effect.flatMap(Ref.get(state), current => PubSub.publish(revisions, current.revision))
 
       const view = Effect.gen(function* () {
         const current = yield* Ref.get(state)
@@ -957,6 +961,7 @@ export class BacklogStore extends Context.Service<
           if (lease?.kind === 'set') leases.set(item.id, lease.lease)
           return { ...current, records: new Map(current.records).set(item.id, item), leases, revision: Math.max(current.revision + 1, at) }
         })
+        yield* announceRevision
       })
 
       const putFile = (item: BacklogItem, file: { readonly attachment: BacklogAttachment; readonly data: string }) =>
@@ -1274,6 +1279,7 @@ export class BacklogStore extends Context.Service<
           next.delete(input.id)
           return { ...current, records: next, revision: Math.max(current.revision + 1, at) }
         })
+        yield* announceRevision
         return found(undefined)
       }, serialized)
 
@@ -1811,12 +1817,14 @@ export class BacklogStore extends Context.Service<
             revision: Math.max(current.revision + 1, at),
           }
         })
+        yield* announceRevision
         return { inserted: result.inserted, items: result.items.length }
       }, serialized)
 
       return BacklogStore.of({
         revision: Effect.map(Ref.get(state), current => current.revision),
         changes: Stream.fromPubSub(notices),
+        revisions: Stream.fromPubSub(revisions),
         capture,
         attachFile,
         importTweetContext,

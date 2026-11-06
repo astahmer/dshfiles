@@ -161,7 +161,7 @@
     {
       "id": "activity-feed-and-freshness",
       "title": "Feed ordered by activity, with idle items sinking",
-      "summary": "The feed lists pinned items, then activity in chronological order with newest at bottom beside the composer. Each entry's activity line names the actor of its last change and links an Agent to the thread it worked in. Status chips narrow the feed and the Items list to one status or several at once. From an empty capture box, ArrowUp focuses the nearest visible item and arrow keys follow the list's visual order. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item.",
+      "summary": "The feed lists pinned items, then activity in chronological order with newest at bottom beside the composer. Each entry's activity line names the actor of its last change and links an Agent to the thread it worked in. Status chips narrow the feed and the Items list to one status or several at once. From an empty capture box, ArrowUp focuses the nearest visible item and arrow keys follow the list's visual order. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item. The open panel stays current from the Host's `changed` event (a write, delete or peer pull re-reads the revision at once); without the event it polls the revision every 5 s, and only while it is visible.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -238,6 +238,18 @@
           "kind": "gherkin",
           "id": "backlog.feed-day-separators",
           "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.feed-host-revision-events",
+          "file": "plugins/@dshfiles/backlog/src/revision-events.test.ts",
+          "testName": "announce every revision a write or a delete moves, so panels re-read on the changed event"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.feed-unit-panel-poll",
+          "file": "plugins/@dshfiles/backlog/src/panel-poll.test.ts",
+          "testName": "polls the revision every 5 s, and only every minute while the Host pushes changes"
         }
       ],
       "telemetry": [

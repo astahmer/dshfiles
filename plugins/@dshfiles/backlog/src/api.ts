@@ -1,4 +1,4 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
+import { defineApi, event, method } from '@dshfiles/dshx/api'
 import { Effect, Schema, SchemaGetter } from 'effect'
 import { AgentConfirmation } from './agent-confirmation.js'
 import { BacklogBackfill } from './backfill.js'
@@ -623,12 +623,16 @@ export const backlogApi = defineApi({
     revision: method({
       input: Schema.Void,
       output: Schema.Number.check(Schema.isFinite()),
-      description: 'A number that changes whenever any item changes; the panel polls it instead of the lists. Not an agent tool.',
+      description:
+        'A number that changes whenever any item changes; the panel reads it instead of the lists, again on each `changed` event. Not an agent tool.',
+      readOnly: true,
+      tags: ['revision'],
     }),
     aiActivity: method({
       input: Schema.Void,
       output: Schema.Struct({ active: Schema.Boolean }),
       description: 'Whether Host-scheduled backlog AI work is currently running. Presentation-only status; not an agent tool.',
+      readOnly: true,
     }),
     projects: method({
       /** Optional so a Client older than the agent-item filter still calls it with no input. */
@@ -1335,6 +1339,13 @@ export const backlogApi = defineApi({
       input: Schema.Struct({ id: itemKeySchema }),
       output: Schema.Struct({ events: Schema.Array(Schema.Struct({ at: epochMsSchema, actor: Schema.String, host: Schema.String })) }),
       description: "Which other Host wrote each of an item's events, for its work log; events this Host wrote are left out. Not an agent tool.",
+    }),
+  },
+  events: {
+    changed: event({
+      schema: Schema.Struct({ revision: Schema.Number.check(Schema.isFinite()) }),
+      description: 'The backlog revision moved: an item was written, deleted or pulled from a peer.',
+      invalidates: ['revision'],
     }),
   },
 })
