@@ -138,7 +138,6 @@ export default defineClient({
     }
 
     const startBtw = (sourceId: SessionId, question: string): SideChatActor => {
-      let held: SessionReference | undefined
       const actor = startSideChat({
         sourceId,
         question,
@@ -162,20 +161,23 @@ export default defineClient({
             )
             if (!selected.ok) throw new Error(selected.error.message)
           },
-          ask: async input => {
-            const childId = ctx.sessions.list.getSnapshot().ids.find(id => id === input.childId)
-            if (childId === undefined) throw new Error('the side chat thread is not listed')
-            held = ctx.sessions.retain(childId, { source: 'btwSideChat' })
-            await held.ready
-            const session = held.binding.session
-            const handle = session.beginSubmission({ mode: 'queue', text: input.question, attachments: [] })
-            const result = await session.prompt([{ type: 'text', text: input.question }], 'queue', undefined, handle.requestId)
-            if (!result.ok) throw new Error(result.error.message)
+          retain: childId => {
+            const listed = ctx.sessions.list.getSnapshot().ids.find(id => id === childId)
+            if (listed === undefined) throw new Error('the side chat thread is not listed')
+            const held = ctx.sessions.retain(listed, { source: 'btwSideChat' })
+            return {
+              ready: held.ready,
+              submit: async question => {
+                const session = held.binding.session
+                const handle = session.beginSubmission({ mode: 'queue', text: question, attachments: [] })
+                const result = await session.prompt([{ type: 'text', text: question }], 'queue', undefined, handle.requestId)
+                if (!result.ok) throw new Error(result.error.message)
+              },
+              release: () => held.release(),
+            }
           },
           openPanel: childId => ctx.sidebarRight.openResource(addressOf(childId), { kind: TAB_KIND, preferNewPane: true }),
           archive: async childId => {
-            held?.release()
-            held = undefined
             sideChats.delete(childId)
             const listed = ctx.sessions.list.getSnapshot().ids.find(id => id === childId)
             if (listed !== undefined) await ctx.workspaces.archiveSession(listed, { stopActivity: true })
