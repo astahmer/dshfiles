@@ -194,7 +194,15 @@ const createWorld = (options: { readonly running?: boolean } = {}) => {
     queueSubject.notify()
   }
 
-  return { world, ports, enqueueRow, finishTurn, editor: () => createQueueEditor(ports) }
+  /** A queued row that already carries the request id a persisted record refers to. */
+  const enqueueWithRpc = (content: readonly QueuedBlock[], rpcId: string) => {
+    const row: RawRow = { id: nextId('message'), content, source: { kind: 'user', rpcId } }
+    world.rows = [...world.rows, row]
+    queueSubject.notify()
+    return row
+  }
+
+  return { world, ports, enqueueRow, enqueueWithRpc, finishTurn, editor: () => createQueueEditor(ports) }
 }
 
 const rowsOf = (world: { readonly rows: readonly RawRow[] }) => QueueEditModel.decodeQueuedRows({ 'next-turn': world.rows })
@@ -402,6 +410,49 @@ test('After a reload the saved record still offers Cancel, which restores the or
 
   assert.deepEqual(textsOf(world), ['first', 'original [shot.png]'])
   assert.equal(world.records, null)
+})
+
+test('A reload while a submission was settling still puts the message back in its place', async () => {
+  const { world, ports, enqueueRow, enqueueWithRpc } = createWorld()
+  const ahead = enqueueRow([text('first')])
+  enqueueWithRpc([text('edited')], 'request-9')
+  world.records = {
+    itemId: 'message-gone',
+    blocks: [text('edited')],
+    before: [ahead.id],
+    backupDraft: 'unsent idea',
+    status: 'submitting',
+    submissions: ['request-9'],
+    composerRestored: true,
+  }
+  const reloaded = createQueueEditor(ports)
+  await settle()
+
+  assert.deepEqual(textsOf(world), ['first', 'edited'])
+  assert.equal(reloaded.getSnapshot().record, null)
+  assert.equal(world.composer.draft, 'unsent idea')
+})
+
+test('A reload while restoring waits for the queued original and places it back', async () => {
+  const { world, ports, enqueueRow, enqueueWithRpc } = createWorld()
+  const ahead = enqueueRow([text('first')])
+  enqueueWithRpc([text('original')], 'request-7')
+  enqueueRow([text('last')])
+  world.records = {
+    itemId: 'message-gone',
+    blocks: [text('original')],
+    before: [ahead.id],
+    backupDraft: '',
+    status: 'restoring',
+    submissions: [],
+    restoreRequestId: 'request-7',
+    composerRestored: true,
+  }
+  const reloaded = createQueueEditor(ports)
+  await settle()
+
+  assert.deepEqual(textsOf(world), ['first', 'original', 'last'])
+  assert.equal(reloaded.getSnapshot().record, null)
 })
 
 test('A restore that fails stays recoverable until retried', async () => {
