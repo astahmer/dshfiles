@@ -13,6 +13,7 @@ import { isListedUnsentThread, presentUnsentThread } from './unsent-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
 import { DEFAULT_THREAD_BOARD_VIEW, storedThreadBoardView, ThreadBoardViewModel } from './thread-board-view.js'
 import { storedCollapsedGroups, toggleCollapsedGroup } from './collapsed-groups.js'
+import { initialThreadRoute, pendingThreadRoute, reduceThreadRoute, threadUrlRoute } from './thread-route.js'
 import { useNearViewport } from './use-near-viewport.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { ThreadGroupHeader } from './thread-group-header.js'
@@ -1680,14 +1681,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     return scheduleSuccessNoticeDismissal(notice, updateNotice)
   }, [notice, updateNotice])
   // Only the page-load route: a list remounted by the rail must not treat the URL it last wrote as a navigation.
-  const [routeRequest, setRouteRequest] = useState<string | null>(() =>
-    typeof window === 'undefined' || !isPrimarySurface ? null : pageLoadThreadRoute.pending(window.location.href),
+  const [route, dispatchRoute] = useReducer(reduceThreadRoute, undefined, () =>
+    initialThreadRoute(typeof window === 'undefined' || !isPrimarySurface ? null : pageLoadThreadRoute.pending(window.location.href)),
   )
   const previousStatus = useRef<Readonly<Record<string, ThreadInteractionStatus>> | null>(null)
-  const openedRouteId = useRef<string | null>(null)
-  // The page-load link resolves once the thread list is ready; Back and Forward are explicit thread navigations.
-  const routeFromPageLoad = useRef(routeRequest !== null)
-  const suppressUrlForSession = useRef<string | null>(null)
   const migrationStarted = useRef(false)
   const attentionRefreshed = useRef(false)
   const previousAttention = useRef<ReadonlyMap<string, ThreadAttentionView> | null>(null)
@@ -2156,10 +2153,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const opened = attention.records.get(sessionId)
     if (opened !== undefined && shouldClearUnreadOnReselect({ requestedSessionId: sessionId, selectedSessionId }))
       attention.clearUnread(sessionId, opened.version)
-    setRouteRequest(null)
     if (isPrimarySurface) pageLoadThreadRoute.settle()
-    openedRouteId.current = sessionId
-    suppressUrlForSession.current = null
+    dispatchRoute({ type: 'select' })
     const session = sessionState.byId[sessionId]
     const workspaceId =
       session === undefined
@@ -2191,45 +2186,51 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   useEffect(() => {
     if (!isPrimarySurface) return
     const onPopState = (): void => {
-      const requested = readThreadUrl(window.location.href)?.sessionId ?? null
-      suppressUrlForSession.current = requested === null ? (selectedSession?.id ?? null) : null
-      openedRouteId.current = null
-      routeFromPageLoad.current = false
-      setRouteRequest(requested)
+      dispatchRoute({
+        type: 'navigate',
+        sessionId: readThreadUrl(window.location.href)?.sessionId ?? null,
+        selectedSessionId: selectedSession?.id ?? null,
+      })
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [isPrimarySurface, selectedSession?.id])
 
   useEffect(() => {
-    if (!isPrimarySurface || routeRequest === null || sessionState.phase !== 'ready') return
+    if (!isPrimarySurface || sessionState.phase !== 'ready') return
+    // A route opened in another path (an archived thread restored first) settles as soon as the list shows it.
+    if (route.status === 'opening') {
+      if (route.sessionId === selectedSessionId) dispatchRoute({ type: 'settle', selectedSessionId })
+      return
+    }
+    const request = pendingThreadRoute(route)
+    if (request === null) return
     pageLoadThreadRoute.settle()
-    const target = sessions.find(session => session.id === routeRequest)
+    const target = sessions.find(session => session.id === request.sessionId)
     if (target === undefined) {
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarLinkNotFound') })
       window.history.replaceState(window.history.state, '', clearThreadUrl(window.location.href))
-      setRouteRequest(null)
+      dispatchRoute({ type: 'missing' })
       return
     }
     if (selectedSessionId === target.id) {
-      openedRouteId.current = routeRequest
-      setRouteRequest(null)
+      dispatchRoute({ type: 'settle', selectedSessionId })
       return
     }
-    if (openedRouteId.current === routeRequest) return
-    openedRouteId.current = routeRequest
-    openThreadRef.current(target.id, { linked: routeFromPageLoad.current })
-  }, [archivedSessionIds, isPrimarySurface, props, routeRequest, selectedSessionId, sessions, sessionState.phase, setNotice])
+    dispatchRoute({ type: 'open' })
+    openThreadRef.current(target.id, { linked: request.source === 'page-load' })
+  }, [archivedSessionIds, isPrimarySurface, props, route, selectedSessionId, sessions, sessionState.phase, setNotice])
 
   useEffect(() => {
-    if (!isPrimarySurface || selectedSession === undefined || routeRequest !== null) return
-    if (suppressUrlForSession.current === selectedSession.id) return
-    suppressUrlForSession.current = null
+    if (!isPrimarySurface || selectedSession === undefined) return
+    const projected = threadUrlRoute({ state: route, selectedSessionId: selectedSession.id })
+    if (projected.suppressionStale) dispatchRoute({ type: 'clear-suppression' })
+    if (projected.sessionId === null) return
     const workspaceId =
       realWorkspaceBySession.get(selectedSession.id) ?? SidebarOrganization.workspaceForLineage(selectedSession, sessionState.byId, workspaceBySession)
     const next = buildThreadUrl(window.location.href, selectedSession.id, workspaceId)
     if (next !== window.location.href) window.history.replaceState(window.history.state, '', next)
-  }, [isPrimarySurface, realWorkspaceBySession, routeRequest, selectedSession, sessionState.byId, workspaceBySession])
+  }, [isPrimarySurface, realWorkspaceBySession, route, selectedSession, sessionState.byId, workspaceBySession])
 
   const changePreferences = useCallback(
     (patch: Partial<SidebarPreferences>): void => {
