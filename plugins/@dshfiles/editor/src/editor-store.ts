@@ -1,24 +1,11 @@
 import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-files/remote'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { createActor, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
+import { editorDocumentMachine, type DocumentContent } from './editor-document-machine.js'
 import { OpenFileAddress, type OpenFileRequest } from './open-file.js'
 
-const MAX_EDITABLE_BYTES = 5 * 1024 * 1024
-
-const IMAGE_TYPES: Readonly<Record<string, string>> = {
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  svg: 'image/svg+xml',
-}
-
-/** What the panel shows: text goes to the editor engine; images and other binary files never reach it. */
-export type DocumentContent =
-  | { readonly kind: 'text' }
-  | { readonly kind: 'image'; readonly url: string; readonly bytes: number }
-  | { readonly kind: 'binary'; readonly bytes: number | null }
+export type { DocumentContent }
 
 export interface OpenDocument {
   readonly id: string
@@ -50,31 +37,31 @@ export interface EditorState {
 
 type Remote = Pick<ClientRemote, 'workspaceFiles'>
 
+type EditorDocumentActor = ActorRefFrom<typeof editorDocumentMachine>
+
+interface DocumentBase {
+  readonly id: string
+  readonly sessionId: SessionId
+  readonly path: string
+  readonly name: string
+  reveal: OpenDocument['reveal']
+}
+
+interface DocumentEntry {
+  readonly base: DocumentBase
+  readonly actor: EditorDocumentActor
+  readonly subscription: { unsubscribe: () => void }
+}
+
 const documentId = (sessionId: string, path: string): string => sessionId + '\n' + path
 
 const baseName = (path: string): string => path.split('/').filter(Boolean).at(-1) ?? path
 
-const imageType = (path: string): string | undefined => IMAGE_TYPES[path.split('.').at(-1)?.toLowerCase() ?? '']
-
-const decodeText = (data: Uint8Array): string | undefined => {
-  if (data.includes(0)) return undefined
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(data)
-  } catch {
-    return undefined
-  }
-}
-
-const sha256 = async (bytes: Uint8Array<ArrayBuffer>): Promise<string> => {
-  if (globalThis.crypto?.subtle === undefined) throw new Error('Saving needs a secure context (https or localhost) for content hashing.')
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
-  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
-}
-
 /**
  * Open files across sessions. Content comes from the Host `workspaceFiles` namespace (`readBytes`, so the exact
  * bytes — trailing newline included — are what the editor hashes and later saves over); each open file is watched
- * through `changes` and reloads when clean, or is flagged when it has unsaved edits.
+ * through `changes` and reloads when clean, or is flagged when it has unsaved edits. One document actor owns that
+ * lifecycle, so a read, reload or watch frame that outlives its document is cancelled with it.
  */
 export const createEditorStore = (options: {
   readonly remote: Remote
@@ -85,7 +72,7 @@ export const createEditorStore = (options: {
   let state: EditorState = { documents: [], activeBySession: {} }
   let requests = 0
   const listeners = new Set<() => void>()
-  const watches = new Map<string, AbortController>()
+  const entries = new Map<string, DocumentEntry>()
   // Symlink-resolved roots learnt from loads, e.g. `/private/tmp/w` for a session whose cwd is `/tmp/w`.
   const resolvedRoots = new Map<string, Set<string>>()
 
@@ -101,31 +88,24 @@ export const createEditorStore = (options: {
   const releaseContent = (document: OpenDocument | undefined): void => {
     if (document?.content.kind === 'image') URL.revokeObjectURL(document.content.url)
   }
-  const patch = (id: string, change: Partial<OpenDocument>): void => {
-    const previous = state.documents.find(document => document.id === id)
-    if (change.content !== undefined && change.content !== previous?.content) releaseContent(previous)
-    set({ ...state, documents: state.documents.map(document => (document.id === id ? { ...document, ...change } : document)) })
-  }
   const find = (id: string): OpenDocument | undefined => state.documents.find(document => document.id === id)
-  /** Bumped on every open and close, so a read that resolves later cannot patch a reopened tab. */
-  const loadGeneration = new Map<string, number>()
-  const generationOf = (id: string): number => loadGeneration.get(id) ?? 0
-  const superseded = (id: string, generation: number): boolean => generationOf(id) !== generation
 
-  /** A second spelling of an open file resolved to the same Host path: keep the first tab, drop this one. */
-  const mergeIntoTwin = (id: string, absolutePath: string): boolean => {
-    const document = find(id)
-    if (document === undefined) return false
-    const twin = state.documents.find(other => other.id !== id && other.sessionId === document.sessionId && other.absolutePath === absolutePath)
-    if (twin === undefined) return false
-    const activeBySession = { ...state.activeBySession }
-    if (activeBySession[document.sessionId] === id) activeBySession[document.sessionId] = twin.id
-    const reveal = document.reveal === null ? twin.reveal : { line: document.reveal.line, request: ++requests }
-    set({
-      activeBySession,
-      documents: state.documents.filter(other => other.id !== id).map(other => (other.id === twin.id ? { ...other, reveal } : other)),
-    })
-    return true
+  const project = (entry: DocumentEntry): OpenDocument => {
+    const snapshot = entry.actor.getSnapshot()
+    const context = snapshot.context
+    const status = snapshot.matches('error') ? 'error' : snapshot.matches('loading') ? 'loading' : 'ready'
+    const document: OpenDocument = {
+      ...entry.base,
+      absolutePath: context.absolutePath,
+      status,
+      content: context.content,
+      text: context.text,
+      sha256: context.sha256,
+      version: context.version,
+      dirty: context.dirty,
+      diskChanged: context.diskChanged,
+    }
+    return status === 'error' ? { ...document, error: context.error ?? '' } : document
   }
 
   const learnRoot = (sessionId: SessionId, path: string, absolutePath: string): void => {
@@ -137,113 +117,55 @@ export const createEditorStore = (options: {
     resolvedRoots.set(sessionId, roots)
   }
 
-  const load = async (id: string, signal?: AbortSignal): Promise<void> => {
-    const document = find(id)
-    if (document === undefined) return
-    const generation = generationOf(id)
-    const result = await remote.workspaceFiles.readBytes(document.sessionId, document.path, {}, signal)
-    if (find(id) === undefined || superseded(id, generation)) return
-    if (result.ok) {
-      learnRoot(document.sessionId, document.path, result.value.absolutePath)
-      if (mergeIntoTwin(id, result.value.absolutePath)) return
-      if (document.absolutePath !== result.value.absolutePath) patch(id, { absolutePath: result.value.absolutePath })
-    }
-    if (!result.ok) {
-      if (result.error.code === 'workspace-file/not-found') {
-        patch(id, { status: 'ready', content: { kind: 'text' }, text: '', sha256: null, version: null, dirty: false, diskChanged: false })
-        return
-      }
-      if (result.error.code === 'workspace-file/too-large') {
-        const stat = await remote.workspaceFiles.stat(document.sessionId, document.path, signal)
-        patch(id, {
-          status: 'ready',
-          content: { kind: 'binary', bytes: stat.ok ? (stat.value.bytes ?? null) : null },
-          absolutePath: stat.ok ? stat.value.absolutePath : document.absolutePath,
-          version: stat.ok ? stat.value.version : null,
-        })
-        return
-      }
-      patch(id, { status: 'error', error: result.error.message })
-      return
-    }
-    const data = result.value.data
-    const mime = imageType(document.path)
-    if (mime !== undefined) {
-      const url = URL.createObjectURL(new Blob([data], { type: mime }))
-      patch(id, { status: 'ready', content: { kind: 'image', url, bytes: data.byteLength }, version: result.value.version, dirty: false, diskChanged: false })
-      return
-    }
-    const text = decodeText(data)
-    if (text === undefined) {
-      patch(id, { status: 'ready', content: { kind: 'binary', bytes: data.byteLength }, version: result.value.version, dirty: false, diskChanged: false })
-      return
-    }
-    if (data.byteLength > MAX_EDITABLE_BYTES) {
-      patch(id, { status: 'error', error: `File is larger than ${MAX_EDITABLE_BYTES / 1024 / 1024} MB; the editor does not open it.` })
-      return
-    }
-    const digest = await sha256(result.value.data)
-    if (superseded(id, generation)) return
-    patch(id, {
-      content: { kind: 'text' },
-      status: 'ready',
-      absolutePath: result.value.absolutePath,
-      text,
-      sha256: digest,
-      version: result.value.version,
-      dirty: false,
-      diskChanged: false,
-    })
+  const destroy = (id: string): void => {
+    const entry = entries.get(id)
+    if (entry === undefined) return
+    entries.delete(id)
+    entry.subscription.unsubscribe()
+    entry.actor.stop()
+    releaseContent(project(entry))
   }
 
-  /**
-   * Follow one document's change feed. A burst only replaces the newest announced version while a reconcile is
-   * running, so a hundred save frames cost one read plus one trailing pass, and the last version always wins.
-   */
-  const watch = (id: string, sessionId: SessionId, path: string): void => {
-    const controller = new AbortController()
-    watches.set(id, controller)
-    let pendingVersion: string | null | undefined
-    let draining = false
-    const reconcile = async (): Promise<void> => {
-      const document = find(id)
-      if (document === undefined) return
-      if (!document.dirty || document.content.kind !== 'text') {
-        await load(id, controller.signal)
-        return
-      }
-      // A dirty buffer keeps its edits; flag the change unless the disk now holds what this editor saved.
-      const current = await remote.workspaceFiles.readBytes(sessionId, path, {}, controller.signal)
-      if (current.ok && (await sha256(current.value.data)) === find(id)?.sha256) patch(id, { version: current.value.version })
-      else patch(id, { diskChanged: true })
+  /** A second spelling of an open file resolved to the same Host path: keep the first tab, drop this one. */
+  const mergeIntoTwin = (id: string, absolutePath: string): boolean => {
+    const document = find(id)
+    if (document === undefined) return false
+    const twin = state.documents.find(other => other.id !== id && other.sessionId === document.sessionId && other.absolutePath === absolutePath)
+    if (twin === undefined) return false
+    const activeBySession = { ...state.activeBySession }
+    if (activeBySession[document.sessionId] === id) activeBySession[document.sessionId] = twin.id
+    const reveal = document.reveal === null ? twin.reveal : { line: document.reveal.line, request: ++requests }
+    const documents = state.documents.filter(other => other.id !== id).map(other => (other.id === twin.id ? { ...other, reveal } : other))
+    set({ activeBySession, documents })
+    destroy(id)
+    return true
+  }
+
+  const syncDocument = (id: string): void => {
+    const entry = entries.get(id)
+    const previous = find(id)
+    if (entry === undefined || previous === undefined) return
+    const next = project(entry)
+    if (next.absolutePath !== null && next.absolutePath !== previous.absolutePath) {
+      learnRoot(entry.base.sessionId, entry.base.path, next.absolutePath)
+      if (mergeIntoTwin(id, next.absolutePath)) return
     }
-    const drain = async (): Promise<void> => {
-      if (draining) return
-      draining = true
-      try {
-        while (pendingVersion !== undefined && watches.get(id) === controller) {
-          if (pendingVersion !== null && pendingVersion === find(id)?.version) {
-            pendingVersion = undefined
-            continue
-          }
-          pendingVersion = undefined
-          await reconcile()
-        }
-      } finally {
-        draining = false
-      }
+    if (next.content !== previous.content && previous.content.kind === 'image') URL.revokeObjectURL(previous.content.url)
+    set({ ...state, documents: state.documents.map(document => (document.id === id ? next : document)) })
+  }
+
+  const closeDocument = (id: string): void => {
+    const closing = find(id)
+    destroy(id)
+    if (closing === undefined) return
+    const documents = state.documents.filter(document => document.id !== id)
+    const activeBySession = { ...state.activeBySession }
+    if (activeBySession[closing.sessionId] === id) {
+      const fallback = documents.filter(document => document.sessionId === closing.sessionId).at(-1)
+      if (fallback === undefined) delete activeBySession[closing.sessionId]
+      else activeBySession[closing.sessionId] = fallback.id
     }
-    void (async () => {
-      try {
-        for await (const frame of remote.workspaceFiles.changes(sessionId, path, controller.signal)) {
-          if (frame.kind !== 'change' || 'absent' in frame.change || find(id) === undefined) continue
-          pendingVersion = frame.change.version
-          void drain().catch(() => undefined)
-        }
-      } catch {
-        // Watching is best effort: a file outside the workspace has no change feed.
-      }
-    })()
+    set({ documents, activeBySession })
   }
 
   return {
@@ -264,6 +186,8 @@ export const createEditorStore = (options: {
       const reveal = request.line === undefined ? null : { line: request.line, request: ++requests }
       const activeBySession = { ...state.activeBySession, [sessionId]: id }
       if (existing !== undefined) {
+        const entry = entries.get(id)
+        if (entry !== undefined) entry.base.reveal = reveal
         set({
           ...state,
           activeBySession,
@@ -271,53 +195,34 @@ export const createEditorStore = (options: {
         })
         return
       }
-      const document: OpenDocument = {
-        id,
-        sessionId,
-        path,
-        absolutePath: null,
-        name: baseName(path),
-        status: 'loading',
-        content: { kind: 'text' },
-        text: '',
-        sha256: null,
-        version: null,
-        dirty: false,
-        diskChanged: false,
-        reveal,
+      const base: DocumentBase = { id, sessionId, path, name: baseName(path), reveal }
+      const actor = createActor(editorDocumentMachine, { input: { remote, sessionId, path } })
+      const entry: DocumentEntry = {
+        base,
+        actor,
+        subscription: actor.subscribe(() => syncDocument(id)),
       }
-      loadGeneration.set(id, generationOf(id) + 1)
-      set({ documents: [...state.documents, document], activeBySession })
-      void load(id).then(() => {
-        if (find(id)?.status === 'ready') watch(id, sessionId, path)
-      })
+      entries.set(id, entry)
+      actor.start()
+      set({ documents: [...state.documents, project(entry)], activeBySession })
     },
     activate: (sessionId: SessionId, id: string): void => set({ ...state, activeBySession: { ...state.activeBySession, [sessionId]: id } }),
-    close: (id: string): void => {
-      watches.get(id)?.abort()
-      watches.delete(id)
-      loadGeneration.set(id, generationOf(id) + 1)
-      const closing = find(id)
-      releaseContent(closing)
-      const documents = state.documents.filter(document => document.id !== id)
-      const activeBySession = { ...state.activeBySession }
-      if (closing !== undefined && activeBySession[closing.sessionId] === id) {
-        const fallback = documents.filter(document => document.sessionId === closing.sessionId).at(-1)
-        if (fallback === undefined) delete activeBySession[closing.sessionId]
-        else activeBySession[closing.sessionId] = fallback.id
-      }
-      set({ documents, activeBySession })
-    },
+    close: (id: string): void => closeDocument(id),
     setDirty: (id: string, dirty: boolean): void => {
-      if (find(id)?.dirty !== dirty) patch(id, { dirty })
+      entries.get(id)?.actor.send({ type: 'buffer.edit', dirty })
     },
-    saved: (id: string, sha: string): void => patch(id, { sha256: sha, diskChanged: false }),
-    keepMine: (id: string): void => patch(id, { diskChanged: false }),
-    reload: (id: string): Promise<void> => load(id),
+    saved: (id: string, sha: string): void => {
+      entries.get(id)?.actor.send({ type: 'document.saved', sha256: sha })
+    },
+    keepMine: (id: string): void => {
+      entries.get(id)?.actor.send({ type: 'disk.keepMine' })
+    },
+    reload: (id: string): Promise<void> => {
+      entries.get(id)?.actor.send({ type: 'document.reload' })
+      return Promise.resolve()
+    },
     dispose: (): void => {
-      for (const controller of watches.values()) controller.abort()
-      watches.clear()
-      for (const document of state.documents) releaseContent(document)
+      for (const id of [...entries.keys()]) destroy(id)
       listeners.clear()
     },
   }
