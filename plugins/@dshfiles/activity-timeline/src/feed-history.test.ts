@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { createFeedHistory, mergeFeedItems } from './feed-history.js'
+import { mergeFeedItems } from './feed-history.js'
 
 const item = (id: string, at: number) => ({ id, at })
 
@@ -39,17 +39,4 @@ test('does not reuse a previous array whose items were replaced', () => {
   const replaced = mergeFeedItems({ older, newest: [{ id: 'b', at: 2 }], previous: first })
   assert.notEqual(replaced, first)
   assert.equal(replaced[1]?.id, 'b')
-})
-
-test('refuses a page that resolves after the filter changed', () => {
-  const history = createFeedHistory()
-  const token = history.request()
-  assert.equal(history.accepts(token), true)
-
-  history.invalidate()
-  assert.equal(history.accepts(token), false)
-
-  const next = history.request()
-  assert.notEqual(next, token)
-  assert.equal(history.accepts(next), true)
 })

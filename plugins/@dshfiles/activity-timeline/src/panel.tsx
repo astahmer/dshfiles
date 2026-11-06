@@ -14,20 +14,20 @@ import { usePrependScrollAnchor } from '@dshfiles/plugin-ui/hooks/use-prepend-sc
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useInfiniteQuery, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
-import type { ActivityEvent, ActivityLevel, ActivitySource, CondensedItem } from './types.js'
+import type { ActivityEvent, ActivitySource, CondensedItem } from './types.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { activityTimelineApi } from './api.js'
-import { createFeedHistory, mergeFeedItems } from './feed-history.js'
+import { activityFeedKeys, activityFeedQueries, NO_PAGES, type ActivityFeedFilter } from './feed-queries.js'
+import { mergeFeedItems } from './feed-history.js'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import type { ActivityTimelineTranslate } from './locales.js'
 
-const feedKey = ['activity-timeline', 'feed'] as const
 const statsKey = ['activity-timeline', 'stats'] as const
 
-/** A stable empty page, so a feed with nothing loaded keeps the merge memo from re-evaluating every render. */
-const NO_ITEMS: readonly CondensedItem[] = []
+/** How many rows one page carries; the tail page polls and the older pages load on demand. */
+const FEED_PAGE_LIMIT = 80
 
 /** Dark cockpit: only attention gets colour; the source stays a neutral chip. */
 const badgeVariant = (item: CondensedItem): 'outline' | 'destructive' => (item.level === 'attention' ? 'destructive' : 'outline')
@@ -102,9 +102,7 @@ export const ActivityTimelinePanel = (props: {
   const [sources, setSources] = useState<readonly ActivitySource[]>([])
   const [attentionOnly, setAttentionOnly] = useState(false)
   const [detailed, setDetailed] = useState(false)
-  const [older, setOlder] = useState<readonly CondensedItem[]>([])
-  const [cursor, setCursor] = useState<string | null>(null)
-  const feedHistory = useMemo(() => createFeedHistory(), [])
+  const [failedPageScope, setFailedPageScope] = useState<string | null>(null)
   const mergedItems = useRef<readonly CondensedItem[]>([])
   const [selected, setSelected] = useState<CondensedItem | null>(null)
   const [pendingNew, setPendingNew] = useState(0)
@@ -112,76 +110,35 @@ export const ActivityTimelinePanel = (props: {
   const scrollRef = useRef<HTMLDivElement>(null)
   const nearBottomRef = useRef(true)
   const debouncedSearch = useDebouncedValue({ value: search.trim(), delayMs: 200 })
-  const attentionLevels: readonly ActivityLevel[] = ['attention']
-  const filterKey = useMemo(
-    () => [debouncedSearch, [...sources].sort().join(','), attentionOnly, detailed] as const,
+  const filter = useMemo<ActivityFeedFilter>(
+    () => ({ search: debouncedSearch, sources, attentionOnly, detailed }),
     [debouncedSearch, sources, attentionOnly, detailed],
   )
+  const filterKey = useMemo(() => activityFeedKeys.filter(filter), [filter])
   const olderScope = JSON.stringify(filterKey)
+  const feedQuery = useInfiniteQuery(activityFeedQueries.feed({ client: api, filter, limit: FEED_PAGE_LIMIT }))
+  const pages = feedQuery.data?.pages
+  const { newest: newestItems, older } = useMemo(() => activityFeedQueries.items(pages ?? NO_PAGES), [pages])
   const captureOlderAnchor = usePrependScrollAnchor({ root: scrollRef, pageCount: older.length, scope: olderScope })
-  const feedQuery = useQuery({
-    queryKey: [...feedKey, ...filterKey],
-    queryFn: ({ signal }) =>
-      runHostRequest({
-        signal,
-        request: hostSignal =>
-          api.page(
-            {
-              ...(debouncedSearch.length !== 0 && { search: debouncedSearch }),
-              ...(sources.length !== 0 && { sources: [...sources] }),
-              ...(attentionOnly && { levels: [...attentionLevels] }),
-              detailed,
-              limit: 80,
-            },
-            { signal: hostSignal },
-          ),
-      }),
-    refetchInterval: 5_000,
-    retry: 1,
+  const olderPageFailed = failedPageScope === olderScope
+  const loadOlder = (): void => {
+    if (feedQuery.hasNextPage !== true || feedQuery.isFetchingNextPage) return
+    captureOlderAnchor()
+    setFailedPageScope(null)
+    void feedQuery.fetchNextPage()
+  }
+  const olderSentinel = useLoadMore({
+    enabled: feedQuery.hasNextPage === true && !feedQuery.isFetchingNextPage && !olderPageFailed,
+    resetKey: older.length,
+    onLoadMore: loadOlder,
+    root: scrollRef,
+    rootMargin: '500px 0px 0px 0px',
   })
   const statsQuery = useQuery({
     queryKey: statsKey,
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.stats({}, { signal: hostSignal }) }),
     refetchInterval: 30_000,
     retry: 1,
-  })
-  const olderMutation = useMutation({
-    mutationFn: async (_token: number) => {
-      if (cursor === null) return null
-      return runHostRequest({
-        request: signal =>
-          api.page(
-            {
-              cursor,
-              ...(debouncedSearch.length !== 0 && { search: debouncedSearch }),
-              ...(sources.length !== 0 && { sources: [...sources] }),
-              ...(attentionOnly && { levels: [...attentionLevels] }),
-              detailed,
-              limit: 80,
-            },
-            { signal },
-          ),
-      })
-    },
-    onSuccess: (page, token) => {
-      // A page that resolved after the filter changed belongs to the previous history.
-      if (page === null || !feedHistory.accepts(token)) return
-      const pageItems = page.items ?? []
-      setOlder(current => [...pageItems, ...current])
-      setCursor(page.nextCursor)
-    },
-  })
-  const loadOlder = (): void => {
-    if (cursor === null || olderMutation.isPending) return
-    captureOlderAnchor()
-    olderMutation.mutate(feedHistory.request())
-  }
-  const olderSentinel = useLoadMore({
-    enabled: cursor !== null && !olderMutation.isPending && !olderMutation.isError,
-    resetKey: older.length,
-    onLoadMore: loadOlder,
-    root: scrollRef,
-    rootMargin: '500px 0px 0px 0px',
   })
   const detailQuery = useQuery({
     queryKey: ['activity-timeline', 'event', selected?.id],
@@ -203,7 +160,6 @@ export const ActivityTimelinePanel = (props: {
     },
     retry: false,
   })
-  const newestItems = feedQuery.data?.items ?? NO_ITEMS
   const items = useMemo(() => {
     const merged = mergeFeedItems({ older, newest: newestItems, previous: mergedItems.current })
     mergedItems.current = merged
@@ -222,18 +178,9 @@ export const ActivityTimelinePanel = (props: {
     setNavigationError('')
   }, [selected?.id])
 
-  const resetOlderMutation = olderMutation.reset
   useEffect(() => {
-    feedHistory.invalidate()
-    mergedItems.current = []
-    setOlder([])
-    setCursor(null)
-    resetOlderMutation()
-  }, [feedHistory, filterKey, resetOlderMutation])
-
-  useEffect(() => {
-    if (older.length === 0) setCursor(feedQuery.data?.nextCursor ?? null)
-  }, [feedQuery.data?.nextCursor, older.length])
+    if (feedQuery.isFetchNextPageError) setFailedPageScope(olderScope)
+  }, [feedQuery.isFetchNextPageError, olderScope])
 
   useEffect(() => {
     const container = scrollRef.current
@@ -326,9 +273,9 @@ export const ActivityTimelinePanel = (props: {
           </Button>
         </div>
       </div>
-      {feedQuery.error === null && olderMutation.error === null ? null : (
+      {feedQuery.error === null ? null : (
         <Alert variant="destructive">
-          <AlertDescription>{errorMessage(feedQuery.error ?? olderMutation.error, t('loadFailed'))}</AlertDescription>
+          <AlertDescription>{errorMessage(feedQuery.error, t('loadFailed'))}</AlertDescription>
         </Alert>
       )}
       <div className="dshx:grid dshx:min-h-0 dshx:gap-3 dshx:@4xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -341,7 +288,7 @@ export const ActivityTimelinePanel = (props: {
                   {t('newEvents')} ({pendingNew})
                 </Button>
               ) : null}
-              {cursor === null || !olderMutation.isError ? null : (
+              {!olderPageFailed ? null : (
                 <Button size="sm" variant="outline" onClick={loadOlder}>
                   {t('loadOlder')}
                 </Button>
@@ -364,7 +311,7 @@ export const ActivityTimelinePanel = (props: {
               <div key="activity-older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
               <ActivityFeed events={feedEvents} emptyLabel={null} onSelectEvent={selectFeedEvent} />
             </div>
-            {olderMutation.isPending ? (
+            {feedQuery.isFetchingNextPage ? (
               <p className="dshx:p-1 dshx:text-xs dshx:text-muted-foreground" role="status">
                 {t('loadingOlder')}
               </p>

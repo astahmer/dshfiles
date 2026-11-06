@@ -26,19 +26,3 @@ export const mergeFeedItems = <Item extends FeedItem>(input: {
   if (previous !== undefined && previous.length === merged.length && previous.every((item, index) => item === merged[index])) return previous
   return merged
 }
-
-/**
- * Which filter a paged history belongs to. An older page that resolves after the filter changed would otherwise be
- * prepended into the new filter's list, with a cursor that no longer matches what is on screen.
- */
-export const createFeedHistory = () => {
-  let generation = 0
-  return {
-    /** A token for a page request started now; refuse it once the filter moves on. */
-    request: (): number => generation,
-    invalidate: (): void => {
-      generation += 1
-    },
-    accepts: (token: number): boolean => token === generation,
-  }
-}
