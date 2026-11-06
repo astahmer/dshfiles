@@ -55,6 +55,7 @@ import {
 
 import { ActivityDescription } from './activity-description.js'
 import { ActorThreadLink } from './actor-thread-link.js'
+import { BacklogReferenceText } from './backlog-inline-reference.js'
 import { BacklogReferenceChip } from './backlog-reference-chip.js'
 import { BacklogActivityReferences } from './activity-thread-reference.js'
 import { useAgentDispatch } from './agent-dispatch-context.js'
@@ -408,7 +409,9 @@ const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogPr
       <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
         <WandSparklesIcon aria-hidden className="dshx:size-3.5 dshx:text-violet" />
         <span className="dshx:font-medium">{fromThread ? 'Thread suggests' : 'Triage suggests'}</span>
-        <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">{BacklogTriage.describe(proposal, () => duplicateRef)}</span>
+        <span className="dshx:min-w-0 dshx:break-words dshx:text-muted-foreground">
+          <BacklogReferenceText text={BacklogTriage.describe(proposal, () => duplicateRef)} />
+        </span>
         <span className="dshx:ml-auto dshx:text-muted-foreground">{Math.round(proposal.confidence * 100)}%</span>
       </div>
       {proposal.reason === '' ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{proposal.reason}</p>}

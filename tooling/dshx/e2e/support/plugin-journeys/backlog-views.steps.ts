@@ -396,20 +396,58 @@ Then('the inspector no longer lists the link {string}', async ({ page }: { page:
   await finishJourneyAssertions(page)
 })
 
-const suggestionMarker = (title: string): string => `[[answer {"confidence":0.3,"title":"${title}"}]]`
+const suggestionMarker = (title: string, duplicateOf?: number): string =>
+  `[[answer {"confidence":0.3,"title":"${title}"${duplicateOf === undefined ? '' : `,"duplicateOf":${String(duplicateOf)}`}}]]`
 
-When('a low-confidence fake triage suggestion titled {string} is captured', async ({ page }: { page: Page }, title: string) => {
+const captureSuggestion = async (page: Page, marker: string): Promise<void> => {
   // Below the default 0.8 apply threshold, so the suggestion waits on the item instead of applying.
-  await capture(page).fill(suggestionMarker(title))
+  await capture(page).fill(marker)
   await capture(page).press('Enter')
   await expect(capture(page)).toHaveText('')
+}
+
+When('a low-confidence fake triage suggestion titled {string} is captured', async ({ page }: { page: Page }, title: string) => {
+  await captureSuggestion(page, suggestionMarker(title))
 })
+
+When(
+  'a low-confidence fake triage suggestion titled {string} naming b:{int} as its duplicate is captured',
+  async ({ page }: { page: Page }, title: string, duplicate: number) => {
+    // The model names a duplicate by the number it was shown, a journey's capture ordinal. Triage only shows it items
+    // whose titles share two words with the new one, so the suggested title repeats the duplicate's.
+    await captureSuggestion(page, suggestionMarker(title, duplicate))
+  },
+)
 
 const openFromSuggestions = async (page: Page, id: number): Promise<void> => {
   await showInboxFilter(page, 'Suggestions')
   await (await inboxRow(page, id)).click({ position: { x: 60, y: 12 } })
   await expect(peek(page).getByRole('region', { name: 'Triage suggestion', exact: true })).toBeVisible()
 }
+
+When('the triage suggestion on b:{int} is opened', async ({ page }: { page: Page }, id: number) => {
+  await showInboxFilter(page, 'Suggestions')
+  await expect(await inboxRow(page, id)).toBeVisible({ timeout: 30_000 })
+  await openFromSuggestions(page, id)
+})
+
+Then('the {string} previews b:{int} titled {string}', async ({ page }: { page: Page }, place: string, ordinal: number, title: string) => {
+  await recordAssertion(page, `backlog-duplicate-preview-${place.toLowerCase().replaceAll(' ', '-')}`, async () => {
+    const label = await backlogLabel(page, ordinal)
+    const link = peek(page)
+      .getByLabel(place, { exact: true })
+      .getByRole('link', { name: `Preview backlog item ${label}`, exact: true })
+    const preview = page.locator('[data-dshfiles-backlog-preview]')
+    // The card may already be open from another link, so the link must become the card's anchor: that proves this
+    // link opened it. A scroll closes the card by design, so ask again rather than read a card the page took away.
+    await expect(async () => {
+      await link.click()
+      await expect(link).toHaveAttribute('data-dshfiles-entity-anchor', /.+/u, { timeout: 1_500 })
+      await expect(preview.getByRole('heading', { name: `Backlog · ${label}`, exact: true })).toBeVisible({ timeout: 1_500 })
+      await expect(preview).toContainText(title, { timeout: 1_500 })
+    }).toPass({ timeout: 30_000 })
+  })
+})
 
 When('the triage suggestion on b:{int} is accepted', async ({ page }: { page: Page }, id: number) => {
   await openFromSuggestions(page, id)
