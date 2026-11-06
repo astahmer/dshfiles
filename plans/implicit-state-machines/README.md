@@ -11,19 +11,19 @@ refer to it.
 
 ## Resume here
 
-WP1 and WP2 are done on this line. WP2: 16 fixed, L51 left. WP3 (device sign-in, autosave, hover-intent), WP4 (Host lifecycles), WP5 (client flows) and the rest of WP7 are in flight in parallel lanes; integrate each lane onto this line and keep the table below current. WP7 so far: L4, L8, L11, L21, L33, L36, L52, L54, L74, L80 fixed; L18 left.
+WP1, WP2 and WP3 are done on this line (WP3: device sign-in, autosave and hover-intent built; the shared poll actor closed as obsolete because H25 and M29 own their polls inside their machines). WP4 is nearly done (20 of 22; subprocess-local M53 and workspace-folder-picker M69 are in the last WP4 lane), WP5 and WP6 are in flight in parallel lanes, and WP7 has 10 of its 14 fixes done with L18 left and the L1-L80 walk recorded.
 
 ## Progress
 
-| WP  | Scope                                          | Findings             | Status                                 |
-| --- | ---------------------------------------------- | -------------------- | -------------------------------------- |
-| 1   | Real bugs with small fixes                     | 12                   | done (11 fixed, H5 obsolete)           |
-| 2   | Wire the machines we already have              | 17                   | done (16 fixed, L51 left)              |
-| 3   | Shared building blocks                         | 4 blocks, 10 callers | in progress                            |
-| 4   | Host lifecycles                                | 22                   | in progress                            |
-| 5   | Client flows that need a machine               | 34                   | in progress                            |
-| 6   | Query, mutation or union instead of hand state | 17                   | not started                            |
-| 7   | Low-severity triage                            | 80 (14 to fix)       | in progress (10 of 14 fixed, L18 left) |
+| WP  | Scope                                          | Findings             | Status                                                |
+| --- | ---------------------------------------------- | -------------------- | ----------------------------------------------------- |
+| 1   | Real bugs with small fixes                     | 12                   | done (11 fixed, H5 obsolete)                          |
+| 2   | Wire the machines we already have              | 17                   | done (16 fixed, L51 left)                             |
+| 3   | Shared building blocks                         | 4 blocks, 10 callers | done (3 built, poll actor obsolete)                   |
+| 4   | Host lifecycles                                | 22                   | in progress (20 of 22)                                |
+| 5   | Client flows that need a machine               | 34                   | in progress                                           |
+| 6   | Query, mutation or union instead of hand state | 17                   | in progress                                           |
+| 7   | Low-severity triage                            | 80 (14 to fix)       | in progress (10 of 14 fixed, L18 left, walk recorded) |
 
 Update a row's status and the "Resume here" line after each milestone commit.
 
@@ -90,12 +90,12 @@ Explicit machines exist; the parallel state beside them moves in.
 
 Built once, at the narrowest owner, only for flows that already repeat. Check real callers before extracting.
 
-| Block                                                                         | Owner                                | Callers                                              |
-| ----------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------- |
-| Device sign-in machine (Host + client)                                        | ai-accounts                          | H2, M8 (Host); M7, M9 (client)                       |
-| Autosave machine (editing → debounce → saving → saved/failed, flush on leave) | `@dshfiles/plugin-ui/machine`        | M11, L12, L14 (H5 obsolete); then any later autosave |
-| Poll actor (interval, backoff, stop on terminal)                              | `@dshfiles/plugin-ui/machine`        | H25, M26, M29 where TanStack Query does not fit      |
-| Hover-intent menu (open/close delays, pinned)                                 | plugin-ui primitive or kit HoverCard | M59                                                  |
+| Block                                                                         | Owner                                | Callers                                                                               |
+| ----------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------- |
+| Device sign-in machine (Host + client)                                        | ai-accounts                          | done: H2, M8 (Host); M7, M9 (client)                                                  |
+| Autosave machine (editing → debounce → saving → saved/failed, flush on leave) | `@dshfiles/plugin-ui/machine`        | done: L12, L14 (H5 obsolete); M11 already has its own autosaver                       |
+| Poll actor (interval, backoff, stop on terminal)                              | `@dshfiles/plugin-ui/machine`        | obsolete: H25 and M29 own their polls inside their own machines, so no caller is left |
+| Hover-intent menu (open/close delays, pinned)                                 | plugin-ui primitive or kit HoverCard | done: M59 (the kit HoverCard has no pinned open, so a machine)                        |
 
 ## WP4 — Host lifecycles
 
