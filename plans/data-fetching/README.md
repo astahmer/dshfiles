@@ -1,8 +1,6 @@
 # Data fetching: one batched transport and a page-wide resource store
 
-Resume here: P1's socket census needs the user's browser (`chrome://net-export` on the live page, tabs counted); then
-the P2 batch-transport spike. P0 1–2 are above `main` in the `data-fetch` JJ workspace; 3–4 and the HAR analyzer are
-above `main` in the `df-p0` JJ workspace; 5–10 are attributed below and left open with their reason.
+Resume here: after the Host restart, measure the live page with `har-capture.mjs --summary` (batching, store pilots and P0 fixes deployed together); then P5 native reads. The P1 socket census of the user's own browser still needs `chrome://net-export`.
 
 ## Why
 
@@ -119,13 +117,38 @@ The store never mixes owners: keys carry the owner and the Connection identity, 
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------- |
 | P0    | Quick fixes from the HAR (list below)                                                                                                                                                                                                                                                                                  | each plugin                        | 4 of 10 done (not deployed), 6 attributed and open              |
 | P1    | Name what holds the sockets: per tab, list EventSources, WebSockets and long requests (resource timing + `chrome://net-export` on the live page, tabs counted); promote the HAR analyzer to `.agents/skills/live-performance-audit/scripts/har-summary.mjs` with the channel → plugin map computed from the repository | live-performance-audit             | Analyzer done (`df-p0`); socket census needs the user's browser |
-| P2    | Batched transport: Host route on the dshx leader, client batcher with NDJSON streaming, per-entry abort, old-Host fallback, spans; WebSocket-mux feasibility spike                                                                                                                                                     | dshx                               | Not started                                                     |
+| P2    | Batched transport: Host route on the dshx leader, client batcher with NDJSON streaming, per-entry abort, old-Host fallback, spans; WebSocket-mux feasibility spike                                                                                                                                                     | dshx                               | Done (not deployed)                                             |
 | P3    | `ResourceStore` core + React adapter + TanStack bridge; pilot on backlog `revision`/`aiActivity`, `annotations/list`, `traces-alerts/feed`                                                                                                                                                                             | dshx, plugin-ui, pilots            | Not started                                                     |
 | P4    | Event tags and `invalidates` on contracts; drop the pilots' polls where the Host publishes the change                                                                                                                                                                                                                  | dshx, pilots                       | Not started                                                     |
 | P5    | Store resources for shared native reads (`session/modelCatalog`, `credentials/describe`, `llm/listProviders`)                                                                                                                                                                                                          | dshx, model-selection, ai-accounts | Not started                                                     |
 | P6    | Host-pushed snapshots/patches for the heaviest hot keys (`thread-sidebar-attention/state`, `jj-threads/threadAt`), only if P4 numbers still show them                                                                                                                                                                  | thread-sidebar, jj-integration     | Not started                                                     |
 | P7    | Foldkit adapter spike (Subscription/Command) and a foldkit-remote transport comparison                                                                                                                                                                                                                                 | dshx                               | Not started                                                     |
 | P8    | Migrate remaining Host reads; keep TanStack only where a plugin needs its mutation/form helpers                                                                                                                                                                                                                        | all plugins                        | Not started                                                     |
+
+### P2 batched transport (shipped)
+
+- **Route.** The dshx registry leader registers `POST /api/dshx-batch` beside `/api/dshx-events`
+  (`tooling/dshx/packages/dshx/src/api/host-batch.ts`). Body `{ entries: [{ id, endpoint, payload }] }` (at most 64,
+  Effect Schema validated); each entry runs through its API's own `dispatch` with the per-channel route's caller
+  (`client`), browser peer and envelope traceparent, so each keeps its `api-dispatch` span and validation. The answer is
+  `application/x-ndjson`, one `{ id, result }` line per entry as it settles; an endpoint no API serves answers
+  `{ id, status: 404 }`. One failing entry never fails the batch.
+- **Client.** `src/api/client-batch.ts`: one page-wide batcher under `Symbol.for('@dshfiles/dshx.api-batch.v1')`, used
+  only in a browser page. Reads (`readOnly` or a read-only tool, the same test as the in-flight join) issued within
+  8 ms, up to 32, go as one POST; the in-flight join stays in front. An abort inside the window drops the entry; after
+  the flush it stops waiting and the POST is cancelled when no entry waits on it. Writes keep their own route.
+- **Fallback.** 404/405/501 or a non-NDJSON answer puts the page on per-channel POSTs for good; any other failure
+  sends that batch per channel and keeps batching; an entry the stream left unanswered is sent per channel once.
+  `localStorage['dshx:batch'] = 'off'` opts a page out (used for the A/B below).
+- **Streaming.** Connection writes a fetch-route body chunk by chunk (`for await … res.write`); in the scratch page
+  three entries arrived as three chunks (8, 8, 11 ms, headers at 7 ms).
+- **Evidence.** `tests/api-batch.spec.ts` (14 tests: window, maxSize, abort, order, partial failure, 404 line,
+  fallback, retry-once, Host dispatch with one span per entry, client end to end, opt-out). Scratch DSH (backlog,
+  preview, jj-integration), page load × 2 each: batching off 4 and 3 per-channel dshx POSTs; on 0 per-channel and 2
+  batch POSTs carrying 3 entries, all 200, no new console errors. The scratch page has few dshx reads; the live
+  number waits for deployment and the P1 HAR summary.
+- **Mux spike.** No supported plugin surface reaches `/api/remote.mux` (fetch routes have no upgrade, browser
+  `rpc` has no `open`, mux streams need Typert-generated Remotes); recorded as [Host gap 98](../dsh-host-gaps.md).
 
 ### P0 quick fixes
 
