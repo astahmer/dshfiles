@@ -346,3 +346,47 @@ it('skips a non-JSON line from the CLI instead of throwing out of its stdout han
 
   expect(textOf(message)).toBe('still here')
 })
+
+const IDLE_PROCESS_TIMEOUT_MS = 30 * 60_000
+
+it('keeps a claude process that is awaiting a tool call past the idle timeout', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'claude-cli-held-'))
+  directories.push(directory)
+  const executable = join(directory, 'claude')
+  writeFileSync(executable, FAKE_CLAUDE)
+  chmodSync(executable, 0o755)
+  const cli = new ClaudeCliSessions({ configDir: () => join(directory, '.claude'), executable })
+  sessions.push(cli)
+  const [model] = anthropicProvider().getModels()
+  if (model === undefined) throw new Error('pi-ai lists no Anthropic model')
+  const tool = { name: 'echo_tool', description: 'Echo a value', parameters: { type: 'object', properties: { value: { type: 'string' } } } }
+  const messages: Message[] = [{ role: 'user', content: 'please call the tool', timestamp: 1 }]
+  const context = () => normalizeContext({ systemPrompt: 'You are inside DSH.', tools: [tool as never], messages })
+  const options = { sessionId: 'session-held-tool' }
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  try {
+    const first = await finished(cli.stream(model, context(), options))
+    expect(first.stopReason).toBe('toolUse')
+    expect(cli.processCount).toBe(1)
+
+    vi.advanceTimersByTime(IDLE_PROCESS_TIMEOUT_MS + 1)
+    expect(cli.processCount).toBe(1)
+
+    messages.push(first, {
+      role: 'toolResult',
+      toolCallId: 'toolu_1',
+      toolName: 'echo_tool',
+      content: [{ type: 'text', text: 'pong' }],
+      isError: false,
+      timestamp: 2,
+    })
+    const second = await finished(cli.stream(model, context(), options))
+    expect(textOf(second)).toBe('tool said pong')
+    expect(cli.processCount).toBe(1)
+
+    vi.advanceTimersByTime(IDLE_PROCESS_TIMEOUT_MS + 1)
+    expect(cli.processCount).toBe(0)
+  } finally {
+    vi.useRealTimers()
+  }
+})

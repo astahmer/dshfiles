@@ -150,6 +150,14 @@ interface HeldCall {
   result?: { readonly content: readonly unknown[]; readonly isError: boolean }
 }
 
+/** Where a process stands: spawned and not yet attached, idle with its reap timer, streaming a step, holding tool calls, or gone. */
+type SessionPhase =
+  | { readonly kind: 'starting' }
+  | { readonly kind: 'idle'; readonly timer: NodeJS.Timeout }
+  | { readonly kind: 'streaming'; readonly sink: (event: CliEvent) => void }
+  | { readonly kind: 'awaitingTools' }
+  | { readonly kind: 'dead' }
+
 interface Session {
   readonly key: string
   readonly signature: string
@@ -161,15 +169,13 @@ interface Session {
   lastFingerprint: string
   /** Assistant messages this process produced since the last sync, which DSH appends to its transcript. */
   produced: number
-  /** The DSH stream currently receiving this process's events; events with no listener wait in `backlog`. */
-  sink: ((event: CliEvent) => void) | undefined
+  phase: SessionPhase
+  /** Events emitted with no stream listening wait here. */
   readonly backlog: CliEvent[]
   /** Tool calls Claude made through the bridge, by tool_use id, plus calls not yet matched to an id. */
   readonly held: Map<string, HeldCall>
   readonly unmatchedCalls: { readonly name: string; readonly argumentsJson: string; readonly bridgeId: string | number; readonly socket: Socket }[]
   readonly emittedToolUses: { readonly id: string; readonly name: string; argumentsJson: string }[]
-  idleTimer: NodeJS.Timeout | undefined
-  dead: boolean
 }
 
 type CliEvent = { readonly kind: 'stream'; readonly event: StreamEvent } | { readonly kind: 'failed'; readonly message: string } | { readonly kind: 'exited' }
@@ -271,8 +277,48 @@ export class ClaudeCliSessions {
     return this.sessions.size
   }
 
+  /** A process outlives a step only while it is idle: streaming or holding a tool call is a live Turn. */
   private static settled(session: Session): boolean {
-    return session.sink === undefined && session.held.size === 0 && session.unmatchedCalls.length === 0
+    return session.phase.kind === 'idle'
+  }
+
+  private static pendingTools = (session: Session): boolean => session.held.size > 0 || session.unmatchedCalls.length > 0 || session.emittedToolUses.length > 0
+
+  private static stopTimer(phase: SessionPhase): void {
+    if (phase.kind === 'idle') clearTimeout(phase.timer)
+  }
+
+  private armIdle(session: Session): NodeJS.Timeout {
+    const timer = setTimeout(() => this.stopKey(session.key), IDLE_PROCESS_MS)
+    timer.unref()
+    return timer
+  }
+
+  private idleOrAwaiting(session: Session): void {
+    session.phase = ClaudeCliSessions.pendingTools(session) ? { kind: 'awaitingTools' } : { kind: 'idle', timer: this.armIdle(session) }
+  }
+
+  /** The step ended: the process idles unless it still holds tool calls, which DSH may answer much later. */
+  private closeStream(session: Session): void {
+    ClaudeCliSessions.stopTimer(session.phase)
+    this.idleOrAwaiting(session)
+  }
+
+  /** Tool bookkeeping changed outside a step; a running stream owns those transitions while it lasts. */
+  private settleTools(session: Session): void {
+    if (session.phase.kind !== 'idle' && session.phase.kind !== 'awaitingTools') return
+    ClaudeCliSessions.stopTimer(session.phase)
+    this.idleOrAwaiting(session)
+  }
+
+  private openStream(session: Session, sink: (event: CliEvent) => void): void {
+    ClaudeCliSessions.stopTimer(session.phase)
+    session.phase = { kind: 'streaming', sink }
+  }
+
+  private die(session: Session): void {
+    ClaudeCliSessions.stopTimer(session.phase)
+    session.phase = { kind: 'dead' }
   }
 
   dispose(): void {
@@ -324,7 +370,7 @@ export class ClaudeCliSessions {
   }
 
   private continues(session: Session, signature: string, messages: TranscriptContext['messages']): boolean {
-    if (session.dead || session.signature !== signature || messages.length < session.synced) return false
+    if (session.phase.kind === 'dead' || session.signature !== signature || messages.length < session.synced) return false
     if (session.synced > 0 && fingerprint(JSON.stringify(messages[session.synced - 1] ?? '')) !== session.lastFingerprint) return false
     let produced = session.produced
     for (const message of messages.slice(session.synced)) {
@@ -369,6 +415,7 @@ export class ClaudeCliSessions {
     held.result = result
     session.held.set(toolUseId, held)
     this.release(session, toolUseId)
+    this.settleTools(session)
   }
 
   private release(session: Session, toolUseId: string): void {
@@ -396,6 +443,7 @@ export class ClaudeCliSessions {
     held.socket = call.socket
     session.held.set(use.id, held)
     this.release(session, use.id)
+    this.settleTools(session)
   }
 
   private spawn(input: {
@@ -465,13 +513,11 @@ export class ClaudeCliSessions {
       synced: 0,
       lastFingerprint: '',
       produced: 0,
-      sink: undefined,
       backlog: [],
       held: new Map(),
       unmatchedCalls: [],
       emittedToolUses: [],
-      idleTimer: undefined,
-      dead: false,
+      phase: { kind: 'starting' },
     }
     session.server.on('connection', socket => {
       socket.on('error', () => undefined)
@@ -496,8 +542,8 @@ export class ClaudeCliSessions {
     })
     session.server.listen(socketPath)
     const emit = (event: CliEvent): void => {
-      if (session.sink === undefined) session.backlog.push(event)
-      else session.sink(event)
+      if (session.phase.kind === 'streaming') session.phase.sink(event)
+      else session.backlog.push(event)
     }
     let stderr = ''
     child.stderr.setEncoding('utf8')
@@ -518,21 +564,21 @@ export class ClaudeCliSessions {
         emit({ kind: 'failed', message: actionableFailure(value.result ?? `Claude Code ended the turn with ${value.subtype ?? 'an error'}`, configDir) })
     })
     child.on('exit', code => {
-      session.dead = true
+      this.die(session)
       if (code !== 0 && code !== null)
         emit({ kind: 'failed', message: `claude exited with ${String(code)}${stderr.trim() === '' ? '' : `: ${stderr.trim()}`}` })
       emit({ kind: 'exited' })
       this.cleanup(session)
     })
     child.on('error', error => {
-      session.dead = true
+      this.die(session)
       emit({ kind: 'failed', message: `could not start claude: ${error.message}` })
       this.cleanup(session)
     })
     // A write after the process exited fails with EPIPE; the exit handler already reports the failure.
     child.stdin.on('error', () => undefined)
     session.server.on('error', error => {
-      session.dead = true
+      this.die(session)
       emit({ kind: 'failed', message: `could not open the Claude tool bridge: ${error.message}` })
       this.cleanup(session)
     })
@@ -548,15 +594,13 @@ export class ClaudeCliSessions {
     readonly signal: AbortSignal | undefined
   }): void {
     const { session, stream, output, fail } = input
-    if (session.idleTimer !== undefined) clearTimeout(session.idleTimer)
     const open = new Map<number, { readonly kind: 'text' | 'thinking' | 'toolCall'; readonly contentIndex: number; json: string }>()
     let started = false
     let finished = false
     const finish = (): void => {
       finished = true
-      session.sink = undefined
       input.signal?.removeEventListener('abort', onAbort)
-      session.idleTimer = setTimeout(() => this.stopKey(session.key), IDLE_PROCESS_MS)
+      this.closeStream(session)
     }
     const onAbort = (): void => {
       if (finished) return
@@ -681,7 +725,7 @@ export class ClaudeCliSessions {
           return
       }
     }
-    session.sink = handle
+    this.openStream(session, handle)
     for (const event of session.backlog.splice(0)) handle(event)
   }
 
@@ -693,8 +737,7 @@ export class ClaudeCliSessions {
   }
 
   private stop(session: Session): void {
-    if (session.idleTimer !== undefined) clearTimeout(session.idleTimer)
-    session.dead = true
+    this.die(session)
     if (session.child.exitCode === null) session.child.kill()
     this.cleanup(session)
   }
