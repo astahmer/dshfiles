@@ -695,6 +695,7 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
       setStopOutcome(result)
       void queryClient.invalidateQueries({ queryKey: snapshotKey })
     },
+    onError: () => setArmed(null),
   })
 
   const stopOrphans = useMutation({
