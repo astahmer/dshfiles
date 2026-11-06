@@ -27,6 +27,8 @@ import { RestartStatusItem } from './restart-status-item.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { DestinationSections } from './destinations.js'
+import { WaitingThreadsPanel } from './waiting-threads-panel.js'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { ArchivedThreadDock } from './archived-thread-dock.js'
@@ -76,6 +78,9 @@ import {
 
 /** The board page's id: its `main` slot key and its row in the sidebar's panel list. */
 const BOARD_PANEL_ID = 'dshfiles-thread-board'
+
+/** Inbox › Waiting threads: the thread-shaped read of the inbox, one row per waiting thread. */
+const WAITING_THREADS_PANEL_ID = 'thread-sidebar-waiting'
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
@@ -1105,6 +1110,36 @@ export default defineClient({
         BoardPanelGlyph,
       ),
     )
+    // The inbox lists items; this page answers the thread-shaped question next to it, in the Inbox destination.
+    ctx.slots.inject('main', () =>
+      ctx.slots.register(
+        { name: 'main', key: WAITING_THREADS_PANEL_ID, locale: THREAD_SIDEBAR_LOCALE_NAMESPACE },
+        decorate(({ t }: { readonly t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> }) => (
+          <PluginQueryProvider>
+            <WaitingThreadsPanel t={t} sessions={ctx.sessions} openThread={sessionId => openThread(SessionId(sessionId))} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register(
+        {
+          name: 'sidebar.panellist',
+          id: WAITING_THREADS_PANEL_ID,
+          order: 3,
+          label: () => translate('waitingThreadsSectionLabel'),
+          locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
+        },
+        WaitingThreadsGlyph,
+      ),
+    )
+    metadata?.plugin?.add(DestinationSections, {
+      panelId: WAITING_THREADS_PANEL_ID,
+      destination: 'inbox',
+      label: translate('waitingThreadsSectionLabel'),
+      description: translate('waitingThreadsDescription'),
+      order: 2,
+    })
     ctx.effect(
       () =>
         PaletteBridge.addActions([
@@ -1244,5 +1279,22 @@ const BoardPanelGlyph = (props: { readonly size?: number }): JSX.Element => (
     <rect x="3.5" y="4" width="5" height="16" rx="1.5" />
     <rect x="10" y="4" width="5" height="11" rx="1.5" />
     <rect x="16.5" y="4" width="4" height="7" rx="1.5" />
+  </svg>
+)
+
+/** A thread with its attention mark: the Inbox › Waiting threads page. */
+const WaitingThreadsGlyph = (props: { readonly size?: number }): JSX.Element => (
+  <svg
+    aria-hidden
+    width={props.size ?? 18}
+    height={props.size ?? 18}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+  >
+    <path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v8A1.5 1.5 0 0 1 18.5 16H9l-4 3.5z" />
+    <circle cx="12" cy="10.5" r="1.2" />
   </svg>
 )

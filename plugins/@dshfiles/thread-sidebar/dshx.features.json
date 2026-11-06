@@ -3347,6 +3347,56 @@
           "reason": "Client-only presentation; tab bar opens are counted through the navigation counter's api-dispatch span."
         }
       ]
+    },
+    {
+      "id": "waiting-threads-page",
+      "title": "See the threads waiting on you in one page",
+      "summary": "Inbox › Waiting threads lists one row per thread with an open inbox item about it: blocking and failed first, finished turns next, each with Open, its provider verb when it has one, and Done. The Inbox page next to it lists items across every source.",
+      "reach": ["click tab \"Inbox\"", "click button \"Waiting threads\"", "expect heading \"Waiting threads\""],
+      "surfaces": ["client", "integration"],
+      "surface": "destinationSection",
+      "destination": "inbox",
+      "currentSurface": "left-nav: Inbox › Waiting threads",
+      "configuration": [],
+      "states": ["needs-you", "ready", "empty", "busy", "provider-absent"],
+      "failureModes": [
+        "A thread with several open items appears once, at its most urgent item, so a busy thread never fills the page.",
+        "Without @dshfiles/activity-timeline the page lists nothing and the rail section is still reachable.",
+        "Done clears that one item; a later turn on the same thread opens a new item and the row comes back.",
+        "A provider verb that fails keeps the row and shows the provider's own message."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/activity-timeline",
+          "boundary": "attention-api module: Needs you and Other items, and Done on one item. The page reads no other plugin's state.",
+          "deterministicFake": "Ordering and tab counts are pinned in src/waiting-threads.test.ts."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only page over the attention-api methods, whose Host spans already exist."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.waiting-threads-rows",
+          "file": "plugins/@dshfiles/thread-sidebar/src/waiting-threads.test.ts",
+          "testName": "lists one row per thread, blocking before failed before review, newest first within each"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.waiting-threads-counts",
+          "file": "plugins/@dshfiles/thread-sidebar/src/waiting-threads.test.ts",
+          "testName": "counts each tab by severity, and an empty inbox has none"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.waiting-threads-browser",
+          "reason": "The page only has rows when the Host attention store holds items, which a fresh scratch profile does not; the empty page is reachable, and ordering plus counts are unit-tested."
+        }
+      ]
     }
   ],
   "kind": "bundle"

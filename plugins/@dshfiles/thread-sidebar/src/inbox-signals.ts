@@ -43,8 +43,12 @@ const EMPTY: ReadonlyMap<string, InboxThreadSignal> = new Map()
 
 export interface InboxThreadSignals {
   readonly signals: ReadonlyMap<string, InboxThreadSignal>
+  /** False until both views answered once, so an empty list can say it is empty instead of still loading. */
+  readonly loaded: boolean
   /** Run a provider verb on one item; resolves to the provider's outcome. */
   readonly act: (itemId: string, verb: AttentionProviderVerb) => Promise<{ readonly ok: boolean; readonly message: string }>
+  /** Mark one item done, the way the Inbox page's Done does; a provider may clear its own record too. */
+  readonly done: (itemId: string) => Promise<void>
 }
 
 /** Needs you and Other, refreshed by the inbox's `changed` event; empty while the inbox plugin is absent. */
@@ -79,7 +83,14 @@ export const useInboxThreadSignals = (options: { readonly enabled: boolean }): I
     },
     [api, queryClient],
   )
-  return { signals, act }
+  const done = useCallback(
+    async (itemId: string) => {
+      await api.done({ id: itemId })
+      void queryClient.invalidateQueries({ queryKey: inboxKeys.all })
+    },
+    [api, queryClient],
+  )
+  return { signals, act, done, loaded: needsYou.isSuccess && other.isSuccess }
 }
 
 export class InboxSignalsModel {

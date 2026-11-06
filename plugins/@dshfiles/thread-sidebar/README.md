@@ -22,6 +22,7 @@
 ![Thread navigation icons and a pinned More menu in the collapsed sidebar](docs/screenshots/collapsed-sidebar-navigation.png)
 
 ![Thread sidebar list, with the thread board page open beside it](docs/screenshots/thread-classification.png)
+![Inbox › Waiting threads: one row per thread waiting on your answer, approval or review](docs/screenshots/waiting-threads-page.png)
 ![Manage saved views with Inactive and Interrupted filters](docs/screenshots/thread-list-views.png)
 ![Synthetic saved view retained after reload over HTTP LAN access](docs/screenshots/saved-view-http-lan.png)
 ![Start a chat directly from an expanded or collapsed project header](docs/screenshots/project-header-chat.png)
