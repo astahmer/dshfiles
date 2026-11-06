@@ -641,6 +641,11 @@
           "kind": "gherkin",
           "id": "backlog.proposal-accept-dismiss",
           "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.proposal-duplicate-reference",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
         }
       ],
       "telemetry": [

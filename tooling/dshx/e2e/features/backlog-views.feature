@@ -4,7 +4,7 @@ Feature: Backlog views
   separators, the Inbox filters, the Items grouping, Projects, search
   operators, saved views, the capture composer and the item inspector.
   Every scenario uses a fresh isolated profile; only the triage suggestion
-  scenario talks to a model, and that one is the local fake provider.
+  scenarios talk to a model, and that one is the local fake provider.
 
   @scenario:backlog.feed-day-separators
   Scenario: The feed separates entries by day
@@ -151,3 +151,20 @@ Feature: Backlog views
     Then backlog item b:1 is titled "Accepted suggestion title" without a suggestion
     When the triage suggestion on b:2 is dismissed
     Then backlog item b:2 keeps its title without a suggestion
+
+  @scenario:backlog.proposal-duplicate-reference
+  Scenario: Open the duplicate a triage suggestion names
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts, @dshfiles/settings-shell" is booted
+    When the Backlog panel is opened
+    And Backlog automatic triage is configured to use the local fake model
+    And a Command Code account backed by a local fake provider is added
+    And the Backlog panel is opened
+    And "Composer drops pasted chips" is captured
+    And a low-confidence fake triage suggestion titled "Composer drops pasted chips" naming b:1 as its duplicate is captured
+    And the Backlog Inbox is opened
+    And the triage suggestion on b:2 is opened
+    And the work log is opened
+    Then the "Triage suggestion" previews b:1 titled "Composer drops pasted chips"
+    And the "Work log" previews b:1 titled "Composer drops pasted chips"
+    When the backlog preview is opened in the Backlog panel
+    Then the backlog detail shows "Composer drops pasted chips"
