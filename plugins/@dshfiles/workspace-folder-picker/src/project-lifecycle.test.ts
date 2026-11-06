@@ -172,6 +172,24 @@ describe.skipIf(!toolsAvailable)('project lifecycle against real git and jj', ()
     ),
   )
 
+  it.live('admits one clone for a destination when two starts race for it', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { root, origin, jobs } = yield* lifecycle({ installed: ['git', 'jj'] })
+        const started = yield* Effect.all(
+          [
+            jobs.start({ repositoryUrl: `file://${origin}`, parentPath: root, name: 'clone' }),
+            jobs.start({ repositoryUrl: `file://${origin}`, parentPath: root, name: 'clone' }),
+          ],
+          { concurrency: 'unbounded' },
+        )
+        expect(new Set(started.map(job => job.id)).size).toBe(1)
+        expect(yield* settled(jobs, started[0]?.id ?? '')).toMatchObject({ state: 'succeeded' })
+        expect((yield* jobs.list).length).toBe(1)
+      }),
+    ),
+  )
+
   it.live('fails a clone of a missing repository and leaves no folder behind', () =>
     Effect.scoped(
       Effect.gen(function* () {

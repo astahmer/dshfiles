@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
-import { Clock, Context, Duration, Effect, FiberMap, FileSystem, Layer, Option, Ref, Schema, Stream } from 'effect'
+import { Clock, Context, Duration, Effect, FiberMap, FileSystem, Layer, Option, Ref, Schema, Semaphore, Stream } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import type { CloneJob, CreatedProject } from './project-lifecycle-api.js'
 
@@ -222,6 +222,50 @@ const destinationOf = Effect.fnUntraced(function* (
   return path
 })
 
+type ClonePhase = CloneJob['phase']
+type CloneProgress = CloneJob['progress']
+
+/** What every clone job carries whatever it became; the state says which fields it may hold. */
+interface CloneJobTrack {
+  readonly id: string
+  readonly repositoryUrl: string
+  readonly path: string
+  readonly startedAt: number
+  readonly finishedAt: number | null
+}
+
+/** A job that moved past running keeps the phase and progress it reached, so the row it shows never rewinds. */
+type CloneJobState =
+  | { readonly state: 'running'; readonly phase: ClonePhase; readonly progress: CloneProgress }
+  | { readonly state: 'succeeded'; readonly phase: 'done'; readonly progress: CloneProgress; readonly workspaceId: string }
+  | { readonly state: 'failed'; readonly phase: ClonePhase; readonly progress: CloneProgress; readonly error: string }
+  | { readonly state: 'cancelled'; readonly phase: ClonePhase; readonly progress: CloneProgress }
+
+type TrackedCloneJob = CloneJobTrack & { readonly state: CloneJobState }
+type RunningCloneJob = CloneJobTrack & { readonly state: Extract<CloneJobState, { readonly state: 'running' }> }
+
+const isRunning = (job: TrackedCloneJob): job is RunningCloneJob => job.state.state === 'running'
+
+const runningState = (phase: ClonePhase, progress: CloneProgress): Extract<CloneJobState, { readonly state: 'running' }> => ({
+  state: 'running',
+  phase,
+  progress,
+})
+
+/** The wire job the API and its tools answer with, projected from the tracked state. */
+const cloneJobOf = (job: TrackedCloneJob): CloneJob => ({
+  id: job.id,
+  repositoryUrl: job.repositoryUrl,
+  path: job.path,
+  state: job.state.state,
+  phase: job.state.phase,
+  progress: job.state.progress,
+  startedAt: job.startedAt,
+  finishedAt: job.finishedAt,
+  workspaceId: job.state.state === 'succeeded' ? job.state.workspaceId : null,
+  error: job.state.state === 'failed' ? job.state.error : null,
+})
+
 /** Background clones on this Host: a bounded newest-first trail, one job per destination, cancellable until it registers. */
 export class CloneJobs extends Context.Service<
   CloneJobs,
@@ -244,40 +288,46 @@ export class CloneJobs extends Context.Service<
       const commands = yield* ProjectCommands
       const lookup = yield* ExecutableLookup
       const registry = yield* ProjectRegistry
-      const jobs = yield* Ref.make<ReadonlyMap<string, CloneJob>>(new Map())
+      const jobs = yield* Ref.make<ReadonlyMap<string, TrackedCloneJob>>(new Map())
       const sequence = yield* Ref.make(0)
       const running = yield* FiberMap.make<string>()
       const home = yield* ProjectHome
+      // One admission at a time: two starts for the same destination cannot both pass the running check.
+      const admission = yield* Semaphore.make(1)
 
-      const update = (id: string, patch: Partial<CloneJob>) =>
+      /** Moves a job that is still running; a job that reached a terminal state never moves again. */
+      const transition = (id: string, change: (job: RunningCloneJob) => TrackedCloneJob) =>
         Ref.update(jobs, current => {
           const job = current.get(id)
-          return job === undefined ? current : new Map(current).set(id, { ...job, ...patch })
+          if (job === undefined || !isRunning(job)) return current
+          return new Map(current).set(id, change(job))
         })
-      const viewOf = (id: string) => Effect.map(Ref.get(jobs), current => Option.fromUndefinedOr(current.get(id)))
+
+      const viewOf = (id: string) => Effect.map(Ref.get(jobs), current => Option.map(Option.fromUndefinedOr(current.get(id)), cloneJobOf))
 
       const prune = Ref.update(jobs, current => {
-        const finished = [...current.values()].filter(job => job.state !== 'running')
+        const finished = [...current.values()].filter(job => job.state.state !== 'running')
         const dropped = new Set(finished.slice(0, Math.max(0, current.size - MAX_JOBS)).map(job => job.id))
         return dropped.size === 0 ? current : new Map([...current].filter(([id]) => !dropped.has(id)))
       })
 
-      const execute = (job: CloneJob, input: { readonly git: string; readonly jj: Option.Option<string> }) => {
-        const finish = (patch: Partial<CloneJob>) =>
+      const execute = (job: RunningCloneJob, input: { readonly git: string; readonly jj: Option.Option<string> }) => {
+        const finish = (change: (current: RunningCloneJob, at: number) => TrackedCloneJob) =>
           Effect.gen(function* () {
-            yield* update(job.id, { ...patch, finishedAt: yield* Clock.currentTimeMillis })
-            const finished = yield* viewOf(job.id)
-            if (Option.isSome(finished))
-              yield* Effect.annotateCurrentSpan({ 'dshx.clone.state': finished.value.state, 'dshx.clone.phase': finished.value.phase })
+            const at = yield* Clock.currentTimeMillis
+            yield* transition(job.id, current => change(current, at))
+            const finished = yield* Ref.get(jobs)
+            const stored = finished.get(job.id)
+            if (stored !== undefined) yield* Effect.annotateCurrentSpan({ 'dshx.clone.state': stored.state.state, 'dshx.clone.phase': stored.state.phase })
           })
         const discardFolder = fs.remove(job.path, { recursive: true, force: true }).pipe(Effect.ignore)
         const cancelled = Effect.gen(function* () {
           yield* discardFolder
-          const current = yield* viewOf(job.id)
-          yield* finish({
-            state: 'cancelled',
-            progress: { percent: Option.match(current, { onNone: () => null, onSome: view => view.progress.percent }), message: 'Cancelled' },
-          })
+          yield* finish((current, at) => ({
+            ...current,
+            finishedAt: at,
+            state: { state: 'cancelled', phase: current.state.phase, progress: { percent: current.state.progress.percent, message: 'Cancelled' } },
+          }))
         })
 
         return Effect.gen(function* () {
@@ -287,35 +337,60 @@ export class CloneJobs extends Context.Service<
               cwd: home,
               onStderr: text => {
                 const progress = readProgress(text)
-                return progress === undefined ? Effect.void : update(job.id, { progress })
+                return progress === undefined ? Effect.void : transition(job.id, current => ({ ...current, state: { ...current.state, progress } }))
               },
             })
             .pipe(Effect.timeoutOption(CLONE_TIMEOUT))
           if (Option.isNone(cloned)) {
             yield* discardFolder
-            return yield* finish({ state: 'failed', error: 'The clone took longer than 30 minutes and was stopped.' })
+            return yield* finish((current, at) => ({
+              ...current,
+              finishedAt: at,
+              state: { ...current.state, state: 'failed', error: 'The clone took longer than 30 minutes and was stopped.' },
+            }))
           }
           if (cloned.value.exitCode !== 0) {
             yield* discardFolder
-            return yield* finish({ state: 'failed', error: excerpt(cloned.value.stderr) || 'git clone failed.' })
+            return yield* finish((current, at) => ({
+              ...current,
+              finishedAt: at,
+              state: { ...current.state, state: 'failed', error: excerpt(cloned.value.stderr) || 'git clone failed.' },
+            }))
           }
           if (Option.isSome(input.jj)) {
-            yield* update(job.id, { phase: 'colocating', progress: { percent: 100, message: 'Colocating jj' } })
+            yield* transition(job.id, current => ({
+              ...current,
+              state: { state: 'running', phase: 'colocating', progress: { percent: 100, message: 'Colocating jj' } },
+            }))
             const colocated = yield* commands.run({ argv: [input.jj.value, 'git', 'init', '--colocate'], cwd: job.path })
             if (colocated.exitCode !== 0) {
-              return yield* finish({
-                state: 'failed',
-                error: `${excerpt(colocated.stderr) || 'jj git init failed.'} The clone is kept at ${job.path}; run \`jj git init --colocate\` there, then add the folder as a project.`,
-              })
+              return yield* finish((current, at) => ({
+                ...current,
+                finishedAt: at,
+                state: {
+                  ...current.state,
+                  state: 'failed',
+                  error: `${excerpt(colocated.stderr) || 'jj git init failed.'} The clone is kept at ${job.path}; run \`jj git init --colocate\` there, then add the folder as a project.`,
+                },
+              }))
             }
           }
-          yield* update(job.id, { phase: 'registering', progress: { percent: 100, message: 'Adding the project' } })
+          yield* transition(job.id, current => ({
+            ...current,
+            state: { state: 'running', phase: 'registering', progress: { percent: 100, message: 'Adding the project' } },
+          }))
           const registered = yield* registry.register(job.path)
-          yield* finish({ state: 'succeeded', phase: 'done', workspaceId: registered.workspaceId, progress: { percent: 100, message: 'Cloned' } })
+          yield* finish((current, at) => ({
+            ...current,
+            finishedAt: at,
+            state: { state: 'succeeded', phase: 'done', workspaceId: registered.workspaceId, progress: { percent: 100, message: 'Cloned' } },
+          }))
         }).pipe(
           Effect.catchTags({
-            ProjectCommandFailed: error => finish({ state: 'failed', error: error.message.slice(0, 1_000) }),
-            ProjectRegisterFailed: error => finish({ state: 'failed', error: error.message.slice(0, 1_000) }),
+            ProjectCommandFailed: error =>
+              finish((current, at) => ({ ...current, finishedAt: at, state: { ...current.state, state: 'failed', error: error.message.slice(0, 1_000) } })),
+            ProjectRegisterFailed: error =>
+              finish((current, at) => ({ ...current, finishedAt: at, state: { ...current.state, state: 'failed', error: error.message.slice(0, 1_000) } })),
           }),
           Effect.onInterrupt(() => cancelled),
           Effect.withSpan('project clone', { attributes: { 'dshx.clone.colocate': Option.isSome(input.jj) } }),
@@ -323,45 +398,45 @@ export class CloneJobs extends Context.Service<
       }
 
       const start = Effect.fn('project clone start')(function* (input: { readonly repositoryUrl: string; readonly parentPath: string; readonly name: string }) {
-        const path = join(expandHome(input.parentPath, home), input.name)
-        const existing = [...(yield* Ref.get(jobs)).values()].find(job => job.path === path && job.state === 'running')
-        if (existing !== undefined) return existing
-        const target = yield* destinationOf(fs, { ...input, home })
-        const git = yield* lookup.resolve('git')
-        if (Option.isNone(git)) return yield* new GitMissing({ hint: 'Install git, then clone again.' })
-        const jj = yield* lookup.resolve('jj')
-        const now = yield* Clock.currentTimeMillis
-        const count = yield* Ref.updateAndGet(sequence, value => value + 1)
-        const job: CloneJob = {
-          id: `clone-${String(now)}-${String(count)}`,
-          repositoryUrl: input.repositoryUrl,
-          path: target,
-          state: 'running',
-          phase: 'cloning',
-          progress: { percent: null, message: 'Starting' },
-          startedAt: now,
-          finishedAt: null,
-          workspaceId: null,
-          error: null,
-        }
-        yield* Ref.update(jobs, current => new Map(current).set(job.id, job))
-        yield* prune
-        yield* FiberMap.run(running, job.id, execute(job, { git: git.value, jj }))
-        return job
+        return yield* admission.withPermit(
+          Effect.gen(function* () {
+            const path = join(expandHome(input.parentPath, home), input.name)
+            const existing = [...(yield* Ref.get(jobs)).values()].find(job => job.path === path && job.state.state === 'running')
+            if (existing !== undefined) return cloneJobOf(existing)
+            const target = yield* destinationOf(fs, { ...input, home })
+            const git = yield* lookup.resolve('git')
+            if (Option.isNone(git)) return yield* new GitMissing({ hint: 'Install git, then clone again.' })
+            const jj = yield* lookup.resolve('jj')
+            const now = yield* Clock.currentTimeMillis
+            const count = yield* Ref.updateAndGet(sequence, value => value + 1)
+            const job: RunningCloneJob = {
+              id: `clone-${String(now)}-${String(count)}`,
+              repositoryUrl: input.repositoryUrl,
+              path: target,
+              startedAt: now,
+              finishedAt: null,
+              state: runningState('cloning', { percent: null, message: 'Starting' }),
+            }
+            yield* Ref.update(jobs, current => new Map(current).set(job.id, job))
+            yield* prune
+            yield* FiberMap.run(running, job.id, execute(job, { git: git.value, jj }))
+            return cloneJobOf(job)
+          }),
+        )
       })
 
       const cancel = Effect.fn('project clone cancel')(function* (jobId: string) {
-        const job = yield* viewOf(jobId)
-        if (Option.isNone(job)) return yield* new JobMissing({ jobId })
+        const found = yield* Effect.map(Ref.get(jobs), current => current.get(jobId))
+        if (found === undefined) return yield* new JobMissing({ jobId })
         // Registration is not cancellable: the folder is already a project by the time it could be interrupted.
-        if (job.value.state === 'running' && job.value.phase !== 'registering') yield* FiberMap.remove(running, jobId)
-        return job.value
+        if (found.state.state === 'running' && found.state.phase !== 'registering') yield* FiberMap.remove(running, jobId)
+        return cloneJobOf(found)
       })
 
       return CloneJobs.of({
         start,
         cancel,
-        list: Effect.map(Ref.get(jobs), current => [...current.values()].reverse()),
+        list: Effect.map(Ref.get(jobs), current => [...current.values()].reverse().map(cloneJobOf)),
         get: viewOf,
       })
     }),
