@@ -8,6 +8,7 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { KeyRoundIcon, PlusIcon, SearchIcon, TriangleAlertIcon } from '@dshfiles/plugin-ui/icons'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -18,6 +19,7 @@ import type { SecretMetadata } from './secret-metadata.js'
 import { SecretInputBinding } from './secret-input-bind.js'
 import { JEV_SECRET_ALIAS, JEV_SECRET_ENVIRONMENT, saveGlobalJevSecret } from './jev-secret-store.js'
 import { placeSecretButton, placeSecretPanel } from './secret-input-placement.js'
+import { type FieldAnchor, secretInputOverlayMachine } from './secret-input-overlay-machine.js'
 import { SecretSetupForm } from './secret-setup-form.js'
 import type { SecretSetupTarget } from './secret-setup-form.js'
 import { SecretSetupModel } from './secret-setup-model.js'
@@ -26,18 +28,14 @@ import { referenceStatusKey, SecretReferenceRepair } from './secret-reference-re
 
 const noProbeFolders: readonly string[] = []
 
-interface FieldAnchor {
-  readonly element: HTMLInputElement | HTMLTextAreaElement
-  readonly rect: DOMRect
-}
-
 interface SecretInputOverlayProps {
   readonly t: SecretCatalogTranslate
 }
 
 const panelWidth = 320
 
-const measure = (element: HTMLInputElement | HTMLTextAreaElement): FieldAnchor | null => {
+const measure = (element: Element): FieldAnchor | null => {
+  if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) return null
   if (!element.isConnected || !SecretInputBinding.accepts(element)) return null
   const rect = element.getBoundingClientRect()
   return rect.width === 0 || rect.height === 0 ? null : { element, rect }
@@ -75,34 +73,31 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
   const api = useApi(secretCatalogApi)
   const setupApi = useApi(secretSetupApi)
   const queryClient = useQueryClient()
-  const [anchor, setAnchor] = useState<FieldAnchor | null>(null)
-  const [open, setOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [createdReference, setCreatedReference] = useState<{ readonly element: HTMLInputElement | HTMLTextAreaElement; readonly reference: string } | null>(
-    null,
-  )
+  const [snapshot, send, actor] = useMachine(secretInputOverlayMachine)
   const [query, setQuery] = useState('')
-  const [jevSetupOpen, setJevSetupOpen] = useState(false)
-  const [jevSetupPending, setJevSetupPending] = useState(false)
   const [panelSize, setPanelSize] = useState({ width: panelWidth, height: 0 })
   const [fieldText, setFieldText] = useState('')
-  const autoOpenedFor = useRef<string | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const toggleRef = useRef<HTMLSpanElement | null>(null)
+  const anchor = snapshot.context.anchor
+  const jevSetupOpen = snapshot.matches('jevSetup')
+  const jevSetupPending = snapshot.matches({ jevSetup: 'saving' })
+  const creating = snapshot.matches('create')
+  const open = snapshot.matches('list') || creating || jevSetupOpen
+  const createStep = snapshot.context.create?.step ?? SecretSetupSteps.draft()
 
-  const track = useCallback((element: Element | null) => {
-    if (element === null || !SecretInputBinding.accepts(element)) return setAnchor(null)
-    setCreatedReference(current => (current !== null && current.element !== element ? null : current))
-    setAnchor(measure(element))
-  }, [])
+  const setAnchor = useCallback(
+    (element: Element | null) => {
+      send({ type: 'measure', anchor: element === null || !SecretInputBinding.accepts(element) ? null : measure(element) })
+    },
+    [send],
+  )
 
   useEffect(() => {
     const onFocusIn = (event: FocusEvent): void => {
       const element = event.target
-      if (jevSetupPending || !(element instanceof Element) || !element.matches(SecretInputBinding.selector)) return
-      setCreating(false)
-      setJevSetupOpen(false)
-      track(element)
+      if (!(element instanceof Element) || !element.matches(SecretInputBinding.selector)) return
+      send({ type: 'focus', anchor: measure(element) })
     }
     const onFocusOut = (event: FocusEvent): void => {
       const next = event.relatedTarget
@@ -112,27 +107,24 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
         next === null && target instanceof Node && (panelRef.current?.contains(target) === true || toggleRef.current?.contains(target) === true)
       if (focusStaysInside || focusedLayerElementWasRemoved) return
       window.setTimeout(() => {
-        if (jevSetupPending) return
+        if (actor.getSnapshot().matches({ jevSetup: 'saving' })) return
         const active = document.activeElement
         const keepOpen = panelRef.current?.contains(active) === true || toggleRef.current?.contains(active) === true
         if (active !== null && (active.matches(SecretInputBinding.selector) || keepOpen)) return
-        setAnchor(null)
-        setOpen(false)
-        setCreating(false)
-        setJevSetupOpen(false)
+        send({ type: 'blur' })
       }, 0)
     }
     const onCreate = (event: Event): void => {
       const element = event.target
-      if (jevSetupPending || !(element instanceof Element) || !element.matches(SecretInputBinding.selector) || !SecretInputBinding.accepts(element)) return
+      if (!(element instanceof Element) || !element.matches(SecretInputBinding.selector) || !SecretInputBinding.accepts(element)) return
+      if (actor.getSnapshot().matches({ jevSetup: 'saving' })) return
       element.focus()
-      track(element)
-      setJevSetupOpen(false)
-      setCreating(true)
-      setOpen(true)
+      const measured = measure(element)
+      if (measured !== null) send({ type: 'create', anchor: measured })
     }
     const remeasure = (): void => {
-      setAnchor(current => (current === null ? null : measure(current.element)))
+      const current = actor.getSnapshot().context.anchor
+      if (current !== null) setAnchor(current.element)
     }
     document.addEventListener(SecretInputBinding.createEvent, onCreate)
     document.addEventListener('focusin', onFocusIn)
@@ -146,7 +138,7 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
       document.removeEventListener('scroll', remeasure, true)
       window.removeEventListener('resize', remeasure)
     }
-  }, [jevSetupPending, track])
+  }, [actor, send, setAnchor])
 
   useLayoutEffect(() => {
     if (!open) return
@@ -182,12 +174,9 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
   const referenceState = fieldReference === null ? null : (referenceStatus.data?.state ?? null)
   const referenceUnresolved = referenceState !== null && referenceState !== 'resolved' && referenceState !== 'empty'
   useEffect(() => {
-    if (!referenceUnresolved || fieldReference === null || jevSetupPending || creating) return
-    if (autoOpenedFor.current === fieldReference) return
-    autoOpenedFor.current = fieldReference
-    setJevSetupOpen(false)
-    setOpen(true)
-  }, [creating, fieldReference, jevSetupPending, referenceUnresolved])
+    if (!referenceUnresolved || fieldReference === null) return
+    send({ type: 'reference.unresolved', reference: fieldReference })
+  }, [fieldReference, referenceUnresolved, send])
   const listQuery = useQuery({
     queryKey: ['secret-catalog', 'list', cwd],
     enabled: anchor !== null,
@@ -222,22 +211,14 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
     void queryClient.invalidateQueries({ queryKey: ['secret-catalog'] })
   }
 
-  const savedJevKey = (): void => {
-    setOpen(false)
-    setJevSetupOpen(false)
-    setAnchor(null)
-  }
-
   const choose = (row: SecretMetadata): void => {
     if (anchor === null) return
     SecretInputBinding.writeValue(anchor.element, SecretInputBinding.referenceText({ alias: row.alias, environment: row.environment }))
-    setCreatedReference(null)
-    setOpen(false)
+    send({ type: 'pick' })
     anchor.element.focus()
   }
 
   if (anchor === null) return null
-  const referenceToRetry = createdReference?.element === anchor.element ? createdReference.reference : undefined
   const layer = anchor.element.closest('[role="dialog"]') ?? document.body
   const viewport = { width: window.innerWidth, height: window.innerHeight }
   const settingLabel = backlogJevField
@@ -259,15 +240,7 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
           data-testid={backlogJevField ? 'secret-input-jev-setup' : 'secret-input-bind'}
           disabled={jevSetupPending || creating}
           onClick={() => {
-            if (jevSetupPending || creating) return
-            if (open) {
-              setOpen(false)
-              setJevSetupOpen(false)
-              return
-            }
-            setJevSetupOpen(backlogJevField)
-            setCreating(false)
-            setOpen(true)
+            send({ type: 'toggle', jevField: backlogJevField })
           }}
           onMouseDown={event => event.preventDefault()}
           className={showJevLabel ? 'dshx:h-7 dshx:px-2 dshx:text-xs' : undefined}
@@ -293,10 +266,10 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
           {jevSetupOpen ? (
             <JevSecretSetup
               existing={jevRows.length === 1}
-              onCancel={() => setJevSetupOpen(false)}
-              onPendingChange={setJevSetupPending}
+              onCancel={() => send({ type: 'jev.cancel' })}
+              onPendingChange={pending => send({ type: 'jev.pending', pending })}
               onSave={saveJevKey}
-              onSaved={savedJevKey}
+              onSaved={() => send({ type: 'jev.saved' })}
               t={props.t}
               unavailable={jevUnavailable}
             />
@@ -307,20 +280,15 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
                 SecretInputBinding.writeValue(anchor.element, reference)
               }}
               onBound={() => {
-                setCreatedReference(current => (current?.element === anchor.element ? null : current))
-                setCreating(false)
-                setOpen(false)
+                send({ type: 'bound' })
                 anchor.element.focus()
               }}
               onCancel={() => {
-                setCreating(false)
+                send({ type: 'cancel.create' })
                 anchor.element.focus()
               }}
-              onStepChange={step => {
-                const reference = SecretSetupSteps.createdReference(step)
-                setCreatedReference(reference === undefined ? null : { element: anchor.element, reference })
-              }}
-              step={SecretSetupSteps.restore(referenceToRetry)}
+              onStepChange={step => send({ type: 'step', step })}
+              step={createStep}
               t={props.t}
               target={targetOf(anchor.element)}
             />
@@ -329,7 +297,7 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
               {fieldReference !== null ? <SecretReferenceRepair className="dshx:max-w-none dshx:p-2" cwd={cwd} reference={fieldReference} t={props.t} /> : null}
               <p className="dshx:px-1 dshx:text-xs dshx:font-medium">{props.t('bindSecret')}</p>
               {backlogJevField && (
-                <Button className="dshx:w-full dshx:justify-start" onClick={() => setJevSetupOpen(true)} size="sm" type="button" variant="outline">
+                <Button className="dshx:w-full dshx:justify-start" onClick={() => send({ type: 'open.jev' })} size="sm" type="button" variant="outline">
                   <PlusIcon />
                   {props.t('jevSetupButton')}
                 </Button>
@@ -374,7 +342,7 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
                   ) : null}
                 </ul>
               ) : null}
-              <Button onClick={() => setCreating(true)} size="sm" type="button" variant="outline">
+              <Button onClick={() => send({ type: 'open.create' })} size="sm" type="button" variant="outline">
                 {props.t('setupAddAndBind')}
               </Button>
             </>
