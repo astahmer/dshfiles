@@ -751,21 +751,23 @@ export default defineClient({
         [registerCustomizationHost],
       )
       return (
-        <SidebarRoot
-          {...props}
-          contentOverridden={contentOverridden}
-          customizationTarget={contentOverridden ? customizationTarget : null}
-          customizationActionRef={customizationActionRef}
-          readFooterSnapshot={readFooterSnapshot}
-          subscribeFooterSnapshot={subscribeFooterSnapshot}
-          readClientRevisionKey={readClientRevisionKey}
-          readStageSession={readStageSession}
-          subscribeStageSession={subscribeStageSession}
-          subscribeClientRevisions={subscribeClientRevisions}
-          openSession={openSessionRestoringArchived}
-          runCommand={runCommand}
-          loadModelCatalog={loadModelCatalog}
-        />
+        <PluginQueryProvider>
+          <SidebarRoot
+            {...props}
+            contentOverridden={contentOverridden}
+            customizationTarget={contentOverridden ? customizationTarget : null}
+            customizationActionRef={customizationActionRef}
+            readFooterSnapshot={readFooterSnapshot}
+            subscribeFooterSnapshot={subscribeFooterSnapshot}
+            readClientRevisionKey={readClientRevisionKey}
+            readStageSession={readStageSession}
+            subscribeStageSession={subscribeStageSession}
+            subscribeClientRevisions={subscribeClientRevisions}
+            openSession={openSessionRestoringArchived}
+            runCommand={runCommand}
+            loadModelCatalog={loadModelCatalog}
+          />
+        </PluginQueryProvider>
       )
     }
 
