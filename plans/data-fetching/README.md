@@ -118,8 +118,8 @@ The store never mixes owners: keys carry the owner and the Connection identity, 
 | P0    | Quick fixes from the HAR (list below)                                                                                                                                                                                                                                                                                  | each plugin                        | 4 of 10 done (not deployed), 6 attributed and open              |
 | P1    | Name what holds the sockets: per tab, list EventSources, WebSockets and long requests (resource timing + `chrome://net-export` on the live page, tabs counted); promote the HAR analyzer to `.agents/skills/live-performance-audit/scripts/har-summary.mjs` with the channel → plugin map computed from the repository | live-performance-audit             | Analyzer done (`df-p0`); socket census needs the user's browser |
 | P2    | Batched transport: Host route on the dshx leader, client batcher with NDJSON streaming, per-entry abort, old-Host fallback, spans; WebSocket-mux feasibility spike                                                                                                                                                     | dshx                               | Done (not deployed)                                             |
-| P3    | `ResourceStore` core + React adapter + TanStack bridge; pilot on backlog `revision`/`aiActivity`, `annotations/list`, `traces-alerts/feed`                                                                                                                                                                             | dshx, plugin-ui, pilots            | Not started                                                     |
-| P4    | Event tags and `invalidates` on contracts; drop the pilots' polls where the Host publishes the change                                                                                                                                                                                                                  | dshx, pilots                       | Not started                                                     |
+| P3    | `ResourceStore` core + React adapter + TanStack bridge; pilot on backlog `revision`/`aiActivity`, `annotations/list`, `traces-alerts/feed`                                                                                                                                                                             | dshx, plugin-ui, pilots            | Done (not deployed)                                             |
+| P4    | Event tags and `invalidates` on contracts; drop the pilots' polls where the Host publishes the change                                                                                                                                                                                                                  | dshx, pilots                       | Done (not deployed); P4 events for annotations/traces open      |
 | P5    | Store resources for shared native reads (`session/modelCatalog`, `credentials/describe`, `llm/listProviders`)                                                                                                                                                                                                          | dshx, model-selection, ai-accounts | Not started                                                     |
 | P6    | Host-pushed snapshots/patches for the heaviest hot keys (`thread-sidebar-attention/state`, `jj-threads/threadAt`), only if P4 numbers still show them                                                                                                                                                                  | thread-sidebar, jj-integration     | Not started                                                     |
 | P7    | Foldkit adapter spike (Subscription/Command) and a foldkit-remote transport comparison                                                                                                                                                                                                                                 | dshx                               | Not started                                                     |
@@ -149,6 +149,26 @@ The store never mixes owners: keys carry the owner and the Connection identity, 
   number waits for deployment and the P1 HAR summary.
 - **Mux spike.** No supported plugin surface reaches `/api/remote.mux` (fetch routes have no upgrade, browser
   `rpc` has no `open`, mux streams need Typert-generated Remotes); recorded as [Host gap 98](../dsh-host-gaps.md).
+
+### P3/P4 shipped (2026-11-06, `df-store` JJ workspace, not deployed)
+
+- `@dshfiles/dshx/client`: `resourceStore()` (framework-free core in `src/api/resource-store.ts`), `apiResource`,
+  `useResource`, `invalidateApiResources`; contracts take `method({ tags })` and `event({ invalidates })`. Guide:
+  `tooling/dshx/docs/sdk/resource-store.md`. `@dshfiles/plugin-ui/query` adds `resourceQueryOptions`.
+- Backlog: the Host publishes `backlog/changed` after each write, delete or peer pull (100 ms debounce); `revision`
+  polls 5 s only while that event is not live and 60 s while it is. `aiActivity` keeps its 1 s visible-only poll,
+  now store-owned. Both reads are `readOnly`, so they coalesce.
+- `annotations/list`: one store key per session, 60 s base poll, 4 s while the popover is open, no queue-time timeout.
+  Polls kept: the Host publishes no annotation event.
+- `traces-alerts/feed`: TanStack bridge (`queryFn` through the store), `readOnly`, no queue-time timeout. Poll kept on
+  the query.
+- Verified in a scratch DSH (backlog + annotations + traces): with the Backlog panel open and `backlog/changed` live,
+  0 revision reads in a 16 s idle window (the 5 s poll made ~3) and a re-read 207 ms after a capture; journeys
+  backlog 74/74, annotations 4/4, traces 11/11.
+- Not yet: a P4 event for annotations and traces alerts, a live after-number (HAR) for any of it.
+
+P0-1 and P0-2 are verified only by focused tests (`panel-poll.test.ts`, `tests/catalog-refresh.test.ts`) and typecheck;
+they are not deployed, so no live after-number exists yet.
 
 ### P0 quick fixes
 
