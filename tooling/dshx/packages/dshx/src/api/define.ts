@@ -39,6 +39,7 @@ function method(options: {
   readonly output?: never
   readonly description?: string
   readonly readOnly?: boolean
+  readonly tags?: readonly string[]
   readonly tool?: ApiToolExposure
 }): ApiMethodDefinition<void, void, unknown, unknown>
 function method<const InputSchema extends ApiSchema | undefined = undefined, const OutputSchema extends ApiSchema | undefined = undefined>(options: {
@@ -46,6 +47,7 @@ function method<const InputSchema extends ApiSchema | undefined = undefined, con
   readonly output?: OutputSchema
   readonly description?: string
   readonly readOnly?: boolean
+  readonly tags?: readonly string[]
   readonly tool?: ApiToolExposure<OutputSchema extends ApiSchema ? ApiSchemaOutput<OutputSchema> : unknown>
 }): MethodFromSchemas<InputSchema, OutputSchema>
 function method(options: ApiMethodOptions = {}): AnyApiMethodDefinition {
@@ -56,6 +58,7 @@ function method(options: ApiMethodOptions = {}): AnyApiMethodDefinition {
 const event = <const Schema extends ApiSchema>(options: {
   readonly schema: Schema
   readonly description?: string
+  readonly invalidates?: readonly string[]
 }): ApiEventDefinition<ApiSchemaInput<Schema>, ApiSchemaOutput<Schema>> => ({
   ...options,
 })

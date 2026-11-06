@@ -45,6 +45,11 @@ export interface ApiMethodMetadata {
    * whose `tool.readOnly` is true counts as read-only too. Leave it unset for anything that writes.
    */
   readonly readOnly?: boolean
+  /**
+   * Names for what this read returns, scoped to its API. An event of the same API whose `invalidates` lists one of
+   * them makes the page-wide resource store read it again.
+   */
+  readonly tags?: readonly string[]
 }
 
 export interface ApiMethodOptions<InputSchema extends ApiSchema = ApiSchema, OutputSchema extends ApiSchema = ApiSchema> extends ApiMethodMetadata {
@@ -73,6 +78,8 @@ export interface ApiEventDefinition<HostPayload = unknown, ClientPayload = HostP
   readonly [apiEventPayloadBrand]?: readonly [HostPayload, ClientPayload]
   /** What the event announces, written for another plugin author. */
   readonly description?: string
+  /** Tags of this API's reads the event makes stale; the resource store re-reads the subscribed ones. */
+  readonly invalidates?: readonly string[]
 }
 
 export type AnyApiEventDefinition = ApiEventDefinition<any, any>

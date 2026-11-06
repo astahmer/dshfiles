@@ -32,7 +32,28 @@ export type {
   SlotContribution,
   SlotOptions,
 } from './types.js'
-export { useApi, useApiEvent, useApiQuery } from '../api/client.js'
+export { useApi, useApiEvent, useApiQuery, useResource } from '../api/client.js'
+export type { UseResourceOptions, UseResourceResult } from '../api/client.js'
+import { ApiResourceModel } from '../api/api-resource.js'
+import { ResourceStoreModel } from '../api/resource-store.js'
+/** The page-wide store every plugin bundle shares; see the resource store guide. */
+export const resourceStore = ResourceStoreModel.page
+/** Register one dshx read in the page-wide resource store and return its key. */
+export const apiResource = ApiResourceModel.register
+/** Re-read the subscribed resources of an API whose methods carry one of these tags. */
+export const invalidateApiResources = ApiResourceModel.invalidate
+export type { ApiResourceOptions } from '../api/api-resource.js'
+export type {
+  ResourceConnection,
+  ResourceDefinition,
+  ResourceInvalidation,
+  ResourceInvalidationSource,
+  ResourceSnapshot,
+  ResourceStatus,
+  ResourceStore,
+  ResourceSubscribeOptions,
+  ResourceSubscription,
+} from '../api/resource-store.js'
 import { HostStorageModel } from './host-storage.js'
 /** Host-backed key-value storage and stores for a plugin; see the plugin-context guide. */
 export const hostStorage = HostStorageModel.forPlugin

@@ -60,6 +60,8 @@ const CLIENT_PLUGIN_CONTEXT_PATH = fileURLToPath(new URL('../../client/plugin-co
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
 const API_CLIENT_EVENTS_PATH = fileURLToPath(new URL('../../api/client-events.js', import.meta.url))
+const API_RESOURCE_PATH = fileURLToPath(new URL('../../api/api-resource.js', import.meta.url))
+const API_RESOURCE_STORE_PATH = fileURLToPath(new URL('../../api/resource-store.js', import.meta.url))
 const CLIENT_HOST_STORAGE_PATH = fileURLToPath(new URL('../../client/host-storage.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
 const API_ZOD_VIEW_PATH = fileURLToPath(new URL('../../api/zod-view.js', import.meta.url))
@@ -177,7 +179,12 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `import { HostCommandsModel } from ${JSON.stringify(CLIENT_HOST_COMMANDS_PATH)}`,
           'export const hasHostCommandRegistry = HostCommandsModel.hasRegistry',
           'export const runHostCommand = HostCommandsModel.run',
-          `export { useApi, useApiEvent, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
+          `export { useApi, useApiEvent, useApiQuery, useResource } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
+          `import { ResourceStoreModel } from ${JSON.stringify(API_RESOURCE_STORE_PATH)}`,
+          'export const resourceStore = ResourceStoreModel.page',
+          `import { ApiResourceModel } from ${JSON.stringify(API_RESOURCE_PATH)}`,
+          'export const apiResource = ApiResourceModel.register',
+          'export const invalidateApiResources = ApiResourceModel.invalidate',
           `export { hostStorage } from ${JSON.stringify(VIRTUAL_CLIENT_HOST_STORAGE)}`,
           `import { ApiClientEventsModel } from ${JSON.stringify(API_CLIENT_EVENTS_PATH)}`,
           'export const subscribeApiEvent = ApiClientEventsModel.subscribe',
@@ -218,8 +225,9 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
         ].join('\n')
       if (id === VIRTUAL_CLIENT_API_HOOKS) {
         return [
-          `import { useApi as useApiImplementation, useApiEvent as useApiEventImplementation, useApiQuery as useApiQueryImplementation } from ${JSON.stringify(CLIENT_API_PATH)}`,
+          `import { useApi as useApiImplementation, useApiEvent as useApiEventImplementation, useApiQuery as useApiQueryImplementation, useResource as useResourceImplementation } from ${JSON.stringify(CLIENT_API_PATH)}`,
           'export function useApi(...args) { return useApiImplementation(...args) }',
+          'export function useResource(...args) { return useResourceImplementation(...args) }',
           'export function useApiEvent(...args) { return useApiEventImplementation(...args) }',
           'export function useApiQuery(...args) { return useApiQueryImplementation(...args) }',
           '',

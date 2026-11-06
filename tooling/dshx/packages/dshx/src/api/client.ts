@@ -18,6 +18,8 @@ import type {
 import { ApiProtocolModel } from './common.js'
 import { ApiRuntimeModel, type ContextLike } from './runtime.js'
 import { ApiClientEventsModel } from './client-events.js'
+import { ApiResourceModel, type ApiResourceOptions } from './api-resource.js'
+import { ResourceStoreModel, type ResourceSnapshot, type ResourceSubscription } from './resource-store.js'
 
 type ReactRuntime = typeof import('react')
 declare const require: ((name: string) => ReactRuntime) | undefined
@@ -240,6 +242,69 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
     })
   }, [])
   return { ...state, refetch }
+}
+
+export type UseResourceOptions<Output> = ApiResourceOptions<Output> & {
+  /** False keeps the cached data without subscribing, so the key neither reads nor polls for this caller. */
+  readonly enabled?: boolean | undefined
+  /** Whether this caller is on screen; a hidden caller never starts a read and pauses the poll it alone keeps. */
+  readonly visible?: boolean | undefined
+  /** A shorter poll only this caller needs while it shows more, such as an open popover. */
+  readonly subscriberPollInterval?: number | undefined
+}
+
+export type UseResourceResult<T> = ResourceSnapshot<T> & { readonly refetch: () => void }
+
+/**
+ * Read one dshx API method through the page-wide resource store: every caller of the same method and input, in any
+ * plugin bundle, shares one read, one cache entry and one poll.
+ */
+export function useResource<const Methods extends Record<string, AnyApiMethodDefinition>, K extends keyof Methods & string>(
+  contract: ApiContract<Methods>,
+  method: K,
+  input: ApiClientInput<Methods[K]>,
+  options: UseResourceOptions<ApiClientOutput<Methods[K]>> = {},
+): UseResourceResult<ApiClientOutput<Methods[K]>> {
+  const api = useApi(contract)
+  const store = ResourceStoreModel.page()
+  const key = ApiResourceModel.register({
+    client: api,
+    method,
+    input,
+    options: {
+      ...(options.staleTime !== undefined && { staleTime: options.staleTime }),
+      ...(options.pollInterval !== undefined && { pollInterval: options.pollInterval }),
+      ...(options.livePollInterval !== undefined && { livePollInterval: options.livePollInterval }),
+      ...(options.shouldPoll !== undefined && { shouldPoll: options.shouldPoll }),
+      ...(options.pollWhileHidden !== undefined && { pollWhileHidden: options.pollWhileHidden }),
+    },
+  })
+  const enabled = options.enabled !== false
+  const visible = options.visible !== false
+  const subscriberPollInterval = options.subscriberPollInterval
+  const subscriberOptions = runtime().useRef({ visible, pollInterval: subscriberPollInterval })
+  subscriberOptions.current = { visible, pollInterval: subscriberPollInterval }
+  const subscription = runtime().useRef<ResourceSubscription | undefined>(undefined)
+  const subscribe = runtime().useCallback(
+    (listener: () => void) => {
+      if (!enabled) return () => undefined
+      const created = store.subscribe(key, listener, subscriberOptions.current)
+      subscription.current = created
+      return () => {
+        created()
+        if (subscription.current === created) subscription.current = undefined
+      }
+    },
+    [store, key, enabled],
+  )
+  runtime().useEffect(() => {
+    subscription.current?.update({ visible, pollInterval: subscriberPollInterval })
+  }, [visible, subscriberPollInterval])
+  const snapshot = runtime().useSyncExternalStore(subscribe, () => store.getSnapshot<ApiClientOutput<Methods[K]>>(key))
+  const refetch = runtime().useCallback(() => {
+    store.ensure(key, { force: true }).catch(() => undefined)
+  }, [store, key])
+  return runtime().useMemo(() => ({ ...snapshot, refetch }), [snapshot, refetch])
 }
 
 export class ApiClientLifecycle {

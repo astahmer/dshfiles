@@ -272,6 +272,18 @@ function apiConnectionAvailable<const Methods extends Record<string, AnyApiMetho
   return typeof source?.getSnapshot !== 'function' || source.getSnapshot() !== undefined
 }
 
+/** The Connection behind a client: its identity and the Host generation it reports. */
+export interface ApiConnectionHandle {
+  readonly identity: ConnectionLifecycleLike
+  readonly hostDescription: HostDescriptionSourceLike | undefined
+}
+
+/** Internal: the Connection behind a client, so page-wide caches key and reset by it. */
+function apiClientConnection<const Methods extends Record<string, AnyApiMethodDefinition>>(client: ApiClient<Methods>): ApiConnectionHandle | undefined {
+  const connection = clientConnections.get(client)
+  return connection === undefined ? undefined : { identity: connection, hostDescription: connection.hostDescription }
+}
+
 /** Internal: the contract and owner behind a client created by this module. */
 function apiClientEventTarget<const Methods extends Record<string, AnyApiMethodDefinition>, const Events extends Record<string, AnyApiEventDefinition>>(
   client: ApiClient<Methods, Events>,
@@ -286,4 +298,5 @@ export class ApiRuntimeModel {
   static readonly subscribeConnection = subscribeApiConnection
   static readonly connectionAvailable = apiConnectionAvailable
   static readonly eventTarget = apiClientEventTarget
+  static readonly connectionOf = apiClientConnection
 }

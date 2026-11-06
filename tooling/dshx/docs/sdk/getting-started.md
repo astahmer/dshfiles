@@ -262,6 +262,9 @@ const result = await host.get()
 
 For components, existing `useApi` and `useApiQuery` hooks retain their native Connection provider, cancellation, and inferred result types. The compiler uses the same package identity on both halves. Connection owns Host/Origin and browser authentication. DSH 0.2 does not support the old per-handler `authority` option; explicit values now fail with a corrective message. Use native admission primitives for stricter policies. JSON transport rejects values that would be lost or changed by serialization, including non-finite numbers, class instances and undefined array entries. A Client input object member written as `undefined` is dropped before validation, exactly as the JSON on the wire would drop it, so an absent optional field may be written either way; Host outputs stay strict, where a dropped member would silently change the declared contract.
 
+For reads that several surfaces or plugins share, or that poll, use `useResource` and the page-wide
+[resource store](resource-store.md): one cache entry, one read and one poll timer per key for the whole page.
+
 ## Client service contracts
 
 Cordis uses one `Context` type for Host and Client packages, even when a service
