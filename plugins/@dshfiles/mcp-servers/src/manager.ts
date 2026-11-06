@@ -334,6 +334,7 @@ export class McpManager extends Context.Service<
           const plan = Effect.gen(function* () {
             const current = input.servers ?? (yield* servers)
             const ids = new Set(current.map(server => server.id))
+            yield* Ref.update(localProcesses, previous => new Map([...previous].filter(([id]) => ids.has(id))))
             const suspended = yield* Ref.updateAndGet(disconnected, previous => new Set([...previous].filter(id => ids.has(id))))
             const toolCallTimeoutMs = (yield* preferences).toolCallTimeoutSeconds * 1000
             const active = current.filter(server => server.enabled && !suspended.has(server.id))
