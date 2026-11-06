@@ -354,6 +354,14 @@
   min-width: 0;
   max-width: 360px;
   white-space: nowrap;
+  /* A squeezed item clips instead of painting over its neighbour; the margin keeps focus rings visible. */
+  overflow: clip;
+  overflow-clip-margin: 3px;
+}
+
+/* An item drawing its own row of controls (the quota meters) is as wide as its controls, not a text label. */
+.statusItem[data-status-controls] {
+  max-width: none;
 }
 
 .statusItem:empty,

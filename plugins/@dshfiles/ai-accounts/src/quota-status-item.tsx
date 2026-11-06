@@ -12,8 +12,8 @@ const QuotaStatusFrame = (props: { readonly compact: boolean; readonly children:
   <span
     className={cn(
       'dshx-root dshx:flex dshx:min-w-0 dshx:items-center',
-      // One 24 px line: the meters keep their text, lose their 32 px button height, and never wrap the strip.
-      !props.compact && 'dshx:[&>div]:flex-nowrap dshx:[&>div]:p-0 dshx:[&_button]:h-5 dshx:[&_button]:min-h-0 dshx:[&_button]:py-0',
+      // One 24 px line: the meters keep their two text lines at the strip's full height and never wrap the strip.
+      !props.compact && 'dshx:[&>div]:flex-nowrap dshx:[&>div]:p-0 dshx:[&_button]:h-6 dshx:[&_button]:min-h-0 dshx:[&_button]:py-0',
     )}
     data-testid="status-item-quota"
   >

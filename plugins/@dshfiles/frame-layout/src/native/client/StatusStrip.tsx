@@ -87,7 +87,7 @@ const StatusItemView = (props: {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <span className={css.statusItem} data-status-item={item.id} data-status-side={item.side}>
+        <span className={css.statusItem} data-status-item={item.id} data-status-side={item.side} data-status-controls={item.controls === true ? '' : undefined}>
           {item.open === undefined || item.controls === true ? (
             content
           ) : (
