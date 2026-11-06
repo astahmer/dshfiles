@@ -24,6 +24,12 @@ import { InlineReferenceScope } from '../../inline-references.tsx'
 import { mergeTurnRailItems } from './turn-rail-items.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
+import {
+  beginImagePreview, imagePreviewClosed, imagePreviewLoaded, imagePreviewOpened, imagePreviewOpening,
+  imagePreviewRequestIsCurrent, type ImagePreview,
+} from '../../image-preview-request.ts'
+import { beginFileOpen, idleFileOpen, settleFileOpen, type FileOpenRequest } from '../../file-open-request.ts'
+import { MOTION_TAIL_MS, motionTailNext, type MotionTail } from '../../motion-tail.ts'
 import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 import css from './ChatView.module.css'
 
@@ -57,9 +63,6 @@ function observedInputs(
 }
 
 type PendingInput = PendingSubmission | InboxState['next-step'][number]
-
-/** How long fold transitions stay enabled after a Turn stops running. */
-const MOTION_TAIL_MS = 800
 
 /**
  * The chat view slot entry: pure component over the composed props; each
@@ -100,12 +103,8 @@ export function ChatView({
       dialog: t('image.dialog'), close: t('image.close'),
     },
   }), [cwd, t])
-  const [imagePreview, setImagePreview] = useState<{ readonly images: readonly LightboxImage[]; readonly initialIndex: number } | null>(null)
-  const imagePreviewRequest = useRef(0)
-  useEffect(() => {
-    imagePreviewRequest.current += 1
-    setImagePreview(null)
-  }, [sessionId])
+  const [imagePreview, setImagePreview] = useState<ImagePreview<LightboxImage>>(imagePreviewClosed)
+  useEffect(() => { setImagePreview(imagePreviewClosed()) }, [sessionId])
   const imageLightboxLabels = useMemo<ImageLightboxLabels>(() => ({
     dialog: t('image.dialog'),
     close: t('image.close'),
@@ -115,13 +114,14 @@ export function ChatView({
     loading: t('image.loading'),
   }), [t])
   const openImagePreview = useCallback((image: LightboxImage, path?: string) => {
-    const request = ++imagePreviewRequest.current
+    const request = beginImagePreview()
+    setImagePreview(imagePreviewOpening(request))
     const open = async (): Promise<void> => {
       const firstTurn = railItems[0]
       if (imageGalleryScope === 'thread' && firstTurn?.anchor.kind === 'unloaded') {
         await loadThrough(firstTurn.anchor.seq).catch(() => {})
       }
-      if (request !== imagePreviewRequest.current) return
+      if (!imagePreviewRequestIsCurrent(request)) return
       const nodes: ImageGalleryNode[] = []
       for (const { turn } of railItems) {
         nodes.push(
@@ -141,40 +141,31 @@ export function ChatView({
         fallbackImage: image,
       })
       const preview = { images: selection.images, initialIndex: selection.initialIndex }
-      setImagePreview(preview)
+      setImagePreview(current => imagePreviewOpened(current, { request, ...preview }))
       void Promise.all(selection.images.map((candidate, index) => {
         if (candidate.src !== undefined) return Promise.resolve(candidate.src)
         const load = selection.loaders[index]
         return load === undefined ? Promise.resolve(undefined) : load().catch(() => undefined)
       })).then(sources => {
-        setImagePreview(current => current !== preview ? current : {
-          ...preview,
+        setImagePreview(current => imagePreviewLoaded(current, {
+          request,
           images: preview.images.map((candidate, index) => {
             const src = sources[index]
             return src === undefined ? candidate : { ...candidate, src }
           }),
-        })
+        }))
       })
     }
     void open()
   }, [cwd, fileImages, imageGalleryScope, loadImage, loadThrough, nodeStore, railItems])
-  const closeImagePreview = useCallback(() => {
-    imagePreviewRequest.current += 1
-    setImagePreview(null)
-  }, [])
+  const closeImagePreview = useCallback(() => { setImagePreview(imagePreviewClosed()) }, [])
   const running = useSession(s => s.running)
   // Fold transitions run while a Turn is live, while an input is pending, and briefly after settling.
-  const [motionTail, setMotionTail] = useState(false)
+  const [motionTail, setMotionTail] = useState<MotionTail>('off')
   useEffect(() => {
-    if (!deferCompletedTurns) {
-      setMotionTail(false)
-      return
-    }
-    if (running) {
-      setMotionTail(true)
-      return
-    }
-    const timer = setTimeout(() => { setMotionTail(false) }, MOTION_TAIL_MS)
+    setMotionTail(current => motionTailNext(current, { running, deferCompletedTurns }))
+    if (!deferCompletedTurns || running) return
+    const timer = setTimeout(() => { setMotionTail('off') }, MOTION_TAIL_MS)
     return () => { clearTimeout(timer) }
   }, [running, deferCompletedTurns])
   const openState = useSession(s => s.openState)
@@ -213,34 +204,36 @@ export function ChatView({
     if (transcript.hidden === 0 || firstMounted === null) return order
     return order.filter(key => (nodeStore.get(key)?.anchorSeq ?? firstMounted) >= firstMounted)
   }, [order, nodeStore, transcript.hidden, transcript.firstSeq])
-  const [fileOpenError, setFileOpenError] = useState<{ path: string; message: string } | null>(null)
-  const [fileOpenBusy, setFileOpenBusy] = useState(false)
-  // Close/retry must ignore a settlement that started before the latest
-  // gesture; otherwise a cancelled in-flight refusal reopens the dialog.
-  const fileOpenRequest = useRef(0)
+  const [fileOpen, setFileOpen] = useState<FileOpenRequest>(idleFileOpen)
+  /** The refusal dialog's content: the settled refusal, or the one a running retry keeps on screen. */
+  const fileOpenFailure = fileOpen.status === 'refused'
+    ? { path: fileOpen.path, message: fileOpen.message, busy: false }
+    : fileOpen.status === 'opening' && fileOpen.refusal !== undefined
+      ? { path: fileOpen.path, message: fileOpen.refusal, busy: true }
+      : null
 
-  const requestOpenFile = useCallback((path: string, options?: OpenFileOptions) => {
-    const id = ++fileOpenRequest.current
-    setFileOpenBusy(true)
-    void (options === undefined ? openFile(path) : openFile(path, options)).then(
-      () => {
-        if (id !== fileOpenRequest.current) return
-        setFileOpenError(null)
-        setFileOpenBusy(false)
-      },
+  const startFileOpen = useCallback((input: { path: string; options: OpenFileOptions | undefined; refusal: string | undefined }) => {
+    const request = beginFileOpen(input)
+    if (request.status !== 'opening') return
+    setFileOpen(request)
+    void (input.options === undefined ? openFile(input.path) : openFile(input.path, input.options)).then(
+      () => { setFileOpen(current => settleFileOpen(current, { request: request.request, message: undefined })) },
       (error: unknown) => {
-        if (id !== fileOpenRequest.current) return
-        setFileOpenError({
-          path,
-          message: openFailureMessage(
-            error,
-            t('fileOpen.unknown'),
-          ),
-        })
-        setFileOpenBusy(false)
+        setFileOpen(current => settleFileOpen(current, {
+          request: request.request,
+          message: openFailureMessage(error, t('fileOpen.unknown')),
+        }))
       },
     )
   }, [openFile, t])
+
+  const requestOpenFile = useCallback((path: string, options?: OpenFileOptions) => {
+    startFileOpen({ path, options, refusal: undefined })
+  }, [startFileOpen])
+
+  const retryFileOpen = useCallback((input: { path: string; refusal: string }) => {
+    startFileOpen({ path: input.path, options: undefined, refusal: input.refusal })
+  }, [startFileOpen])
 
   const requestOpenImageAwareFile = useCallback((path: string, options?: OpenFileOptions) => {
     openMarkdownFileLink({
@@ -265,11 +258,7 @@ export function ChatView({
     openMarkdownExternalLink({ href, kind, openImage: image => { openImagePreview(image) }, openExternalLink })
   }, [openExternalLink, openImagePreview])
 
-  const closeFileOpenError = useCallback(() => {
-    fileOpenRequest.current += 1
-    setFileOpenError(null)
-    setFileOpenBusy(false)
-  }, [])
+  const closeFileOpenError = useCallback(() => { setFileOpen(idleFileOpen()) }, [])
 
   const inboxSteering = useMemo(
     () => inbox?.['next-step'].filter(message => message.source.kind === 'user') ?? [],
@@ -341,7 +330,7 @@ export function ChatView({
         <div ref={scroll.listRef} className={css.scroll}>
           <div ref={scroll.columnRef} className={css.column} data-chat-flow=""
             data-chat-motion={deferCompletedTurns && scroll.initialized
-              && (running || motionTail || pendingInputs.length > 0) ? '' : undefined}>
+              && (running || motionTail !== 'off' || pendingInputs.length > 0) ? '' : undefined}>
             {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
             {openState === 'error' && openError !== null && (
               <div className={css.openError}>
@@ -382,15 +371,15 @@ export function ChatView({
           </button>
         </div>
       )}
-      {imagePreview !== null && (
+      {imagePreview.status === 'open' && (
         <ImageLightbox images={imagePreview.images} initialIndex={imagePreview.initialIndex} labels={imageLightboxLabels} onClose={closeImagePreview} />
       )}
-      {fileOpenError !== null && (
+      {fileOpenFailure !== null && (
         <FileOpenErrorDialog
-          message={fileOpenError.message}
-          busy={fileOpenBusy}
+          message={fileOpenFailure.message}
+          busy={fileOpenFailure.busy}
           onClose={closeFileOpenError}
-          onRetry={() => { requestOpenFile(fileOpenError.path) }}
+          onRetry={() => { retryFileOpen({ path: fileOpenFailure.path, refusal: fileOpenFailure.message }) }}
           t={t}
         />
       )}
