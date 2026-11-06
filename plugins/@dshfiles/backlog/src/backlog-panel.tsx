@@ -78,12 +78,11 @@ import { usePanelRequests } from './use-panel-requests.js'
 import { BacklogExportSettings } from './export-settings.js'
 import { BacklogHostsSettings } from './peer-settings.js'
 import { withViewTransition } from './view-transition.js'
+import { BacklogPanelPoll } from './panel-poll.js'
 
 type OpenThread = (sessionId: string) => void
 type View = BacklogView
 
-/** Agents write from other threads; a short poll keeps the open panel current without a push channel. */
-const REFRESH_MS = 5_000
 const MAX_ANIMATED_ITEMS = 150
 // Ready came last so the number keys of the older views stay as they were.
 const views = ['feed', 'inbox', 'items', 'board', 'projects', 'shipped', 'ready'] as const
@@ -586,18 +585,30 @@ export const BacklogPanel = (props: {
   const hideAgentItems = stored.hideAgentItems[agentItemsScope]
 
   const queryClient = useQueryClient()
+  const visible = props.visible !== false
   // A cheap number that changes with any write; lists and details refetch only when it moves.
+  // Agents write from other threads; a short poll keeps the visible panel current without a push channel.
   const revision = useQuery({
     queryKey: ['dshfiles-backlog-revision'],
     queryFn: ({ signal }) => api.revision(undefined, { signal }),
-    refetchInterval: REFRESH_MS,
+    refetchInterval: BacklogPanelPoll.revisionMs({ visible }),
   })
   const aiActivity = useQuery({
     queryKey: [BacklogQueries.key, 'ai-activity'],
     queryFn: ({ signal }) => api.aiActivity(undefined, { signal }),
     retry: false,
-    refetchInterval: query => (query.state.error === null ? 1_000 : false),
+    refetchInterval: query => BacklogPanelPoll.aiActivityMs({ visible, failed: query.state.error !== null }),
   })
+  const wasVisible = useRef<boolean | undefined>(undefined)
+  const refetchRevision = revision.refetch
+  const refetchAiActivity = aiActivity.refetch
+  useEffect(() => {
+    if (BacklogPanelPoll.shouldRefreshOnReveal({ wasVisible: wasVisible.current, visible })) {
+      void refetchRevision()
+      void refetchAiActivity()
+    }
+    wasVisible.current = visible
+  }, [visible, refetchRevision, refetchAiActivity])
   const aiWorking =
     triagePending || (aiActivity.error === null && aiActivity.data?.active === true) || backfillJobState === 'queued' || backfillJobState === 'running'
   const lastRevision = useRef<number | undefined>(undefined)
@@ -608,7 +619,7 @@ export const BacklogPanel = (props: {
   }, [revision.data, queryClient])
   usePanelRequests({
     draftKey,
-    visible: props.visible !== false,
+    visible,
     onCapture: setCaptureRequest,
     onFocus: key => {
       const select = (itemId: number): void => {
