@@ -2,6 +2,7 @@ import * as Schema from 'effect/Schema'
 import { AccountDraftModel } from './account-draft.js'
 import { AccountConnectionMethodModel } from './account-connection-method.js'
 import { AccountHomePolicy } from './account-home-policy.js'
+import { joiningOf, statusOf, transition, type SetupPhase } from './account-setup-phase.js'
 import {
   accountDraftSchema,
   configureAccountConnectionInputSchema,
@@ -25,18 +26,11 @@ interface Operation {
   observed: AccountProfile | undefined
   method: AccountConnectionMethod
   shadowRoot: string
-  configuring: boolean
   readonly controller: AbortController
   draft: AccountDraft
-  status: AccountConnectionSnapshot['status']
+  phase: SetupPhase
   key: string | undefined
   keyReference: string | undefined
-  committing: boolean
-  cleaned: boolean
-  completion?: Promise<AccountConnectionSnapshot>
-  configuration?: Promise<AccountConnectionSnapshot>
-  cleanup?: Promise<void>
-  resourceCleanup?: Promise<void>
 }
 
 export interface SetupVerificationInput {
@@ -46,6 +40,9 @@ export interface SetupVerificationInput {
   readonly signal: AbortSignal
   readonly resolveCredential: CredentialValueResolver
 }
+
+/** Start the work one microtask later, so the operation's phase is set before the task can read it. */
+const defer = <T>(run: () => Promise<T>): Promise<T> => Promise.resolve().then(run)
 
 /** One bounded, ephemeral owner per Host. Nothing here is a saved account until commitConnection. */
 export const createAccountSetupService = (input: {
@@ -72,7 +69,11 @@ export const createAccountSetupService = (input: {
   const now = input.now ?? Date.now
   let disposed = false
   const live = (operation: Operation): boolean =>
-    !disposed && !operation.controller.signal.aborted && operation.expiresAt > now() && (operation.status === 'pending' || operation.status === 'verifying')
+    !disposed &&
+    !operation.controller.signal.aborted &&
+    operation.expiresAt > now() &&
+    operation.phase.kind !== 'complete' &&
+    operation.phase.kind !== 'discarded'
   const profile = (draft: AccountDraft, shadowRoot: string): AccountProfile => ({
     ...draft,
     ...input.store.connectionMetadata(draft, shadowRoot),
@@ -82,33 +83,37 @@ export const createAccountSetupService = (input: {
     state: 'unconfigured',
     detail: null,
   })
-  const snapshot = (operation: Operation): AccountConnectionSnapshot => ({
-    operationId: operation.operationId,
-    instanceId: operation.draft.instanceId,
-    status: operation.status,
-    method: operation.method,
-    expiresAt: operation.expiresAt,
-    account:
-      operation.status === 'discarded'
-        ? null
-        : {
-            ...operation.observed,
-            ...profile(operation.draft, operation.shadowRoot),
-            identity: operation.observed?.identity ?? null,
-            plan: operation.observed?.plan ?? null,
-            signedIn: operation.status === 'complete' || operation.observed?.signedIn === true,
-            state: operation.status === 'complete' ? 'healthy' : (operation.observed?.state ?? 'unconfigured'),
-          },
-  })
+  const snapshot = (operation: Operation): AccountConnectionSnapshot => {
+    const status = statusOf(operation.phase)
+    return {
+      operationId: operation.operationId,
+      instanceId: operation.draft.instanceId,
+      status,
+      method: operation.method,
+      expiresAt: operation.expiresAt,
+      account:
+        status === 'discarded'
+          ? null
+          : {
+              ...operation.observed,
+              ...profile(operation.draft, operation.shadowRoot),
+              identity: operation.observed?.identity ?? null,
+              plan: operation.observed?.plan ?? null,
+              signedIn: status === 'complete' || operation.observed?.signedIn === true,
+              state: status === 'complete' ? 'healthy' : (operation.observed?.state ?? 'unconfigured'),
+            },
+    }
+  }
   const releaseReconnect = (operation: Operation): void => {
     if (operation.existing !== undefined && reconnectOwners.get(operation.existing.instanceId) === operation.requestKey)
       reconnectOwners.delete(operation.existing.instanceId)
   }
   const cleanupResources = (operation: Operation): Promise<void> => {
-    if (operation.resourceCleanup !== undefined) return operation.resourceCleanup
+    const phase = operation.phase
+    if (phase.kind !== 'discarded') return Promise.resolve()
+    if (phase.resourceCleanup !== undefined) return phase.resourceCleanup
     const task = (async () => {
       try {
-        if (operation.status === 'complete') return
         await input.settleLogin?.(operation.draft.instanceId)
         const allocated = operation.allocated
         const selectedOwnedDescendant =
@@ -118,30 +123,31 @@ export const createAccountSetupService = (input: {
               AccountHomePolicy.containsConfiguredHome(allocated.homePath, operation.draft.shadowHomePath)))
         if (allocated !== undefined && !selectedOwnedDescendant) await input.cleanupCandidate(allocated)
       } finally {
-        operation.cleaned = true
+        operation.phase = transition(operation.phase, { kind: 'cleaned' })
         releaseReconnect(operation)
       }
     })()
-    operation.resourceCleanup = task
+    operation.phase = { ...phase, resourceCleanup: task }
     return task
   }
   const cleanup = (operation: Operation): Promise<void> => {
-    if (operation.cleanup !== undefined) return operation.cleanup
+    const phase = operation.phase
+    if (phase.kind === 'discarded' && phase.cleanup !== undefined) return phase.cleanup
     const task = (async () => {
       // Join in-flight verification/commit before removing the operation's private staging.
-      await operation.completion?.catch(() => undefined)
-      await operation.configuration?.catch(() => undefined)
+      await joiningOf(phase)?.catch(() => undefined)
       await cleanupResources(operation)
     })()
-    operation.cleanup = task
+    if (phase.kind === 'discarded') operation.phase = { ...phase, cleanup: task }
     cleanupTasks.add(task)
     void task.finally(() => cleanupTasks.delete(task)).catch(() => undefined)
     return task
   }
   const invalidate = (operation: Operation): void => {
-    if (operation.status === 'complete' || operation.status === 'discarded' || operation.committing) return
+    const discarded = transition(operation.phase, { kind: 'discard' })
+    if (discarded === operation.phase) return
     // Must precede every await, including subprocess shutdown or credential cleanup.
-    operation.status = 'discarded'
+    operation.phase = discarded
     operation.controller.abort()
     operation.key = undefined
     input.cancelLogin(operation.draft.instanceId)
@@ -153,7 +159,7 @@ export const createAccountSetupService = (input: {
     id = id.toLowerCase()
     const operation = operations.get(id)
     if (operation === undefined) throw new Error('This account connection is no longer available. Start again.')
-    if (operation.expiresAt <= now() && operation.status !== 'complete' && !operation.committing) {
+    if (operation.expiresAt <= now() && operation.phase.kind !== 'complete' && operation.phase.kind !== 'committing') {
       invalidate(operation)
       void cleanup(operation).catch(() => undefined)
     }
@@ -161,7 +167,7 @@ export const createAccountSetupService = (input: {
   }
   const pending = (id: string): Operation => {
     const operation = get(id)
-    if (!live(operation) || operation.status !== 'pending' || operation.configuring) throw new Error('This account connection is no longer editable.')
+    if (!live(operation) || operation.phase.kind !== 'pending') throw new Error('This account connection is no longer editable.')
     return operation
   }
   const privateReference = (id: string): string => AccountDraftModel.suggestedApiKeyRef(`connection_${id.replaceAll('-', '')}`)
@@ -195,7 +201,7 @@ export const createAccountSetupService = (input: {
       if (disposed) throw new Error('Account connections are unavailable.')
       // Terminal tombstones are retained until TTL; enforce a hard per-Host bound.
       for (const [id, operation] of operations)
-        if (operation.expiresAt <= now() && (operation.status === 'complete' || (operation.status === 'discarded' && operation.cleaned))) {
+        if (operation.expiresAt <= now() && (operation.phase.kind === 'complete' || (operation.phase.kind === 'discarded' && operation.phase.cleaned))) {
           operations.delete(id)
           preparations.delete(operation.requestKey)
         }
@@ -222,20 +228,17 @@ export const createAccountSetupService = (input: {
         observed,
         method,
         shadowRoot: file.shadowRoot,
-        configuring: false,
         draft,
-        status: 'pending',
+        phase: { kind: 'pending' },
         controller: new AbortController(),
         key: undefined,
         keyReference: undefined,
-        committing: false,
-        cleaned: false,
       }
       operations.set(requestKey, operation)
       const timer = setTimeout(
         () => {
           timers.delete(operation.operationId)
-          if (operation.committing) return
+          if (operation.phase.kind === 'committing') return
           invalidate(operation)
           void cleanup(operation).catch(() => undefined)
         },
@@ -265,12 +268,12 @@ export const createAccountSetupService = (input: {
   }
   const complete = (id: string): Promise<AccountConnectionSnapshot> => {
     const operation = get(id)
-    if (operation.status === 'complete') return Promise.resolve(snapshot(operation))
-    if (operation.completion !== undefined) return operation.completion
-    if (!live(operation) || operation.configuring)
+    const phase = operation.phase
+    if (phase.kind === 'complete') return Promise.resolve(snapshot(operation))
+    if (phase.kind === 'verifying' || phase.kind === 'committing') return phase.completion
+    if (!live(operation) || phase.kind !== 'pending')
       return Promise.reject(new Error('This account connection is no longer active or its configuration is changing.'))
-    operation.status = 'verifying'
-    const task = (async () => {
+    const task = defer(async () => {
       try {
         const file = await input.store.readAccountFile()
         if (!live(operation)) throw new Error('Account connection cancelled.')
@@ -291,17 +294,16 @@ export const createAccountSetupService = (input: {
           beforeCommit: async () => {
             // Accepted commit runs inside the store queue, after checking latest account settings/removal.
             if (!live(operation)) throw new Error('Account connection cancelled.')
-            operation.committing = true
+            operation.phase = transition(operation.phase, { kind: 'commit' })
             if (operation.method === 'device') await input.adoptCredential?.(operation.draft.instanceId)
             if (operation.key !== undefined && operation.keyReference !== undefined) {
-              await input.saveKey(operation.keyReference, operation.operationId, operation.key, () => operation.committing)
+              await input.saveKey(operation.keyReference, operation.operationId, operation.key, () => operation.phase.kind === 'committing')
               operation.key = undefined
             }
           },
-          claimCommit: () => operation.committing,
+          claimCommit: () => operation.phase.kind === 'committing',
           didCommit: () => {
-            operation.status = 'complete'
-            operation.committing = false
+            operation.phase = transition(operation.phase, { kind: 'committed' })
             releaseReconnect(operation)
           },
         })
@@ -317,19 +319,17 @@ export const createAccountSetupService = (input: {
         return snapshot(operation)
       } catch {
         // A successful atomic publication cannot be undone by a route refresh failure.
-        if (operation.status === 'complete') return snapshot(operation)
-        if (operation.committing) {
-          operation.committing = false
-          operation.status = 'pending'
-          delete operation.completion
+        if (operation.phase.kind === 'complete') return snapshot(operation)
+        if (operation.phase.kind === 'committing') {
+          operation.phase = transition(operation.phase, { kind: 'commitFailed' })
           throw new Error('Verified connection could not be saved. Retry completion; no account was published.')
         }
         invalidate(operation)
         await cleanupResources(operation)
         throw new Error('Account connection could not be verified. Start again; no account was saved.')
       }
-    })()
-    operation.completion = task
+    })
+    operation.phase = transition(phase, { kind: 'verify', completion: task })
     return task
   }
   return {
@@ -376,9 +376,7 @@ export const createAccountSetupService = (input: {
       }
       const keepStagedKey = !methodChanged && method === 'key' && next.apiKeyEnv === operation.keyReference
       // Exclude new login/complete/stage requests before the first await. Old login identity is invalidated synchronously.
-      operation.configuring = true
-      input.cancelLogin(operation.draft.instanceId)
-      const task = (async () => {
+      const task = defer(async () => {
         try {
           await input.settleLogin?.(operation.draft.instanceId)
           const file = await input.store.readAccountFile()
@@ -394,11 +392,11 @@ export const createAccountSetupService = (input: {
           operation.draft = next
           return snapshot(operation)
         } finally {
-          operation.configuring = false
-          delete operation.configuration
+          operation.phase = transition(operation.phase, { kind: 'configured' })
         }
-      })()
-      operation.configuration = task
+      })
+      operation.phase = transition(operation.phase, { kind: 'configure', configuration: task })
+      input.cancelLogin(operation.draft.instanceId)
       return task
     },
     stageKey,
@@ -413,29 +411,23 @@ export const createAccountSetupService = (input: {
         return
       }
       const operation = get(id)
-      if (operation.committing) throw new Error('This verified connection is already being saved; cancellation cannot undo an accepted commit.')
-      if (operation.status === 'complete') throw new Error('This connection has already been saved. Remove the account explicitly instead.')
+      if (operation.phase.kind === 'committing')
+        throw new Error('This verified connection is already being saved; cancellation cannot undo an accepted commit.')
+      if (operation.phase.kind === 'complete') throw new Error('This connection has already been saved. Remove the account explicitly instead.')
       invalidate(operation)
       await cleanup(operation)
     },
     canBeginLogin: (id: string, instanceId: string): boolean => {
       try {
         const operation = get(id)
-        return (
-          operation.draft.instanceId === instanceId &&
-          live(operation) &&
-          operation.status === 'pending' &&
-          !operation.configuring &&
-          operation.method === 'device'
-        )
+        return operation.draft.instanceId === instanceId && live(operation) && operation.phase.kind === 'pending' && operation.method === 'device'
       } catch {
         return false
       }
     },
-    candidates: (): readonly AccountDraft[] =>
-      [...operations.values()].filter(operation => live(operation) || operation.committing).map(operation => operation.draft),
+    candidates: (): readonly AccountDraft[] => [...operations.values()].filter(operation => live(operation)).map(operation => operation.draft),
     candidate: (id: string): AccountDraft | undefined =>
-      [...operations.values()].find(operation => operation.draft.instanceId === id && (live(operation) || operation.committing))?.draft,
+      [...operations.values()].find(operation => operation.draft.instanceId === id && live(operation))?.draft,
     dispose: (): void => {
       disposed = true
       for (const operation of operations.values()) {
@@ -451,4 +443,5 @@ export const createAccountSetupService = (input: {
     },
   }
 }
+
 export type AccountSetupService = ReturnType<typeof createAccountSetupService>
