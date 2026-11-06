@@ -165,7 +165,11 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
   const resolve = useMutation({
     mutationFn: async (annotation: Annotation) =>
       runHostRequest({ request: signal => api.resolve({ sessionId, id: annotation.id, revision: annotation.revision }, { signal }) }),
-    onSuccess: refresh,
+    onSuccess: async () => {
+      setActionError(null)
+      await refresh()
+    },
+    onError: (cause: unknown) => setActionError(cause instanceof Error ? cause.message : 'Could not resolve that annotation.'),
   })
 
   const dismiss = useMutation({

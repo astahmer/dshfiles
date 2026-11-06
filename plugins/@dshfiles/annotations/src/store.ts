@@ -79,6 +79,21 @@ export type StoreFailure = AnnotationNotFound | AnnotationRevisionConflict | Ann
 const META_KEY = 'meta'
 const CLOSED: readonly AnnotationStatus[] = ['resolved', 'dismissed']
 
+/**
+ * The one table every mutator reads: the status a verb moves an annotation to, or nothing when the verb does not apply
+ * to the status the record is in. Resolved and dismissed are terminal.
+ */
+const NEXT_STATUS = {
+  acknowledge: (status: AnnotationStatus): AnnotationStatus | undefined => (status === 'pending' || status === 'stale' ? 'acknowledged' : undefined),
+  resolve: (status: AnnotationStatus): AnnotationStatus | undefined => (CLOSED.includes(status) ? undefined : 'resolved'),
+  dismiss: (status: AnnotationStatus): AnnotationStatus | undefined => (CLOSED.includes(status) ? undefined : 'dismissed'),
+  'mark-stale': (status: AnnotationStatus): AnnotationStatus | undefined => (CLOSED.includes(status) ? undefined : 'stale'),
+} satisfies Record<string, (status: AnnotationStatus) => AnnotationStatus | undefined>
+
+type AnnotationVerb = keyof typeof NEXT_STATUS
+
+const transition = (status: AnnotationStatus, verb: AnnotationVerb): AnnotationStatus | undefined => NEXT_STATUS[verb](status)
+
 const recordKey = (input: { readonly sessionId: string; readonly id: string }): string => `${input.sessionId}\u0000${input.id}`
 
 const newerRevision = (current: number, now: number): number => Math.max(current + 1, now)
@@ -118,7 +133,7 @@ export interface AnnotationStoreShape {
     readonly revision: number
     readonly summary?: string
     readonly resolvedBy: 'human' | 'agent'
-  }) => Effect.Effect<Annotation, AnnotationNotFound | AnnotationRevisionConflict>
+  }) => Effect.Effect<Annotation, AnnotationNotFound | AnnotationRevisionConflict | AnnotationClosed>
   readonly dismiss: (input: {
     readonly sessionId: string
     readonly id: string
@@ -251,9 +266,6 @@ export class AnnotationStore extends Context.Service<AnnotationStore, Annotation
         return next
       })
 
-      const openRecord = (input: { readonly sessionId: string; readonly id: string }) =>
-        Effect.flatMap(find(input), record => (CLOSED.includes(record.status) ? Effect.fail(new AnnotationClosed({ id: input.id })) : Effect.succeed(record)))
-
       const serialized = <A, E>(effect: Effect.Effect<A, E>) => writes.withPermit(effect)
 
       return AnnotationStore.of({
@@ -290,8 +302,9 @@ export class AnnotationStore extends Context.Service<AnnotationStore, Annotation
               // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- the first missing id fails the whole acknowledgement, in request order.
               for (const id of input.ids) {
                 const record = yield* find({ sessionId: input.sessionId, id })
-                if (record.status !== 'pending' && record.status !== 'stale') continue
-                acknowledged.push(yield* mutate(record, { status: 'acknowledged' }))
+                const next = transition(record.status, 'acknowledge')
+                if (next === undefined) continue
+                acknowledged.push(yield* mutate(record, { status: next }))
               }
               return acknowledged
             }),
@@ -303,8 +316,10 @@ export class AnnotationStore extends Context.Service<AnnotationStore, Annotation
               const record = yield* find(input)
               if (record.revision !== input.revision)
                 return yield* new AnnotationRevisionConflict({ id: input.id, expected: input.revision, actual: record.revision })
+              const next = transition(record.status, 'resolve')
+              if (next === undefined) return yield* new AnnotationClosed({ id: input.id })
               return yield* mutate(record, {
-                status: 'resolved',
+                status: next,
                 resolvedAt: yield* Clock.currentTimeMillis,
                 resolvedBy: input.resolvedBy,
                 resolution: { revision: input.revision, ...(input.summary !== undefined && { summary: input.summary }) },
@@ -315,11 +330,13 @@ export class AnnotationStore extends Context.Service<AnnotationStore, Annotation
         dismiss: input =>
           serialized(
             Effect.gen(function* () {
-              const record = yield* openRecord(input)
+              const record = yield* find(input)
+              const next = transition(record.status, 'dismiss')
+              if (next === undefined) return yield* new AnnotationClosed({ id: input.id })
               const now = yield* Clock.currentTimeMillis
               const message = { id: `msg_${record.thread.length + 1}`, role: 'human' as const, body: `Dismissed: ${input.reason}`, at: now }
               return yield* mutate(record, {
-                status: 'dismissed',
+                status: next,
                 resolvedAt: now,
                 resolvedBy: 'human',
                 resolution: { revision: record.revision, summary: input.reason },
@@ -331,9 +348,11 @@ export class AnnotationStore extends Context.Service<AnnotationStore, Annotation
         markStale: input =>
           serialized(
             Effect.gen(function* () {
-              const record = yield* openRecord(input)
+              const record = yield* find(input)
+              const next = transition(record.status, 'mark-stale')
+              if (next === undefined) return yield* new AnnotationClosed({ id: input.id })
               if (record.status === 'stale' && record.target.staleReason === input.reason) return record
-              return yield* mutate(record, { status: 'stale', target: { ...record.target, staleReason: input.reason } })
+              return yield* mutate(record, { status: next, target: { ...record.target, staleReason: input.reason } })
             }),
           ).pipe(Effect.withSpan('annotations store mark stale')),
 
