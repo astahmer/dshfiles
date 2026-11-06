@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 import {
   Button, extractMarkdownPlainText, IconEditOutlineRegular, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -27,26 +27,15 @@ function tooltip(description: string | undefined): { title?: string } {
  * @returns The plan-review takeover for this request.
  */
 export function PlanReviewPanel({ pending, review, t, renderSlot }: PlanReviewPanelProps) {
-  // Foreground decisions wait for the resolved frame; accepted Remote decisions
-  // hide the panel. A failed send re-enables the buttons and shows the error.
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const settle = (send: () => Promise<void>, remote = false): void => {
-    setBusy(true)
-    setError(null)
-    void send()
-      .then(() => {
-        if (!remote) return
-        setBusy(false)
-        void pending.dismiss().catch(() => { setError(t('status.sent')) })
-      })
-      .catch((cause: unknown) => {
-        setBusy(false)
-        setError(cause instanceof Error ? cause.message : String(cause))
-      })
-  }
+  // Decisions are recorded on the carrier, so a second presentation of this card
+  // renders the same in-flight, failed or sent controls.
+  const submission = useSyncExternalStore(pending.subscribe, pending.snapshot).submission
+  const settling = submission.kind === 'submitting' || submission.kind === 'sent'
+  const error = submission.kind !== 'failed' ? null
+    : submission.reason === 'error' ? submission.message
+      : t(submission.reason === 'sent' ? 'status.sent' : 'error.resubmit')
   const decide = (label: string): void => {
-    settle(() => pending.answer({ answers: [{ id: review.id, selected: [label] }] }), pending.snapshot().channel === 'rpc')
+    void pending.submit({ answers: [{ id: review.id, selected: [label] }] })
   }
   const summary = useMemo(() => {
     const title = extractMarkdownPlainText(review.plan, { mode: 'first-line' })
@@ -56,9 +45,9 @@ export function PlanReviewPanel({ pending, review, t, renderSlot }: PlanReviewPa
 
   return (
     <div className={css.frame} data-plan-review-key={pending.key}>
-      <section className={css.card} aria-label={review.question} aria-busy={busy}>
+      <section className={css.card} aria-label={review.question} aria-busy={settling}>
         <div className={css.strip}>
-          <StateDot state={busy ? 'ongoing' : 'warning'} />
+          <StateDot state={settling ? 'ongoing' : 'warning'} />
           {t('plan.header')}
           <div className={css.previewActions}>
             {renderSlot('conversation.plan-review.actions', { review, requestKey: pending.key })}
@@ -73,13 +62,13 @@ export function PlanReviewPanel({ pending, review, t, renderSlot }: PlanReviewPa
           <div className={css.actions}>
             <Button
               variant="outline" className={css.discuss} icon={<IconEditOutlineRegular size={14} />}
-              disabled={busy} onClick={() => { settle(() => pending.dismiss()) }}
+              disabled={settling} onClick={() => { void pending.dismiss() }}
             >
               {t('plan.discuss')}
             </Button>
             <Button
               variant="primary" {...tooltip(review.approve.description)}
-              disabled={busy} onClick={() => { decide(review.approve.label) }}
+              disabled={settling} onClick={() => { decide(review.approve.label) }}
             >
               {t('plan.approve')}
             </Button>

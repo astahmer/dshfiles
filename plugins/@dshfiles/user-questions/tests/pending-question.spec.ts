@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions/types'
 import { createWaterfallRequest, PendingQuestion } from '../src/native/contract/slots.js'
 
@@ -14,7 +15,9 @@ interface PendingStart {
 
 const start = (deadline: number | undefined): PendingStart => {
   const pending = new PendingQuestion(SESSION, QUESTIONS)
-  const request = createWaterfallRequest(deadline, undefined, () => {})
+  const request = createWaterfallRequest(deadline, undefined, channel => {
+    pending.detachWaterfall(channel)
+  })
   pending.attachWaterfall(request.channel)
   return {
     pending,
@@ -169,7 +172,7 @@ describe('PendingQuestion settlement', () => {
     const { pending, outcome } = start(undefined)
     const answer = { answers: [{ id: 'q1', selected: ['A'] }] }
 
-    await pending.answer(answer)
+    await pending.submit(answer)
 
     await expect(outcome).resolves.toEqual({ ok: true, value: answer })
   })
@@ -186,14 +189,127 @@ describe('PendingQuestion settlement', () => {
     pending.setState('continued')
     const answer = { answers: [{ id: 'q1', selected: ['B'] }] }
 
-    await pending.answer(answer)
+    await pending.submit(answer)
 
     expect(answers).toEqual([answer])
   })
 
-  it('refuses a question no channel accepts yet', async () => {
+  it('records an answer it could not send', async () => {
     const pending = new PendingQuestion(SESSION, QUESTIONS)
 
-    await expect(pending.answer({ answers: [] })).rejects.toThrow('no channel accepts an answer yet')
+    await pending.submit({ answers: [] })
+
+    expect(pending.snapshot().submission).toEqual({
+      kind: 'failed',
+      reason: 'error',
+      message: 'no channel accepts an answer yet',
+    })
+  })
+})
+
+describe('PendingQuestion submission', () => {
+  it('keeps a waterfall answer attempt until the card closes', async () => {
+    const { pending } = start(undefined)
+
+    expect(pending.snapshot().submission).toEqual({ kind: 'idle' })
+
+    await pending.submit({ answers: [{ id: 'q1', selected: ['A'] }] })
+
+    expect(pending.snapshot().submission).toEqual({ kind: 'sent', intent: 'answer' })
+  })
+
+  it('re-arms a sent waterfall answer once the question continues', async () => {
+    const { pending } = start(undefined)
+    const answers: unknown[] = []
+    const answer = { answers: [{ id: 'q1', selected: ['A'] }] }
+    await pending.submit(answer)
+
+    pending.attachRpc({
+      answer: async posted => {
+        answers.push(posted)
+        return true
+      },
+    })
+    pending.setState('continued')
+
+    expect(pending.snapshot().submission).toEqual({ kind: 'failed', reason: 'resubmit' })
+
+    await pending.submit(answer)
+
+    expect(answers).toEqual([answer])
+    expect(pending.snapshot().submission).toEqual({ kind: 'idle' })
+  })
+
+  it('never runs two submissions at once', async () => {
+    const pending = new PendingQuestion(SESSION, QUESTIONS)
+    const answers: unknown[] = []
+    let accept: ((accepted: boolean) => void) | undefined
+    pending.attachRpc({
+      answer: answer =>
+        new Promise(resolve => {
+          answers.push(answer)
+          accept = resolve
+        }),
+    })
+    pending.setState('continued')
+    const first = { answers: [{ id: 'q1', selected: ['A'] }] }
+    const second = { answers: [{ id: 'q1', selected: ['B'] }] }
+
+    const settled = pending.submit(first)
+    await Promise.resolve()
+
+    expect(pending.snapshot().submission).toEqual({ kind: 'submitting', intent: 'answer', channel: 'rpc' })
+
+    await pending.submit(second)
+
+    expect(answers).toEqual([first])
+
+    accept?.(true)
+    await settled
+  })
+
+  it('records a cancellation attempt and its failure', async () => {
+    const pending = new PendingQuestion(SESSION, QUESTIONS)
+
+    await pending.cancel()
+
+    expect(pending.snapshot().submission).toEqual({
+      kind: 'failed',
+      reason: 'error',
+      message: 'no channel accepts a cancellation yet',
+    })
+  })
+
+  it('waits for the close after a waterfall cancellation', async () => {
+    const { pending, outcome } = start(undefined)
+
+    await pending.cancel()
+
+    expect(pending.snapshot().submission).toEqual({ kind: 'sent', intent: 'cancel' })
+    await expect(outcome).resolves.toEqual({ ok: false, code: 'ASK_CANCELLED' })
+  })
+
+  it('keeps the answer when its panel could not be withdrawn', async () => {
+    const pending = new PendingQuestion(SESSION, QUESTIONS, brandString<ToolCallId>('call-1'))
+    pending.attachSeat({
+      hide: () => {
+        throw new Error('seat gone')
+      },
+    })
+    pending.attachRpc({ answer: async () => true })
+    pending.setState('continued')
+
+    await pending.submit({ answers: [{ id: 'q1', selected: ['A'] }] })
+
+    expect(pending.snapshot().submission).toEqual({ kind: 'failed', reason: 'sent' })
+  })
+
+  it('clears a failed attempt when the next edit starts', async () => {
+    const pending = new PendingQuestion(SESSION, QUESTIONS)
+    await pending.submit({ answers: [] })
+
+    pending.resetSubmission()
+
+    expect(pending.snapshot().submission).toEqual({ kind: 'idle' })
   })
 })

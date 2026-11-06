@@ -8,7 +8,9 @@ import {
   IconChevronRightOutlineRegular, IconChevronUpOutlineRegular, IconCloseOutlineRegular,
   IconEditOutlineRegular, MarkdownText,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { planReviewOf, type QuestionAnswer, type QuestionCardSnapshot, type QuestionComposerProps } from './contract/slots.ts'
+import {
+  planReviewOf, type QuestionAnswer, type QuestionCardSnapshot, type QuestionComposerProps, type QuestionSubmission,
+} from './contract/slots.ts'
 import type { PendingQuestion } from './contract/slots.ts'
 import type { QuestionDraftAnswer, QuestionDraftProgress } from './draft-store.ts'
 import { PlanReviewPanel } from './PlanReviewPanel.tsx'
@@ -26,7 +28,24 @@ type Feedback = { key: 'error.incomplete' | 'error.unanswered' | 'error.unavaila
 
 /** A removed card can remain mounted until the composer seat updates. */
 const REMOVED_CARD: QuestionCardSnapshot = {
-  state: 'open', phase: { kind: 'closed' }, waitState: 'counting', countdown: undefined, channel: 'none', closed: true,
+  state: 'open',
+  phase: { kind: 'closed' },
+  submission: { kind: 'idle' },
+  waitState: 'counting',
+  countdown: undefined,
+  channel: 'none',
+  closed: true,
+}
+
+/**
+ * Translate a recorded attempt into displayed feedback; only failures show.
+ * @param submission - the card's single answer attempt.
+ * @returns the feedback to render, or null while nothing failed.
+ */
+const submissionFeedback = (submission: QuestionSubmission): Feedback | null => {
+  if (submission.kind !== 'failed') return null
+  if (submission.reason === 'error') return { text: submission.message }
+  return { key: submission.reason === 'sent' ? 'status.sent' : 'error.resubmit' }
 }
 
 /**
@@ -195,36 +214,26 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
       || item.selected.some((label, labelIndex) => label !== initialDrafts[itemIndex]?.selected[labelIndex])
       || item.custom !== '' || item.skipped) === true
       ? 'editing' : undefined)
-  const [busy, setBusy] = useState<'answer' | 'cancel' | null>(null)
-  const [error, setError] = useState<Feedback | null>(null)
+  const [validation, setValidation] = useState<Feedback | null>(null)
   const card = useQuestionCard(pending.key, snapshot => snapshot ?? REMOVED_CARD)
   const canSubmit = card.channel !== 'none'
+  const submission = card.submission
+  const submitting = submission.kind === 'submitting' || submission.kind === 'sent'
+  const answering = submitting && submission.intent === 'answer'
+  const feedback = submissionFeedback(submission) ?? validation
   // The answer surface freezes while a submission is in flight, and for good on
   // a review card: its call has already settled.
-  const locked = busy !== null || review !== undefined
-  // A waterfall submission is only "sent": the gateway drops an outcome that
-  // arrives after another Client settled the event, without telling anyone.
-  // The draft therefore survives until the projection closes the card, and a
-  // card that flips to continued while a submission is in flight re-arms the
-  // controls so the same draft can go through the Remote path.
-  const sentVia = useRef<'waterfall' | null>(null)
-  useEffect(() => {
-    if (sentVia.current !== 'waterfall' || card.state !== 'continued') return
-    sentVia.current = null
-    setBusy(null)
-    setError({ key: 'error.resubmit' })
-  }, [card.state])
+  const locked = submitting || review !== undefined
   useEffect(() => {
     if (card.closed) actions.clear(pending.key)
   }, [actions, card.closed, pending.key])
   useEffect(() => {
     actions.prune(pending.liveKeys())
   }, [actions, pending])
-  const waitDisposition = useRef<'editing' | 'waiting' | undefined>(restoredWait)
   useEffect(() => {
-    if (waitDisposition.current === 'waiting') pending.takeTime()
-    if (waitDisposition.current === 'editing') pending.engage()
-  }, [pending])
+    if (restoredWait === 'waiting') pending.takeTime()
+    if (restoredWait === 'editing') pending.engage()
+  }, [pending, restoredWait])
   // The countdown belongs to the carrier, not to this component: the user can
   // close the panel and reopen it from the tool call row, and a timer that died
   // with the mount would leave the tool call waiting past its deadline.
@@ -245,24 +254,28 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   const hasOptions = (question.options?.length ?? 0) > 0
   const { title: questionTitle, body: questionBody } = useMemo(() => QuestionMarkdownText.parts(question.question), [question.question])
 
+  const waitChoice = (): 'editing' | 'waiting' | undefined => {
+    const { kind } = pending.snapshot().phase
+    return kind === 'editing' ? 'editing' : kind === 'waiting' ? 'waiting' : undefined
+  }
+
   const replaceProgress = (nextIndex: number, nextDrafts: QuestionDraftAnswer[]): void => {
+    const wait = waitChoice()
     actions.replace(pending.key, {
       index: nextIndex,
       drafts: nextDrafts,
-      ...(waitDisposition.current === undefined ? {} : { wait: waitDisposition.current }),
+      ...(wait === undefined ? {} : { wait }),
     })
   }
 
-  const takeTime = (): void => {
-    waitDisposition.current = 'waiting'
-    pending.takeTime()
-    replaceProgress(index, drafts)
+  const clearFeedback = (): void => {
+    setValidation(null)
+    pending.resetSubmission()
   }
 
-  const engage = (): void => {
-    if (waitDisposition.current !== undefined) return
-    waitDisposition.current = 'editing'
-    pending.engage()
+  const takeTime = (): void => {
+    pending.takeTime()
+    replaceProgress(index, drafts)
   }
 
   const focusAnswerSurface = (event: FocusEvent<HTMLDivElement>): void => {
@@ -276,7 +289,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   useEffect(() => {
     const release = (): void => { pending.releaseFocus() }
     const refocus = (): void => {
-      if (waitDisposition.current === 'editing') {
+      if (pending.snapshot().phase.kind === 'editing') {
         pending.engage()
         return
       }
@@ -302,28 +315,21 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
       return
     }
     if (!canSubmit) {
-      setError({ key: 'error.unavailable' })
+      setValidation({ key: 'error.unavailable' })
       return
     }
-    setBusy('cancel')
-    setError(null)
-    sentVia.current = 'waterfall'
-    void pending.dismiss()
-      .catch((cause: unknown) => {
-        sentVia.current = null
-        setBusy(null)
-        setError({ text: cause instanceof Error ? cause.message : String(cause) })
-      })
+    clearFeedback()
+    void pending.cancel()
   }
 
   const updateDraft = (
     update: (current: QuestionDraftAnswer) => QuestionDraftAnswer,
     nextIndex = index,
   ): void => {
-    engage()
+    pending.engage()
     const nextDrafts = drafts.map((item, itemIndex) => itemIndex === index ? update(item) : item)
     replaceProgress(nextIndex, nextDrafts)
-    setError(null)
+    clearFeedback()
   }
 
   const choose = (label: string): void => {
@@ -347,11 +353,11 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
     const missing = values.findIndex(item => !completed(item))
     if (missing >= 0) {
       replaceProgress(missing, values)
-      setError({ key: 'error.incomplete' })
+      setValidation({ key: 'error.incomplete' })
       return
     }
     if (!canSubmit) {
-      setError({ key: 'error.unavailable' })
+      setValidation({ key: 'error.unavailable' })
       return
     }
     const answer: QuestionAnswer = {
@@ -366,35 +372,18 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
         }
       }),
     }
-    setBusy('answer')
-    setError(null)
-    // The external-store render can lag the carrier as a timed call continues.
-    // Read the channel used by answer() in this same event turn.
-    const channel = pending.snapshot().channel
-    sentVia.current = channel === 'waterfall' ? 'waterfall' : null
-    void pending.answer(answer)
-      .then(() => {
-        if (channel !== 'rpc') return
-        sentVia.current = null
-        setBusy(null)
-        setError(null)
-        void pending.dismiss().catch(() => { setError({ key: 'status.sent' }) })
-      })
-      .catch((cause: unknown) => {
-        sentVia.current = null
-        setBusy(null)
-        setError({ text: cause instanceof Error ? cause.message : String(cause) })
-      })
+    clearFeedback()
+    void pending.submit(answer)
   }
 
   const continueFlow = (): void => {
     if (!answered(draft)) {
-      setError({ key: 'error.unanswered' })
+      setValidation({ key: 'error.unanswered' })
       return
     }
     if (index < questions.length - 1) {
       replaceProgress(index + 1, drafts)
-      setError(null)
+      clearFeedback()
       return
     }
     submitDrafts(drafts)
@@ -420,12 +409,12 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   }
 
   const skipQuestion = (): void => {
-    engage()
+    pending.engage()
     const nextDrafts = drafts.map((item, itemIndex) => itemIndex === index
       ? { selected: [], custom: '', skipped: true }
       : item)
     replaceProgress(index < questions.length - 1 ? index + 1 : index, nextDrafts)
-    setError(null)
+    clearFeedback()
     if (index < questions.length - 1) {
       return
     }
@@ -472,7 +461,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
               aria-label={t(minimized ? 'nav.maximize' : 'nav.minimize')}
               title={t(minimized ? 'nav.maximize' : 'nav.minimize')}
               aria-expanded={!minimized}
-              disabled={busy !== null}
+              disabled={submitting}
               onClick={() => { setMinimized(current => !current) }}
             >
               {minimized ? <IconChevronUpOutlineRegular /> : <IconChevronDownOutlineRegular />}
@@ -481,7 +470,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
               type="button" className={css.iconButton}
               aria-label={t(pending.dismissal === 'hide' ? 'nav.close' : 'nav.cancel')}
               title={t(pending.dismissal === 'hide' ? 'nav.close' : 'nav.cancel')}
-              disabled={busy !== null} onClick={dismissFlow}
+              disabled={submitting} onClick={dismissFlow}
             >
               <IconCloseOutlineRegular />
             </button>
@@ -623,35 +612,35 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
               <div className={css.pager}>
                 <button
                   type="button" className={css.iconButton} aria-label={t('nav.prev')}
-                  disabled={index === 0 || busy !== null}
-                  onClick={() => { replaceProgress(index - 1, drafts); setError(null) }}
+                  disabled={index === 0 || submitting}
+                  onClick={() => { replaceProgress(index - 1, drafts); clearFeedback() }}
                 >
                   <IconChevronLeftOutlineRegular />
                 </button>
                 <span className={css.progress}>{index + 1} / {questions.length}</span>
                 <button
                   type="button" className={css.iconButton} aria-label={t('nav.next')}
-                  disabled={index === questions.length - 1 || busy !== null}
-                  onClick={() => { replaceProgress(index + 1, drafts); setError(null) }}
+                  disabled={index === questions.length - 1 || submitting}
+                  onClick={() => { replaceProgress(index + 1, drafts); clearFeedback() }}
                 >
                   <IconChevronRightOutlineRegular />
                 </button>
               </div>
               <div className={css.feedback} role="status">
-                {error === null ? null : 'key' in error ? t(error.key) : error.text}
+                {feedback === null ? null : 'key' in feedback ? t(feedback.key) : feedback.text}
               </div>
               {/* A review card has nothing to send: the pager alone walks the record. */}
               {review === undefined && (
                 <div className={css.footerActions}>
-                  <Button variant="outline" disabled={busy !== null} onClick={skipQuestion}>
+                  <Button variant="outline" disabled={submitting} onClick={skipQuestion}>
                     {t('action.skip')}
                   </Button>
                   <Button
                     variant="primary"
-                    disabled={busy !== null || !answered(draft) || (index === questions.length - 1 && !canSubmit)}
+                    disabled={submitting || !answered(draft) || (index === questions.length - 1 && !canSubmit)}
                     onClick={continueFlow}
                   >
-                    {busy === 'answer'
+                    {answering
                       ? t('submitting')
                       : index === questions.length - 1 ? t('submit') : t('action.next')}
                   </Button>

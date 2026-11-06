@@ -219,12 +219,32 @@ export type QuestionWaitPhase =
   /** The card left the registry; no wait runs any more. */
   | { readonly kind: 'closed' }
 
+/**
+ * The one answer attempt a card records, so every presentation renders the same
+ * in-flight, sent or failed controls.
+ */
+export type QuestionSubmission =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'submitting'; readonly intent: 'answer' | 'cancel'; readonly channel: 'waterfall' | 'rpc' }
+  /** The waterfall accepted it; the projection closes the card when the Host records it. */
+  | { readonly kind: 'sent'; readonly intent: 'answer' | 'cancel' }
+  | { readonly kind: 'failed'; readonly reason: 'error'; readonly message: string }
+  /** The Remote answer was taken but the panel could not be withdrawn. */
+  | { readonly kind: 'failed'; readonly reason: 'sent' }
+  /** The question continued while a waterfall attempt was in flight; the draft can go again. */
+  | { readonly kind: 'failed'; readonly reason: 'resubmit' }
+
+/** Render one thrown value as a card's failed attempt. */
+const failureMessageOf = (cause: unknown): string => cause instanceof Error ? cause.message : String(cause)
+
 /** Reactive card state read by every mounted presentation of one question. */
 export interface QuestionCardSnapshot {
   /** Mirrors the projection row; `open` until the projection says otherwise. */
   readonly state: UserQuestionState
   /** The single active wait phase. */
   readonly phase: QuestionWaitPhase
+  /** The single answer attempt, `idle` until the user sends or cancels. */
+  readonly submission: QuestionSubmission
   /** User-visible foreground wait presentation. */
   readonly waitState: 'counting' | 'focused' | 'editing' | 'waiting' | 'continued'
   /**
@@ -272,6 +292,7 @@ export class PendingQuestion {
 
   #projection: UserQuestionState = 'open'
   #phase: QuestionWaitPhase = { kind: 'counting', deadline: undefined }
+  #submission: QuestionSubmission = { kind: 'idle' }
   #waterfall: QuestionWaterfallChannel | undefined
   #rpc: QuestionRpcChannel | undefined
   #seat: QuestionSeat | undefined
@@ -345,6 +366,7 @@ export class PendingQuestion {
     return {
       state: this.#projection,
       phase,
+      submission: this.#submission,
       waitState: this.#waitStateOf(phase),
       countdown: this.#countdownOf(phase),
       channel: this.#channelOf(),
@@ -483,7 +505,22 @@ export class PendingQuestion {
   setState(state: UserQuestionState): void {
     if (this.#projection === state) return
     this.#projection = state
+    if (state === 'continued' && this.#waterfallAttempt()) {
+      this.#submission = { kind: 'failed', reason: 'resubmit' }
+    }
     this.publish()
+  }
+
+  /** Whether a recorded attempt is still waiting for the card to close. */
+  #waterfallAttempt(): boolean {
+    const submission = this.#submission
+    return submission.kind === 'sent'
+      || (submission.kind === 'submitting' && submission.channel === 'waterfall')
+  }
+
+  /** Whether an attempt is in flight; a second one would race it. */
+  #inFlight(): boolean {
+    return this.#submission.kind === 'submitting' || this.#submission.kind === 'sent'
   }
 
   /** Stop this Client's countdown indefinitely; the waterfall then waits like a blocking question. */
@@ -555,41 +592,91 @@ export class PendingQuestion {
   close(): void {
     if (this.#phase.kind === 'closed') return
     this.#phase = { kind: 'closed' }
+    this.#submission = { kind: 'idle' }
     this.publish()
   }
 
-  /**
-   * Submit the whole answer batch through the live waterfall, or through the
-   * Remote path once the question is continued.
-   * @param answer - complete structured answer batch.
-   */
-  answer(answer: QuestionAnswer): Promise<void> {
+  /** Clear a failed attempt so the next edit starts from idle. */
+  resetSubmission(): void {
+    if (this.#submission.kind !== 'failed') return
+    this.#submission = { kind: 'idle' }
+    this.publish()
+  }
+
+  async #answerWaterfall(answer: QuestionAnswer): Promise<void> {
     const waterfall = this.#waterfall
-    if (waterfall !== undefined) {
-      return settlePendingComposer(() => { waterfall.resolve(answer) }, 'pending question settlement failed')
-    }
+    if (waterfall === undefined) throw new Error('no channel accepts an answer yet')
+    await settlePendingComposer(() => { waterfall.resolve(answer) }, 'pending question settlement failed')
+  }
+
+  async #answerRemote(answer: QuestionAnswer): Promise<void> {
     const rpc = this.#rpc
-    if (this.#projection === 'continued' && rpc !== undefined) {
-      return rpc.answer(answer).then((accepted) => {
-        if (!accepted) throw new Error('this question is no longer answerable')
-      })
-    }
-    return Promise.reject(new Error('no channel accepts an answer yet'))
+    if (rpc === undefined || this.#projection !== 'continued') throw new Error('no channel accepts an answer yet')
+    const accepted = await rpc.answer(answer)
+    if (!accepted) throw new Error('this question is no longer answerable')
   }
 
   /**
-   * Close the panel. A tool-call-keyed card only leaves the composer seat: the
-   * request stands, the countdown keeps running here, and the tool call row
-   * reopens it. A card the Host never named ends its request instead, because
-   * nothing could bring it back.
+   * Submit the whole answer batch and record the attempt on the card, so the
+   * panel renders one in-flight, sent or failed state instead of its own flags.
+   * A second attempt while one stands is a no-op.
+   * @param answer - complete structured answer batch.
+   */
+  async submit(answer: QuestionAnswer): Promise<void> {
+    if (this.#inFlight()) return
+    const remote = this.#channelOf() === 'rpc'
+    this.#submission = { kind: 'submitting', intent: 'answer', channel: remote ? 'rpc' : 'waterfall' }
+    this.publish()
+    try {
+      if (!remote) {
+        await this.#answerWaterfall(answer)
+        this.#submission = { kind: 'sent', intent: 'answer' }
+        this.publish()
+        return
+      }
+      await this.#answerRemote(answer)
+      this.#submission = { kind: 'idle' }
+      this.publish()
+      await this.dismiss().catch(() => {
+        this.#submission = { kind: 'failed', reason: 'sent' }
+        this.publish()
+      })
+    } catch (error) {
+      this.#submission = { kind: 'failed', reason: 'error', message: failureMessageOf(error) }
+      this.publish()
+    }
+  }
+
+  /**
+   * End the request through its waterfall, recording the attempt like an
+   * answer; a tool-call-keyed card only leaves its seat instead.
+   */
+  async cancel(): Promise<void> {
+    if (this.dismissal === 'hide') {
+      await this.dismiss()
+      return
+    }
+    if (this.#inFlight()) return
+    this.#submission = { kind: 'submitting', intent: 'cancel', channel: 'waterfall' }
+    this.publish()
+    try {
+      const waterfall = this.#waterfall
+      if (waterfall === undefined) throw new Error('no channel accepts a cancellation yet')
+      await settlePendingComposer(() => { waterfall.reject('ASK_CANCELLED') }, 'pending question cancellation failed')
+      this.#submission = { kind: 'sent', intent: 'cancel' }
+      this.publish()
+    } catch (error) {
+      this.#submission = { kind: 'failed', reason: 'error', message: failureMessageOf(error) }
+      this.publish()
+    }
+  }
+
+  /**
+   * Withdraw the panel from the composer seat without ending the request: the
+   * countdown keeps running here and the tool call row reopens it.
    */
   dismiss(): Promise<void> {
-    if (this.dismissal === 'hide') {
-      return settlePendingComposer(() => { this.#seat?.hide() }, 'pending question hide failed')
-    }
-    const waterfall = this.#waterfall
-    if (waterfall === undefined) return Promise.reject(new Error('no channel accepts a cancellation yet'))
-    return settlePendingComposer(() => { waterfall.reject('ASK_CANCELLED') }, 'pending question cancellation failed')
+    return settlePendingComposer(() => { this.#seat?.hide() }, 'pending question hide failed')
   }
 }
 
