@@ -1,5 +1,5 @@
 import * as Schema from 'effect/Schema'
-import type { Mutation, previewSchema } from './api.js'
+import type { Mutation, Revision, previewSchema } from './api.js'
 import { assign, emit, fromPromise, setup } from '@dshfiles/plugin-ui/machine'
 import { SchemaHelpers } from './schema-helpers.js'
 
@@ -38,6 +38,9 @@ interface RevisionActionContext {
   readonly preview: ActionPreview | null
   readonly result: ConfirmResult | null
   readonly error: string | null
+  readonly provisionedPath: string | null
+  readonly moveSource: Revision | null
+  readonly workspaceRemoval: { readonly commitId: string; readonly name: string } | null
 }
 
 type RevisionActionEvent =
@@ -59,6 +62,11 @@ type RevisionActionEvent =
   | { readonly type: 'cancel' }
   | { readonly type: 'dismissError' }
   | { readonly type: 'repository.refresh' }
+  | { readonly type: 'workspace.provisioned.clear' }
+  | { readonly type: 'workspace.removal.open'; readonly commitId: string; readonly name: string }
+  | { readonly type: 'workspace.removal.close' }
+  | { readonly type: 'move.start'; readonly revision: Revision }
+  | { readonly type: 'move.end' }
   | { readonly type: 'reset' }
 
 // A Host from before PluginApiError (until the user restarts DSH) sends this generic failure; name the action instead.
@@ -71,13 +79,10 @@ const failureMessage = (error: unknown, fallback: string): string => {
 
 const idleContext = { dragOrigin: null, dropTarget: null, dropPresentation: null, preview: null, action: null } as const
 
+const clearedContext = { ...idleContext, result: null, error: null, provisionedPath: null, moveSource: null, workspaceRemoval: null } as const
+
 interface RevisionActionInput {
   readonly client: RevisionActionClient
-}
-
-interface RevisionActionEmitted {
-  readonly type: 'confirmed'
-  readonly workspacePath: string | null
 }
 
 interface RevisionActionSettled {
@@ -90,7 +95,7 @@ interface RevisionActionMachineTypes {
   readonly context: RevisionActionContext
   readonly events: RevisionActionEvent
   readonly input: RevisionActionInput
-  readonly emitted: RevisionActionEmitted | RevisionActionSettled
+  readonly emitted: RevisionActionSettled
 }
 
 /**
@@ -110,14 +115,30 @@ export const revisionActionMachine = setup({
   },
 }).createMachine({
   id: 'revisionAction',
-  context: ({ input }) => ({ client: input.client, repoId: null, result: null, error: null, ...idleContext }),
+  context: ({ input }) => ({
+    client: input.client,
+    repoId: null,
+    result: null,
+    error: null,
+    provisionedPath: null,
+    moveSource: null,
+    workspaceRemoval: null,
+    ...idleContext,
+  }),
   initial: 'idle',
   on: {
     dismissError: { actions: assign({ error: null }) },
     'repository.refresh': {
       actions: assign(({ context }) => (context.error === STALE_REVISION_ERROR ? { error: null } : {})),
     },
-    reset: { target: '.idle', actions: assign({ ...idleContext, result: null, error: null }) },
+    reset: { target: '.idle', actions: assign({ ...clearedContext }) },
+    'workspace.provisioned.clear': { actions: assign({ provisionedPath: null }) },
+    'workspace.removal.open': {
+      actions: assign(({ event }) => ({ workspaceRemoval: { commitId: event.commitId, name: event.name } })),
+    },
+    'workspace.removal.close': { actions: assign({ workspaceRemoval: null }) },
+    'move.start': { actions: assign(({ event }) => ({ moveSource: event.revision })) },
+    'move.end': { actions: assign({ moveSource: null }) },
     reject: { actions: assign(({ event }) => ({ error: event.error })) },
   },
   states: {
@@ -202,8 +223,10 @@ export const revisionActionMachine = setup({
         onDone: {
           target: 'idle',
           actions: [
-            assign(({ event }) => ({ result: event.output })),
-            emit(({ event }) => ({ type: 'confirmed', workspacePath: event.output.workspacePath }) as const),
+            assign(({ context, event }) => ({
+              result: event.output,
+              provisionedPath: event.output.workspacePath ?? context.provisionedPath,
+            })),
             emit(({ context }) => ({ type: 'settled', repoId: context.repoId ?? '' }) as const),
           ],
         },

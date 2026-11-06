@@ -81,7 +81,8 @@ import { useOpenInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from './revision-list.js'
 import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin, STALE_REVISION_ERROR } from './revision-action-machine.js'
 import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, RevisionDropModel, REVISION_MIME, WORKSPACE_MIME } from './revision-drop.js'
-import { repositoryLoadingState, shouldReregisterRepository } from './repository-loading.js'
+import { repositoryLoadingState } from './repository-loading.js'
+import { repositoryRegistrationMachine } from './repository-registration-machine.js'
 import { openGraphRepository } from './repository-opening.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 import { GRAPH_DENSITY, GraphLanes, graphWidthFor, RevisionGraphCell, type GraphMetrics } from './revision-graph-cell.js'
@@ -264,8 +265,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [preferences, setPreference] = usePreferences()
   const diffLayout: PatchLayout =
     preferences.diffLayout !== 'auto' ? preferences.diffLayout : !sidePanel && window.matchMedia('(min-width: 1100px)').matches ? 'split' : 'unified'
-  const autoRegisterPath = useRef<string | null>(null)
-  const recoveredRepositoryPath = useRef<string | null>(null)
   const repositoryRootsById = useRef(new Map<string, string>())
   const scope = props.scope
   const [initialRequest] = useState(() => {
@@ -287,7 +286,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       }),
   )
   const [pendingReferenceRequest, setPendingReferenceRequest] = useState(initialRequest?.reference ?? null)
-  const [repoId, setRepoId] = useState<string | null>(null)
   const [repoHistory, setRepoHistory] = useState(() => storedRepoHistory.get().slice(0, REPO_HISTORY_LIMIT))
   const [pickerOpen, setPickerOpen] = useState(false)
   const [chosenView, setView] = usePanelScopeState<View | null>(scope, 'view', () => PanelScopes.persisted(scope).view ?? null)
@@ -376,15 +374,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [describeDrafts, setDescribeDrafts] = useState<Readonly<Record<string, string>>>({})
   const [remote, setRemote] = useState('')
   const [bookmark, setBookmark] = useState('')
-  const [provisionedPath, setProvisionedPath] = useState<string | null>(null)
   const [workspaceBase, setWorkspaceBase] = useState<Revision | null>(null)
-  const [workspaceRemoval, setWorkspaceRemoval] = useState<{ readonly commitId: string; readonly name: string } | null>(null)
   const [fullDiff, setFullDiff] = useState<FullDiffTarget | null>(null)
   const showViewTabs = props.view === undefined || fullDiff !== null
   const [patchDisclosure, setPatchDisclosure] = useState<{ readonly commitId: string; readonly open: boolean } | null>(null)
   const [bookmarkDraft, setBookmarkDraft] = useState<{ readonly commitId: string } | null>(null)
   const [cleanupOpen, setCleanupOpen] = useState(false)
-  const [moveSource, setMoveSource] = useState<Revision | null>(null)
   const [copyNotice, setCopyNotice] = useState<{ readonly copied: boolean; readonly label: string } | null>(null)
   const mineOnly = preferences.mineOnly
   const hideImmutable = preferences.hideImmutable
@@ -394,58 +389,62 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const confirmResult = actionSnapshot.context.result
   const actionBusy = actionSnapshot.hasTag('busy')
   const { dragOrigin, dropTarget, dropPresentation } = actionSnapshot.context
+  const { provisionedPath, moveSource, workspaceRemoval } = actionSnapshot.context
   const dragSource = dragOrigin?.kind === 'revision' ? dragOrigin.sourceId : null
 
   useEffect(() => {
-    const confirmed = actionActor.on('confirmed', event => {
-      if (event.workspacePath !== null) setProvisionedPath(event.workspacePath)
-    })
     const settled = actionActor.on('settled', event => {
       const root = repositoryRootsById.current.get(event.repoId)
       if (root !== undefined) void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(root) })
     })
-    return () => {
-      confirmed.unsubscribe()
-      settled.unsubscribe()
-    }
+    return () => settled.unsubscribe()
   }, [actionActor, queryClient])
 
-  const launchMutation = useMutation({ mutationFn: (cwd: string) => props.launchSession(cwd) })
+  const [registrationSnapshot, sendRegistration, registrationActor] = useMachine(repositoryRegistrationMachine, {
+    input: {
+      client: {
+        register: ({ path: requestedPath, readOnly }) => (readOnly ? api.registerRepository({ path: requestedPath }) : openGraphRepository(api, requestedPath)),
+      },
+      path,
+    },
+  })
+  const repoId = registrationSnapshot.context.repoId
+  const registrationBusy = registrationSnapshot.hasTag('busy')
+  const registrationError = registrationSnapshot.context.error
 
-  const registerMutation = useMutation({
-    mutationFn: (input: { readonly path: string; readonly readOnly?: boolean }) =>
-      input.readOnly === true ? api.registerRepository({ path: input.path }) : openGraphRepository(api, input.path),
-    onSuccess: registered => {
-      repositoryRootsById.current.set(registered.repoId, registered.root)
+  useEffect(() => {
+    const registered = registrationActor.on('registered', event => {
+      const { repoId: registeredRepoId, root } = event.repo
+      repositoryRootsById.current.set(registeredRepoId, root)
       while (repositoryRootsById.current.size > REPOSITORY_ID_LIMIT) {
         const oldestRepoId = repositoryRootsById.current.keys().next().value
         if (oldestRepoId === undefined) break
         repositoryRootsById.current.delete(oldestRepoId)
       }
       sendAction({ type: 'reset' })
-      setProvisionedPath(null)
       setWorkspaceBase(null)
-      setRepoId(registered.repoId)
-      setPath(registered.root)
+      setPath(root)
       setSelection(null)
       setComparisonSelection(null)
-      setMoveSource(null)
-      setWorkspaceRemoval(null)
       setDescribeDrafts({})
       setFullDiff(null)
-      const nextHistory = [registered.root, ...repoHistory.filter(item => item !== registered.root)].slice(0, REPO_HISTORY_LIMIT)
-      setRepoHistory(nextHistory)
-      storedRepoHistory.set(nextHistory)
-      PanelScopes.remember(scope, { path: registered.root })
-      if (scope === DEFAULT_PANEL_SCOPE) storedRepoPath.set(registered.root)
-      void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(registered.root) })
-    },
-  })
-  const { mutate: registerRepository, reset: resetRegistration } = registerMutation
+      setRepoHistory(current => {
+        const nextHistory = [root, ...current.filter(item => item !== root)].slice(0, REPO_HISTORY_LIMIT)
+        storedRepoHistory.set(nextHistory)
+        return nextHistory
+      })
+      PanelScopes.remember(scope, { path: root })
+      if (scope === DEFAULT_PANEL_SCOPE) storedRepoPath.set(root)
+      void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(root) })
+    })
+    return () => registered.unsubscribe()
+  }, [queryClient, registrationActor, scope, sendAction, setComparisonSelection, setPath, setSelection])
+
+  const launchMutation = useMutation({ mutationFn: (cwd: string) => props.launchSession(cwd) })
 
   const autoRefresh = useAutoRefresh({
     preferences,
-    paused: registerMutation.isPending || actionBusy || preview !== undefined,
+    paused: registrationBusy || actionBusy || preview !== undefined,
     surfaceVisible: props.visible ?? true,
     onBecameVisible: () => {
       if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(path) })
@@ -468,14 +467,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   graphGenerationRef.current = graphSnapshotGeneration
   const graphOnScreen = autoRefresh.visible && view === 'graph' && !diffTabOpen
   useEffect(() => {
-    if (!shouldReregisterRepository({ hasError: stateQuery.error !== null, repoId, path, recoveredPath: recoveredRepositoryPath.current })) return
-    recoveredRepositoryPath.current = path
-    resetRegistration()
-    registerRepository({ path, readOnly: true })
-  }, [path, registerRepository, resetRegistration, repoId, stateQuery.error])
+    if (stateQuery.error === null) return
+    sendRegistration({ type: 'recover', path })
+  }, [path, sendRegistration, stateQuery.error])
   useEffect(() => {
-    if (state !== undefined) recoveredRepositoryPath.current = null
-  }, [state])
+    if (state !== undefined) sendRegistration({ type: 'state.loaded' })
+  }, [state, sendRegistration])
   const debouncedSearch = useDebouncedValue({ value: textFilter.trim(), delayMs: 250 })
   const debouncedSearchRef = useRef(debouncedSearch)
   debouncedSearchRef.current = debouncedSearch
@@ -610,17 +607,15 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     return sidePanelRepository.onRequest(requested => {
       if (requested.reference !== undefined) setPendingReferenceRequest(requested.reference)
       if (shownRootRef.current !== null && containsPath(shownRootRef.current, requested.path)) return
-      autoRegisterPath.current = requested.path
-      registerRepository({ path: requested.path })
+      sendRegistration({ type: 'register', path: requested.path })
     })
-  }, [sidePanel, registerRepository])
+  }, [sidePanel, sendRegistration])
 
   useEffect(() => {
     const selectedPath = path.trim()
-    if (repoId !== null || selectedPath.length === 0 || autoRegisterPath.current === selectedPath) return
-    autoRegisterPath.current = selectedPath
-    registerRepository({ path: selectedPath })
-  }, [path, repoId, registerRepository])
+    if (selectedPath.length === 0) return
+    sendRegistration({ type: 'register', path: selectedPath })
+  }, [path, sendRegistration])
 
   useEffect(() => {
     if (state === undefined) return
@@ -628,12 +623,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     setDescribeDrafts(current => Object.fromEntries(Object.entries(current).filter(([commitId]) => visibleCommitIds.has(commitId))))
   }, [state])
 
-  const busy = registerMutation.isPending || stateQuery.isFetching || actionBusy
+  const busy = registrationBusy || stateQuery.isFetching || actionBusy
   const repositoryStatus = repositoryLoadingState({
-    registering: registerMutation.isPending,
+    registering: registrationBusy,
     fetching: stateQuery.isFetching,
     hasState: state !== undefined,
-    hasError: stateQuery.error !== null || registerMutation.error !== null,
+    hasError: stateQuery.error !== null || registrationError !== null,
   })
   const loadingRepository = repositoryStatus.loading
 
@@ -914,7 +909,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const moveRowFocus = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.key === 'Escape' && moveSource !== null) {
       event.preventDefault()
-      setMoveSource(null)
+      sendAction({ type: 'move.end' })
       return
     }
     // Any key can scroll the list (Page Down, Enter on a focused row), so none of them keep a restore pending.
@@ -939,21 +934,21 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const errorMessages = [
     stateQuery.error && errorMessage(stateQuery.error, 'Could not load this repository.'),
     graphPageMutation.error && errorMessage(graphPageMutation.error, 'Could not load revision results.'),
-    registerMutation.error && errorMessage(registerMutation.error, 'Could not register this repository.'),
+    registrationError ?? undefined,
     actionSnapshot.context.error,
     launchMutation.error && errorMessage(launchMutation.error, 'A thread could not be opened in this workspace. Try again.'),
   ].filter((message): message is string => Boolean(message))
 
   const askForConfirmation = (action: Mutation, presentation: DropPresentation | null = null): void => {
     if (repoId === null) return
-    if (action.kind === 'workspace-add') setProvisionedPath(null)
-    registerMutation.reset()
+    if (action.kind === 'workspace-add') sendAction({ type: 'workspace.provisioned.clear' })
+    sendRegistration({ type: 'clear.error' })
     sendAction({ type: 'prepare', repoId, action, presentation })
   }
 
   const chooseMoveDestination = (destination: Revision): void => {
     if (moveSource === null) return
-    setMoveSource(null)
+    sendAction({ type: 'move.end' })
     const resolution = RevisionDropModel.resolveRevision({ sourceRevisionId: moveSource.commitId, target: destination, revisions: state?.revisions ?? [] })
     if (resolution.kind === 'invalid') {
       sendAction({ type: 'reject', error: resolution.message })
@@ -1029,8 +1024,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     workspaceRemoval === null || repoId === null || state === undefined ? null : (
       <InlineWorkspaceRemoval
         name={workspaceRemoval.name}
-        onCancel={() => setWorkspaceRemoval(null)}
-        onRemoved={() => setWorkspaceRemoval(null)}
+        onCancel={() => sendAction({ type: 'workspace.removal.close' })}
+        onRemoved={() => sendAction({ type: 'workspace.removal.close' })}
         repoId={repoId}
         repoRoot={state.root}
       />
@@ -1154,7 +1149,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const dropOn = (event: DragEvent, revision: Revision): void => {
     event.preventDefault()
-    registerMutation.reset()
+    sendRegistration({ type: 'clear.error' })
     const resolution = dropResolution(event, revision)
     sendAction({
       type: 'drop',
@@ -1250,7 +1245,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         {revision.workspaces
           .filter(name => name !== 'default')
           .map(name => (
-            <ContextMenuItem key={name} onSelect={() => setWorkspaceRemoval({ commitId: revision.commitId, name })} variant="destructive">
+            <ContextMenuItem
+              key={name}
+              onSelect={() => sendAction({ type: 'workspace.removal.open', commitId: revision.commitId, name })}
+              variant="destructive"
+            >
               Remove workspace {name}…
             </ContextMenuItem>
           ))}
@@ -1266,7 +1265,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             Revert onto @
           </ContextMenuItem>
         )}
-        {!revision.immutable && <ContextMenuItem onSelect={() => setMoveSource(revision)}>Rebase branch onto…</ContextMenuItem>}
+        {!revision.immutable && <ContextMenuItem onSelect={() => sendAction({ type: 'move.start', revision })}>Rebase branch onto…</ContextMenuItem>}
         {!revision.immutable && mainRevision !== undefined && mainRevision.commitId !== revision.commitId && (
           <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'rebase', sourceId: revision.commitId, destinationId: mainRevision.commitId })}>
             Rebase onto main
@@ -1308,7 +1307,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       {name === 'default' ? null : (
         <>
           <ContextMenuSeparator />
-          <ContextMenuItem onSelect={() => setWorkspaceRemoval({ commitId, name })} variant="destructive">
+          <ContextMenuItem onSelect={() => sendAction({ type: 'workspace.removal.open', commitId, name })} variant="destructive">
             Remove workspace…
           </ContextMenuItem>
         </>
@@ -1713,7 +1712,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
                 Choose a destination for {moveSource.shortestChangeId} · {firstLine(moveSource.description)}. Press Escape to cancel.
               </span>
-              <Button onClick={() => setMoveSource(null)} size="sm" type="button" variant="outline">
+              <Button onClick={() => sendAction({ type: 'move.end' })} size="sm" type="button" variant="outline">
                 Cancel
               </Button>
             </div>
@@ -1850,7 +1849,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
       <EmptyHeader>
         <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">Repository could not be loaded.</EmptyTitle>
-        <Button className="dshx:mt-2" disabled={busy} onClick={() => registerRepository({ path, readOnly: true })} size="sm" type="button" variant="outline">
+        <Button
+          className="dshx:mt-2"
+          disabled={busy}
+          onClick={() => sendRegistration({ type: 'register', path, readOnly: true })}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
           Retry
         </Button>
       </EmptyHeader>
@@ -2106,7 +2112,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           {(errorMessages.length > 0 || copyNotice !== null || provisionedPath !== null || (confirmResult !== null && confirmResult.output.length > 0)) && (
             <div className="dshx:flex dshx:max-h-48 dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:overflow-auto dshx:border-b dshx:px-3 dshx:py-2">
               {errorMessages.map(message => {
-                const repositoryError = stateQuery.error !== null || registerMutation.error !== null
+                const repositoryError = stateQuery.error !== null || registrationError !== null
                 return (
                   <Alert className="dshx:px-3 dshx:py-2" key={message} variant="destructive">
                     <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
@@ -2176,10 +2182,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             onRegisterWorkspace={props.registerWorkspace}
             onSelect={selected => {
               setPickerOpen(false)
-              autoRegisterPath.current = selected.canonicalPath
-              setRepoId(null)
               setPath(selected.canonicalPath)
-              registerMutation.mutate({ path: selected.canonicalPath })
+              sendRegistration({ type: 'register', path: selected.canonicalPath })
             }}
             projects={props.projects}
             recentFolders={repoHistory}

@@ -52,8 +52,7 @@ type IntegrationQueueEvent =
 const setJob = (jobs: ReadonlyMap<string, IntegrationJob>, path: string, job: IntegrationJob): ReadonlyMap<string, IntegrationJob> =>
   new Map(jobs).set(path, job)
 
-const noticeForResult = (result: LandResult): IntegrationNotice | null =>
-  result.status === 'landed' ? null : { kind: 'land-result', result }
+const noticeForResult = (result: LandResult): IntegrationNotice | null => (result.status === 'landed' ? null : { kind: 'land-result', result })
 
 const noticeForFailure = (error: unknown): IntegrationNotice =>
   IntegrationRecovery.isQueued(error) ? { kind: 'queued' } : { kind: 'failed', message: errorMessage(error, '') }
@@ -71,11 +70,7 @@ const queuedJobs = (current: ReadonlyMap<string, IntegrationJob>, paths: readonl
   return jobs
 }
 
-const advanceQueue = (
-  context: IntegrationQueueContext,
-  job: IntegrationJob,
-  notice: IntegrationNotice | null,
-): Partial<IntegrationQueueContext> => {
+const advanceQueue = (context: IntegrationQueueContext, job: IntegrationJob, notice: IntegrationNotice | null): Partial<IntegrationQueueContext> => {
   const activePath = context.queue[0]
   if (activePath === undefined) return { activePath: null, queue: [], notice }
   return { activePath: null, queue: context.queue.slice(1), jobs: setJob(context.jobs, activePath, job), notice }
