@@ -11,6 +11,8 @@ export interface ModelCatalogState {
   error: string | null
 }
 
+const CATALOG_REFRESH_COALESCE_MS = 50
+
 /** Loads at most one model catalog for the current Host generation. */
 export class ModelCatalogDirectory {
   /** Current shared catalog value and load lifecycle. */
@@ -98,8 +100,29 @@ export class ModelCatalogDirectory {
     void this.load().catch(() => { /* the selector exposes the shared error */ })
   }
 
+  private pendingRefresh: ReturnType<typeof setTimeout> | undefined
+
+  /**
+   * Refresh once for a burst of Host change events. One settings or credential write announces several events
+   * within a few milliseconds; refreshing on each started one `session/modelCatalog` read per event.
+   */
+  scheduleRefresh(): void {
+    if (this.pendingRefresh !== undefined) return
+    this.pendingRefresh = setTimeout(() => {
+      this.pendingRefresh = undefined
+      this.refresh()
+    }, CATALOG_REFRESH_COALESCE_MS)
+  }
+
+  private cancelScheduledRefresh(): void {
+    if (this.pendingRefresh === undefined) return
+    clearTimeout(this.pendingRefresh)
+    this.pendingRefresh = undefined
+  }
+
   /** Clear Host-specific values and load the replacement Host generation. */
   resetGeneration(): void {
+    this.cancelScheduledRefresh()
     this.reasoning.clear()
     this.invalidate(true)
     void this.load().catch(() => { /* the selector exposes the shared error */ })

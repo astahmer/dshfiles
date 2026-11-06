@@ -26,5 +26,5 @@
     }
   ],
   "added": ["src/native/inject.ts"],
-  "delta": ["src/native/directory.ts", "src/native/service.ts", "src/native/index.ts"]
+  "delta": ["src/native/catalog.ts", "src/native/directory.ts", "src/native/service.ts", "src/native/index.ts"]
 }

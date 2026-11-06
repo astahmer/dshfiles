@@ -48,7 +48,8 @@ Vendored files stay byte-identical except:
 | File                                    | Owned delta                                                                                                                                |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | [directory.ts](src/native/directory.ts) | Subscribe to the public draft list; stage local choices without RPC; resolve local defaults without projection; clean up the subscription. |
-| [service.ts](src/native/service.ts)     | Inject `sessionDrafts` and pass it to the single directory owner.                                                                          |
+| [catalog.ts](src/native/catalog.ts)     | `scheduleRefresh()`: one catalog read per 50 ms burst of Host change events instead of one per event.                                      |
+| [service.ts](src/native/service.ts)     | Inject `sessionDrafts` and pass it to the single directory owner; refresh the catalog through `scheduleRefresh()`.                         |
 | [index.ts](src/native/index.ts)         | Require the draft service before activating the native surfaces.                                                                           |
 
 On a DSH upgrade, inspect upstream changes, preserve the native public service and
