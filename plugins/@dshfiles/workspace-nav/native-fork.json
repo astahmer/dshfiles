@@ -28,9 +28,11 @@
   "delta": [
     "src/native/navigation.ts",
     "src/native/index.ts",
-    "src/native/rows/WorkspaceBrowser.tsx"
+    "src/native/rows/WorkspaceBrowser.tsx",
+    "src/native/WorkspacePicker.tsx"
   ],
   "added": [
-    "src/native/rows/workspace-dialogs.ts"
+    "src/native/rows/workspace-dialogs.ts",
+    "src/native/workspace-pick-flow.ts"
   ]
 }

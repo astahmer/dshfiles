@@ -9,7 +9,7 @@
  * occupant's own create-folder affordance already covers creating one.
  */
 import type { ReactNode, RefObject } from 'react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useReducer } from 'react'
 import {
   Button, IconFolderCloseRegular, IconPlusOutlineRegular, Menu, Modal, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -19,6 +19,9 @@ import type {
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from './contract/slots.ts'
+import {
+  PICK_FLOW_MENU, pickFlowBusy, pickFlowError, pickFlowOpen, pickFlowPicking, pickFlowReduce,
+} from './workspace-pick-flow.ts'
 import css from './WorkspacePicker.module.css'
 
 const ADD_WORKSPACE = '::add-workspace'
@@ -79,15 +82,16 @@ export function WorkspacePickFlow({
     () => anchorRef?.current?.getBoundingClientRect() ?? null,
     [anchorRef],
   )
-  const [errorOpen, setErrorOpen] = useState(false)
-  const [modalError, setModalError] = useState<string | null>(null)
-  const [flowOpen, setFlowOpen] = useState(false)
-  const [pickingFolder, setPickingFolder] = useState(false)
+  const [flowState, dispatchFlow] = useReducer(pickFlowReduce, PICK_FLOW_MENU)
+  const errorOpen = flowState.kind === 'error'
+  const modalError = pickFlowError(flowState)
+  const flowOpen = pickFlowOpen(flowState)
+  const pickingFolder = pickFlowPicking(flowState)
   // One picking interaction at a time: while the flow is open (native chooser
   // pending, browse dialog up) or its pick is being adopted, every other
   // menu action stays disabled — a late outcome must not race a concurrent
   // selection or adoption.
-  const flowBusy = flowOpen || pickingFolder
+  const flowBusy = pickFlowBusy(flowState)
   useEffect(() => { onBusyChange?.(flowBusy) }, [flowBusy, onBusyChange])
 
   // The occupied hole gates the picking affordance: with no composed flow the
@@ -101,7 +105,7 @@ export function WorkspacePickFlow({
   // empty hole (Choose again after the occupant unloaded with the error
   // dialog up) — that transition must snap back too, not just occupancy loss.
   useEffect(() => {
-    if (flowOpen && !flowAvailable) setFlowOpen(false)
+    if (flowOpen && !flowAvailable) dispatchFlow({ type: 'occupant.lost' })
   }, [flowOpen, flowAvailable])
   const addEntries: MenuEntry[] = flowAvailable
     ? [{ id: ADD_WORKSPACE, label: t('menu.addWorkspace'), icon: <IconPlusOutlineRegular size={16} />, disabled: flowBusy }]
@@ -123,26 +127,23 @@ export function WorkspacePickFlow({
   const menuIsEmpty = items.length === 0
 
   const closeModal = (): void => {
-    setErrorOpen(false)
-    setModalError(null)
+    dispatchFlow({ type: 'error.close' })
   }
 
   /** Adopt a picked directory; failures land in the folder-error dialog (Choose again reopens the flow). */
-  const adoptDirectory = (path: string): Promise<void> =>
-    createWorkspace({ path }).then((workspace) => {
-      setFlowOpen(false)
+  const adoptDirectory = (path: string): Promise<void> => {
+    dispatchFlow({ type: 'flow.picked' })
+    return createWorkspace({ path }).then((workspace) => {
+      dispatchFlow({ type: 'flow.adopted' })
       onPick(workspace.workspaceId)
     }).catch((reason: unknown) => {
-      setModalError(reason instanceof Error ? reason.message : String(reason))
-      setFlowOpen(false)
-      setErrorOpen(true)
+      dispatchFlow({ type: 'flow.failed', message: reason instanceof Error ? reason.message : String(reason) })
     })
+  }
 
   const openDirectoryFlow = useCallback((): void => {
     onClose()
-    setErrorOpen(false)
-    setModalError(null)
-    setFlowOpen(true)
+    dispatchFlow({ type: 'add.select' })
   }, [onClose])
 
   // A menu exists to disambiguate between targets. With no workspaces listed
@@ -165,16 +166,9 @@ export function WorkspacePickFlow({
   const flowOwner: DirectoryFlowOwnerProps = {
     open: flowOpen,
     busy: pickingFolder,
-    onPicked: (path) => {
-      setPickingFolder(true)
-      void adoptDirectory(path).finally(() => { setPickingFolder(false) })
-    },
-    onCancel: () => { setFlowOpen(false) },
-    onError: (message) => {
-      setFlowOpen(false)
-      setModalError(message)
-      setErrorOpen(true)
-    },
+    onPicked: (path) => { void adoptDirectory(path) },
+    onCancel: () => { dispatchFlow({ type: 'flow.cancel' }) },
+    onError: (message) => { dispatchFlow({ type: 'flow.failed', message }) },
   }
 
   const handleSelect = (id: string): void => {
