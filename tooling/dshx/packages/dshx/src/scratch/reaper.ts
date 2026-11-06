@@ -32,7 +32,9 @@ const leaseVerdict = (options: { readonly state: ScratchState; readonly lastUsed
   const host = ScratchStateRuntime.ownedProcessStatus(options.state.host)
   if (host === 'gone') return { kind: 'stop', reason: `dsh pid ${options.state.host.pid} exited` }
   if (host === 'foreign') return { kind: 'stop', reason: `dsh pid ${options.state.host.pid} now runs another command` }
-  const idleTimeoutMinutes = options.state.kept === true ? 0 : (options.state.idleTimeoutMinutes ?? DEFAULT_IDLE_TIMEOUT_MINUTES)
+  const lease = ScratchStateRuntime.leaseOf(options.state)
+  if (lease.kind === 'pinned') return { kind: 'in-use' }
+  const idleTimeoutMinutes = options.state.idleTimeoutMinutes ?? DEFAULT_IDLE_TIMEOUT_MINUTES
   if (idleTimeoutMinutes === 0) return { kind: 'in-use' }
   const idleMinutes = (options.now - options.lastUsedAt) / 60_000
   if (idleMinutes < idleTimeoutMinutes) return { kind: 'in-use' }
@@ -73,28 +75,31 @@ const startWarned = async (options: {
 
 /** Decide and act for the instance recorded in `stateDir`: enter its warning, stop it past the grace, or leave it be. */
 const reapIfStale = async (options: { readonly stateDir: string; readonly now: number }): Promise<ReapOutcome> => {
-  const state = await ScratchStateRuntime.read(options.stateDir, options.stateDir).catch(() => undefined)
-  const lastUsedAt = await ScratchStateRuntime.lastUsedAt(options.stateDir)
-  if (state === undefined || lastUsedAt === undefined) return { kind: 'in-use' }
-  const verdict = leaseVerdict({ state, lastUsedAt, now: options.now })
-  if (verdict.kind === 'in-use') return verdict
-  if (verdict.kind === 'warn') {
-    const warned = await startWarned({
-      state,
-      stateDir: options.stateDir,
-      lastUsedAt,
-      now: options.now,
-      idleReason: verdict.idleReason,
-      warnMinutes: verdict.warnMinutes,
-    })
-    return { kind: 'warned', warned }
-  }
-  if (verdict.kind === 'warned') return { kind: 'warned', warned: { name: state.name, stateDir: state.stateDir, warning: verdict.warning } }
-  const result = await scratchDown(state, false)
-  return {
-    kind: 'stopped',
-    stopped: { name: state.name, stateDir: state.stateDir, reason: verdict.reason, actions: result.actions, leftRunning: result.leftRunning },
-  }
+  if ((await ScratchStateRuntime.read(options.stateDir, options.stateDir).catch(() => undefined)) === undefined) return { kind: 'in-use' }
+  return ScratchStateRuntime.withLock(options.stateDir, async () => {
+    const state = await ScratchStateRuntime.read(options.stateDir, options.stateDir).catch(() => undefined)
+    const lastUsedAt = await ScratchStateRuntime.lastUsedAt(options.stateDir)
+    if (state === undefined || lastUsedAt === undefined) return { kind: 'in-use' }
+    const verdict = leaseVerdict({ state, lastUsedAt, now: options.now })
+    if (verdict.kind === 'in-use') return verdict
+    if (verdict.kind === 'warn') {
+      const warned = await startWarned({
+        state,
+        stateDir: options.stateDir,
+        lastUsedAt,
+        now: options.now,
+        idleReason: verdict.idleReason,
+        warnMinutes: verdict.warnMinutes,
+      })
+      return { kind: 'warned', warned }
+    }
+    if (verdict.kind === 'warned') return { kind: 'warned', warned: { name: state.name, stateDir: state.stateDir, warning: verdict.warning } }
+    const result = await scratchDown(state, false)
+    return {
+      kind: 'stopped',
+      stopped: { name: state.name, stateDir: state.stateDir, reason: verdict.reason, actions: result.actions, leftRunning: result.leftRunning },
+    }
+  })
 }
 
 /** Reap every stale instance recorded under the state root, plus `extraStateDirs` (an explicit --state-dir). */

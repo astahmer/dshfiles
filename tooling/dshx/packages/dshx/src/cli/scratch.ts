@@ -329,7 +329,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
     }
     const readState = await ScratchStateRuntime.read(stateDir, name.success)
     if (action === 'keep') {
-      const result = await ScratchStateRuntime.keepScratch({ state: readState, forever: values.forever === true })
+      const result = await ScratchStateRuntime.keepScratch({ stateDir, name: name.success, forever: values.forever === true })
       const kept = ScratchStateRuntime.publicState(result.state)
       const stops =
         kept.idleTimeoutMinutes === 0
@@ -342,7 +342,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
     }
     // Every command that reaches an instance answers its warning; doctor reports the one it answered. `down` stops it anyway.
     const answeredWarning = ScratchStateRuntime.scratchWarning(readState, Date.now())
-    const cancelled = action === 'down' ? { state: readState } : await ScratchStateRuntime.cancelWarning(readState)
+    const cancelled = action === 'down' ? { state: readState } : await ScratchStateRuntime.cancelWarning({ stateDir, name: name.success })
     const state = cancelled.state
     if (action !== 'down') await ScratchStateRuntime.renewLease(stateDir)
     if (action === 'doctor') {

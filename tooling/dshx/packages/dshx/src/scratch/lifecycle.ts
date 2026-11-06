@@ -55,7 +55,7 @@ export const scratchDoctor = async (options: { readonly state: ScratchState; rea
   const warnMinutes = state.warnMinutes ?? DEFAULT_WARN_MINUTES
   const watchdog = state.watchdog === undefined ? 'not recorded' : ScratchStateRuntime.ownedProcessStatus(state.watchdog)
   const lease =
-    state.kept === true
+    ScratchStateRuntime.leaseOf(state).kind === 'pinned'
       ? 'pinned by "dshx dev keep --forever": no idle stop'
       : idleTimeoutMinutes === 0
         ? 'no idle timeout'

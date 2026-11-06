@@ -2,7 +2,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { Result, SchemaIssue } from 'effect'
 import * as Schema from 'effect/Schema'
 import { closeSync, openSync } from 'node:fs'
-import { appendFile, mkdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, open, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { decodeJson, jsonValueSchema } from '../json.js'
@@ -28,6 +28,15 @@ const ownedProcessFields = {
   signature: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(Schema.isMinLength(1)),
 }
 const ownedProcessSchema = Schema.Struct(ownedProcessFields)
+
+/** The persisted lease phase: one authority for in use, warned and pinned. */
+export const scratchLeaseSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('active') }),
+  Schema.Struct({ kind: Schema.Literal('warned'), warnedAt: Schema.String }),
+  Schema.Struct({ kind: Schema.Literal('pinned') }),
+])
+
+export type ScratchLease = (typeof scratchLeaseSchema)['Type']
 
 export const ScratchStateSchema = Schema.Struct({
   schemaVersion: Schema.Literal(1),
@@ -63,6 +72,8 @@ export const ScratchStateSchema = Schema.Struct({
   warnedAt: Schema.optional(Schema.String),
   /** `dshx dev keep --forever` pinned the instance: no idle stop until another `up` or `down`. */
   kept: Schema.optional(Schema.Boolean),
+  /** The lease phase; a state file written before it existed is normalized from `kept`/`warnedAt` on read. */
+  lease: Schema.optional(scratchLeaseSchema),
   /** The detached process that runs `down` when the lease expires or the dsh process is gone. */
   watchdog: Schema.optional(ownedProcessSchema),
 })
@@ -93,6 +104,73 @@ const resolveStateDir = (options: { readonly name: string; readonly stateDir?: s
 
 const stateFile = (stateDir: string): string => join(stateDir, 'state.json')
 
+const stateLockFile = (stateDir: string): string => join(stateDir, 'state.lock')
+
+const withLease = (state: ScratchState, lease: ScratchLease): ScratchState => {
+  const next = { ...state, lease }
+  delete next.warnedAt
+  delete next.kept
+  return next
+}
+
+/** The persisted lease phase, or the phase implied by a state file written before it existed. */
+export const leaseOf = (state: ScratchState): ScratchLease => {
+  if (state.lease !== undefined) return state.lease
+  if (state.kept === true) return { kind: 'pinned' }
+  if (state.warnedAt !== undefined) return { kind: 'warned', warnedAt: state.warnedAt }
+  return { kind: 'active' }
+}
+
+export type LeaseEvent = { readonly kind: 'warn'; readonly warnedAt: string } | { readonly kind: 'keep' } | { readonly kind: 'pin' }
+
+/** One lease transition: only active or warned can warn, keep clears a warning but not a pin, and pin always wins. */
+export const applyLease = (state: ScratchState, event: LeaseEvent): ScratchState => {
+  const lease = leaseOf(state)
+  if (event.kind === 'warn') return lease.kind === 'pinned' ? state : withLease(state, { kind: 'warned', warnedAt: event.warnedAt })
+  if (event.kind === 'keep') return lease.kind === 'pinned' ? state : withLease(state, { kind: 'active' })
+  return withLease(state, { kind: 'pinned' })
+}
+
+const LOCK_TIMEOUT_MS = 5_000
+const LOCK_STALE_MS = 10_000
+
+/** Serialize a lease read-modify-write across the CLI and the detached watchdog process. */
+const withStateLock = async <Result>(stateDir: string, work: () => Promise<Result>): Promise<Result> => {
+  await mkdir(stateDir, { recursive: true, mode: 0o700 })
+  const lockPath = stateLockFile(stateDir)
+  const deadline = Date.now() + LOCK_TIMEOUT_MS
+  for (;;) {
+    const handle = await open(lockPath, 'wx', 0o600).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === 'EEXIST') return undefined
+      throw error
+    })
+    if (handle !== undefined) {
+      try {
+        return await work()
+      } finally {
+        await handle.close()
+        await rm(lockPath, { force: true })
+      }
+    }
+    const stale = await stat(lockPath).then(
+      info => Date.now() - info.mtimeMs > LOCK_STALE_MS,
+      () => true,
+    )
+    if (stale) {
+      await rm(lockPath, { force: true })
+      continue
+    }
+    if (Date.now() > deadline) {
+      throw new ScratchError(
+        'state-locked',
+        `The scratch state in ${stateDir} is locked by another dshx dev process.`,
+        'Wait for the running command to finish, or remove state.lock if no dshx dev command is running.',
+      )
+    }
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+}
+
 const readScratchState = async (stateDir: string, name: string): Promise<ScratchState> => {
   const source = await readFile(stateFile(stateDir), 'utf8').catch(() => undefined)
   if (source === undefined) {
@@ -111,17 +189,13 @@ const readScratchState = async (stateDir: string, name: string): Promise<Scratch
       'Run "dshx dev down --dry-run" to see what it would stop, then "dshx dev down".',
     )
   }
-  return parsed.success as ScratchState
+  return withLease(parsed.success as ScratchState, leaseOf(parsed.success as ScratchState))
 }
 
 const writeScratchState = async (state: ScratchState): Promise<void> => {
   await mkdir(state.stateDir, { recursive: true, mode: 0o700 })
-  await writeFile(stateFile(state.stateDir), `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 })
-}
-
-const trackFakeProvider = async (state: ScratchState, fakeProvider: NonNullable<ScratchState['fakeProvider']>): Promise<void> => {
-  const current = await readScratchState(state.stateDir, state.name)
-  await writeScratchState({ ...current, fakeProvider })
+  const next = withLease(state, leaseOf(state))
+  await writeFile(stateFile(next.stateDir), `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })
 }
 
 const removeScratchStateFile = (stateDir: string): Promise<void> => rm(stateFile(stateDir), { force: true })
@@ -134,19 +208,6 @@ const renewLease = async (stateDir: string): Promise<void> => {
 
 const lastUsedAt = async (stateDir: string): Promise<number | undefined> => (await stat(stateFile(stateDir)).catch(() => undefined))?.mtimeMs
 
-/** The pending warning and the grace it has left, or undefined when the instance is not in its warning phase. */
-const scratchWarning = (state: ScratchState, now: number): ScratchWarning | undefined => {
-  if (state.warnedAt === undefined) return undefined
-  const startedAt = Date.parse(state.warnedAt)
-  if (Number.isNaN(startedAt)) return undefined
-  const warnMinutes = state.warnMinutes ?? DEFAULT_WARN_MINUTES
-  return {
-    warnedAt: state.warnedAt,
-    graceEndsAt: new Date(startedAt + warnMinutes * 60_000).toISOString(),
-    minutesLeft: Math.max(0, warnMinutes - (now - startedAt) / 60_000),
-  }
-}
-
 /** Minutes the way help and doctor print them; a spec's fractional `warnMinutes` keeps one decimal. */
 const formatMinutes = (minutes: number): string => (minutes < 0.1 ? 'under a minute' : `${Math.round(minutes * 10) / 10} min`)
 
@@ -155,10 +216,44 @@ const logScratchEvent = async (stateDir: string, message: string): Promise<void>
   await appendFile(join(stateDir, 'watchdog.log'), `${new Date().toISOString()} ${message}\n`, { mode: 0o600 }).catch(() => undefined)
 }
 
-const withoutWarning = (state: ScratchState): ScratchState => {
-  const next = { ...state }
-  delete next.warnedAt
-  return next
+const withoutWarning = (state: ScratchState): ScratchState => applyLease(state, { kind: 'keep' })
+
+const scratchWarning = (state: ScratchState, now: number): ScratchWarning | undefined => {
+  const lease = leaseOf(state)
+  if (lease.kind !== 'warned') return undefined
+  const startedAt = Date.parse(lease.warnedAt)
+  if (Number.isNaN(startedAt)) return undefined
+  const warnMinutes = state.warnMinutes ?? DEFAULT_WARN_MINUTES
+  return {
+    warnedAt: lease.warnedAt,
+    graceEndsAt: new Date(startedAt + warnMinutes * 60_000).toISOString(),
+    minutesLeft: Math.max(0, warnMinutes - (now - startedAt) / 60_000),
+  }
+}
+
+/** One locked read-modify-write of the lease record, so concurrent commands never overwrite each other. */
+const updateScratchState = async <Result>(options: {
+  readonly stateDir: string
+  readonly name: string
+  readonly update: (
+    state: ScratchState,
+  ) =>
+    | { readonly state: ScratchState; readonly result: Result; readonly write?: boolean }
+    | Promise<{ readonly state: ScratchState; readonly result: Result; readonly write?: boolean }>
+}): Promise<Result> =>
+  withStateLock(options.stateDir, async () => {
+    const current = await readScratchState(options.stateDir, options.name)
+    const applied = await options.update(current)
+    if (applied.write !== false) await writeScratchState(applied.state)
+    return applied.result
+  })
+
+const trackFakeProvider = async (state: ScratchState, fakeProvider: NonNullable<ScratchState['fakeProvider']>): Promise<void> => {
+  await updateScratchState({
+    stateDir: state.stateDir,
+    name: state.name,
+    update: current => ({ state: { ...current, fakeProvider }, result: undefined }),
+  })
 }
 
 /**
@@ -166,7 +261,7 @@ const withoutWarning = (state: ScratchState): ScratchState => {
  * one back and let the grace clock stand on its own.
  */
 const markWarned = async (options: { readonly state: ScratchState; readonly warnedAt: string; readonly lastUsedAt: number }): Promise<ScratchState> => {
-  const next: ScratchState = { ...options.state, warnedAt: options.warnedAt }
+  const next = applyLease(options.state, { kind: 'warn', warnedAt: options.warnedAt })
   await writeScratchState(next)
   const seconds = options.lastUsedAt / 1000
   await utimes(stateFile(next.stateDir), seconds, seconds)
@@ -174,51 +269,70 @@ const markWarned = async (options: { readonly state: ScratchState; readonly warn
 }
 
 /** A command that reached the instance answers a pending warning; it also renews the lease. */
-const cancelWarning = async (state: ScratchState): Promise<{ readonly state: ScratchState; readonly cancelled: boolean }> => {
-  if (state.warnedAt === undefined) return { state, cancelled: false }
-  const next = withoutWarning(state)
-  await writeScratchState(next)
-  await renewLease(next.stateDir)
-  await logScratchEvent(next.stateDir, `answered the warning for "${next.name}"; warning cancelled, lease renewed`)
-  return { state: next, cancelled: true }
-}
+const cancelWarning = async (options: {
+  readonly stateDir: string
+  readonly name: string
+}): Promise<{
+  readonly state: ScratchState
+  readonly cancelled: boolean
+}> =>
+  updateScratchState<{ readonly state: ScratchState; readonly cancelled: boolean }>({
+    stateDir: options.stateDir,
+    name: options.name,
+    update: async current => {
+      if (leaseOf(current).kind !== 'warned') return { state: current, result: { state: current, cancelled: false }, write: false }
+      const next = withoutWarning(current)
+      await renewLease(next.stateDir)
+      await logScratchEvent(next.stateDir, `answered the warning for "${next.name}"; warning cancelled, lease renewed`)
+      return { state: next, result: { state: next, cancelled: true } }
+    },
+  })
 
 /** `dshx dev keep`: answer the warning and renew the lease, or pin the instance so it never stops on its own. */
 const keepScratch = async (options: {
-  readonly state: ScratchState
+  readonly stateDir: string
+  readonly name: string
   readonly forever: boolean
-}): Promise<{ readonly state: ScratchState; readonly cancelledWarning: boolean }> => {
-  const base = withoutWarning(options.state)
-  const next: ScratchState = options.forever ? { ...base, kept: true, idleTimeoutMinutes: 0 } : base
-  await writeScratchState(next)
-  await renewLease(next.stateDir)
-  await logScratchEvent(
-    next.stateDir,
-    options.forever ? `keep --forever pinned "${next.name}": warning cancelled, no idle stop` : `keep cancelled the warning for "${next.name}"; lease renewed`,
-  )
-  return { state: next, cancelledWarning: options.state.warnedAt !== undefined }
-}
+}): Promise<{ readonly state: ScratchState; readonly cancelledWarning: boolean }> =>
+  updateScratchState({
+    stateDir: options.stateDir,
+    name: options.name,
+    update: async current => {
+      const next = applyLease(current, options.forever ? { kind: 'pin' } : { kind: 'keep' })
+      await renewLease(next.stateDir)
+      await logScratchEvent(
+        next.stateDir,
+        options.forever
+          ? `keep --forever pinned "${next.name}": warning cancelled, no idle stop`
+          : `keep cancelled the warning for "${next.name}"; lease renewed`,
+      )
+      return { state: next, result: { state: next, cancelledWarning: leaseOf(current).kind === 'warned' } }
+    },
+  })
 
 /** The state minus the launch token, safe to print. */
-const publicState = (state: ScratchState) => ({
-  name: state.name,
-  origin: state.origin,
-  port: state.port,
-  home: state.home,
-  profile: state.profile,
-  stateDir: state.stateDir,
-  project: state.project.path,
-  bundles: state.bundles,
-  hostPid: state.host.pid,
-  browserPid: state.browser.pid,
-  hostLog: state.hostLog,
-  evidenceDir: state.evidenceDir,
-  idleTimeoutMinutes: state.kept === true ? 0 : (state.idleTimeoutMinutes ?? DEFAULT_IDLE_TIMEOUT_MINUTES),
-  warnMinutes: state.warnMinutes ?? DEFAULT_WARN_MINUTES,
-  warnedAt: state.warnedAt,
-  kept: state.kept === true,
-  watchdogPid: state.watchdog?.pid,
-})
+const publicState = (state: ScratchState) => {
+  const lease = leaseOf(state)
+  return {
+    name: state.name,
+    origin: state.origin,
+    port: state.port,
+    home: state.home,
+    profile: state.profile,
+    stateDir: state.stateDir,
+    project: state.project.path,
+    bundles: state.bundles,
+    hostPid: state.host.pid,
+    browserPid: state.browser.pid,
+    hostLog: state.hostLog,
+    evidenceDir: state.evidenceDir,
+    idleTimeoutMinutes: lease.kind === 'pinned' ? 0 : (state.idleTimeoutMinutes ?? DEFAULT_IDLE_TIMEOUT_MINUTES),
+    warnMinutes: state.warnMinutes ?? DEFAULT_WARN_MINUTES,
+    warnedAt: lease.kind === 'warned' ? lease.warnedAt : undefined,
+    kept: lease.kind === 'pinned',
+    watchdogPid: state.watchdog?.pid,
+  }
+}
 
 const isWithin = (root: string, target: string): boolean => {
   const normalizedRoot = resolve(root)
@@ -269,6 +383,9 @@ export class ScratchStateRuntime {
   static readonly markWarned = markWarned
   static readonly cancelWarning = cancelWarning
   static readonly keepScratch = keepScratch
+  static readonly leaseOf = leaseOf
+  static readonly applyLease = applyLease
+  static readonly withLock = withStateLock
   static readonly publicState = publicState
   static readonly isWithin = isWithin
   static readonly ownedProcessStatus = ownedProcessStatus
