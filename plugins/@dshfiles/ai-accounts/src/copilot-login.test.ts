@@ -262,4 +262,43 @@ describe('GitHub Copilot device sign-in', () => {
     const service = createCopilotLoginService({ credentials: undefined, isCopilotAccount: () => false, onChange: () => undefined })
     await expect(service.begin('other-account')).rejects.toThrow('no longer available')
   })
+
+  it('does not leave a stuck starting phase when the saved credential cannot be read', async () => {
+    const { provider } = createCredentialProvider()
+    provider.readRecord = async () => {
+      throw new Error('private-record-detail')
+    }
+    const service = createCopilotLoginService({
+      credentials: provider,
+      isCopilotAccount: () => true,
+      onChange: () => undefined,
+      login: async () => credential,
+    })
+    await service.begin('copilot')
+    expect(service.state('copilot')).toMatchObject({ status: 'error' })
+    expect(service.state('copilot').message).not.toContain('private-record-detail')
+    service.dispose()
+  })
+
+  it('does not leave a waiting phase behind when disconnecting fails', async () => {
+    const { provider } = createCredentialProvider()
+    provider.deleteRecord = async () => {
+      throw new Error('private-record-detail')
+    }
+    const service = createCopilotLoginService({
+      credentials: provider,
+      isCopilotAccount: () => true,
+      onChange: () => undefined,
+      login: async interaction => {
+        interaction.notify({ type: 'device_code', userCode: 'ABCD-EFGH', verificationUri: 'https://github.com/login/device' })
+        return new Promise(() => undefined)
+      },
+    })
+    await service.begin('copilot')
+    expect(service.state('copilot').status).toBe('waiting')
+    await expect(service.signOut('copilot')).rejects.toThrow()
+    expect(service.state('copilot').status).toBe('error')
+    expect(service.state('copilot').message).not.toContain('private-record-detail')
+    service.dispose()
+  })
 })
