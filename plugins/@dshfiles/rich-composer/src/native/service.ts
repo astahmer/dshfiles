@@ -35,6 +35,7 @@ import type {
 } from './contract/input.ts'
 import type { InputSubmitMode } from './contract/composer-submission.ts'
 import { startInteraction } from '@dshfiles/dshx/tracing/client'
+import { TaskQueue } from '../file-upload-queue.ts'
 
 const encodeBase64 = (bytes: Uint8Array): string => {
   let binary = ''
@@ -175,12 +176,7 @@ export class ConversationController extends Service implements IConversation {
     readonly done: Promise<void>
   }>()
   private readonly pendingFileUploads = new Set<Promise<void>>()
-  private readonly fileUploadQueue: Array<{
-    readonly run: () => Promise<void>
-    readonly settle: () => void
-  }> = []
-  private activeFileUploads = 0
-  private readonly maxConcurrentFileUploads: number
+  private readonly fileUploadQueue: TaskQueue
   private readonly multiHost: ReturnType<typeof createApiClient<typeof multiHostApi.methods>>
   private readonly remoteWorkspaceOwnership = createSnapshotStore<Record<string, RemoteSessionWorkspaceOwnership>>({})
   private readonly remoteWorkspaceRequests = new Map<string, { readonly controller: AbortController; readonly promise: Promise<void> }>()
@@ -200,7 +196,7 @@ export class ConversationController extends Service implements IConversation {
     super(ctx, 'conversation')
     this.input = config.input
     this.blocks = config.blocks
-    this.maxConcurrentFileUploads = config.maxConcurrentFileUploads
+    this.fileUploadQueue = new TaskQueue(config.maxConcurrentFileUploads)
     this.multiHost = createApiClient(ctx, multiHostApi, '@dshfiles/multi-host')
     ctx.effect(() => async () => {
       const operations = [...this.fileUploadOperations.values()]
@@ -209,7 +205,7 @@ export class ConversationController extends Service implements IConversation {
       this.remoteWorkspaceRequests.clear()
       await Promise.allSettled([...this.pendingFileUploads])
       this.fileUploadOperations.clear()
-      this.fileUploadQueue.length = 0
+      this.fileUploadQueue.clear()
       for (const attachment of this.draftAttachments.values()) {
         if (attachment.kind === 'image') revokePreview(attachment.previewUrl)
       }
@@ -418,18 +414,23 @@ export class ConversationController extends Service implements IConversation {
   private beginFileUpload(sessionId: SessionId, attachment: ComposerFileAttachment): void {
     this.fileUploadOperations.get(attachment.id)?.controller.abort()
     const controller = new AbortController()
+    // Picked files wait their turn as `queued`: the store never claims an upload started before a slot opened.
     this.fileUploads.update((draft) => {
-      draft[attachment.id] = { status: 'uploading', loaded: 0 }
+      draft[attachment.id] = { status: 'queued' }
     })
     let settle!: () => void
     const done = new Promise<void>((resolve) => { settle = resolve })
     this.fileUploadOperations.set(attachment.id, { controller, done })
     this.pendingFileUploads.add(done)
     void done.then(() => { this.pendingFileUploads.delete(done) })
-    const run = async (): Promise<void> => {
+    const start = async (): Promise<void> => {
       try {
-        if (controller.signal.aborted
-          || this.fileUploadOperations.get(attachment.id)?.controller !== controller) return
+        if (this.fileUploadOperations.get(attachment.id)?.controller !== controller) return
+        this.fileUploads.update((draft) => {
+          if (!(attachment.id in draft)) return
+          draft[attachment.id] = { status: 'uploading', loaded: 0 }
+        })
+        if (controller.signal.aborted) return
         const onProgress = (progress: { readonly loaded: number; readonly total?: number }): void => {
           if (this.fileUploadOperations.get(attachment.id)?.controller !== controller) return
           this.fileUploads.update((draft) => {
@@ -489,22 +490,7 @@ export class ConversationController extends Service implements IConversation {
         }
       }
     }
-    this.fileUploadQueue.push({ run, settle })
-    this.pumpFileUploads()
-  }
-
-  /** Start queued upload Workers until the configured concurrency is occupied. */
-  private pumpFileUploads(): void {
-    while (this.activeFileUploads < this.maxConcurrentFileUploads) {
-      const task = this.fileUploadQueue.shift()
-      if (task === undefined) return
-      this.activeFileUploads += 1
-      void task.run().finally(() => {
-        this.activeFileUploads -= 1
-        task.settle()
-        this.pumpFileUploads()
-      })
-    }
+    this.fileUploadQueue.push({ start, settle })
   }
 
   /**

@@ -4,7 +4,7 @@ import { XIcon } from '@dshfiles/plugin-ui/icons'
 import { AttachmentRail } from '../AttachmentRail.js'
 import type { AttachmentRailItem } from '../AttachmentRail.js'
 import { DropOverlay } from '../DropOverlay.js'
-import { FileCard } from '../FileCard.js'
+import { FileCard, type FileCardState } from '../FileCard.js'
 import { ImageLightbox, type ImageLightboxLabels } from '@dshfiles/plugin-ui/components/image-lightbox'
 import { AttachmentGalleryLabelsModel } from './labels.js'
 import { installDocumentDropEvents } from './drop-events.js'
@@ -20,6 +20,10 @@ interface ComposerRailItem extends AttachmentRailItem {
 interface ComposerAttachmentsOwnerProps extends ComposerAttachmentsProps {
   galleryLabels: ImageLightboxLabels
 }
+
+/** Any status a fork of the conversation contract adds that is neither a receipt nor a refusal is still a live upload. */
+const fileCardState = (upload: { readonly status: string } | undefined): FileCardState =>
+  upload?.status === 'ready' ? 'ready' : upload?.status === 'error' ? 'error' : 'uploading'
 
 export function ComposerAttachments({
   attachments,
@@ -89,7 +93,7 @@ export function ComposerAttachments({
                   <FileCard
                     name={attachment.file.name || t('file.label')}
                     bytes={attachment.file.size}
-                    state={upload === undefined || upload.status === 'uploading' ? 'uploading' : upload.status === 'ready' ? 'ready' : 'error'}
+                    state={fileCardState(upload)}
                     {...(upload?.status === 'uploading' && upload.total !== undefined && upload.total > 0 ? { progress: upload.loaded / upload.total } : {})}
                     labels={AttachmentGalleryLabelsModel.fileCardLabels(t, attachment.file.name)}
                     onRemove={() => {
