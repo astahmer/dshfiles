@@ -111,6 +111,17 @@ Then('the preview page is listed beside the server and its snapshot holds the pa
   })
 })
 
+Then("Watch shows the agent's page live in the Agent browser tab", async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'preview-mirror-shows-page', async () => {
+    await chip(page).click()
+    await page.getByRole('region', { name: 'Dev servers' }).getByRole('button', { name: 'Watch', exact: true }).click()
+    const frame = page.locator('[data-preview-mirror="p1"] img')
+    await expect(frame).toBeVisible({ timeout: 20_000 })
+    await expect.poll(() => frame.evaluate(image => (image instanceof HTMLImageElement ? image.naturalWidth : 0)), { timeout: 20_000 }).toBe(1280)
+    await expect(page.locator('[data-preview-mirror="p1"]').getByText('http://127.0.0.1:', { exact: false })).toBeVisible()
+  })
+})
+
 Then('stopping the server from the thread header ends its process', async ({ page }: { page: Page }) => {
   const port = requirePort(page)
   await recordAssertion(page, 'preview-stop-ends-server', async () => {

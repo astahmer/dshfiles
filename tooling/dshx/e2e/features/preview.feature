@@ -12,4 +12,5 @@ Feature: Thread dev servers and the agent preview browser
     Then the thread header lists the server's port
     When the fake model opens and snapshots the server page in the preview browser
     Then the preview page is listed beside the server and its snapshot holds the page text
+    And Watch shows the agent's page live in the Agent browser tab
     And stopping the server from the thread header ends its process
