@@ -1148,7 +1148,7 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
           args,
           runtime.io,
           { sessionId, selected: selection },
-          `Selected ${selection.provider}/${selection.model} for Session ${sessionId}; DSH may also persist it as the new default model.`,
+          `Selected ${selection.provider}/${selection.model} for Session ${sessionId}; the default model is unchanged.`,
         )
         return 0
       }
