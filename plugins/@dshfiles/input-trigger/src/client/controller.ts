@@ -8,7 +8,7 @@
  * disposes it with the scope fiber.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { createSnapshotStore, type ObservableSnapshot, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ArbitrateKey, ArbitrateOutcome, CommandClaim, PickOutcome, ReferenceInsert, TokenSpan } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { detectTrigger } from '../core/detect.js'
@@ -24,26 +24,6 @@ import type {
   TriggerChar,
   TriggerGuard,
 } from '../types.js'
-
-/** Token identity a dismissal sticks to: the same trigger, query, and span bounds. */
-interface DismissedHit {
-  readonly trigger: string
-  readonly query: string
-  readonly quoted: boolean
-  readonly start: number
-  readonly end: number
-}
-
-/** Whether a tracked hit is the one the user just dismissed (same token, same query). */
-function dismissedHit(dismissed: DismissedHit, hit: TriggerHit): boolean {
-  return (
-    dismissed.trigger === hit.trigger &&
-    dismissed.query === hit.query &&
-    dismissed.quoted === hit.quoted &&
-    dismissed.start === hit.span.start &&
-    dismissed.end === hit.span.end
-  )
-}
 
 /** Roster access the controller borrows from the root service (registration order preserved). */
 export interface SourceRoster {
@@ -71,10 +51,14 @@ export class InputTriggerController {
   readonly menu: SnapshotStore<MenuState> = createSnapshotStore<MenuState>(MENU_CLOSED)
   /**
    * Name of the source opened through the programmatic launcher, or null for
-   * trigger-detected/closed menus. Composer chrome subscribes to this store
-   * for the launcher's expanded state without owning a second menu model.
+   * trigger-detected/closed menus. A read-only projection of the menu state,
+   * so composer chrome reads the launcher's expanded state without a second
+   * menu model beside it.
    */
-  readonly launcher: SnapshotStore<string | null> = createSnapshotStore<string | null>(null)
+  readonly launcher: ObservableSnapshot<string | null> = {
+    getSnapshot: () => this.menu.getSnapshot().launcher,
+    subscribe: fn => this.menu.subscribe(fn),
+  }
   /**
    * Crumbs published by each header-bearing source for the open menu, keyed
    * by source name. A snapshot store like {@link InputTriggerController.launcher}:
@@ -98,15 +82,6 @@ export class InputTriggerController {
 
   /** The authoritative hit: single truth for span CAS material (menu snapshot never carries it alone). */
   private hit: TriggerHit | null = null
-  /**
-   * Identity of the hit whose menu the user dismissed. A dismissal means "not
-   * this one, not now": the same token with the same query keeps its menu
-   * closed, so restoring the caret after a dismissal cannot reopen it. Typing
-   * (a new query) or moving to another token clears it.
-   */
-  private dismissed: DismissedHit | null = null
-  /** Whether the open menu was reached by a drill pick; cleared with the menu. */
-  private drilled = false
   private fetch: AbortController | null = null
   private disposed = false
   /** Per-source lexicon unsubscribers (sources without the hook never enter). */
@@ -144,8 +119,8 @@ export class InputTriggerController {
   track(draft: string, caret: number, guard: TriggerGuard, draftRev: number): void {
     if (this.disposed) return
     if (draft.length > 0) this.warmOnce()
-    const launched = this.launcher.getSnapshot() !== null
-    this.clearLauncher()
+    const launched = this.menu.getSnapshot().launcher !== null
+    if (launched) this.reduce({ type: 'launcher-cleared' })
     const raw = detectTrigger(draft, caret, guard)
     if (raw === null) {
       // A launcher-opened menu is opened by a gesture, not by a typed token:
@@ -158,7 +133,7 @@ export class InputTriggerController {
       // A frozen-tier track is the submit gesture's own bookkeeping, not a new
       // intent from the user: a command submitted after a dismissal must not
       // re-arm the menu the dismissal closed.
-      if (guard.tier !== 'frozen') this.dismissed = null
+      if (guard.tier !== 'frozen') this.reduce({ type: 'dismissed-cleared' })
       this.stopFetch()
       this.reduce({ type: 'close' })
       return
@@ -166,9 +141,10 @@ export class InputTriggerController {
     const hit: TriggerHit = { ...raw, span: { ...raw.span, draftRev } }
     // A launcher-opened menu is a fresh intent: the dismissal that closed the
     // same token earlier must not silence it.
-    if (launched) this.dismissed = null
-    if (this.dismissed !== null) {
-      if (!dismissedHit(this.dismissed, hit)) this.dismissed = null
+    if (launched) this.reduce({ type: 'dismissed-cleared' })
+    const dismissed = this.menu.getSnapshot().dismissed
+    if (dismissed !== null) {
+      if (!InputTriggerMenuModel.dismissedHit(dismissed, hit)) this.reduce({ type: 'dismissed-cleared' })
       else {
         this.hit = hit
         return
@@ -210,7 +186,7 @@ export class InputTriggerController {
    */
   toggleSource(source: string, hit: TriggerHit): void {
     if (this.disposed) return
-    if (this.launcher.getSnapshot() === source && this.menu.getSnapshot().open) {
+    if (this.menu.getSnapshot().launcher === source && this.menu.getSnapshot().open) {
       this.dismiss()
       return
     }
@@ -221,9 +197,8 @@ export class InputTriggerController {
     }
     this.stopFetch()
     this.hit = hit
-    this.launcher.set(source)
     this.menu.set(InputTriggerMenuModel.seedGroups(this.menu.getSnapshot(), [match]))
-    this.reduce({ type: 'hit', hit })
+    this.reduce({ type: 'hit', hit, launcher: source })
     this.refreshHeaders(hit, [match])
     this.fetchCandidates(hit, [match])
   }
@@ -303,9 +278,8 @@ export class InputTriggerController {
       case 'tabBack': {
         // Escape leaves, and Shift+Tab leaves with it: the exit gesture never
         // settles a candidate, so it cannot consume or rewrite the draft.
-        this.rememberDismissed()
         this.stopFetch()
-        this.reduce({ type: 'close' })
+        this.reduce({ type: 'dismiss' })
         return 'consumed'
       }
       case 'enter': {
@@ -472,15 +446,14 @@ export class InputTriggerController {
   /** External dismiss (e.g. pointer outside the composer area). */
   dismiss(): void {
     if (this.disposed) return
-    this.rememberDismissed()
     this.stopFetch()
-    this.reduce({ type: 'close' })
+    this.reduce({ type: 'dismiss' })
   }
 
   /** Re-fetch the currently open menu without changing its hit or visible rows. */
   refreshOpenMenu(): void {
     if (this.disposed || !this.menu.getSnapshot().open || this.hit === null) return
-    const launched = this.launcher.getSnapshot()
+    const launched = this.menu.getSnapshot().launcher
     const roster = this.deps.roster.sources(this.hit.trigger).filter(source => launched === null || source.name === launched)
     if (roster.length === 0) return
     this.fetchCandidates(this.hit, roster)
@@ -572,7 +545,7 @@ export class InputTriggerController {
           query: hit.query,
           quoted: hit.quoted,
           position: hit.position,
-          drilled: this.drilled,
+          drilled: this.menu.getSnapshot().drilled,
           signal: controller.signal,
         })
         .then(
@@ -619,8 +592,7 @@ export class InputTriggerController {
     // closed for it until the text changes, so a settled command that opens a
     // surface of its own does not bring the menu back when that surface closes
     // and the caret returns.
-    if (action === 'pick') this.rememberDismissed()
-    this.reduce({ type: 'close' })
+    this.reduce({ type: action === 'pick' ? 'dismiss' : 'close' })
     // Claimed before the edit, and after the close above so the reducer's own
     // teardown cannot clear it: the input may apply the descent through a
     // synchronous editor commit that re-enters track(), and the header and
@@ -629,8 +601,8 @@ export class InputTriggerController {
     // no re-entry, which is why withdrawing the claim afterwards still keeps
     // a header off a draft nobody descended into — one that would name a
     // directory while hiding the locations its rows still need.
-    this.drilled = action === 'drill'
-    if (!this.execute(outcome, hit.span)) this.drilled = false
+    this.reduce({ type: 'drilled', value: action === 'drill' })
+    if (!this.execute(outcome, hit.span)) this.reduce({ type: 'drilled', value: false })
   }
 
   /** Re-poll every header-bearing source in the hit roster and publish their crumbs. */
@@ -641,7 +613,7 @@ export class InputTriggerController {
       if (src.header === undefined) continue
       let published: readonly InputTriggerCrumb[] | undefined
       try {
-        published = src.header(projection, { query: hit.query, quoted: hit.quoted, drilled: this.drilled })
+        published = src.header(projection, { query: hit.query, quoted: hit.quoted, drilled: this.menu.getSnapshot().drilled })
       } catch (error) {
         // A faulty source drops silently with a console record (the
         // candidate-fetch failure policy); a header is decoration and must
@@ -660,32 +632,11 @@ export class InputTriggerController {
     this.headers.set(next)
   }
 
-  /** Record the open menu's identity as dismissed, so a bare re-track cannot revive it. */
-  private rememberDismissed(): void {
-    const hit = this.hit
-    this.dismissed =
-      hit === null
-        ? null
-        : {
-            trigger: hit.trigger,
-            query: hit.query,
-            quoted: hit.quoted,
-            start: hit.span.start,
-            end: hit.span.end,
-          }
-  }
-
-  private clearLauncher(): void {
-    if (this.launcher.getSnapshot() !== null) this.launcher.set(null)
-  }
-
   private reduce(ev: MenuEvent): void {
     const cur = this.menu.getSnapshot()
     const next = InputTriggerMenuModel.reduce(cur, ev)
     if (next !== cur) this.menu.set(next)
     if (next.open) return
-    this.clearLauncher()
-    this.drilled = false
     this.setHeaders(new Map())
   }
 }

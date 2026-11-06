@@ -83,7 +83,7 @@ export const inject = ['sessions', 'locale']
  */
 /** Closed menu face used while a Session has no scope: the overlay renders nothing. */
 const CLOSED_MENU_FACE: MenuViewInjected = {
-  menu: createSnapshotStore<MenuState>({ open: false, hit: null, generation: 0, groups: [], highlight: null }),
+  menu: createSnapshotStore<MenuState>({ open: false, hit: null, generation: 0, groups: [], highlight: null, launcher: null, drilled: false, dismissed: null }),
   headers: createSnapshotStore<ReadonlyMap<string, readonly InputTriggerCrumb[]>>(new Map()),
   onPick: () => {},
   onHover: () => {},

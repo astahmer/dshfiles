@@ -14,10 +14,36 @@
  * the groups.
  */
 import type { InputTriggerCandidate, InputTriggerSource } from '../types.js'
-import type { ExactMatch, MenuReduce, MenuState } from './contract.js'
+import type { DismissedHit, ExactMatch, MenuReduce, MenuState, TriggerHit } from './contract.js'
 
 /** Closed rest state with generation 0; store initializer and test seed. */
-export const MENU_CLOSED: MenuState = { open: false, hit: null, generation: 0, groups: [], highlight: null }
+export const MENU_CLOSED: MenuState = {
+  open: false,
+  hit: null,
+  generation: 0,
+  groups: [],
+  highlight: null,
+  launcher: null,
+  drilled: false,
+  dismissed: null,
+}
+
+/** The token identity a dismissal records, so a bare re-track of the same hit keeps its menu closed. */
+const dismissedOf = (hit: TriggerHit): DismissedHit => ({
+  trigger: hit.trigger,
+  query: hit.query,
+  quoted: hit.quoted,
+  start: hit.span.start,
+  end: hit.span.end,
+})
+
+/** Whether a tracked hit is the one the user just dismissed (same token, same query). */
+const dismissedHit = (dismissed: DismissedHit, hit: TriggerHit): boolean =>
+  dismissed.trigger === hit.trigger &&
+  dismissed.query === hit.query &&
+  dismissed.quoted === hit.quoted &&
+  dismissed.start === hit.span.start &&
+  dismissed.end === hit.span.end
 
 /**
  * Replace the group roster with pending groups for `sources`, in order.
@@ -40,10 +66,14 @@ const seedGroups = (state: MenuState, sources: readonly Pick<InputTriggerSource,
   }
 }
 
-/** Close, preserving the generation so in-flight settlements stay droppable. */
+/**
+ * Close, preserving the generation so in-flight settlements stay droppable and
+ * the dismissal so the closed token cannot reopen. The launcher and drill
+ * records belong to the open menu and end with it.
+ */
 const closed = (state: MenuState): MenuState =>
-  state.open || state.hit !== null || state.groups.length > 0 || state.highlight !== null
-    ? { open: false, hit: null, generation: state.generation, groups: [], highlight: null }
+  state.open || state.hit !== null || state.groups.length > 0 || state.highlight !== null || state.launcher !== null || state.drilled
+    ? { open: false, hit: null, generation: state.generation, groups: [], highlight: null, launcher: null, drilled: false, dismissed: state.dismissed }
     : state
 
 /** First item of the first non-empty ready group, or null. */
@@ -95,6 +125,13 @@ const menuReduce: MenuReduce = (state, ev) => {
         open: true,
         hit: ev.hit,
         generation: state.generation + 1,
+        // A launcher-opened menu names its source until the next track clears
+        // it; a typed menu clears it in the same transition.
+        launcher: ev.launcher ?? null,
+        // A drill record outlives the close that preceded it: the synchronous
+        // re-entry the descent causes reads it to ask the drilled sources.
+        drilled: state.drilled,
+        dismissed: state.dismissed,
         // Items and highlight survive the refinement (stale-while-revalidate):
         // the previous query's candidates stay rendered with the highlight
         // parked where it was while the new fetch runs, and the settled
@@ -143,6 +180,14 @@ const menuReduce: MenuReduce = (state, ev) => {
     }
     case 'close':
       return closed(state)
+    case 'dismiss':
+      return closed({ ...state, dismissed: state.hit === null ? null : dismissedOf(state.hit) })
+    case 'dismissed-cleared':
+      return state.dismissed === null ? state : { ...state, dismissed: null }
+    case 'launcher-cleared':
+      return state.launcher === null ? state : { ...state, launcher: null }
+    case 'drilled':
+      return state.drilled === ev.value ? state : { ...state, drilled: ev.value }
   }
 }
 
@@ -165,4 +210,5 @@ export class InputTriggerMenuModel {
   static readonly seedGroups = seedGroups
   static readonly reduce = menuReduce
   static readonly exactMatch = exactMatch
+  static readonly dismissedHit = dismissedHit
 }
