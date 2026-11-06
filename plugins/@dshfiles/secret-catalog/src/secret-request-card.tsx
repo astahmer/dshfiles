@@ -18,18 +18,20 @@ const requestTurns = new JevChatTurnTimeline()
 
 type Answer = { readonly kind: 'stored'; readonly reference: string } | { readonly kind: 'declined' }
 
+/** Asking, typing the value, or told the request is gone; a lost request can never show the form again. */
+type CardPhase = 'asking' | 'editing' | 'lost'
+
 const RequestCard = (props: {
   readonly request: SecretRequestView
   readonly t: SecretCatalogTranslate
   readonly onAnswered: (answer: Answer) => void
 }): JSX.Element => {
   const api = useApi(secretRequestsApi)
-  const [editing, setEditing] = useState(false)
-  const [lost, setLost] = useState(false)
+  const [phase, setPhase] = useState<CardPhase>('asking')
   const decline = useMutation({
     mutationFn: () => api.decline({ requestId: props.request.requestId }),
     onSuccess: () => props.onAnswered({ kind: 'declined' }),
-    onError: () => setLost(true),
+    onError: () => setPhase('lost'),
   })
   const t = props.t
   return (
@@ -58,23 +60,23 @@ const RequestCard = (props: {
         <figcaption className="dshx:text-xs dshx:text-muted-foreground">{t('requestPurpose')}</figcaption>
         <blockquote className="dshx:text-sm dshx:break-words">{props.request.purpose}</blockquote>
       </figure>
-      {lost ? (
+      {phase === 'lost' ? (
         <p className="dshx:text-xs dshx:text-destructive" role="alert">
           {t('requestLost')}
         </p>
       ) : null}
-      {editing ? (
+      {phase === 'editing' ? (
         <SecretSetupForm
           onBind={async reference => {
             try {
               await api.complete({ requestId: props.request.requestId, reference })
             } catch (error) {
-              setLost(true)
+              setPhase('lost')
               throw error
             }
           }}
           onBound={reference => props.onAnswered({ kind: 'stored', reference })}
-          onCancel={() => setEditing(false)}
+          onCancel={() => setPhase('asking')}
           onCreatedReference={() => undefined}
           t={t}
           target={{ cwd: props.request.cwd, suggestedAlias: props.request.alias, environment: props.request.environment, scope: props.request.scope }}
@@ -84,7 +86,7 @@ const RequestCard = (props: {
           <Button disabled={decline.isPending} onClick={() => decline.mutate()} size="sm" type="button" variant="ghost">
             {decline.isPending ? t('requestDeclining') : t('requestDecline')}
           </Button>
-          <Button disabled={decline.isPending} onClick={() => setEditing(true)} size="sm" type="button">
+          <Button disabled={decline.isPending} onClick={() => setPhase('editing')} size="sm" type="button">
             {t('requestEnterValue')}
           </Button>
         </div>
