@@ -540,7 +540,9 @@ export class Recall extends Context.Service<
             sessions.searchContent({ query, limit: 1 }).pipe(
               Effect.andThen(Effect.flatMap(elapsed, ms => Effect.logInfo(`memory: session-content index reconciled in ${ms} ms`))),
               Effect.catchCause(cause =>
-                Effect.flatMap(elapsed, ms => Effect.logWarning(`memory: session-content reconciliation failed after ${ms} ms`, cause)),
+                Effect.flatMap(elapsed, ms =>
+                  Effect.logWarning(`memory: session-content reconciliation failed after ${ms} ms`, cause).pipe(Effect.andThen(Ref.set(warming, false))),
+                ),
               ),
             ),
           )
