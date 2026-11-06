@@ -22,7 +22,7 @@ import type {
   BeginSubmissionInput, PendingSubmissionRetirement, SessionFace, SubmissionHandle,
 } from '../contract/session.ts'
 import type {
-  OpenState, PendingSubmission, PromptError, SessionSnapshot,
+  PendingSubmission, PromptError, SessionSnapshot,
 } from '../contract/snapshot.ts'
 import { MutableSessionEventSource } from '../contract/events.ts'
 import type {
@@ -73,6 +73,95 @@ interface PendingHistory {
   readonly pages: (readonly SessionEventLikeEntry[])[]
 }
 
+type JumpPaging = {
+  readonly kind: 'jump'
+  readonly generation: number
+  readonly targetSeq: SessionSeq
+  readonly pending: PendingHistory
+  readonly promise: Promise<void>
+}
+
+/** Pagination substate of an open window: idle, one older page, or a retargetable jump loop. */
+type HistoryPaging = { readonly kind: 'idle' } | { readonly kind: 'older' } | JumpPaging
+
+/**
+ * Complete history lifecycle. The generation is the stream identity: every state carries the
+ * generation it belongs to, so a stale open, page or failure cannot write into a newer window.
+ */
+type HistoryState =
+  | { readonly kind: 'cold'; readonly generation: number; readonly promise?: Promise<void> }
+  | { readonly kind: 'loading'; readonly generation: number; readonly promise: Promise<void> }
+  | { readonly kind: 'open'; readonly generation: number; readonly paging: HistoryPaging }
+  | { readonly kind: 'error'; readonly generation: number; readonly error: RemoteFailure }
+
+/**
+ * Composer lifecycle: blank → engaging once a send is attempted → engaged when a turn or a
+ * running Agent is observed. `blank` and `attempted` are phase data, so a re-blank guard and
+ * the engaging/awaiting edge read one state instead of four independent booleans.
+ */
+type ComposerPhase =
+  | { readonly kind: 'blank' }
+  | { readonly kind: 'engaging'; readonly blank: boolean; readonly awaitingFirstTurn: boolean }
+  | { readonly kind: 'engaged'; readonly blank: boolean; readonly attempted: boolean }
+
+const attemptPhase = (phase: ComposerPhase): ComposerPhase => {
+  switch (phase.kind) {
+    case 'blank':
+      return { kind: 'engaging', blank: true, awaitingFirstTurn: false }
+    case 'engaging':
+      return phase
+    case 'engaged':
+      return { kind: 'engaged', blank: phase.blank, attempted: true }
+  }
+}
+
+const promptPhase = (phase: ComposerPhase): ComposerPhase => {
+  switch (phase.kind) {
+    case 'blank':
+      return { kind: 'engaging', blank: true, awaitingFirstTurn: true }
+    case 'engaging':
+      return { ...phase, awaitingFirstTurn: phase.awaitingFirstTurn || phase.blank }
+    case 'engaged':
+      return { ...phase, attempted: true }
+  }
+}
+
+const acceptedPhase = (phase: ComposerPhase): ComposerPhase =>
+  phase.kind === 'blank' ? phase : { ...phase, blank: false }
+
+const turnObservedPhase = (phase: ComposerPhase): ComposerPhase =>
+  phase.kind === 'engaging'
+    ? { kind: 'engaged', blank: phase.blank, attempted: true }
+    : phase
+
+const runningObservedPhase = (phase: ComposerPhase): ComposerPhase => {
+  switch (phase.kind) {
+    case 'blank':
+      return { kind: 'engaged', blank: false, attempted: false }
+    case 'engaging':
+      return { kind: 'engaged', blank: false, attempted: true }
+    case 'engaged':
+      return { kind: 'engaged', blank: false, attempted: phase.attempted }
+  }
+}
+
+const blankObservedPhase = (phase: ComposerPhase): ComposerPhase =>
+  phase.kind === 'blank' ? phase : { ...phase, blank: true }
+
+const nonBlankPhase = (phase: ComposerPhase): ComposerPhase =>
+  phase.kind === 'blank'
+    ? { kind: 'engaged', blank: false, attempted: false }
+    : { ...phase, blank: false }
+
+const phaseBlank = (phase: ComposerPhase): boolean =>
+  phase.kind === 'blank' ? true : phase.blank
+
+const phaseAttempted = (phase: ComposerPhase): boolean =>
+  phase.kind === 'engaging' ? true : phase.kind === 'engaged' ? phase.attempted : false
+
+const phaseAwaitingFirstTurn = (phase: ComposerPhase): boolean =>
+  phase.kind === 'engaging' && phase.awaitingFirstTurn
+
 /** Manager-owned observers of a Session object's local state edges. */
 export interface SessionOptions {
   /** Catalog-discovered address selecting non-activating subagent transport. */
@@ -111,33 +200,14 @@ export class Session implements SessionFace {
   // ---- Window and derived state (all private; the snapshot is the only read API) ----
   private baseSeq = SessionLogOffset(0)
   private hasMore = false
-  private openState: OpenState = 'cold'
-  private openError: RemoteFailure | null = null
-  private openPromise: Promise<void> | null = null
-  /** Bumped by stream replacement to invalidate an in-flight doOpen. Stale
-   *  passes drop all writes once the generation moves on. */
-  private openGeneration = 0
-  private loadingOlder = false
-  /** Shared low-water target of the running jump loop; null when no jump is paging. */
-  private jumpTargetSeq: SessionSeq | null = null
-  /** The running jump loop's completion, shared by retargeting callers. */
-  private jumpPromise: Promise<void> | null = null
-  private pendingHistory: PendingHistory | null = null
+  private history: HistoryState = { kind: 'cold', generation: 0 }
   private readonly stopObservingInbox: () => void
   private readonly assistantStream = new ClientAssistantStream()
   private running = false
   private address: SubagentAddress | undefined
   private parentAvailable: boolean | undefined
-  /**
-   * Sticky send marker, private input of the composerPhase derivation: set
-   * synchronously before prompt()'s first await, never reset — the blank →
-   * engaging edge of the phase machine (see ComposerPhase).
-   */
-  private promptAttempted = false
-  /** A first accepted prompt stays in the engaging phase until its turn is observable. */
-  private firstPromptPendingTurn = false
   /** New Session display state; unknown bare sessions begin conservatively blank. */
-  private blankBit = true
+  private composer: ComposerPhase = { kind: 'blank' }
   private removed = false
   private promptError: PromptError | null = null
   private lastAgentError: string | null = null
@@ -252,7 +322,7 @@ export class Session implements SessionFace {
     this.submissionSettlements.set(requestId, { placement, onRetire: input.onRetire, retiring: false })
     // The blank → engaging edge flips here, ahead of prompt(): the composer
     // docks and the echo renders on the click's own frame.
-    this.promptAttempted = true
+    this.composer = attemptPhase(this.composer)
     this.notifier.markDirty()
     return { requestId, abandon: () => { this.retireFailedSubmission(requestId) } }
   }
@@ -276,8 +346,7 @@ export class Session implements SessionFace {
     // Synchronous, before the first await: the blank → engaging edge must be
     // visible on the session area's very first frame when a caller sends
     // ahead of navigation (first-send flow).
-    this.promptAttempted = true
-    if (this.blankBit) this.firstPromptPendingTurn = true
+    this.composer = promptPhase(this.composer)
     this.notifier.markDirty()
     const stableRequestId = requestId ?? randomUUID() as SessionRequestId
     const clientTimeZone = resolvedClientTimeZone()
@@ -337,8 +406,8 @@ export class Session implements SessionFace {
       return result
     }
     // Rejection must leave a first prompt blank and eligible for workspace reuse.
-    if (this.blankBit) {
-      this.blankBit = false
+    if (phaseBlank(this.composer)) {
+      this.composer = acceptedPhase(this.composer)
       this.notifier.markDirty()
     }
     this.options.onEngaged?.(this)
@@ -428,22 +497,32 @@ export class Session implements SessionFace {
 
   /** First open: pull the tail page (idempotent — in-flight/already-open returns the existing promise). */
   open(): Promise<void> {
-    if (this.openState === 'open') return Promise.resolve()
-    if (this.openPromise !== null) return this.openPromise
-    const promise = this.doOpen(this.openGeneration).finally(() => {
-      // Identity-guarded: a superseded open must not null out the promise resync just started.
-      if (this.openPromise === promise) this.openPromise = null
+    const history = this.history
+    if (history.kind === 'open') return Promise.resolve()
+    if (history.kind === 'loading') return history.promise
+    // A cold state carrying a promise is an open still waiting on Host creation: the window is not
+    // loading yet, so the snapshot keeps reporting `cold` until the gate settles.
+    if (history.kind === 'cold' && history.promise !== undefined) return history.promise
+    const generation = history.generation + 1
+    const promise = this.doOpen(generation).finally(() => {
+      // A rejected or abandoned gate leaves no window behind: the next open() retries at this generation.
+      if (this.history.generation !== generation) return
+      if (this.history.kind === 'cold' || this.history.kind === 'loading') {
+        this.history = { kind: 'cold', generation }
+        this.notifier.markDirty()
+      }
     })
-    this.openPromise = promise
+    this.history = { kind: 'cold', generation, promise }
     return promise
   }
 
   /** Prepend one Turn-aligned page: at least 50 messages and two Turn starts, capped at 500 messages. */
   async loadOlder(): Promise<void> {
-    if (this.openState !== 'open' || !this.hasMore || this.loadingOlder) return
+    const history = this.history
+    if (history.kind !== 'open' || history.paging.kind !== 'idle' || !this.hasMore) return
     const events = this.events
     if (events === undefined) return
-    this.loadingOlder = true
+    this.history = { ...history, paging: { kind: 'older' } }
     this.notifier.markDirty()
     try {
       await events.prepend({
@@ -455,24 +534,31 @@ export class Session implements SessionFace {
         console.error('[session-controller] loadOlder failed:', error)
       }
     } finally {
-      this.loadingOlder = false
+      // Only the paging state this call started is cleared; a resync or stream failure replaced the whole state.
+      if (this.history.kind === 'open' && this.history.paging.kind === 'older') {
+        this.history = { ...this.history, paging: { kind: 'idle' } }
+      }
       this.notifier.markDirty()
     }
   }
 
   /** Jump loader: page backwards until the window covers seq (see ISession.loadThrough). */
   loadThrough(seq: SessionSeq): Promise<void> {
-    if (this.openState !== 'open' || !this.hasMore || this.baseSeq <= seq) return Promise.resolve()
-    if (this.jumpPromise !== null) {
+    const history = this.history
+    if (history.kind !== 'open' || !this.hasMore || this.baseSeq <= seq) return Promise.resolve()
+    if (history.paging.kind === 'jump') {
       // Retarget the running loop to the lowest requested seq.
-      this.jumpTargetSeq = SessionSeq(Math.min(this.jumpTargetSeq ?? seq, seq))
-      return this.jumpPromise
+      this.history = {
+        ...history,
+        paging: { ...history.paging, targetSeq: SessionSeq(Math.min(history.paging.targetSeq, seq)) },
+      }
+      return history.paging.promise
     }
     // A plain single-page pull owns the busy flag; the jump does not queue
     // behind it (the caller retries once it settles) and must leave no
-    // target behind — only the loop's finally clears that field, and no
+    // target behind — only the loop's finally clears that state, and no
     // loop starts here.
-    if (this.loadingOlder) return Promise.resolve()
+    if (history.paging.kind === 'older') return Promise.resolve()
     const events = this.events
     if (events === undefined) return Promise.resolve()
     const pending: PendingHistory = {
@@ -480,18 +566,20 @@ export class Session implements SessionFace {
       hasMore: this.hasMore,
       pages: [],
     }
-    this.pendingHistory = pending
-    this.jumpTargetSeq = seq
-    this.loadingOlder = true
+    const completion = Promise.withResolvers<void>()
+    this.history = {
+      ...history,
+      paging: { kind: 'jump', generation: history.generation, targetSeq: seq, pending, promise: completion.promise },
+    }
     this.notifier.markDirty()
-    // Stale-pass guard (the doOpen pattern): a resync mid-loop replaces the
-    // stream generation; this pass then stops instead of paging the new
-    // generation toward its old target.
-    const generation = this.openGeneration
-    this.jumpPromise = (async () => {
+    // Stale-pass guard: a resync, stream failure or replacement window drops this loop's paging
+    // state, so the loop stops instead of paging a newer window toward its old target.
+    void (async () => {
       try {
-        while (pending.hasMore && this.jumpTargetSeq !== null && pending.beforeSeq > this.jumpTargetSeq) {
-          if (generation !== this.openGeneration) return
+        while (true) {
+          const jump = this.jumpPaging()
+          if (jump === null || jump.pending !== pending) return
+          if (!pending.hasMore || pending.beforeSeq <= jump.targetSeq) break
           const before = pending.beforeSeq
           await events.prepend({ beforeSeq: before, ...JUMP_PAGE_OPTIONS })
           // No-progress guard: an empty or dropped page that still claims more
@@ -503,33 +591,34 @@ export class Session implements SessionFace {
           console.error('[session-controller] loadThrough failed:', error)
         }
       } finally {
-        this.jumpTargetSeq = null
-        this.jumpPromise = null
-        this.pendingHistory = null
-        this.loadingOlder = false
-        if (generation === this.openGeneration && pending.pages.length > 0) {
-          this.prependWindow(pending.pages.reverse().flat(), pending.hasMore)
+        const jump = this.jumpPaging()
+        if (jump !== null && jump.pending === pending) {
+          this.history = { kind: 'open', generation: jump.generation, paging: { kind: 'idle' } }
+          if (pending.pages.length > 0) {
+            this.prependWindow(pending.pages.reverse().flat(), pending.hasMore)
+          }
         }
         this.notifier.markDirty()
+        completion.resolve()
       }
     })()
-    return this.jumpPromise
+    return completion.promise
   }
 
   /** Rebuild an opened history source after address replacement.
    *  Invalidates any in-flight open first; projection state belongs to the independently
    *  reconnecting control stream and remains untouched. */
   async resync(): Promise<void> {
-    if (this.openState === 'cold') return // never opened: no window to rebuild (doOpen flips to 'loading' synchronously, so cold implies no in-flight open)
-    this.openGeneration++
+    if (this.history.kind === 'cold') return // never opened: no window to rebuild
+    const generation = this.history.generation + 1
     const events = this.events
     this.events = undefined
-    await events?.dispose()
-    this.openPromise = null
-    this.openState = 'cold'
-    this.openError = null
+    // Invalidate before teardown: a concurrent open() or page must see a closed window, not
+    // the stream that is already being disposed.
+    this.history = { kind: 'cold', generation }
     this.baseSeq = SessionLogOffset(0)
     this.notifier.markDirty()
+    await events?.dispose()
     await this.open()
   }
 
@@ -561,11 +650,9 @@ export class Session implements SessionFace {
    */
   handleRunning(running: boolean): void {
     // Running converts display state without establishing durable turn history.
-    if (running && this.blankBit) {
-      this.blankBit = false
-      this.notifier.markDirty()
-    }
-    if (running) this.firstPromptPendingTurn = false
+    const wasBlank = phaseBlank(this.composer)
+    if (running) this.composer = runningObservedPhase(this.composer)
+    if (running && wasBlank) this.notifier.markDirty()
     if (this.running === running) return
     this.running = running
     this.notifier.markDirty()
@@ -583,7 +670,7 @@ export class Session implements SessionFace {
       && this.address?.mode === address?.mode
     this.address = address
     this.parentAvailable = parentAvailable
-    if (!same && this.openState !== 'cold') void this.resync()
+    if (!same && this.history.kind !== 'cold') void this.resync()
     else this.notifier.markDirty()
   }
 
@@ -607,9 +694,9 @@ export class Session implements SessionFace {
    */
   handleBlank(blank: boolean): void {
     blank = blank && this.projections.values().sessionListMetadata?.blank !== false
-    if (blank === this.blankBit) return
-    if (blank && (this.promptAttempted || this.running)) return
-    this.blankBit = blank
+    if (blank === phaseBlank(this.composer)) return
+    if (blank && (phaseAttempted(this.composer) || this.running)) return
+    this.composer = blank ? blankObservedPhase(this.composer) : nonBlankPhase(this.composer)
     this.notifier.markDirty()
   }
 
@@ -640,7 +727,7 @@ export class Session implements SessionFace {
       if (settlement.admitted !== undefined) this.scheduleObservedRetirement(requestId, settlement.admitted)
       else this.retireFailedSubmission(requestId)
     }
-    this.openGeneration++
+    this.history = { kind: 'cold', generation: this.history.generation + 1 }
     const events = this.events
     this.events = undefined
     await events?.dispose()
@@ -648,7 +735,6 @@ export class Session implements SessionFace {
 
   // ---- Private ----
 
-  /** @param generation - openGeneration at launch; stale passes cannot publish after replacement. */
   /**
    * Wait for a provisional Session's Host creation before addressing it.
    * Failure propagates without issuing an RPC against a nonexistent identity.
@@ -659,15 +745,16 @@ export class Session implements SessionFace {
     await this.options.creation
   }
 
+  /** @param generation - the history generation this open was launched at; stale passes drop every write. */
   private async doOpen(generation: number): Promise<void> {
     await this.options.creation
-    if (generation !== this.openGeneration) return
-    this.openState = 'loading'
-    this.openError = null
+    const pending = this.history
+    if (pending.kind !== 'cold' || pending.generation !== generation || pending.promise === undefined) return
+    this.history = { kind: 'loading', generation, promise: pending.promise }
     this.notifier.markDirty()
     const events = new SessionEventStream(this.remote, this.sessionAddress(), {
       publish: (change) => {
-        if (generation !== this.openGeneration || this.events !== events) return
+        if (!this.ownsStream(events, generation)) return
         this.acceptEventChange(change)
       },
       failed: (error) => {
@@ -677,17 +764,29 @@ export class Session implements SessionFace {
     this.events = events
     try {
       await events.open(OPENING_PAGE_OPTIONS)
-      if (generation !== this.openGeneration || this.events !== events) return
-      this.openState = 'open'
+      if (!this.ownsStream(events, generation)) return
+      this.history = { kind: 'open', generation, paging: { kind: 'idle' } }
     } catch (error) {
-      if (generation !== this.openGeneration || this.events !== events) return
-      if (!isRemoteFailure(error)) throw error
+      if (!this.ownsStream(events, generation)) return
       this.events = undefined
-      this.openState = 'error'
-      this.openError = error
+      if (!isRemoteFailure(error)) throw error
+      this.history = { kind: 'error', generation, error }
     } finally {
-      if (generation === this.openGeneration) this.notifier.markDirty()
+      if (this.history.generation === generation) this.notifier.markDirty()
     }
+  }
+
+  /** Whether the stream constructed at `generation` is still this Session's live window. */
+  private ownsStream(events: SessionEventStream, generation: number): boolean {
+    return this.events === events
+      && this.history.generation === generation
+      && (this.history.kind === 'loading' || this.history.kind === 'open')
+  }
+
+  /** The running jump loop's paging state, or null when no jump owns this window. */
+  private jumpPaging(): JumpPaging | null {
+    const history = this.history
+    return history.kind === 'open' && history.paging.kind === 'jump' ? history.paging : null
   }
 
   /** Apply one contiguous journal update already reconciled by the Remote stream. */
@@ -725,12 +824,13 @@ export class Session implements SessionFace {
     const visible = this.assistantStream.replace(entries, assistantStream)
     this.baseSeq = SessionLogOffset(entries[0]?.event.seq ?? 0)
     this.hasMore = hasMore
-    if (this.pendingHistory !== null) {
-      this.pendingHistory.beforeSeq = this.baseSeq
-      this.pendingHistory.hasMore = hasMore
-      this.pendingHistory.pages.length = 0
+    const jump = this.jumpPaging()
+    if (jump !== null) {
+      jump.pending.beforeSeq = this.baseSeq
+      jump.pending.hasMore = hasMore
+      jump.pending.pages.length = 0
     }
-    if (visible.some(entry => entry.event.type === 'turn/start')) this.firstPromptPendingTurn = false
+    if (visible.some(entry => entry.event.type === 'turn/start')) this.composer = turnObservedPhase(this.composer)
     if (projections !== undefined) this.projections.seed(projections)
     this.eventSource.replace(visible, hasMore)
     // A new follow baseline replaces confirmed optimistic inputs with Host-owned rows.
@@ -783,8 +883,9 @@ export class Session implements SessionFace {
 
   /** Prepend one stream-validated history page. */
   private prependWindow(entries: readonly SessionEventLikeEntry[], hasMore: boolean): void {
-    if (this.pendingHistory !== null) {
-      const pending = this.pendingHistory
+    const jump = this.jumpPaging()
+    if (jump !== null) {
+      const pending = jump.pending
       pending.beforeSeq = entries[0] === undefined ? pending.beforeSeq : SessionLogOffset(entries[0].event.seq)
       pending.hasMore = hasMore
       pending.pages.push(entries)
@@ -798,14 +899,14 @@ export class Session implements SessionFace {
   /** Append one stream-validated live event. */
   private appendLive(entry: SessionLiveEventEntry): boolean {
     const event = entry.event
-    const awaitingFirstTurn = this.firstPromptPendingTurn
-    if (event.type === 'turn/start') this.firstPromptPendingTurn = false
+    const awaitingFirstTurn = phaseAwaitingFirstTurn(this.composer)
+    if (event.type === 'turn/start') this.composer = turnObservedPhase(this.composer)
     this.eventSource.append(entry)
     // After the feed append: the conversation assembly's animation frame is
     // registered by the feed subscribers above, so the echo-retirement frame
     // scheduled here always runs after the durable node became renderable.
     this.observeSubmissionEvent(event)
-    return awaitingFirstTurn !== this.firstPromptPendingTurn
+    return awaitingFirstTurn !== phaseAwaitingFirstTurn(this.composer)
   }
 
   /** Observe durable acceptance even when insertion and claim share one projection notification. */
@@ -922,13 +1023,10 @@ export class Session implements SessionFace {
 
   /** Publish a terminal background failure only while this stream still owns the Session. */
   private failEventStream(events: SessionEventStream, generation: number, error: unknown): void {
-    if (generation !== this.openGeneration || this.events !== events) return
+    if (!this.ownsStream(events, generation)) return
     if (!isRemoteFailure(error)) throw error
-    this.openGeneration++
     this.events = undefined
-    this.openPromise = null
-    this.openState = 'error'
-    this.openError = error
+    this.history = { kind: 'error', generation, error }
     void events.dispose()
     this.notifier.markDirty()
   }
@@ -948,15 +1046,15 @@ export class Session implements SessionFace {
           ...(this.parentAvailable === undefined ? {} : { parentAvailable: this.parentAvailable }),
         },
       removed: this.removed,
-      openState: this.openState,
-      openError: this.openError,
+      openState: this.history.kind,
+      openError: this.history.kind === 'error' ? this.history.error : null,
       hasMore: this.hasMore,
-      loadingOlder: this.loadingOlder,
+      loadingOlder: this.history.kind === 'open' && this.history.paging.kind !== 'idle',
       promptError: this.promptError,
-      blank: this.blankBit,
+      blank: phaseBlank(this.composer),
       lastAgentError: this.lastAgentError,
-      promptAttempted: this.promptAttempted,
-      awaitingFirstTurn: this.firstPromptPendingTurn,
+      promptAttempted: phaseAttempted(this.composer),
+      awaitingFirstTurn: phaseAwaitingFirstTurn(this.composer),
     }
   }
 
