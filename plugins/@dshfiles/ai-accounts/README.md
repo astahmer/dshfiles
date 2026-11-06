@@ -174,7 +174,8 @@ other Mistral subscription path (t3code and Zed run Vibe over ACP instead).
   `x-affinity` set to the conversation for prompt caching.
 - **Models.** The Vibe plan catalog (`/v1/model-catalog?surface=vibe-code`, e.g. `mistral-vibe-cli-latest`), falling back
   to the documented `/v1/models`; only tool-capable chat models are offered, each with the context window and image
-  input Mistral reports for it.
+  input Mistral reports for it. Large 4, GLM 5.3 Flash and DeepSeek V4.1 Flash always offer image input, as their
+  [model pages](https://docs.mistral.ai/models/) document, even when the catalog leaves it out.
 - **Reasoning.** Each model offers the `reasoning_effort` values
   [Mistral accepts](https://docs.mistral.ai/studio/conversations/reasoning): Large 4 low/medium/high; GLM 5.3,
   GLM 5.3 Flash and `zai-glm-latest` low/high/max; DeepSeek V4.1 Flash low/high/max (undocumented, as a live account

@@ -24,3 +24,15 @@ describe('Mistral reasoning efforts', () => {
     expect(provider.describeModel('mistral-vibe-cli-latest')?.thinkingLevelMap).toMatchObject({ off: 'none', high: 'high' })
   })
 })
+
+describe('Mistral image input', () => {
+  it('offers image input on every model Mistral documents as reading images', () => {
+    expect(catalogModel('mistral-large-4')?.input).toEqual(['text', 'image'])
+    for (const id of ['zai-glm-5-3-flash', 'deepseek-v4-1-flash-1017']) expect(provider.describeModel(id)?.input).toEqual(['text', 'image'])
+    // A catalog entry that leaves vision out cannot hide it.
+    for (const id of ['zai-glm-5-3-flash', 'mistral-large-4-0'])
+      expect(provider.describeModel(id, { id, inputModalities: ['text'] })?.input).toEqual(['text', 'image'])
+    // GLM 5.3 itself is a text model.
+    expect(catalogModel('zai-glm-5-3')?.input).toEqual(['text'])
+  })
+})
