@@ -198,6 +198,29 @@ describe('account provider profiles', () => {
     expect(await efforts('deepseek-v4-1-flash-1017')).toEqual(['low', 'high', 'max'])
   })
 
+  it('offers image input on the Mistral account models that read images', async () => {
+    const profile = ProviderProfileModel.buildProfile({
+      upstream: createMistralProvider(),
+      provider: 'mistral-work',
+      displayName: 'Mistral Work',
+      additionalModelIds: ['deepseek-v4-1-flash-1017'],
+      discoveredModels: [{ id: 'zai-glm-5-3-flash', inputModalities: ['text'] }],
+    })
+    const adapter = new EffortPinnedAdapter(
+      {
+        profiles: () => new Map([['mistral-work', profile]]),
+        resolveApiKey: async () => undefined,
+        auth: {
+          credentials: { read: async () => undefined, list: async () => [], modify: async () => undefined, delete: async () => undefined },
+          authContext: { env: async () => undefined, fileExists: async () => false },
+        },
+      },
+      { reasoningDefaults: new Map(), fastMode: disabledFastMode },
+    )
+    for (const model of ['mistral-large-4', 'zai-glm-5-3-flash', 'deepseek-v4-1-flash-1017'])
+      expect((await adapter.resolveModel('mistral-work', model)).inputModalities).toEqual(['text', 'image'])
+  })
+
   it('keeps the context window and image input a provider catalog reports', () => {
     const profile = ProviderProfileModel.buildProfile({
       upstream: createMistralProvider(),

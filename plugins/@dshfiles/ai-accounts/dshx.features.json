@@ -423,7 +423,8 @@
         "Distribution never mixes provider kinds or models with incompatible request capabilities.",
         "Under Priority, a thread with a model fallback chain fails over along that chain (any provider, enabled and healthy routes only) instead of across compatible accounts.",
         "Only manually added IDs absent from the provider catalog get a delete action; provider models remain provider-owned.",
-        "A Mistral model offers only the reasoning efforts Mistral accepts for it, never an Off that would send a rejected `none`."
+        "A Mistral model offers only the reasoning efforts Mistral accepts for it, never an Off that would send a rejected `none`.",
+        "A Mistral model that Mistral documents as reading images offers image input even when its catalog entry leaves vision out."
       ],
       "externalDependencies": [
         {
@@ -502,6 +503,18 @@
           "id": "ai-accounts.mistral-reasoning-efforts",
           "file": "plugins/@dshfiles/ai-accounts/src/provider-profile.test.ts",
           "testName": "offers Mistral account models only the reasoning efforts Mistral accepts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.mistral-image-input",
+          "file": "plugins/@dshfiles/ai-accounts/src/provider-profile.test.ts",
+          "testName": "offers image input on the Mistral account models that read images"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.mistral-hosted-models",
+          "file": "plugins/@dshfiles/ai-accounts/src/mistral-provider.test.ts",
+          "testName": "catalogs DeepSeek V4.1 Flash 1017 as Mistral documents it"
         },
         {
           "kind": "unit-test",

@@ -18,8 +18,19 @@ const EFFORT_GROUPS: readonly (readonly [readonly MistralEffort[], readonly stri
   ],
 ]
 
-const effortsFor = (id: string): readonly MistralEffort[] | undefined =>
-  EFFORT_GROUPS.find(([, ids]) => ids.some(key => id === key || id.startsWith(`${key}-`)))?.[0]
+const covers = (key: string, id: string): boolean => id === key || id.startsWith(`${key}-`)
+
+const effortsFor = (id: string): readonly MistralEffort[] | undefined => EFFORT_GROUPS.find(([, ids]) => ids.some(key => covers(key, id)))?.[0]
+
+/**
+ * Models Mistral documents as reading images, with their dash variants (docs.mistral.ai/models, read 2026-11-06).
+ * pi-ai 1.3.0 gives only Large 4 image input, and GLM 5.3 Flash borrows the text-only GLM 5.3. A catalog entry that
+ * leaves vision out does not hide it.
+ */
+const IMAGE_INPUT_MODELS = ['mistral-large-4', 'zai-glm-5-3-flash', 'deepseek-v4-1-flash']
+const TEXT_AND_IMAGE = ['text', 'image'] as const
+
+const readsImages = (id: string): boolean => IMAGE_INPUT_MODELS.some(key => covers(key, id))
 
 /** pi-ai's per-level wire values. `off` is unsupported, so a request without an effort omits `reasoning_effort`. */
 const mistralThinkingLevelMap = (id: string): ThinkingLevelMap | undefined => {
@@ -53,12 +64,36 @@ export const mistralTemplateId = (id: string, known: readonly string[]): string 
   return known.includes('mistral-medium-latest') ? 'mistral-medium-latest' : known[0]
 }
 
+/**
+ * Mistral-hosted models pi-ai 1.3.0 does not catalog, as their Mistral model pages document them (read 2026-11-06).
+ * Each borrows its template's transport; "1M" and "128k" are written as pi-ai writes them for GLM 5.3.
+ */
+const HOSTED_MODELS = [
+  {
+    id: 'deepseek-v4-1-flash-1017',
+    name: 'DeepSeek V4.1 Flash 1017',
+    contextWindow: 1_048_576,
+    maxTokens: 131_072,
+    cost: { input: 0.3, output: 1.2, cacheRead: 0.007, cacheWrite: 0 },
+  },
+]
+
 /** pi-ai's Mistral provider with the efforts Mistral accepts, able to describe a model the account discovered after boot. */
 export const createMistralProvider = () => {
   const provider = mistralProvider()
-  const models = provider.getModels().map(model => {
+  const catalog = provider.getModels()
+  const catalogIds = catalog.map(model => model.id)
+  const hosted: typeof catalog = HOSTED_MODELS.filter(entry => !catalogIds.includes(entry.id)).flatMap(entry => {
+    const template = catalog.find(model => model.id === mistralTemplateId(entry.id, catalogIds))
+    return template === undefined ? [] : [{ ...template, ...entry }]
+  })
+  const models = [...catalog, ...hosted].map((model): typeof model => {
     const thinkingLevelMap = mistralThinkingLevelMap(model.id)
-    return thinkingLevelMap === undefined ? model : { ...model, reasoning: true, thinkingLevelMap }
+    return {
+      ...model,
+      ...(thinkingLevelMap !== undefined && { reasoning: true, thinkingLevelMap }),
+      ...(readsImages(model.id) && { input: [...TEXT_AND_IMAGE] }),
+    }
   })
   return {
     ...provider,
@@ -79,6 +114,7 @@ export const createMistralProvider = () => {
         ...(thinkingLevelMap !== undefined && { reasoning: true, thinkingLevelMap }),
         ...(contextWindow !== undefined && contextWindow > 0 && { contextWindow }),
         ...(discovered?.inputModalities !== undefined && { input: [...discovered.inputModalities] }),
+        ...(readsImages(id) && { input: [...TEXT_AND_IMAGE] }),
       }
     },
   }
