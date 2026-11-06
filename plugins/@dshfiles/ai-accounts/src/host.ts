@@ -392,7 +392,8 @@ const startAccountsHost = (input: {
           provider: id,
           displayName: route.displayName,
           ...settings.get(id),
-          additionalModelIds: [...(settings.get(id)?.additionalModelIds ?? []), ...(catalogState.discovered(id) ?? [])],
+          additionalModelIds: settings.get(id)?.additionalModelIds ?? [],
+          discoveredModels: catalogState.discovered(id) ?? [],
         }),
       ]),
     )
@@ -612,7 +613,7 @@ const startAccountsHost = (input: {
     const profile = editingProfiles.get(instanceId)
     const models = profile?.piProvider?.getModels() ?? []
     const nativeIds = profile === undefined ? new Set<string>() : ProviderProfileModel.nativeModelIdsForProfile(profile)
-    const discoveredIds = new Set(catalogState.discovered(instanceId) ?? [])
+    const discoveredIds = new Set((catalogState.discovered(instanceId) ?? []).map(discovered => discovered.id))
     return Promise.all(
       models.map(async model => ({
         ...(await catalogAdapter.resolveModel(instanceId, model.id)),
@@ -650,7 +651,7 @@ const startAccountsHost = (input: {
         return entries.map(entry => ({
           id: entry.id,
           ...(entry.contextWindow !== undefined && { contextWindow: entry.contextWindow }),
-          inputModalities: entry.vision ? ['text', 'image'] : ['text'],
+          ...(entry.vision !== undefined && { inputModalities: entry.vision ? ['text', 'image'] : ['text'] }),
         }))
       }
       const modelIds = await fetchOpenCodeGoCatalog(signal)
@@ -731,12 +732,10 @@ const startAccountsHost = (input: {
     if (route === undefined || !route.enabled || !discoversModels(route)) return
     const settingsNs = `ai-accounts.${route.kind}.${instanceId}`
     const discoveryRequest = route.kind === COMMANDCODE_KIND ? { provider: route.kind, baseURL: route.apiBaseUrl } : { provider: route.kind }
-    const modelIds = await catalogState.refresh(instanceId, async signal =>
-      (await llm.discoverModels(settingsNs, discoveryRequest, signal)).map(model => model.id),
-    )
+    const models = await catalogState.refresh(instanceId, signal => llm.discoverModels(settingsNs, discoveryRequest, signal))
     // A route that changed while the fetch ran cannot claim the models it found.
-    if (modelIds === undefined || !sameKeyedRoute(routes.get(instanceId), route)) return
-    catalogState.record({ instanceId, route, modelIds })
+    if (models === undefined || !sameKeyedRoute(routes.get(instanceId), route)) return
+    catalogState.record({ instanceId, route, models })
     await refreshRoutes()
   }
   runtime.refreshModelCatalog = refreshModelCatalog

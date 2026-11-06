@@ -116,7 +116,8 @@ const modelListSchema = Schema.Struct({ data: AiAccountsSchema.list(catalogModel
 export interface MistralCatalogEntry {
   readonly id: string
   readonly contextWindow?: number
-  readonly vision: boolean
+  /** Absent when the catalog does not say, so a template keeps its own input. */
+  readonly vision?: boolean
 }
 
 const catalogEntries = (models: readonly (typeof catalogModelSchema.Type)[]): readonly MistralCatalogEntry[] => {
@@ -131,7 +132,7 @@ const catalogEntries = (models: readonly (typeof catalogModelSchema.Type)[]): re
     entries.push({
       id: model.id,
       ...(context !== undefined && context !== null && context > 0 && { contextWindow: context }),
-      vision: model.capabilities.vision === true,
+      ...(model.capabilities.vision !== undefined && { vision: model.capabilities.vision }),
     })
   }
   return entries

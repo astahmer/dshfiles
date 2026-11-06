@@ -80,10 +80,11 @@ describe('Mistral model catalog', () => {
         object: 'list',
         data: [
           { id: 'devstral-latest', capabilities: chat, max_context_length: null },
+          { id: 'codestral-latest', capabilities: { ...chat, vision: false } },
           { id: 'open-mistral-7b', capabilities: chat, deprecation: '2025-03-30T12:00:00Z' },
         ],
       }),
-    ).toEqual([{ id: 'devstral-latest', vision: false }])
+    ).toEqual([{ id: 'devstral-latest' }, { id: 'codestral-latest', vision: false }])
     expect(() => parseMistralCatalog({ unexpected: true })).toThrow()
   })
 
@@ -94,7 +95,7 @@ describe('Mistral model catalog', () => {
         : Response.json({ data: [{ id: 'mistral-medium-latest', capabilities: chat }] }),
     )
     vi.stubGlobal('fetch', fetchMock)
-    expect(await fetchMistralCatalog('key')).toEqual([{ id: 'mistral-medium-latest', vision: false }])
+    expect(await fetchMistralCatalog('key')).toEqual([{ id: 'mistral-medium-latest' }])
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
       'https://api.mistral.ai/v1/model-catalog?surface=vibe-code',
       'https://api.mistral.ai/v1/models',

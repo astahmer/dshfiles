@@ -198,6 +198,24 @@ describe('account provider profiles', () => {
     expect(await efforts('deepseek-v4-1-flash-1017')).toEqual(['low', 'high', 'max'])
   })
 
+  it('keeps the context window and image input a provider catalog reports', () => {
+    const profile = ProviderProfileModel.buildProfile({
+      upstream: createMistralProvider(),
+      provider: 'mistral-work',
+      displayName: 'Mistral Work',
+      additionalModelIds: [],
+      discoveredModels: [
+        { id: 'deepseek-v4-1-flash-1017', contextWindow: 1_048_576, inputModalities: ['text', 'image'] },
+        { id: 'mistral-vibe-cli-latest', inputModalities: ['text'] },
+        { id: 'mistral-vibe-cli-fast' },
+      ],
+    })
+    const model = (id: string) => modelsFor(profile).find(candidate => candidate.id === id)
+    expect(model('deepseek-v4-1-flash-1017')).toMatchObject({ contextWindow: 1_048_576, input: ['text', 'image'] })
+    expect(model('mistral-vibe-cli-latest')?.input).toEqual(['text'])
+    expect(model('mistral-vibe-cli-fast')?.input).toEqual(['text', 'image'])
+  })
+
   it('retries a content-free settlement instead of ending the turn', () => {
     const profile = ProviderProfileModel.buildProfile({
       upstream: createCommandCodeProvider(),

@@ -1,3 +1,4 @@
+import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-llm'
 import type { ThinkingLevelMap } from '@earendil-works/pi-ai'
 import { mistralProvider } from '@earendil-works/pi-ai/providers/mistral'
 
@@ -62,7 +63,7 @@ export const createMistralProvider = () => {
   return {
     ...provider,
     getModels: () => models,
-    describeModel: (id: string, contextWindow?: number): (typeof models)[number] | undefined => {
+    describeModel: (id: string, discovered?: LlmDiscoveredModel): (typeof models)[number] | undefined => {
       const templateId = mistralTemplateId(
         id,
         models.map(model => model.id),
@@ -70,12 +71,14 @@ export const createMistralProvider = () => {
       const template = models.find(model => model.id === templateId)
       if (template === undefined) return undefined
       const thinkingLevelMap = mistralThinkingLevelMap(id)
+      const contextWindow = discovered?.contextWindow
       return {
         ...template,
         id,
         name: id,
         ...(thinkingLevelMap !== undefined && { reasoning: true, thinkingLevelMap }),
         ...(contextWindow !== undefined && contextWindow > 0 && { contextWindow }),
+        ...(discovered?.inputModalities !== undefined && { input: [...discovered.inputModalities] }),
       }
     },
   }

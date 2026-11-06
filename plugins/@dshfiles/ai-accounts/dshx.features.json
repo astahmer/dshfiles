@@ -502,6 +502,12 @@
           "id": "ai-accounts.mistral-reasoning-efforts",
           "file": "plugins/@dshfiles/ai-accounts/src/provider-profile.test.ts",
           "testName": "offers Mistral account models only the reasoning efforts Mistral accepts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.discovered-model-capabilities",
+          "file": "plugins/@dshfiles/ai-accounts/src/provider-profile.test.ts",
+          "testName": "keeps the context window and image input a provider catalog reports"
         }
       ],
       "telemetry": [

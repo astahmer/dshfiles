@@ -17,8 +17,8 @@ describe('ModelCatalogs', () => {
     Effect.gen(function* () {
       const catalogs = yield* ModelCatalogs.make
       expect(catalogs.discovered('go_a')).toBeUndefined()
-      yield* catalogs.record({ instanceId: 'go_a', route, modelIds: ['a', 'b'] })
-      expect(catalogs.discovered('go_a')).toEqual(['a', 'b'])
+      yield* catalogs.record({ instanceId: 'go_a', route, models: [{ id: 'a' }, { id: 'b', contextWindow: 1_048_576 }] })
+      expect(catalogs.discovered('go_a')).toEqual([{ id: 'a' }, { id: 'b', contextWindow: 1_048_576 }])
       yield* catalogs.forget('go_a')
       expect(catalogs.discovered('go_a')).toBeUndefined()
     }),
@@ -57,11 +57,11 @@ describe('ModelCatalogs', () => {
   it.effect('retains only the catalogs whose route still matches', () =>
     Effect.gen(function* () {
       const catalogs = yield* ModelCatalogs.make
-      yield* catalogs.record({ instanceId: 'go_a', route, modelIds: ['a'] })
-      yield* catalogs.record({ instanceId: 'go_b', route, modelIds: ['b'] })
+      yield* catalogs.record({ instanceId: 'go_a', route, models: [{ id: 'a' }] })
+      yield* catalogs.record({ instanceId: 'go_b', route, models: [{ id: 'b' }] })
       yield* catalogs.retain(({ instanceId }) => instanceId === 'go_b')
       expect(catalogs.discovered('go_a')).toBeUndefined()
-      expect(catalogs.discovered('go_b')).toEqual(['b'])
+      expect(catalogs.discovered('go_b')).toEqual([{ id: 'b' }])
     }),
   )
 })

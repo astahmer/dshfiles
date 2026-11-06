@@ -1,4 +1,4 @@
-import type { GenerateOptions, LlmImageRequestPricing, LlmResolvedModelInfo, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, LlmDiscoveredModel, LlmImageRequestPricing, LlmResolvedModelInfo, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
@@ -94,6 +94,8 @@ export class ProviderProfileModel {
     readonly provider: string
     readonly displayName: string
     readonly additionalModelIds: readonly string[]
+    /** Models the provider catalog reported for this account, with the context window and input it disclosed. */
+    readonly discoveredModels?: readonly LlmDiscoveredModel[]
     /** Sees every HTTP response this account's provider receives, e.g. to read a declared Retry-After. */
     readonly onResponse?: (response: { readonly status: number; readonly headers: Readonly<Record<string, string>> }) => void
   }): ResolvedPiAiProviderProfile => {
@@ -113,10 +115,11 @@ export class ProviderProfileModel {
       const named = { ...model, provider: params.provider, name: AccountsRules.accountModelName(params.provider, model.name) }
       return offersThinkingOff ? offerThinkingOff(named) : named
     })
-    for (const id of new Set(params.additionalModelIds)) {
+    const discovered = new Map((params.discoveredModels ?? []).map(model => [model.id, model]))
+    for (const id of new Set([...params.additionalModelIds, ...discovered.keys()])) {
       if (models.some(model => model.id === id)) continue
       // Command Code knows each model's own efforts and modalities; a neighbour's would be wrong.
-      const described = 'describeModel' in params.upstream ? params.upstream.describeModel(id) : undefined
+      const described = 'describeModel' in params.upstream ? params.upstream.describeModel(id, discovered.get(id)) : undefined
       if (described !== undefined) {
         models.push({ ...described, provider: params.provider, name: AccountsRules.accountModelName(params.provider, id) })
         continue
