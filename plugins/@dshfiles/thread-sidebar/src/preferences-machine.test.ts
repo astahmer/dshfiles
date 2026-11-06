@@ -1,7 +1,9 @@
 import { createActor, waitFor } from '@dshfiles/plugin-ui/machine'
 import { describe, expect, it, vi } from 'vitest'
+import type { LegacyPreferences } from './legacy-preferences-migration.js'
 import { DEFAULT_PREFERENCES, type SidebarPreferences } from './organization.js'
 import { SidebarPreferencesMachine, type SidebarPreferencesMachineClient } from './preferences-machine.js'
+import { DEFAULT_THREAD_VIEW_SETTINGS } from './thread-view-preferences.js'
 
 const deferred = <Value>() => {
   let resolve: (value: Value) => void = () => undefined
@@ -11,10 +13,19 @@ const deferred = <Value>() => {
   return { promise, resolve }
 }
 
+const settledLegacy = (overrides: Partial<LegacyPreferences> = {}): LegacyPreferences => ({
+  threadViews: { settings: DEFAULT_THREAD_VIEW_SETTINGS, doneFiltersMigrated: true, shippedFiltersMigrated: true },
+  collapsedGroups: [],
+  ...overrides,
+})
+
+const customThreadViews = () => ({ ...DEFAULT_THREAD_VIEW_SETTINGS, showFilterControl: false })
+
 const createClient = (
   options: {
     readonly local?: SidebarPreferences | null
     readonly host?: SidebarPreferences | null
+    readonly legacy?: LegacyPreferences
     readonly writeHost?: (patch: Partial<SidebarPreferences>) => Promise<boolean>
   } = {},
 ) => {
@@ -22,6 +33,8 @@ const createClient = (
   const host = options.host === undefined ? DEFAULT_PREFERENCES : options.host
   const hostWrites: Partial<SidebarPreferences>[] = []
   let removeCount = 0
+  let legacy = options.legacy ?? settledLegacy()
+  let legacyClearCount = 0
 
   const client: SidebarPreferencesMachineClient = {
     readLocal: () => local,
@@ -34,9 +47,16 @@ const createClient = (
       removeCount += 1
       local = null
     },
+    legacy: {
+      read: () => legacy,
+      clear: () => {
+        legacyClearCount += 1
+        legacy = settledLegacy()
+      },
+    },
   }
 
-  return { client, hostWrites, getLocal: () => local, getRemoveCount: () => removeCount }
+  return { client, hostWrites, getLocal: () => local, getRemoveCount: () => removeCount, getLegacyClearCount: () => legacyClearCount }
 }
 
 const startMachine = (client: SidebarPreferencesMachineClient) => createActor(SidebarPreferencesMachine.machine, { input: { client } }).start()
@@ -133,6 +153,72 @@ describe('SidebarPreferencesMachine', () => {
     expect(harness.hostWrites).toEqual([])
     expect(harness.getLocal()).toBeNull()
     expect(harness.getRemoveCount()).toBe(1)
+  })
+
+  it('keeps the browser copies until the Host write that holds them settles, then clears them', async () => {
+    const write = deferred<boolean>()
+    const harness = createClient({
+      legacy: settledLegacy({ threadViews: { settings: customThreadViews(), doneFiltersMigrated: false, shippedFiltersMigrated: false } }),
+      writeHost: () => write.promise,
+    })
+    const actor = startMachine(harness.client)
+
+    actor.send({ type: 'migration.requested' })
+    await vi.waitFor(() => expect(harness.hostWrites).toHaveLength(1))
+    expect(harness.hostWrites[0]).toEqual({ threadViews: customThreadViews() })
+    expect(harness.getLegacyClearCount()).toBe(0)
+
+    write.resolve(true)
+    await waitFor(actor, snapshot => snapshot.context.migrationStatus === 'done')
+    expect(harness.getLegacyClearCount()).toBe(1)
+  })
+
+  it('keeps the browser copies when the Host refuses their value', async () => {
+    const harness = createClient({
+      legacy: settledLegacy({ collapsedGroups: ['project:alpha'] }),
+      writeHost: async () => false,
+    })
+    const actor = startMachine(harness.client)
+
+    actor.send({ type: 'migration.requested' })
+    await waitFor(actor, snapshot => snapshot.context.migrationStatus === 'failed')
+    expect(harness.hostWrites).toEqual([{ collapsedGroups: ['project:alpha'] }])
+    expect(harness.getLegacyClearCount()).toBe(0)
+  })
+
+  it('writes the browser preferences before the legacy copies in one pass', async () => {
+    const migratedMode: SidebarPreferences['headerMode'] = DEFAULT_PREFERENCES.headerMode === 'compact' ? 'expanded' : 'compact'
+    const harness = createClient({
+      local: { ...DEFAULT_PREFERENCES, headerMode: migratedMode },
+      legacy: settledLegacy({ collapsedGroups: ['project:alpha'] }),
+    })
+    const actor = startMachine(harness.client)
+
+    actor.send({ type: 'migration.requested' })
+    await waitFor(actor, snapshot => snapshot.context.migrationStatus === 'done')
+    expect(harness.hostWrites).toEqual([{ headerMode: migratedMode }, { collapsedGroups: ['project:alpha'] }])
+    expect(harness.getLegacyClearCount()).toBe(1)
+  })
+
+  it('drops browser copies that need no write without writing anything', async () => {
+    const harness = createClient()
+    const actor = startMachine(harness.client)
+
+    actor.send({ type: 'migration.requested' })
+    await waitFor(actor, snapshot => snapshot.context.migrationStatus === 'done')
+    expect(harness.hostWrites).toEqual([])
+    expect(harness.getLegacyClearCount()).toBe(1)
+  })
+
+  it('keeps the browser copies when the Host is unavailable', async () => {
+    const harness = createClient({ host: null, legacy: settledLegacy({ collapsedGroups: ['project:alpha'] }) })
+    const actor = startMachine(harness.client)
+
+    actor.send({ type: 'migration.requested' })
+    await waitFor(actor, snapshot => snapshot.matches('idle') && snapshot.context.migrationOperationId === null)
+    expect(actor.getSnapshot().context.migrationStatus).toBe('idle')
+    expect(harness.hostWrites).toEqual([])
+    expect(harness.getLegacyClearCount()).toBe(0)
   })
 
   it('records synchronous local storage results as warning state', () => {

@@ -12,7 +12,7 @@ import type { SessionDraft, SessionDrafts } from '@dshfiles/session-controller/d
 import { isListedUnsentThread, presentUnsentThread } from './unsent-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
 import { DEFAULT_THREAD_BOARD_VIEW, storedThreadBoardView, ThreadBoardViewModel } from './thread-board-view.js'
-import { storedCollapsedGroups, toggleCollapsedGroup } from './collapsed-groups.js'
+import { toggleCollapsedGroup } from './collapsed-groups.js'
 import { initialThreadRoute, pendingThreadRoute, reduceThreadRoute, threadUrlRoute } from './thread-route.js'
 import { useNearViewport } from './use-near-viewport.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
@@ -188,14 +188,7 @@ import {
   type ThreadSourceFilter,
   type ThreadViewPreferences,
 } from './thread-view.js'
-import {
-  doneViewFilterMigration,
-  shippedViewFiltersMigration,
-  ThreadViewPreferencesModel,
-  threadViewPreferences,
-  type ThreadViewSettings,
-  WORKING_VIEW_ID,
-} from './thread-view-preferences.js'
+import { ThreadViewPreferencesModel, type ThreadViewSettings, WORKING_VIEW_ID } from './thread-view-preferences.js'
 import { SHOW_WORKING_THREADS_EVENT } from './working-status-item.js'
 import {
   ThreadViewManager,
@@ -1511,7 +1504,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   const sessionStatus = props.useSessionStatus(state => state)
   const workspaceState = props.useWorkspaces(state => state)
-  const { preferences, updatePreferences, storageWarning, hostBacked, threadViewWritePending, setSelectedThreadId, threadTitle } = useSidebarState()
+  const { preferences, updatePreferences, storageWarning, setSelectedThreadId, threadTitle } = useSidebarState()
   const attention = useThreadAttention({ enabled: sessionState.phase === 'ready' })
   const agentHandleOf = useRowAgentHandles()
   const recoveryApi = useApi(threadSidebarRecoveryApi)
@@ -2238,53 +2231,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     },
     [updatePreferences],
   )
-
-  const viewsMigrationStarted = useRef(false)
-  const doneViewMigrationTarget = useRef<ThreadViewSettings | null>(null)
-  const removeLegacyViewsAfterMigration = useRef(false)
-  useEffect(() => {
-    if (!isPrimarySurface || !hostBacked || viewsMigrationStarted.current || threadViewWritePending) return
-    viewsMigrationStarted.current = true
-    const legacy = threadViewPreferences.get()
-    const adoptLegacy =
-      !ThreadViewPreferencesModel.isDefaultThreadViewSettings(legacy) && ThreadViewPreferencesModel.isDefaultThreadViewSettings(preferences.threadViews)
-    const source = adoptLegacy ? legacy : preferences.threadViews
-    const shouldMigrateDone = adoptLegacy || !doneViewFilterMigration.get() || ThreadViewPreferencesModel.isDefaultThreadViewSettings(source)
-    const shouldUpgradeShippedFilters = adoptLegacy || !shippedViewFiltersMigration.get() || ThreadViewPreferencesModel.isDefaultThreadViewSettings(source)
-    const doneMigrated = shouldMigrateDone ? ThreadViewPreferencesModel.migrateDoneViewSettings(source) : source
-    const migrated = shouldUpgradeShippedFilters ? ThreadViewPreferencesModel.upgradeShippedViewFilters(doneMigrated) : doneMigrated
-    const needsWrite = adoptLegacy || migrated !== source
-    if (!needsWrite) {
-      threadViewPreferences.remove()
-      doneViewFilterMigration.set(true)
-      shippedViewFiltersMigration.set(true)
-      return
-    }
-    doneViewMigrationTarget.current = migrated
-    removeLegacyViewsAfterMigration.current = true
-    changePreferences({ threadViews: migrated })
-  }, [changePreferences, hostBacked, isPrimarySurface, preferences.threadViews, threadViewWritePending])
-  useEffect(() => {
-    const target = doneViewMigrationTarget.current
-    if (!isPrimarySurface || !hostBacked || target === null || threadViewWritePending || storageWarning) return
-    if (JSON.stringify(preferences.threadViews) !== JSON.stringify(target)) return
-    doneViewMigrationTarget.current = null
-    doneViewFilterMigration.set(true)
-    shippedViewFiltersMigration.set(true)
-    if (removeLegacyViewsAfterMigration.current) threadViewPreferences.remove()
-    removeLegacyViewsAfterMigration.current = false
-  }, [hostBacked, isPrimarySurface, preferences.threadViews, storageWarning, threadViewWritePending])
-
-  // Group collapse moved from browser storage to Host settings: hand the browser copy over once, then drop it.
-  const groupsMigrationStarted = useRef(false)
-  useEffect(() => {
-    if (!isPrimarySurface || !hostBacked || groupsMigrationStarted.current) return
-    groupsMigrationStarted.current = true
-    const legacy = storedCollapsedGroups.get()
-    storedCollapsedGroups.remove()
-    if (legacy.length === 0 || preferences.collapsedGroups.length > 0) return
-    changePreferences({ collapsedGroups: [...legacy] })
-  }, [changePreferences, hostBacked, isPrimarySurface, preferences.collapsedGroups])
 
   const attentionDisplayRow = (key: AttentionDisplayPreferenceKey, label: ThreadAttentionLabel, colorKey: AttentionColorKey): JSX.Element => {
     const mode = preferences[key]

@@ -5,10 +5,12 @@ import type { PaletteMode } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
+import { storedCollapsedGroups } from './collapsed-groups.js'
 import { DEFAULT_PREFERENCES, type SidebarPreferences } from './organization.js'
 import { SidebarPreferencesModel, storedPreferences } from './preferences.js'
 import { SidebarPreferencesMachine, type SidebarPreferencesMachineClient } from './preferences-machine.js'
 import { threadSidebarSettings } from './settings.js'
+import { doneViewFilterMigration, shippedViewFiltersMigration, threadViewPreferences } from './thread-view-preferences.js'
 
 interface PreferencesSnapshot {
   readonly preferences: SidebarPreferences
@@ -63,6 +65,22 @@ export const usePreferences = (): PreferencesSnapshot & {
         return current.setMany(patch)
       },
       removeLocal: () => storedPreferences.remove(),
+      legacy: {
+        read: () => ({
+          threadViews: {
+            settings: threadViewPreferences.get(),
+            doneFiltersMigrated: doneViewFilterMigration.get(),
+            shippedFiltersMigrated: shippedViewFiltersMigration.get(),
+          },
+          collapsedGroups: storedCollapsedGroups.get(),
+        }),
+        clear: () => {
+          threadViewPreferences.remove()
+          doneViewFilterMigration.set(true)
+          shippedViewFiltersMigration.set(true)
+          storedCollapsedGroups.remove()
+        },
+      },
     }),
     [settingsRef],
   )
@@ -81,10 +99,12 @@ export const usePreferences = (): PreferencesSnapshot & {
     [hostBacked, send],
   )
 
+  const threadViewWritePending = snapshot.context.pendingOperationIds.threadViews !== undefined
+  // One-shot: the machine queues it once and latches its outcome, so a later render never replays the hand-over.
   useEffect(() => {
-    if (!hostBacked || hostPreferences === null || storedPreferences.get() === null) return
+    if (!hostBacked || threadViewWritePending) return
     send({ type: 'migration.requested' })
-  }, [hostBacked, hostPreferences, send])
+  }, [hostBacked, threadViewWritePending, send])
 
   const preferences = useMemo(
     () => (hostBacked ? { ...hostPreferences, ...snapshot.context.pending } : localPreferences),
@@ -94,7 +114,7 @@ export const usePreferences = (): PreferencesSnapshot & {
     preferences,
     storageWarning: hostBacked ? snapshot.context.hostWriteFailed : snapshot.context.localWriteFailed,
     hostBacked,
-    threadViewWritePending: snapshot.context.pendingOperationIds.threadViews !== undefined,
+    threadViewWritePending,
     updatePreferences,
   }
 }

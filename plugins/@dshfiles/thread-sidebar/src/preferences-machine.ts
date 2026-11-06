@@ -1,4 +1,6 @@
 import { assign, fromCallback, fromPromise, setup, spawnChild } from '@dshfiles/plugin-ui/machine'
+import type { LegacyPreferences } from './legacy-preferences-migration.js'
+import { planLegacyPreferencesMigration } from './legacy-preferences-migration.js'
 import type { SidebarPreferences } from './organization.js'
 import { SidebarPreferencesModel } from './preferences.js'
 
@@ -7,6 +9,11 @@ export interface SidebarPreferencesMachineClient {
   readonly readHost: () => SidebarPreferences | null
   readonly writeHost: (patch: Partial<SidebarPreferences>) => Promise<boolean>
   readonly removeLocal: () => void
+  /** Browser copies the Host preferences replaced; the machine drops them only once their write settled. */
+  readonly legacy: {
+    readonly read: () => LegacyPreferences
+    readonly clear: () => void
+  }
 }
 
 type MigrationOutcome = 'migrated' | 'empty' | 'unavailable' | 'failed'
@@ -67,19 +74,31 @@ const readMigrationOverlay = (client: SidebarPreferencesMachineClient): Partial<
 }
 
 const migrate = async (client: SidebarPreferencesMachineClient): Promise<MigrationOutcome> => {
-  const local = client.readLocal()
-  if (local === null) return 'empty'
   const host = client.readHost()
   if (host === null) return 'unavailable'
 
-  const patch = SidebarPreferencesModel.preferencesToMigrate(local, host)
-  if (Object.keys(patch).length === 0) {
-    client.removeLocal()
-    return 'empty'
+  const local = client.readLocal()
+  let settledHost = host
+  let outcome: MigrationOutcome = 'empty'
+  if (local !== null) {
+    const patch = SidebarPreferencesModel.preferencesToMigrate(local, host)
+    if (Object.keys(patch).length === 0) {
+      client.removeLocal()
+    } else {
+      if (!(await client.writeHost(patch))) return 'failed'
+      settledHost = { ...host, ...patch }
+      client.removeLocal()
+      outcome = 'migrated'
+    }
   }
-  if (!(await client.writeHost(patch))) return 'failed'
-  client.removeLocal()
-  return 'migrated'
+
+  const legacyPatch = planLegacyPreferencesMigration({ legacy: client.legacy.read(), host: settledHost })
+  if (Object.keys(legacyPatch).length > 0) {
+    if (!(await client.writeHost(legacyPatch))) return 'failed'
+    outcome = 'migrated'
+  }
+  client.legacy.clear()
+  return outcome
 }
 
 /**
