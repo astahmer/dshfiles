@@ -2,10 +2,11 @@ import type { JSX } from 'react'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { BacklogActivityReferences } from './activity-thread-reference.js'
+import { BacklogReferenceText } from './backlog-inline-reference.js'
 
 /**
- * One activity line with its thread reference as a link. An anchor, not a button: a button lays out as an
- * inline-block box even under `display: inline`, so a long title wrapped inside its own centred block.
+ * One activity line with its thread reference and any `b:<ref>` as links. An anchor, not a button: a button lays out as
+ * an inline-block box even under `display: inline`, so a long title wrapped inside its own centred block.
  */
 export const ActivityDescription = (props: {
   readonly description: string
@@ -15,16 +16,16 @@ export const ActivityDescription = (props: {
 }): JSX.Element => {
   const description = props.description
   const threadId = props.threadId
-  if (threadId === undefined) return <>{description}</>
+  if (threadId === undefined) return <BacklogReferenceText text={description} />
   const reference = BacklogActivityReferences.threadReferenceRange(description, threadId)
-  if (reference === undefined) return <>{description}</>
+  if (reference === undefined) return <BacklogReferenceText text={description} />
   const label = props.threadLabel(threadId)
   const text = reference.text.startsWith('thread:')
     ? `the thread “${label}”`
     : `${reference.text.toLowerCase().startsWith('a ') ? 'a' : 'the'} thread “${label}”`
   return (
     <>
-      {description.slice(0, reference.start)}
+      <BacklogReferenceText text={description.slice(0, reference.start)} />
       <Tooltip>
         <TooltipTrigger asChild>
           <a
@@ -40,7 +41,7 @@ export const ActivityDescription = (props: {
         </TooltipTrigger>
         <TooltipContent>{`Open thread ${label}`}</TooltipContent>
       </Tooltip>
-      {description.slice(reference.end)}
+      <BacklogReferenceText text={description.slice(reference.end)} />
     </>
   )
 }

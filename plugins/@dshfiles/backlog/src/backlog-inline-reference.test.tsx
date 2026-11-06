@@ -5,7 +5,10 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { backlogInlineReference } from './backlog-inline-reference.js'
+import { activityPhrase } from './activity-phrase.js'
+import { ActivityDescription } from './activity-description.js'
+import { backlogInlineReference, BacklogReferenceText } from './backlog-inline-reference.js'
+import { BacklogTriage } from './triage.js'
 import { EntityPreview } from '@dshfiles/input-trigger/entity-registry'
 
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -43,12 +46,12 @@ const renderRun = (text: string, surface: InlineReferenceContext['surface'] = 'p
 const links = (container: Element): readonly string[] =>
   [...container.querySelectorAll('[data-dshfiles-backlog-reference]')].map(element => element.textContent ?? '')
 
-const previews = (): { readonly requests: { readonly id: number; readonly anchorId: number }[]; readonly stop: () => void } => {
-  const requests: { readonly id: number; readonly anchorId: number }[] = []
+const previews = (): { readonly requests: { readonly id: string; readonly anchorId: number }[]; readonly stop: () => void } => {
+  const requests: { readonly id: string; readonly anchorId: number }[] = []
   const onRequest = (event: Event): void => {
     if (!(event instanceof CustomEvent)) return
     const request = EntityPreview.decodeRequest(event.detail)
-    if (request !== null && request.kind === 'backlog') requests.push({ id: Number(request.id), anchorId: request.anchorId })
+    if (request !== null && request.kind === 'backlog') requests.push({ id: String(request.id), anchorId: request.anchorId })
   }
   window.addEventListener(EntityPreview.event, onRequest)
   return { requests, stop: () => window.removeEventListener(EntityPreview.event, onRequest) }
@@ -76,7 +79,7 @@ describe('backlog inline references', () => {
     if (link === null) throw new Error('no link')
     fireEvent.click(link, { button: 0 })
     fireEvent.keyDown(link, { key: 'Enter' })
-    expect(requests.map(request => request.id)).toEqual([12, 12])
+    expect(requests.map(request => request.id)).toEqual(['12', '12'])
     // The request carries the anchor the card re-measures when the page scrolls.
     expect(container.querySelector(`[data-dshfiles-entity-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(link)
     stop()
@@ -89,6 +92,43 @@ describe('backlog inline references', () => {
     const link = container.querySelector('[data-dshfiles-backlog-reference]')
     if (link !== null) fireEvent.click(link, { button: 0 })
     expect(requests).toEqual([])
+    stop()
+  })
+})
+
+describe('duplicate references in an item peek', () => {
+  it('opens the duplicate item from a triage activity line', () => {
+    const { requests, stop } = previews()
+    const description = activityPhrase({ kind: 'triaged', actor: 'system', detail: 'suggested kind bug, duplicate of b:k3f9' }, 'none')
+    const { container } = render(
+      <p>
+        <ActivityDescription description={description} threadId={undefined} threadLabel={() => ''} openThread={() => undefined} />
+      </p>,
+    )
+    expect(container.textContent).toBe('triage suggested kind bug, duplicate of b:k3f9')
+    expect(links(container)).toEqual(['b:k3f9'])
+    const link = container.querySelector('[data-dshfiles-backlog-reference="k3f9"]')
+    if (link === null) throw new Error('no link')
+    fireEvent.click(link, { button: 0 })
+    fireEvent.keyDown(link, { key: 'Enter' })
+    expect(requests.map(request => request.id)).toEqual(['k3f9', 'k3f9'])
+    expect(container.querySelector(`[data-dshfiles-entity-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(link)
+    stop()
+  })
+
+  it('opens the duplicate item from a triage suggestion summary', () => {
+    const { requests, stop } = previews()
+    const { container } = render(
+      <p>
+        <BacklogReferenceText text={BacklogTriage.describe({ kind: 'bug', duplicateOf: 7 }, () => 'k3f9')} />
+      </p>,
+    )
+    expect(container.textContent).toBe('kind bug, duplicate of b:k3f9')
+    expect(links(container)).toEqual(['b:k3f9'])
+    const link = container.querySelector('[data-dshfiles-backlog-reference="k3f9"]')
+    if (link === null) throw new Error('no link')
+    fireEvent.click(link, { button: 0 })
+    expect(requests.map(request => request.id)).toEqual(['k3f9'])
     stop()
   })
 })
