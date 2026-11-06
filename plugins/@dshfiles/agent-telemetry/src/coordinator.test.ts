@@ -346,6 +346,36 @@ describe('model calls with a purpose and outside a step', () => {
 })
 
 describe('wait spans', () => {
+  it('closes an approval and a compaction left open when their turn ends', () => {
+    using recorder = recordSpans()
+    const observer = coordinator()
+    const observed = session('s-8')
+    emit(observer, observed, 'turn/start', { turn: 1 })
+    emit(observer, observed, 'step/start', { turn: 1, step: 1 })
+    emit(observer, observed, 'tool/call', { turn: 1, step: 1, callId: 'rm', name: 'bash', arguments: '{}' })
+    emit(observer, observed, 'approval/asked', { id: 'a1', toolName: 'bash', callId: 'rm' })
+    emit(observer, observed, 'compaction/start', { compactionId: 'k1', turn: 1 })
+    emit(observer, observed, 'compaction/start', { compactionId: 'k2', turn: null })
+    emit(observer, observed, 'turn/end', { turn: 1, reason: { kind: 'completed' } })
+
+    expect(recorder.named('approval wait')).toHaveLength(1)
+    expect(recorder.span('approval wait').status).toMatchObject({ code: 'error', message: 'TURN_ENDED_BEFORE_DECISION' })
+    expect(recorder.named('compaction')).toHaveLength(1)
+    // A session-level compaction is not this turn's to close.
+    emit(observer, observed, 'compaction/end', { compactionId: 'k2' })
+    expect(recorder.named('compaction')).toHaveLength(2)
+  })
+
+  it("closes a session's open background job when the session is disposed", () => {
+    using recorder = recordSpans()
+    const observer = coordinator()
+    const observed = session('s-9')
+    emit(observer, observed, 'job/registered', { jobId: 'j9', owner: 's-9', kind: 'bash', startedAt: 1 })
+    observer.onDisposed(observed)
+
+    expect(recorder.named('job bash')).toHaveLength(1)
+  })
+
   it('records approval, model retry and background job waits under the right parent', () => {
     using recorder = recordSpans()
     const observer = coordinator()

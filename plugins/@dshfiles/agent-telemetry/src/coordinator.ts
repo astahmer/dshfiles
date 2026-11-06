@@ -127,9 +127,15 @@ interface SessionState {
   readonly session: ObservedSession
   readonly creationParent: SpanContext | undefined
   turn: TurnState | undefined
-  readonly approvals: Map<string, Span>
+  readonly approvals: Map<string, OpenWait>
   readonly retries: Map<string, Span>
-  readonly compactions: Map<string, Span>
+  readonly compactions: Map<string, OpenWait>
+}
+
+/** A wait span that belongs to one turn (or to the session when `turn` is null), so a turn end can close what it left open. */
+interface OpenWait {
+  readonly span: Span
+  readonly turn: number | null
 }
 
 const DELEGATION_TOOLS = new Set(['subagent', 'subagent_fork', 'workflow', 'send_message'])
@@ -230,7 +236,7 @@ const turnFailure = (reason: (typeof turnEndSchema.Type)['reason']): string | un
  */
 export const createCoordinator = (options: CoordinatorOptions) => {
   const sessions = new Map<string, SessionState>()
-  const jobs = new Map<string, Span>()
+  const jobs = new Map<string, { readonly span: Span; readonly sessionId: string }>()
 
   const contained = <T>(label: string, fallback: T, run: () => T): T => {
     try {
@@ -409,6 +415,18 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     const turn = state.turn
     if (turn === undefined) return
     if (turn.step !== undefined) closeStep(state, turn, 'interrupted')
+    for (const [id, wait] of state.approvals) {
+      if (wait.turn !== turn.turn) continue
+      state.approvals.delete(id)
+      fail(wait.span, 'TURN_ENDED_BEFORE_DECISION')
+      wait.span.end()
+    }
+    for (const [id, wait] of state.compactions) {
+      if (wait.turn !== turn.turn) continue
+      state.compactions.delete(id)
+      fail(wait.span, 'TURN_ENDED_BEFORE_COMPACTION_END')
+      wait.span.end()
+    }
     turn.agent.setAttributes({
       ...GenAi.totalsAttributes(turn.usage),
       [CostAttributes.usd]: turn.costUsd,
@@ -453,9 +471,9 @@ export const createCoordinator = (options: CoordinatorOptions) => {
 
   const startApproval = (state: SessionState, data: typeof approvalAskedSchema.Type): void => {
     const turn = state.turn?.turn ?? 0
-    state.approvals.set(
-      data.id,
-      startSpan('approval wait', {
+    state.approvals.set(data.id, {
+      turn,
+      span: startSpan('approval wait', {
         parent: waitParent(state, data.callId),
         attributes: {
           'dsh.session.id': state.session.id,
@@ -465,15 +483,15 @@ export const createCoordinator = (options: CoordinatorOptions) => {
           'gen_ai.tool.call.id': data.callId,
         },
       }),
-    )
+    })
   }
 
   const endApproval = (state: SessionState, data: typeof approvalDecidedSchema.Type): void => {
-    const span = state.approvals.get(data.id)
-    if (span === undefined) return
+    const wait = state.approvals.get(data.id)
+    if (wait === undefined) return
     state.approvals.delete(data.id)
-    span.setAttribute('dsh.approval.outcome', redactIdentifier(data.outcome))
-    span.end()
+    wait.span.setAttribute('dsh.approval.outcome', redactIdentifier(data.outcome))
+    wait.span.end()
   }
 
   const startRetry = (state: SessionState, data: typeof llmRetrySchema.Type): void => {
@@ -505,48 +523,48 @@ export const createCoordinator = (options: CoordinatorOptions) => {
   const startCompaction = (state: SessionState, data: typeof compactionStartSchema.Type): void => {
     const turn = state.turn
     const parent = turn !== undefined && (data.turn === null || data.turn === turn.turn) ? (turn.step?.span ?? turn.agent) : undefined
-    state.compactions.set(
-      data.compactionId,
-      startSpan('compaction', {
+    state.compactions.set(data.compactionId, {
+      turn: data.turn,
+      span: startSpan('compaction', {
         parent: parent === undefined ? (activeSpanContext() ?? null) : contextOf(parent),
         attributes: { 'dsh.session.id': state.session.id, 'dsh.turn': data.turn ?? undefined, 'dsh.compaction.id': data.compactionId },
       }),
-    )
+    })
   }
 
   const endCompaction = (state: SessionState, data: typeof compactionEndSchema.Type): void => {
-    const span = state.compactions.get(data.compactionId)
-    if (span === undefined) return
+    const wait = state.compactions.get(data.compactionId)
+    if (wait === undefined) return
     state.compactions.delete(data.compactionId)
-    if (data.error === undefined) span.setStatus('ok')
-    else fail(span, 'COMPACTION_FAILED')
-    span.end()
+    if (data.error === undefined) wait.span.setStatus('ok')
+    else fail(wait.span, 'COMPACTION_FAILED')
+    wait.span.end()
   }
 
   const startJob = (state: SessionState, data: typeof jobRegisteredSchema.Type): void => {
     const kind = redactIdentifier(data.kind) ?? 'job'
-    jobs.set(
-      data.jobId,
-      startSpan(`job ${kind}`, {
+    jobs.set(data.jobId, {
+      sessionId: state.session.id,
+      span: startSpan(`job ${kind}`, {
         kind: 'producer',
         parent: waitParent(state, data.toolCall?.callId),
         attributes: { 'dsh.session.id': state.session.id, 'dsh.job.id': data.jobId, 'dsh.job.kind': kind, 'gen_ai.tool.call.id': data.toolCall?.callId },
       }),
-    )
+    })
   }
 
   const endJob = (data: typeof jobSettledSchema.Type): void => {
-    const span = jobs.get(data.jobId)
-    if (span === undefined) return
+    const job = jobs.get(data.jobId)
+    if (job === undefined) return
     jobs.delete(data.jobId)
-    span.setAttributes({
+    job.span.setAttributes({
       'dsh.job.status': redactIdentifier(data.status),
       'dsh.job.cause': redactIdentifier(data.cause),
       'dsh.job.producer_reported': data.producerReported,
     })
-    if (data.status === 'failed') fail(span, 'JOB_FAILED')
-    else if (data.status === 'completed') span.setStatus('ok')
-    span.end()
+    if (data.status === 'failed') fail(job.span, 'JOB_FAILED')
+    else if (data.status === 'completed') job.span.setStatus('ok')
+    job.span.end()
   }
 
   const onEvent = (session: ObservedSession, event: ObservedEvent): void =>
@@ -675,7 +693,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
   const standaloneParent = (request: ObservedLlmRequest, state: SessionState | undefined): SpanContext | null => {
     if (request.purpose === 'compaction') {
       const compaction = [...(state?.compactions.values() ?? [])].at(-1)
-      if (compaction?.context !== undefined) return compaction.context
+      if (compaction?.span.context !== undefined) return compaction.span.context
     }
     const sessionSpan = state?.turn?.step?.span ?? state?.turn?.agent
     if (sessionSpan?.context !== undefined) return sessionSpan.context
@@ -863,7 +881,13 @@ export const createCoordinator = (options: CoordinatorOptions) => {
       const state = sessions.get(session.id)
       if (state?.session !== session) return
       closeTurn(state, { kind: 'interrupted' })
-      for (const span of [...state.approvals.values(), ...state.retries.values(), ...state.compactions.values()]) span.end()
+      for (const wait of [...state.approvals.values(), ...state.compactions.values()]) wait.span.end()
+      for (const retry of state.retries.values()) retry.end()
+      for (const [jobId, job] of jobs) {
+        if (job.sessionId !== session.id) continue
+        jobs.delete(jobId)
+        job.span.end()
+      }
       sessions.delete(session.id)
     })
 
@@ -871,9 +895,10 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     contained('closing live spans', undefined, () => {
       for (const state of sessions.values()) {
         closeTurn(state, { kind: 'error', error: { code: 'PLUGIN_UNLOADED' } })
-        for (const span of [...state.approvals.values(), ...state.retries.values(), ...state.compactions.values()]) span.end()
+        for (const wait of [...state.approvals.values(), ...state.compactions.values()]) wait.span.end()
+        for (const retry of state.retries.values()) retry.end()
       }
-      for (const span of jobs.values()) span.end()
+      for (const job of jobs.values()) job.span.end()
       sessions.clear()
       jobs.clear()
     })
