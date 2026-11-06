@@ -126,6 +126,26 @@ describe('job history index', () => {
       }),
     )
 
+    it.effect('clears the indexing flag when a pass dies instead of leaving it stuck active', () =>
+      Effect.gen(function* () {
+        const scratch = yield* scratchSessions
+        const failingFileSystem = Layer.effect(
+          FileSystem.FileSystem,
+          Effect.map(FileSystem.FileSystem, fileSystem => ({
+            ...fileSystem,
+            readDirectoryEntries: () => Effect.die('directory read failed'),
+          })),
+        ).pipe(Layer.provide(NodeFileSystem.layer))
+        const index = yield* Layer.build(HistoryIndex.layer.pipe(Layer.provide(Layer.mergeAll(HistoryConfig.layer(scratch), failingFileSystem)))).pipe(
+          Effect.map(context => Context.get(context, HistoryIndex)),
+        )
+
+        yield* Effect.exit(index.pass)
+
+        expect((yield* index.snapshot).indexing.active).toBe(false)
+      }),
+    )
+
     it.effect('tolerates a missing sessions root', () =>
       Effect.gen(function* () {
         const path = yield* Path.Path

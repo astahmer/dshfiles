@@ -271,6 +271,10 @@ export class HistoryIndex extends Context.Service<
           )
       })
 
+      const clearActive = SubscriptionRef.update(state, current =>
+        current.indexing.active ? { ...current, indexing: { ...current.indexing, active: false } } : current,
+      )
+
       const runPass = Effect.fn('background-jobs history pass')(function* () {
         yield* load
         yield* SubscriptionRef.update(state, current => ({ ...current, indexing: { ...current.indexing, active: true } }))
@@ -336,7 +340,7 @@ export class HistoryIndex extends Context.Service<
       return HistoryIndex.of({
         snapshot: SubscriptionRef.get(state),
         changes: SubscriptionRef.changes(state),
-        pass: permit.withPermit(runPass()).pipe(
+        pass: permit.withPermit(runPass().pipe(Effect.ensuring(clearActive))).pipe(
           Effect.andThen(SubscriptionRef.get(state)),
           Effect.map(snapshot => snapshot.indexing),
         ),
