@@ -6,6 +6,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { claudeAccountService, createClaudeAccountService } from './claude-account.js'
 import { CredentialModel } from './credentials.js'
 
+const deferred = () => {
+  let resolve = (): void => undefined
+  const promise = new Promise<void>(done => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
 describe('Claude Code login', () => {
   let configDir: string
   const login = (accessToken: string): void =>
@@ -66,6 +74,42 @@ describe('Claude usage reads', () => {
     answers.push(new Response('{}', { status: 500 }))
     await service.readUsage(configDir)
     expect(requests).toBe(3)
+    rmSync(configDir, { recursive: true, force: true })
+  })
+
+  it('keeps a shared usage read alive when the caller that started it cancels', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'claude-usage-'))
+    writeFileSync(
+      join(configDir, '.credentials.json'),
+      JSON.stringify({ claudeAiOauth: { accessToken: 'sk-ant-oat-test', refreshToken: 'r', expiresAt: 9_999_999_999_999 } }),
+    )
+    const usage = new Response(JSON.stringify({ five_hour: { utilization: 31, resets_at: '2026-10-08T15:00:00Z' } }), { status: 200 })
+    const started = deferred()
+    const release = deferred()
+    let requests = 0
+    const service = createClaudeAccountService({
+      readFile,
+      readKeyFromEnv: CredentialModel.readKeyFromEnv,
+      readKeychainSecret: async () => undefined,
+      now: () => 1_000_000,
+      fetch: async (_url, init) => {
+        requests += 1
+        started.resolve()
+        return new Promise<Response>((resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted.', 'AbortError')), { once: true })
+          void release.promise.then(() => resolve(usage))
+        })
+      },
+    })
+    const controller = new AbortController()
+    const cancelled = service.readUsage(configDir, controller.signal)
+    const shared = service.readUsage(configDir)
+    await started.promise
+    controller.abort()
+    release.resolve()
+    expect((await shared).status).toBe('ok')
+    expect((await cancelled).status).toBe('error')
+    expect(requests).toBe(1)
     rmSync(configDir, { recursive: true, force: true })
   })
 })

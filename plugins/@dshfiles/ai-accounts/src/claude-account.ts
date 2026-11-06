@@ -233,23 +233,56 @@ const CLAUDE_USAGE_BACKOFF_MS = 10 * 60_000
 
 type UsageRead = { readonly card: UsageCard; readonly retryAfterMs?: number }
 
-interface UsageEntry {
-  card?: UsageCard
-  at: number
-  backoffUntil: number
-  inFlight?: Promise<UsageCard> | undefined
-}
+type UsageReading = { readonly card: UsageCard; readonly at: number }
+
+type UsageCacheEntry =
+  | { readonly kind: 'fetching'; readonly request: Promise<UsageCard>; readonly reading: UsageReading | undefined; readonly controller: AbortController }
+  | { readonly kind: 'cached'; readonly reading: UsageReading }
+  | { readonly kind: 'backoff'; readonly reading: UsageReading | undefined; readonly until: number }
 
 const retryAfterMs = (header: string | null): number => {
   const seconds = Number(header)
   return header !== null && Number.isFinite(seconds) && seconds > 0 ? seconds * 1_000 : CLAUDE_USAGE_BACKOFF_MS
 }
 
+const isFresh = (reading: UsageReading, now: number): boolean => now - reading.at < CLAUDE_USAGE_FRESH_MS
+
+const cancelledUsage = (): UsageCard => ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
+
 /** The last good reading, labelled with its age, while Anthropic asks us to wait; a rate-limited card without one. */
-const staleOrLimited = (entry: UsageEntry, now: number): UsageCard => {
-  if (entry.card === undefined) return ProviderUsageModel.emptyUsage('rate-limited', 'Claude rate-limited the usage request.')
-  const minutes = Math.max(1, Math.round((now - entry.at) / 60_000))
-  return { ...entry.card, message: `Reading from ${String(minutes)} min ago; Claude asked to wait before the next one.` }
+const staleOrLimited = (reading: UsageReading | undefined, now: number): UsageCard => {
+  if (reading === undefined) return ProviderUsageModel.emptyUsage('rate-limited', 'Claude rate-limited the usage request.')
+  const minutes = Math.max(1, Math.round((now - reading.at) / 60_000))
+  return { ...reading.card, message: `Reading from ${String(minutes)} min ago; Claude asked to wait before the next one.` }
+}
+
+const settledEntry = (read: UsageRead, reading: UsageReading | undefined, now: number): UsageCacheEntry | undefined => {
+  if (read.retryAfterMs !== undefined) return { kind: 'backoff', reading, until: now + read.retryAfterMs }
+  if (read.card.status === 'ok') return { kind: 'cached', reading: { card: read.card, at: now } }
+  return reading === undefined ? undefined : { kind: 'cached', reading }
+}
+
+const settledCard = (read: UsageRead, entry: UsageCacheEntry | undefined, now: number): UsageCard =>
+  entry?.kind === 'backoff' ? staleOrLimited(entry.reading, now) : read.card
+
+/** A shared read outlives any one caller: cancelling your request stops only your wait on it. */
+const abortableUsage = (request: Promise<UsageCard>, signal: AbortSignal | undefined): Promise<UsageCard> => {
+  if (signal === undefined) return request
+  if (signal.aborted) return Promise.resolve(cancelledUsage())
+  return new Promise<UsageCard>((resolve, reject) => {
+    const onAbort = (): void => resolve(cancelledUsage())
+    signal.addEventListener('abort', onAbort, { once: true })
+    void request.then(
+      card => {
+        signal.removeEventListener('abort', onAbort)
+        resolve(card)
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort)
+        reject(error)
+      },
+    )
+  })
 }
 
 const fetchUsage = async (
@@ -300,9 +333,11 @@ const fetchUsage = async (
 }
 
 export const createClaudeAccountService = (dependencies: ClaudeAccountServiceDependencies) => {
-  const usageReads = new Map<string, UsageEntry>()
+  const usageReads = new Map<string, UsageCacheEntry>()
   return {
     invalidateUsage: (configDir: string): void => {
+      const entry = usageReads.get(configDir)
+      if (entry?.kind === 'fetching') entry.controller.abort()
       usageReads.delete(configDir)
     },
     describeAuth: async (input: {
@@ -350,26 +385,22 @@ export const createClaudeAccountService = (dependencies: ClaudeAccountServiceDep
       // endpoint after a few calls a minute, so one reading serves them all for a while and a 429 backs off.
       const now = dependencies.now()
       const known = usageReads.get(configDir)
-      if (known?.card !== undefined && now - known.at < CLAUDE_USAGE_FRESH_MS) return known.card
-      if (known !== undefined && now < known.backoffUntil) return staleOrLimited(known, now)
-      if (known?.inFlight !== undefined) return known.inFlight
-      const inFlight = fetchUsage(configDir, dependencies, signal).then(read => {
-        if (usageReads.get(configDir)?.inFlight !== inFlight) return read.card
-        const entry = usageReads.get(configDir) ?? { at: 0, backoffUntil: 0 }
-        entry.inFlight = undefined
-        usageReads.set(configDir, entry)
-        if (read.retryAfterMs !== undefined) {
-          entry.backoffUntil = dependencies.now() + read.retryAfterMs
-          return staleOrLimited(entry, dependencies.now())
-        }
-        if (read.card.status === 'ok') {
-          entry.card = read.card
-          entry.at = dependencies.now()
-        }
-        return read.card
+      if (known?.kind === 'cached' && isFresh(known.reading, now)) return known.reading.card
+      if (known?.kind === 'backoff' && now < known.until) return staleOrLimited(known.reading, now)
+      if (known?.kind === 'fetching') return abortableUsage(known.request, signal)
+      if (signal?.aborted === true) return cancelledUsage()
+      const reading = known?.reading
+      const controller = new AbortController()
+      const request = fetchUsage(configDir, dependencies, controller.signal).then(read => {
+        const current = usageReads.get(configDir)
+        if (current?.kind !== 'fetching' || current.controller !== controller) return read.card
+        const entry = settledEntry(read, reading, dependencies.now())
+        if (entry === undefined) usageReads.delete(configDir)
+        else usageReads.set(configDir, entry)
+        return settledCard(read, entry, dependencies.now())
       })
-      usageReads.set(configDir, { ...(known ?? { at: 0, backoffUntil: 0 }), inFlight })
-      return inFlight
+      usageReads.set(configDir, { kind: 'fetching', request, reading, controller })
+      return abortableUsage(request, signal)
     },
   }
 }
