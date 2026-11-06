@@ -43,6 +43,7 @@ export const tracesAlertsApi = defineApi({
       }),
       output: alertFeedSchema,
       description: 'Alert events newer than an id, newest first (at most 20), with the latest id and the firing count; what a notifier polls.',
+      readOnly: true,
     }),
     save: method({
       input: alertRuleDraftSchema,

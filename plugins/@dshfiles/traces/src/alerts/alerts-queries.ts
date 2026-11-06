@@ -1,7 +1,7 @@
 import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { retryOnceUnlessTimedOut, runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { queryOptions } from '@dshfiles/plugin-ui/query'
+import { queryOptions, resourceQueryOptions } from '@dshfiles/plugin-ui/query'
 import type { tracesAlertsApi } from './alerts-api.js'
 
 export type AlertsClient = typeof tracesAlertsApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
@@ -31,10 +31,10 @@ export const alertsQueries = {
       refetchInterval: pollUnlessMissing(STATE_POLL_MS),
       retry: (failures, error) => !alertsOwnerMissing(error) && retryOnceUnlessTimedOut(failures, error),
     }),
+  /** Read through the page-wide resource store, so the badge, the panel and the notifier share one read per id. */
   feed: (client: AlertsClient, afterId: number | null) =>
     queryOptions({
-      queryKey: [...alertsKeys.feed, afterId] as const,
-      queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.feed({ afterId }, { signal: hostSignal }) }),
+      ...resourceQueryOptions({ queryKey: [...alertsKeys.feed, afterId] as const, client, method: 'feed', input: { afterId } }),
       refetchInterval: pollUnlessMissing(FEED_POLL_MS),
       retry: false,
     }),

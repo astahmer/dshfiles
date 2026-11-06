@@ -741,6 +741,12 @@
           "id": "traces.alerts-self-spans",
           "file": "plugins/@dshfiles/traces/src/otlp/self-spans.test.ts",
           "testName": "keeps an alert evaluation that changed a rule or failed, and drops a routine one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-feed-shared-read",
+          "file": "plugins/@dshfiles/traces/src/alerts/alerts-queries.test.ts",
+          "testName": "reads the feed through the page-wide store, so the badge and the notifier share one read"
         }
       ],
       "telemetry": [
