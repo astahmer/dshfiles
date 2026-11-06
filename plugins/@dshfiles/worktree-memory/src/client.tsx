@@ -1,6 +1,6 @@
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
-import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -10,6 +10,7 @@ import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, type ReactNode } from 'react'
 import { WORKTREE_MEMORY_LOCALE_NAMESPACE, worktreeMemoryLocale } from './locales.js'
+import { OrphanStatusItem } from './orphan-status-item.js'
 import { MemoryBadge, MemoryGlyph, WorktreeMemoryPanel, type WorktreeMemoryPanelProps } from './panel.js'
 
 const PANEL_ID = 'dshfiles-worktree-memory'
@@ -23,7 +24,7 @@ const RAM_TAB = 'ram'
 export default defineClient({
   name: '@dshfiles/worktree-memory',
   locales: [worktreeMemoryLocale],
-  inject: ['slots', 'sessions', 'uiWorkspace'],
+  inject: ['layout', 'slots', 'sessions', 'uiWorkspace'],
   setup(ctx, decorate, metadata) {
     const translate = ctx.locale.bind(WORKTREE_MEMORY_LOCALE_NAMESPACE)
     const View = (props: Omit<WorktreeMemoryPanelProps, 'sessions' | 'uiWorkspace' | 't'>): JSX.Element => (
@@ -50,9 +51,27 @@ export default defineClient({
         Thread: plugin.bind(RamForThread),
         Badge: plugin.bind(RamBadge),
       })
+      const processesNavigation = plugin.use(ProcessesNavigation)
+      ctx.effect(
+        () =>
+          OrphanStatusItem.register({
+            plugin,
+            t: translate,
+            open: () => {
+              const navigation = processesNavigation.get()
+              if (navigation.status === 'active') {
+                navigation.value.open(RAM_TAB)
+                return
+              }
+              // SAFETY: PANEL_ID is registered as a main-panel slot below.
+              ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+            },
+          }),
+        'worktree-memory: orphan status item',
+      )
       // Without background-jobs (compositions that leave it out) the RAM page keeps its own entry and glyph.
       plugin.keyed(
-        plugin.use(ProcessesNavigation),
+        processesNavigation,
         (live, scope) => {
           if (live.status === 'active') return
           const dispose = ctx.slots.inject('sidebar.panellist', () =>

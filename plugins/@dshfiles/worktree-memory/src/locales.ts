@@ -68,6 +68,18 @@ const en = {
   stopRefused: 'refused',
   stopMissing: 'already gone',
   justNow: 'just now',
+  scratchHosts: 'Scratch DSH Hosts',
+  scratchOrphan: 'Orphan',
+  scratchOwnerGone: 'Its owner (pid {pid}) exited, so nothing will stop it.',
+  scratchLegacy: 'No owner record and init adopted it over 2 h ago: a leftover from before scratch Hosts recorded their owner.',
+  scratchNoRecord: 'No owner record',
+  scratchOwnerAlive: 'Owner pid {pid} is running',
+  scratchKindE2e: 'E2E',
+  scratchKindDev: 'dshx dev',
+  cpu: 'CPU',
+  stopOrphans: 'Stop orphans ({count})',
+  orphanStatus: '{count} orphaned DSH',
+  orphanStatusHint: 'Orphaned scratch DSH Hosts are using CPU or memory. Open RAM to stop them.',
 } as const
 
 const zh = {
@@ -135,6 +147,18 @@ const zh = {
   stopRefused: '被拒绝',
   stopMissing: '已不存在',
   justNow: '刚刚',
+  scratchHosts: '临时 DSH 实例',
+  scratchOrphan: '孤儿进程',
+  scratchOwnerGone: '其所有者（pid {pid}）已退出，不会再有进程停止它。',
+  scratchLegacy: '没有所有者记录，且已被 init 接管超过 2 小时：来自记录所有者之前的遗留实例。',
+  scratchNoRecord: '无所有者记录',
+  scratchOwnerAlive: '所有者 pid {pid} 正在运行',
+  scratchKindE2e: 'E2E',
+  scratchKindDev: 'dshx dev',
+  cpu: 'CPU',
+  stopOrphans: '停止孤儿进程 ({count})',
+  orphanStatus: '{count} 个孤儿 DSH',
+  orphanStatusHint: '孤儿临时 DSH 实例正在占用 CPU 或内存。打开进程内存页面以停止它们。',
 } satisfies Record<keyof typeof en, string>
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

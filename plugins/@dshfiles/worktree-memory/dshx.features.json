@@ -5,7 +5,7 @@
     {
       "id": "memory-board",
       "title": "Process memory and Node origins",
-      "summary": "The RAM tab of Observe \u203a Processes (and this thread's share in the thread panel's Jobs facet): One page shows resident memory of DSH process trees grouped by workspace, plus current-user Node processes grouped by deterministic script labels, nearest app ancestor or immediate parent, and working directory. Node origin rows expose no argv or environment values, and their RSS excludes compressed or swapped memory. The Processes navigation glyph carries a pressure dot and the detached total; without @dshfiles/background-jobs the RAM page keeps its own entry with them.",
+      "summary": "The RAM tab of Observe › Processes (and this thread's share in the thread panel's Jobs facet): One page shows resident memory of DSH process trees grouped by workspace, plus current-user Node processes grouped by deterministic script labels, nearest app ancestor or immediate parent, and working directory. Node origin rows expose no argv or environment values, and their RSS excludes compressed or swapped memory. The Processes navigation glyph carries a pressure dot and the detached total; without @dshfiles/background-jobs the RAM page keeps its own entry with them.",
       "reach": ["click tab \"Observe\"", "click button \"Processes\"", "click tab \"RAM\"", "expect text \"Node process origins\""],
       "surfaces": ["host", "tool", "client"],
       "surface": "destinationSection",
@@ -31,7 +31,7 @@
         "A job is stopped through the job registry so its Session records the kill; only trees no live job owns are signalled directly.",
         "A bulk stop leaves a job whose owning thread is mid-turn alone, so that turn cannot fail under it; its own Stop stays the only path.",
         "Orphans outside every workspace (apps, system agents, unrelated daemons) are not listed in the DSH tree view.",
-        "Node summaries inspect only the current OS user\u2019s processes; process names use fixed rules and fall back to a generic label.",
+        "Node summaries inspect only the current OS user’s processes; process names use fixed rules and fall back to a generic label.",
         "Node RSS is resident memory only, not the compressed or swapped memory shown by some system monitors.",
         "A platform without ps/lsof or /proc reports itself unsupported instead of an empty board."
       ],
@@ -123,6 +123,97 @@
           "span": "worktree-memory list sessions",
           "file": "plugins/@dshfiles/worktree-memory/src/session-metadata-cache.test.ts",
           "testName": "returns the current value without waiting and coalesces a refresh"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "orphan-scratch-hosts",
+      "title": "Orphaned scratch DSH Hosts",
+      "summary": "Scratch DSH Hosts (--profile dshx-boot) are listed on the RAM tab by the owner their dshx record names (E2E or dshx dev, workspace, owner pid), with CPU and resident memory. A Host whose owner exited, or a pre-record Host init adopted more than 2 h ago, is flagged Orphan; one Stop orphans action (and the worktree_memory_stop_orphans agent tool with confirm: true) ends their process groups. While orphans use at least the configured CPU or memory, the frame status strip shows a warning that opens the RAM tab.",
+      "reach": ["click tab \"Observe\"", "click button \"Processes\"", "click tab \"RAM\"", "expect text \"Node process origins\""],
+      "surfaces": ["host", "tool", "client", "settings"],
+      "surface": "statusItem",
+      "destination": "observe",
+      "currentSurface": "status-strip: Orphans warning; Observe › Processes › RAM: Scratch DSH Hosts",
+      "configuration": [
+        {
+          "key": "orphanAlertCpuPercent",
+          "defaultValue": "50",
+          "constraints": "Percent of one core summed over every orphan tree; the warning shows at or above it.",
+          "coveredBy": ["worktree-memory.orphan-alert-threshold"]
+        },
+        {
+          "key": "orphanAlertMemoryMb",
+          "defaultValue": "1024",
+          "constraints": "Resident MB summed over every orphan tree; the warning shows at or above it.",
+          "coveredBy": ["worktree-memory.orphan-alert-threshold"]
+        }
+      ],
+      "states": ["no-scratch-hosts", "owned", "orphan-owner-gone", "orphan-legacy", "stop-armed", "stopped", "status-warning"],
+      "failureModes": [
+        "A record whose start time does not match the pid it names is ignored, so a recycled pid never borrows an owner.",
+        "A missing or unreadable record directory means no records; a malformed or foreign record file is skipped.",
+        "Stop re-reads the process table and signals only a pid that still runs --profile dshx-boot with the same start time; the serving Host and its ancestors are refused.",
+        "A Host that does not lead its own process group is stopped as its own tree, never by signalling a foreign group.",
+        "An older Host without the scratchHosts method leaves the status item hidden instead of showing an error."
+      ],
+      "externalDependencies": [
+        {
+          "id": "dshx scratch records ($TMPDIR/dshx-scratch/<hostPid>.json)",
+          "boundary": "Read-only JSON files dshx writes for each scratch Host; decoded with Effect Schema, never imported as a module.",
+          "deterministicFake": "src/scratch-hosts.test.ts passes decoded records and fixture process tables to the pure detector."
+        },
+        {
+          "id": "ps (pid, ppid, pgid, rss, %cpu, lstart, args)",
+          "boundary": "Read-only current-user process table; the only writes are the confirmed SIGTERM/SIGKILL of orphaned scratch process groups.",
+          "deterministicFake": "src/scratch-hosts.test.ts parses fixture ps lines and checks the stop guard against fixture rows."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.orphan-owner-record",
+          "file": "plugins/@dshfiles/worktree-memory/src/scratch-hosts.test.ts",
+          "testName": "labels a recorded Host by its live owner and flags one whose owner is dead or recycled"
+        },
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.orphan-legacy",
+          "file": "plugins/@dshfiles/worktree-memory/src/scratch-hosts.test.ts",
+          "testName": "flags a legacy Host only when init adopted it more than two hours ago"
+        },
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.orphan-protected",
+          "file": "plugins/@dshfiles/worktree-memory/src/scratch-hosts.test.ts",
+          "testName": "never lists the serving Host, its supervisor, a non-scratch profile or the node a wrapper runs"
+        },
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.orphan-stop-guard",
+          "file": "plugins/@dshfiles/worktree-memory/src/scratch-hosts.test.ts",
+          "testName": "refuses a gone, recycled or non-scratch pid and never the live Host or its supervisor"
+        },
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.orphan-alert-threshold",
+          "file": "plugins/@dshfiles/worktree-memory/src/scratch-hosts.test.ts",
+          "testName": "shows only while orphans reach the CPU or memory threshold"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "worktree-memory.orphan-browser-journey",
+          "reason": "A journey needs a live orphaned --profile dshx-boot process with a record in the shared $TMPDIR/dshx-scratch directory, which the dshx sweeper of any concurrent scratch boot reaps mid-run; the section, Stop orphans and the status warning were proven in a scratch DSH with a fake orphan (plans/orphan-cleanup.md P7)."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         },
         {
           "kind": "automatic",

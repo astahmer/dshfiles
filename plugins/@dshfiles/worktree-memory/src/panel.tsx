@@ -33,6 +33,8 @@ import {
   type ProcessCategory,
   type ProcessOrigin,
   type ProcessTree,
+  type ScratchHost,
+  type ScratchHosts,
   type StopResult,
   type WorkspaceGroup,
 } from './types.js'
@@ -472,6 +474,101 @@ const GroupCard = (props: {
   )
 }
 
+const formatCpu = (percent: number): string => `${String(Math.round(percent))}%`
+
+const ScratchHostRow = (props: { readonly host: ScratchHost; readonly now: number; readonly t: WorktreeMemoryTranslate }): JSX.Element => {
+  const { host, t } = props
+  const owner = host.owner
+  const ownerLabel = owner === null ? t('scratchNoRecord') : baseName(owner.workspace)
+  const ownerHint =
+    owner === null ? null : `${owner.workspace}\n${owner.alive ? t('scratchOwnerAlive', { pid: owner.pid }) : t('scratchOwnerGone', { pid: owner.pid })}`
+  const orphanHint = host.reason === 'legacy-detached' ? t('scratchLegacy') : t('scratchOwnerGone', { pid: owner?.pid ?? 0 })
+  return (
+    <li className="dshx:flex dshx:items-center dshx:gap-2 dshx:py-1.5" data-scratch-host-pid={host.pid} data-scratch-orphan={String(host.orphan)}>
+      <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+          <span className="dshx:shrink-0 dshx:text-sm dshx:font-medium dshx:tabular-nums">{host.port === null ? 'dsh' : `dsh :${String(host.port)}`}</span>
+          {owner === null ? null : (
+            <Badge variant="secondary" className="dshx:shrink-0">
+              {t(owner.kind === 'e2e' ? 'scratchKindE2e' : 'scratchKindDev')}
+            </Badge>
+          )}
+          {host.orphan ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className={DETACHED_BADGE}>
+                  {t('scratchOrphan')}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent className="dshx:max-w-72">{orphanHint}</TooltipContent>
+            </Tooltip>
+          ) : null}
+        </div>
+        {ownerHint === null ? (
+          <span className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:text-muted-foreground">{ownerLabel}</span>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:text-muted-foreground">{ownerLabel}</span>
+            </TooltipTrigger>
+            <TooltipContent className="dshx:max-w-96 dshx:break-all dshx:whitespace-pre-line">{ownerHint}</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+      <div className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:items-end">
+        <span className="dshx:text-sm dshx:tabular-nums">{formatBytes(host.bytes)}</span>
+        <span className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">
+          {formatCpu(host.cpuPercent)} {t('cpu')} · {formatAge(host.startedAt, props.now, t)}
+        </span>
+      </div>
+    </li>
+  )
+}
+
+/** Every scratch DSH Host by owner; orphans first, with the one verb that stops them all. */
+const ScratchHostsSection = (props: {
+  readonly summary: ScratchHosts
+  readonly now: number
+  readonly armed: boolean
+  readonly pending: boolean
+  readonly onArm: () => void
+  readonly onStop: () => void
+  readonly t: WorktreeMemoryTranslate
+}): JSX.Element => {
+  const { summary, t } = props
+  return (
+    <PageSection
+      heading={t('scratchHosts')}
+      meta={
+        summary.orphanCount === 0
+          ? count(summary.hosts.length, 'process', 'processes', t)
+          : `${String(summary.orphanCount)} ${t('scratchOrphan').toLowerCase()} · ${formatBytes(summary.orphanBytes)} · ${formatCpu(summary.orphanCpuPercent)} ${t('cpu')}`
+      }
+      actions={
+        summary.orphanCount === 0 ? undefined : (
+          <Button
+            variant={props.armed ? 'destructive' : 'outline'}
+            size="sm"
+            disabled={props.pending}
+            onClick={props.armed ? props.onStop : props.onArm}
+            data-stop-orphans
+          >
+            {props.armed ? t('stopConfirmCount', { count: summary.orphanCount }) : t('stopOrphans', { count: summary.orphanCount })}
+          </Button>
+        )
+      }
+      data-scratch-hosts
+      data-scratch-orphan-count={String(summary.orphanCount)}
+    >
+      <ul className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:rounded-lg dshx:border dshx:border-border dshx:px-3">
+        {summary.hosts.map(host => (
+          <ScratchHostRow key={host.pid} host={host} now={props.now} t={t} />
+        ))}
+      </ul>
+    </PageSection>
+  )
+}
+
 const NodeOriginCard = (props: { readonly origin: NodeProcessOrigin; readonly t: WorktreeMemoryTranslate }): JSX.Element => {
   const origin = props.origin
   const sampledPids = origin.samples.map(sample => String(sample.pid)).join(', ')
@@ -600,9 +697,18 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
     },
   })
 
+  const stopOrphans = useMutation({
+    mutationFn: async () => api.stopOrphans({ confirm: true }),
+    onSuccess: result => {
+      setArmed(null)
+      setStopOutcome({ stopped: result.stopped, viaJob: 0, missing: result.missing, refused: result.refused })
+      void queryClient.invalidateQueries({ queryKey: snapshotKey })
+    },
+  })
+
   const controls: StopControls = {
     armed,
-    pending: stop.isPending,
+    pending: stop.isPending || stopOrphans.isPending,
     arm: key => {
       setArmed(key)
       setStopOutcome(null)
@@ -736,11 +842,11 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
               <AlertDescription>{t('unsupported')}</AlertDescription>
             </Alert>
           ) : null}
-          {stop.isError ? (
+          {stop.isError || stopOrphans.isError ? (
             <Alert variant="destructive">
               <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
                 <span className="dshx:min-w-0 dshx:flex-1">
-                  {errorMessage(stop.error, t('stopFailed'))} {t('stopFailedRecovery')}
+                  {errorMessage(stop.error ?? stopOrphans.error, t('stopFailed'))} {t('stopFailedRecovery')}
                 </span>
                 <Button variant="outline" size="sm" disabled={snapshot.isFetching} onClick={() => void snapshot.refetch()}>
                   {t('refresh')}
@@ -754,6 +860,17 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
               {stopOutcome.refused === 0 ? '' : ` · ${String(stopOutcome.refused)} ${t('stopRefused')}`}
               {stopOutcome.missing === 0 ? '' : ` · ${String(stopOutcome.missing)} ${t('stopMissing')}`}
             </p>
+          )}
+          {value?.scratchHosts === undefined || value.scratchHosts.hosts.length === 0 || mode === 'thread' ? null : (
+            <ScratchHostsSection
+              summary={value.scratchHosts}
+              now={now}
+              armed={armed === 'orphans'}
+              pending={controls.pending}
+              onArm={() => controls.arm('orphans')}
+              onStop={() => stopOrphans.mutate()}
+              t={t}
+            />
           )}
           {value === undefined || !value.supported ? null : (
             <PageSection heading={t('processTrees')} meta={count(groups.length, 'group', 'groups', t)}>

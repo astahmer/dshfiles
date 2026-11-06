@@ -52,9 +52,39 @@ and the footer says how many it left alone. A bulk stop names the tree count bef
 200 (the API's target limit) and reports one summary. `Stop detached (N)` keeps the narrower leftovers-only verb, per
 section and in the footer.
 
+## Scratch DSH Hosts and orphans
+
+![Scratch DSH Hosts with an orphan](docs/screenshots/orphan-scratch-hosts.png)
+
+The RAM tab lists every scratch DSH Host of this user (`--profile dshx-boot`: E2E fixtures and `dshx dev up`) by owner,
+with CPU and resident memory summed over its tree. The owner comes from the record dshx writes for each scratch Host,
+`$TMPDIR/dshx-scratch/<hostPid>.json` = `{ hostPid, hostStartedAt, ownerPid, ownerStartedAt, workspace, kind, command }`
+([orphan cleanup plan](../../../plans/orphan-cleanup.md), P2). The Host reads those files itself and decodes them with
+Effect Schema; a missing directory means no records and a malformed file is skipped.
+
+A Host is an **orphan** when:
+
+- its record names an owner whose pid is dead or now runs a process started at another time, or
+- it has no record (started before the record contract), init adopted it (PPID 1) and it is older than 2 h.
+
+**Stop orphans (N)** on the section, and the `worktree_memory_stop_orphans` tool, re-read the process table and
+signal only a pid that still runs `--profile dshx-boot` with the same start time: SIGTERM to its process group (dshx
+starts scratch Hosts as group leaders; one that is not gets only its own tree, children first), then SIGKILL after 3 s on
+the same identity. The Host serving the page and its ancestors are never signalled.
+
+The frame status strip (`@dshfiles/frame-layout` `StatusItems`, which this plugin provides; frame-layout never imports
+it) shows **N orphaned DSH · size · CPU** only while orphans use at least the configured CPU or memory, and opens the
+RAM tab. The item polls `scratchHosts` every 30 s: one `ps` and the record directory, no working-directory probes.
+
+| Setting (`dshfiles-worktree-memory`) | Default | Meaning                                        |
+| ------------------------------------ | ------- | ---------------------------------------------- |
+| `orphanAlertCpuPercent`              | 50      | Warn at or above this CPU, percent of one core |
+| `orphanAlertMemoryMb`                | 1024    | Warn at or above this resident memory, in MB   |
+
 ## Agent tools
 
-`worktree_memory_snapshot` (read-only) and `worktree_memory_stop` (requires `confirm: true`).
+`worktree_memory_snapshot` (read-only, includes `scratchHosts`), `worktree_memory_stop` and
+`worktree_memory_stop_orphans` (both require `confirm: true`).
 
 ## Host gap
 

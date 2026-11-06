@@ -1,11 +1,27 @@
-import { homedir, totalmem, userInfo } from 'node:os'
-import { Clock, Context, Duration, Effect, FiberSet, FileSystem, Layer, Schema, Stream } from 'effect'
+import { homedir, tmpdir, totalmem, userInfo } from 'node:os'
+import { join } from 'node:path'
+import { Settings } from '@dshfiles/dshx/effect/settings'
+import type { SettingsValue } from '@dshfiles/dshx/settings'
+import { Clock, Context, Duration, Effect, FiberSet, FileSystem, Layer, Option, Schema, Stream } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import { HostDirectory, JobTracker } from './host-edge-promise.js'
 import { nodeProcessCwdPids, summarizeNodeProcesses } from './node-process-summary.js'
 import { ProcessTable, type ProcessRow } from './process-table.js'
+import { ScratchHostDetector, type ScratchProcessRow } from './scratch-hosts.js'
 import { SessionMetadata } from './session-metadata-cache.js'
-import { emptyCategoryBytes, type MemoryPressure, type MemorySnapshot, type ProcessTree, type StopResult, type StopTarget } from './types.js'
+import { worktreeMemorySettings } from './settings.js'
+import {
+  emptyCategoryBytes,
+  type MemoryPressure,
+  type MemorySnapshot,
+  type ProcessTree,
+  type ScratchHosts,
+  type StopOrphansResult,
+  type StopResult,
+  type StopTarget,
+} from './types.js'
+
+export const WorktreeMemorySettings = Settings.Tag<SettingsValue<typeof worktreeMemorySettings.schema>>(worktreeMemorySettings.namespace)
 
 const SNAPSHOT_TTL = Duration.seconds(3)
 const PROBE_TIMEOUT = Duration.seconds(10)
@@ -13,6 +29,8 @@ const KILL_GRACE = Duration.seconds(3)
 const MAX_PS_CHARACTERS = 8 * 1024 * 1024
 const MAX_CWD_PROBES = 400
 const MAX_NODE_CWD_PROBES = 100
+const MAX_SCRATCH_RECORDS = 500
+const SCRATCH_RECORD_FILE = /^\d+\.json$/
 
 /** A process probe (`ps`, `lsof`, `sysctl`) could not run or did not finish in time. */
 export class ProbeFailed extends Schema.TaggedError<ProbeFailed>()(
@@ -59,6 +77,11 @@ interface Probe {
   readonly rows: readonly ProcessRow[]
 }
 
+interface ScratchProbe {
+  readonly summary: ScratchHosts
+  readonly rows: readonly ScratchProcessRow[]
+}
+
 /** Resident memory of this user's processes, grouped by the DSH workspace, Session or job that owns them. */
 export class ProcessProbe extends Context.Service<
   ProcessProbe,
@@ -69,6 +92,10 @@ export class ProcessProbe extends Context.Service<
     readonly probeForStop: Effect.Effect<Probe, ProbeFailed>
     readonly processTable: Effect.Effect<ProcessRow[], ProbeFailed>
     readonly pressure: Effect.Effect<MemoryPressure>
+    /** Scratch DSH Hosts with their owners and orphan flags: one `ps` and the dshx record files, no working-directory probes. */
+    readonly scratchHosts: Effect.Effect<ScratchProbe, ProbeFailed>
+    /** The scratch process table alone, for a stop that re-checks identities right before signalling. */
+    readonly scratchTable: Effect.Effect<ScratchProcessRow[], ProbeFailed>
   }
 >()('@dshfiles/worktree-memory/ProcessProbe') {
   static readonly layer = Layer.effect(
@@ -79,6 +106,7 @@ export class ProcessProbe extends Context.Service<
       const directory = yield* HostDirectory
       const jobs = yield* JobTracker
       const sessionMetadata = yield* SessionMetadata
+      const settings = yield* WorktreeMemorySettings
 
       const run = Effect.fn('worktree-memory probe')(
         function* (command: string, args: readonly string[]) {
@@ -100,6 +128,47 @@ export class ProcessProbe extends Context.Service<
       const processTable = run('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,rss=,lstart=,args=']).pipe(
         Effect.map(ProcessTable.parsePs),
       )
+
+      const scratchTable = run('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,pgid=,rss=,%cpu=,lstart=,args=']).pipe(
+        Effect.map(ScratchHostDetector.parsePs),
+      )
+
+      // A missing directory means dshx wrote no record yet; an unreadable or foreign file is skipped, never trusted.
+      const scratchRecords = Effect.gen(function* () {
+        const directory = join(tmpdir(), 'dshx-scratch')
+        const names = yield* fs.readDirectory(directory).pipe(Effect.orElseSucceed((): string[] => []))
+        const files = names.filter(name => SCRATCH_RECORD_FILE.test(name)).slice(0, MAX_SCRATCH_RECORDS)
+        const records = yield* Effect.forEach(
+          files,
+          name =>
+            fs.readFileString(join(directory, name)).pipe(
+              Effect.map(ScratchHostDetector.decodeRecord),
+              Effect.orElseSucceed(() => Option.none()),
+            ),
+          { concurrency: 8 },
+        )
+        yield* Effect.annotateCurrentSpan({ 'worktree_memory.scratch.record_count': files.length })
+        return records.flatMap(record => Option.toArray(record))
+      }).pipe(Effect.withSpan('worktree-memory read scratch records'))
+
+      const scratchHosts = Effect.gen(function* () {
+        const [rows, records, configured, now] = yield* Effect.all([scratchTable, scratchRecords, settings.get, Clock.currentTimeMillis], {
+          concurrency: 'unbounded',
+        })
+        const summary = ScratchHostDetector.detect({
+          rows,
+          records,
+          now,
+          hostPid: process.pid,
+          alert: { cpuPercent: configured.orphanAlertCpuPercent, memoryBytes: configured.orphanAlertMemoryMb * 1024 * 1024 },
+        })
+        yield* Effect.annotateCurrentSpan({
+          'worktree_memory.scratch.host_count': summary.hosts.length,
+          'worktree_memory.scratch.orphan_count': summary.orphanCount,
+        })
+        const probed: ScratchProbe = { summary, rows }
+        return probed
+      }).pipe(Effect.withSpan('worktree-memory scratch hosts'))
 
       const readCwds = Effect.fn('worktree-memory read cwds')(function* (pids: readonly number[]) {
         const probed = pids.slice(0, MAX_CWD_PROBES)
@@ -139,7 +208,7 @@ export class ProcessProbe extends Context.Service<
         const now = yield* Clock.currentTimeMillis
         if (!supportedPlatform) return { snapshot: unsupported(now), rows: [] }
         const sessions = includeSessions ? yield* sessionMetadata.current : []
-        const [rows, currentPressure] = yield* Effect.all([processTable, pressure], { concurrency: 'unbounded' })
+        const [rows, currentPressure, scratch] = yield* Effect.all([processTable, pressure, scratchHosts], { concurrency: 'unbounded' })
         const candidates = ProcessTable.candidates({ rows, hostPid: process.pid })
         const nodePids = nodeProcessCwdPids({ rows, limit: MAX_NODE_CWD_PROBES })
         const cwds = yield* readCwds([...new Set([...candidates.hostChildren, ...candidates.orphans, ...nodePids])])
@@ -156,7 +225,7 @@ export class ProcessProbe extends Context.Service<
           pressure: currentPressure,
           systemBytes: totalmem(),
         })
-        const probed: Probe = { snapshot: { ...snapshot, nodeProcesses: summarizeNodeProcesses({ rows, cwds, home }) }, rows }
+        const probed: Probe = { snapshot: { ...snapshot, nodeProcesses: summarizeNodeProcesses({ rows, cwds, home }), scratchHosts: scratch.summary }, rows }
         return probed
       })
 
@@ -167,7 +236,14 @@ export class ProcessProbe extends Context.Service<
         return (yield* cachedProbe).snapshot
       })
 
-      return ProcessProbe.of({ snapshot, probeForStop: Effect.andThen(probe(false), result => Effect.as(invalidate, result)), processTable, pressure })
+      return ProcessProbe.of({
+        snapshot,
+        probeForStop: Effect.andThen(probe(false), result => Effect.as(invalidate, result)),
+        processTable,
+        pressure,
+        scratchHosts,
+        scratchTable,
+      })
     }),
   )
 }
@@ -178,7 +254,10 @@ const sendSignal = (pid: number, name: NodeJS.Signals) =>
 /** Stops process trees a snapshot listed: a live job through its registry, any other tree with SIGTERM then SIGKILL. */
 export class ProcessStopper extends Context.Service<
   ProcessStopper,
-  { readonly stop: (targets: readonly StopTarget[]) => Effect.Effect<StopResult, ProbeFailed> }
+  {
+    readonly stop: (targets: readonly StopTarget[]) => Effect.Effect<StopResult, ProbeFailed>
+    readonly stopOrphans: () => Effect.Effect<StopOrphansResult, ProbeFailed>
+  }
 >()('@dshfiles/worktree-memory/ProcessStopper') {
   static readonly layer = Layer.effect(
     ProcessStopper,
@@ -230,7 +309,60 @@ export class ProcessStopper extends Context.Service<
         return result
       })
 
-      return ProcessStopper.of({ stop })
+      interface OrphanSignal {
+        readonly pid: number
+        readonly startedAt: number
+        readonly group: boolean
+      }
+
+      /** SIGKILL only what is still the same scratch Host (group) or the same process (tree member) after the grace. */
+      const escalateOrphans = (signalled: readonly OrphanSignal[]) =>
+        Effect.gen(function* () {
+          yield* Effect.sleep(KILL_GRACE)
+          const rows = yield* probe.scratchTable
+          const alive = new Map(rows.map(row => [row.pid, row.startedAt]))
+          yield* Effect.forEach(
+            signalled,
+            target => {
+              if (!target.group) return alive.get(target.pid) === target.startedAt ? sendSignal(target.pid, 'SIGKILL') : Effect.void
+              return ScratchHostDetector.guardStop({ target, rows, hostPid: process.pid }) === 'signal-group' ? sendSignal(-target.pid, 'SIGKILL') : Effect.void
+            },
+            { discard: true },
+          )
+        }).pipe(
+          Effect.catchTag('ProbeFailed', error => Effect.logWarning('worktree-memory: orphan SIGKILL escalation skipped', error)),
+          Effect.withSpan('worktree-memory stop orphans escalate'),
+        )
+
+      const stopOrphans = Effect.fn('worktree-memory stop orphans')(function* () {
+        const { summary, rows } = yield* probe.scratchHosts
+        const byPid = new Map(rows.map(row => [row.pid, row]))
+        const verdicts = summary.hosts
+          .filter(host => host.orphan)
+          .map(host => ({ host, verdict: ScratchHostDetector.guardStop({ target: host, rows, hostPid: process.pid }) }))
+        const targets = verdicts.flatMap(({ host, verdict }): OrphanSignal[] => {
+          if (verdict === 'signal-group') return [{ pid: host.pid, startedAt: host.startedAt, group: true }]
+          if (verdict !== 'signal-tree') return []
+          return ProcessTable.treePids(rows, host.pid).flatMap(pid => {
+            const row = byPid.get(pid)
+            return row === undefined || pid === process.pid ? [] : [{ pid, startedAt: row.startedAt, group: false }]
+          })
+        })
+        const sent = yield* Effect.forEach(targets, target =>
+          Effect.map(sendSignal(target.group ? -target.pid : target.pid, 'SIGTERM'), delivered => (delivered ? [target] : [])),
+        )
+        const signalled = sent.flat()
+        const result = {
+          stopped: verdicts.filter(entry => entry.verdict === 'signal-group' || entry.verdict === 'signal-tree').length,
+          missing: verdicts.filter(entry => entry.verdict === 'gone').length,
+          refused: verdicts.filter(entry => entry.verdict === 'recycled' || entry.verdict === 'not-scratch' || entry.verdict === 'protected').length,
+        }
+        yield* Effect.annotateCurrentSpan({ 'worktree_memory.orphans.stopped': result.stopped, 'worktree_memory.orphans.refused': result.refused })
+        if (signalled.length > 0) yield* FiberSet.run(escalations, escalateOrphans(signalled))
+        return result
+      })
+
+      return ProcessStopper.of({ stop, stopOrphans })
     }),
   )
 }

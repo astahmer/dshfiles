@@ -92,6 +92,53 @@ const nodeProcessSummarySchema = Schema.Struct({
 })
 export type NodeProcessSummary = typeof nodeProcessSummarySchema.Type
 
+export const scratchKindValues = ['e2e', 'dev'] as const
+
+const scratchOwnerSchema = Schema.Struct({
+  pid: positiveInt,
+  startedAt: nonNegativeNumber,
+  workspace: limitedString(1024),
+  kind: Schema.Literals(scratchKindValues),
+  alive: Schema.Boolean,
+})
+
+/**
+ * - `owner-gone`: a dshx scratch record names an owner whose pid is dead or now runs a process started at another time.
+ * - `legacy-detached`: no record, re-parented to init and older than two hours (Hosts started before the record contract).
+ */
+const orphanReasonValues = ['owner-gone', 'legacy-detached'] as const
+export type OrphanReason = (typeof orphanReasonValues)[number]
+
+const scratchHostSchema = Schema.Struct({
+  pid: positiveInt,
+  startedAt: nonNegativeInt,
+  port: Schema.NullOr(positiveInt),
+  owner: Schema.NullOr(scratchOwnerSchema),
+  orphan: Schema.Boolean,
+  reason: Schema.NullOr(Schema.Literals(orphanReasonValues)),
+  bytes: nonNegativeNumber,
+  cpuPercent: nonNegativeNumber,
+  processCount: positiveInt,
+})
+export type ScratchHost = typeof scratchHostSchema.Type
+
+export const scratchHostsSchema = Schema.Struct({
+  hosts: Schema.Array(scratchHostSchema).check(Schema.isMaxLength(200)),
+  orphanCount: nonNegativeInt,
+  orphanBytes: nonNegativeNumber,
+  orphanCpuPercent: nonNegativeNumber,
+  /** The settings thresholds: the status strip warns while orphans use at least this much CPU or memory. */
+  alert: Schema.Struct({ cpuPercent: nonNegativeNumber, memoryBytes: nonNegativeNumber }),
+})
+export type ScratchHosts = typeof scratchHostsSchema.Type
+
+export const stopOrphansResultSchema = Schema.Struct({
+  stopped: nonNegativeInt,
+  refused: nonNegativeInt,
+  missing: nonNegativeInt,
+})
+export type StopOrphansResult = typeof stopOrphansResultSchema.Type
+
 export const memorySnapshotSchema = Schema.Struct({
   takenAt: Schema.Number,
   supported: Schema.Boolean,
@@ -104,6 +151,7 @@ export const memorySnapshotSchema = Schema.Struct({
   categoryBytes: Schema.Record(Schema.Literals(processCategoryValues), nonNegativeNumber),
   groups: Schema.Array(workspaceGroupSchema).check(Schema.isMaxLength(200)),
   nodeProcesses: Schema.optional(nodeProcessSummarySchema),
+  scratchHosts: Schema.optional(scratchHostsSchema),
 })
 export type MemorySnapshot = typeof memorySnapshotSchema.Type
 
