@@ -12,15 +12,38 @@ import { ProfileOrchestrator } from '../profile/orchestrator.js'
 import { watchProjectFiles } from './project-watcher.js'
 import type { DevBuildEvent, DevChildProcess, DevEvent, DevProjectWatcher, DevSession, DevSessionOptions, DevState, DevWatcher } from './types.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
+import {
+  advanceBuild,
+  beginReload,
+  buildsReady,
+  finishReload,
+  initialBuilds,
+  initialChild,
+  initialReload,
+  isChildRunning,
+  isClosed,
+  nextBuildGeneration,
+  nextBuilds,
+  projectDevState,
+  requestReload,
+  transitionChild,
+  type BuildsState,
+  type ChildPhase,
+  type DevFace,
+  type DevLifecycle,
+  type FaceConfigured,
+  type ReloadPhase,
+} from './session-state.js'
 
 const DEFAULT_STOP_TIMEOUT_MS = 3_000
+
+type WatcherGroupPhase = 'buffering' | 'active' | 'closed'
 
 interface CompilerWatcherGroup {
   readonly generation: number
   readonly watchers: { host?: DevWatcher; client?: DevWatcher }
-  readonly pending: Array<{ readonly face: 'host' | 'client'; readonly event: DevBuildEvent }>
-  active: boolean
-  closed: boolean
+  readonly pending: Array<{ readonly face: DevFace; readonly event: DevBuildEvent }>
+  phase: WatcherGroupPhase
   eventChain: Promise<void>
 }
 
@@ -126,6 +149,11 @@ function projectInputs(project: ResolvedDshxConfig): readonly string[] {
   ]
 }
 
+const facesOf = (project: ResolvedDshxConfig): FaceConfigured => ({
+  host: project.hostEntry !== undefined,
+  client: project.clientEntry !== undefined,
+})
+
 /** Start a coordinated Host/Client watch build and selected DSH process. */
 export async function startDevSession(project: ResolvedDshxConfig, options: DevSessionOptions = {}): Promise<DevSession> {
   const environment = { ...process.env, ...options.profile?.env, ...options.env }
@@ -138,42 +166,28 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
   const diagnostics: DshxDiagnostic[] = [...activeProfile.diagnostics]
   let activeWatchers: CompilerWatcherGroup | undefined
   let projectWatcher: DevProjectWatcher | undefined
-  let activeGeneration = 0
-  let child: DevChildProcess | undefined
-  let childStart: Promise<void> | undefined
-  let closed = false
-  let transitioning = false
-  let restartChain: Promise<void> = Promise.resolve()
+  let lifecycle: DevLifecycle = 'open'
+  let builds: BuildsState = initialBuilds(facesOf(project))
+  let child: ChildPhase = initialChild
+  let reload: ReloadPhase = initialReload
+  let restartQueue: Promise<void> = Promise.resolve()
   let reloadCompletion: Promise<void> = Promise.resolve()
-  let reloadRunning = false
-  let reloadPending = false
-  let reloadChangedFile = project.configFile ?? project.packageFile
-  let hostBuilt = activeProject.hostEntry === undefined
-  let clientBuilt = activeProject.clientEntry === undefined
-  let initialDshAttempted = false
-  const ignoredExit = new WeakSet<object>()
-  const observedExit = new WeakSet<object>()
-  let state: DevState = {
-    hostBuild: activeProject.hostEntry === undefined ? 'idle' : 'building',
-    clientBuild: activeProject.clientEntry === undefined ? 'idle' : 'building',
-    hostRestartRequired: false,
-    dshProcess: 'stopped',
-  }
+  let state: DevState = projectDevState({ lifecycle, builds, child })
 
   const emit = (event: DevEvent): void => {
     for (const listener of [...listeners]) listener(event)
   }
-  const setState = (next: Partial<DevState>): void => {
-    state = { ...state, ...next }
+  const publish = (): void => {
+    state = projectDevState({ lifecycle, builds, child })
     emit({ type: 'state', state })
   }
   const emitDiagnostic = (item: DshxDiagnostic): void => {
     diagnostics.push(item)
     emit({ type: 'diagnostic', diagnostic: item })
   }
+  const currentChild = (): DevChildProcess | undefined => (child.kind === 'running' || child.kind === 'restart-required' ? child.child : undefined)
 
   const stopChild = async (target: DevChildProcess): Promise<void> => {
-    ignoredExit.add(target)
     const exited = new Promise<void>(resolve => {
       target.on('exit', () => resolve())
     })
@@ -190,133 +204,134 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
     if (!didExit) target.kill('SIGKILL')
   }
 
-  // The project and profile are fixed at launch: a reload may replace the active ones while this child runs.
-  const startChildNow = async ({
-    restarting,
-    project: childProject,
-    profile: childProfile,
-  }: {
+  const runChildStart = async (input: {
     readonly restarting: boolean
-    readonly project: typeof activeProject
+    readonly project: ResolvedDshxConfig
     readonly profile: typeof activeProfile
+    readonly starting: ChildPhase
   }): Promise<void> => {
-    if (closed || transitioning || child !== undefined || state.dshProcess === 'starting' || !hostBuilt || !clientBuilt) return
-    setState({ dshProcess: 'starting', hostRestartRequired: false })
     // `--open` is a DSHX-only policy flag. rc.2 opens the browser when no
     // `--no-open` flag is present, but rejects an explicit `--open` argument.
     const requestedDshArgs = options.dshArgs ?? []
     const forwardedDshArgs = requestedDshArgs.filter(arg => arg !== '--open')
     const args = [
       '--profile',
-      childProfile.profile,
-      ...(childProfile.profile === 'web' && !requestedDshArgs.includes('--open') && !forwardedDshArgs.includes('--no-open') ? ['--no-open'] : []),
+      input.profile.profile,
+      ...(input.profile.profile === 'web' && !requestedDshArgs.includes('--open') && !forwardedDshArgs.includes('--no-open') ? ['--no-open'] : []),
       ...forwardedDshArgs,
     ]
     const childEnvironment = options.inspectBridge === true ? { ...environment, DSHX_INSPECT_BRIDGE: '1' } : environment
     try {
       const childFactory =
-        options.child ?? ((projectValue, childArgs, childEnv) => childFromExeca(projectValue, childArgs, childEnv, childProfile.dsh.executable ?? 'local'))
-      const started = await childFactory(childProject, args, childEnvironment)
-      if (closed) {
+        options.child ?? ((projectValue, childArgs, childEnv) => childFromExeca(projectValue, childArgs, childEnv, input.profile.dsh.executable ?? 'local'))
+      const started = await childFactory(input.project, args, childEnvironment)
+      if (child !== input.starting) {
         await stopChild(started)
         return
       }
-      child = started
+      child = transitionChild(child, { kind: 'spawned', child: started })
       started.on('error', error => {
-        if (ignoredExit.has(started) || observedExit.has(started)) return
-        ignoredExit.add(started)
-        if (child === started) child = undefined
-        const item = diagnostic(
-          restarting ? 'DSHX4404' : 'DSHX4401',
-          `DSH process failed to start: ${errorMessage(error)}`,
-          childProject.packageFile,
-          'Install DSH locally or make the official dsh command available on PATH, then retry.',
+        if (currentChild() !== started) return
+        child = transitionChild(child, { kind: 'exited' })
+        publish()
+        emitDiagnostic(
+          diagnostic(
+            input.restarting ? 'DSHX4404' : 'DSHX4401',
+            `DSH process failed to start: ${errorMessage(error)}`,
+            input.project.packageFile,
+            'Install DSH locally or make the official dsh command available on PATH, then retry.',
+          ),
         )
-        setState({ dshProcess: 'failed' })
-        emitDiagnostic(item)
       })
       started.on('exit', (code, signal) => {
-        if (observedExit.has(started)) return
-        observedExit.add(started)
-        if (ignoredExit.has(started)) {
-          if (child === started) child = undefined
-          return
-        }
-        if (child === started) child = undefined
+        if (currentChild() !== started) return
+        child = transitionChild(child, { kind: 'exited' })
+        publish()
         const item = diagnostic(
           code === null ? 'DSHX4403' : 'DSHX4402',
           code === null ? `DSH process exited due to signal ${signal ?? 'unknown'}.` : `DSH process exited with code ${code}.`,
-          childProject.packageFile,
+          input.project.packageFile,
           'Inspect the DSH stderr output, then call restart() after fixing the issue.',
         )
-        setState({ dshProcess: 'failed' })
         emit({ type: 'dsh-exit', code, signal, diagnostic: item })
         emitDiagnostic(item)
       })
-      setState({ dshProcess: 'running' })
+      publish()
     } catch (error) {
-      const item = diagnostic(
-        restarting ? 'DSHX4404' : 'DSHX4401',
-        `Failed to start DSH process: ${errorMessage(error)}`,
-        childProject.packageFile,
-        'Install DSH locally or make the official dsh command available on PATH, then retry.',
+      if (child !== input.starting) return
+      child = transitionChild(child, { kind: 'start-failed' })
+      publish()
+      emitDiagnostic(
+        diagnostic(
+          input.restarting ? 'DSHX4404' : 'DSHX4401',
+          `Failed to start DSH process: ${errorMessage(error)}`,
+          input.project.packageFile,
+          'Install DSH locally or make the official dsh command available on PATH, then retry.',
+        ),
       )
-      setState({ dshProcess: 'failed' })
-      emitDiagnostic(item)
     }
   }
 
   const startChild = (restarting = false): Promise<void> => {
-    if (childStart !== undefined) return childStart
-    const operation = startChildNow({ restarting, project: activeProject, profile: activeProfile })
-    childStart = operation
-    void operation.then(
-      () => {
-        if (childStart === operation) childStart = undefined
-      },
-      () => {
-        if (childStart === operation) childStart = undefined
-      },
-    )
-    return operation
+    if (child.kind === 'starting') return child.completion
+    if (isClosed(lifecycle) || !buildsReady(builds)) return Promise.resolve()
+    let settle!: () => void
+    const completion = new Promise<void>(resolve => {
+      settle = resolve
+    })
+    child = transitionChild(child, { kind: 'start', completion })
+    if (child.kind !== 'starting') {
+      settle()
+      return Promise.resolve()
+    }
+    const starting = child
+    publish()
+    return runChildStart({ restarting, project: activeProject, profile: activeProfile, starting }).finally(settle)
   }
 
   const startInitialChild = async (): Promise<void> => {
-    if (initialDshAttempted || !hostBuilt || !clientBuilt) return
-    initialDshAttempted = true
+    if (child.kind !== 'pending' || !buildsReady(builds)) return
     await startChild()
   }
 
   const stopDsh = async (): Promise<void> => {
-    if (child === undefined) {
-      if (state.dshProcess !== 'stopped') setState({ dshProcess: 'stopped' })
+    if (!isChildRunning(child)) {
+      if (child.kind !== 'failed') return
+      child = transitionChild(child, { kind: 'stopped' })
+      publish()
       return
     }
-    const stopped = stopChild(child)
-    child = undefined
-    setState({ dshProcess: 'stopped' })
-    await stopped
+    const target = currentChild()
+    child = transitionChild(child, { kind: 'stopped' })
+    publish()
+    if (target !== undefined) await stopChild(target)
   }
 
   const restartInternal = async (): Promise<void> => {
-    if (closed || transitioning) return
-    setState({ hostRestartRequired: false })
+    if (isClosed(lifecycle) || reload.kind !== 'idle') return
     await stopDsh()
     await startChild(true)
   }
 
   const restart = (): Promise<void> => {
-    restartChain = restartChain.then(restartInternal, restartInternal)
-    return restartChain
+    restartQueue = restartQueue.then(restartInternal, restartInternal)
+    return restartQueue
   }
 
-  const handleBuildEvent = async (generation: number, face: 'host' | 'client', event: DevBuildEvent): Promise<void> => {
-    if (closed || transitioning || generation !== activeGeneration) return
+  const handleBuildEvent = async (generation: number, face: DevFace, event: DevBuildEvent): Promise<void> => {
+    if (isClosed(lifecycle) || reload.kind !== 'idle') return
     if (event.code === 'START' || event.code === 'BUNDLE_START') {
-      setState({ [face === 'host' ? 'hostBuild' : 'clientBuild']: 'building' })
+      const advanced = advanceBuild(builds, { generation, face, kind: 'begin' })
+      if (advanced === undefined) return
+      builds = advanced.builds
+      publish()
       return
     }
     if (event.code === 'ERROR') {
+      const advanced = advanceBuild(builds, { generation, face, kind: 'failed' })
+      if (advanced === undefined) return
+      builds = advanced.builds
+      publish()
       const file = face === 'host' ? (activeProject.hostEntry ?? activeProject.packageFile) : (activeProject.clientEntry ?? activeProject.packageFile)
       const item = diagnostic(
         'DSHX4406',
@@ -324,22 +339,17 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
         file,
         'Fix the source error; the watcher remains active and will retry on the next change.',
       )
-      setState({ [face === 'host' ? 'hostBuild' : 'clientBuild']: 'error' })
       emit({ type: 'build-error', face, error: event.error, diagnostic: item })
       emitDiagnostic(item)
       return
     }
     if (event.code !== 'BUNDLE_END') return
-    const initial = face === 'host' ? !hostBuilt : !clientBuilt
-    if (face === 'host') {
-      hostBuilt = true
-      setState({ hostBuild: 'ok' })
-    } else {
-      clientBuilt = true
-      setState({ clientBuild: 'ok' })
-    }
-    emit({ type: 'build-success', face, initial })
-    if (!initial && state.dshProcess === 'running') {
+    const advanced = advanceBuild(builds, { generation, face, kind: 'succeeded' })
+    if (advanced === undefined) return
+    builds = advanced.builds
+    publish()
+    emit({ type: 'build-success', face, initial: advanced.initial })
+    if (!advanced.initial && isChildRunning(child)) {
       if (face === 'client') {
         emit({ type: 'client-rebuilt' })
       } else if (activeProject.dev.hostHmr !== undefined) {
@@ -347,7 +357,10 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
       } else if (activeProject.dev.hostRestart === 'auto') {
         await restart()
       } else {
-        setState({ hostRestartRequired: true })
+        if (child.kind === 'running') {
+          child = transitionChild(child, { kind: 'restart-required' })
+          publish()
+        }
         emit({ type: 'host-restart-required' })
       }
     }
@@ -355,9 +368,8 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
   }
 
   const closeCompilerWatchers = async (group: CompilerWatcherGroup, reportErrors = true): Promise<void> => {
-    if (group.closed) return
-    group.active = false
-    group.closed = true
+    if (group.phase === 'closed') return
+    group.phase = 'closed'
     await group.eventChain.catch(() => undefined)
     await Promise.all(
       Object.entries(group.watchers).map(async ([face, watcher]) => {
@@ -388,11 +400,10 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
       generation,
       watchers: {},
       pending: [],
-      active: false,
-      closed: false,
+      phase: 'buffering',
       eventChain: Promise.resolve(),
     }
-    const attach = async (face: 'host' | 'client'): Promise<void> => {
+    const attach = async (face: DevFace): Promise<void> => {
       try {
         const created =
           face === 'host'
@@ -400,8 +411,8 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
             : await (options.clientWatcher ?? (async (opts: BuildClientOptions): Promise<DevWatcher> => watchClient(opts)))(paths.client!)
         group.watchers[face] = created
         created.on('event', event => {
-          if (group.closed) return
-          if (!group.active) {
+          if (group.phase === 'closed') return
+          if (group.phase === 'buffering') {
             group.pending.push({ face, event })
             return
           }
@@ -429,7 +440,8 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
   }
 
   const activateCompilerWatchers = (group: CompilerWatcherGroup): void => {
-    group.active = true
+    if (group.phase !== 'buffering') return
+    group.phase = 'active'
     for (const { face, event } of group.pending.splice(0)) {
       const operation = handleBuildEvent(group.generation, face, event).catch(error => {
         emitDiagnostic(
@@ -450,56 +462,60 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
     return factory(projectInputs(candidate), file => requestProjectReload(file))
   }
 
+  const closeProjectWatcher = async (): Promise<void> => {
+    await projectWatcher?.close().catch(error => {
+      emitDiagnostic(
+        diagnostic(
+          'DSHX4408',
+          `Failed to close the project watcher: ${errorMessage(error)}`,
+          activeProject.packageFile,
+          'Check for stale file watchers and restart the session.',
+        ),
+      )
+    })
+  }
+
+  const discardCandidates = async (
+    candidateWatchers: CompilerWatcherGroup | undefined,
+    candidateProjectWatcher: DevProjectWatcher | undefined,
+  ): Promise<void> => {
+    if (candidateWatchers !== undefined) await closeCompilerWatchers(candidateWatchers, false)
+    await candidateProjectWatcher?.close().catch(() => undefined)
+  }
+
   const reloadProject = async (changedFile: string): Promise<void> => {
     let candidateWatchers: CompilerWatcherGroup | undefined
     let candidateProjectWatcher: DevProjectWatcher | undefined
     try {
       const resolver = options.resolveProject ?? resolveDshxConfig
       const candidate = await resolver({ cwd: activeProject.root })
-      if (closed) return
+      if (isClosed(lifecycle)) return
       const candidateProfile = await ensureProfile(candidate, profileOptions)
-      if (closed) return
+      if (isClosed(lifecycle)) return
       const candidateBuildPaths = buildOptions(candidate, candidateProfile.dsh.compatibility)
-      const candidateGeneration = activeGeneration + 1
-      candidateWatchers = await createCompilerWatchers(candidate, candidateBuildPaths, candidateGeneration)
+      candidateWatchers = await createCompilerWatchers(candidate, candidateBuildPaths, nextBuildGeneration(builds))
       try {
         candidateProjectWatcher = await createProjectWatcher(candidate)
       } catch (error) {
-        await closeCompilerWatchers(candidateWatchers, false)
+        await discardCandidates(candidateWatchers, undefined)
         candidateWatchers = undefined
         throw error
       }
-      if (closed) {
-        await closeCompilerWatchers(candidateWatchers, false)
-        await candidateProjectWatcher.close().catch(() => undefined)
+      if (isClosed(lifecycle)) {
+        await discardCandidates(candidateWatchers, candidateProjectWatcher)
         return
       }
 
-      transitioning = true
-      activeGeneration = candidateGeneration
-      await restartChain.catch(() => undefined)
-      if (closed) {
-        transitioning = false
-        await closeCompilerWatchers(candidateWatchers, false)
-        await candidateProjectWatcher.close().catch(() => undefined)
+      await restartQueue.catch(() => undefined)
+      if (isClosed(lifecycle)) {
+        await discardCandidates(candidateWatchers, candidateProjectWatcher)
         return
       }
       if (activeWatchers !== undefined) await closeCompilerWatchers(activeWatchers)
       await stopDsh()
-      await projectWatcher?.close().catch(error => {
-        emitDiagnostic(
-          diagnostic(
-            'DSHX4408',
-            `Failed to close the previous project watcher: ${errorMessage(error)}`,
-            activeProject.packageFile,
-            'Check for stale file watchers and restart the session.',
-          ),
-        )
-      })
-      if (closed) {
-        transitioning = false
-        await closeCompilerWatchers(candidateWatchers, false)
-        await candidateProjectWatcher.close().catch(() => undefined)
+      await closeProjectWatcher()
+      if (isClosed(lifecycle)) {
+        await discardCandidates(candidateWatchers, candidateProjectWatcher)
         return
       }
 
@@ -509,25 +525,16 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
       projectWatcher = candidateProjectWatcher
       candidateWatchers = undefined
       candidateProjectWatcher = undefined
-      hostBuilt = activeProject.hostEntry === undefined
-      clientBuilt = activeProject.clientEntry === undefined
-      initialDshAttempted = false
-      setState({
-        hostBuild: activeProject.hostEntry === undefined ? 'idle' : 'building',
-        clientBuild: activeProject.clientEntry === undefined ? 'idle' : 'building',
-        hostRestartRequired: false,
-        dshProcess: 'stopped',
-      })
-      transitioning = false
+      builds = nextBuilds(builds, facesOf(candidate))
+      child = transitionChild(child, { kind: 'reset' })
+      publish()
       activateCompilerWatchers(activeWatchers)
       for (const item of candidateProfile.diagnostics) emitDiagnostic(item)
       await activeWatchers.eventChain
       await startInitialChild()
     } catch (error) {
-      transitioning = false
-      if (candidateWatchers !== undefined) await closeCompilerWatchers(candidateWatchers, false)
-      await candidateProjectWatcher?.close().catch(() => undefined)
-      if (closed) return
+      await discardCandidates(candidateWatchers, candidateProjectWatcher)
+      if (isClosed(lifecycle)) return
       const file = error instanceof DshxError && error.file !== undefined ? error.file : changedFile
       emitDiagnostic(
         diagnostic(
@@ -541,24 +548,22 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
   }
 
   const drainProjectReloads = async (): Promise<void> => {
-    while (reloadPending && !closed) {
-      reloadPending = false
-      await reloadProject(reloadChangedFile)
+    while (!isClosed(lifecycle)) {
+      const started = beginReload(reload)
+      if (started === undefined) return
+      reload = started.phase
+      await reloadProject(started.changedFile)
+      reload = finishReload(reload)
     }
   }
 
   function requestProjectReload(file: string): void {
-    if (closed) return
-    reloadChangedFile = file
-    reloadPending = true
-    if (reloadRunning) return
-    reloadRunning = true
-    const operation = drainProjectReloads().finally(() => {
-      reloadRunning = false
-      if (reloadPending && !closed) requestProjectReload(reloadChangedFile)
-    })
-    reloadCompletion = operation
-    void operation.catch(() => undefined)
+    if (isClosed(lifecycle)) return
+    const idle = reload.kind === 'idle'
+    reload = requestReload(reload, file)
+    if (!idle) return
+    reloadCompletion = drainProjectReloads()
+    void reloadCompletion.catch(() => undefined)
   }
 
   const session: DevSession = {
@@ -585,37 +590,31 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
     },
     restart,
     async close() {
-      if (closed) return
-      closed = true
-      reloadPending = false
-      await projectWatcher?.close().catch(error => {
-        emitDiagnostic(
-          diagnostic(
-            'DSHX4408',
-            `Failed to close the project watcher: ${errorMessage(error)}`,
-            activeProject.packageFile,
-            'Check for stale file watchers and restart the session.',
-          ),
-        )
-      })
+      if (isClosed(lifecycle)) return
+      lifecycle = 'closing'
+      reload = initialReload
+      await closeProjectWatcher()
       await reloadCompletion.catch(() => undefined)
       if (activeWatchers !== undefined) await closeCompilerWatchers(activeWatchers)
       await stopDsh()
-      await childStart?.catch(() => undefined)
-      await restartChain.catch(() => undefined)
+      if (child.kind === 'starting') await child.completion.catch(() => undefined)
+      await restartQueue.catch(() => undefined)
       await stopDsh()
+      child = transitionChild(child, { kind: 'ended' })
+      lifecycle = 'closed'
+      publish()
     },
   }
 
   emit({ type: 'state', state })
   try {
-    activeWatchers = await createCompilerWatchers(activeProject, initialBuildPaths, activeGeneration)
+    activeWatchers = await createCompilerWatchers(activeProject, initialBuildPaths, builds.generation)
     projectWatcher = await createProjectWatcher(activeProject)
     activateCompilerWatchers(activeWatchers)
   } catch (error) {
-    closed = true
+    lifecycle = 'closed'
     if (activeWatchers !== undefined) await closeCompilerWatchers(activeWatchers, false)
-    await projectWatcher?.close().catch(() => undefined)
+    await closeProjectWatcher()
     if (error instanceof DshxError) throw error
     throw new DshxError('DSHX4408', `Failed to start the project configuration watcher: ${errorMessage(error)}`, {
       cause: error,

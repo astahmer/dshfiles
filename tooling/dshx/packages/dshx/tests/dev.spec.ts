@@ -529,6 +529,61 @@ describe('development process orchestration', () => {
     await session.close()
   })
 
+  it('waits for an in-flight initial child start before swapping the project configuration', async () => {
+    const initial: ResolvedDshxConfig = {
+      ...project('host'),
+      configFile: '/project/plugin/dshx.config.ts',
+      configDependencies: ['/project/plugin/config/initial.ts'],
+    }
+    const next: ResolvedDshxConfig = { ...initial, hostEntry: '/project/plugin/src/next-host.ts' }
+    const compilerWatchers: FakeWatcher[] = []
+    const projectWatchers: FakeProjectWatcher[] = []
+    const children: FakeChild[] = []
+    let releaseFirstStart: (() => void) | undefined
+    const firstStart = new Promise<void>(resolve => {
+      releaseFirstStart = resolve
+    })
+    const session = await startDevSession(initial, {
+      preparedProfile: prepared(initial),
+      ensureProfile: async candidate => prepared(candidate),
+      resolveProject: async () => next,
+      hostWatcher: async () => {
+        const watcher = new FakeWatcher()
+        compilerWatchers.push(watcher)
+        return watcher
+      },
+      projectWatcher: async (files, onChange) => {
+        const watcher = new FakeProjectWatcher(files, onChange)
+        projectWatchers.push(watcher)
+        return watcher
+      },
+      child: async () => {
+        const child = new FakeChild()
+        children.push(child)
+        if (children.length === 1) await firstStart
+        return child
+      },
+    })
+
+    compilerWatchers[0]?.build({ code: 'BUNDLE_END' })
+    await flush()
+    expect(session.state.dshProcess).toBe('starting')
+
+    projectWatchers[0]?.change(initial.packageFile)
+    await flush()
+    expect(projectWatchers).toHaveLength(1)
+
+    releaseFirstStart?.()
+    await vi.waitFor(() => expect(projectWatchers).toHaveLength(2))
+    await vi.waitFor(() => expect(session.state).toMatchObject({ dshProcess: 'stopped', hostBuild: 'building' }))
+    expect(children[0]?.signals).toContain('SIGTERM')
+
+    compilerWatchers[1]?.build({ code: 'BUNDLE_END' })
+    await vi.waitFor(() => expect(children).toHaveLength(2))
+    expect(session.state).toMatchObject({ dshProcess: 'running', hostBuild: 'ok' })
+    await session.close()
+  })
+
   it('keeps the last-good session alive after reload failure and recovers on the next dependency change', async () => {
     const initial: ResolvedDshxConfig = {
       ...project('host'),
