@@ -504,7 +504,7 @@ Then('the composer summary shows an exact revision count against main', async ({
   const summary = page.getByRole('button', { name: /^Review workspace changes: @ vs main: 1 only on @$/u })
   await recordAssertion(page, 'jujutsu-composer-summary-shows-a-real-ahead-or-behind-count', () => expect(summary).toBeVisible())
   await summary.click()
-  const review = page.getByTestId('pulls-review-diffs')
+  const review = page.getByTestId('changes-diffs')
   await recordAssertion(page, 'jujutsu-composer-summary-opens-multi-file-workspace-review', async () => {
     await expect(review).toBeVisible()
     await expect(review.getByText('review-one.txt', { exact: true })).toBeVisible()
