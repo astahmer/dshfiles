@@ -10,7 +10,7 @@
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "settings: Plugins › Web search",
+      "currentSurface": "settings: Plugins \u203a Web search",
       "configuration": [],
       "states": ["configured", "missing-key", "unavailable", "stale-while-hidden"],
       "failureModes": [
@@ -36,6 +36,18 @@
           "id": "settings-web-search.registration",
           "file": "plugins/@dshfiles/settings-web-search/tests/registration.test.ts",
           "testName": "registers the Web search plugin page"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-web-search.lazy-read",
+          "file": "plugins/@dshfiles/settings-web-search/tests/credential-read.test.ts",
+          "testName": "reads nothing at boot or on settings changes until the page shows"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-web-search.burst-read",
+          "file": "plugins/@dshfiles/settings-web-search/tests/credential-read.test.ts",
+          "testName": "reads once for a settings describe that republishes all three scopes"
         }
       ]
     }

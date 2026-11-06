@@ -8,11 +8,23 @@
     "path": "packages/client/ui-settings-web-search"
   },
   "files": [
-    { "upstream": "src/client", "local": "src/native" },
-    { "upstream": "src/index.ts", "local": "src/host.ts" },
-    { "upstream": "src/css-modules.d.ts", "local": "src/css-modules.d.ts" },
-    { "upstream": "locale", "local": "locale" }
+    {
+      "upstream": "src/client",
+      "local": "src/native"
+    },
+    {
+      "upstream": "src/index.ts",
+      "local": "src/host.ts"
+    },
+    {
+      "upstream": "src/css-modules.d.ts",
+      "local": "src/css-modules.d.ts"
+    },
+    {
+      "upstream": "locale",
+      "local": "locale"
+    }
   ],
-  "added": [],
-  "delta": []
+  "added": ["src/native/demand-refresh.ts"],
+  "delta": ["src/native/web-search-card-controller.ts"]
 }

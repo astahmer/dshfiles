@@ -18,6 +18,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the ctx.remote merge into this program.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { createDemandRefresh, type DemandRefresh } from './demand-refresh.ts'
 import {
   SettingsFormModel, settingsNumberField, settingsTextField,
   type SettingsFieldState, type SettingsFormActions, type SettingsFormShell, type SettingsFormScope, type SettingsFormScopeSnapshot,
@@ -131,6 +132,8 @@ export class WebSearchCardController {
   private readonly messages: SettingsFormModel<WebSearchSettings>
   private readonly api: SettingsFormModel<WebApiSettings>
   private readonly store: SnapshotStore<WebSearchCardState>
+  /** Reads the credential while the page shows, once per burst of changes; the boot read waits for the first show. */
+  private readonly credentialRead: DemandRefresh<WebSearchCardState>
   private readonly unsubscribe: (() => void)[]
   private credential: CredentialState = { ref: '', configured: false, writable: true }
 
@@ -161,17 +164,30 @@ export class WebSearchCardController {
       },
     ])
     this.store = createSnapshotStore(this.projection())
+    this.credentialRead = createDemandRefresh({ store: this.store, refresh: () => { void this.readCredential() }, stale: true })
     // A staged switch can change which section names the key, without any
     // scope publishing; a scope change can rename the reference itself.
     const publish = () => {
       this.store.set(this.projection())
-      if (this.ref() !== this.credential.ref) void this.readCredential()
+      if (this.ref() !== this.credential.ref) this.requestCredential()
     }
     this.unsubscribe = [
       ...[this.selection, this.messages, this.api].map(form => form.bind(() => form.shell()).subscribe(publish)),
-      ...[scopes.web, scopes.messages, scopes.api].map(scope => scope.subscribe(() => { void this.readCredential() })),
+      ...[scopes.web, scopes.messages, scopes.api].map(scope => scope.subscribe(() => { this.requestCredential() })),
     ]
-    void this.readCredential()
+  }
+
+  /**
+   * Forget the answer for a reference that changed, as {@link readCredential} does, then read once the page shows and
+   * the burst settles: one settings describe republishes all three scopes at once.
+   */
+  private requestCredential(): void {
+    const ref = this.ref()
+    if (ref !== this.credential.ref) {
+      this.credential = { ref, configured: false, writable: true }
+      this.store.set(this.projection())
+    }
+    this.credentialRead.request()
   }
 
   /** Whether the Host serves both sections the switch needs. */
@@ -256,7 +272,7 @@ export class WebSearchCardController {
    */
   refreshCredential(ref: string): void {
     if (ref !== this.credential.ref) return
-    void this.readCredential()
+    this.requestCredential()
   }
 
   /**
@@ -272,7 +288,7 @@ export class WebSearchCardController {
       return this.searchApi() ? this.api : this.messages
     }
     return {
-      hooks: { webSearchCard: this.store },
+      hooks: { webSearchCard: this.credentialRead.observed },
       edit: (field, text) => { formOf(field).actions().edit(field, text) },
       resetField: (field) => { formOf(field).actions().resetField(field) },
       setSearchApi: (enabled) => { this.select(enabled) },
@@ -332,6 +348,7 @@ export class WebSearchCardController {
   /** Release configuration subscriptions. */
   dispose(): void {
     for (const off of this.unsubscribe) off()
+    this.credentialRead.dispose()
     for (const form of [this.selection, this.messages, this.api]) form.dispose()
   }
 }

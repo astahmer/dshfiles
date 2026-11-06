@@ -1,7 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import type { ComponentType } from 'react'
 import { vi } from 'vitest'
-import { apply, inject } from '../src/native/index.ts'
+import { apply, inject } from '../src/native/index.js'
 
 interface Observable {
   readonly subscribe: (listener: () => void) => () => void
