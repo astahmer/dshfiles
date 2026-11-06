@@ -2,6 +2,8 @@
 
 ![Thread dev servers](docs/screenshots/thread-dev-servers.png)
 
+![Agent browser](docs/screenshots/agent-browser.png)
+
 Three things a thread needs while it builds a web app:
 
 - **Agent preview browser.** Agent tools drive a headless Chromium on the DSH Host, one isolated browser context per
