@@ -55,8 +55,6 @@ owner.
 **Thread loop (Phase 4)**
 
 - [ ] Done / Restore releases and recreates the workspace (C3 in [t3code parity](../t3code-parity.md)).
-- [ ] Walkthrough card at the end of a turn that changed code (candidates: `ActivityDock` or `SessionRecap`, see
-      [component adoption](../component-adoption/README.md)).
 - [x] ~~Walkthrough card~~: turn-summary renders `ActivityDock` after a turn that changed files, with Review in
       Changes (setting `walkthrough`).
 - [x] ~~Step timestamps and durations~~: already shipped by `@dshfiles/tool-meta` on every tool card.
@@ -83,6 +81,8 @@ owner.
 - [x] ~~Settings changes lost after a reload~~: dshx keeps each settings write until the Host confirms it and replays
       it on the next page.
 - [x] ~~Status strip with every item hidden~~ keeps a control to show items again.
+- [x] ~~Workbench thread tabs lost the sticky composer and hero centering~~ after they switched to the main variant;
+      phase rules now key on the content body, and squeezed status items clip instead of overlapping (2026-11-06).
 - [ ] Multi-host journeys fail 0/6 on main too, so its Phase 1 UI is unverified.
 - [ ] Pre-existing failures (2026-11-05 recount): thread-sidebar section-order and navigation-layout,
       jujutsu composer-context, the ai-accounts six above; workbench/main-tabs/editor journeys are flaky under load
