@@ -506,7 +506,18 @@ history, bookmarks and other workspaces stay where they are.
 
 ## Agent tools
 
-- `jj_thread_isolate`: before the first code edit, create a dedicated jj workspace when the current Session is not isolated. It starts from the current working-copy revision. The Session cwd stays unchanged, so use the returned absolute path for all file operations and as shell `workdir`; status and rebase tools follow the isolated workspace automatically.
+- `jj_thread_isolate`: before the first code edit, create a dedicated jj workspace when the current Session is not isolated. It starts from the configured bookmark. The Session cwd stays unchanged, so use the returned absolute path for all file operations and as shell `workdir`; status and rebase tools follow the isolated workspace automatically.
+
+### Workspaces subagents work in
+
+A subagent calls `jj_thread_isolate` itself instead of running `jj workspace add`. Its workspace is then a managed
+thread workspace that the subagent's Session owns: [cleanup](#cleanup) keeps it while that Session works or waits for an
+answer, and once its work is on the bookmark — `jj_thread_rebase` with the workspace `path` (the parent may call it once
+the subagent is idle), or any rebase that keeps the revisions' ancestry — the next automatic pass removes it with its
+`node_modules`. A raw `jj workspace add` under the threads directory is also listed, but no Session guards it, and a
+`jj workspace forget` leaves its folder for the opt-in `untracked` kind.
+[`agent-workspace-cleanup.integration.test.ts`](src/agent-workspace-cleanup.integration.test.ts) pins the flow.
+
 - `jj_thread_status`: this thread's revisions not yet on the target bookmark and whether it moved.
 - `jj_thread_rebase`: rebase this thread's work onto the target bookmark.
 

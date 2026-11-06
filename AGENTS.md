@@ -187,11 +187,17 @@ workspaces. See [the fork workflow](docs/fork-maintenance.md).
 
 Work lands on `main`; never push with either Git or JJ without authorization.
 
-- Do parallel work in your own workspace, never in someone else's checkout:
-  `jj workspace add ../dshfiles-<topic> --name <topic> -r main`, or a thread
-  workspace created by `@dshfiles/jj-integration` (see its
-  [README](plugins/@dshfiles/jj-integration/README.md); **Rebase** moves it
-  onto `main`).
+- Do parallel work in your own workspace, never in someone else's checkout.
+  An agent (subagents included) calls the `jj_thread_isolate` tool before its
+  first edit and works in the absolute path it returns: the workspace is a
+  managed thread workspace from `main`, its Session guards it while it works,
+  and once its work lands (`jj_thread_rebase` with that `path`, or any rebase
+  that keeps its revisions' ancestry — not `jj duplicate`) the Host's cleanup
+  removes it with its `node_modules`. Do not tell a subagent to run a raw
+  `jj workspace add`: such a workspace has no owning Session, and once forgotten
+  its folder stays on disk. A human working outside DSH may still use
+  `jj workspace add ../dshfiles-<topic> --name <topic> -r main` (see the
+  jj-integration [README](plugins/@dshfiles/jj-integration/README.md)).
 - One described revision per logical change: Conventional Commit title and a
   body that says why. Do not add `Co-Authored-By` trailers or local DSH agent
   handles to commit metadata; they are not GitHub collaborators. `jj describe

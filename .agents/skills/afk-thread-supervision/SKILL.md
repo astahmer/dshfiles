@@ -7,7 +7,7 @@ description: Supervises long-running work across DSH threads while the user is a
 
 Use one dedicated supervisor thread for the user's monitoring request. Load `dsh-sessions`; for JJ integration load `jj-linearize` (it absorbed `jj-merge-workspaces` and `jj-history-consolidation`); for plugin changes load `dsh-plugin-verify` as needed.
 
-If the user asks for a separate supervisor thread and the current thread is not suitable, create one with the `dshx sessions create --cwd <repo> --json` flow from `dsh-sessions`, then send its kickoff prompt to the returned session ID. Do not create redundant supervisors. If it needs to edit or land code, use its own JJ workspace rather than an active agent's workspace.
+If the user asks for a separate supervisor thread and the current thread is not suitable, create one with the `dshx sessions create --cwd <repo> --json` flow from `dsh-sessions`, then send its kickoff prompt to the returned session ID. Do not create redundant supervisors. If it needs to edit or land code, use its own JJ workspace rather than an active agent's workspace: call `jj_thread_isolate` first, and tell every subagent you start to do the same instead of a raw `jj workspace add`, so the Host's workspace cleanup removes the workspace once its work lands.
 
 ## Start the watch
 
@@ -31,11 +31,11 @@ If the user asks for a separate supervisor thread and the current thread is not 
 3. Prefer the thread's latest successful checks when they cover its described revisions; do not rerun identical suites just for supervision. Rerun only the narrow check needed when a rebase/conflict resolution changes source, evidence is missing or stale, or a relevant check failed. Integrate every completed, described revision that passes those gates; the AFK request is standing authorization and does not require per-thread rebase approval. Keep active, incomplete, undescribed, conflicting, or otherwise failing work isolated, but continue with independent eligible branches. Use `jj-linearize` for completed branches and for many heads, duplicates, or conflicts. Stop only on unclear duplicate changes or conflict roots.
 4. Never push unless the user explicitly asks. Never restart the live DSH instance; use the project's scratch verification workflow when runtime proof is needed.
 
-## Forget empty workspaces
+## Remove finished workspaces
 
 - Preserve `default`, every active workspace, and every workspace with tracked or untracked changes.
-- Confirm the exact workspace name and path, check that no live session owns it, then run `jj status` only when it is inactive. Forget only if the working copy is clean. A clean-looking `@` can still have untracked files.
-- `jj workspace forget <name>` removes JJ tracking but leaves the directory and revision data on disk. Do not `rm`, abandon revisions, or delete nonempty workspace data unless the user explicitly authorizes that separate action.
+- Use `jj_thread_cleanup` (`apply: false` to preview, `apply: true` when the user asked to clean up): it skips unlanded work, working or waiting Sessions and queued integrations, snapshots each working copy first, then forgets the workspace and deletes its folder with its `node_modules`.
+- Do not run a bare `jj workspace forget <name>`: it removes JJ tracking but leaves the directory on disk, which only the opt-in `untracked` cleanup kind finds later. Do not `rm`, abandon revisions, or delete nonempty workspace data unless the user explicitly authorizes that separate action.
 
 ## Each continuation and closeout
 
