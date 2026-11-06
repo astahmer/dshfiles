@@ -512,6 +512,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "ai-accounts.mistral-hosted-models",
+          "file": "plugins/@dshfiles/ai-accounts/src/mistral-provider.test.ts",
+          "testName": "catalogs DeepSeek V4.1 Flash 1017 as Mistral documents it"
+        },
+        {
+          "kind": "unit-test",
           "id": "ai-accounts.discovered-model-capabilities",
           "file": "plugins/@dshfiles/ai-accounts/src/provider-profile.test.ts",
           "testName": "keeps the context window and image input a provider catalog reports"

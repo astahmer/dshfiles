@@ -64,10 +64,30 @@ export const mistralTemplateId = (id: string, known: readonly string[]): string 
   return known.includes('mistral-medium-latest') ? 'mistral-medium-latest' : known[0]
 }
 
+/**
+ * Mistral-hosted models pi-ai 1.3.0 does not catalog, as their Mistral model pages document them (read 2026-11-06).
+ * Each borrows its template's transport; "1M" and "128k" are written as pi-ai writes them for GLM 5.3.
+ */
+const HOSTED_MODELS = [
+  {
+    id: 'deepseek-v4-1-flash-1017',
+    name: 'DeepSeek V4.1 Flash 1017',
+    contextWindow: 1_048_576,
+    maxTokens: 131_072,
+    cost: { input: 0.3, output: 1.2, cacheRead: 0.007, cacheWrite: 0 },
+  },
+]
+
 /** pi-ai's Mistral provider with the efforts Mistral accepts, able to describe a model the account discovered after boot. */
 export const createMistralProvider = () => {
   const provider = mistralProvider()
-  const models = provider.getModels().map((model): typeof model => {
+  const catalog = provider.getModels()
+  const catalogIds = catalog.map(model => model.id)
+  const hosted: typeof catalog = HOSTED_MODELS.filter(entry => !catalogIds.includes(entry.id)).flatMap(entry => {
+    const template = catalog.find(model => model.id === mistralTemplateId(entry.id, catalogIds))
+    return template === undefined ? [] : [{ ...template, ...entry }]
+  })
+  const models = [...catalog, ...hosted].map((model): typeof model => {
     const thinkingLevelMap = mistralThinkingLevelMap(model.id)
     return {
       ...model,

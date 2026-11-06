@@ -36,3 +36,19 @@ describe('Mistral image input', () => {
     expect(catalogModel('zai-glm-5-3')?.input).toEqual(['text'])
   })
 })
+
+describe('Mistral-hosted models pi-ai does not catalog', () => {
+  it('catalogs DeepSeek V4.1 Flash 1017 as Mistral documents it', () => {
+    expect(catalogModel('deepseek-v4-1-flash-1017')).toMatchObject({
+      name: 'DeepSeek V4.1 Flash 1017',
+      provider: 'mistral',
+      input: ['text', 'image'],
+      contextWindow: 1_048_576,
+      maxTokens: 131_072,
+      cost: { input: 0.3, output: 1.2, cacheRead: 0.007, cacheWrite: 0 },
+      reasoning: true,
+      thinkingLevelMap: { off: null, minimal: null, low: 'low', medium: null, high: 'high', xhigh: null, max: 'max' },
+    })
+    expect(provider.getModels().filter(model => model.id === 'deepseek-v4-1-flash-1017')).toHaveLength(1)
+  })
+})
