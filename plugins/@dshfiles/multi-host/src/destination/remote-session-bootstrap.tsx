@@ -1,49 +1,34 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { Schema } from 'effect'
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 import type { MultiHostClient } from './queries.js'
+import { remoteSessionBootstrapMachine, type BootstrapFailure } from './remote-session-bootstrap-machine.js'
 
 const bootstrapFailureSchema = Schema.Struct({ message: Schema.String, code: Schema.optional(Schema.String) })
-type BootstrapFailure = Schema.Schema.Type<typeof bootstrapFailureSchema>
 
-const createdSessions = new Map<string, string>()
-const sessionCreations = new Map<string, Promise<string>>()
-
-const createSessionOnce = async (target: string, create: () => Promise<string>): Promise<string> => {
-  const created = createdSessions.get(target)
-  if (created !== undefined) return created
-
-  const pending = sessionCreations.get(target)
-  if (pending !== undefined) return pending
-
-  const operation = create().then(sessionId => {
-    createdSessions.set(target, sessionId)
-    return sessionId
-  })
-  sessionCreations.set(target, operation)
-  try {
-    return await operation
-  } finally {
-    if (sessionCreations.get(target) === operation) sessionCreations.delete(target)
-  }
-}
-
-/** Creates an empty remote Session so the ordinary conversation and composer own the first draft too. */
-export const RemoteSessionBootstrap = (props: {
+interface RemoteSessionBootstrapProps {
   readonly api: MultiHostClient
   readonly runtimeId: string
   readonly hostName: string
   readonly cwd: string | undefined
   readonly prepareCwd?: () => Promise<string>
   readonly onStarted: (sessionId: string) => void | Promise<void>
-}) => {
-  const [attempt, setAttempt] = useState(0)
-  const [starting, setStarting] = useState(false)
-  const [failure, setFailure] = useState<BootstrapFailure | null>(null)
-  const attempted = useRef<string | undefined>(undefined)
+}
+
+/** Creates an empty remote Session so the ordinary conversation and composer own the first draft too. */
+export const RemoteSessionBootstrap = (props: RemoteSessionBootstrapProps) => {
+  const target = props.cwd === undefined ? undefined : `${props.runtimeId}\u0000${props.cwd}`
+  if (target === undefined) return null
+  // A different remote folder is a different Session, so its bootstrap starts from scratch.
+  return <RemoteSessionBootstrapAttempt key={target} {...props} target={target} />
+}
+
+const RemoteSessionBootstrapAttempt = (props: RemoteSessionBootstrapProps & { readonly target: string }) => {
+  // The machine snapshots its input once per target; the refs keep a prop change from freezing a stale Host call.
   const api = useRef(props.api)
   const runtimeId = useRef(props.runtimeId)
   const hostName = useRef(props.hostName)
@@ -57,18 +42,10 @@ export const RemoteSessionBootstrap = (props: {
   prepareCwd.current = props.prepareCwd
   onStarted.current = props.onStarted
 
-  const target = props.cwd === undefined ? undefined : `${props.runtimeId}\u0000${props.cwd}`
-
-  useEffect(() => {
-    if (target === undefined) return
-    const attemptKey = `${target}\u0000${String(attempt)}`
-    if (attempted.current === attemptKey) return
-    attempted.current = attemptKey
-    let active = true
-    setFailure(null)
-    setStarting(true)
-    void (async () => {
-      const sessionId = await createSessionOnce(target, async () => {
+  const [snapshot, send] = useMachine(remoteSessionBootstrapMachine, {
+    input: {
+      target: props.target,
+      create: async () => {
         const remoteCwd = prepareCwd.current === undefined ? cwd.current : await prepareCwd.current()
         if (remoteCwd === undefined) throw new Error('Choose a folder on this host first.')
         const result = await api.current.threadCreate({ runtimeId: runtimeId.current, cwd: remoteCwd })
@@ -76,33 +53,23 @@ export const RemoteSessionBootstrap = (props: {
           throw { message: `${result.message} (${result.code})`, code: result.code } satisfies BootstrapFailure
         }
         return result.sessionId
-      })
-      if (active) {
-        await onStarted.current(sessionId)
-        createdSessions.delete(target)
-      }
-    })()
-      .catch(error => {
-        if (!active) return
+      },
+      onStarted: sessionId => onStarted.current(sessionId),
+      describeFailure: error => {
         const parsed = Schema.decodeUnknownResult(bootstrapFailureSchema)(error)
-        setFailure(parsed._tag === 'Success' ? parsed.success : { message: errorMessage(error, `Could not start a thread on ${hostName.current}.`) })
-      })
-      .finally(() => {
-        if (active) setStarting(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [attempt, target])
+        return parsed._tag === 'Success' ? parsed.success : { message: errorMessage(error, `Could not start a thread on ${hostName.current}.`) }
+      },
+    },
+  })
 
-  if (target === undefined) return null
-  if (failure !== null) {
+  const failure = snapshot.context.failure
+  if (snapshot.matches('failed') || snapshot.matches('unrecoverable')) {
     return (
       <Alert variant="destructive" className="dshx:mt-2">
         <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2">
-          <span className="dshx:min-w-0 dshx:flex-1">{failure.message}</span>
-          {failure.code === 'unknown-mutation-outcome' ? null : (
-            <Button size="sm" variant="outline" onClick={() => setAttempt(value => value + 1)}>
+          <span className="dshx:min-w-0 dshx:flex-1">{failure?.message ?? `Could not start a thread on ${props.hostName}.`}</span>
+          {snapshot.matches('unrecoverable') ? null : (
+            <Button size="sm" variant="outline" onClick={() => send({ type: 'retry' })}>
               Retry
             </Button>
           )}
@@ -110,7 +77,7 @@ export const RemoteSessionBootstrap = (props: {
       </Alert>
     )
   }
-  if (!starting) return null
+  if (snapshot.matches('started')) return null
   return (
     <p className="dshx:mt-2 dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground" role="status">
       <Spinner className="dshx:size-3.5" /> Opening a native thread on {props.hostName}…
