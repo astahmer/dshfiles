@@ -1,5 +1,5 @@
 import { Context, Effect, FileSystem, Layer, Option, Path, type PlatformError } from 'effect'
-import { GitFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed } from './errors.js'
+import { GitFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed, type ThreadWorkspaceError } from './errors.js'
 import { Git, type GitCommandFailed, type GitRunFailed } from '@dshfiles/git-cli'
 import { JjSettings } from './jj-settings.js'
 import { RepoLocks } from './repo-locks.js'
@@ -21,6 +21,7 @@ import type {
   VerifiedLandOutcome,
 } from './thread-workspace-types.js'
 import type { ThreadLocation } from './thread-workspace-model.js'
+import { LAND_ATTEMPTS, runVerifiedLand, type LandSettlement, type LandStepResult } from './verified-land-phases.js'
 
 const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
 const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u
@@ -35,7 +36,6 @@ const SNAPSHOT_REFS = 'refs/dsh/snapshots/'
 /** Enough of `for-each-ref` to see far past the kept snapshots; a longer listing converges over later snapshots. */
 const SNAPSHOT_LISTING_BYTES = 128 * 1024
 const MAX_CONFLICT_FILES = 50
-const LAND_ATTEMPTS = 3
 const GRAPH_REVISIONS = 20
 const SNAPSHOT_AUTHOR = { GIT_AUTHOR_NAME: 'dsh', GIT_AUTHOR_EMAIL: 'dsh@localhost', GIT_COMMITTER_NAME: 'dsh', GIT_COMMITTER_EMAIL: 'dsh@localhost' }
 /** git keeps uncommitted edits outside any commit; they surface as this one revision, undescribed, so landing asks for a commit. */
@@ -459,6 +459,15 @@ const make = Effect.gen(function* () {
     return new Set(listed.filter(line => line.startsWith('- ')).map(line => line.slice(2).trim()))
   })
 
+  interface GitLandScan {
+    readonly base: string
+    readonly work: readonly ThreadRevision[]
+  }
+  interface GitLandRebase extends GitLandScan {
+    readonly rebased: readonly ThreadRevision[]
+    readonly head: ThreadRevision
+  }
+
   const landVerified = Effect.fn('git thread workspaces land verified')(function* (input: VerifiedLandOptions) {
     const cancelled = input.cancelled ?? Effect.succeed(false)
     const cancelledOutcome: VerifiedLandOutcome = { status: 'verification-cancelled' }
@@ -475,48 +484,78 @@ const make = Effect.gen(function* () {
         const name = input.bookmark ?? (yield* bookmark)
         if ((yield* headOf(cwd)) !== input.expectedSourceRevision)
           return stale('The thread changed after its completion checks passed. Stop for Project Checks again; automatic integration did not rebase it.')
-        for (let attempt = 1; ; attempt++) {
-          if (yield* cancelled) return cancelledOutcome
-          if (!(yield* authorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          yield* refuseRebaseInProgress(cwd)
-          if (yield* isDirty(cwd)) return { status: 'needs-description', revisions: [workingTreeRevision] } satisfies VerifiedLandOutcome
-          const base = yield* commitOf(cwd, yield* targetRef(cwd, name))
-          const work = yield* revisions(`${base}..HEAD`, cwd)
-          if (work.length === 0) return { status: 'nothing-to-land' } satisfies VerifiedLandOutcome
-          const equivalent = yield* patchEquivalent(cwd, base)
-          const represented = work.filter(revision => equivalent.has(revision.commitId))
-          if (represented.length > 0)
-            return represented.length === work.length
-              ? ({ status: 'already-integrated', revisions: represented } satisfies VerifiedLandOutcome)
-              : ({ status: 'patch-equivalent-work', revisions: represented } satisfies VerifiedLandOutcome)
-          const undescribed = work.filter(revision => ThreadIntegrationModel.isPlaceholderRevisionDescription(revision.description))
-          if (undescribed.length > 0) return { status: 'needs-description', revisions: undescribed } satisfies VerifiedLandOutcome
-          if (!(yield* authorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          const rebase = yield* rebaseOnto(cwd, base)
-          if (rebase.status === 'conflicted') return { status: 'conflicted', revisions: work, files: rebase.files } satisfies VerifiedLandOutcome
-          const rebased = yield* revisions(`${base}..HEAD`, cwd)
-          const head = rebased[0]
-          if (head === undefined) return { status: 'nothing-to-land' } satisfies VerifiedLandOutcome
-          if (yield* cancelled) return cancelledOutcome
-          if (!(yield* authorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          const verification = yield* input.verifyCandidate({ workingCopyCommitId: head.commitId, attempt })
-          if (verification.status === 'cancelled' || (yield* cancelled)) return cancelledOutcome
-          if (verification.status === 'stale') return stale(verification.message)
-          if (verification.status === 'failed') return { status: 'verification-failed', message: verification.message } satisfies VerifiedLandOutcome
-          if ((yield* headOf(cwd)) !== head.commitId || (yield* isDirty(cwd)))
-            return stale('The thread changed while Project Checks ran. The bookmark was not advanced; review the current work.')
-          if (!(yield* authorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          const current = yield* commitOf(cwd, yield* targetRef(cwd, name))
-          if (current === base && (yield* advanceBookmark({ repoRoot: thread.repoRoot, name, from: base, to: head.commitId }))) {
-            yield* metadata
-              .record(thread.repoRoot, thread.threadName, { tipChangeId: head.commitId, baseChangeId: base, sessionId: input.sessionId })
-              .pipe(Effect.ignore)
-            return { status: 'landed', revisions: rebased, head } satisfies VerifiedLandOutcome
-          }
-          const movedForward = (yield* run(['merge-base', '--is-ancestor', base, yield* targetRef(cwd, name)], cwd)).exitCode === 0
-          if (!movedForward) return stale('The target bookmark moved backwards or sideways while landing; review it before retrying.')
-          if (attempt >= LAND_ATTEMPTS) return stale('The bookmark changed before the checked revision could be landed; retry integration.')
-        }
+
+        const stop = (outcome: VerifiedLandOutcome): LandSettlement => ({ _tag: 'stop', outcome })
+        const nextStep = <State>(state: State): LandStepResult<State> => ({ _tag: 'next', state })
+        const retry = (exhausted: string): LandSettlement => ({ _tag: 'restart', exhausted })
+
+        const scan = (_base: null, _attempt: number): Effect.Effect<LandStepResult<GitLandScan>, ThreadWorkspaceError> =>
+          Effect.gen(function* () {
+            if (!(yield* authorized)) return stop({ status: 'not-eligible' })
+            yield* refuseRebaseInProgress(cwd)
+            if (yield* isDirty(cwd)) return stop({ status: 'needs-description', revisions: [workingTreeRevision] })
+            const base = yield* commitOf(cwd, yield* targetRef(cwd, name))
+            const work = yield* revisions(`${base}..HEAD`, cwd)
+            if (work.length === 0) return stop({ status: 'nothing-to-land' })
+            const equivalent = yield* patchEquivalent(cwd, base)
+            const represented = work.filter(revision => equivalent.has(revision.commitId))
+            if (represented.length > 0)
+              return stop(
+                represented.length === work.length
+                  ? { status: 'already-integrated', revisions: represented }
+                  : { status: 'patch-equivalent-work', revisions: represented },
+              )
+            const undescribed = work.filter(revision => ThreadIntegrationModel.isPlaceholderRevisionDescription(revision.description))
+            if (undescribed.length > 0) return stop({ status: 'needs-description', revisions: undescribed })
+            return nextStep({ base, work })
+          })
+
+        const rebase = (scanned: GitLandScan, _attempt: number): Effect.Effect<LandStepResult<GitLandRebase>, ThreadWorkspaceError> =>
+          Effect.gen(function* () {
+            if (!(yield* authorized)) return stop({ status: 'not-eligible' })
+            const rebasedState = yield* rebaseOnto(cwd, scanned.base)
+            if (rebasedState.status === 'conflicted') return stop({ status: 'conflicted', revisions: scanned.work, files: rebasedState.files })
+            const rebased = yield* revisions(`${scanned.base}..HEAD`, cwd)
+            const head = rebased[0]
+            if (head === undefined) return stop({ status: 'nothing-to-land' })
+            if (yield* cancelled) return stop(cancelledOutcome)
+            if (!(yield* authorized)) return stop({ status: 'not-eligible' })
+            return nextStep({ base: scanned.base, work: scanned.work, rebased, head })
+          })
+
+        const verify = (rebasedState: GitLandRebase, attempt: number): Effect.Effect<LandStepResult<GitLandRebase>, ThreadWorkspaceError> =>
+          Effect.gen(function* () {
+            const verification = yield* input.verifyCandidate({ workingCopyCommitId: rebasedState.head.commitId, attempt })
+            if (verification.status === 'cancelled' || (yield* cancelled)) return stop(cancelledOutcome)
+            if (verification.status === 'stale') return stop(stale(verification.message))
+            if (verification.status === 'failed') return stop({ status: 'verification-failed', message: verification.message })
+            if ((yield* headOf(cwd)) !== rebasedState.head.commitId || (yield* isDirty(cwd)))
+              return stop(stale('The thread changed while Project Checks ran. The bookmark was not advanced; review the current work.'))
+            if (!(yield* authorized)) return stop({ status: 'not-eligible' })
+            return nextStep(rebasedState)
+          })
+
+        const land = (verified: GitLandRebase, _attempt: number): Effect.Effect<LandSettlement, ThreadWorkspaceError> =>
+          Effect.gen(function* () {
+            if (!(yield* authorized)) return stop({ status: 'not-eligible' })
+            const current = yield* commitOf(cwd, yield* targetRef(cwd, name))
+            if (current === verified.base && (yield* advanceBookmark({ repoRoot: thread.repoRoot, name, from: verified.base, to: verified.head.commitId }))) {
+              yield* metadata
+                .record(thread.repoRoot, thread.threadName, { tipChangeId: verified.head.commitId, baseChangeId: verified.base, sessionId: input.sessionId })
+                .pipe(Effect.ignore)
+              return stop({ status: 'landed', revisions: verified.rebased, head: verified.head })
+            }
+            const movedForward = (yield* run(['merge-base', '--is-ancestor', verified.base, yield* targetRef(cwd, name)], cwd)).exitCode === 0
+            if (!movedForward) return stop(stale('The target bookmark moved backwards or sideways while landing; review it before retrying.'))
+            return retry('The bookmark changed before the checked revision could be landed; retry integration.')
+          })
+
+        return yield* runVerifiedLand({
+          cancelled,
+          cancelledOutcome,
+          start: () => null,
+          steps: { scan, rebase, verify, land },
+        })
       }),
     )
   })

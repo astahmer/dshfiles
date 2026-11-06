@@ -3,7 +3,7 @@ import { KeyedMutex } from '@dshfiles/dshx/effect/keyed-mutex'
 import { commandAttributes } from '@dshfiles/dshx/tracing'
 import { Context, Effect, FiberMap, FileSystem, Layer, Option, Path, type PlatformError, Ref, Schema } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
-import { JjFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed } from './errors.js'
+import { JjFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed, type ThreadWorkspaceError } from './errors.js'
 import { Executables } from './executables-promise.js'
 import { JjSettings } from './jj-settings.js'
 import { RepoLocks } from './repo-locks.js'
@@ -25,6 +25,7 @@ import type {
   VerifiedLandOutcome,
 } from './thread-workspace-types.js'
 import type { ThreadLocation } from './thread-workspace-model.js'
+import { LAND_ATTEMPTS, runVerifiedLand, type LandSettlement, type LandStepResult } from './verified-land-phases.js'
 
 /**
  * Concurrent read-only `jj` processes per repository scan. Each thread costs two of them, and the scan runs while the
@@ -46,7 +47,6 @@ const MAX_PATCH_PATHS = 128
 const MAX_PATCH_PATH_BYTES = 16_384
 const MAX_PATCH_TARGET_REVISIONS = 1_024
 const MAX_PATCH_BODY_BYTES = 65_536
-const LAND_ATTEMPTS = 3
 const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
 const HEX_ID = /^[0-9a-f]+$/u
 const OPERATION_ID = /^[0-9a-f]{12,128}$/u
@@ -857,6 +857,15 @@ const make = Effect.gen(function* () {
   const changedDuringScanMessage = 'The thread changed during the patch scan. Stop for Project Checks again; automatic integration did not rebase it.'
   const stale = (message: string): VerifiedLandOutcome => ({ status: 'verification-stale', message })
 
+  interface JjLandScan {
+    readonly snapshot: ReadSnapshot
+    readonly sourceRevision: string
+  }
+  interface JjLandRebase extends JjLandScan {
+    readonly rebased: readonly ThreadRevision[]
+    readonly candidate: ThreadRevision
+  }
+
   const landVerified = Effect.fn('thread workspaces land verified')(function* (input: VerifiedLandOptions) {
     const cancelled = input.cancelled ?? Effect.succeed(false)
     const cancelledOutcome: VerifiedLandOutcome = { status: 'verification-cancelled' }
@@ -902,230 +911,228 @@ const make = Effect.gen(function* () {
           yield* jj(['abandon', ...leftovers.map(revision => knownCommitRevset(revision.commitId))], cwd)
         }
 
-        const bookmarkMovedOutcome = Effect.fnUntraced(function* (moved: {
-          readonly snapshot: ReadSnapshot
-          readonly expectedCommitId: string
-          readonly attempt: number
-          readonly sideways: string
-          readonly exhausted: string
-        }) {
-          const targetMovedForward = yield* bookmarkTargetDescendsFrom({
-            repoRoot,
-            operationId: moved.snapshot.operationId,
-            expectedCommitId: moved.expectedCommitId,
-            currentCommitId: moved.snapshot.bookmarkCommitId,
-          })
-          if (!targetMovedForward) return stale(moved.sideways)
-          if (moved.attempt >= LAND_ATTEMPTS) return stale(moved.exhausted)
-          return undefined
-        })
+        const stop = (outcome: VerifiedLandOutcome): LandSettlement => ({ _tag: 'stop', outcome })
+        const nextStep = <State>(state: State): LandStepResult<State> => ({ _tag: 'next', state })
+        const retry = (exhausted: string): LandSettlement => ({ _tag: 'restart', exhausted })
 
-        for (let attempt = 1; ; attempt++) {
-          if (yield* cancelled) return cancelledOutcome
-          if (!(yield* ensureAuthorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          const attemptSourceRevision = yield* workingCopyCommitId(cwd)
-          if (attempt === 1 && attemptSourceRevision !== input.expectedSourceRevision) return stale(staleSourceMessage)
-          const attemptSnapshot = yield* readSnapshot(repoRoot, target)
-          const attemptWorkspaceRevision = yield* revisionsAtOperation('@', cwd, attemptSnapshot.operationId)
-          if (attemptWorkspaceRevision[0]?.commitId !== attemptSourceRevision) return stale(changedDuringScanMessage)
-          const attemptDetachedGroup = (yield* detachedRevisionsByWorkspace(repoRoot, attemptSnapshot)).get(thread.threadName) ?? {
-            detached: [],
-            represented: [],
-          }
-          if (attemptDetachedGroup.detached.length > 0)
-            return { status: 'detached-work', revisions: attemptDetachedGroup.detached } satisfies VerifiedLandOutcome
-          const attemptWork = yield* revisionsAtOperation(
-            unlandedRevsetAt(thread.threadName, attemptSnapshot.bookmarkCommitId),
-            cwd,
-            attemptSnapshot.operationId,
-          )
-          const patchComparison = yield* comparePatchEquivalence({ candidates: attemptWork, repoRoot, snapshot: attemptSnapshot })
-          if (!workMetadataMatches(work, attemptWork) || !patchFingerprintsMatch(initialPatchComparison, patchComparison))
-            return stale('The thread work changed after its initial scan. Review the current work and run Project Checks again.')
-          if (attemptWork.length === 0)
-            return attemptDetachedGroup.represented.length > 0
-              ? ({ status: 'already-integrated', revisions: attemptDetachedGroup.represented } satisfies VerifiedLandOutcome)
-              : ({ status: 'nothing-to-land' } satisfies VerifiedLandOutcome)
-          const patchBlock = patchGuardOutcome(attemptWork, patchComparison)
-          if (patchBlock !== undefined) return patchBlock
-          const attemptUndescribed = attemptWork.filter(revision => ThreadIntegrationModel.isPlaceholderRevisionDescription(revision.description))
-          if (attemptUndescribed.length > 0) return { status: 'needs-description', revisions: attemptUndescribed } satisfies VerifiedLandOutcome
-          if (!(yield* ensureAuthorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          if ((yield* workingCopyCommitId(cwd)) !== attemptSourceRevision) return stale(changedDuringScanMessage)
-          const latestSnapshot = yield* readSnapshot(repoRoot, target)
-          if (latestSnapshot.bookmarkCommitId !== attemptSnapshot.bookmarkCommitId) {
-            const blocked = yield* bookmarkMovedOutcome({
-              snapshot: latestSnapshot,
-              expectedCommitId: attemptSnapshot.bookmarkCommitId,
-              attempt,
-              sideways: 'The target bookmark moved backwards or sideways during scanning; review it before retrying.',
-              exhausted: 'The repository changed during the patch scan. Retry integration after the current changes settle.',
-            })
-            if (blocked !== undefined) return blocked
-            continue
-          }
-          if (latestSnapshot.operationId !== attemptSnapshot.operationId) {
-            if (attempt >= LAND_ATTEMPTS) return stale('The repository changed during the patch scan. Retry integration after the current changes settle.')
-            continue
-          }
-          if (!(yield* ensureAuthorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          yield* jj(
-            [
-              '--at-operation',
-              attemptSnapshot.operationId,
-              'rebase',
-              '-b',
-              knownCommitRevset(attemptSourceRevision),
-              '-d',
-              knownCommitRevset(attemptSnapshot.bookmarkCommitId),
-            ],
-            cwd,
-          )
-          if (yield* cancelled) return cancelledOutcome
-          const scanAfter = scanRebasedState({
+        const scanRebased = (expected: ReadSnapshot) =>
+          scanRebasedState({
             repoRoot,
             cwd,
             threadName: thread.threadName,
             bookmark: target,
-            expectedBookmarkCommitId: attemptSnapshot.bookmarkCommitId,
+            expectedBookmarkCommitId: expected.bookmarkCommitId,
             authorize: ensureAuthorized,
           })
-          const afterRebase = yield* scanAfter
-          if (afterRebase.status === 'not-eligible') return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          if (afterRebase.status === 'bookmark-moved') {
-            const blocked = yield* bookmarkMovedOutcome({
-              snapshot: afterRebase.snapshot,
-              expectedCommitId: attemptSnapshot.bookmarkCommitId,
-              attempt,
-              sideways: 'The target bookmark moved backwards or sideways during rebase; review it before retrying.',
-              exhausted: 'The bookmark changed during rebase. Retry integration after the current changes settle.',
-            })
-            if (blocked !== undefined) return blocked
-            continue
-          }
-          const rebased = afterRebase.revisions
-          const conflicted = rebased.filter(revision => revision.conflict)
-          if (conflicted.length > 0) {
-            const files = yield* conflictedFiles(conflicted, cwd)
-            return { status: 'conflicted', revisions: conflicted, files } satisfies VerifiedLandOutcome
-          }
-          if (afterRebase.detached.length > 0) return { status: 'detached-work', revisions: afterRebase.detached } satisfies VerifiedLandOutcome
-          if (!workMetadataMatches(work, rebased) || !patchFingerprintsMatch(initialPatchComparison, afterRebase.comparison))
-            return stale('The thread changed during rebase. The bookmark was not advanced; retry after reviewing the current work.')
-          const [candidateRevision, ...extraCandidateRevisions] = yield* revisionsAtOperation(
-            afterRebase.workingCopyEmpty ? '@-' : '@',
-            cwd,
-            afterRebase.snapshot.operationId,
-          )
-          if (candidateRevision === undefined || extraCandidateRevisions.length > 0)
-            return stale('Could not identify one checked revision to advance the bookmark to.')
 
-          if (yield* cancelled) return cancelledOutcome
-          if (!(yield* ensureAuthorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          yield* jj(['edit', knownCommitRevset(candidateRevision.commitId)], cwd)
-          const verificationState = yield* scanAfter
-          if (verificationState.status === 'not-eligible') return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          if (verificationState.status === 'bookmark-moved') {
-            const blocked = yield* bookmarkMovedOutcome({
-              snapshot: verificationState.snapshot,
-              expectedCommitId: attemptSnapshot.bookmarkCommitId,
-              attempt,
-              sideways: 'The target bookmark moved backwards or sideways before Project Checks.',
-              exhausted: 'The bookmark changed while preparing Project Checks; retry integration.',
+        const bookmarkMoved = (moved: {
+          readonly snapshot: ReadSnapshot
+          readonly expectedCommitId: string
+          readonly sideways: string
+          readonly exhausted: string
+        }): Effect.Effect<LandSettlement, ThreadWorkspaceError> =>
+          Effect.gen(function* () {
+            const targetMovedForward = yield* bookmarkTargetDescendsFrom({
+              repoRoot,
+              operationId: moved.snapshot.operationId,
+              expectedCommitId: moved.expectedCommitId,
+              currentCommitId: moved.snapshot.bookmarkCommitId,
             })
-            if (blocked !== undefined) return blocked
-            continue
-          }
-          if (
-            verificationState.workingCopyRevisionId !== candidateRevision.commitId ||
-            verificationState.detached.length > 0 ||
-            !workMetadataMatches(work, verificationState.revisions) ||
-            !patchFingerprintsMatch(initialPatchComparison, verificationState.comparison)
-          )
-            return stale('The thread changed while preparing Project Checks. The bookmark was not advanced; retry after reviewing the current work.')
-          if (verificationState.revisions.some(revision => revision.conflict))
-            return stale('A conflict appeared while preparing Project Checks; resolve it before retrying.')
-          if (!(yield* ensureAuthorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          const verification = yield* input.verifyCandidate({ workingCopyCommitId: candidateRevision.commitId, attempt })
-          if (verification.status === 'cancelled' || (yield* cancelled)) return cancelledOutcome
-          if (verification.status === 'stale') return stale(verification.message)
-          if (verification.status === 'failed') return { status: 'verification-failed', message: verification.message } satisfies VerifiedLandOutcome
-          const postVerificationState = yield* scanAfter
-          if (postVerificationState.status === 'not-eligible') return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          if (postVerificationState.status === 'bookmark-moved') {
-            const blocked = yield* bookmarkMovedOutcome({
-              snapshot: postVerificationState.snapshot,
-              expectedCommitId: attemptSnapshot.bookmarkCommitId,
-              attempt,
-              sideways: 'The target bookmark moved backwards or sideways during Project Checks.',
-              exhausted: 'The bookmark changed while Project Checks ran; retry integration.',
-            })
-            if (blocked !== undefined) return blocked
-            continue
-          }
-          if (
-            postVerificationState.workingCopyRevisionId !== candidateRevision.commitId ||
-            postVerificationState.detached.length > 0 ||
-            !workMetadataMatches(work, postVerificationState.revisions) ||
-            !patchFingerprintsMatch(initialPatchComparison, postVerificationState.comparison)
-          )
-            return stale('The thread changed while Project Checks ran. The bookmark was not advanced; review the current work.')
+            return targetMovedForward ? retry(moved.exhausted) : stop(stale(moved.sideways))
+          })
 
-          const beforeMoveSnapshot = yield* readSnapshot(repoRoot, target)
-          if (beforeMoveSnapshot.bookmarkCommitId !== attemptSnapshot.bookmarkCommitId) {
-            const blocked = yield* bookmarkMovedOutcome({
-              snapshot: beforeMoveSnapshot,
-              expectedCommitId: attemptSnapshot.bookmarkCommitId,
-              attempt,
-              sideways: 'The target bookmark moved backwards or sideways before landing; review it before retrying.',
-              exhausted: 'The bookmark moved before landing. Retry integration after the current changes settle.',
+        const scan = (_base: null, attempt: number): Effect.Effect<LandStepResult<JjLandScan>, ThreadWorkspaceError> =>
+          Effect.gen(function* () {
+            if (!(yield* ensureAuthorized)) return stop({ status: 'not-eligible' })
+            const attemptSourceRevision = yield* workingCopyCommitId(cwd)
+            if (attempt === 1 && attemptSourceRevision !== input.expectedSourceRevision) return stop(stale(staleSourceMessage))
+            const attemptSnapshot = yield* readSnapshot(repoRoot, target)
+            const attemptWorkspaceRevision = yield* revisionsAtOperation('@', cwd, attemptSnapshot.operationId)
+            if (attemptWorkspaceRevision[0]?.commitId !== attemptSourceRevision) return stop(stale(changedDuringScanMessage))
+            const attemptDetachedGroup = (yield* detachedRevisionsByWorkspace(repoRoot, attemptSnapshot)).get(thread.threadName) ?? {
+              detached: [],
+              represented: [],
+            }
+            if (attemptDetachedGroup.detached.length > 0) return stop({ status: 'detached-work', revisions: attemptDetachedGroup.detached })
+            const attemptWork = yield* revisionsAtOperation(
+              unlandedRevsetAt(thread.threadName, attemptSnapshot.bookmarkCommitId),
+              cwd,
+              attemptSnapshot.operationId,
+            )
+            const patchComparison = yield* comparePatchEquivalence({ candidates: attemptWork, repoRoot, snapshot: attemptSnapshot })
+            if (!workMetadataMatches(work, attemptWork) || !patchFingerprintsMatch(initialPatchComparison, patchComparison))
+              return stop(stale('The thread work changed after its initial scan. Review the current work and run Project Checks again.'))
+            if (attemptWork.length === 0)
+              return stop(
+                attemptDetachedGroup.represented.length > 0
+                  ? { status: 'already-integrated', revisions: attemptDetachedGroup.represented }
+                  : { status: 'nothing-to-land' },
+              )
+            const patchBlock = patchGuardOutcome(attemptWork, patchComparison)
+            if (patchBlock !== undefined) return stop(patchBlock)
+            const attemptUndescribed = attemptWork.filter(revision => ThreadIntegrationModel.isPlaceholderRevisionDescription(revision.description))
+            if (attemptUndescribed.length > 0) return stop({ status: 'needs-description', revisions: attemptUndescribed })
+            if (!(yield* ensureAuthorized)) return stop({ status: 'not-eligible' })
+            if ((yield* workingCopyCommitId(cwd)) !== attemptSourceRevision) return stop(stale(changedDuringScanMessage))
+            const latestSnapshot = yield* readSnapshot(repoRoot, target)
+            if (latestSnapshot.bookmarkCommitId !== attemptSnapshot.bookmarkCommitId)
+              return yield* bookmarkMoved({
+                snapshot: latestSnapshot,
+                expectedCommitId: attemptSnapshot.bookmarkCommitId,
+                sideways: 'The target bookmark moved backwards or sideways during scanning; review it before retrying.',
+                exhausted: 'The repository changed during the patch scan. Retry integration after the current changes settle.',
+              })
+            if (latestSnapshot.operationId !== attemptSnapshot.operationId)
+              return retry('The repository changed during the patch scan. Retry integration after the current changes settle.')
+            return nextStep({ snapshot: attemptSnapshot, sourceRevision: attemptSourceRevision })
+          })
+
+        const rebase = (scanned: JjLandScan, _attempt: number): Effect.Effect<LandStepResult<JjLandRebase>, ThreadWorkspaceError> =>
+          Effect.gen(function* () {
+            if (!(yield* ensureAuthorized)) return stop({ status: 'not-eligible' })
+            yield* jj(
+              [
+                '--at-operation',
+                scanned.snapshot.operationId,
+                'rebase',
+                '-b',
+                knownCommitRevset(scanned.sourceRevision),
+                '-d',
+                knownCommitRevset(scanned.snapshot.bookmarkCommitId),
+              ],
+              cwd,
+            )
+            if (yield* cancelled) return stop(cancelledOutcome)
+            const afterRebase = yield* scanRebased(scanned.snapshot)
+            if (afterRebase.status === 'not-eligible') return stop({ status: 'not-eligible' })
+            if (afterRebase.status === 'bookmark-moved')
+              return yield* bookmarkMoved({
+                snapshot: afterRebase.snapshot,
+                expectedCommitId: scanned.snapshot.bookmarkCommitId,
+                sideways: 'The target bookmark moved backwards or sideways during rebase; review it before retrying.',
+                exhausted: 'The bookmark changed during rebase. Retry integration after the current changes settle.',
+              })
+            const rebased = afterRebase.revisions
+            const conflicted = rebased.filter(revision => revision.conflict)
+            if (conflicted.length > 0) return stop({ status: 'conflicted', revisions: conflicted, files: yield* conflictedFiles(conflicted, cwd) })
+            if (afterRebase.detached.length > 0) return stop({ status: 'detached-work', revisions: afterRebase.detached })
+            if (!workMetadataMatches(work, rebased) || !patchFingerprintsMatch(initialPatchComparison, afterRebase.comparison))
+              return stop(stale('The thread changed during rebase. The bookmark was not advanced; retry after reviewing the current work.'))
+            const [candidateRevision, ...extraCandidateRevisions] = yield* revisionsAtOperation(
+              afterRebase.workingCopyEmpty ? '@-' : '@',
+              cwd,
+              afterRebase.snapshot.operationId,
+            )
+            if (candidateRevision === undefined || extraCandidateRevisions.length > 0)
+              return stop(stale('Could not identify one checked revision to advance the bookmark to.'))
+            return nextStep({ snapshot: scanned.snapshot, sourceRevision: scanned.sourceRevision, rebased, candidate: candidateRevision })
+          })
+
+        const verify = (rebasedState: JjLandRebase, attempt: number): Effect.Effect<LandStepResult<JjLandRebase>, ThreadWorkspaceError> =>
+          Effect.gen(function* () {
+            if (yield* cancelled) return stop(cancelledOutcome)
+            if (!(yield* ensureAuthorized)) return stop({ status: 'not-eligible' })
+            yield* jj(['edit', knownCommitRevset(rebasedState.candidate.commitId)], cwd)
+            const verificationState = yield* scanRebased(rebasedState.snapshot)
+            if (verificationState.status === 'not-eligible') return stop({ status: 'not-eligible' })
+            if (verificationState.status === 'bookmark-moved')
+              return yield* bookmarkMoved({
+                snapshot: verificationState.snapshot,
+                expectedCommitId: rebasedState.snapshot.bookmarkCommitId,
+                sideways: 'The target bookmark moved backwards or sideways before Project Checks.',
+                exhausted: 'The bookmark changed while preparing Project Checks; retry integration.',
+              })
+            if (
+              verificationState.workingCopyRevisionId !== rebasedState.candidate.commitId ||
+              verificationState.detached.length > 0 ||
+              !workMetadataMatches(work, verificationState.revisions) ||
+              !patchFingerprintsMatch(initialPatchComparison, verificationState.comparison)
+            )
+              return stop(stale('The thread changed while preparing Project Checks. The bookmark was not advanced; retry after reviewing the current work.'))
+            if (verificationState.revisions.some(revision => revision.conflict))
+              return stop(stale('A conflict appeared while preparing Project Checks; resolve it before retrying.'))
+            if (!(yield* ensureAuthorized)) return stop({ status: 'not-eligible' })
+            const verification = yield* input.verifyCandidate({ workingCopyCommitId: rebasedState.candidate.commitId, attempt })
+            if (verification.status === 'cancelled' || (yield* cancelled)) return stop(cancelledOutcome)
+            if (verification.status === 'stale') return stop(stale(verification.message))
+            if (verification.status === 'failed') return stop({ status: 'verification-failed', message: verification.message })
+            const postVerificationState = yield* scanRebased(rebasedState.snapshot)
+            if (postVerificationState.status === 'not-eligible') return stop({ status: 'not-eligible' })
+            if (postVerificationState.status === 'bookmark-moved')
+              return yield* bookmarkMoved({
+                snapshot: postVerificationState.snapshot,
+                expectedCommitId: rebasedState.snapshot.bookmarkCommitId,
+                sideways: 'The target bookmark moved backwards or sideways during Project Checks.',
+                exhausted: 'The bookmark changed while Project Checks ran; retry integration.',
+              })
+            if (
+              postVerificationState.workingCopyRevisionId !== rebasedState.candidate.commitId ||
+              postVerificationState.detached.length > 0 ||
+              !workMetadataMatches(work, postVerificationState.revisions) ||
+              !patchFingerprintsMatch(initialPatchComparison, postVerificationState.comparison)
+            )
+              return stop(stale('The thread changed while Project Checks ran. The bookmark was not advanced; review the current work.'))
+            return nextStep(rebasedState)
+          })
+
+        const land = (verified: JjLandRebase, attempt: number): Effect.Effect<LandSettlement, ThreadWorkspaceError> =>
+          Effect.gen(function* () {
+            const beforeMoveSnapshot = yield* readSnapshot(repoRoot, target)
+            if (beforeMoveSnapshot.bookmarkCommitId !== verified.snapshot.bookmarkCommitId)
+              return yield* bookmarkMoved({
+                snapshot: beforeMoveSnapshot,
+                expectedCommitId: verified.snapshot.bookmarkCommitId,
+                sideways: 'The target bookmark moved backwards or sideways before landing; review it before retrying.',
+                exhausted: 'The bookmark moved before landing. Retry integration after the current changes settle.',
+              })
+            if (yield* cancelled) return stop(cancelledOutcome)
+            if (!(yield* ensureAuthorized)) return stop({ status: 'not-eligible' })
+            const moved = yield* run(
+              [
+                '--ignore-working-copy',
+                'bookmark',
+                'move',
+                '--from',
+                knownCommitRevset(verified.snapshot.bookmarkCommitId),
+                '--to',
+                knownCommitRevset(verified.candidate.commitId),
+                exactBookmarkNamePattern(target),
+              ],
+              cwd,
+            )
+            const afterMoveSnapshot = yield* readSnapshot(repoRoot, target)
+            const candidateIsOnBookmark = yield* bookmarkTargetDescendsFrom({
+              repoRoot,
+              operationId: afterMoveSnapshot.operationId,
+              expectedCommitId: verified.candidate.commitId,
+              currentCommitId: afterMoveSnapshot.bookmarkCommitId,
             })
-            if (blocked !== undefined) return blocked
-            continue
-          }
-          if (yield* cancelled) return cancelledOutcome
-          if (!(yield* ensureAuthorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
-          const moved = yield* run(
-            [
-              '--ignore-working-copy',
-              'bookmark',
-              'move',
-              '--from',
-              knownCommitRevset(attemptSnapshot.bookmarkCommitId),
-              '--to',
-              knownCommitRevset(candidateRevision.commitId),
-              exactBookmarkNamePattern(target),
-            ],
-            cwd,
-          )
-          const afterMoveSnapshot = yield* readSnapshot(repoRoot, target)
-          const candidateIsOnBookmark = yield* bookmarkTargetDescendsFrom({
-            repoRoot,
-            operationId: afterMoveSnapshot.operationId,
-            expectedCommitId: candidateRevision.commitId,
-            currentCommitId: afterMoveSnapshot.bookmarkCommitId,
+            if (candidateIsOnBookmark) {
+              // The checked candidate is `@`, so the thread continues on a fresh change above the advanced bookmark.
+              if (yield* ensureAuthorized) yield* jj(['new', knownCommitRevset(afterMoveSnapshot.bookmarkCommitId)], cwd).pipe(Effect.ignore)
+              const baseChangeId = yield* changeIdForCommit(verified.snapshot.bookmarkCommitId, cwd).pipe(Effect.option, Effect.map(Option.getOrUndefined))
+              const tipChangeId = yield* changeIdForCommit(verified.candidate.commitId, cwd).pipe(Effect.option, Effect.map(Option.getOrUndefined))
+              yield* writeRebaseMetadata(thread.repoRoot, thread.threadName, { tipChangeId, baseChangeId, sessionId: input.sessionId }).pipe(Effect.ignore)
+              return stop({ status: 'landed', revisions: verified.rebased, head: verified.candidate })
+            }
+            if (yield* cancelled) return stop(cancelledOutcome)
+            const targetMovedForward = yield* bookmarkTargetDescendsFrom({
+              repoRoot,
+              operationId: afterMoveSnapshot.operationId,
+              expectedCommitId: verified.snapshot.bookmarkCommitId,
+              currentCommitId: afterMoveSnapshot.bookmarkCommitId,
+            })
+            if (!targetMovedForward) return stop(stale('The target bookmark moved backwards or sideways while landing; review it before retrying.'))
+            if (attempt >= LAND_ATTEMPTS && moved.exitCode !== 0) return yield* jjFailed(`Could not move ${target}: ${moved.stderr.trim().slice(0, 400)}`)
+            return retry('The bookmark changed before the checked revision could be landed; retry integration.')
           })
-          if (candidateIsOnBookmark) {
-            // The checked candidate is `@`, so the thread continues on a fresh change above the advanced bookmark.
-            if (yield* ensureAuthorized) yield* jj(['new', knownCommitRevset(afterMoveSnapshot.bookmarkCommitId)], cwd).pipe(Effect.ignore)
-            const baseChangeId = yield* changeIdForCommit(attemptSnapshot.bookmarkCommitId, cwd).pipe(Effect.option, Effect.map(Option.getOrUndefined))
-            const tipChangeId = yield* changeIdForCommit(candidateRevision.commitId, cwd).pipe(Effect.option, Effect.map(Option.getOrUndefined))
-            yield* writeRebaseMetadata(thread.repoRoot, thread.threadName, { tipChangeId, baseChangeId, sessionId: input.sessionId }).pipe(Effect.ignore)
-            return { status: 'landed', revisions: rebased, head: candidateRevision } satisfies VerifiedLandOutcome
-          }
-          if (yield* cancelled) return cancelledOutcome
-          const targetMovedForward = yield* bookmarkTargetDescendsFrom({
-            repoRoot,
-            operationId: afterMoveSnapshot.operationId,
-            expectedCommitId: attemptSnapshot.bookmarkCommitId,
-            currentCommitId: afterMoveSnapshot.bookmarkCommitId,
-          })
-          if (!targetMovedForward) return stale('The target bookmark moved backwards or sideways while landing; review it before retrying.')
-          if (attempt >= LAND_ATTEMPTS) {
-            if (moved.exitCode !== 0) return yield* jjFailed(`Could not move ${target}: ${moved.stderr.trim().slice(0, 400)}`)
-            return stale('The bookmark changed before the checked revision could be landed; retry integration.')
-          }
-        }
+
+        return yield* runVerifiedLand({
+          cancelled,
+          cancelledOutcome,
+          start: () => null,
+          steps: { scan, rebase, verify, land },
+        })
       }),
     )
   })
