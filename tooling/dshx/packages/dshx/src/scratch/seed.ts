@@ -12,6 +12,8 @@ import type { DialogsService, ToastsService } from '../client/app-services.js'
 import type { ReachSeed } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
 import { FAKE_COMMAND_CODE_MODEL, FAKE_COMMAND_CODE_MODEL_ID } from './fake-command-code.js'
+import { spawnGuardedDetached } from './guarded-spawn.js'
+import { ScratchRegistry } from './registry.js'
 import { ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
 
 const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
@@ -382,11 +384,21 @@ const startFakeProvider = async (
     if (ready !== undefined) return { baseUrl: ready, process: current }
   }
   await rm(readyFile, { force: true })
-  const pid = ScratchStateRuntime.spawnDetached(process.execPath, [fakeProviderScript, readyFile], {
-    cwd: state.stateDir,
-    env: process.env,
-    log: join(state.stateDir, 'fake-provider.log'),
-  })
+  const log = join(state.stateDir, 'fake-provider.log')
+  // It outlives this command, so its owner is the instance's watchdog: the provider stops with the instance it serves.
+  const watchdogStartedAt = state.watchdog === undefined ? undefined : ScratchRegistry.processStartedAt(state.watchdog.pid)
+  const pid =
+    state.watchdog === undefined || watchdogStartedAt === undefined
+      ? ScratchStateRuntime.spawnDetached(process.execPath, [fakeProviderScript, readyFile], { cwd: state.stateDir, env: process.env, log })
+      : spawnGuardedDetached({
+          command: process.execPath,
+          args: [fakeProviderScript, readyFile],
+          owner: { ownerPid: state.watchdog.pid, ownerStartedAt: watchdogStartedAt, workspace: DSHFILES_ROOT },
+          pipe: false,
+          cwd: state.stateDir,
+          env: process.env,
+          log,
+        }).pid
   const providerProcess = { pid, signature: [fakeProviderScript, readyFile] }
   await ScratchStateRuntime.trackFakeProvider(state, providerProcess)
   const deadline = Date.now() + timeoutMs

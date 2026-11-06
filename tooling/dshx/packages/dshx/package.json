@@ -165,6 +165,10 @@
     "./effect/host-prompt": {
       "types": "./dist/effect/host-prompt.d.ts",
       "default": "./dist/effect/host-prompt.js"
+    },
+    "./scratch-registry": {
+      "types": "./dist/scratch/registry.d.ts",
+      "default": "./dist/scratch/registry.js"
     }
   },
   "scripts": {

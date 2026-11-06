@@ -8,7 +8,9 @@ import { compositionFailures, readProfileComposition } from '../project/profile-
 import { ScratchProfileRuntime } from '../project/scratch-profile.js'
 import { resolveDshExecutable } from '../project/dsh-executable.js'
 import { registerScratchWorkspace } from '../project/scratch-workspace.js'
+import { spawnGuardedDetached } from './guarded-spawn.js'
 import { ScratchReaperRuntime, type ReapedScratch, type WarnedScratch } from './reaper.js'
+import { ScratchRegistry } from './registry.js'
 import { ScratchSeedRuntime } from './seed.js'
 import { LIVE_DSH_HOME, LIVE_DSH_PORT, ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
 import { decodeJson } from '../json.js'
@@ -106,7 +108,11 @@ const readWebSeedDependencies = async (): Promise<ReadonlySet<string> | undefine
 
 export const scratchUp = async (
   options: ScratchUpOptions,
-): Promise<{ readonly state: ScratchState; readonly swept: readonly ReapedScratch[]; readonly warned: readonly WarnedScratch[] }> => {
+): Promise<{
+  readonly state: ScratchState
+  readonly swept: readonly ReapedScratch[]
+  readonly warned: readonly WarnedScratch[]
+}> => {
   const executable = await resolveDshExecutable()
   if (options.port === LIVE_DSH_PORT) {
     throw new ScratchError('live-port', `Port ${LIVE_DSH_PORT} belongs to the live DSH.`, 'Omit --port to take a free port.')
@@ -164,6 +170,8 @@ export const scratchUp = async (
   const home = prepared.homeRoot
   let hostPid: number | undefined
   let browserPid: number | undefined
+  let watchdogPid: number | undefined
+  const releases: (() => void)[] = []
   try {
     const dump = await readProfileComposition({
       projectRoot: DSHFILES_ROOT,
@@ -195,14 +203,34 @@ export const scratchUp = async (
     await Promise.all([hostLog, browserLog, browserEvents, browserReady].map(file => rm(file, { force: true })))
     await writeFile(browserEvents, '', { mode: 0o600 })
 
+    // The watchdog starts first so the Host and Chromium can name it their owner: their guards stop them when it dies,
+    // and the pipe this process holds stops them if `up` itself dies before it hands them over.
+    watchdogPid = ScratchStateRuntime.spawnDetached(
+      process.execPath,
+      [watchdogScript, '--state-dir', options.stateDir, '--starting-pid', String(process.pid)],
+      {
+        cwd: options.stateDir,
+        env: process.env,
+        log: join(options.stateDir, 'watchdog.log'),
+      },
+    )
+    const owner = { ownerPid: watchdogPid, ownerStartedAt: ScratchRegistry.processStartedAt(watchdogPid) ?? Date.now(), workspace: DSHFILES_ROOT }
+
     const port = options.port ?? (await findFreePort())
     options.onProgress(`starting dsh on 127.0.0.1:${port}`)
     const hostArgs = ['--profile', prepared.profile, '--port', String(port), '--no-open']
-    hostPid = ScratchStateRuntime.spawnDetached(executable, hostArgs, {
+    const guardedHost = spawnGuardedDetached({
+      command: executable,
+      args: hostArgs,
+      owner,
+      pipe: true,
+      recordKind: 'dev',
       cwd: DSHFILES_ROOT,
       env: ScratchProfileRuntime.hostEnvironment(home, prepared.profileRoot, hostSource),
       log: hostLog,
     })
+    hostPid = guardedHost.pid
+    releases.push(guardedHost.release)
     const launchUrl = await waitFor(
       async () => {
         if (ScratchStateRuntime.ownedProcessStatus({ pid: hostPid ?? 0, signature: ['--port'] }) === 'gone')
@@ -220,11 +248,17 @@ export const scratchUp = async (
 
     const cdpPort = await findFreePort()
     options.onProgress('starting headless Chromium')
-    browserPid = ScratchStateRuntime.spawnDetached(
-      process.execPath,
-      [browserHostScript, '--cdp-port', String(cdpPort), '--user-data-dir', join(home, 'browser'), '--events', browserEvents, '--ready', browserReady],
-      { cwd: options.stateDir, env: process.env, log: browserLog },
-    )
+    const guardedBrowser = spawnGuardedDetached({
+      command: process.execPath,
+      args: [browserHostScript, '--cdp-port', String(cdpPort), '--user-data-dir', join(home, 'browser'), '--events', browserEvents, '--ready', browserReady],
+      owner,
+      pipe: true,
+      cwd: options.stateDir,
+      env: process.env,
+      log: browserLog,
+    })
+    browserPid = guardedBrowser.pid
+    releases.push(guardedBrowser.release)
     await waitFor(
       async () => ((await stat(browserReady).catch(() => undefined)) === undefined ? undefined : true),
       60_000,
@@ -259,18 +293,15 @@ export const scratchUp = async (
     if (fakeSecretCli !== undefined) state.fakeSecretCli = fakeSecretCli
     state.idleTimeoutMinutes = options.idleTimeoutMinutes
     state.warnMinutes = options.warnMinutes
-    await ScratchStateRuntime.write(state)
-    const watchdogPid = ScratchStateRuntime.spawnDetached(process.execPath, [watchdogScript, '--state-dir', options.stateDir], {
-      cwd: options.stateDir,
-      env: process.env,
-      log: join(options.stateDir, 'watchdog.log'),
-    })
     state.watchdog = { pid: watchdogPid, signature: [watchdogScript, options.stateDir] }
     await ScratchStateRuntime.write(state)
+    for (const release of releases) release()
     return { state, swept, warned }
   } catch (error) {
+    if (watchdogPid !== undefined) await stopGroup(watchdogPid)
     if (browserPid !== undefined) await stopGroup(browserPid)
     if (hostPid !== undefined) await stopGroup(hostPid)
+    for (const release of releases) release()
     await prepared.dispose()
     throw error
   }

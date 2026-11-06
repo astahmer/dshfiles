@@ -7,6 +7,8 @@ import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../.
 import { compositionFailures, readProfileComposition } from '../../packages/dshx/src/project/profile-composition.js'
 import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/project/owned-process.js'
 import { resolveDshExecutable } from '../../packages/dshx/src/project/dsh-executable.js'
+import { guardedCommand } from '../../packages/dshx/src/scratch/guarded-spawn.js'
+import { ScratchRegistry, type ScratchOwner } from '../../packages/dshx/src/scratch/registry.js'
 import { recordScratchProcess, scratchLedgerPath } from '../../scripts/reap-scratch-processes.mjs'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
 import { createScratchHostLifecycle, type ScratchHostInstance } from './scratch-host-lifecycle.js'
@@ -133,6 +135,10 @@ const waitForHostUrl = (host: ChildProcess, output: () => string, profile: strin
     host.once('exit', handleExit)
   })
 
+/** This worker owns every Host it starts: their guards stop them when it dies, whatever killed it. */
+let workerOwner: ScratchOwner | undefined
+const scratchOwner = (): ScratchOwner => (workerOwner ??= ScratchRegistry.currentOwner(DSHFILES_ROOT))
+
 export const startScratchProfile = async (
   prepared: PreparedBootProfile,
   profileLabel: string,
@@ -161,13 +167,19 @@ export const startScratchProfile = async (
     const scratchEnvironment = isolatedHostEnvironment(prepared.homeRoot, prepared.profileRoot)
     const hostPath = pathPrefix === undefined ? scratchEnvironment.PATH : [pathPrefix, scratchEnvironment.PATH].filter(Boolean).join(delimiter)
     const hostEnvironment = hostPath === undefined ? scratchEnvironment : { ...scratchEnvironment, PATH: hostPath }
-    const host = spawnOwnedProcess(executable, ['--profile', prepared.profile, '--port', String(port), '--no-open'], {
-      cwd: DSHFILES_ROOT,
+    // The Host runs under the parent-death guard: this worker holds its stdin pipe, and the kernel closes it however
+    // the worker dies (a SIGKILLed worker never reaches `close()` or an exit handler), which stops the Host's group.
+    const guarded = guardedCommand({
+      command: executable,
+      args: ['--profile', prepared.profile, '--port', String(port), '--no-open'],
+      owner: scratchOwner(),
+      pipe: true,
+      recordKind: 'e2e',
       // directory-picker-auto mounts the OS chooser on a darwin/win32 loopback Host, which a browser cannot drive; an SSH
       // launch is its documented signal for the in-app browse picker, so folder journeys behave the same on every platform.
       env: { ...hostEnvironment, ...egressGuard.environment, ...hostEnv, SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0' },
-      stdio: ['ignore', 'pipe', 'pipe'],
     })
+    const host = spawnOwnedProcess(guarded.command, guarded.args, { cwd: DSHFILES_ROOT, env: guarded.env, stdio: ['pipe', 'pipe', 'pipe'] })
     let output = ''
     const collect = (chunk: Buffer): void => {
       output = `${output}${chunk.toString('utf8')}`.slice(-32_768)

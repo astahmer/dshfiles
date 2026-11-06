@@ -6,12 +6,23 @@ import { ScratchStateRuntime } from './state.js'
  * `node watchdog.js --state-dir <dir>`: started detached by `dshx dev up`, it warns once the idle lease expires, then
  * runs `down` when that warning's grace ends with no keep, or as soon as its dsh process is gone, so a forgotten
  * scratch DSH does not keep a Host and Chromium running. It exits when the state is gone (a manual `down`) or names
- * another watchdog (a later `up`).
+ * another watchdog (a later `up`). `up` starts it before the Host, so the Host's parent-death guard can name it as the
+ * owner: until `up` writes the state, `--starting-pid` (the `up` process) still running means "not written yet".
  */
-const { values } = parseArgs({ options: { 'state-dir': { type: 'string' }, 'interval-ms': { type: 'string' } } })
+const { values } = parseArgs({ options: { 'state-dir': { type: 'string' }, 'interval-ms': { type: 'string' }, 'starting-pid': { type: 'string' } } })
 const stateDir = values['state-dir']
 if (stateDir === undefined) throw new Error('Usage: watchdog.js --state-dir <dir> [--interval-ms <ms>]')
 const intervalMs = Number(values['interval-ms'] ?? 60_000)
+const startingPid = values['starting-pid'] === undefined ? undefined : Number(values['starting-pid'])
+
+const isAlive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
 
 const log = (message: string): void => {
   process.stdout.write(`${new Date().toISOString()} ${message}\n`)
@@ -20,6 +31,7 @@ const log = (message: string): void => {
 const keepWatching = async (): Promise<boolean> => {
   const state = await ScratchStateRuntime.read(stateDir, stateDir).catch(() => undefined)
   if (state === undefined) {
+    if (startingPid !== undefined && isAlive(startingPid)) return true
     log('the scratch state is gone; exiting')
     return false
   }
