@@ -16,6 +16,10 @@
       "types": "./src/attention-api.ts",
       "default": "./dist/attention-api.js"
     },
+    "./attention-openers": {
+      "types": "./src/attention-openers.ts",
+      "default": "./dist/attention-openers.js"
+    },
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml"
   },

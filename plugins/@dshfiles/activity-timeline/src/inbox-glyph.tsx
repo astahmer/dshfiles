@@ -1,17 +1,18 @@
 import { useApi, useApiEvent } from '@dshfiles/dshx/client'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { attentionApi, type AttentionItem } from './attention-api.js'
+import { attentionApi } from './attention-api.js'
 import { InboxNotifications } from './inbox-notifications.js'
-import { inboxKeys } from './inbox-panel.js'
+import { inboxKeys, useInboxOpener, type Navigation } from './inbox-panel.js'
 
 /**
  * The Inbox nav glyph and its one badge: the Needs you count, a projection of inbox state (plan §4.8). It also hosts
  * the opt-in blocking alerts, because the nav entry is mounted for as long as the sidebar is.
  */
-export const InboxGlyph = (props: { readonly size?: number; readonly onOpenItem: (item: AttentionItem) => void }): JSX.Element => {
+export const InboxGlyph = (props: { readonly size?: number; readonly navigation: Navigation }): JSX.Element => {
   const api = useApi(attentionApi)
   const queryClient = useQueryClient()
+  const openSubject = useInboxOpener(props.navigation)
   const eventStatus = useApiEvent(attentionApi, 'changed', () => void queryClient.invalidateQueries({ queryKey: inboxKeys.all }))
   const needsYou = useQuery({
     queryKey: inboxKeys.view('needs-you'),
@@ -19,7 +20,7 @@ export const InboxGlyph = (props: { readonly size?: number; readonly onOpenItem:
     refetchInterval: eventStatus === 'live' ? 60_000 : 15_000,
     retry: 1,
   })
-  InboxNotifications.useBlockingAlerts(needsYou.data?.items, props.onOpenItem)
+  InboxNotifications.useBlockingAlerts(needsYou.data?.items, item => void openSubject(item.subject))
   const count = needsYou.data?.counts.needsYou ?? 0
   const size = props.size ?? 18
   return (

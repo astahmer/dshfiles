@@ -41,12 +41,7 @@ export default defineClient({
         { name: 'sidebar.panellist', id: INBOX_PANEL_ID, order: 2, label: () => inboxTranslate('title'), locale: INBOX_LOCALE_NAMESPACE },
         decorate(props => (
           <PluginQueryProvider>
-            <InboxGlyph
-              size={props.size}
-              onOpenItem={item => {
-                if (item.subject.kind === 'session') openThread(navigation, item.subject.id)
-              }}
-            />
+            <InboxGlyph size={props.size} navigation={navigation} />
           </PluginQueryProvider>
         )),
       ),

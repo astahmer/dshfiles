@@ -8,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { agentsApi } from '@dshfiles/agents/contract'
+import { AttentionSubjectOpeners } from '@dshfiles/activity-timeline/attention-openers'
 import { InlineReferences } from '@dshfiles/chat/inline-references'
 import { createApiClient, defineClient, LinkHandler } from '@dshfiles/dshx/client'
 import type {} from '@dshfiles/input-trigger/client'
@@ -295,6 +296,17 @@ export default defineClient({
       // SAFETY: this entry registers PANEL_ID as a main-slot key just below, so it is a live panel id.
       ctx.layout.selectPanel(PANEL_ID as MainPanelId)
     }
+    // An Inbox item about a backlog item opens that item here; the inbox owns the row, this page owns the target.
+    metadata?.plugin?.add(AttentionSubjectOpeners, {
+      subjectKind: 'backlog-item',
+      label: 'backlog item',
+      open: subject => {
+        const id = Number(subject.id)
+        if (!Number.isSafeInteger(id) || id <= 0) return false
+        openInBacklog(id)
+        return true
+      },
+    })
     metadata?.plugin?.add(LinkHandler, {
       id: 'dshfiles-backlog.item',
       scheme: 'b',

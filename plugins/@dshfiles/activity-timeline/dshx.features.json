@@ -387,6 +387,50 @@
           "reason": "Client-only: renders inbox state and calls the attention API, whose Host work carries the automatic api-dispatch span."
         }
       ]
+    },
+    {
+      "id": "inbox-opens-subject",
+      "title": "Open an Inbox item's source in one click",
+      "summary": "Every Inbox row whose subject another page owns offers Open: a thread subject opens the thread (an archived one says so), a backlog item opens that item in the Backlog page, and any text naming a thread gets an Open thread link. The page that owns a subject kind registers an opener, so the inbox shows Open only where something can actually open it.",
+      "reach": ["click tab \"Inbox\"", "expect text \"Needs you\""],
+      "surfaces": ["client", "integration"],
+      "surface": "rowAction",
+      "destination": "inbox",
+      "currentSurface": "Inbox: Open on an item's subject",
+      "configuration": [],
+      "states": ["thread-subject", "provider-subject", "no-opener", "archived-thread", "referenced-thread"],
+      "failureModes": [
+        "A subject kind nobody contributed an opener for shows no Open button, so the row never promises a page that does not exist.",
+        "An archived or missing thread reports that it is unavailable and how to bring it back instead of reviving it silently.",
+        "An opener that answers false (the item is gone) says so and leaves Done as the way out.",
+        "The inbox reads one opener per subject kind: a second contribution for the same kind is ignored rather than ambiguous."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/backlog",
+          "boundary": "Backlog contributes an attention subject opener that selects the item in its own page; activity-timeline never imports backlog and renders nothing extra when backlog is absent.",
+          "deterministicFake": "Thread reference parsing is pinned in src/thread-reference.test.ts; the opener registry is a dshx client registry with no ordering logic of its own."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only navigation over the attention-api methods, whose Host spans already exist."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.thread-reference",
+          "file": "plugins/@dshfiles/activity-timeline/src/thread-reference.test.ts",
+          "testName": "prefers the item subject, then its reason, then its detail"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "activity-timeline.inbox-opens-subject-browser",
+          "reason": "The rows it changes need inbox items in a Host store the scratch profile only gets from another plugin's provider; the behaviour is the registry lookup and the thread reference the unit test covers."
+        }
+      ]
     }
   ]
 }

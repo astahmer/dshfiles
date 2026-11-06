@@ -1,7 +1,7 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { useApi, useApiEvent } from '@dshfiles/dshx/client'
+import { useApi, useApiEvent, useRegistry } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -16,14 +16,23 @@ import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
-import { ClockIcon, EllipsisIcon } from '@dshfiles/plugin-ui/icons'
+import { ClockIcon, EllipsisIcon, MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useState } from 'react'
-import { attentionApi, type AttentionItem, type AttentionProviderVerb, type AttentionView } from './attention-api.js'
+import { useCallback, useMemo, useState } from 'react'
+import {
+  attentionApi,
+  type AttentionItem,
+  type AttentionProviderVerb,
+  type AttentionSubject,
+  type AttentionSubjectKind,
+  type AttentionView,
+} from './attention-api.js'
+import { AttentionSubjectOpeners, type AttentionSubjectOpener } from './attention-openers.js'
 import { InboxNotifications } from './inbox-notifications.js'
 import type { InboxTranslate } from './inbox-locales.js'
 import { InboxView, type SnoozeChoice } from './inbox-view.js'
+import { ThreadReferences } from './thread-reference.js'
 
 export const inboxKeys = { all: ['activity-timeline', 'attention'] as const, view: (view: AttentionView) => ['activity-timeline', 'attention', view] as const }
 
@@ -48,6 +57,24 @@ export const openThread = (navigation: Navigation, sessionId: string): boolean =
   } catch {
     return false
   }
+}
+
+/** The pages other plugins let the inbox open, by subject kind; absent for a kind nobody contributed. */
+export const useSubjectOpeners = (): ReadonlyMap<AttentionSubjectKind, AttentionSubjectOpener> => {
+  const openers = useRegistry(AttentionSubjectOpeners)
+  return useMemo(() => new Map(openers.map(opener => [opener.subjectKind, opener])), [openers])
+}
+
+/** Open an item's subject wherever it lives: its thread, or the page its provider registered. */
+export const useInboxOpener = (navigation: Navigation): ((subject: AttentionSubject) => boolean) => {
+  const openers = useSubjectOpeners()
+  return useCallback(
+    (subject: AttentionSubject) => {
+      if (subject.kind === 'session') return openThread(navigation, subject.id)
+      return openers.get(subject.kind)?.open(subject) ?? false
+    },
+    [navigation, openers],
+  )
 }
 
 /** Plan §4.7: blocking items are Needs you, failed stay Failed, ready is Ready; anything closed reads as Done. */
@@ -78,7 +105,9 @@ const InboxRow = (props: {
   readonly now: number
   readonly sessionLabel: (sessionId: string) => string
   readonly busy: boolean
+  readonly openers: ReadonlyMap<AttentionSubjectKind, AttentionSubjectOpener>
   readonly onOpen: (item: AttentionItem) => void
+  readonly onOpenThread: (sessionId: string) => void
   readonly onAct: (item: AttentionItem, verb: AttentionProviderVerb, choiceId?: string) => void
   readonly onDone: (item: AttentionItem) => void
   readonly onSnooze: (item: AttentionItem, choice: SnoozeChoice) => void
@@ -91,6 +120,12 @@ const InboxRow = (props: {
   const status = statusOf(item, props.view)
   const statusLabel = statusLabelOf(status, t)
   const subjectLabel = item.subject.kind === 'session' ? props.sessionLabel(item.subject.id) : (item.subject.label ?? item.subject.id)
+  const opener = item.subject.kind === 'session' ? undefined : props.openers.get(item.subject.kind)
+  const openable = item.subject.kind === 'session' || opener !== undefined
+  const referencedThreadId =
+    item.subject.kind === 'session'
+      ? null
+      : (ThreadReferences.threadIdIn(item.reason) ?? (item.detail === null ? null : ThreadReferences.threadIdIn(item.detail)))
   return (
     <EntityRow
       role="listitem"
@@ -102,7 +137,7 @@ const InboxRow = (props: {
       meta={
         <>
           <span>{InboxView.sourceLabel(item.source)}</span>
-          {item.subject.kind === 'session' ? (
+          {openable ? (
             <button
               type="button"
               className="dshx:min-w-0 dshx:max-w-full dshx:truncate dshx:text-left dshx:underline-offset-2 dshx:hover:underline"
@@ -112,6 +147,16 @@ const InboxRow = (props: {
             </button>
           ) : (
             <span className="dshx:min-w-0 dshx:truncate">{subjectLabel}</span>
+          )}
+          {referencedThreadId === null ? null : (
+            <button
+              type="button"
+              className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-info dshx:underline-offset-2 dshx:hover:underline"
+              onClick={() => props.onOpenThread(referencedThreadId)}
+            >
+              <MessagesSquareIcon aria-hidden className="dshx:size-3" />
+              {t('openThread')}
+            </button>
           )}
           <span>{InboxView.relativeAge(item.openedAt, props.now)}</span>
           {item.occurrences > 1 ? <Badge variant="outline">{`${String(item.occurrences)} ${t('occurrences')}`}</Badge> : null}
@@ -148,7 +193,7 @@ const InboxRow = (props: {
               </Button>
             ))
           : null}
-        {item.verbs.includes('Open') && item.subject.kind === 'session' ? (
+        {openable ? (
           <Button size="sm" variant={open && !item.verbs.includes('Answer') ? 'default' : 'ghost'} onClick={() => props.onOpen(item)}>
             {t('open')}
           </Button>
@@ -216,6 +261,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   const queryClient = useQueryClient()
   const [view, setView] = useState<AttentionView>('needs-you')
   const [notice, setNotice] = useState<{ readonly tone: 'ok' | 'error'; readonly text: string } | null>(null)
+  const openSubject = useInboxOpener(props)
   const sessionLabel = EntityLabels.useSessionLabel(props.sessions)
   const eventStatus = useApiEvent(attentionApi, 'changed', () => void queryClient.invalidateQueries({ queryKey: inboxKeys.all }))
   const listQuery = useQuery({
@@ -251,10 +297,13 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
     onSuccess: outcome => settle(outcome ?? null),
     onError: failed,
   })
+  const openers = useSubjectOpeners()
   const openItem = (item: AttentionItem): void => {
-    if (item.subject.kind !== 'session') return
-    if (openThread(props, item.subject.id)) setNotice(null)
-    else setNotice({ tone: 'error', text: t('sessionUnavailable') })
+    if (openSubject(item.subject)) setNotice(null)
+    else {
+      const label = openers.get(item.subject.kind)?.label
+      setNotice({ tone: 'error', text: label === undefined ? t('sessionUnavailable') : t('subjectUnavailable', { label }) })
+    }
   }
   const data = listQuery.data
   const counts = data?.counts
@@ -310,7 +359,12 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
               now={now}
               sessionLabel={sessionLabel}
               busy={transition.isPending}
+              openers={openers}
               onOpen={openItem}
+              onOpenThread={sessionId => {
+                if (openThread(props, sessionId)) setNotice(null)
+                else setNotice({ tone: 'error', text: t('sessionUnavailable') })
+              }}
               onAct={(target, verb, choiceId) => transition.mutate({ kind: 'act', id: target.id, verb, ...(choiceId !== undefined && { choiceId }) })}
               onDone={target => transition.mutate({ kind: 'done', id: target.id })}
               onSnooze={(target, choice) => transition.mutate({ kind: 'snooze', id: target.id, choice })}

@@ -47,9 +47,13 @@ export const ATTENTION_PROVIDER_VERBS = ['Answer', 'Approve', 'Land', 'Retry', '
 export const attentionProviderVerbSchema = Schema.Literals(ATTENTION_PROVIDER_VERBS)
 export type AttentionProviderVerb = typeof attentionProviderVerbSchema.Type
 
+export const ATTENTION_SUBJECT_KINDS = ['session', 'backlog-item', 'host', 'workspace', 'revision', 'url'] as const
+export const attentionSubjectKindSchema = Schema.Literals(ATTENTION_SUBJECT_KINDS)
+export type AttentionSubjectKind = typeof attentionSubjectKindSchema.Type
+
 /** What an item is about, in a form the inbox can link with a native reference. */
 export const attentionSubjectSchema = Schema.Struct({
-  kind: Schema.Literals(['session', 'backlog-item', 'host', 'workspace', 'revision', 'url']),
+  kind: attentionSubjectKindSchema,
   id: text(1, 512),
   /** A human label when the provider knows one; the inbox resolves session titles itself. */
   label: Schema.optionalKey(text(1, 200)),
