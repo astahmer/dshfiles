@@ -17,6 +17,11 @@ playwright-report/
 .playwright-cli/
 .dsh-e2e-evidence/
 
+# Test scratch that must sit inside the repository to resolve its packages; a killed run leaves it behind, and jj
+# would otherwise snapshot it into the working copy.
+.dshx-host-tool-schemas-*/
+.effect-schema-codemod-test-*/
+
 # Local reference checkouts and benchmark scratch.
 .references/
 .bench/
