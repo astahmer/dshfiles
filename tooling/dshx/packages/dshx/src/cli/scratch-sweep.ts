@@ -2,13 +2,14 @@ import { parseArgs } from 'node:util'
 import type { Writable } from 'node:stream'
 import { sweepScratch } from '../scratch/sweep.js'
 
-const HELP = `dshx scratch sweep — stop scratch DSH Hosts nobody owns any more.
+const HELP = `dshx scratch sweep — stop scratch DSH Hosts nobody owns any more, and prune old scratch state.
 
 Stops (SIGTERM, then SIGKILL after a few seconds) the process group of every scratch Host whose registry record
 (\${TMPDIR}/dshx-scratch/<pid>.json) names an owner that is gone — its pid exited or now belongs to another process —
 after checking its command line still carries "--profile dshx-boot". Also stops "--profile dshx-boot" processes with no
 record, parent pid 1 and over 2 h old (Hosts leaked before the registry existed). Drops records of Hosts that already
-exited. The live DSH runs another profile and is never touched.
+exited, deletes \${TMPDIR}/dshx-dev/<name> state dirs untouched for 24 h with no live process, and keeps each
+instance's newest 20 evidence runs. The live DSH runs another profile and is never touched.
 
 Options:
   --dry-run            List what would be stopped and removed; change nothing.

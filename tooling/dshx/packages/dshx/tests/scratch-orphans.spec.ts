@@ -1,13 +1,14 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { once } from 'node:events'
 import type { Readable } from 'node:stream'
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { decodeJson, jsonObjectSchema } from '../src/json.js'
 import { guardedCommand } from '../src/scratch/guarded-spawn.js'
 import { ScratchRegistry, type ScratchOwner, type ScratchRecord } from '../src/scratch/registry.js'
+import { pruneScratchStateDirs } from '../src/scratch/retention.js'
 import { listProcesses, sweepScratch } from '../src/scratch/sweep.js'
 
 let workRoot = ''
@@ -286,5 +287,34 @@ describe('scratch sweep', () => {
     const swept = await sweepScratch({ dryRun: false, registryDir, stateRoot, legacyMinAgeMs: 0, graceMs: 300, processes: ours() })
     expect(swept.actions.map(action => [action.kind, action.pid])).toEqual([['stop-legacy', pid]])
     await waitUntil(() => !isAlive(pid), 2_000)
+  })
+})
+
+describe('scratch state retention', () => {
+  it('deletes state dirs untouched for 24 h with no live process and keeps the newest 20 evidence runs', async () => {
+    const root = join(workRoot, 'retention')
+    const stale = join(root, 'stale')
+    const fresh = join(root, 'fresh')
+    await mkdir(join(stale, 'evidence'), { recursive: true })
+    await mkdir(join(fresh, 'evidence'), { recursive: true })
+    for (let index = 0; index < 25; index += 1) {
+      const file = join(fresh, 'evidence', `run-${String(index).padStart(2, '0')}.png`)
+      await writeFile(file, '')
+      const at = new Date(Date.now() - (25 - index) * 60_000)
+      await utimes(file, at, at)
+    }
+    const old = new Date(Date.now() - 48 * 3_600_000)
+    for (const path of [join(stale, 'evidence'), stale]) await utimes(path, old, old)
+
+    const preview = await pruneScratchStateDirs({ dryRun: true, root })
+    expect(preview.filter(action => action.kind === 'remove-state-dir').map(action => action.target)).toEqual([stale])
+    expect(preview.filter(action => action.kind === 'prune-evidence')).toHaveLength(5)
+    expect((await readdir(root)).sort()).toEqual(['fresh', 'stale'])
+
+    await pruneScratchStateDirs({ dryRun: false, root })
+    expect(await readdir(root)).toEqual(['fresh'])
+    const kept = (await readdir(join(fresh, 'evidence'))).sort()
+    expect(kept).toHaveLength(20)
+    expect(kept[0]).toBe('run-05.png')
   })
 })

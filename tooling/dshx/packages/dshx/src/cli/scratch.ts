@@ -169,7 +169,8 @@ ${COMMON_HELP}`,
 
 Stops the recorded watchdog, dsh and Chromium process groups only while their command lines still
 match what up started (a reused pid is left alone), deletes the scratch home and the state/log files, and keeps
-the evidence directory and any --project folder.
+the evidence directory and any --project folder. It then prunes the state root: every instance keeps its newest 20
+evidence runs, and a state dir untouched for 24 h with no live process is deleted.
 
 Options:
   --dry-run            List what would be stopped and removed; change nothing.
@@ -378,9 +379,12 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
     const { scratchDown } = await import('../scratch/lifecycle.js')
     const dryRun = values['dry-run'] === true
     const result = await scratchDown(state, dryRun)
+    const { pruneScratchStateDirs } = await import('../scratch/retention.js')
+    const retention = await pruneScratchStateDirs({ dryRun })
+    const retentionLines = retention.map(item => `${dryRun ? 'would ' : ''}${item.kind} ${item.target} — ${item.reason}\n`).join('')
     return succeed(
-      { dryRun, ...result },
-      `${result.actions.map(item => `${dryRun && item.action !== 'keep' && item.action !== 'skip' ? `would ${item.action}` : item.action} ${item.target} — ${item.reason}`).join('\n')}\n${result.leftRunning.length > 0 ? `still running: ${result.leftRunning.join(', ')}\n` : ''}`,
+      { dryRun, ...result, retention },
+      `${result.actions.map(item => `${dryRun && item.action !== 'keep' && item.action !== 'skip' ? `would ${item.action}` : item.action} ${item.target} — ${item.reason}`).join('\n')}\n${retentionLines}${result.leftRunning.length > 0 ? `still running: ${result.leftRunning.join(', ')}\n` : ''}`,
       result.leftRunning.length === 0,
     )
   } catch (error) {

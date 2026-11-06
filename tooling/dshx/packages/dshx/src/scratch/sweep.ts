@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ScratchRegistry, type ScratchRecord } from './registry.js'
+import { pruneScratchStateDirs, type RetentionAction } from './retention.js'
 import { ScratchStateRuntime } from './state.js'
 
 /** Only a process whose command line carries this marker is ever signalled; the live DSH runs another profile. */
@@ -18,7 +19,7 @@ export interface ScratchProcess {
 }
 
 export interface SweepAction {
-  readonly kind: 'stop-orphan' | 'stop-legacy' | 'drop-record' | 'skip'
+  readonly kind: 'stop-orphan' | 'stop-legacy' | 'drop-record' | 'skip' | RetentionAction['kind']
   readonly target: string
   readonly reason: string
   readonly pid?: number
@@ -108,8 +109,8 @@ const devStatePids = async (root: string): Promise<ReadonlySet<number>> => {
 
 /**
  * Stop scratch Hosts whose owner is gone, drop records of Hosts that already exited, stop legacy orphans the registry
- * never knew (`--profile dshx-boot`, parent pid 1, older than `legacyMinAgeMs`). With
- * `dryRun`, report the same actions and change nothing.
+ * never knew (`--profile dshx-boot`, parent pid 1, older than `legacyMinAgeMs`), then apply the state-directory
+ * retention. With `dryRun`, report the same actions and change nothing.
  */
 export const sweepScratch = async (options: {
   readonly dryRun: boolean
@@ -117,6 +118,7 @@ export const sweepScratch = async (options: {
   readonly stateRoot?: string
   readonly legacyMinAgeMs?: number
   readonly graceMs?: number
+  readonly now?: number
   /** The process table to judge; a spec narrows it to the processes it started, so it never stops a real orphan. */
   readonly processes?: readonly ScratchProcess[]
 }): Promise<SweepResult> => {
@@ -178,5 +180,8 @@ export const sweepScratch = async (options: {
     if (!options.dryRun && !(await stopScratchProcess(candidate, graceMs))) leftRunning.push(candidate.pid)
   }
 
+  const retentionOptions: Parameters<typeof pruneScratchStateDirs>[0] =
+    options.now === undefined ? { dryRun: options.dryRun, root: stateRoot } : { dryRun: options.dryRun, root: stateRoot, now: options.now }
+  actions.push(...(await pruneScratchStateDirs(retentionOptions)))
   return { actions, live, leftRunning }
 }
