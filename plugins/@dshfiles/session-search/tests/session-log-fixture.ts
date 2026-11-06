@@ -14,6 +14,10 @@ export const writeSessionLog = async (input: {
   readonly exchanges: number
   readonly sessionId?: string
   readonly framePerEvent?: boolean
+  /** One frame for the whole log, the shape the writer produces when its first flush carries the header and many events. */
+  readonly singleFrame?: boolean
+  /** Bytes of incompressible text in the first frame, so a single-frame log exceeds the reader's 64 KiB window. */
+  readonly firstFramePadding?: number
 }): Promise<string> => {
   const { directory, exchanges } = input
   await mkdir(directory, { recursive: true })
@@ -28,6 +32,15 @@ export const writeSessionLog = async (input: {
     seq += 1
     time += 1_000
     lines.push(`${JSON.stringify(withoutUndefined({ type, seq, time, data, surfaceOp }))}\n`)
+  }
+  if (input.firstFramePadding !== undefined && input.firstFramePadding > 0) {
+    let seed = 2_166_136_261
+    let text = ''
+    for (let index = 0; index < input.firstFramePadding; index += 1) {
+      seed = (seed * 1_664_525 + 1_013_904_223) >>> 0
+      text += (seed % 36).toString(36)
+    }
+    next('user/message', { id: 'msg-padding', role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } }, 'append')
   }
   for (let index = 1; index <= exchanges; index += 1) {
     next('turn/start', { turn: index })
@@ -59,16 +72,18 @@ export const writeSessionLog = async (input: {
     next('turn/end', { turn: index, reason: { kind: 'completed' } })
   }
   const perEvent = input.framePerEvent ?? true
-  const frames: Buffer[] = [compress(lines[0] ?? '')]
-  let batch = ''
-  for (const line of lines.slice(1)) {
-    batch += line
-    if (perEvent) {
-      frames.push(compress(batch))
-      batch = ''
+  const frames: Buffer[] = input.singleFrame === true ? [compress(lines.join(''))] : [compress(lines[0] ?? '')]
+  if (input.singleFrame !== true) {
+    let batch = ''
+    for (const line of lines.slice(1)) {
+      batch += line
+      if (perEvent) {
+        frames.push(compress(batch))
+        batch = ''
+      }
     }
+    if (batch.length > 0) frames.push(compress(batch))
   }
-  if (batch.length > 0) frames.push(compress(batch))
   const path = `${directory}/session.v4.jsonl.zstd`
   await writeFile(path, Buffer.concat(frames))
   return path

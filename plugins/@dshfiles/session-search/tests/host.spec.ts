@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -28,6 +29,16 @@ describe('frame container reader', () => {
     expect(first.text.length + resumed.text.length).toBeGreaterThan(0)
     expect(whole.text).toContain('exchange 1')
     expect(whole.offset).toBe(frames.at(-1)?.end)
+  })
+
+  it('reads the header from a first frame larger than the reader window', async () => {
+    const directory = join(root, 'project', 'session-dddddddd-0000-4000-8000-000000000000')
+    const path = await writeSessionLog({ directory, exchanges: 2, singleFrame: true, firstFramePadding: 256 * 1024 })
+    const frames = FrameLog.scan(await readFile(path))
+    expect(frames).toHaveLength(1)
+    expect(frames[0]?.end).toBeGreaterThan(64 * 1024)
+    expect(FrameLog.scan((await readFile(path)).subarray(0, 64 * 1024))).toHaveLength(0)
+    expect((await FrameLog.readHeader(path)).id).toBe('session-dddddddd-0000-4000-8000-000000000000')
   })
 
   it('reads the header from the first frame', async () => {

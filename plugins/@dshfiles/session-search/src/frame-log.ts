@@ -123,14 +123,23 @@ export class FrameLog {
   static async readHeader(path: string): Promise<SessionHeaderRow> {
     const handle = await open(path, 'r')
     try {
-      const buffer = Buffer.alloc(HEADER_BYTES)
-      const { bytesRead } = await handle.read(buffer, 0, HEADER_BYTES, 0)
-      const view = buffer.subarray(0, bytesRead)
-      const first = FrameLog.scan(view)[0]
-      if (first === undefined) throw new Error(`no complete Zstandard frame in the first ${String(HEADER_BYTES)} bytes of ${path}`)
-      const text = zstdDecompressSync(view.subarray(first.start, first.end)).toString('utf8')
-      const newline = text.indexOf('\n')
-      return decodeJson(sessionHeaderSchema, newline < 0 ? text : text.slice(0, newline))
+      const { size } = await handle.stat()
+      // A frame is not bounded by HEADER_BYTES: the writer batches a session's first events with its header, so the first
+      // frame is routinely larger than 64 KiB (2026-11-06: a 454 KiB frame stopped ingest on that log every pass, and
+      // one unreadable session aborted the whole pass, leaving the index 1125 sessions behind). Grow the window until a
+      // complete frame is in it instead of declaring the log corrupt.
+      for (let window = HEADER_BYTES; ; window *= 2) {
+        const buffer = Buffer.alloc(window)
+        const { bytesRead } = await handle.read(buffer, 0, window, 0)
+        const view = buffer.subarray(0, bytesRead)
+        const first = FrameLog.scan(view)[0]
+        if (first !== undefined) {
+          const text = zstdDecompressSync(view.subarray(first.start, first.end)).toString('utf8')
+          const newline = text.indexOf('\n')
+          return decodeJson(sessionHeaderSchema, newline < 0 ? text : text.slice(0, newline))
+        }
+        if (window >= size) throw new Error(`no complete Zstandard frame in the ${String(size)}-byte log ${path}`)
+      }
     } finally {
       await handle.close()
     }
