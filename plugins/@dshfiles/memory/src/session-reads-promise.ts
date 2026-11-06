@@ -1,9 +1,10 @@
 import type {} from '@deepseek-ai/dsh-session-query'
 import type { SessionListRequest } from '@deepseek-ai/dsh-api-session-controller'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { HostEvents } from '@dshfiles/dshx/effect'
-import { hostService } from '@dshfiles/dshx/effect/host-context'
+import { HostContext } from '@dshfiles/dshx/effect/host-context'
 import { Cache, Context, Duration, Effect, Layer, Option, Schema } from 'effect'
 
 import type { ThreadHeader } from './digest.ts'
@@ -72,12 +73,19 @@ export class SessionReads extends Context.Service<
   static readonly layer = Layer.effect(
     SessionReads,
     Effect.gen(function* () {
-      const sessionQuery = Option.getOrUndefined(yield* Effect.option(hostService('sessionQuery')))
-      const sessionController = Option.getOrUndefined(yield* Effect.option(hostService('sessionController')))
-      const agents = Option.getOrUndefined(yield* Effect.option(hostService('agents')))
+      const host = yield* HostContext
+      // Services are resolved per call, never once at activation: the row that owns `sessionQuery` registers its engine
+      // from its own activation, and Loader order does not promise that it is up before memory (2026-11-06: memory
+      // activated first, captured `undefined`, and every finder content search reported "unavailable" until restart).
+      // A per-call read also follows a service replaced later in the same process by a Host recompose.
+      const currentHostService = <K extends string & keyof CordisContext>(name: K) => {
+        const service = host.ctx.get(name)
+        return service === undefined || service === null ? undefined : service
+      }
 
       const read = Effect.fn('memory session read')(function* (sessionId: string) {
         yield* Effect.annotateCurrentSpan('dsh.session.id', sessionId)
+        const sessionQuery = currentHostService('sessionQuery')
         if (sessionQuery === undefined) return yield* new SessionLogUnavailable({ sessionId })
         const log = yield* Effect.tryPromise({
           try: () => sessionQuery.readSession(SessionId(sessionId)),
@@ -90,6 +98,7 @@ export class SessionReads extends Context.Service<
       const recent = yield* Cache.makeWith(read, { capacity: 4, timeToLive: exit => (exit._tag === 'Success' ? Duration.infinity : Duration.zero) })
 
       const listAll = Effect.gen(function* () {
+        const sessionQuery = currentHostService('sessionQuery')
         if (sessionQuery === undefined) return yield* new SessionListUnavailable({})
         const records = yield* Effect.tryPromise({
           try: signal => sessionQuery.listSessions(signal),
@@ -107,6 +116,7 @@ export class SessionReads extends Context.Service<
 
       const titles = Effect.fn('memory session titles')(function* (sessionIds: readonly string[]) {
         if (sessionIds.length === 0) return []
+        const sessionController = currentHostService('sessionController')
         // The Session list serves each title from the projection cache (a log-prefix read, kept until the Session
         // changes). A Session it has no title for is left untitled here, so the finder falls back to its digest's title:
         // core's title fold decodes the whole log, 57 of them took 3.1 s of the first search after a restart.
@@ -127,6 +137,7 @@ export class SessionReads extends Context.Service<
       })
 
       const searchContent = Effect.fn('memory session content search')(function* (request: { readonly query: string; readonly limit: number }) {
+        const sessionQuery = currentHostService('sessionQuery')
         if (sessionQuery === undefined) return yield* new ContentSearchFailed({ code: 'unavailable', reason: 'the DSH sessionQuery service is unavailable' })
         const page = yield* Effect.tryPromise({
           try: signal =>
@@ -153,7 +164,9 @@ export class SessionReads extends Context.Service<
 
       const parentOf = (sessionId: string) =>
         Effect.gen(function* () {
-          const live = agents?.list().find(agent => agent.id === sessionId)
+          const live = currentHostService('agents')
+            ?.list()
+            .find(agent => agent.id === sessionId)
           if (live !== undefined) return live.session.header.parentSession
           const log = yield* Effect.option(read(sessionId))
           return Option.getOrUndefined(log)?.header.parentSession
