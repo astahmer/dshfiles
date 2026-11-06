@@ -5,6 +5,11 @@ import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selec
 
 type RemoteModelCatalog = Pick<ModelDirectoryState, 'groups' | 'failures'>
 
+type CatalogState =
+  | { readonly kind: 'idle' | 'loading' }
+  | { readonly kind: 'ready'; readonly catalog: RemoteModelCatalog }
+  | { readonly kind: 'error'; readonly error: string }
+
 const initialState = (base: ModelDirectoryState): ModelDirectoryState => ({
   ...base,
   groups: [],
@@ -41,11 +46,13 @@ const createRemoteStore = (initial: ModelDirectoryState): SnapshotStore<ModelDir
 export class RemoteModelDirectory {
   readonly store: SnapshotStore<ModelDirectoryState>
   private catalog: RemoteModelCatalog | undefined
+  /** Remote catalog load, kept apart from the base selection so neither overwrites the other's status. */
+  private catalogState: CatalogState = { kind: 'idle' }
   private generation = 0
   private readonly unsubscribe: () => void
 
   constructor(
-    private readonly base: ModelDirectory,
+    private readonly base: Pick<ModelDirectory, 'store' | 'select'>,
     private readonly fetchCatalog: () => Promise<RemoteModelCatalog>,
   ) {
     this.store = createRemoteStore(initialState(base.store.getSnapshot()))
@@ -54,27 +61,15 @@ export class RemoteModelDirectory {
 
   readonly load = async (): Promise<ModelDirectoryState> => {
     const generation = ++this.generation
-    this.store.update(state => {
-      state.status = 'loading'
-      state.error = null
-    })
+    this.setCatalogState({ kind: 'loading' })
     try {
       const catalog = await this.fetchCatalog()
       if (generation !== this.generation) return this.store.getSnapshot()
       this.catalog = catalog
-      this.store.update(state => {
-        state.groups = catalog.groups
-        state.failures = catalog.failures
-        state.status = 'ready'
-        state.error = null
-        state.routable = catalog.groups.some(group => group.id === state.current?.provider && group.models.some(model => model.id === state.current?.model))
-      })
+      this.setCatalogState({ kind: 'ready', catalog })
     } catch (error) {
       if (generation !== this.generation) return this.store.getSnapshot()
-      this.store.update(state => {
-        state.status = 'error'
-        state.error = error instanceof Error ? error.message : String(error)
-      })
+      this.setCatalogState({ kind: 'error', error: error instanceof Error ? error.message : String(error) })
     }
     return this.store.getSnapshot()
   }
@@ -85,9 +80,8 @@ export class RemoteModelDirectory {
     this.store.update(state => {
       state.current = selection
       state.pending = null
-      state.status = 'ready'
-      state.error = null
       state.routable = this.isRoutable(selection)
+      this.applyStatus(state, { selecting: false, selectionError: null })
     })
     return result
   }
@@ -97,6 +91,22 @@ export class RemoteModelDirectory {
     this.unsubscribe()
   }
 
+  private setCatalogState(catalogState: CatalogState): void {
+    this.catalogState = catalogState
+    const selection = this.base.store.getSnapshot()
+    this.store.update(state => {
+      if (catalogState.kind === 'ready') {
+        state.groups = catalogState.catalog.groups
+        state.failures = catalogState.catalog.failures
+        state.routable = this.isRoutable(state.current)
+      }
+      this.applyStatus(state, {
+        selecting: selection.status === 'selecting',
+        selectionError: selection.status === 'error' ? selection.error : null,
+      })
+    })
+  }
+
   private syncSelection(): void {
     const selection = this.base.store.getSnapshot()
     this.store.update(state => {
@@ -104,11 +114,21 @@ export class RemoteModelDirectory {
       if (selection.retainedEffort === undefined) delete state.retainedEffort
       else state.retainedEffort = selection.retainedEffort
       state.pending = selection.pending
-      if (selection.status === 'selecting' || selection.status === 'error') state.status = selection.status
-      else if (state.status === 'selecting') state.status = 'ready'
-      if (selection.error !== null) state.error = selection.error
       if (state.current !== null && this.catalog !== undefined) state.routable = this.isRoutable(state.current)
+      this.applyStatus(state, {
+        selecting: selection.status === 'selecting',
+        selectionError: selection.status === 'error' ? selection.error : null,
+      })
     })
+  }
+
+  /** The combined status: a selection in flight or failed wins over the remote catalog's own load state. */
+  private applyStatus(state: ModelDirectoryState, selection: { readonly selecting: boolean; readonly selectionError: string | null }): void {
+    const catalogError = this.catalogState.kind === 'error' ? this.catalogState.error : null
+    state.error = selection.selectionError ?? catalogError
+    if (selection.selecting) state.status = 'selecting'
+    else if (state.error !== null) state.status = 'error'
+    else state.status = this.catalogState.kind
   }
 
   private isRoutable(selection: ModelSelection | null): boolean {

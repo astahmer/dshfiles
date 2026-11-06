@@ -38,6 +38,11 @@ export interface ModelDirectoryState {
   error: string | null
 }
 
+type SelectionState =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'selecting'; readonly pending: ModelSelection }
+  | { readonly kind: 'error'; readonly error: string }
+
 /** One session's shared directory controller; disposed with the session scope. */
 export class ModelDirectory {
   static shouldCompactForHandoff = (input: {
@@ -70,6 +75,8 @@ export class ModelDirectory {
   /** Latest selection operation wins; an older response never overwrites a newer one. */
   private generation = 0
   private disposed = false
+  /** Selection lifecycle, kept apart from the catalog load so neither overwrites the other. */
+  private selection: SelectionState = { kind: 'idle' }
   private readonly contextPressureSchema = z.object({
     pressureTokens: z.number().optional(),
     projectedTokens: z.number().optional(),
@@ -133,8 +140,7 @@ export class ModelDirectory {
     // send an Agent-bound RPC merely to configure a client-only blank.
     if (this.drafts?.stageModel(this.sessionId, selection)) {
       ++this.generation
-      this.store.update((state) => { state.status = 'ready'; state.pending = null; state.error = null })
-      this.syncInputs()
+      this.setSelection({ kind: 'idle' })
       return { ok: true, value: undefined }
     }
     const previous = this.store.getSnapshot().current
@@ -142,7 +148,7 @@ export class ModelDirectory {
     const previousEffort = previous?.reasoningEffort ?? (previous === null ? undefined : this.catalog.reasoningFor(previous)?.defaultEffort)
     const nextEffort = selection.reasoningEffort ?? this.catalog.reasoningFor(selection)?.defaultEffort
     const generation = ++this.generation
-    this.store.update((state) => { state.status = 'selecting'; state.pending = selection; state.error = null })
+    this.setSelection({ kind: 'selecting', pending: selection })
     try {
       const routeChanged = previous !== null && (previous.provider !== selection.provider || previous.model !== selection.model)
       if (routeChanged && previous !== null && pressure !== undefined) {
@@ -168,11 +174,7 @@ export class ModelDirectory {
         return result.ok ? { ok: true, value: undefined } : result
       }
       if (!result.ok) {
-        this.store.update((state) => {
-          state.status = 'error'
-          state.pending = null
-          state.error = `${result.error.code}: ${result.error.message}`
-        })
+        this.setSelection({ kind: 'error', error: `${result.error.code}: ${result.error.message}` })
         return result
       }
       if (previous !== null) {
@@ -183,16 +185,11 @@ export class ModelDirectory {
           ...this.isBlank() ? {} : { session_id: this.sessionId }, model_name: to, switch_from: previousEffort ?? 'default', switch_to: nextEffort ?? 'default',
         })
       }
-      this.store.update((state) => { state.status = 'ready'; state.pending = null; state.error = null })
-      this.syncInputs()
+      this.setSelection({ kind: 'idle' })
       return { ok: true, value: undefined }
     } catch (error) {
       if (!this.disposed && generation === this.generation) {
-        this.store.update((state) => {
-          state.status = 'error'
-          state.pending = null
-          state.error = error instanceof Error ? error.message : String(error)
-        })
+        this.setSelection({ kind: 'error', error: error instanceof Error ? error.message : String(error) })
       }
       throw error
     }
@@ -204,12 +201,7 @@ export class ModelDirectory {
   resetConnected(): void {
     if (this.disposed) return
     ++this.generation
-    this.store.update((state) => {
-      if (state.status === 'selecting') state.status = 'idle'
-      state.pending = null
-      state.error = null
-    })
-    this.syncInputs()
+    this.setSelection({ kind: 'idle' })
   }
 
   /** Scope teardown: late settlements lose write access to the store. */
@@ -239,8 +231,15 @@ export class ModelDirectory {
     }
   }
 
+  private setSelection(selection: SelectionState): void {
+    this.selection = selection
+    this.syncInputs()
+  }
+
   private syncInputs(): void {
     if (this.disposed) return
+    const pending = this.selection.kind === 'selecting' ? this.selection.pending : null
+    const selectionError = this.selection.kind === 'error' ? this.selection.error : null
     const catalog = this.catalog.store.getSnapshot()
     const projected = modelSelectionProjection(this.projected.getSnapshot())
     const draft = this.drafts?.list.getSnapshot()[this.sessionId]
@@ -258,9 +257,9 @@ export class ModelDirectory {
         routable: null,
         groups: catalog.value?.groups ?? [],
         failures: catalog.value?.failures ?? [],
-        status: catalog.status === 'error' ? 'error' : 'loading',
-        pending: this.store.getSnapshot().pending,
-        error: catalog.error,
+        status: pending !== null ? 'selecting' : selectionError !== null || catalog.status === 'error' ? 'error' : 'loading',
+        pending,
+        error: selectionError ?? catalog.error,
       })
       return
     }
@@ -273,11 +272,9 @@ export class ModelDirectory {
       routable,
       groups: catalog.value.groups,
       failures: catalog.value.failures,
-      status: this.store.getSnapshot().status === 'selecting'
-        ? 'selecting'
-        : 'ready',
-      pending: this.store.getSnapshot().pending,
-      error: null,
+      status: pending !== null ? 'selecting' : selectionError !== null ? 'error' : 'ready',
+      pending,
+      error: selectionError,
     })
   }
 }

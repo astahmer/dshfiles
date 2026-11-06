@@ -218,6 +218,37 @@ describe('shared model directory', () => {
     expect(directory.store.getSnapshot()).toMatchObject({ current: initial, status: 'error', pending: null, error: 'session/writer-held: Session is in use' })
   })
 
+  it('keeps a selection failure when an unrelated input changes', async () => {
+    const { directory, pressure, projected, selectModel } = fixture(false)
+    await directory.load()
+    projected.set({ lastUsed: null, next: initial })
+    selectModel.mockResolvedValueOnce({ ok: false as const, error: new RemoteError('session/writer-held', 'Session is in use', { sessionId }) })
+    await directory.select(chosen)
+    pressure.set({ contextWindow: 1_000_000, projectedTokens: 10_000 })
+    expect(directory.store.getSnapshot()).toMatchObject({ status: 'error', error: 'session/writer-held: Session is in use' })
+  })
+
+  it('stays selecting while the catalog reloads under an in-flight selection', async () => {
+    const { catalog, directory, projected, selectModel } = fixture(false)
+    await directory.load()
+    projected.set({ lastUsed: null, next: initial })
+    let settle: () => void = () => {}
+    selectModel.mockImplementationOnce(
+      selection =>
+        new Promise(resolve => {
+          settle = () => resolve({ ok: true, value: { selected: selection } })
+        }),
+    )
+    const selecting = directory.select(chosen)
+    await vi.waitFor(() => expect(selectModel).toHaveBeenCalled())
+    catalog.refresh()
+    await directory.load()
+    expect(directory.store.getSnapshot()).toMatchObject({ status: 'selecting', pending: chosen })
+    settle()
+    await selecting
+    expect(directory.store.getSnapshot()).toMatchObject({ status: 'ready', pending: null })
+  })
+
   it('uses the Host once a local draft materializes, and unsubscribes on disposal', async () => {
     const { directory, list, projected, selectModel } = fixture()
     await directory.load()
