@@ -40,6 +40,10 @@ import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
 import { AnimatedRows } from './AnimatedRows.tsx'
 import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from '../stores.ts'
 import { WorkspacePickFlow } from '../WorkspacePicker.tsx'
+import {
+  deleteDialogError, deleteDialogOpen, deleteDialogPending, deleteDialogSettled, deleteDialogTitle,
+  renameDialogBlocked, renameDialogView, type DeleteDialog, type RenameDialog,
+} from './workspace-dialogs.ts'
 import css from './WorkspaceBrowser.module.css'
 
 /**
@@ -1190,33 +1194,25 @@ export function WorkspaceBrowser({
   // The stored title decides whether confirming is a real rename; the draft is
   // seeded with the label on screen. They differ for a Workspace still
   // carrying its automatic title, so confirming the prefill pins that name.
-  const [renameTarget, setRenameTarget] = useState<{ workspaceId: WorkspaceId; storedTitle: string } | null>(null)
-  const [renameDraft, setRenameDraft] = useState('')
-  const [renaming, setRenaming] = useState(false)
-  const [renameError, setRenameError] = useState<string | null>(null)
-  const renameTrimmed = renameDraft.trim()
-  // Self is excluded by identity, not by title: the draft is seeded with the
-  // localized label, which for an automatically titled Workspace equals its
-  // own displayed title without being a conflict with itself.
-  const renameDuplicate = renameTarget !== null && renameTrimmed !== ''
-    && workspaces.some(w => w.workspaceId !== renameTarget.workspaceId && w.title === renameTrimmed)
-  const renameBlocked = renaming || renameTrimmed === ''
-    || renameTarget === null || renameTrimmed === renameTarget.storedTitle || renameDuplicate
+  const [renameDialog, setRenameDialog] = useState<RenameDialog>({ kind: 'closed' })
+  const rename = renameDialogView(renameDialog)
+  const renameTargetId = rename.target?.workspaceId
+  const renameTrimmed = rename.draft.trim()
+  const renameDuplicate = renameTargetId !== undefined && renameTrimmed !== ''
+    && workspaces.some(w => w.workspaceId !== renameTargetId && w.title === renameTrimmed)
+  const renameBlocked = renameDialogBlocked({ dialog: renameDialog, workspaces })
   const closeRename = () => {
-    if (renaming) return
-    setRenameTarget(null)
-    setRenameError(null)
+    if (rename.renaming) return
+    setRenameDialog({ kind: 'closed' })
   }
   const confirmRename = () => {
-    if (renameBlocked) return
-    setRenaming(true)
-    setRenameError(null)
-    renameWorkspace(renameTarget.workspaceId, renameTrimmed).then(() => {
-      setRenaming(false)
-      setRenameTarget(null)
+    const target = rename.target
+    if (target === null || renameBlocked) return
+    setRenameDialog({ ...target, kind: 'renaming', draft: rename.draft })
+    renameWorkspace(target.workspaceId, renameTrimmed).then(() => {
+      setRenameDialog({ kind: 'closed' })
     }).catch((reason: unknown) => {
-      setRenaming(false)
-      setRenameError(reason instanceof Error ? reason.message : String(reason))
+      setRenameDialog({ ...target, kind: 'failed', draft: rename.draft, error: reason instanceof Error ? reason.message : String(reason) })
     })
   }
 
@@ -1230,36 +1226,31 @@ export function WorkspaceBrowser({
 
   // Delete dialog is separate from the row so a successful removal can
   // unmount that row without tearing down the in-flight confirmation state.
-  const [deleteTarget, setDeleteTarget] = useState<{ workspaceId: WorkspaceId; title: string } | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteCommittedId, setDeleteCommittedId] = useState<WorkspaceId | null>(null)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deleteDialog, setDeleteDialog] = useState<DeleteDialog>({ kind: 'closed' })
+  const deleteOpen = deleteDialogOpen(deleteDialog)
+  const deletePending = deleteDialogPending(deleteDialog)
+  const deleteTitle = deleteDialogTitle(deleteDialog)
+  const deleteError = deleteDialogError(deleteDialog)
   useEffect(() => {
-    if (deleteCommittedId === null
-      || workspaces.some(workspace => workspace.workspaceId === deleteCommittedId)) return
-    setDeleting(false)
-    setDeleteCommittedId(null)
-    setDeleteTarget(null)
-  }, [deleteCommittedId, workspaces])
+    if (!deleteDialogSettled({ dialog: deleteDialog, workspaces })) return
+    setDeleteDialog({ kind: 'closed' })
+  }, [deleteDialog, workspaces])
   const closeDelete = () => {
-    if (deleting) return
-    setDeleteTarget(null)
-    setDeleteError(null)
+    if (deletePending) return
+    setDeleteDialog({ kind: 'closed' })
   }
   const confirmDelete = () => {
     /* v8 ignore next -- the Modal is absent without a target and its button is disabled while deleting. */
-    if (deleting || deleteTarget === null) return
-    setDeleting(true)
-    setDeleteCommittedId(null)
-    setDeleteError(null)
-    deleteWorkspace(deleteTarget.workspaceId).then(() => {
+    if (deletePending || deleteDialog.kind !== 'confirming') return
+    const target = deleteDialog
+    setDeleteDialog({ ...target, kind: 'deleting' })
+    deleteWorkspace(target.workspaceId).then(() => {
       // Keep the confirmation pending until this component has rendered the
       // committed list projection without the deleted id. Closing earlier
       // exposes one stale React frame to the next Create Workspace gesture.
-      setDeleteCommittedId(deleteTarget.workspaceId)
+      setDeleteDialog({ ...target, kind: 'awaitingList' })
     }).catch((reason: unknown) => {
-      setDeleting(false)
-      setDeleteError(reason instanceof Error ? reason.message : String(reason))
+      setDeleteDialog({ ...target, kind: 'failed', error: reason instanceof Error ? reason.message : String(reason) })
     })
   }
 
@@ -1463,41 +1454,43 @@ export function WorkspaceBrowser({
                 home={home}
                 t={t}
                 onRenameRequest={(workspaceId, displayTitle) => {
-                  setRenameTarget({
+                  setRenameDialog({
+                    kind: 'editing',
                     workspaceId,
                     storedTitle: storedWorkspaces.find(w => w.workspaceId === workspaceId)?.title ?? displayTitle,
+                    draft: displayTitle,
                   })
-                  setRenameDraft(displayTitle)
-                  setRenameError(null)
                 }}
                 onDeleteRequest={(workspaceId, title) => {
-                  setDeleteTarget({ workspaceId, title })
-                  setDeleteError(null)
+                  setDeleteDialog({ kind: 'confirming', workspaceId, title })
                 }}
               />
             ))}
       </div>
 
       <Modal
-        open={renameTarget !== null}
+        open={rename.open}
         onClose={closeRename}
         closeLabel={t('close')}
         title={t('rename.workspace.title')}
         footer={(
           <>
-            <Button variant="outline" disabled={renaming} onClick={closeRename}>{t('cancel')}</Button>
+            <Button variant="outline" disabled={rename.renaming} onClick={closeRename}>{t('cancel')}</Button>
             <Button variant="primary" disabled={renameBlocked} onClick={confirmRename}>{t('rename')}</Button>
           </>
         )}
       >
         <input
           className={css.renameInput}
-          value={renameDraft}
+          value={rename.draft}
           aria-label={t('field.workspaceName')}
           data-modal-autofocus
-          disabled={renaming}
+          disabled={rename.renaming}
           onFocus={(e) => { e.target.select() }}
-          onChange={(e) => { setRenameDraft(e.target.value); setRenameError(null) }}
+          onChange={(e) => {
+            const draft = e.target.value
+            setRenameDialog(current => current.kind === 'closed' ? current : { ...current, kind: 'editing', draft })
+          }}
           onCompositionStart={() => { composingRef.current = true }}
           onCompositionEnd={() => { composingRef.current = false }}
           onKeyDown={(e) => {
@@ -1510,24 +1503,24 @@ export function WorkspaceBrowser({
         {renameDuplicate && (
           <div className={css.renameError} role="alert">{t('conflict.named', { name: renameTrimmed })}</div>
         )}
-        {renameError !== null && <div className={css.renameError} role="alert">{renameError}</div>}
+        {rename.error !== null && <div className={css.renameError} role="alert">{rename.error}</div>}
       </Modal>
 
       <Modal
-        open={deleteTarget !== null}
+        open={deleteOpen}
         onClose={closeDelete}
         closeLabel={t('close')}
         title={t('delete.workspace')}
-        {...deleteTarget === null
+        {...deleteTitle === undefined
           ? {}
-          : { description: t('delete.desc', { name: deleteTarget.title }) }}
+          : { description: t('delete.desc', { name: deleteTitle }) }}
         footer={(
           <>
-            <Button variant="outline" disabled={deleting} onClick={closeDelete}>{t('cancel')}</Button>
+            <Button variant="outline" disabled={deletePending} onClick={closeDelete}>{t('cancel')}</Button>
             <Button
               variant="outline"
               className={css.deleteAction}
-              disabled={deleting}
+              disabled={deletePending}
               onClick={confirmDelete}
             >
               {t('delete.workspace')}
@@ -1535,7 +1528,7 @@ export function WorkspaceBrowser({
           </>
         )}
       >
-        {deleting && <div className={css.deleteStatus} role="status">{t('delete.pending')}</div>}
+        {deletePending && <div className={css.deleteStatus} role="status">{t('delete.pending')}</div>}
         {deleteError !== null && <div className={css.renameError} role="alert">{deleteError}</div>}
       </Modal>
     </div>
