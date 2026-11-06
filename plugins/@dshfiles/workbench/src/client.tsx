@@ -50,6 +50,7 @@ import { createResourcePanelHost } from './resource-panel-host.js'
 import { createWorkbenchTerminalSource } from './terminal-source.js'
 import { createNativePageAdmission } from './native-page-admission.js'
 import { ThreadFacets } from './thread-facets.js'
+import { FacetFollowing } from './facet-following.js'
 import { threadOnScreen } from './thread-on-screen.js'
 import { captureLayoutArrangement, restoreLayoutArrangement } from './layout-arrangements.js'
 import { SavedLayouts, savedLayouts, type SavedLayout } from './saved-layouts.js'
@@ -799,7 +800,7 @@ export default defineClient({
             resourceRegistrations.get(id)?.dispose()
             resourceRegistrations.delete(id)
           }
-          following.delete(id)
+          following.forget(id)
           facetHome.set(resource.kind, region)
           closeElsewhere(region, resource.id)
           return true
@@ -808,61 +809,27 @@ export default defineClient({
       }
       /**
        * Pages of a thread that left the screen, kept in place until the on-screen thread's page of the same kind
-       * replaces them; `askedFor` is the thread their page was already requested for, so each thread is asked once.
+       * replaces them; one page state per id, asked once per thread.
        */
-      const following = new Map<string, { askedFor: string | undefined }>()
-      let rebindQueued = false
-      let settleTimer: ReturnType<typeof setTimeout> | undefined
-      /** A kept page whose replacement never arrived gives its place up; while no thread is on screen it stays. */
-      const settle = (): void => {
-        settleTimer = undefined
-        const onScreen = facetThread.getSnapshot()
-        for (const id of [...following.keys()]) {
-          const registration = resourceRegistrations.get(id)
-          if (registration === undefined || placedIn(id) === undefined || resources.list().some(entry => entry.id === id)) {
-            following.delete(id)
-            continue
-          }
-          if (onScreen === undefined || registration.record.sessionId === onScreen) continue
-          following.delete(id)
-          release(id)
-        }
-      }
-      const rebind = (): void => {
-        rebindQueued = false
-        const onScreen = facetThread.getSnapshot()
-        // No thread on screen (a new-thread draft, a destination page): the facet keeps its place and its last
-        // thread's body until a thread comes on screen, which runs `sync` again.
-        if (onScreen === undefined) return
-        for (const [id, state] of [...following]) {
-          const registration = resourceRegistrations.get(id)
-          if (registration === undefined || placedIn(id) === undefined) {
-            following.delete(id)
-            continue
-          }
-          if (state.askedFor === onScreen || registration.record.sessionId === onScreen) continue
-          state.askedFor = onScreen
-          // The on-screen thread's page of this kind arrives through `sync`, possibly after this call returns (the
-          // native store publishes on its own schedule); `sync` then puts it in this page's place.
-          if (!(resources.openPage?.(registration.record.kind, () => undefined) ?? false)) {
-            following.delete(id)
-            release(id)
-          }
-        }
-        if (following.size > 0 && settleTimer === undefined) settleTimer = setTimeout(settle, 2_000)
-      }
+      const following = new FacetFollowing({
+        onScreen: () => facetThread.getSnapshot(),
+        threadOf: id => resourceRegistrations.get(id)?.record.sessionId,
+        kindOf: id => resourceRegistrations.get(id)?.record.kind,
+        follows: id => {
+          const record = resourceRegistrations.get(id)?.record
+          return record !== undefined && threadFacets.follows(record)
+        },
+        placed: id => placedIn(id) !== undefined,
+        listed: id => resources.list().some(entry => entry.id === id),
+        openPage: kind => resources.openPage?.(kind, () => undefined) ?? false,
+        release,
+      })
       const sync = (): void => {
         const entries = resources.list()
         const workbench = ctx.get('mainSurface')?.mode() === 'workbench'
-        const onScreen = facetThread.getSnapshot()
-        for (const [id, registration] of resourceRegistrations) {
+        for (const id of resourceRegistrations.keys()) {
           if (!workbench || entries.some(entry => entry.id === id)) continue
-          if (threadFacets.follows(registration.record) && onScreen !== registration.record.sessionId && placedIn(id) !== undefined) {
-            if (!following.has(id)) following.set(id, { askedFor: undefined })
-            continue
-          }
-          following.delete(id)
-          release(id)
+          following.drop(id)
         }
         for (const resource of entries) {
           const previous = resourceRegistrations.get(resource.id)
@@ -887,11 +854,7 @@ export default defineClient({
             openInRegion(owner?.[0] ?? savedRegionOf(resource.id) ?? home ?? 'right', resource.id, false)
           }
         }
-        if (following.size > 0 && onScreen !== undefined && !rebindQueued) {
-          rebindQueued = true
-          // After every Session's projection settled: a thread that came on screen may publish its own page next.
-          queueMicrotask(rebind)
-        }
+        following.scheduleRebind()
       }
       const off = resources.subscribe(sync)
       const offMode = ctx.get('mainSurface')?.subscribe(sync)
@@ -901,8 +864,7 @@ export default defineClient({
         off()
         offMode?.()
         offScreen()
-        if (settleTimer !== undefined) clearTimeout(settleTimer)
-        following.clear()
+        following.dispose()
         for (const entry of resourceRegistrations.values()) entry.dispose()
         resourceRegistrations.clear()
       }
