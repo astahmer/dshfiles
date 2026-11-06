@@ -95,21 +95,21 @@ const MISSING_EXECUTABLE = /Executable doesn't exist at (\S+)/
  * Playwright looks for its browsers under `$HOME`. A launcher or scratch harness that rewrites HOME hides the cache the
  * account installed, so the same path under the account's own home is tried once.
  */
-const accountHomeExecutable = (error: unknown, exists: (path: string) => boolean): string | undefined => {
+const accountHomeExecutable = async (error: unknown, exists: (path: string) => Promise<boolean>): Promise<string | undefined> => {
   if (process.env.PLAYWRIGHT_BROWSERS_PATH !== undefined || !(error instanceof Error)) return undefined
   const missing = MISSING_EXECUTABLE.exec(error.message)?.[1]
   const accountHome = userInfo().homedir
   if (missing === undefined || accountHome === homedir() || !missing.startsWith(`${homedir()}/`)) return undefined
   const relocated = `${accountHome}${missing.slice(homedir().length)}`
-  return exists(relocated) ? relocated : undefined
+  return (await exists(relocated)) ? relocated : undefined
 }
 
-const launchChromium = async (configuredPath: string, exists: (path: string) => boolean): Promise<Browser> => {
+const launchChromium = async (configuredPath: string, exists: (path: string) => Promise<boolean>): Promise<Browser> => {
   if (configuredPath !== '') return chromium.launch({ headless: true, executablePath: configuredPath })
   try {
     return await chromium.launch({ headless: true })
   } catch (error) {
-    const relocated = accountHomeExecutable(error, exists)
+    const relocated = await accountHomeExecutable(error, exists)
     if (relocated === undefined) throw error
     return chromium.launch({ headless: true, executablePath: relocated })
   }
@@ -150,7 +150,7 @@ export class PreviewBrowsers {
   readonly #threads = new Map<string, ThreadBrowser>()
   readonly #touchThread: (sessionId: string, idleMinutes: number) => void
   readonly #settle: SettleWaiter
-  readonly #exists: (path: string) => boolean
+  readonly #exists: (path: string) => Promise<boolean>
   #browser: Promise<Browser> | undefined
 
   constructor(input: {
@@ -159,7 +159,7 @@ export class PreviewBrowsers {
     readonly touchThread: (sessionId: string, idleMinutes: number) => void
     readonly settle: SettleWaiter
     /** Whether a relocated Playwright executable exists; the Host reads it through FileSystem. */
-    readonly exists: (path: string) => boolean
+    readonly exists: (path: string) => Promise<boolean>
   }) {
     this.#settings = input.settings
     this.#touchThread = input.touchThread

@@ -57,7 +57,8 @@ export class PreviewPages extends Context.Service<
               Effect.sleep(SETTLE_TIMEOUT).pipe(Effect.as(undefined as never)),
             ),
           ),
-        exists: path => Effect.runSync(fs.exists(path).pipe(Effect.orElseSucceed(() => false))),
+        // FileSystem.exists is asynchronous on Node: runSync threw here, so the relocated-browser fallback never ran.
+        exists: path => Effect.runPromise(fs.exists(path).pipe(Effect.orElseSucceed(() => false))),
       })
 
       yield* settings.changes.pipe(

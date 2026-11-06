@@ -22,7 +22,7 @@ const browsers = new PreviewBrowsers({
   touchThread: () => undefined,
   // The driver's settle deadline is the Host's Effect; a test just awaits the measurement.
   settle: async work => work.catch(() => undefined),
-  exists: path => existsSync(path),
+  exists: async path => existsSync(path),
 })
 
 beforeAll(async () => {
