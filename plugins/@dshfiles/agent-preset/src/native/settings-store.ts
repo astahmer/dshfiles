@@ -10,6 +10,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the ctx.remote merge into this program.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { joinPageRead } from '@dshfiles/dshx/client'
 import type { AgentPresetRoster } from '@deepseek-ai/dsh-agent-preset-registry/types'
 import { isBuiltInPreset } from './locales.ts'
 
@@ -57,6 +58,24 @@ export function requiresCodingTools(preset: AgentPresetOption | undefined): bool
 /** One roster entry exactly as the host reports it. */
 export type RosterPreset = AgentPresetRoster['presets'][number]
 
+/** `performance.now()` of the last roster change the Host announced; a shared read that started earlier may predate it. */
+let rosterChangedAt = Number.NEGATIVE_INFINITY
+
+/** Record a Host roster change, so the next roster reads start one fresh request instead of joining an older one. */
+export function markRosterChanged(): void {
+  rosterChangedAt = performance.now()
+}
+
+/**
+ * One `agentPresets.list` request for every surface reading the roster at once: a refresh reloads the label, the
+ * section and every seat in the same tick, each through its own store.
+ * @param ctx - the browser plugin context carrying the Remote namespaces.
+ * @returns the Host answer, shared with the other readers of this burst.
+ */
+export function listRoster(ctx: ClientContext): ReturnType<ClientContext['remote']['agentPresets']['list']> {
+  return joinPageRead({ key: 'remote:agentPresets/list', read: () => ctx.remote.agentPresets.list(), notBefore: rosterChangedAt })
+}
+
 /** The roster, or the message to show in its place. */
 export type RosterRead = { ok: true; value: AgentPresetRoster } | { ok: false; error: string }
 
@@ -68,7 +87,7 @@ const EMPTY_ROSTER: AgentPresetRoster = { presets: [] }
  * @returns the roster, or the message to show in its place.
  */
 export async function readRoster(ctx: ClientContext): Promise<RosterRead> {
-  const result = await ctx.remote.agentPresets.list()
+  const result = await listRoster(ctx)
   if (result.ok) return { ok: true, value: result.value }
   // Agent presets are optional: without that service every session uses the
   // Host composition, so callers receive the same empty roster as a mounted

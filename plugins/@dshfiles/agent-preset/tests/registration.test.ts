@@ -21,7 +21,11 @@ afterEach(async () => {
   await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
 })
 
-async function fixture() {
+type RosterList = () => Promise<{ ok: true; value: { presets: [] } }>
+const emptyRoster: RosterList = async () => ({ ok: true, value: { presets: [] } })
+
+async function fixture(list: RosterList = emptyRoster) {
+  const events = new Map<string, (payload: string) => void>()
   const ctx = new Context()
   contexts.push(ctx)
   type Surface = typeof AgentPresetSeat | typeof AgentPresetLabel | typeof AgentPresetSection | typeof CreatePluginMenuItem
@@ -55,11 +59,17 @@ async function fixture() {
     get: () => createSnapshotStore({ status: 'idle', value: {}, writable: false }),
     developerTools: { enabled: createSnapshotStore(true) },
   })
-  ctx.provide('remote', { $on: () => () => {}, agentPresets: { list: async () => ({ ok: true, value: { presets: [] } }) } })
+  ctx.provide('remote', {
+    $on: (event: string, listener: (payload: string) => void) => {
+      events.set(event, listener)
+      return () => events.delete(event)
+    },
+    agentPresets: { list },
+  })
   ctx.provide('remote.agentPresets', {})
   ctx.provide('remote.settings', {})
   await ctx.plugin({ inject: [...inject], apply }).await()
-  return { ctx, entries, startSession }
+  return { ctx, entries, startSession, events }
 }
 
 describe('whole native Loader row', () => {
@@ -80,5 +90,19 @@ describe('whole native Loader row', () => {
     face.startCreatorDraft()
     expect(stage).toHaveBeenCalledExactlyOnceWith('cordis', true)
     expect(startSession).toHaveBeenCalledExactlyOnceWith(undefined, { clearPreviousDraft: false, agentPreset: 'cordis' })
+  })
+
+  it('reads the roster once when a Host roster change reloads every surface', async () => {
+    const answers: (() => void)[] = []
+    const list = vi.fn<RosterList>(
+      () =>
+        new Promise(resolve => {
+          answers.push(() => resolve({ ok: true, value: { presets: [] } }))
+        }),
+    )
+    const { events } = await fixture(list)
+    events.get('settings/document-updated')?.('agent-preset-registry')
+    expect(list).toHaveBeenCalledTimes(1)
+    for (const answer of answers.splice(0)) answer()
   })
 })

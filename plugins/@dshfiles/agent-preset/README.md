@@ -46,11 +46,15 @@ profile, install globally, restart DSH, or update the running Host.
 - Version/ref: `0.2.1-rc.2` / `dsh-v0.2.1-rc.2`, commit `687f282e8625c6b8d11ff58211a90524be2e4317`.
 - MIT license retained in [LICENSE](LICENSE).
 - [native-fork.json](native-fork.json) maps the browser snapshot, inert Host entry, CSS declarations and locale assets.
-- Only [native registration](src/native/index.ts) and [seat controller](src/native/seat-store.ts) carry deltas.
-  Native components/styles and Settings controller are unchanged.
+- Deltas: [native registration](src/native/index.ts) and [seat controller](src/native/seat-store.ts) carry the
+  draft staging; [registration](src/native/index.ts) also marks a Host roster change before its refresh, and the
+  [settings store](src/native/settings-store.ts) and [section store](src/native/section-store.ts) read the roster
+  through one shared `agentPresets.list` request (dshx `joinPageRead`), so a refresh that reloads the label, the
+  section and every seat sends one request instead of one per store. [Locales](src/native/locales.ts) carry the
+  recorded copy delta. Native components and styles are unchanged.
 
 On an upstream bump, run `node scripts/native-fork-diff.mjs agent-preset --to <new-tag>`, copy unchanged
-files, reapply the two recorded deltas, update provenance, and rerun the focused tests plus the scratch journey.
+files, reapply the recorded deltas, update provenance, and rerun the focused tests plus the scratch journey.
 
 ## Verification
 

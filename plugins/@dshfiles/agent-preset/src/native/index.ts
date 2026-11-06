@@ -44,7 +44,7 @@ import type { AgentPresetSectionInjected } from './AgentPresetSection.tsx'
 import { AgentPresetSeatController, type AgentPresetStage } from './seat-store.ts'
 import { AgentPresetSectionController } from './section-store.ts'
 import { en, zh, type AgentPresetSettingsKey } from './locales.ts'
-import { AGENT_PRESET_SETTINGS_NS, AgentPresetSettingsController } from './settings-store.ts'
+import { AGENT_PRESET_SETTINGS_NS, AgentPresetSettingsController, markRosterChanged } from './settings-store.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -151,6 +151,7 @@ export function apply(ctx: ClientContext): void {
     // The roster reflects live declarations and the default is a settings field, so
     // both an external settings edit and a reconnect can move this row.
     const refresh = (): void => {
+      markRosterChanged()
       void controller.load()
       // The section reads the same roster and marks the same default, so a
       // change made from either surface converges both.
