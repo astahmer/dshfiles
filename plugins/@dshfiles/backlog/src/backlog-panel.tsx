@@ -47,6 +47,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, 
 
 import { backlogApi, BacklogViews, type BacklogBackfillResult, type BacklogSummaryView } from './api.js'
 import { BackfillDialog } from './backfill-dialog.js'
+import { backfillStatusQueries } from './backfill-queries.js'
 import { BoardView } from './board-view.js'
 import { setBacklogViewSelection, type BacklogView, type BacklogViewSelection } from './view-selection.js'
 import { Composer, type ComposerThread } from './composer.js'
@@ -492,36 +493,17 @@ export const BacklogPanel = (props: {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
   const triagePending = useIsMutating({ mutationKey: BACKLOG_TRIAGE_MUTATION_KEY }) > 0
-  const [backfillJob, setBackfillJob] = useState<BacklogBackfillResult | null>(null)
-  const [backfillError, setBackfillError] = useState<string | null>(null)
-  const backfillJobId = backfillJob?.jobId
+  const [backfillStarted, setBackfillStarted] = useState<BacklogBackfillResult | null>(null)
+  const [backfillStartError, setBackfillStartError] = useState<string | null>(null)
+  const backfillJobId = backfillStarted?.jobId ?? null
+  const backfill = useQuery(backfillStatusQueries.status({ client: api, jobId: backfillJobId }))
+  // The run's own answer stands in until the first poll lands, and covers a Host that reports no job id at all.
+  const backfillJob = backfill.data === undefined ? backfillStarted : backfill.data
   const backfillJobState = backfillJob?.state
-  useEffect(() => {
-    if (backfillJobId === undefined || backfillJobId === null || backfillJobState === 'completed' || backfillJobState === 'failed') return
-    let stopped = false
-    let timer: number | undefined
-    const refresh = async (): Promise<void> => {
-      try {
-        const next = await api.backfillTriageStatus({ jobId: backfillJobId })
-        if (stopped) return
-        if (next === null) {
-          setBackfillError('This backfill is no longer available in this Host process.')
-          return
-        }
-        setBackfillJob(next)
-        if (next.state === 'queued' || next.state === 'running') timer = window.setTimeout(() => void refresh(), 1_000)
-      } catch (error) {
-        if (stopped) return
-        setBackfillError(errorMessage(error, 'Could not read backfill progress.'))
-        timer = window.setTimeout(() => void refresh(), 5_000)
-      }
-    }
-    timer = window.setTimeout(() => void refresh(), 1_000)
-    return () => {
-      stopped = true
-      if (timer !== undefined) window.clearTimeout(timer)
-    }
-  }, [api, backfillJobId, backfillJobState])
+  const backfillError =
+    backfillStartError ??
+    (backfill.error === null ? null : errorMessage(backfill.error, 'Could not read backfill progress.')) ??
+    (backfillJobId !== null && backfill.isSuccess && backfill.data === null ? 'This backfill is no longer available in this Host process.' : null)
   const stored = preferences.useValue()
   const view = stored.view
   const setPreference = (change: Partial<typeof stored>): void => {
@@ -1199,12 +1181,13 @@ export const BacklogPanel = (props: {
           triageOff={triageOff}
           progress={backfillJob}
           error={backfillError}
-          onError={message => setBackfillError(message.length === 0 ? null : message)}
+          onError={message => setBackfillStartError(message.length === 0 ? null : message)}
           run={async request => {
-            setBackfillError(null)
-            setBackfillJob(null)
+            setBackfillStartError(null)
+            setBackfillStarted(null)
             const started = await actions.backfillTriage.mutateAsync(request)
-            setBackfillJob(started)
+            if (started.jobId !== null) queryClient.setQueryData(backfillStatusQueries.key(started.jobId), started)
+            setBackfillStarted(started)
             void queryClient.invalidateQueries({ queryKey: [BacklogQueries.key] })
           }}
           close={() => setBackfillOpen(false)}
