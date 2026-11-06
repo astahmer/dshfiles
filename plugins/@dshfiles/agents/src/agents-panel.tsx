@@ -26,9 +26,11 @@ import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { AlertCircleIcon, CheckIcon, ChevronLeftIcon, CopyIcon, EllipsisIcon, PlusIcon, SendIcon, TrashIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 
+import { agentEditorMachine, type AgentEditorSelection } from './agent-editor-machine.js'
 import { AgentFocusModel } from './agent-focus.js'
 import { AGENT_TEMPLATES, AgentEditor, type AgentFix, type AgentTemplate } from './agent-editor.js'
 import { AgentEditorForm, agentFieldId } from './agent-editor-form.js'
@@ -62,12 +64,9 @@ export interface AgentsPanelProps {
   readonly startThread: (request: AgentDispatchRequest) => Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }>
 }
 
-/** What the detail pane shows: nothing yet, a saved agent, or a new draft that is not saved. */
-type Selection = { readonly kind: 'none' } | { readonly kind: 'agent'; readonly handle: string } | { readonly kind: 'new'; readonly base: AgentDraft }
-
 type Notice = { readonly tone: 'ok'; readonly text: string; readonly restore?: AgentDraft } | { readonly tone: 'error'; readonly text: string }
 
-const NONE: Selection = { kind: 'none' }
+const NONE: AgentEditorSelection = { kind: 'none' }
 const NOTICE_MS = 5_000
 
 const targetOf = (value: string, projects: readonly AgentsPanelProject[]): AgentThreadTarget => {
@@ -100,15 +99,13 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
   const agents = useMemo(() => list.data?.agents ?? [], [list.data])
   const options = useMemo(() => catalog.data?.options ?? [], [catalog.data])
 
-  const [selection, setSelection] = useState<Selection>(NONE)
+  const [editor, sendEditor, editorActor] = useMachine(agentEditorMachine)
   const [draft, setDraft] = useState<AgentDraft>(() => AgentEditor.draftOf(null))
   const [tab, setTab] = useState<'settings' | 'threads'>('settings')
   const [notice, setNotice] = useState<Notice | null>(null)
-  const [pending, setPending] = useState<Selection | null>(null)
-  const [removing, setRemoving] = useState<Agent | null>(null)
-  const [starting, setStarting] = useState<Agent | null>(null)
-  const [startError, setStartError] = useState<string | null>(null)
   const [attempted, setAttempted] = useState(false)
+  const selection = editor.context.selection
+  const modal = editor.context.modal
   const [toggling, setToggling] = useState<ReadonlySet<string>>(() => new Set())
   const focus = useSyncExternalStore(AgentFocusModel.subscribe, AgentFocusModel.read, () => null)
 
@@ -134,22 +131,28 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
     return () => window.clearTimeout(timer)
   }, [notice])
 
-  const apply = (next: Selection): void => {
-    setSelection(next)
-    setDraft(next.kind === 'new' ? next.base : AgentEditor.draftOf(next.kind === 'agent' ? (agents.find(agent => agent.handle === next.handle) ?? null) : null))
-    setTab('settings')
-    setNotice(null)
-    setPending(null)
-    setAttempted(false)
+  const apply = (next: AgentEditorSelection): void => {
+    sendEditor({ type: 'APPLY', selection: next })
   }
   /** Moving away from unsaved edits asks first, so a stray tap on another row never drops a long brief. */
-  const navigate = (next: Selection): void => {
-    if (dirty) {
-      setPending(next)
-      return
-    }
-    apply(next)
+  const navigate = (next: AgentEditorSelection): void => {
+    sendEditor({ type: 'OPEN', selection: next, dirty })
   }
+
+  // The editor's own text follows the machine's selection; the machine owns which agent that is.
+  useEffect(() => {
+    const subscription = editorActor.on('applied', event => {
+      const next = event.selection
+      setDraft(
+        next.kind === 'new' ? next.base : AgentEditor.draftOf(next.kind === 'agent' ? (agents.find(agent => agent.handle === next.handle) ?? null) : null),
+      )
+      setTab('settings')
+      setNotice(null)
+      setAttempted(false)
+    })
+    return () => subscription.unsubscribe()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the reset reads the current list, not a selection.
+  }, [editorActor, agents])
 
   // A mention preview's "Open in Agents" lands here: select that agent, then drop the request.
   useEffect(() => {
@@ -170,7 +173,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
         setNotice({ tone: 'error', text: `At most ${String(agentLimits.agents)} agents are kept. Remove one you no longer use, then save again.` })
         return
       }
-      setSelection({ kind: 'agent', handle: result.agent.handle })
+      sendEditor({ type: 'APPLY', selection: { kind: 'agent', handle: result.agent.handle } })
       setDraft(AgentEditor.draftOf(result.agent))
       setNotice({ tone: 'ok', text: 'Saved.' })
     },
@@ -212,7 +215,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
     mutationFn: async (agent: Agent) => ({ agent, result: await api.remove({ handle: agent.handle, confirm: true }) }),
     onSuccess: async ({ agent, result }) => {
       await invalidateList()
-      setRemoving(null)
+      sendEditor({ type: 'CANCEL_REMOVE' })
       if (result.kind === 'built-in') {
         setNotice({ tone: 'error', text: 'The built-in @dsh agent cannot be removed. Turn it off with its switch instead.' })
         return
@@ -245,16 +248,16 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
   const dispatch = useMutation({
     mutationFn: async (input: { readonly agent: Agent; readonly prompt: string; readonly target: string }) =>
       props.startThread({ agent: input.agent, prompt: input.prompt, target: targetOf(input.target, projects) }),
-    onMutate: () => setStartError(null),
+    onMutate: () => sendEditor({ type: 'START_PENDING' }),
     onSuccess: async result => {
       if (!result.ok) {
-        setStartError(result.reason)
+        sendEditor({ type: 'START_FAILED', message: result.reason })
         return
       }
-      setStarting(null)
+      sendEditor({ type: 'STARTED' })
       await client.invalidateQueries({ queryKey: [AGENTS_QUERY_ROOT] })
     },
-    onError: error => setStartError(errorMessage(error, 'The thread was not started.')),
+    onError: error => sendEditor({ type: 'START_FAILED', message: errorMessage(error, 'The thread was not started.') }),
   })
 
   const threads = useQuery({
@@ -285,12 +288,9 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
   const listActions = {
     select: (handle: string) => navigate({ kind: 'agent', handle }),
     setEnabled: (agent: Agent, enabled: boolean) => toggle.mutate({ agent, enabled }),
-    startThread: (agent: Agent) => {
-      setStartError(null)
-      setStarting(agent)
-    },
+    startThread: (agent: Agent) => sendEditor({ type: 'ASK_START', agent }),
     duplicate: (agent: Agent) => newAgent(AgentEditor.duplicate(agent, agents)),
-    remove: (agent: Agent) => setRemoving(agent),
+    remove: (agent: Agent) => sendEditor({ type: 'ASK_REMOVE', agent }),
   }
 
   const onEditorKey = (event: KeyboardEvent<HTMLElement>): void => {
@@ -427,7 +427,11 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
                             Duplicate
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem variant="destructive" disabled={current.builtIn} onSelect={() => setRemoving(current)}>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            disabled={current.builtIn}
+                            onSelect={() => sendEditor({ type: 'ASK_REMOVE', agent: current })}
+                          >
                             <TrashIcon />
                             {current.builtIn ? 'Built in, cannot be removed' : 'Remove…'}
                           </DropdownMenuItem>
@@ -530,27 +534,27 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
       </Page>
 
       <AgentStartDialog
-        agent={starting}
+        agent={modal.kind === 'start' ? modal.agent : null}
         projects={projects.map(project => ({ id: project.id, title: project.title }))}
         routeLabel={routeLabel}
         presetLabel={presetLabel}
-        pending={dispatch.isPending}
-        error={startError}
+        pending={modal.kind === 'start' && modal.pending}
+        error={modal.kind === 'start' ? modal.error : null}
         onOpenChange={open => {
-          if (!open) setStarting(null)
+          if (!open) sendEditor({ type: 'CLOSE_START' })
         }}
         onStart={input => {
-          if (starting !== null) dispatch.mutate({ agent: starting, ...input })
+          if (modal.kind === 'start') dispatch.mutate({ agent: modal.agent, ...input })
         }}
       />
 
-      <AlertDialog open={removing !== null} onOpenChange={open => !open && setRemoving(null)}>
+      <AlertDialog open={modal.kind === 'remove'} onOpenChange={open => !open && sendEditor({ type: 'CANCEL_REMOVE' })}>
         <AlertDialogContent className="dshx-root">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove @{removing?.handle}?</AlertDialogTitle>
+            <AlertDialogTitle>Remove @{modal.kind === 'remove' ? modal.agent.handle : ''}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Its settings and its list of {plural(removing?.threadCount ?? 0, 'thread')} are deleted. The threads themselves stay, and mentions of @
-              {removing?.handle} stop starting threads. You can undo right after.
+              Its settings and its list of {plural(modal.kind === 'remove' ? modal.agent.threadCount : 0, 'thread')} are deleted. The threads themselves stay,
+              and mentions of @{modal.kind === 'remove' ? modal.agent.handle : ''} stop starting threads. You can undo right after.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -560,7 +564,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
               disabled={remove.isPending}
               onClick={event => {
                 event.preventDefault()
-                if (removing !== null) remove.mutate(removing)
+                if (modal.kind === 'remove') remove.mutate(modal.agent)
               }}
             >
               Remove agent
@@ -569,7 +573,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={pending !== null} onOpenChange={open => !open && setPending(null)}>
+      <AlertDialog open={editor.matches('confirmLeave')} onOpenChange={open => !open && sendEditor({ type: 'KEEP_EDITING' })}>
         <AlertDialogContent className="dshx-root">
           <AlertDialogHeader>
             <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
@@ -579,7 +583,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep editing</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => pending !== null && apply(pending)}>
+            <AlertDialogAction variant="destructive" onClick={() => sendEditor({ type: 'DISCARD' })}>
               Discard
             </AlertDialogAction>
           </AlertDialogFooter>
