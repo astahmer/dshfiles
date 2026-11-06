@@ -1,21 +1,21 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { useEffect, useMemo, useState } from 'react'
-import { jujutsuApi, type GraphLandmark, type Revision } from './api.js'
+import { useEffect, useMemo } from 'react'
+import { jujutsuApi, type Revision } from './api.js'
 import { GraphLandmarksQuery } from './graph-landmarks-query.js'
 import { GraphNavigationModel } from './graph-navigation.js'
 import { resolveGraphSelection } from './graph-selection.js'
 import {
   graphNavigationMachine,
+  isComparisonTarget,
   selectGraphNavigationViewState,
+  type ComparisonTarget,
   type GraphNavigationClient,
   type GraphSliceMode,
   type GraphSliceRequest,
 } from './graph-navigation-machine.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME } from './repository-query-cache.js'
-
-type ComparisonTarget = GraphLandmark['kind'] | 'revision'
 
 interface GraphNavigationInput {
   readonly repoId: string | null
@@ -43,22 +43,14 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
   const [navigationSnapshot, sendNavigation] = useMachine(graphNavigationMachine, {
     input: { client: sliceClient, scope, repoId: input.repoId },
   })
-  const [targetKey, setTargetKey] = useState<ComparisonTarget>('main')
-  const [comparisonOpen, setComparisonOpen] = useState(false)
-  const [customTargetId, setCustomTargetId] = useState('')
 
   useEffect(() => {
     sendNavigation({ type: 'scope.change', scope, repoId: input.repoId })
-    setTargetKey('main')
-    setCustomTargetId('')
-    setComparisonOpen(false)
   }, [scope, input.repoId, sendNavigation])
   const navigation = navigationSnapshot.context
   const scopeReady = navigation.scope === scope
   const navigationView = selectGraphNavigationViewState(navigation, scope)
-  const scopedTargetKey = scopeReady ? targetKey : 'main'
-  const scopedComparisonOpen = scopeReady && comparisonOpen
-  const scopedCustomTargetId = scopeReady ? customTargetId : ''
+  const comparison = navigationView.comparison
 
   const landmarksQuery = useQuery(
     GraphLandmarksQuery.options({
@@ -80,11 +72,11 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
   const selectedRevision = resolveGraphSelection({ selection: input.selected, revisions: input.revisions, extraRevisions })
   const comparisonRevision = resolveGraphSelection({ selection: input.comparison, revisions: input.revisions, extraRevisions })
   const landmarks = landmarksQuery.data?.landmarks ?? []
-  const targetLandmark = landmarks.find(landmark => landmark.kind === scopedTargetKey)
-  const targetRevision = scopedTargetKey === 'revision' ? undefined : targetLandmark?.status === 'resolved' ? targetLandmark.revisions[0] : undefined
-  const targetCommitId = scopedTargetKey === 'revision' ? scopedCustomTargetId : (targetRevision?.commitId ?? '')
-  const targetLabel = scopedTargetKey === 'revision' ? scopedCustomTargetId.slice(0, 12) : (targetLandmark?.label ?? scopedTargetKey)
-  const comparisonTarget = landmarks.find(landmark => landmark.kind === scopedTargetKey)
+  const targetLandmark = landmarks.find(landmark => landmark.kind === comparison.target)
+  const targetRevision = comparison.target === 'revision' ? undefined : targetLandmark?.status === 'resolved' ? targetLandmark.revisions[0] : undefined
+  const targetCommitId = comparison.target === 'revision' ? comparison.customTargetId : (targetRevision?.commitId ?? '')
+  const targetLabel = comparison.target === 'revision' ? comparison.customTargetId.slice(0, 12) : (targetLandmark?.label ?? comparison.target)
+  const comparisonTarget = landmarks.find(landmark => landmark.kind === comparison.target)
   const preferredTarget =
     landmarks.find(landmark => landmark.kind === 'main' && landmark.status === 'resolved') ??
     landmarks.find(landmark => landmark.kind === 'main-origin' && landmark.status === 'resolved') ??
@@ -92,20 +84,16 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
   const defaultTargetKey: ComparisonTarget = preferredTarget?.kind ?? 'main'
   const beginComparison = (target?: ComparisonTarget): void => {
     if (!scopeReady) return
-    const nextTarget = target ?? defaultTargetKey
-    setTargetKey(nextTarget)
-    if (nextTarget === 'revision') setCustomTargetId('')
-    setComparisonOpen(true)
+    sendNavigation({ type: 'comparison.open', target: target ?? defaultTargetKey })
   }
 
   const chooseTarget = (value: string): void => {
-    if (!scopeReady || (value !== 'current' && value !== 'main-origin' && value !== 'main' && value !== 'default' && value !== 'revision')) return
-    setTargetKey(value)
-    if (value === 'revision') setCustomTargetId('')
+    if (!scopeReady || !isComparisonTarget(value)) return
+    sendNavigation({ type: 'comparison.target', target: value })
   }
 
   const closeComparison = (): void => {
-    if (scopeReady) setComparisonOpen(false)
+    if (scopeReady) sendNavigation({ type: 'comparison.close' })
   }
 
   const relationshipQuery = useQuery({
@@ -122,7 +110,7 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
       if ('failure' in result) throw new Error(result.failure.message)
       return result
     },
-    enabled: scopedComparisonOpen && input.repoId !== null && comparisonRevision !== undefined && targetCommitId.length > 0,
+    enabled: comparison.open && input.repoId !== null && comparisonRevision !== undefined && targetCommitId.length > 0,
     retry: false,
     staleTime: JUJUTSU_QUERY_STALE_TIME,
     gcTime: JUJUTSU_QUERY_GC_TIME,
@@ -160,18 +148,18 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
   return {
     selectedRevision,
     comparisonRevision,
-    comparisonOpen: scopedComparisonOpen,
+    comparisonOpen: comparison.open,
     comparisonTarget,
     defaultTargetKey,
     landmarks,
     landmarksQuery,
-    targetKey: scopedTargetKey,
+    targetKey: comparison.target,
     chooseTarget,
     beginComparison,
     closeComparison,
-    customTargetId: scopedCustomTargetId,
+    customTargetId: comparison.customTargetId,
     setCustomTargetId: (value: string) => {
-      if (scopeReady) setCustomTargetId(value)
+      if (scopeReady) sendNavigation({ type: 'comparison.custom', value })
     },
     targetLabel,
     targetCommitId,

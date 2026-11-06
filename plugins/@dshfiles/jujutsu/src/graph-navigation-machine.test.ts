@@ -102,6 +102,7 @@ describe('graphNavigationMachine', () => {
       hidden: [],
       revealed: [],
       lensSelection: null,
+      comparison: { open: false, target: 'main', customTargetId: '' },
       notice: '',
     })
     expect(selectGraphNavigationViewState(context, 'root:repo').view).toEqual(context.view)
@@ -235,6 +236,29 @@ describe('graphNavigationMachine', () => {
     await waitFor(actor, snapshot => snapshot.context.notice.startsWith('Nothing exclusive to hide:'))
     expect(actor.getSnapshot().context.hidden).toHaveLength(1)
     expect(actor.getSnapshot().context.view?.label).toBe('History leading to history')
+    actor.stop()
+  })
+
+  it('owns the comparison target and closes it with the scope it belongs to', () => {
+    const actor = createGraphActor({ graphSlice: async () => graphSlice([]) })
+    expect(actor.getSnapshot().context.comparison).toEqual({ open: false, target: 'main', customTargetId: '' })
+
+    actor.send({ type: 'comparison.open', target: 'main-origin' })
+    expect(actor.getSnapshot().context.comparison).toEqual({ open: true, target: 'main-origin', customTargetId: '' })
+
+    actor.send({ type: 'comparison.target', target: 'revision' })
+    actor.send({ type: 'comparison.custom', value: 'abc123' })
+    expect(actor.getSnapshot().context.comparison).toEqual({ open: true, target: 'revision', customTargetId: 'abc123' })
+
+    actor.send({ type: 'comparison.close' })
+    expect(actor.getSnapshot().context.comparison).toEqual({ open: false, target: 'revision', customTargetId: 'abc123' })
+
+    actor.send({ type: 'comparison.open', target: 'main' })
+    const context = actor.getSnapshot().context
+    expect(selectGraphNavigationViewState(context, 'root:next').comparison).toEqual({ open: false, target: 'main', customTargetId: '' })
+
+    actor.send({ type: 'scope.change', scope: 'root:next', repoId: 'next' })
+    expect(actor.getSnapshot().context.comparison).toEqual({ open: false, target: 'main', customTargetId: '' })
     actor.stop()
   })
 
