@@ -83,7 +83,17 @@ export const DevServersChip = (props: {
   if (servers.length === 0 && pages.length === 0) return null
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={next => {
+        // Pages refresh only on `pagesChanged`; opening the list re-reads both, so a missed event never hides a page.
+        if (next) {
+          void queryClient.invalidateQueries({ queryKey: pagesKey })
+          void queryClient.invalidateQueries({ queryKey: key })
+        }
+        setOpen(next)
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
