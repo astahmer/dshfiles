@@ -459,14 +459,12 @@ button.crumbEditable {
   margin: 2px;
 }
 
-.root[data-phase='active'] .viewArea,
-.embeddedBody[data-content-phase='active'] .viewArea {
+.body[data-content-phase='active'] .viewArea {
   flex: 1 0 auto;
   min-height: auto;
 }
 
-.root[data-phase='active'] .composerSeat,
-.embeddedBody[data-content-phase='active'] .composerSeat {
+.body[data-content-phase='active'] .composerSeat {
   position: sticky;
   bottom: 0;
   /* Above markdown CodeBlock sticky banners (z-index 6) so the footer never
@@ -495,7 +493,7 @@ button.crumbEditable {
    seat above the back-to-bottom control (z-index 8, ui-chat ChatView) while
    the menu is open. The steady state stays 7 so the control keeps painting
    over the card. */
-.root[data-phase='active'] .composerSeat:has([data-trigger-menu]) {
+.body[data-content-phase='active'] .composerSeat:has([data-trigger-menu]) {
   z-index: 9;
 }
 
@@ -583,16 +581,14 @@ button.crumbEditable {
 
 /* Hero: the composer sits inside the session scroll body; center there so
    the tree seat matches active (sticky footer) without a Root remount. */
-.root[data-phase='hero'] .scrollBody,
-.embeddedBody[data-content-phase='hero'] .scrollBody {
+.body[data-content-phase='hero'] .scrollBody {
   justify-content: center;
   overflow-y: auto;
 }
 
 /* Settling (session replaying, hero/docked unknown): keep the composer seat
    mounted but invisible so no wrong layout flashes before the phase lands. */
-.root[data-phase='settling'] .composerSeat,
-.embeddedBody[data-content-phase='settling'] .composerSeat {
+.body[data-content-phase='settling'] .composerSeat {
   visibility: hidden;
 }
 
