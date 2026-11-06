@@ -238,6 +238,10 @@
   disabled: true
 - id: session-log-download
   disabled: false
+# The right-Sidebar Browser tab is off in stock Web profiles. @dshfiles/preview's dev-server Open, preview_reveal and
+# chat links opened In-App Sidebar all land in it (the dshx Browser contract @dshfiles/chat provides over it).
+- id: ui-sidebar-browser
+  disabled: false
 # OpenTelemetry GenAI spans for turns, steps, model calls and tools come from @dshfiles/agent-telemetry (row
 # dshfiles-agent-telemetry, forked from @loongsuite/dsh-plugin, whose gated `loongsuite-observability` row is gone).
 # Its row has no `disabled` gate: spans are no-ops until dshx tracing has a destination, the OTEL_EXPORTER_OTLP_*
