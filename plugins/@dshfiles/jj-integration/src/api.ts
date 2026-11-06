@@ -369,7 +369,7 @@ export const jjIntegrationApi = defineApi({
       input: emptyInputSchema,
       output: workspaceSyncOutputSchema,
       description:
-        'State of the last sync of the DSH checkout onto main after a rebase: running, done or failed, which plugins were rebuilt, conflicts, and whether DSH needs a restart. Read-only.',
+        'State of the last sync of the DSH checkout onto main after a rebase: queued, running, done or failed, which plugins were rebuilt, conflicts, and whether DSH needs a restart. Read-only.',
       tool: {
         name: 'jj_thread_workspace_sync',
         readOnly: true,

@@ -198,7 +198,7 @@ const WorkspaceSyncLine = (props: { readonly t: JjIntegrationTranslate }): JSX.E
     // A Host older than this client has no workspaceSync method: show nothing until DSH restarts.
     queryFn: ({ signal }) =>
       runHostRequest({ signal, timeoutMs: 15_000, request: hostSignal => api.workspaceSync({}, { signal: hostSignal }) }).catch(() => ({ sync: null })),
-    refetchInterval: query => (query.state.data?.sync?.state === 'running' ? 2_000 : false),
+    refetchInterval: query => (query.state.data?.sync?.state === 'running' || query.state.data?.sync?.state === 'queued' ? 2_000 : false),
   })
   const view = sync.data?.sync
   if (view === null || view === undefined) return null
@@ -206,7 +206,7 @@ const WorkspaceSyncLine = (props: { readonly t: JjIntegrationTranslate }): JSX.E
   return (
     <Alert variant={outcome === 'failed' || outcome === 'conflicted' ? 'destructive' : 'default'} data-sync-outcome={outcome}>
       <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        {view.state === 'running' ? <Spinner /> : null}
+        {view.state === 'running' || view.state === 'queued' ? <Spinner /> : null}
         <span>{describeWorkspaceSync(props.t, view)}</span>
         {view.restartNeeded && restart !== null ? (
           <Button size="sm" variant="outline" onClick={() => void restart.run(NO_PALETTE_CONTEXT)}>

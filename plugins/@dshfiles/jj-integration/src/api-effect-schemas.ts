@@ -42,7 +42,7 @@ export const cleanupTargetSchema = Schema.Struct({
 })
 
 export const workspaceSyncSchema = Schema.Struct({
-  state: Schema.Literals(['running', 'done', 'failed']),
+  state: Schema.Literals(['queued', 'running', 'done', 'failed']),
   workspace: Schema.String,
   bookmark: Schema.String,
   status: Schema.NullOr(Schema.Literals(['up-to-date', 'synced', 'would-sync', 'refused', 'conflicted', 'build-failed'])),
