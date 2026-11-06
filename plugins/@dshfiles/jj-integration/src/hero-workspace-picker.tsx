@@ -90,6 +90,13 @@ export const HeroWorkspacePicker = (
     staleTime: 60_000,
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.projects({}, { signal: hostSignal }) }),
   })
+  const pickerCapabilities = useQuery({
+    queryKey: ['workspace-folder-picker', 'capabilities'],
+    enabled: props.open && !remote,
+    queryFn: ({ signal }) => browserApi.capabilities({}, { signal }),
+    retry: false,
+    staleTime: 60_000,
+  })
   if (destination.kind === 'runtime') {
     const runtime = directory.data?.runtimes.find(item => item.id === destination.runtimeId)
     const hostName = directory.data?.hosts.find(host => host.id === runtime?.hostId)?.name ?? runtime?.name ?? 'Remote host'
@@ -196,7 +203,7 @@ export const HeroWorkspacePicker = (
         }}
         onSelect={selection => void choose(selection).catch(() => props.onClose())}
         onClose={props.onClose}
-        showNativePicker={false}
+        showNativePicker={pickerCapabilities.data?.nativePicker === true}
         disabled={projects.isLoading}
         loading={projects.isLoading}
         heading={props.t('chooseProject')}

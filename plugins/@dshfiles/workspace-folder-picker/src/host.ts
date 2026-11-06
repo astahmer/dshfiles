@@ -1,4 +1,5 @@
-import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
+import type {} from '@deepseek-ai/dsh-host-directory-picker'
+import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
 import { Effect, Layer, Option } from 'effect'
@@ -18,12 +19,19 @@ const toolsStatus = Effect.fn('project tools status')(function* () {
   return { home: yield* ProjectHome, git: Option.isSome(git), jj: Option.isSome(jj), gh: Option.isSome(gh) }
 })
 
+/** Read per call: the Host's picker is optional and may come or go, and a browse-only one cannot open a native dialog. */
+const pickerCapabilities = Effect.fn('directory picker read capability')(function* () {
+  const picker = yield* hostService('directoryPicker').pipe(Effect.option)
+  return { nativePicker: Option.isSome(picker) && picker.value.capability().kind === 'native' }
+})
+
 export default DshxPlugin.make({
   name: 'dshfiles-workspace-folder-picker',
   inject: ['subprocess', 'workspaceController'],
   layer: Layer.mergeAll(projectLayer, DirectoryBrowser.layer, ProjectRemover.layer),
   apis: [
     Api.bind(workspaceFolderBrowserApi, {
+      capabilities: pickerCapabilities,
       list: input => DirectoryBrowser.use(browser => browser.list(input.path)),
       createDirectory: input => DirectoryBrowser.use(browser => browser.createDirectory(input)),
     }),

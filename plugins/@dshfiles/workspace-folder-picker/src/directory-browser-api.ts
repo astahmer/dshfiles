@@ -26,6 +26,16 @@ export const workspaceFolderBrowserApi = defineApi({
   version: 1,
   owner: '@dshfiles/workspace-folder-picker',
   methods: {
+    capabilities: WorkspaceFolderPickerSchema.method({
+      input: Schema.Struct({}),
+      output: Schema.Struct({ nativePicker: Schema.Boolean }),
+      description: 'Check whether this Host offers its native folder-selection dialog without opening it.',
+      tool: {
+        name: 'workspace_folder_browser_capabilities',
+        readOnly: true,
+        render: capability => (capability.nativePicker ? 'Native folder selection available' : 'Paste an absolute path or browse folders in the app'),
+      },
+    }),
     list: WorkspaceFolderPickerSchema.method({
       input: Schema.Struct({ path: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_PATH_LENGTH))) }),
       output: directoryListingSchema,

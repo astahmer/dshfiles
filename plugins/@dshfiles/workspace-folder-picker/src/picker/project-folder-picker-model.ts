@@ -18,38 +18,67 @@ type DirectoryPathListing = {
   readonly truncated: boolean
 }
 
-const normalizeDirectoryPath = (path: string): string => path.replace(/\/+$/, '') || '/'
+const isWindowsPath = (path: string): boolean => /^[a-z]:[\\/]/i.test(path) || /^[\\/]{2}[^\\/]+[\\/][^\\/]+(?:[\\/]|$)/.test(path)
+const normalizeDirectoryPath = (path: string): string => {
+  if (!isWindowsPath(path)) return path.replace(/\/+$/, '') || '/'
+  const separator = path.includes('\\') ? '\\' : '/'
+  const slashes = path.replace(/\\/g, '/')
+  const normalized = `${slashes.startsWith('//') ? '/' : ''}${slashes.replace(/\/+/g, '/').replace(/\/+$/, '')}`.replace(/\//g, separator)
+  // A drive without its separator is drive-relative, so keep its root intact.
+  return /^[a-z]:$/i.test(normalized) ? `${normalized}${separator}` : normalized
+}
+const comparisonPath = (path: string): string => {
+  const normalized = normalizeDirectoryPath(path)
+  return isWindowsPath(normalized) ? normalized.replace(/\\/g, '/').toLowerCase() : normalized
+}
+const childPrefix = (path: string): string => (path.endsWith('/') ? path : `${path}/`)
 
 export class ProjectFolderPickerModel {
   static readonly isHomeRelativePathQuery = (query: string): boolean => {
     const path = query.trim()
-    return path === '~' || path.startsWith('~/')
+    return path === '~' || /^~[\\/]/.test(path)
   }
 
-  static readonly isPathQuery = (query: string): boolean => query.trim().startsWith('/') || ProjectFolderPickerModel.isHomeRelativePathQuery(query)
+  static readonly isAbsolutePath = (query: string): boolean => {
+    const path = query.trim()
+    if (/^[\\/]{2}[?.][\\/]/.test(path)) return false
+    return path.startsWith('/') || isWindowsPath(path)
+  }
+
+  static readonly isPathQuery = (query: string): boolean =>
+    ProjectFolderPickerModel.isAbsolutePath(query) || ProjectFolderPickerModel.isHomeRelativePathQuery(query)
 
   static readonly resolvePathQuery = (query: string, home: string | undefined): string | null => {
     const path = query.trim()
-    if (path.startsWith('/')) return normalizeDirectoryPath(path)
+    if (ProjectFolderPickerModel.isAbsolutePath(path)) return normalizeDirectoryPath(path)
     if (!ProjectFolderPickerModel.isHomeRelativePathQuery(path) || home === undefined) return null
-    const relativePath = (path === '~' ? '' : path.slice(2)).replace(/^\/+|\/+$/g, '')
-    if (relativePath.length === 0) return home
-    return `${home.replace(/\/+$/, '')}/${relativePath}`
+    const windowsHome = isWindowsPath(home)
+    const separator = windowsHome && home.includes('\\') ? '\\' : '/'
+    const relativePath = (path === '~' ? '' : path.slice(2)).replace(windowsHome ? /^[\\/]+|[\\/]+$/g : /^\/+|\/+$/g, '')
+    if (relativePath.length === 0) return normalizeDirectoryPath(home)
+    const normalizedHome = normalizeDirectoryPath(home)
+    return normalizeDirectoryPath(`${normalizedHome}${normalizedHome.endsWith(separator) ? '' : separator}${relativePath}`)
   }
 
   static readonly matchingDirectoryPaths = (listing: DirectoryPathListing, query: string): readonly string[] | null => {
     const requestedPath = ProjectFolderPickerModel.resolvePathQuery(query, listing.home)
     if (requestedPath === null) return null
-    const currentPath = normalizeDirectoryPath(listing.path)
-    const normalizedRequestedPath = normalizeDirectoryPath(requestedPath)
+    const currentPath = comparisonPath(listing.path)
+    const normalizedRequestedPath = comparisonPath(requestedPath)
     if (currentPath === normalizedRequestedPath) return null
-    const prefix = currentPath === '/' ? '/' : `${currentPath}/`
+    const prefix = childPrefix(currentPath)
     if (!normalizedRequestedPath.startsWith(prefix)) return null
     const remainingPath = normalizedRequestedPath.slice(prefix.length)
     const nextSegment = remainingPath.split('/')[0]
     if (nextSegment === undefined || nextSegment.length === 0) return null
-    const segmentIsComplete = remainingPath.includes('/') || query.trim().endsWith('/')
-    return listing.entries.filter(entry => (segmentIsComplete ? entry.name === nextSegment : entry.name.startsWith(nextSegment))).map(entry => entry.path)
+    const windowsPath = isWindowsPath(requestedPath)
+    const segmentIsComplete = remainingPath.includes('/') || (windowsPath ? /[\\/]$/.test(query.trim()) : query.trim().endsWith('/'))
+    return listing.entries
+      .filter(entry => {
+        const name = windowsPath ? entry.name.toLowerCase() : entry.name
+        return segmentIsComplete ? name === nextSegment : name.startsWith(nextSegment)
+      })
+      .map(entry => entry.path)
   }
 
   static readonly uniqueMatchingDirectoryPath = (listing: DirectoryPathListing, query: string): string | null => {
@@ -59,10 +88,10 @@ export class ProjectFolderPickerModel {
   }
 
   static readonly isPathAtOrWithin = (path: string, parentPath: string): boolean => {
-    const normalizedPath = normalizeDirectoryPath(path)
-    const normalizedParentPath = normalizeDirectoryPath(parentPath)
+    const normalizedPath = comparisonPath(path)
+    const normalizedParentPath = comparisonPath(parentPath)
     if (normalizedPath === normalizedParentPath) return true
-    const prefix = normalizedParentPath === '/' ? '/' : `${normalizedParentPath}/`
+    const prefix = childPrefix(normalizedParentPath)
     return normalizedPath.startsWith(prefix)
   }
 
@@ -92,7 +121,11 @@ export class ProjectFolderPickerModel {
   static readonly folderSelection = (canonicalPath: string): ProjectFolderSelection => ({
     kind: 'directory',
     canonicalPath,
-    title: canonicalPath.split('/').filter(Boolean).at(-1) ?? canonicalPath,
+    title:
+      canonicalPath
+        .split(isWindowsPath(canonicalPath) ? /[\\/]/ : '/')
+        .filter(Boolean)
+        .at(-1) ?? canonicalPath,
   })
 
   static readonly isPickerTab = (value: string): value is PickerTab => pickerTabs.some(tab => tab === value)

@@ -17,6 +17,11 @@ Feature: Workspace folder picker
     When the sidebar Add workspace action is opened
     Then the picker starts in folder browsing mode without project actions
 
+  @scenario:workspace-folder-picker.native-selection
+  Scenario: Recover from native folder selection cancellation and failure
+    Given the isolated plugin profile "@dshfiles/workspace-folder-picker" is booted
+    Then native folder selection supports cancellation, recovery and registration
+
   @scenario:workspace-folder-picker.clone-repository
   Scenario: Clone a local repository as a project
     Given the isolated plugin profile "@dshfiles/workspace-folder-picker" is booted

@@ -158,7 +158,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   })
   const listing = browseTarget === null ? null : (listingQuery.data ?? null)
   const absolutePath = query.trim()
-  const hasAbsolutePath = absolutePath.startsWith('/')
+  const hasAbsolutePath = ProjectFolderPickerModel.isAbsolutePath(absolutePath)
   const requestedPath = listing === null ? null : ProjectFolderPickerModel.resolvePathQuery(query, listing.home)
   const canUseTypedPath =
     pathMode && hasAbsolutePath && listing?.path !== absolutePath && (props.mode !== 'directories' || props.onUseAbsolutePath !== undefined)
@@ -192,8 +192,8 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     createMutation.isPending ||
     removeMutation.isPending
   let error: string | null = null
-  if (pickMutation.isError) error = 'The folder picker is unavailable on this Host.'
-  else if (registerMutation.isError) error = 'This folder could not be registered as a project.'
+  if (pickMutation.isError) error = 'The native folder picker is unavailable. Paste an absolute path instead.'
+  else if (registerMutation.isError) error = 'This folder could not be registered. Check that the absolute path exists and is accessible, then retry.'
   else if (createMutation.isError) error = 'This folder could not be created.'
   else if (removeMutation.isError) error = 'This project could not be removed from the registered projects.'
   else if (listingQuery.isError) error = canUseTypedPath ? 'Folder browsing failed. You can still use this absolute path.' : 'This folder could not be opened.'
@@ -233,7 +233,9 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     createMutation.reset()
     pickMutation.mutate(undefined, {
       onSuccess: pickedPath => {
-        if (pickedPath !== null) browse(pickedPath)
+        if (pickedPath === null) return
+        if (props.mode === 'directories') props.onSelect(ProjectFolderPickerModel.folderSelection(pickedPath))
+        else registerWorkspacePath(pickedPath)
       },
     })
   }
@@ -361,7 +363,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                     if (listing === null || nextPath === null || !ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.path)) {
                       setBrowseTarget(current => (current !== null && current.path === undefined ? current : { path: undefined }))
                     }
-                  } else if (nextQuery.trim().startsWith('/')) {
+                  } else if (ProjectFolderPickerModel.isAbsolutePath(nextQuery)) {
                     if (
                       listing === null ||
                       (nextPath !== null &&
