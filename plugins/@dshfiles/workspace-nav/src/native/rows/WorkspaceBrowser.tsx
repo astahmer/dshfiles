@@ -30,6 +30,8 @@ import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
+import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { ArchivedFilter, GroupNode, SessionNode, SessionOrderBy, SessionRowState } from '../tree.ts'
 import {
@@ -893,11 +895,19 @@ function SearchResults({
 }
 
 /**
- * Render the browsing region.
+ * Render the browsing region behind the query provider its Session search reads through.
  * @param props - composed slot props (shell owner share + store + injected actions).
  * @returns the region element tree.
  */
-export function WorkspaceBrowser({
+export function WorkspaceBrowser(props: WorkspaceBrowserProps) {
+  return (
+    <PluginQueryProvider>
+      <WorkspaceBrowserBody {...props} />
+    </PluginQueryProvider>
+  )
+}
+
+function WorkspaceBrowserBody({
   wide,
   usePanelInfo,
   expandSidebar,
@@ -1075,15 +1085,23 @@ export function WorkspaceBrowser({
   // The query outlives the tree and the input (both wide-only) so collapsing
   // does not silently drop an in-progress filter.
   const [query, setQuery] = useState('')
-  const [searchExpanded, setSearchExpanded] = useState(false)
+  /** collapsed = rail button; expanding = rail click waiting out the slide before focus; expanded = the input. */
+  const [searchPhase, setSearchPhase] = useState<'collapsed' | 'expanding' | 'expanded'>('collapsed')
+  const searchExpanded = searchPhase !== 'collapsed'
   const [revealSessionId, setRevealSessionId] = useState<SessionId | undefined>(undefined)
   const normalizedQuery = sanitizeSearchQuery(query).trim()
-  const [remoteSearch, setRemoteSearch] = useState<RemoteSearchState>({
-    query: '',
-    status: 'idle',
-    items: [],
-    hasMore: false,
+  const debouncedQuery = useDebouncedValue({ value: normalizedQuery, delayMs: SEARCH_DEBOUNCE_MS })
+  const searchPage = useQuery({
+    queryKey: ['workspace-nav', 'session-search', debouncedQuery],
+    queryFn: ({ signal }) => searchSessions(debouncedQuery, signal),
+    enabled: debouncedQuery !== '',
   })
+  const remoteSearch = useMemo<RemoteSearchState>(() => {
+    if (debouncedQuery === '') return { query: '', status: 'idle', items: [], hasMore: false }
+    if (searchPage.error !== null) return { query: debouncedQuery, status: 'error', items: [], hasMore: false }
+    if (searchPage.data === undefined) return { query: debouncedQuery, status: 'loading', items: [], hasMore: false }
+    return { query: debouncedQuery, status: 'ready', items: searchPage.data.items, hasMore: searchPage.data.hasMore }
+  }, [debouncedQuery, searchPage.data, searchPage.error])
   const searchRoot = useRef<HTMLDivElement | null>(null)
   const searchInput = useRef<HTMLInputElement | null>(null)
   // Section-header ＋ opens the picker menu (same popover in wide and rail
@@ -1099,7 +1117,7 @@ export function WorkspaceBrowser({
     }
     setRevealSessionId(sessionId)
     setQuery('')
-    setSearchExpanded(false)
+    setSearchPhase('collapsed')
     open(sessionId)
   }
   const acknowledgeSessionReveal = (sessionId: SessionId): void => {
@@ -1109,14 +1127,14 @@ export function WorkspaceBrowser({
     if (normalizedQuery !== '') setRevealSessionId(undefined)
   }, [normalizedQuery])
 
-  // Rail search = expand + land in the search box: the flag arms before the
+  // Rail search = expand + land in the search box: `expanding` arms before the
   // expand request; once the shell flips wide the input mounts and takes focus.
-  const [searchOnExpand, setSearchOnExpand] = useState(false)
+  const searchOnExpand = searchPhase === 'expanding'
   useEffect(() => {
     if (wide && searchOnExpand) {
       const timer = window.setTimeout(() => {
         searchInput.current?.focus({ preventScroll: true })
-        setSearchOnExpand(false)
+        setSearchPhase('expanded')
       }, EXPAND_SLIDE_MS)
       return () => { window.clearTimeout(timer) }
     }
@@ -1124,71 +1142,36 @@ export function WorkspaceBrowser({
   useEffect(() => {
     if (shortcutState.searchRequest === 0) return
     closeAddWorkspace()
-    setSearchExpanded(true)
     if (!wide) {
-      setSearchOnExpand(true)
+      setSearchPhase('expanding')
       expandSidebar()
-    } else searchInput.current?.focus({ preventScroll: true })
+      return
+    }
+    setSearchPhase('expanded')
+    searchInput.current?.focus({ preventScroll: true })
   }, [shortcutState.searchRequest])
 
   useEffect(() => {
-    if (!wide || !searchExpanded || searchOnExpand) return
+    if (!wide || searchPhase !== 'expanded') return
     searchInput.current?.focus({ preventScroll: true })
-  }, [wide, searchExpanded, searchOnExpand])
+  }, [wide, searchPhase])
 
   // Outside-click dismissal stays off while the rail gesture is in flight
-  // (searchOnExpand): the rail click flips the shell wide and mounts this
+  // (expanding): the rail click flips the shell wide and mounts this
   // listener during its own dispatch, then keeps bubbling to document with
   // the now-unmounted rail button as its target — outside searchRoot, so the
   // listener would dismiss the search that click just opened.
   useEffect(() => {
-    if (!wide || !searchExpanded || searchOnExpand) return
+    if (!wide || searchPhase !== 'expanded') return
     const onClick = (event: MouseEvent): void => {
       if (!(event.target instanceof Node) || searchRoot.current?.contains(event.target) === true) return
       searchInput.current?.blur()
       if (normalizedQuery !== '') return
-      setSearchExpanded(false)
+      setSearchPhase('collapsed')
     }
     document.addEventListener('click', onClick)
     return () => { document.removeEventListener('click', onClick) }
-  }, [normalizedQuery, wide, searchExpanded, searchOnExpand])
-
-  useEffect(() => {
-    if (normalizedQuery === '') {
-      setRemoteSearch({ query: '', status: 'idle', items: [], hasMore: false })
-      return
-    }
-    const controller = new AbortController()
-    setRemoteSearch({
-      query: normalizedQuery,
-      status: 'loading',
-      items: [],
-      hasMore: false,
-    })
-    const timer = window.setTimeout(() => {
-      searchSessions(normalizedQuery, controller.signal).then((result) => {
-        if (controller.signal.aborted) return
-        setRemoteSearch({
-          query: normalizedQuery,
-          status: 'ready',
-          items: result.items,
-          hasMore: result.hasMore,
-        })
-      }).catch(() => {
-        if (controller.signal.aborted) return
-        setRemoteSearch({
-          query: normalizedQuery,
-          status: 'error',
-          items: [],
-          hasMore: false,
-        })
-      })
-    }, SEARCH_DEBOUNCE_MS)
-    return () => {
-      window.clearTimeout(timer)
-      controller.abort()
-    }
-  }, [normalizedQuery, searchSessions])
+  }, [normalizedQuery, wide, searchPhase])
 
   // Rename dialog (browser-owned so it outlives row unmounts during collapse).
   // The stored title decides whether confirming is a real rename; the draft is
@@ -1269,7 +1252,7 @@ export function WorkspaceBrowser({
               className={clsx(css.search, searchExpanded && css.searchExpanded)}
               onClick={() => {
                 closeAddWorkspace()
-                setSearchExpanded(true)
+                setSearchPhase('expanded')
                 searchInput.current?.focus()
               }}
             >
@@ -1299,7 +1282,7 @@ export function WorkspaceBrowser({
                 onKeyDown={(e) => {
                   if (e.key !== 'Escape') return
                   setQuery('')
-                  setSearchExpanded(false)
+                  setSearchPhase('collapsed')
                 }}
               />
               {searchExpanded && (
@@ -1310,7 +1293,7 @@ export function WorkspaceBrowser({
                   onClick={(e) => {
                     e.stopPropagation()
                     setQuery('')
-                    setSearchExpanded(false)
+                    setSearchPhase('collapsed')
                   }}
                 >
                   <IconCloseFillRegular />

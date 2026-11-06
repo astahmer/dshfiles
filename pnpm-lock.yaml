@@ -8735,6 +8735,9 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
+      '@dshfiles/plugin-ui':
+        specifier: workspace:*
+        version: link:../plugin-ui
       '@dshfiles/session-controller':
         specifier: workspace:*
         version: link:../session-controller
