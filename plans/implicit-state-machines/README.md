@@ -11,19 +11,19 @@ refer to it.
 
 ## Resume here
 
-Nothing started. Begin with WP1 (`H10`).
+WP1 done in JJ workspace `ism-wp1` (one revision per finding above `main`, not landed yet). H5 closed as obsolete. Begin WP2 (`H24`).
 
 ## Progress
 
-| WP  | Scope                                          | Findings             | Status      |
-| --- | ---------------------------------------------- | -------------------- | ----------- |
-| 1   | Real bugs with small fixes                     | 12                   | not started |
-| 2   | Wire the machines we already have              | 17                   | not started |
-| 3   | Shared building blocks                         | 4 blocks, 10 callers | not started |
-| 4   | Host lifecycles                                | 22                   | not started |
-| 5   | Client flows that need a machine               | 34                   | not started |
-| 6   | Query, mutation or union instead of hand state | 17                   | not started |
-| 7   | Low-severity triage                            | 80 (14 to fix)       | not started |
+| WP  | Scope                                          | Findings             | Status                       |
+| --- | ---------------------------------------------- | -------------------- | ---------------------------- |
+| 1   | Real bugs with small fixes                     | 12                   | done (11 fixed, H5 obsolete) |
+| 2   | Wire the machines we already have              | 17                   | not started                  |
+| 3   | Shared building blocks                         | 4 blocks, 10 callers | not started                  |
+| 4   | Host lifecycles                                | 22                   | not started                  |
+| 5   | Client flows that need a machine               | 34                   | not started                  |
+| 6   | Query, mutation or union instead of hand state | 17                   | not started                  |
+| 7   | Low-severity triage                            | 80 (14 to fix)       | not started                  |
 
 Update a row's status and the "Resume here" line after each milestone commit.
 
@@ -90,12 +90,12 @@ Explicit machines exist; the parallel state beside them moves in.
 
 Built once, at the narrowest owner, only for flows that already repeat. Check real callers before extracting.
 
-| Block                                                                         | Owner                                | Callers                                         |
-| ----------------------------------------------------------------------------- | ------------------------------------ | ----------------------------------------------- |
-| Device sign-in machine (Host + client)                                        | ai-accounts                          | H2, M8 (Host); M7, M9 (client)                  |
-| Autosave machine (editing → debounce → saving → saved/failed, flush on leave) | `@dshfiles/plugin-ui/machine`        | H5, M11, L12, L14; then any later autosave      |
-| Poll actor (interval, backoff, stop on terminal)                              | `@dshfiles/plugin-ui/machine`        | H25, M26, M29 where TanStack Query does not fit |
-| Hover-intent menu (open/close delays, pinned)                                 | plugin-ui primitive or kit HoverCard | M59                                             |
+| Block                                                                         | Owner                                | Callers                                              |
+| ----------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------- |
+| Device sign-in machine (Host + client)                                        | ai-accounts                          | H2, M8 (Host); M7, M9 (client)                       |
+| Autosave machine (editing → debounce → saving → saved/failed, flush on leave) | `@dshfiles/plugin-ui/machine`        | M11, L12, L14 (H5 obsolete); then any later autosave |
+| Poll actor (interval, backoff, stop on terminal)                              | `@dshfiles/plugin-ui/machine`        | H25, M26, M29 where TanStack Query does not fit      |
+| Hover-intent menu (open/close delays, pinned)                                 | plugin-ui primitive or kit HoverCard | M59                                                  |
 
 ## WP4 — Host lifecycles
 
