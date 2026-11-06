@@ -505,6 +505,18 @@ describe('thread turn signals', () => {
     }).pipe(Effect.scoped),
   )
 
+  it.effect('clears the block its own thread set even after other activity on the item', () =>
+    Effect.gen(function* () {
+      const store = yield* workingItem
+      yield* store.applyThreadAttention({ id: 1, threadId: 'session-abc123', attention: 'blocked', reason: 'the thread failed: RATE_LIMIT' })
+      yield* store.comment({ id: 1, text: 'a note while it is blocked', actor: user })
+
+      const cleared = yield* store.applyThreadAttention({ id: 1, threadId: 'session-abc123', attention: 'none', reason: 'the thread works again' })
+      expect(cleared.ok && cleared.value.item.attention).toBe('none')
+      expect((yield* store.list({ inbox: true })).total).toBe(0)
+    }).pipe(Effect.scoped),
+  )
+
   it.effect('leaves an attention the user set by hand, and a closed item, alone', () =>
     Effect.gen(function* () {
       const store = yield* workingItem

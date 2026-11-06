@@ -1,7 +1,7 @@
 import type { Message } from '@deepseek-ai/dsh-llm'
 import type { TurnEndReason } from '@deepseek-ai/dsh-session/types'
 
-import type { BacklogEvent, BacklogItem } from './item.js'
+import type { BacklogAttention, BacklogEvent, BacklogItem } from './item.js'
 
 /** What one finished thread turn means for the backlog items that thread is linked to. */
 export interface ThreadTurnOutcome {
@@ -44,14 +44,46 @@ const changesAttention = (event: Pick<BacklogEvent, 'detail' | 'fieldChanges'>):
   event.detail === 'attention' || (event.fieldChanges?.some(change => change.field === 'attention') ?? false)
 
 /**
+ * Who set the attention an item carries now: a hand set always wins, a thread signal belongs to the thread that wrote
+ * it, and anything else keeps the actor that wrote it.
+ */
+export type AttentionOwner =
+  | { readonly kind: 'user' }
+  | { readonly kind: 'thread'; readonly threadId: string; readonly setBy: string }
+  | { readonly kind: 'other'; readonly setBy: string }
+
+export interface ItemAttention {
+  readonly value: BacklogAttention
+  readonly owner: AttentionOwner
+}
+
+/**
+ * The attention an item carries and its owner, read once from the last event that changed it, whatever else touched the
+ * item since. A hand set owns the flag until the user changes it.
+ */
+const attentionOf = (item: Pick<BacklogItem, 'attention' | 'humanFields' | 'events'>): ItemAttention => {
+  const value = item.attention ?? 'none'
+  if (item.humanFields.includes('attention')) return { value, owner: { kind: 'user' } }
+  const changed = value === 'none' ? undefined : item.events.findLast(changesAttention)
+  if (changed === undefined) return { value, owner: { kind: 'other', setBy: '' } }
+  if (changed.threadId !== undefined) return { value, owner: { kind: 'thread', threadId: changed.threadId, setBy: changed.actor } }
+  return { value, owner: { kind: 'other', setBy: changed.actor } }
+}
+
+/** A thread signal owns the flag: that thread's turn wrote it, and nothing replaced it since. */
+const ownedByThread = (attention: ItemAttention, threadId: string): boolean => attention.owner.kind === 'thread' && attention.owner.threadId === threadId
+
+/** The thread wrote the flag, either as its own signal or as an agent writing on its behalf. */
+const setByThread = (owner: AttentionOwner, threadId: string): boolean =>
+  (owner.kind === 'thread' && owner.threadId === threadId) || (owner.kind === 'other' && owner.setBy === `agent:${threadId}`)
+
+/**
  * A question the thread answered settles the request for input that same thread made. A flag the user set by hand, or
  * one another agent raised, waits for its own owner: answering a question elsewhere says nothing about it.
  */
 const answeredQuestionSettles = (input: { readonly item: Pick<BacklogItem, 'attention' | 'humanFields' | 'events'>; readonly threadId: string }): boolean => {
-  if ((input.item.attention ?? 'none') !== 'needs-input' || input.item.humanFields.includes('attention')) return false
-  const asked = input.item.events.findLast(changesAttention)
-  if (asked === undefined) return false
-  return asked.threadId === input.threadId || asked.actor === `agent:${input.threadId}`
+  const attention = attentionOf(input.item)
+  return attention.value === 'needs-input' && setByThread(attention.owner, input.threadId)
 }
 
 /** What a finished thread's turn says about the items it works on, before any item is touched. */
@@ -90,6 +122,8 @@ export class ThreadLifecycle {
   static readonly outcome = outcome
   static readonly replyText = replyText
   static readonly openToResolution = openToResolution
+  static readonly attentionOf = attentionOf
+  static readonly ownedByThread = ownedByThread
   static readonly idleThreadNudges = idleThreadNudges
   static readonly answeredQuestionSettles = answeredQuestionSettles
 }

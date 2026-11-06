@@ -133,3 +133,34 @@ describe('answered questions', () => {
     expect(ThreadLifecycle.answeredQuestionSettles({ item: asked({ events: [] }), threadId: 'session-abc' })).toBe(false)
   })
 })
+
+describe('attention ownership', () => {
+  const event = (fields: Partial<BacklogItem['events'][number]>): BacklogItem['events'][number] => ({
+    at: 1,
+    actor: 'system',
+    kind: 'edited',
+    detail: 'attention',
+    ...fields,
+  })
+
+  it('reads the owner from the event that changed the flag, not from whatever came after', () => {
+    expect(
+      ThreadLifecycle.attentionOf({
+        attention: 'blocked',
+        humanFields: [],
+        events: [event({ threadId: 'session-a' }), event({ actor: 'user', kind: 'commented', detail: 'a note', threadId: 'session-a' })],
+      }),
+    ).toEqual({ value: 'blocked', owner: { kind: 'thread', threadId: 'session-a', setBy: 'system' } })
+  })
+
+  it('keeps a hand set with the user and an agent write with the agent', () => {
+    expect(ThreadLifecycle.attentionOf({ attention: 'needs-input', humanFields: ['attention'], events: [event({ threadId: 'session-a' })] })).toEqual({
+      value: 'needs-input',
+      owner: { kind: 'user' },
+    })
+    expect(ThreadLifecycle.attentionOf({ attention: 'blocked', humanFields: [], events: [event({ actor: 'agent:session-b' })] })).toEqual({
+      value: 'blocked',
+      owner: { kind: 'other', setBy: 'agent:session-b' },
+    })
+  })
+})
