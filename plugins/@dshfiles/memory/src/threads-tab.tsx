@@ -159,19 +159,13 @@ const DigestedThreadDetail = (props: {
   const thread = props.thread
   const digestLines = thread.digest.split('\n')
   const digestBody = digestLines.length > 1 ? digestLines.slice(1).join('\n').trim() : thread.digest
-  const [raw, setRaw] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
-  const [rawText, setRawText] = useState<string>('')
-  useEffect(() => {
-    if (tab !== 'raw' || raw !== 'idle') return
-    setRaw('loading')
-    void api
-      .preview({ id: `t:${thread.id}` })
-      .then(result => {
-        setRawText(result.summary)
-        setRaw('ready')
-      })
-      .catch(() => setRaw('failed'))
-  }, [api, raw, tab, thread.id])
+  const raw = useQuery({
+    queryKey: ['dshfiles-memory', 'thread-raw', thread.id],
+    queryFn: ({ signal }) => api.preview({ id: `t:${thread.id}` }, { signal }),
+    enabled: tab === 'raw',
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  })
   const timeline = useMemo(() => {
     const entries: { readonly at: number; readonly title: string; readonly detail?: string }[] = [
       { at: props.createdAt, title: 'Thread created' },
@@ -289,11 +283,11 @@ const DigestedThreadDetail = (props: {
         </ol>
       </TabsContent>
       <TabsContent value="raw">
-        {raw === 'loading' ? <p className="dshx:text-xs dshx:text-muted-foreground">Reading the thread excerpt…</p> : null}
-        {raw === 'failed' ? <p className="dshx:text-xs dshx:text-destructive">The thread excerpt could not be read.</p> : null}
-        {raw === 'ready' ? (
+        {raw.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Reading the thread excerpt…</p> : null}
+        {raw.isError ? <p className="dshx:text-xs dshx:text-destructive">The thread excerpt could not be read.</p> : null}
+        {raw.isSuccess ? (
           <pre className="dshx:max-h-96 dshx:overflow-auto dshx:whitespace-pre-wrap dshx:rounded-lg dshx:bg-muted/50 dshx:p-3 dshx:font-mono! dshx:text-[11px]">
-            {rawText}
+            {raw.data.summary}
           </pre>
         ) : null}
       </TabsContent>
