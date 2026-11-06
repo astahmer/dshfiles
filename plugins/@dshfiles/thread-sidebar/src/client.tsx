@@ -44,7 +44,7 @@ import {
   IconUnarchiveOutlineRegular,
   writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -150,6 +150,7 @@ import {
   type SidebarNotice,
 } from './sidebar-notice.js'
 import { threadSidebarMachineApi } from './machine-api.js'
+import { useRecoveryOperations, type RecoveryOperationsSettled } from './recovery-operations-machine.js'
 import { threadSidebarRecoveryApi } from './recovery-api.js'
 import { restartRecoveryRefetchInterval } from './restart-recovery-poll.js'
 import { selectRecoveryRows } from './restart-recovery-rows.js'
@@ -1529,8 +1530,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     },
     retry: false,
   })
-  const resumeMutation = useMutation({ mutationFn: (input: { readonly sessionId: SessionSummary['id'] }) => recoveryApi.resume(input) })
-  const dismissMutation = useMutation({ mutationFn: (input: { readonly sessionId: SessionSummary['id'] }) => recoveryApi.dismiss(input) })
   // A Host that predates the reason field answers with ids only; those entries are managed restarts.
   const recoveryReasonBySessionId = useMemo(() => {
     const reasons = new Map<string, RecoveryReason>()
@@ -1544,8 +1543,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     (sessionId: string): RecoveryReason | undefined => recoveryReasonBySessionId.get(sessionId),
     [recoveryReasonBySessionId],
   )
-  const [resumeBusySessionIds, setResumeBusySessionIds] = useState<ReadonlySet<string>>(() => new Set())
-  const [resumeAllBusy, setResumeAllBusy] = useState(false)
   const accountsApi = useApi(aiAccountsApi)
   const usageLimitQuery = useQuery({
     queryKey: usageLimitQueryKey,
@@ -1563,8 +1560,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     window.addEventListener(QUOTA_CONTINUATION_UPDATED_EVENT, refresh)
     return () => window.removeEventListener(QUOTA_CONTINUATION_UPDATED_EVENT, refresh)
   }, [queryClient])
-  const [usageLimitBusyIds, setUsageLimitBusyIds] = useState<ReadonlySet<string>>(() => new Set())
-  const [usageLimitResumeAllBusy, setUsageLimitResumeAllBusy] = useState(false)
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
   // Collapsing the sidebar hides the thread region with CSS, so a jj scan bought while collapsed has no reader: the
   // query waits, the schedule stops, and expanding the sidebar fetches once and arms it again. The board page reads
@@ -1678,34 +1673,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       openThreadRef.current(continued.continuedSessionId)
     } catch {
       setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarContinueInFailure') })
-    }
-  }
-  const resumeRecoverySession = async (sessionId: SessionSummary['id']): Promise<boolean> => {
-    if (resumeBusySessionIds.has(sessionId)) return false
-    setResumeBusySessionIds(current => new Set(current).add(sessionId))
-    try {
-      const result = await resumeMutation.mutateAsync({ sessionId })
-      if (!result.accepted) throw new Error('The recovery request is no longer pending.')
-      await queryClient.invalidateQueries({ queryKey: restartRecoveryQueryKey })
-      setNotice({ tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: 1 }) })
-      return true
-    } catch {
-      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
-      return false
-    } finally {
-      setResumeBusySessionIds(current => {
-        const next = new Set(current)
-        next.delete(sessionId)
-        return next
-      })
-    }
-  }
-  const dismissRecoverySession = async (sessionId: SessionSummary['id']): Promise<void> => {
-    try {
-      await dismissMutation.mutateAsync({ sessionId })
-      await queryClient.invalidateQueries({ queryKey: restartRecoveryQueryKey })
-    } catch {
-      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
     }
   }
   useEffect(() => {
@@ -1972,159 +1939,141 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [allUsageLimitRows, threadView.sourceFilter],
   )
   const allUsageLimitSessionIds = useMemo(() => new Set(allUsageLimitRows.map(row => row.session.id)), [allUsageLimitRows])
-  const resumeUsageLimitThread = async (input: { readonly continuationId: string; readonly sessionId: string }): Promise<boolean> => {
-    if (usageLimitBusyIds.has(input.continuationId)) return false
-    setUsageLimitBusyIds(current => new Set(current).add(input.continuationId))
-    try {
-      const result = await accountsApi.resumeQuotaContinuation({ continuationId: input.continuationId })
-      if (!result.accepted) {
-        setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarUsageLimitSuperseded') })
-        await queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
-        return false
-      }
-      setNotice({ tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: 1 }) })
-      await queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
-      return true
-    } catch {
-      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
-      return false
-    } finally {
-      setUsageLimitBusyIds(current => {
-        const next = new Set(current)
-        next.delete(input.continuationId)
-        return next
+  const sessionIdByContinuationId = useMemo(() => new Map(usageLimitRows.map(row => [row.continuation.continuationId, row.session.id])), [usageLimitRows])
+  const recoverySettled = (settled: RecoveryOperationsSettled): void => {
+    void queryClient.invalidateQueries({ queryKey: restartRecoveryQueryKey })
+    const failedSessionIds = settled.results
+      .filter(result => result.status !== 'accepted')
+      .flatMap(result => {
+        const session = sessions.find(candidate => candidate.id === result.key)
+        return session === undefined ? [] : [session.id]
       })
+    if (settled.tag === 'recovery-dismiss') {
+      if (failedSessionIds.length === 0) return
+      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
+      return
     }
+    if (settled.tag === 'recovery-row') {
+      setNotice(
+        failedSessionIds.length === 0
+          ? { tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: 1 }) }
+          : { tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') },
+      )
+      return
+    }
+    setNotice(
+      failedSessionIds.length === 0
+        ? { tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: settled.results.length }) }
+        : failedResumeNotice({
+            message: props.tSidebar('threadSidebarResumePartial', { sent: settled.results.length - failedSessionIds.length, failed: failedSessionIds.length }),
+            actionLabel: props.tSidebar('threadSidebarOpenFailedResume'),
+            failedSessionIds,
+            openThread,
+          }),
+    )
   }
-  const changeUsageLimitRecovery = async (input: {
+  const usageLimitSettled = (settled: RecoveryOperationsSettled): void => {
+    void queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
+    const failedKeys = settled.results.filter(result => result.status !== 'accepted').map(result => result.key)
+    if (settled.tag === 'usage-limit-change') {
+      if (failedKeys.length === 0) return
+      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
+      return
+    }
+    if (settled.tag === 'usage-limit-row') {
+      if (failedKeys.length === 0) setNotice({ tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: 1 }) })
+      else if (settled.results[0]?.status === 'rejected') setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarUsageLimitSuperseded') })
+      else setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
+      return
+    }
+    if (failedKeys.length === 0) {
+      setNotice({ tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: settled.results.length }) })
+      return
+    }
+    setNotice(
+      failedResumeNotice({
+        message: props.tSidebar('threadSidebarResumePartial', { sent: settled.results.length - failedKeys.length, failed: failedKeys.length }),
+        actionLabel: props.tSidebar('threadSidebarOpenFailedResume'),
+        failedSessionIds: failedKeys.flatMap(key => {
+          const sessionId = sessionIdByContinuationId.get(key)
+          return sessionId === undefined ? [] : [sessionId]
+        }),
+        openThread,
+      }),
+    )
+  }
+  const usageLimitOperations = useRecoveryOperations({ onSettled: usageLimitSettled })
+  const recoveryOperations = useRecoveryOperations({ onSettled: recoverySettled })
+  const usageLimitBusyIds = usageLimitOperations.busyKeys
+  const usageLimitResumeAllBusy = usageLimitOperations.running
+  const resumeBusySessionIds = recoveryOperations.busyKeys
+  const resumeAllBusy = recoveryOperations.running
+  const resumeUsageLimitThread = (input: { readonly continuationId: string }): void => {
+    usageLimitOperations.run({
+      tag: 'usage-limit-row',
+      operations: [
+        {
+          key: input.continuationId,
+          run: ({ signal }) => accountsApi.resumeQuotaContinuation({ continuationId: input.continuationId }, { signal }),
+        },
+      ],
+    })
+  }
+  const changeUsageLimitRecovery = (input: {
     readonly continuationId: string
     readonly duration?: UsageLimitSnooze
     readonly sessionId?: string
     readonly enabled?: boolean
     readonly dismiss?: boolean
-  }): Promise<void> => {
-    setUsageLimitBusyIds(current => new Set(current).add(input.continuationId))
-    try {
-      if (input.dismiss === true) await accountsApi.dismissQuotaContinuation({ continuationId: input.continuationId })
-      if (input.duration !== undefined) await accountsApi.snoozeQuotaContinuation({ continuationId: input.continuationId, duration: input.duration })
-      if (input.enabled !== undefined && input.sessionId !== undefined) {
-        await accountsApi.setQuotaContinuationAutoRetry({
-          continuationId: input.continuationId,
-          sessionId: input.sessionId,
-          enabled: input.enabled,
-        })
-        window.dispatchEvent(new Event(QUOTA_CONTINUATION_UPDATED_EVENT))
-      }
-      await queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
-    } catch {
-      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
-    } finally {
-      setUsageLimitBusyIds(current => {
-        const next = new Set(current)
-        next.delete(input.continuationId)
-        return next
-      })
-    }
+  }): void => {
+    usageLimitOperations.run({
+      tag: 'usage-limit-change',
+      operations: [
+        {
+          key: input.continuationId,
+          run: async ({ signal }) => {
+            if (input.dismiss === true) await accountsApi.dismissQuotaContinuation({ continuationId: input.continuationId }, { signal })
+            if (input.duration !== undefined)
+              await accountsApi.snoozeQuotaContinuation({ continuationId: input.continuationId, duration: input.duration }, { signal })
+            if (input.enabled !== undefined && input.sessionId !== undefined) {
+              await accountsApi.setQuotaContinuationAutoRetry(
+                { continuationId: input.continuationId, sessionId: input.sessionId, enabled: input.enabled },
+                { signal },
+              )
+              window.dispatchEvent(new Event(QUOTA_CONTINUATION_UPDATED_EVENT))
+            }
+            return { accepted: true }
+          },
+        },
+      ],
+    })
   }
-  const resumeAllUsageLimits = async (): Promise<void> => {
-    if (usageLimitResumeAllBusy) return
-    const pending = usageLimitRows.filter(row => !usageLimitBusyIds.has(row.continuation.continuationId))
-    if (pending.length === 0) return
-    setUsageLimitResumeAllBusy(true)
-    setUsageLimitBusyIds(current => new Set([...current, ...pending.map(row => row.continuation.continuationId)]))
-    let nextIndex = 0
-    let sent = 0
-    let failed = 0
-    const failedSessionIds: SessionSummary['id'][] = []
-    const worker = async (): Promise<void> => {
-      while (nextIndex < pending.length) {
-        const row = pending[nextIndex]
-        nextIndex += 1
-        if (row === undefined) continue
-        try {
-          const result = await accountsApi.resumeQuotaContinuation({ continuationId: row.continuation.continuationId })
-          if (result.accepted) sent += 1
-          else {
-            failed += 1
-            failedSessionIds.push(row.session.id)
-          }
-        } catch {
-          failed += 1
-          failedSessionIds.push(row.session.id)
-        }
-      }
-    }
-    try {
-      await Promise.all(Array.from({ length: Math.min(3, pending.length) }, worker))
-      await queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
-      setNotice(
-        failed === 0
-          ? { tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: sent }) }
-          : failedResumeNotice({
-              message: props.tSidebar('threadSidebarResumePartial', { sent, failed }),
-              actionLabel: props.tSidebar('threadSidebarOpenFailedResume'),
-              failedSessionIds,
-              openThread,
-            }),
-      )
-    } finally {
-      setUsageLimitBusyIds(current => {
-        const next = new Set(current)
-        for (const row of pending) next.delete(row.continuation.continuationId)
-        return next
-      })
-      setUsageLimitResumeAllBusy(false)
-    }
+  const resumeAllUsageLimits = (): void => {
+    usageLimitOperations.run({
+      tag: 'usage-limit-batch',
+      operations: usageLimitRows.map(row => ({
+        key: row.continuation.continuationId,
+        run: ({ signal }) => accountsApi.resumeQuotaContinuation({ continuationId: row.continuation.continuationId }, { signal }),
+      })),
+    })
   }
-  const resumeAllRecoveries = async (rows: readonly SessionSummary[]): Promise<void> => {
-    if (resumeAllBusy) return
-    const sessionIds = rows.filter(session => !resumeBusySessionIds.has(session.id)).map(session => session.id)
-    if (sessionIds.length === 0) return
-    setResumeAllBusy(true)
-    setResumeBusySessionIds(current => new Set([...current, ...sessionIds]))
-    let nextIndex = 0
-    let sent = 0
-    let failed = 0
-    const failedSessionIds: SessionSummary['id'][] = []
-    const worker = async (): Promise<void> => {
-      while (nextIndex < sessionIds.length) {
-        const sessionId = sessionIds[nextIndex]
-        nextIndex += 1
-        if (sessionId === undefined) continue
-        try {
-          const result = await resumeMutation.mutateAsync({ sessionId })
-          if (result.accepted) sent += 1
-          else {
-            failed += 1
-            failedSessionIds.push(sessionId)
-          }
-        } catch {
-          failed += 1
-          failedSessionIds.push(sessionId)
-        }
-      }
-    }
-    try {
-      await Promise.all(Array.from({ length: Math.min(3, sessionIds.length) }, worker))
-      await queryClient.invalidateQueries({ queryKey: restartRecoveryQueryKey })
-      setNotice(
-        failed === 0
-          ? { tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: sent }) }
-          : failedResumeNotice({
-              message: props.tSidebar('threadSidebarResumePartial', { sent, failed }),
-              actionLabel: props.tSidebar('threadSidebarOpenFailedResume'),
-              failedSessionIds,
-              openThread,
-            }),
-      )
-    } finally {
-      setResumeBusySessionIds(current => {
-        const next = new Set(current)
-        for (const sessionId of sessionIds) next.delete(sessionId)
-        return next
-      })
-      setResumeAllBusy(false)
-    }
+  const resumeRecoverySession = (sessionId: SessionSummary['id']): void => {
+    recoveryOperations.run({
+      tag: 'recovery-row',
+      operations: [{ key: sessionId, run: ({ signal }) => recoveryApi.resume({ sessionId }, { signal }) }],
+    })
+  }
+  const dismissRecoverySession = (sessionId: SessionSummary['id']): void => {
+    recoveryOperations.run({
+      tag: 'recovery-dismiss',
+      operations: [{ key: `dismiss:${sessionId}`, run: ({ signal }) => recoveryApi.dismiss({ sessionId }, { signal }).then(() => ({ accepted: true })) }],
+    })
+  }
+  const resumeAllRecoveries = (rows: readonly SessionSummary[]): void => {
+    recoveryOperations.run({
+      tag: 'recovery-batch',
+      operations: rows.map(row => ({ key: row.id, run: ({ signal }) => recoveryApi.resume({ sessionId: row.id }, { signal }) })),
+    })
   }
   const unreadSessionIds = useStableValue(
     useMemo(
