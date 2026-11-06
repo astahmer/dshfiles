@@ -44,6 +44,7 @@ import {
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useAutosave } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import {
   useEffect,
   useRef,
@@ -72,8 +73,8 @@ import { BacklogItemMenu } from './item-actions-menu.js'
 import { BacklogSyncControls } from './sync-controls.js'
 import { BacklogText, ItemMarkdown } from './item-text.js'
 import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
-import { submitReply } from './reply-submission.js'
-import type { AgentContinuationSelection, AgentContinuationThread } from './agent-dispatch.js'
+import { composerReplyMachine } from './reply-machine.js'
+import type { AgentContinuationSelection } from './agent-dispatch.js'
 import { ItemPickers } from './item-pickers.js'
 import { DueDates, useToday } from './due-date-hooks.js'
 import { PeekSections } from './peek-sections.js'
@@ -857,61 +858,26 @@ const CommentBox = (props: {
   const actions = useBacklogActions()
   const dispatch = useAgentDispatch()
   const [text, setText] = useState('')
-  const [pending, setPending] = useState(false)
-  const submitting = useRef(false)
-  const [failed, setFailed] = useState<string | null>(null)
-  const [continuationChoice, setContinuationChoice] = useState<{ readonly agentHandle: string; readonly threads: readonly AgentContinuationThread[] } | null>(
-    null,
-  )
-  const continuationResolver = useRef<((selection: AgentContinuationSelection) => void) | null>(null)
-  const attachments = useComposerFiles({ onError: setFailed })
+  const [attachmentFailure, setAttachmentFailure] = useState<string | null>(null)
+  const attachments = useComposerFiles({ onError: setAttachmentFailure })
+  const [reply, send] = useMachine(composerReplyMachine)
+  const sending = reply.matches('saving') || reply.matches('dispatching') || reply.matches('answering')
+  const continuation = reply.context.continuation
 
-  const chooseContinuation = (input: {
-    readonly agent: { readonly handle: string }
-    readonly threads: readonly AgentContinuationThread[]
-  }): Promise<AgentContinuationSelection> =>
-    new Promise(resolve => {
-      continuationResolver.current = resolve
-      setContinuationChoice({
-        agentHandle: input.agent.handle,
-        threads: input.threads.map(thread => ({
-          ...thread,
-          title: props.threads.find(candidate => candidate.id === thread.sessionId)?.title ?? thread.title,
-        })),
-      })
-    })
-
-  const resolveContinuation = (selection: AgentContinuationSelection): void => {
-    const resolve = continuationResolver.current
-    continuationResolver.current = null
-    setContinuationChoice(null)
-    if (selection.kind === 'cancel') setFailed('Comment saved; no thread was started.')
-    resolve?.(selection)
-  }
-
-  useEffect(
-    () => () => {
-      continuationResolver.current?.({ kind: 'cancel' })
-      continuationResolver.current = null
-    },
-    [],
-  )
-
-  /** A leading `@handle` starts that agent's thread; anything else, or a handle nothing matches, stays a comment. */
-  const submit = async (submittedText: string): Promise<void> => {
+  const submit = (submittedText: string): void => {
     const files = [...attachments.files]
-    if ((submittedText.trim() === '' && files.length === 0) || submitting.current) return
-    submitting.current = true
-    setPending(true)
-    setFailed(null)
-    try {
-      const text = ImageAttachmentReferenceModel.markdownImageReferences(submittedText, files)
-      await submitReply({
-        text,
-        files,
+    if ((submittedText.trim() === '' && files.length === 0) || sending) return
+    const markdown = ImageAttachmentReferenceModel.markdownImageReferences(submittedText, files)
+    send({
+      type: 'SUBMIT',
+      text: markdown,
+      files,
+      ports: {
         save: async saved => {
           const payload = saved.map(fileInput)
-          await actions.comment.mutateAsync(payload.length === 0 ? { id: props.item.id, text } : { id: props.item.id, text, files: payload })
+          await actions.comment.mutateAsync(
+            payload.length === 0 ? { id: props.item.id, text: markdown } : { id: props.item.id, text: markdown, files: payload },
+          )
         },
         dispatch:
           dispatch === null
@@ -925,29 +891,30 @@ const CommentBox = (props: {
                     open: props.openCreatedByDefault,
                     smartThreadRouting: props.smartThreadRouting,
                     notificationDelivery: props.threadStartNotifications,
-                    chooseContinuation,
+                    chooseContinuation: input =>
+                      new Promise<AgentContinuationSelection>(resolve => send({ type: 'CONTINUATION_REQUEST', request: input, resolve })),
                   }),
                 answerReply: ({ text: replyText }) => dispatch.answerReply({ item: props.item, text: replyText }),
                 smartReplyAnswers: props.smartReplyAnswers,
               },
-        onAnswering: props.onAnswering,
-        view: {
-          clear: () => {
-            setText('')
-            attachments.clear()
-          },
-          restore: restored => {
-            setText(current => (current === '' ? restored.text : current))
-            attachments.restore(restored.files)
-          },
-          fail: setFailed,
+        clear: () => {
+          setText('')
+          attachments.clear()
         },
-      })
-    } finally {
-      submitting.current = false
-      setPending(false)
-    }
+        restore: restored => {
+          setText(current => (current === '' ? restored.text : current))
+          attachments.restore(restored.files)
+        },
+        reportFailure: undefined,
+        onAnswering: props.onAnswering,
+      },
+    })
   }
+  const continuationThreads = (continuation?.request.threads ?? []).map(thread => ({
+    ...thread,
+    title: props.threads.find(candidate => candidate.id === thread.sessionId)?.title ?? thread.title,
+  }))
+  const failure = attachmentFailure ?? reply.context.failure
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-1">
       <BacklogTextBox
@@ -961,24 +928,24 @@ const CommentBox = (props: {
         variant="reply"
         submitLabel="Reply"
         submitDisabled={text.trim() === '' && attachments.files.length === 0}
-        pending={pending}
-        onSubmit={submittedText => void submit(submittedText)}
+        pending={sending}
+        onSubmit={submit}
       />
       <CommandDialog
-        open={continuationChoice !== null}
+        open={continuation !== null}
         onOpenChange={open => {
-          if (!open) resolveContinuation({ kind: 'cancel' })
+          if (!open) send({ type: 'CANCEL_CONTINUATION' })
         }}
-        heading={`Continue @${continuationChoice?.agentHandle ?? 'agent'}?`}
+        heading={`Continue @${continuation?.request.agent.handle ?? 'agent'}?`}
         description=" "
       >
         <CommandList>
           <CommandGroup heading="Existing threads">
-            {(continuationChoice?.threads ?? []).map(thread => (
+            {continuationThreads.map(thread => (
               <CommandItem
                 key={thread.sessionId}
                 value={`${thread.title} ${thread.sessionId}`}
-                onSelect={() => resolveContinuation({ kind: 'existing', sessionId: thread.sessionId })}
+                onSelect={() => send({ type: 'CONTINUE', selection: { kind: 'existing', sessionId: thread.sessionId } })}
               >
                 <MessageSquareIcon aria-hidden />
                 <span className="dshx:min-w-0 dshx:truncate">{thread.title}</span>
@@ -987,16 +954,16 @@ const CommentBox = (props: {
             ))}
           </CommandGroup>
           <CommandGroup heading="Start new">
-            <CommandItem value="new thread" onSelect={() => resolveContinuation({ kind: 'new' })}>
+            <CommandItem value="new thread" onSelect={() => send({ type: 'CONTINUE', selection: { kind: 'new' } })}>
               <PlusIcon aria-hidden />
               Start a new thread
             </CommandItem>
           </CommandGroup>
         </CommandList>
       </CommandDialog>
-      {failed === null ? null : (
+      {failure === null ? null : (
         <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
-          {failed}
+          {failure}
         </p>
       )}
     </div>
