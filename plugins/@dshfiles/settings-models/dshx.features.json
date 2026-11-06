@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "models-settings",
+      "title": "Models settings and provider onboarding",
+      "summary": "The native Models settings page, the official DeepSeek credential onboarding step and the welcome notice, from one owned fork of the stock row. Behaviour is the native one; the Host reads behind the page follow Host change events in one refresh per burst and only while a surface shows the page's state.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "click button \"Models\"", "expect heading \"Models\""],
+      "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Models section",
+      "configuration": [],
+      "states": ["idle", "loading", "ready", "error", "stale-while-hidden"],
+      "failureModes": [
+        "A provider directory or settings read failure keeps the last good rows and shows the native error with its Retry button.",
+        "Host change events that arrive while no surface shows the page mark it stale; the next surface that shows it reloads once."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@deepseek-ai/dsh-client-ui-settings",
+          "boundary": "The settings shell declares settings.section and settings.onboarding and owns the describe mirror the page reads.",
+          "deterministicFake": "Focused tests drive the store with a typed remote and describe face; the scratch journey uses the real shell."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only fork: it calls native llm, credentials, settings and session Remote methods whose Host spans belong to core."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "settings-models.registration",
+          "file": "plugins/@dshfiles/settings-models/tests/registration.test.ts",
+          "testName": "registers the Models section and both onboarding steps"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+- id: ui-settings-models
+  disabled: true
+- insert:
+    - id: dshfiles-settings-models
+      name: '@dshfiles/settings-models'
