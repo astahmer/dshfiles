@@ -38,6 +38,27 @@ describe('ModelCatalogDirectory.scheduleRefresh', () => {
     expect(catalog.store.getSnapshot().status).toBe('ready')
   })
 
+  it('reads once for a burst whose events arrive spread over more than one window', async () => {
+    const { catalog, modelCatalog } = fixture()
+    await catalog.load()
+    for (let event = 0; event < 4; event += 1) {
+      catalog.scheduleRefresh()
+      await vi.advanceTimersByTimeAsync(40)
+    }
+    await vi.advanceTimersByTimeAsync(60)
+    expect(modelCatalog).toHaveBeenCalledTimes(2)
+  })
+
+  it('still reads within 250 ms of a burst that never goes quiet', async () => {
+    const { catalog, modelCatalog } = fixture()
+    await catalog.load()
+    for (let event = 0; event < 10; event += 1) {
+      catalog.scheduleRefresh()
+      await vi.advanceTimersByTimeAsync(30)
+    }
+    expect(modelCatalog).toHaveBeenCalledTimes(2)
+  })
+
   it('refreshes again for a later burst', async () => {
     const { catalog, modelCatalog } = fixture()
     await catalog.load()

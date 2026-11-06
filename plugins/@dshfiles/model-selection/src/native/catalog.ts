@@ -12,7 +12,8 @@ export interface ModelCatalogState {
   error: string | null
 }
 
-const CATALOG_REFRESH_COALESCE_MS = 50
+const CATALOG_REFRESH_QUIET_MS = 50
+const CATALOG_REFRESH_MAX_WAIT_MS = 250
 
 /** Page-wide key: the native Models settings store reads the same catalog in the same Host event bursts. */
 const MODEL_CATALOG_READ = 'remote:session/modelCatalog'
@@ -111,24 +112,31 @@ export class ModelCatalogDirectory {
   }
 
   private pendingRefresh: ReturnType<typeof setTimeout> | undefined
+  private burstStartedAt: number | undefined
 
   /**
-   * Refresh once for a burst of Host change events. One settings or credential write announces several events
-   * within a few milliseconds; refreshing on each started one `session/modelCatalog` read per event.
+   * Refresh once for a burst of Host change events. One settings or credential write announces several events,
+   * spread over more than 50 ms on a busy page; refreshing on each started one `session/modelCatalog` read per event.
+   * The read waits until the burst is quiet for 50 ms, and at most 250 ms after it began.
    */
   scheduleRefresh(): void {
-    this.changedAt = performance.now()
-    if (this.pendingRefresh !== undefined) return
+    const now = performance.now()
+    this.changedAt = now
+    this.burstStartedAt ??= now
+    if (this.pendingRefresh !== undefined) clearTimeout(this.pendingRefresh)
+    const delay = Math.max(0, Math.min(CATALOG_REFRESH_QUIET_MS, this.burstStartedAt + CATALOG_REFRESH_MAX_WAIT_MS - now))
     this.pendingRefresh = setTimeout(() => {
       this.pendingRefresh = undefined
+      this.burstStartedAt = undefined
       this.refresh()
-    }, CATALOG_REFRESH_COALESCE_MS)
+    }, delay)
   }
 
   private cancelScheduledRefresh(): void {
     if (this.pendingRefresh === undefined) return
     clearTimeout(this.pendingRefresh)
     this.pendingRefresh = undefined
+    this.burstStartedAt = undefined
   }
 
   /** Clear Host-specific values and load the replacement Host generation. */
