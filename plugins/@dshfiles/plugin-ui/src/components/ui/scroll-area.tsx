@@ -6,10 +6,12 @@ import { ScrollArea as ScrollAreaPrimitive } from 'radix-ui'
 
 function ScrollArea({ className, children, ...props }: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
   return (
-    <ScrollAreaPrimitive.Root data-slot="scroll-area" className={cn('dshx:relative', className)} {...props}>
+    // A flex column, so the viewport fills whatever height the root gets, including a flexed `flex-1 min-h-0` size
+    // inside a max-height column, where a `height: 100%` viewport never resolves and the content spills out unclipped.
+    <ScrollAreaPrimitive.Root data-slot="scroll-area" className={cn('dshx:relative dshx:flex dshx:flex-col', className)} {...props}>
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="dshx:size-full dshx:rounded-[inherit] dshx:transition-[color,box-shadow] dshx:outline-none dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:focus-visible:outline-1"
+        className="dshx:min-h-0 dshx:w-full dshx:flex-1 dshx:rounded-[inherit] dshx:transition-[color,box-shadow] dshx:outline-none dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:focus-visible:outline-1"
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
