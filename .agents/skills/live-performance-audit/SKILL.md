@@ -21,6 +21,22 @@ MATCH='^Exact thread title' DUMP=snap.json node $S/switch-probe.mjs 1 && node $S
 node $S/host-cpu-profile.mjs "${DSH_HOST_PID:?set the verified Host PID}" 60   # SIGUSR1 inspector, closed afterwards
 ```
 
+For a page load or anything the probes do not drive, ask the user for a HAR (DevTools › Network › Fetch/XHR ›
+Export HAR) and summarize it:
+
+```sh
+node $S/har-summary.mjs ~/Downloads/<capture>.har            # --json for the raw summary, --top N for more methods
+node --test $S/har-summary.test.mjs
+```
+
+It prints requests, how long until the first request left the browser queue, `blocked` (queue) and `wait` (server)
+p50/p95, requests aborted before being sent, duplicate method + body calls, bytes, and the top methods with the plugin
+that owns each dshx channel (every `@dshfiles/*` package × API id in the repository, hashed with dshx's
+`ApiChannelModel.apiChannel`). It never prints headers, cookies, bodies, query strings or the page URL. Request time far
+above `wait` means the browser queue: what holds the six HTTP/1.1 sockets (other tabs, the `shared-streams` worker's
+EventSources, slow reads) is only visible in the user's browser, through `chrome://net-export` with the tab count noted.
+The HAR's `_initiator.stack` names the calling function when a core method has several possible owners.
+
 Use Node from `.node-version`. Discover the actual live URL/profile rather than assuming a particular port.
 The probes accept `LAUNCH_URL`; keep that token-bearing value in private process configuration and out of logs/source.
 The profiler attaches to the live process without restarting it; tell the user before
