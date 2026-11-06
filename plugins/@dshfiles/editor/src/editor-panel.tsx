@@ -32,10 +32,7 @@ export interface EditorPanelProps {
   readonly loadEngine: () => Promise<CodeEditorEngine>
 }
 
-type Dialog =
-  | { readonly kind: 'approve' | 'conflict'; readonly document: { readonly id: string; readonly path: string } }
-  | { readonly kind: 'discard'; readonly document: OpenDocument }
-  | null
+type Dialog = { readonly kind: 'approve' | 'conflict' | 'discard'; readonly document: { readonly id: string; readonly path: string } }
 
 const subscribeToDarkTheme = (onChange: () => void): (() => void) => {
   const observer = new MutationObserver(onChange)
@@ -130,10 +127,8 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   const activeId = props.sessionId === undefined ? undefined : state.activeBySession[props.sessionId]
   const active = sessionDocuments.find(document => document.id === activeId)
   const [showTree, setShowTree] = useState(true)
-  const [discardDocument, setDiscardDocument] = useState<OpenDocument | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<CodeEditorHandle | null>(null)
-  const engineLoadStartedAt = useRef<number | undefined>(undefined)
   const appliedText = useRef(new Map<string, string>())
   const revealed = useRef(new Map<string, number>())
   const requestSaveRef = useRef<() => void>(() => undefined)
@@ -146,8 +141,8 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   )
   const { snapshot: saveSnapshot, send: sendSave } = useEditorSaveMachine(onSaved)
   const [engineSnapshot, sendEngine] = useMachine(editorEngineLoaderMachine, { input: { loadEngine: props.loadEngine } })
-  const engineNeedsLoad = engineSnapshot.matches('idle')
   const engine = engineSnapshot.matches('ready') ? engineSnapshot.context.engine : null
+  const engineLoadStartedAt = engineSnapshot.context.loadStartedAt
   const engineError = engineSnapshot.matches('error')
 
   useEffect(() => {
@@ -155,19 +150,10 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   }, [active?.id, sendSave])
 
   requestSaveRef.current = () => {
-    if (
-      active === undefined ||
-      active.status !== 'ready' ||
-      active.content.kind !== 'text' ||
-      saveSnapshot.matches('approval') ||
-      saveSnapshot.matches('writing') ||
-      saveSnapshot.matches('conflict')
-    ) {
-      return
-    }
+    if (active === undefined || active.status !== 'ready' || active.content.kind !== 'text') return
     const buffer = handleRef.current?.snapshot(active.id)
     if (buffer === undefined) return
-    sendSave({ type: 'document.changed', documentId: active.id })
+    if (saveSnapshot.context.activeDocumentId !== active.id) sendSave({ type: 'document.changed', documentId: active.id })
     sendSave({
       type: 'save.request',
       request: {
@@ -194,14 +180,8 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
     })
   const savePending = saveSnapshot.matches('writing')
   useEffect(() => {
-    if (!editable) {
-      engineLoadStartedAt.current = undefined
-      sendEngine({ type: 'deactivate' })
-      return
-    }
-    if (engineNeedsLoad) engineLoadStartedAt.current = performance.now()
-    sendEngine({ type: 'activate' })
-  }, [editable, engineNeedsLoad, sendEngine])
+    sendEngine({ type: 'editable.changed', editable })
+  }, [editable, sendEngine])
 
   useEffect(() => {
     if (engine === null) return
@@ -214,18 +194,15 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         onSave: () => requestSaveRef.current(),
       })
       handleRef.current = handle
-      const started = engineLoadStartedAt.current
-      if (started !== undefined) container.dataset.firstOpenMs = String(Math.round(performance.now() - started))
-      engineLoadStartedAt.current = undefined
+      if (engineLoadStartedAt !== null) container.dataset.firstOpenMs = String(Math.round(performance.now() - engineLoadStartedAt))
       return () => {
         handle.dispose()
         if (handleRef.current === handle) handleRef.current = null
       }
     } catch {
-      engineLoadStartedAt.current = undefined
       sendEngine({ type: 'create.failed' })
     }
-  }, [engine, props.store, sendEngine])
+  }, [engine, engineLoadStartedAt, props.store, sendEngine])
 
   useEffect(() => handleRef.current?.setDark(dark), [dark, engine])
 
@@ -255,31 +232,33 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   }
   const sessionId = props.sessionId
   const pendingSave = saveSnapshot.context.pending
-  const saveDialog: Dialog =
-    pendingSave !== null && saveSnapshot.matches('approval')
-      ? { kind: 'approve', document: { id: pendingSave.documentId, path: pendingSave.path } }
-      : pendingSave !== null && saveSnapshot.matches('conflict')
-        ? { kind: 'conflict', document: { id: pendingSave.documentId, path: pendingSave.path } }
-        : null
-  const dialog: Dialog = saveDialog ?? (discardDocument === null ? null : { kind: 'discard', document: discardDocument })
+  const queuedDiscard = saveSnapshot.context.discard
+  const dialogOf = (): Dialog | null => {
+    if (pendingSave !== null && saveSnapshot.matches('approval')) return { kind: 'approve', document: { id: pendingSave.documentId, path: pendingSave.path } }
+    if (pendingSave !== null && saveSnapshot.matches('conflict')) return { kind: 'conflict', document: { id: pendingSave.documentId, path: pendingSave.path } }
+    if (queuedDiscard !== null && saveSnapshot.matches('discard'))
+      return { kind: 'discard', document: { id: queuedDiscard.documentId, path: queuedDiscard.path } }
+    return null
+  }
+  const dialog = dialogOf()
 
   const closeDocument = (document: OpenDocument): void => {
-    if (document.dirty) setDiscardDocument(document)
+    if (document.dirty) sendSave({ type: 'discard.request', document: { documentId: document.id, path: document.path } })
     else props.store.close(document.id)
   }
 
   const confirmDialog = (): void => {
     if (dialog === null) return
-    if (dialog.kind === 'approve') {
-      sendSave({ type: 'approve' })
+    if (dialog.kind === 'discard') {
+      props.store.close(dialog.document.id)
+      sendSave({ type: 'cancel' })
       return
     }
     if (dialog.kind === 'conflict') {
       sendSave({ type: 'overwrite' })
       return
     }
-    props.store.close(dialog.document.id)
-    setDiscardDocument(null)
+    sendSave({ type: 'approve' })
   }
 
   return (
@@ -398,9 +377,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
       </div>
       <AlertDialog
         onOpenChange={open => {
-          if (open) return
-          if (dialog?.kind === 'discard') setDiscardDocument(null)
-          sendSave({ type: 'cancel' })
+          if (!open) sendSave({ type: 'cancel' })
         }}
         open={dialog !== null}
       >
