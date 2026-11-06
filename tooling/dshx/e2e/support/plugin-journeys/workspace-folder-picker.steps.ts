@@ -101,6 +101,7 @@ Then('native folder selection supports cancellation, recovery and registration',
   await writeFile(join(selectedPath, 'keep.txt'), 'keep this file\n')
   let picked = 0
   let capabilityAvailable = false
+  const pathStyle = process.platform === 'win32' ? 'windows' : 'posix'
   const nativeRoute = async (route: Route) => {
     const request = Schema.decodeUnknownSync(rpcIdentity)(route.request().postDataJSON())
     if (request.method === capabilityEndpoint) {
@@ -114,7 +115,7 @@ Then('native folder selection supports cancellation, recovery and registration',
         })
       }
       return route.fulfill({
-        json: { type: 'server-response', rpcId: request.rpcId, result: { ok: true, value: { version: 1, output: { nativePicker: true } } } },
+        json: { type: 'server-response', rpcId: request.rpcId, result: { ok: true, value: { version: 1, output: { nativePicker: true, pathStyle } } } },
       })
     }
     picked += 1
@@ -130,40 +131,48 @@ Then('native folder selection supports cancellation, recovery and registration',
   const pickPattern = '**/api/directoryPicker/pick'
   await page.route(capabilityPattern, nativeRoute)
   await page.route(pickPattern, nativeRoute)
+  const dialog = folderPickerDialog(page)
+  const pathInput = dialog.getByRole('textbox', { name: 'Enter a folder path' })
+  const browse = dialog.getByRole('button', { name: 'Browse…', exact: true })
+  // Every opening mounts a fresh flow; wait for its capability read and its home listing before asserting on either.
+  const openAddWorkspace = async (): Promise<void> => {
+    const capabilityRead = page.waitForResponse(response => response.url().endsWith(`/${capabilityEndpoint}`))
+    await page.getByRole('button', { name: 'Add workspace', exact: true }).click()
+    await capabilityRead
+    await expect(dialog.getByRole('listbox', { name: 'Folders' })).toBeVisible()
+    await expect(pathInput).toHaveValue(absolutePathPattern)
+  }
+  const pickNative = async (expectedPicks: number): Promise<void> => {
+    await browse.click()
+    await expect.poll(() => picked).toBe(expectedPicks)
+  }
   try {
-    await page.reload({ waitUntil: 'domcontentloaded' })
-    await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
-    await page.getByRole('menuitem', { name: /Add workspace/ }).click()
-    const dialog = folderPickerDialog(page)
-    const pathInput = dialog.getByRole('textbox', { name: 'Enter a folder path' })
+    await openAddWorkspace()
     await recordAssertion(page, 'older-host-keeps-absolute-path-fallback', async () => {
       await expect(dialog.getByRole('alert')).toHaveCount(0)
-      await expect(dialog.getByRole('button', { name: 'Browse…', exact: true })).toHaveCount(0)
+      await expect(browse).toHaveCount(0)
       await pathInput.fill(selectedPath)
       await expect(dialog.getByRole('button', { name: 'Use this folder', exact: true })).toBeVisible()
     })
     await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
     capabilityAvailable = true
-    // Open a fresh flow so its capability query sees this deterministic native backend.
-    await page.reload({ waitUntil: 'domcontentloaded' })
-    await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
-    await page.getByRole('menuitem', { name: /Add workspace/ }).click()
-    const browse = dialog.getByRole('button', { name: 'Browse…', exact: true })
+    await openAddWorkspace()
     await expect(browse).toBeEnabled()
     const initialPath = await pathInput.inputValue()
-    await browse.click()
+    await pickNative(1)
     await recordAssertion(page, 'native-cancel-preserves-folder-selection', async () => {
       await expect(browse).toBeEnabled()
       await expect(pathInput).toHaveValue(initialPath)
       await expect(dialog).toBeVisible()
     })
-    await browse.click()
+    await pickNative(2)
     await recordAssertion(page, 'native-failure-keeps-path-entry-and-retry', async () => {
       await expect(dialog.getByRole('alert')).toContainText('Paste an absolute path')
       await expect(pathInput).toBeEnabled()
       await expect(browse).toBeEnabled()
     })
-    await browse.click()
+    await pickNative(3)
     await recordAssertion(page, 'native-selection-registers-workspace', async () => {
       await expect(dialog).toBeHidden()
       await expect(page.getByRole('treeitem').filter({ hasText: 'native-selected-workspace' })).toBeVisible()
