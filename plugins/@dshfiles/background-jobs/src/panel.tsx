@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { ChevronDownIcon, ChevronRightIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import type { ISessions, SessionTarget } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -33,6 +34,7 @@ import { backgroundJobsApi } from './api.js'
 import { jobCategoryValues, type JobCategory } from './classify.js'
 import { JobSelectionModel } from './job-selection.js'
 import type { BackgroundJobsKey, BackgroundJobsTranslate } from './locales.js'
+import { backgroundJobStopMachine } from './stop-machine.js'
 import type { JobBoard, JobRow, JobScope, JobStatus } from './types.js'
 
 const boardKey = ['background-jobs', 'board'] as const
@@ -284,12 +286,6 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
   const [group, setGroup] = useState<'session' | 'category' | 'none'>('session')
   const [categories, setCategories] = useState<readonly JobCategory[]>([])
   const [search, setSearch] = useState('')
-  const [armed, setArmed] = useState<string | null>(null)
-  const [stopping, setStopping] = useState<string | null>(null)
-  const [stopError, setStopError] = useState<string | null>(null)
-  const [selection, setSelection] = useState<ListSelection<string>>(() => ListSelectionModel.empty())
-  const [confirmingStop, setConfirmingStop] = useState(false)
-  const [batchStopping, setBatchStopping] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const debouncedSearch = useDebouncedValue({ value: search, delayMs: 250 })
   const sessionLabel = EntityLabels.useSessionLabel(props.sessions)
@@ -323,55 +319,33 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
     onSuccess: () => queryClient.invalidateQueries({ queryKey: boardKey }),
   })
 
-  const stop = useMutation({
-    mutationFn: async (row: JobRow) => api.kill({ jobId: row.id, confirm: true }),
-    onSuccess: () => {
-      setStopping(null)
-      setArmed(null)
-      setStopError(null)
-      void queryClient.invalidateQueries({ queryKey: boardKey })
-    },
-    onError: error => {
-      setStopping(null)
-      setStopError(errorMessage(error, t('stopFailed')))
+  const [stopSnapshot, sendStop] = useMachine(backgroundJobStopMachine, {
+    input: {
+      kill: (jobId: string) => api.kill({ jobId, confirm: true }),
+      refresh: () => void queryClient.invalidateQueries({ queryKey: boardKey }),
     },
   })
-
   const value = board.data
   const rows = useMemo(() => value?.rows ?? [], [value])
   const stoppableIds = useMemo(() => JobSelectionModel.stoppableIds(rows), [rows])
   useEffect(() => {
-    setSelection(current => {
-      const next = ListSelectionModel.prune({ state: current, visibleIds: stoppableIds })
-      return next.ids.length === current.ids.length && next.anchorId === current.anchorId ? current : next
-    })
-  }, [stoppableIds])
+    sendStop({ type: 'visible', ids: stoppableIds })
+  }, [stoppableIds, sendStop])
+  const selection: ListSelection<string> = stopSnapshot.context.selection
   const selectedJobIds = useMemo(() => new Set(selection.ids), [selection.ids])
-  const clearSelection = (): void => setSelection(ListSelectionModel.empty())
-  const toggleJobSelection = (id: string): void => setSelection(current => ListSelectionModel.toggle({ state: current, id }))
-  const extendJobSelection = (id: string): void => setSelection(current => ListSelectionModel.extend({ state: current, orderedIds: stoppableIds, id }))
-  const stopSelected = async (): Promise<void> => {
-    setBatchStopping(true)
-    setStopError(null)
-    try {
-      const outcome = await JobSelectionModel.stop({
-        ids: selection.ids,
-        kill: async jobId => api.kill({ jobId, confirm: true }),
-      })
-      if (outcome.failed.length > 0) {
-        setSelection({ ids: outcome.failed, anchorId: outcome.failed[0] })
-        setStopError(t('batchStopPartial', { requested: outcome.requested.length, failed: outcome.failed.length }))
-      } else {
-        setConfirmingStop(false)
-        clearSelection()
-      }
-      await queryClient.invalidateQueries({ queryKey: boardKey })
-    } catch (error) {
-      setStopError(errorMessage(error, t('stopFailed')))
-    } finally {
-      setBatchStopping(false)
-    }
-  }
+  const clearSelection = (): void => sendStop({ type: 'select.clear' })
+  const toggleJobSelection = (id: string): void => sendStop({ type: 'select.toggle', id })
+  const extendJobSelection = (id: string): void => sendStop({ type: 'select.extend', id, orderedIds: stoppableIds })
+  const stopFailure = stopSnapshot.context.failure
+  const stopError =
+    stopFailure === null
+      ? null
+      : stopFailure.kind === 'error'
+        ? errorMessage(stopFailure.error, t('stopFailed'))
+        : t('batchStopPartial', { requested: stopFailure.requested, failed: stopFailure.failed })
+  const confirmingStop = stopSnapshot.matches('confirming') || stopSnapshot.matches({ stopping: 'batch' })
+  const batchStopping = stopSnapshot.matches({ stopping: 'batch' })
+  const stopTargetCount = stopSnapshot.context.targetIds.length
   const briefs = useMemo(() => new Map((value?.sessions ?? []).map(session => [session.id, session])), [value])
   const labelOf = useCallback(
     (owner: string): string => (sessionTarget(props.sessions, owner) === undefined ? (briefs.get(owner)?.title ?? sessionLabel(owner)) : sessionLabel(owner)),
@@ -493,7 +467,7 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
                 type="checkbox"
                 aria-label={t('selectAllStoppable')}
                 checked={ListSelectionModel.isComplete({ state: selection, orderedIds: stoppableIds })}
-                onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds: stoppableIds }))}
+                onChange={() => sendStop({ type: 'select.all', orderedIds: stoppableIds })}
                 className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
               />
               <span className="dshx:text-muted-foreground">{t('selectAllStoppable')}</span>
@@ -553,18 +527,14 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
                       row={row}
                       now={now}
                       t={t}
-                      armed={armed === row.id}
-                      stopping={stopping === row.id && stop.isPending}
+                      armed={stopSnapshot.context.armedId === row.id}
+                      stopping={stopSnapshot.matches({ stopping: 'single' }) && stopSnapshot.context.targetIds[0] === row.id}
                       selected={selectedJobIds.has(row.id)}
                       onToggleSelection={toggleJobSelection}
                       onRangeSelection={extendJobSelection}
                       sessionLabel={labelOf}
-                      onArm={target => setArmed(target.id)}
-                      onStop={target => {
-                        setStopping(target.id)
-                        setStopError(null)
-                        stop.mutate(target)
-                      }}
+                      onArm={target => sendStop({ type: 'arm', id: target.id })}
+                      onStop={() => sendStop({ type: 'stop' })}
                     />
                   ))}
                 </EntityList>
@@ -575,7 +545,7 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
           {selection.ids.length === 0 ? null : (
             <div className="dshx:sticky dshx:bottom-2 dshx:z-30 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-2 dshx:pl-3 dshx:text-[13px] dshx:shadow-lg">
               <span className="dshx:mr-2 dshx:tabular-nums">{t('selectedCount', { count: selection.ids.length })}</span>
-              <Button size="sm" variant="destructive" onClick={() => setConfirmingStop(true)}>
+              <Button size="sm" variant="destructive" onClick={() => sendStop({ type: 'ask' })}>
                 {t('stopSelected')}
               </Button>
               <Button size="sm" variant="ghost" onClick={clearSelection}>
@@ -587,25 +557,25 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
           <AlertDialog
             open={confirmingStop}
             onOpenChange={open => {
-              if (!open && !batchStopping) setConfirmingStop(false)
+              if (!open && stopSnapshot.matches('confirming')) sendStop({ type: 'cancel' })
             }}
           >
             <AlertDialogContent className="dshx-root" size="sm">
               <AlertDialogHeader>
-                <AlertDialogTitle className="dshx:text-sm">{t('stopSelectedTitle', { count: selection.ids.length })}</AlertDialogTitle>
+                <AlertDialogTitle className="dshx:text-sm">{t('stopSelectedTitle', { count: stopTargetCount })}</AlertDialogTitle>
                 <AlertDialogDescription>{t('stopSelectedDescription')}</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={batchStopping}>{t('cancel')}</AlertDialogCancel>
                 <AlertDialogAction
                   variant="destructive"
-                  disabled={batchStopping || selection.ids.length === 0}
+                  disabled={batchStopping || stopTargetCount === 0}
                   onClick={event => {
                     event.preventDefault()
-                    void stopSelected()
+                    sendStop({ type: 'confirm' })
                   }}
                 >
-                  {batchStopping ? t('stopping') : t('stopSelectedConfirm', { count: selection.ids.length })}
+                  {batchStopping ? t('stopping') : t('stopSelectedConfirm', { count: stopTargetCount })}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
