@@ -202,6 +202,12 @@ function directChildResult(child: ChildProcess): Promise<SubprocessOutcome> {
   })
 }
 
+/** A detached fallback owner stops owning its range once ONE signal or observation finds it gone. */
+type OwnerPhase = 'owned' | 'stopped'
+
+/** The direct child's promise, before and after its first terminal event. */
+type DirectPhase = 'running' | 'settled'
+
 function fallbackOwner(
   platform: NodeJS.Platform,
   pid: number | undefined,
@@ -210,20 +216,20 @@ function fallbackOwner(
   linuxGroupHasLiveMembers: (processGroupId: number) => boolean | undefined,
   direct: Promise<SubprocessOutcome>,
 ): BoundProcessOwner {
-  let stopped = false
-  let directSettled = false
+  let ownerPhase: OwnerPhase = 'owned'
+  let directPhase: DirectPhase = 'running'
   let observation: Promise<void> | undefined
   void direct.then(
-    () => { directSettled = true },
-    () => { directSettled = true },
+    () => { directPhase = 'settled' },
+    () => { directPhase = 'settled' },
   )
 
   const alive = (): boolean => {
-    if (stopped || pid === undefined) return false
+    if (ownerPhase === 'stopped' || pid === undefined) return false
     if (platform === 'win32') return child.exitCode === null && child.signalCode === null
     try {
       process.kill(-pid, 0)
-      if (directSettled && platform === 'linux' && linuxGroupHasLiveMembers(pid) === false) return false
+      if (directPhase === 'settled' && platform === 'linux' && linuxGroupHasLiveMembers(pid) === false) return false
       return true
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code
@@ -238,7 +244,7 @@ function fallbackOwner(
   return {
     signal: (signal) => {
       if (!alive()) {
-        stopped = true
+        ownerPhase = 'stopped'
         return
       }
       signalTree(platform, pid, signal, child, taskkill)
@@ -246,19 +252,25 @@ function fallbackOwner(
     waitForExit: async () => {
       /* v8 ignore next -- bindManagedProcess memoizes this owner wait; the guard only
          protects direct internal re-entry after signal() observed absence. */
-      if (stopped) return
+      if (ownerPhase === 'stopped') return
       observation ??= (async () => {
         for (let attempt = 0; alive(); attempt += 1) await sleepTick(attempt)
-        stopped = true
+        ownerPhase = 'stopped'
       })()
       await observation
     },
     terminateForHostExit: () => {
-      if (stopped) return
+      if (ownerPhase === 'stopped') return
       signalTree(platform, pid, 'SIGKILL', child, taskkill)
     },
   }
 }
+
+/** The termination ladder: TERM, the grace timeout, then KILL, until the owner reports the range gone. */
+type TerminationPhase = 'running' | 'terminating' | 'killing' | 'exited'
+
+/** The direct outcome, from its promise to the first terminal answer; drains harness pipes before it settles. */
+type OutcomePhase = 'pending' | 'draining' | 'settled' | 'failed'
 
 /**
  * Bind platform launch facts to the existing stdio, outcome, abort, and termination lifecycle.
@@ -318,16 +330,17 @@ export function bindManagedProcess(
   }
 
   let graceTimer: ReturnType<typeof setTimeout> | undefined
-  let terminationStarted = false
-  let rangeExitObserved = false
   let rangeExitObservation: Promise<void> | undefined
-  let settled = false
+  let termination: TerminationPhase = 'running'
+  let outcome: OutcomePhase = 'pending'
 
   const scheduleOwnerCleanup = (): boolean => {
     if (launch.owner.cleanup === undefined) return false
     queueMicrotask(() => { void done.finally(() => { launch.owner.cleanup?.() }).catch(() => {}) })
     return true
   }
+
+  const outcomeSettled = (): boolean => outcome === 'settled' || outcome === 'failed'
 
   /**
    * Start or reuse the handle's managed-range exit observer. A failed read
@@ -340,32 +353,33 @@ export function bindManagedProcess(
   const observeRangeExit = (): Promise<void> => {
     rangeExitObservation ??= (async () => {
       await launch.owner.waitForExit()
-      rangeExitObserved = true
+      termination = 'exited'
       if (graceTimer !== undefined) clearTimeout(graceTimer)
       graceTimer = undefined
       spec.signal?.removeEventListener('abort', onAbort)
       scheduleOwnerCleanup()
     })().catch((error: unknown) => {
-      if (!settled || !scheduleOwnerCleanup()) rangeExitObservation = undefined
+      if (!outcomeSettled() || !scheduleOwnerCleanup()) rangeExitObservation = undefined
       throw error
     })
     return rangeExitObservation
   }
 
   const kill = (sig: 'SIGTERM' | 'SIGKILL', cancellationReason?: unknown): void => {
-    if (rangeExitObserved) return
+    if (termination === 'exited') return
     launch.owner.signal(sig, cancellationReason)
   }
 
   const terminateWithReason = (cancellationReason: unknown): void => {
-    if (rangeExitObserved || terminationStarted) return
-    terminationStarted = true
+    if (termination !== 'running') return
+    termination = 'terminating'
     // Keep the shared observation rejection available to waitForExit() without
     // leaking an unhandled rejection when a caller only invokes terminate().
     void observeRangeExit().catch(() => {})
     kill('SIGTERM', cancellationReason)
     graceTimer = setTimeout(() => {
       graceTimer = undefined
+      termination = 'killing'
       kill('SIGKILL')
     }, spec.graceMs)
   }
@@ -391,17 +405,17 @@ export function bindManagedProcess(
 
   const done = new Promise<SubprocessOutcome>((resolve, reject) => {
     let pipeDrainTimer: ReturnType<typeof setTimeout> | undefined
-    const settle = (outcome: SubprocessOutcome): void => {
-      if (settled) return
-      settled = true
+    const settle = (result: SubprocessOutcome): void => {
+      if (outcomeSettled()) return
+      outcome = 'settled'
       // Only harness-collected pipes are force-closed at the drain boundary;
       // a 'pipe'-mode stream belongs to the caller and closes with the child.
       stopCollectors()
       cleanup()
-      resolve(outcome)
+      resolve(result)
     }
     const fail = (error: unknown): void => {
-      settled = true
+      outcome = 'failed'
       terminate()
       stopCollectors()
       cleanup()
@@ -409,13 +423,14 @@ export function bindManagedProcess(
       // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- Exact cancellation reason is the contract.
       reject(error)
     }
-    launch.direct.then((outcome) => {
+    launch.direct.then((result) => {
       if (stdoutClosed === undefined && stderrClosed === undefined) {
-        settle(outcome)
+        settle(result)
         return
       }
-      pipeDrainTimer = setTimeout(() => { settle(outcome) }, spec.graceMs)
-      void outputStreamsClosed.then(() => { settle(outcome) })
+      outcome = 'draining'
+      pipeDrainTimer = setTimeout(() => { settle(result) }, spec.graceMs)
+      void outputStreamsClosed.then(() => { settle(result) })
     }, fail)
     function cleanup(): void {
       // graceTimer deliberately NOT cleared: forced termination must still
@@ -425,7 +440,7 @@ export function bindManagedProcess(
   })
 
   const waitForExit = async (signal?: AbortSignal): Promise<boolean> => {
-    if (rangeExitObserved) return true
+    if (termination === 'exited') return true
     return waitWithAbort(observeRangeExit(), signal)
   }
 
