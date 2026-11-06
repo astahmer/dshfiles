@@ -55,7 +55,8 @@ interface SessionTitleEditorProps {
   readonly title: string
   readonly label: string
   readonly error: string | undefined
-  readonly onCommit: (title: string) => void
+  /** Resolves whether the rename landed; a failed one leaves the editor open for another try. */
+  readonly onCommit: (title: string) => Promise<boolean>
   readonly onCancel: () => void
 }
 
@@ -76,7 +77,9 @@ function SessionTitleEditor({ title, label, error, onCommit, onCancel }: Session
       onCancel()
       return
     }
-    onCommit(next)
+    void onCommit(next).then(committed => {
+      if (!committed) settled.current = false
+    })
   }
   return (
     <span className={css.titleEditor}>
@@ -126,13 +129,15 @@ export function ConversationSessionHeader({
     setRenaming(false)
     setRenameError(undefined)
   }, [sessionId])
-  const commitRename = async (title: string): Promise<void> => {
+  const commitRename = async (title: string): Promise<boolean> => {
     try {
       await rename(sessionId, title)
       setRenaming(false)
       setRenameError(undefined)
+      return true
     } catch {
       setRenameError(t('session.renameFailed'))
+      return false
     }
   }
   const showTabs = !hideChrome && tabs.length > 1
@@ -161,7 +166,7 @@ export function ConversationSessionHeader({
                             title={summary.displayTitle}
                             label={t('session.renameTitle')}
                             error={renameError}
-                            onCommit={next => void commitRename(next)}
+                            onCommit={commitRename}
                             onCancel={() => {
                               setRenaming(false)
                               setRenameError(undefined)

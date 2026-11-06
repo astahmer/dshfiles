@@ -266,6 +266,33 @@ describe('fixed Conversation content factory composition', () => {
     expect(widthFallbacks.get('embedded')).not.toBe(ConversationWidthControls)
   })
 
+  it('keeps the title editor responsive after a rename fails', async () => {
+    const { header } = fixture('rename-a')
+    const rename = vi.fn<ConversationSessionHeaderSlotProps['rename']>().mockRejectedValueOnce(new Error('Host refused')).mockResolvedValue(undefined)
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() => root.render(<ConversationSessionHeader {...header} rename={rename} />))
+    const titleButton = Array.from(element.querySelectorAll('button')).find(button => button.textContent === 'rename-a')
+    act(() => titleButton?.click())
+    const titleInput = () => element.querySelector<HTMLInputElement>('input[aria-label="session.renameTitle"]')
+    const type = (value: string) =>
+      act(() => {
+        const input = titleInput()
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value)
+        input?.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+    const press = (key: string) => act(async () => void titleInput()?.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })))
+    type('first try')
+    await press('Enter')
+    expect(element.querySelector('[role="alert"]')?.textContent).toBe('session.renameFailed')
+    type('second try')
+    await press('Enter')
+    expect(rename).toHaveBeenNthCalledWith(2, header.sessionId, 'second try')
+    expect(titleInput()).toBeNull()
+  })
+
   it('selects native child views independently in two fixed Sessions without replacing either editor', () => {
     vi.stubGlobal(
       'ResizeObserver',
