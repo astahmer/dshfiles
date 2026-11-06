@@ -10,13 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { PatchView, parsePatchFiles, type PatchLineSelection } from '@dshfiles/plugin-ui/diff'
+import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
 import { MessageSquarePlus, RefreshCw, X } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { pullsReviewApi } from './api.js'
+import { FacetSessionStateModel, type FacetSessionPatch } from './changes-facet-state.js'
 import { ChangesScopeModel, changesScopeSchema, type ChangesRequest, type ChangesScope } from './changes-scope.js'
 import { LandCard } from './land-card.js'
 import { TurnChangesModel, type TurnChangesEvent } from './turn-changes.js'
@@ -121,22 +122,24 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
   const composer = useContract(Composer)
   const queryClient = useQueryClient()
   const { cwd, busy } = useThreadSummary(props.sessions, props.sessionId)
-  const [scope, setScope] = useState<ChangesScope | undefined>(props.request?.scope)
-  const [seq, setSeq] = useState<number | undefined>(props.request?.seq)
-  const [focusPath, setFocusPath] = useState<string | null>(null)
-  const [selection, setSelection] = useState<PatchLineSelection | null>(null)
-  const [comment, setComment] = useState('')
-  const [commentNotice, setCommentNotice] = useState<string | null>(null)
+  const sessionId = props.sessionId
+  const [stored, setStored] = useState(() => ({
+    ...FacetSessionStateModel.initial(sessionId),
+    scope: props.request?.scope,
+    seq: props.request?.seq,
+  }))
+  // Scope, turn, selection and comment draft belong to one thread: switching threads starts them over together.
+  const { scope, seq, focusPath, selection, comment, commentNotice } = FacetSessionStateModel.forSession(stored, sessionId)
+  const patchFacet = useCallback(
+    (patch: FacetSessionPatch): void => setStored(current => FacetSessionStateModel.update(current, { sessionId, patch })),
+    [sessionId],
+  )
 
   useEffect(() => {
     if (props.request === undefined) return
-    setScope(props.request.scope)
-    if (props.request.seq !== undefined) setSeq(props.request.seq)
+    patchFacet(props.request.seq === undefined ? { scope: props.request.scope } : { scope: props.request.scope, seq: props.request.seq })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the opener's request applies when it changes, never again just because the thread did.
   }, [props.request, props.requestRevision])
-  useEffect(() => {
-    setSelection(null)
-    setFocusPath(null)
-  }, [props.sessionId])
 
   const status = useQuery({
     queryKey: ['pulls-review', 'land', cwd ?? ''],
@@ -212,7 +215,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
   const addComment = (): void => {
     if (selection === null || comment.trim().length === 0 || props.sessionId === undefined) return
     if (composer.status !== 'active') {
-      setCommentNotice('The composer is not loaded, so the comment cannot be queued. Copy it into your next message instead.')
+      patchFacet({ commentNotice: 'The composer is not loaded, so the comment cannot be queued. Copy it into your next message instead.' })
       return
     }
     const text = selection.side === 'deletions' ? `(on removed lines) ${comment.trim()}` : comment.trim()
@@ -226,12 +229,10 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
           : { kind: 'comment', path, line: selection.start, endLine: selection.end, text },
     })
     if (!added) {
-      setCommentNotice("This thread's composer is not on screen. Open the thread, then add the comment again.")
+      patchFacet({ commentNotice: "This thread's composer is not on screen. Open the thread, then add the comment again." })
       return
     }
-    setCommentNotice('Added to your next message.')
-    setComment('')
-    setSelection(null)
+    patchFacet({ commentNotice: 'Added to your next message.', comment: '', selection: null })
   }
 
   if (props.sessionId === undefined)
@@ -275,8 +276,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
           className="dshx:max-w-full dshx:flex-wrap"
           onValueChange={value => {
             if (isScope(value)) {
-              setScope(value)
-              setSelection(null)
+              patchFacet({ scope: value, selection: null })
             }
           }}
           size="sm"
@@ -291,7 +291,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
           ))}
         </ToggleGroup>
         {activeScope === 'turn' && turnList.length > 1 ? (
-          <Select onValueChange={value => setSeq(Number(value))} value={String(activeSeq ?? latestTurn?.seq ?? '')}>
+          <Select onValueChange={value => patchFacet({ seq: Number(value) })} value={String(activeSeq ?? latestTurn?.seq ?? '')}>
             <SelectTrigger aria-label="Turn" className="dshx:h-7 dshx:w-auto dshx:text-xs" size="sm">
               <SelectValue />
             </SelectTrigger>
@@ -374,7 +374,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
                       'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left dshx:font-mono dshx:text-xs dshx:hover:underline',
                       viewed && 'dshx:text-muted-foreground',
                     )}
-                    onClick={() => setFocusPath(file.path)}
+                    onClick={() => patchFacet({ focusPath: file.path })}
                     type="button"
                   >
                     {file.display}
@@ -396,14 +396,14 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
                   {selection.end === selection.start ? '' : `–${String(selection.end)}`}
                   {selection.side === 'deletions' ? ' (removed)' : ''}
                 </span>
-                <Button aria-label="Discard comment" onClick={() => setSelection(null)} size="icon-xs" type="button" variant="ghost">
+                <Button aria-label="Discard comment" onClick={() => patchFacet({ selection: null })} size="icon-xs" type="button" variant="ghost">
                   <X aria-hidden className="dshx:size-3.5" />
                 </Button>
               </div>
               <Textarea
                 aria-label="Comment on the selected lines"
                 className="dshx:min-h-16 dshx:text-xs"
-                onChange={event => setComment(event.target.value)}
+                onChange={event => patchFacet({ comment: event.target.value })}
                 onKeyDown={event => {
                   if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) addComment()
                 }}
@@ -430,8 +430,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
               files={parsedFiles}
               focusPath={focusPath}
               onLineSelection={next => {
-                setSelection(next)
-                setCommentNotice(null)
+                patchFacet({ selection: next, commentNotice: null })
               }}
               renderHeaderMetadata={file => {
                 const viewed = marks.viewed.has(file.name)
