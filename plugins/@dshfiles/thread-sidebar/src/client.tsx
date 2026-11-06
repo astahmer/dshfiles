@@ -13,6 +13,7 @@ import { isListedUnsentThread, presentUnsentThread } from './unsent-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
 import { DEFAULT_THREAD_BOARD_VIEW, storedThreadBoardView, ThreadBoardViewModel } from './thread-board-view.js'
 import { toggleCollapsedGroup } from './collapsed-groups.js'
+import { threadDragMachine, type ThreadDragCommands } from './thread-drag-machine.js'
 import { initialThreadRoute, pendingThreadRoute, reduceThreadRoute, threadUrlRoute } from './thread-route.js'
 import { useNearViewport } from './use-near-viewport.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
@@ -26,6 +27,7 @@ import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/wor
 import { useInboxThreadSignals } from './inbox-signals.js'
 import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusGroup } from './thread-status.js'
 import { useApi, useApiQuery, usePlugin, useRegistry } from '@dshfiles/dshx/client'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { ThreadRowActions, type ThreadRowActionTarget } from './thread-row-actions.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
@@ -3640,40 +3642,46 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [orderedSections, preferences.separateRemoteThreads, props.openRemoteThreads, remoteRowsBySection, rowsBySection],
   )
   const sectionHeaderRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const sectionDragRef = useRef<{ pointerId: number; from: number; startY: number; centers: number[] | null } | null>(null)
-  const suppressSectionClick = useRef(false)
-  const [sectionDrag, setSectionDrag] = useState<{ from: number; to: number } | null>(null)
-  const [rowDrag, setRowDrag] = useState<{ sessionId: SessionSummary['id']; section: SidebarSection } | null>(null)
-  const [rowDropSection, setRowDropSection] = useState<SidebarSection | null>(null)
-  const rowDragRef = useRef<{ sessionId: SessionSummary['id']; section: SidebarSection } | null>(null)
-  const rowDropSectionRef = useRef<SidebarSection | null>(null)
-  const suppressRowClick = useRef(false)
-  const moveThreadsToSectionRef = useRef(moveThreadsToSection)
-  moveThreadsToSectionRef.current = moveThreadsToSection
-  // A dropped row lands in a section that is already on screen: revealing the empty ones during the gesture would
-  // re-parent the dragged row, and the browser cancels a native drag whose source node moves.
-  const renderedSections = useMemo(
-    () =>
-      sectionDrag === null
-        ? shownSections
-        : SidebarOrganization.reorderSections({
-            savedOrder: orderedSections,
-            shownSections,
-            fromShownIndex: sectionDrag.from,
-            toShownIndex: sectionDrag.to,
-          }).filter(section => shownSections.includes(section)),
-    [shownSections, orderedSections, sectionDrag],
-  )
-  const endSectionDrag = (): void => {
-    sectionDragRef.current = null
-    setSectionDrag(null)
-  }
   const commitSectionOrder = (fromShownIndex: number, toShownIndex: number): void => {
     if (fromShownIndex === toShownIndex) return
     changePreferences({
       sectionOrder: SidebarOrganization.reorderSections({ savedOrder: orderedSections, shownSections, fromShownIndex, toShownIndex }),
     })
   }
+  // The machine is created once, so its commands read the handlers of the latest render through one holder.
+  const dragCommands = useRef<ThreadDragCommands>({ moveToSection: () => undefined, commitSectionOrder: () => undefined })
+  dragCommands.current = {
+    moveToSection: input => void moveThreadsToSection(SessionId(input.sessionId), input.section),
+    commitSectionOrder: input => commitSectionOrder(input.from, input.to),
+  }
+  const [drag, sendDrag, dragActor] = useMachine(threadDragMachine, {
+    input: {
+      moveToSection: input => dragCommands.current.moveToSection(input),
+      commitSectionOrder: input => dragCommands.current.commitSectionOrder(input),
+    },
+  })
+  const activeRowDrag = drag.matches('rows') ? drag.context.row : null
+  const activeRowDropSection = drag.matches('rows') ? drag.context.dropSection : null
+  const activeSectionDrag = drag.matches('section') ? drag.context.section : null
+  const sectionHeaderCenters = (): number[] =>
+    shownSections.map((_, position) => {
+      const rect = sectionHeaderRefs.current[position]?.getBoundingClientRect()
+      return rect === undefined ? Number.POSITIVE_INFINITY : rect.top + rect.height / 2
+    })
+  // A dropped row lands in a section that is already on screen: revealing the empty ones during the gesture would
+  // re-parent the dragged row, and the browser cancels a native drag whose source node moves.
+  const renderedSections = useMemo(
+    () =>
+      activeSectionDrag === null
+        ? shownSections
+        : SidebarOrganization.reorderSections({
+            savedOrder: orderedSections,
+            shownSections,
+            fromShownIndex: activeSectionDrag.from,
+            toShownIndex: activeSectionDrag.to,
+          }).filter(section => shownSections.includes(section)),
+    [shownSections, orderedSections, activeSectionDrag],
+  )
   /**
    * A thread row is `draggable` so it can be dropped into the composer as a mention, and the browser's own drag
    * suppresses pointer events for the gesture, so moving a row between sections rides the same native
@@ -3685,6 +3693,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       const section = element instanceof Element ? element.closest<HTMLElement>('[data-thread-section]')?.dataset.threadSection : undefined
       return isSidebarSection(section) ? { element, section } : null
     }
+    const draggingRow = (): boolean => dragActor.getSnapshot().matches('rows')
     const onDragStart = (event: DragEvent): void => {
       const target = event.target
       if (!(target instanceof Element)) return
@@ -3693,60 +3702,46 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       const section = row.closest<HTMLElement>('[data-thread-section]')?.dataset.threadSection
       const threadId = row.dataset.threadId
       if (!isSidebarSection(section) || threadId === undefined) return
-      const sessionId = SessionId(threadId)
-      rowDragRef.current = { sessionId, section }
-      setRowDrag({ sessionId, section })
+      sendDrag({ type: 'row.start', row: { sessionId: SessionId(threadId), section } })
     }
     const onDragOver = (event: DragEvent): void => {
-      if (rowDragRef.current === null) return
+      if (!draggingRow()) return
       const target = sectionAt(event.clientX, event.clientY)
       const next = target !== null && threadSurfaceOf(target.element) === surface ? target.section : null
       if (next === null) {
-        rowDropSectionRef.current = null
-        setRowDropSection(current => (current === null ? current : null))
+        sendDrag({ type: 'row.over', section: null })
         return
       }
       // Without preventDefault the browser refuses the drop and no `drop` event ever fires.
       event.preventDefault()
       if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'move'
-      rowDropSectionRef.current = next
-      setRowDropSection(current => (current === next ? current : next))
-    }
-    const endRowDrag = (): void => {
-      rowDragRef.current = null
-      rowDropSectionRef.current = null
-      setRowDrag(null)
-      setRowDropSection(null)
+      sendDrag({ type: 'row.over', section: next })
     }
     const onDrop = (event: DragEvent): void => {
-      const current = rowDragRef.current
-      if (current === null) return
+      if (!draggingRow()) return
       const target = sectionAt(event.clientX, event.clientY)
       const droppedOn = target !== null && threadSurfaceOf(target.element) === surface ? target.section : null
       if (droppedOn === null) {
-        endRowDrag()
+        sendDrag({ type: 'row.end' })
         return
       }
       event.preventDefault()
-      endRowDrag()
-      // The click that ends a drop belongs to the drag, not to the row it started on.
-      suppressRowClick.current = true
-      window.setTimeout(() => {
-        suppressRowClick.current = false
-      }, 0)
-      if (droppedOn !== current.section) void moveThreadsToSectionRef.current(current.sessionId, droppedOn)
+      sendDrag({ type: 'row.drop', section: droppedOn })
+    }
+    const onDragEnd = (): void => {
+      sendDrag({ type: 'row.end' })
     }
     window.addEventListener('dragstart', onDragStart, true)
     window.addEventListener('dragover', onDragOver, true)
     window.addEventListener('drop', onDrop, true)
-    window.addEventListener('dragend', endRowDrag, true)
+    window.addEventListener('dragend', onDragEnd, true)
     return () => {
       window.removeEventListener('dragstart', onDragStart, true)
       window.removeEventListener('dragover', onDragOver, true)
       window.removeEventListener('drop', onDrop, true)
-      window.removeEventListener('dragend', endRowDrag, true)
+      window.removeEventListener('dragend', onDragEnd, true)
     }
-  }, [surface])
+  }, [dragActor, sendDrag, surface])
   const groupedThreadEntries = useMemo(() => {
     if (threadView.groupBy === 'status') return []
     const entries: SidebarGroupedViewEntry[] = [
@@ -4228,8 +4223,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const handleSelectionClickCapture = (event: ReactMouseEvent<HTMLDivElement>): void => {
     // The click a pointer drag produces on release belongs to the drag, not to the row it started on.
-    if (suppressRowClick.current) {
-      suppressRowClick.current = false
+    if (dragActor.getSnapshot().context.suppressed === 'row') {
+      sendDrag({ type: 'suppression.consume' })
       event.preventDefault()
       event.stopPropagation()
       return
@@ -4344,7 +4339,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         parked={parkedSessionIds.has(session.id)}
         settled={settledSessionIds.has(session.id)}
         section={section}
-        dragging={rowDrag?.sessionId === session.id}
+        dragging={activeRowDrag?.sessionId === session.id}
         selected={selectedSession?.id === session.id}
         parentTitle={lineage.parentTitle}
         workspaceId={workspaceId}
@@ -5092,40 +5087,27 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         }}
                         onHeaderPointerDown={event => {
                           if (isBoard || event.button !== 0) return
-                          sectionDragRef.current = { pointerId: event.pointerId, from: index, startY: event.clientY, centers: null }
+                          sendDrag({ type: 'section.press', pointerId: event.pointerId, from: index, startY: event.clientY })
                         }}
                         onHeaderPointerMove={event => {
-                          const current = sectionDragRef.current
-                          if (current === null || current.pointerId !== event.pointerId) return
-                          if (current.centers === null) {
-                            if (Math.abs(event.clientY - current.startY) < SECTION_DRAG_THRESHOLD_PX) return
-                            current.centers = shownSections.map((_, position) => {
-                              const rect = sectionHeaderRefs.current[position]?.getBoundingClientRect()
-                              return rect === undefined ? Number.POSITIVE_INFINITY : rect.top + rect.height / 2
-                            })
+                          const gesture = drag.context.section
+                          if (gesture === null || gesture.pointerId !== event.pointerId) return
+                          if (gesture.centers === null) {
+                            if (Math.abs(event.clientY - gesture.startY) < SECTION_DRAG_THRESHOLD_PX) return
                             event.currentTarget.setPointerCapture(event.pointerId)
+                            sendDrag({ type: 'section.drag', pointerId: event.pointerId, centers: sectionHeaderCenters() })
                           }
                           event.preventDefault()
-                          setSectionDrag({
-                            from: current.from,
-                            to: SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.from, position: event.clientY }),
-                          })
+                          sendDrag({ type: 'section.move', pointerId: event.pointerId, position: event.clientY })
                         }}
                         onHeaderPointerUp={event => {
-                          const current = sectionDragRef.current
-                          if (current === null || current.pointerId !== event.pointerId) return
-                          if (current.centers !== null) {
-                            suppressSectionClick.current = true
-                            commitSectionOrder(
-                              current.from,
-                              SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.from, position: event.clientY }),
-                            )
-                          }
-                          endSectionDrag()
+                          const gesture = drag.context.section
+                          if (gesture === null || gesture.pointerId !== event.pointerId) return
+                          sendDrag({ type: 'section.drop', pointerId: event.pointerId, position: event.clientY })
                         }}
-                        onHeaderPointerCancel={endSectionDrag}
+                        onHeaderPointerCancel={() => sendDrag({ type: 'section.end' })}
                         onHeaderLostPointerCapture={() => {
-                          if (sectionDragRef.current?.centers !== null) endSectionDrag()
+                          if (drag.matches('section')) sendDrag({ type: 'section.end' })
                         }}
                         onHeaderKeyDown={event => {
                           if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
@@ -5136,14 +5118,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           commitSectionOrder(fromShownIndex, toShownIndex)
                         }}
                         onHeaderClick={event => {
-                          if (suppressSectionClick.current) {
-                            suppressSectionClick.current = false
+                          if (dragActor.getSnapshot().context.suppressed === 'section') {
+                            sendDrag({ type: 'suppression.consume' })
                             event.preventDefault()
                             return
                           }
                           props.openRemoteThreads?.()
                         }}
-                        dragging={sectionDrag?.from === index}
+                        dragging={activeSectionDrag?.from === index}
                       />
                     )
                   }
@@ -5164,7 +5146,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       className={cn(
                         'dshx:mt-1 dshx:rounded-md',
                         isBoard && 'dshx:flex dshx:min-h-[24rem] dshx:min-w-72 dshx:flex-1 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5',
-                        rowDrag !== null && rowDropSection === section && 'dshx:bg-accent/40 dshx:ring-1 dshx:ring-inset dshx:ring-ring/30',
+                        activeRowDrag !== null && activeRowDropSection === section && 'dshx:bg-accent/40 dshx:ring-1 dshx:ring-inset dshx:ring-ring/30',
                       )}
                       key={section}
                       data-thread-section={section}
@@ -5181,47 +5163,34 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         className={cn(
                           stickyHeaderClass,
                           'dshx:group dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
-                          rowDrag !== null && 'dshx:ring-1 dshx:ring-ring/20',
-                          rowDropSection === section && 'dshx:bg-accent dshx:text-foreground dshx:ring-ring/50',
-                          sectionDrag?.from === index && 'dshx:cursor-grabbing dshx:bg-accent dshx:opacity-70',
+                          activeRowDrag !== null && 'dshx:ring-1 dshx:ring-ring/20',
+                          activeRowDropSection === section && 'dshx:bg-accent dshx:text-foreground dshx:ring-ring/50',
+                          activeSectionDrag?.from === index && 'dshx:cursor-grabbing dshx:bg-accent dshx:opacity-70',
                         )}
                         aria-expanded={!collapsed}
                         onPointerDown={event => {
                           if (isBoard || event.button !== 0) return
-                          sectionDragRef.current = { pointerId: event.pointerId, from: index, startY: event.clientY, centers: null }
+                          sendDrag({ type: 'section.press', pointerId: event.pointerId, from: index, startY: event.clientY })
                         }}
                         onPointerMove={event => {
-                          const current = sectionDragRef.current
-                          if (current === null || current.pointerId !== event.pointerId) return
-                          if (current.centers === null) {
-                            if (Math.abs(event.clientY - current.startY) < SECTION_DRAG_THRESHOLD_PX) return
-                            current.centers = shownSections.map((_, position) => {
-                              const rect = sectionHeaderRefs.current[position]?.getBoundingClientRect()
-                              return rect === undefined ? Number.POSITIVE_INFINITY : rect.top + rect.height / 2
-                            })
+                          const gesture = drag.context.section
+                          if (gesture === null || gesture.pointerId !== event.pointerId) return
+                          if (gesture.centers === null) {
+                            if (Math.abs(event.clientY - gesture.startY) < SECTION_DRAG_THRESHOLD_PX) return
                             event.currentTarget.setPointerCapture(event.pointerId)
+                            sendDrag({ type: 'section.drag', pointerId: event.pointerId, centers: sectionHeaderCenters() })
                           }
                           event.preventDefault()
-                          setSectionDrag({
-                            from: current.from,
-                            to: SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.from, position: event.clientY }),
-                          })
+                          sendDrag({ type: 'section.move', pointerId: event.pointerId, position: event.clientY })
                         }}
                         onPointerUp={event => {
-                          const current = sectionDragRef.current
-                          if (current === null || current.pointerId !== event.pointerId) return
-                          if (current.centers !== null) {
-                            suppressSectionClick.current = true
-                            commitSectionOrder(
-                              current.from,
-                              SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.from, position: event.clientY }),
-                            )
-                          }
-                          endSectionDrag()
+                          const gesture = drag.context.section
+                          if (gesture === null || gesture.pointerId !== event.pointerId) return
+                          sendDrag({ type: 'section.drop', pointerId: event.pointerId, position: event.clientY })
                         }}
-                        onPointerCancel={endSectionDrag}
+                        onPointerCancel={() => sendDrag({ type: 'section.end' })}
                         onLostPointerCapture={() => {
-                          if (sectionDragRef.current?.centers !== null) endSectionDrag()
+                          if (drag.matches('section')) sendDrag({ type: 'section.end' })
                         }}
                         onKeyDown={event => {
                           if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
@@ -5232,8 +5201,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           commitSectionOrder(fromShownIndex, toShownIndex)
                         }}
                         onClick={() => {
-                          if (suppressSectionClick.current) {
-                            suppressSectionClick.current = false
+                          if (dragActor.getSnapshot().context.suppressed === 'section') {
+                            sendDrag({ type: 'suppression.consume' })
                             return
                           }
                           toggleSection(section)
