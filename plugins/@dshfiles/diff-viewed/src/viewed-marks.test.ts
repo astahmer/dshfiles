@@ -61,6 +61,52 @@ describe('createViewedMarks', () => {
     expect(marks.getSnapshot().has(viewedKey({ ...file, seq: 0 }))).toBe(false)
     expect(marks.getSnapshot().has(viewedKey({ ...file, seq: 2000 }))).toBe(true)
   })
+  describe('with the Host as owner', () => {
+    const other = { ...file, path: 'src/b.ts' }
+    const hostMarks = () => {
+      const marks = createViewedMarks({ storage: () => memoryStorage() })
+      const replies: Array<{ readonly resolve: (marks: readonly string[]) => void; readonly reject: () => void }> = []
+      let revision = 1
+      marks.routeTo(
+        () =>
+          new Promise((resolve, reject) => {
+            replies.push({ resolve: next => resolve({ revision: ++revision, marks: next }), reject: () => reject(new Error('Host refused')) })
+          }),
+      )
+      marks.adopt({ revision, marks: [] })
+      const shown = () => [...marks.getSnapshot()].sort()
+      return { marks, replies, shown }
+    }
+
+    it('stacks a second click on the first one before the Host answers', () => {
+      const { marks, shown } = hostMarks()
+      marks.toggle(file)
+      marks.toggle(other)
+      expect(shown()).toEqual([viewedKey(file), viewedKey(other)].sort())
+    })
+
+    it('keeps a newer flip when an older click is answered', async () => {
+      const { marks, replies, shown } = hostMarks()
+      marks.toggle(file)
+      marks.toggle(other)
+      replies[0]?.resolve([viewedKey(file)])
+      await Promise.resolve()
+      expect(shown()).toEqual([viewedKey(file), viewedKey(other)].sort())
+      replies[1]?.resolve([viewedKey(file), viewedKey(other)])
+      await vi.waitFor(() => expect(shown()).toEqual([viewedKey(file), viewedKey(other)].sort()))
+    })
+
+    it('rolls back only the refused click', async () => {
+      const { marks, replies, shown } = hostMarks()
+      marks.toggle(file)
+      marks.toggle(other)
+      replies[0]?.reject()
+      await vi.waitFor(() => expect(shown()).toEqual([viewedKey(other)]))
+      replies[1]?.resolve([viewedKey(other)])
+      await vi.waitFor(() => expect(shown()).toEqual([viewedKey(other)]))
+    })
+  })
+
   it('adopts marks another window wrote when reloaded', () => {
     const storage = memoryStorage()
     const here = createViewedMarks({ storage: () => storage })

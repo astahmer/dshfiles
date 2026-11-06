@@ -45,8 +45,9 @@ export const createViewedMarks = (options: { readonly storage: () => Pick<Storag
   const listeners = new Set<() => void>()
   let local: MarkSnapshot | null = null
   let host: (MarkSnapshot & { readonly revision: number }) | null = null
-  /** The mark set a click just produced, shown until the Host answers with its own revision. */
+  /** The mark set the unanswered clicks produced, shown until the Host has answered every one of them. */
   let optimistic: ReadonlySet<string> | null = null
+  let unansweredToggles = 0
   let send: ((file: ViewedFile) => Promise<ViewedMarksSnapshot>) | null = null
   let migrated = false
   let stopLocal: (() => void) | null = null
@@ -91,12 +92,9 @@ export const createViewedMarks = (options: { readonly storage: () => Pick<Storag
   const adopt = (next: ViewedMarksSnapshot): void => {
     if (host !== null && next.revision < host.revision) return
     const adopted = { revision: next.revision, marks: next.marks, set: new Set(next.marks) }
-    // oxlint-disable-next-line antislop/no-passthrough-variable -- `host` is replaced on the next line; `current` is the snapshot the optimistic check compares against.
-    const current = host
     host = adopted
-    // A click the Host has not answered yet owns the view; a poll that predates it must not flicker the box back.
-    if (optimistic !== null && (current === null || adopted.revision > current.revision)) optimistic = null
-    else if (optimistic !== null) return
+    // A click the Host has not answered yet owns the view; a snapshot that predates it must not flicker the box back.
+    if (optimistic !== null) return
     notify()
     if (migrated) return
     migrated = true
@@ -126,21 +124,32 @@ export const createViewedMarks = (options: { readonly storage: () => Pick<Storag
         stored.set(next.slice(-MAX_VIEWED_MARKS))
         return
       }
-      // Flip now and reconcile with the Host response, so a click never waits on the round trip.
+      // Flip now and reconcile once the Host answered every click, so a click never waits on the round trip.
       const key = viewedKey(file)
-      const next = new Set(host.set)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      optimistic = next
+      const flip = (marks: ReadonlySet<string>): ReadonlySet<string> => {
+        const next = new Set(marks)
+        if (next.has(key)) next.delete(key)
+        else next.add(key)
+        return next
+      }
+      optimistic = flip(optimistic ?? host.set)
+      unansweredToggles += 1
       notify()
+      const settle = (): void => {
+        unansweredToggles -= 1
+        if (unansweredToggles > 0) return
+        optimistic = null
+        notify()
+      }
       void send(file).then(
         snapshot => {
-          optimistic = null
           adopt(snapshot)
+          settle()
         },
         () => {
-          optimistic = null
-          notify()
+          if (optimistic !== null) optimistic = flip(optimistic)
+          if (unansweredToggles > 1) notify()
+          settle()
         },
       )
     },
