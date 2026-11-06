@@ -84,11 +84,12 @@ owner.
 - [x] ~~Workbench thread tabs lost the sticky composer and hero centering~~ after they switched to the main variant;
       phase rules now key on the content body, and squeezed status items clip instead of overlapping (2026-11-06).
 - [ ] Multi-host journeys fail 0/6 on main too, so its Phase 1 UI is unverified.
-- [ ] Pre-existing failures (2026-11-05 recount): thread-sidebar section-order and navigation-layout,
-      jujutsu composer-context, the ai-accounts six above; workbench/main-tabs/editor journeys are flaky under load
+- [ ] Pre-existing failures (2026-11-05 recount): thread-sidebar section-order and navigation-layout, the
+      ai-accounts six above (jujutsu composer-context fixed 2026-11-06: its summary opens the Changes facet); workbench/main-tabs/editor journeys are flaky under load
       (workbench-terminal now has its Free docking step but its move/probe steps still flake).
-- [ ] Scratch `dshx dev up` in a fresh workspace needs a plugin build first and `DSHX_DSH_EXECUTABLE`; fold that into
-      `verify-dsh` (see `maintain-verify-dsh`).
+- [x] ~~Scratch `dshx dev up` in a fresh workspace~~: `verify-dsh` now prepares the workspace (install, build dshx and
+      plugin-ui); `dev up` builds its bundles and starts the checkout's `node_modules/.bin/dsh`, so no
+      `DSHX_DSH_EXECUTABLE` (2026-11-06).
 
 ## 1. Why this plan exists
 
