@@ -7,7 +7,8 @@ import { secretSetupApi } from './api.js'
 import { SECRET_CATALOG_LOCALE_NAMESPACE } from './locales.js'
 import type { SecretCatalogTranslate } from './locales.js'
 import { SecretSetupForm, type SecretSetupTarget } from './secret-setup-form.js'
-import { SecretSetupSteps, type SecretSetupStep } from './secret-setup-step.js'
+import { SecretSetupOffer as SecretSetupOfferModel } from './secret-setup-offer.js'
+import { SecretSetupSteps } from './secret-setup-step.js'
 
 export { SECRET_CATALOG_LOCALE_NAMESPACE }
 export type { SecretCatalogTranslate } from './locales.js'
@@ -32,9 +33,6 @@ export interface SecretSetupOfferProps {
   readonly onBind: (binding: SecretSetupBinding) => Promise<void>
 }
 
-const addId = (current: ReadonlySet<string>, id: string): ReadonlySet<string> => new Set([...current, id])
-const removeId = (current: ReadonlySet<string>, id: string): ReadonlySet<string> => new Set([...current].filter(currentId => currentId !== id))
-
 const targetOf = (requirement: SecretSetupRequirement): SecretSetupTarget => {
   const target: SecretSetupTarget = {
     cwd: requirement.cwd ?? null,
@@ -55,43 +53,18 @@ export const SecretSetupOffer = (props: SecretSetupOfferProps): JSX.Element | nu
     retry: false,
     staleTime: 30_000,
   })
-  const [opened, setOpened] = useState(false)
-  const [editingIds, setEditingIds] = useState<ReadonlySet<string>>(new Set())
-  const [steps, setSteps] = useState<Readonly<Record<string, SecretSetupStep>>>({})
+  const [offer, setOffer] = useState(SecretSetupOfferModel.initial)
   useEffect(() => {
-    const active = new Set(props.missing.map(requirement => requirement.id))
-    setEditingIds(current => new Set([...current].filter(id => active.has(id))))
-    setSteps(current => Object.fromEntries(Object.entries(current).filter(([id]) => active.has(id))))
+    setOffer(current => SecretSetupOfferModel.prune({ state: current, ids: props.missing.map(requirement => requirement.id) }))
   }, [props.missing])
-  const busyIds = new Set(
-    Object.entries(steps)
-      .filter(([, step]) => SecretSetupSteps.busy(step))
-      .map(([id]) => id),
-  )
-  const boundIds = new Set(
-    Object.entries(steps)
-      .filter(([, step]) => step.kind === 'bound')
-      .map(([id]) => id),
-  )
-  const createdReferences = Object.fromEntries(
-    Object.entries(steps).flatMap(([id, step]) => {
-      const reference = SecretSetupSteps.createdReference(step)
-      return reference === undefined ? [] : [[id, reference]]
-    }),
-  )
 
   if (props.missing.length === 0 || catalog.isError || catalog.data === undefined) return null
 
-  const openSetup = (): void => {
-    setOpened(true)
-    setEditingIds(new Set(props.missing.map(requirement => requirement.id).filter(id => !boundIds.has(id))))
-  }
-  const closeSetup = (): void => {
-    if (busyIds.size > 0) return
-    setOpened(false)
-    setEditingIds(new Set())
-  }
-  const visibleRequirements = props.missing.filter(requirement => !opened || boundIds.has(requirement.id) || !editingIds.has(requirement.id))
+  const ids = props.missing.map(requirement => requirement.id)
+  const busy = SecretSetupOfferModel.busy(offer)
+  const visibleRequirements = props.missing.filter(
+    requirement => offer.panel === 'closed' || SecretSetupOfferModel.bound(offer, requirement.id) || offer.requirements[requirement.id] === undefined,
+  )
 
   return (
     <section
@@ -103,12 +76,12 @@ export const SecretSetupOffer = (props: SecretSetupOfferProps): JSX.Element | nu
           <h3 className="dshx:text-sm dshx:font-semibold">{props.t('setupRequiredTitle')}</h3>
           <p className="dshx:text-xs dshx:text-muted-foreground">{props.t('setupRequiredDescription')}</p>
         </div>
-        {opened ? (
-          <Button disabled={busyIds.size > 0} onClick={closeSetup} size="sm" type="button" variant="ghost">
+        {offer.panel === 'open' ? (
+          <Button disabled={busy} onClick={() => setOffer(current => SecretSetupOfferModel.close(current))} size="sm" type="button" variant="ghost">
             {props.t('setupCancel')}
           </Button>
         ) : (
-          <Button onClick={openSetup} size="sm" type="button">
+          <Button onClick={() => setOffer(current => SecretSetupOfferModel.open({ state: current, ids }))} size="sm" type="button">
             {props.t('setupOpen')}
           </Button>
         )}
@@ -118,37 +91,43 @@ export const SecretSetupOffer = (props: SecretSetupOfferProps): JSX.Element | nu
           {visibleRequirements.map(requirement => (
             <li className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2" key={requirement.id}>
               <span className="dshx:min-w-0 dshx:truncate dshx:text-sm">{requirement.label}</span>
-              {boundIds.has(requirement.id) ? <span className="dshx:text-xs dshx:text-success">{props.t('setupBound')}</span> : null}
+              {SecretSetupOfferModel.bound(offer, requirement.id) ? <span className="dshx:text-xs dshx:text-success">{props.t('setupBound')}</span> : null}
             </li>
           ))}
         </ul>
       ) : null}
-      {opened ? (
+      {offer.panel === 'open' ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-3">
           {props.missing.map(requirement => {
-            if (boundIds.has(requirement.id)) return null
-            if (!editingIds.has(requirement.id)) {
+            if (SecretSetupOfferModel.bound(offer, requirement.id)) return null
+            if (!SecretSetupOfferModel.editing(offer, requirement.id)) {
               return (
                 <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2" key={requirement.id}>
                   <span className="dshx:min-w-0 dshx:truncate dshx:text-sm">{requirement.label}</span>
-                  <Button onClick={() => setEditingIds(current => addId(current, requirement.id))} size="sm" type="button" variant="outline">
-                    {createdReferences[requirement.id] === undefined ? props.t('setupResume') : props.t('setupRetryBind')}
+                  <Button
+                    onClick={() => setOffer(current => SecretSetupOfferModel.edit({ state: current, id: requirement.id }))}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    {SecretSetupOfferModel.createdReference(offer, requirement.id) === undefined ? props.t('setupResume') : props.t('setupRetryBind')}
                   </Button>
                 </div>
               )
             }
+            const requirementState = offer.requirements[requirement.id]
+            const step = requirementState?.kind === 'editing' ? requirementState.step : SecretSetupSteps.draft()
             return (
               <div className="dshx:flex dshx:flex-col dshx:gap-2" key={requirement.id}>
                 <h4 className="dshx:text-sm dshx:font-medium">{requirement.label}</h4>
                 <SecretSetupForm
                   onBind={reference => props.onBind({ id: requirement.id, reference })}
                   onBound={reference => {
-                    setSteps(current => ({ ...current, [requirement.id]: { kind: 'bound', reference } }))
-                    setEditingIds(current => removeId(current, requirement.id))
+                    setOffer(current => SecretSetupOfferModel.markBound({ state: current, id: requirement.id, reference }))
                   }}
-                  onCancel={() => setEditingIds(current => removeId(current, requirement.id))}
-                  onStepChange={step => setSteps(current => ({ ...current, [requirement.id]: step }))}
-                  step={steps[requirement.id] ?? SecretSetupSteps.restore(createdReferences[requirement.id])}
+                  onCancel={() => setOffer(current => SecretSetupOfferModel.cancel({ state: current, id: requirement.id }))}
+                  onStepChange={next => setOffer(current => SecretSetupOfferModel.step({ state: current, id: requirement.id, step: next }))}
+                  step={step}
                   t={props.t}
                   target={targetOf(requirement)}
                 />
