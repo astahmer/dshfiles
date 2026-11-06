@@ -93,3 +93,49 @@ describe('projection refresh queue', () => {
     expect(refreshed).toEqual(['a'])
   })
 })
+
+describe('projection refresh queue retries', () => {
+  it('never runs a third attempt when an id is requested again while its retry waits', async () => {
+    vi.useFakeTimers()
+    try {
+      const attempts = new Map<string, number>()
+      const queue = createProjectionRefreshQueue({
+        retryDelayMs: 1_000,
+        refresh: async sessionId => {
+          attempts.set(sessionId, (attempts.get(sessionId) ?? 0) + 1)
+          throw new Error('unavailable')
+        },
+      })
+      queue.request(['x'], 'visible')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(attempts.get('x')).toBe(1)
+      queue.request(['x'], 'visible')
+      await vi.advanceTimersByTimeAsync(1_000)
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(attempts.get('x')).toBe(2)
+      expect(queue.pending()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('aborts the in-flight refresh and ignores its result once cancelled', async () => {
+    let release: () => void = () => undefined
+    const gate = new Promise<void>(resolveRelease => {
+      release = resolveRelease
+    })
+    let signal: AbortSignal | undefined
+    const queue = createProjectionRefreshQueue({
+      refresh: async (_sessionId, refreshSignal) => {
+        signal = refreshSignal
+        await gate
+      },
+    })
+    queue.request(['a'], 'visible')
+    await vi.waitFor(() => expect(signal).toBeDefined())
+    queue.cancel()
+    expect(signal?.aborted).toBe(true)
+    release()
+    await vi.waitFor(() => expect(queue.pending()).toBe(0))
+  })
+})
