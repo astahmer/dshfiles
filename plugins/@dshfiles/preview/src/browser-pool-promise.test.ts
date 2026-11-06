@@ -167,4 +167,14 @@ describe('PreviewBrowsers', () => {
     expect(await browsers.list('session-b')).toEqual([])
     expect((await browsers.list('session-a')).length).toBe(1)
   })
+
+  it('shares one context between two pages a thread opens at once', { timeout: 30_000 }, async () => {
+    const opened = await Promise.all([
+      browsers.open({ sessionId: 'session-c', url: origin, reveal: false }),
+      browsers.open({ sessionId: 'session-c', url: origin, reveal: false }),
+    ])
+    expect(opened.map(page => page.pageId).sort()).toEqual(['p1', 'p2'])
+    expect((await browsers.list('session-c')).length).toBe(2)
+    expect(await browsers.closeThread('session-c')).toBe(2)
+  })
 })

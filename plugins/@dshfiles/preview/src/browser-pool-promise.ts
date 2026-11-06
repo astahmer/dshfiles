@@ -148,6 +148,8 @@ const pageSpan = <Result>(name: string, pageId: string | undefined, run: () => P
 export class PreviewBrowsers {
   readonly #settings: () => PreviewSettings
   readonly #threads = new Map<string, ThreadBrowser>()
+  /** A thread's context while it is being created, so openers that arrive together share it. */
+  readonly #creating = new Map<string, Promise<ThreadBrowser>>()
   readonly #touchThread: (sessionId: string, idleMinutes: number) => void
   readonly #settle: SettleWaiter
   readonly #exists: (path: string) => Promise<boolean>
@@ -203,12 +205,18 @@ export class PreviewBrowsers {
     return verdict.ok ? route.continue() : route.abort('blockedbyclient')
   }
 
-  async #thread(sessionId: string): Promise<ThreadBrowser> {
+  #thread(sessionId: string): Promise<ThreadBrowser> {
     const existing = this.#threads.get(sessionId)
-    if (existing !== undefined) return existing
+    if (existing !== undefined) return Promise.resolve(existing)
+    const pending = this.#creating.get(sessionId)
+    if (pending !== undefined) return pending
+    const creating = this.#createThread(sessionId).finally(() => this.#creating.delete(sessionId))
+    this.#creating.set(sessionId, creating)
+    return creating
+  }
+
+  async #createThread(sessionId: string): Promise<ThreadBrowser> {
     const browser = await this.#launch()
-    const raced = this.#threads.get(sessionId)
-    if (raced !== undefined) return raced
     const context = await browser.newContext({ viewport: VIEWPORT, acceptDownloads: false, serviceWorkers: 'block' })
     context.setDefaultTimeout(ACTION_TIMEOUT_MS)
     context.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS)
