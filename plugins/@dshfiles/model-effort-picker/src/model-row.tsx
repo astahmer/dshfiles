@@ -98,7 +98,15 @@ const EffortPicker = ({ efforts, effortIndex, busy, onSelect }: EffortPickerProp
           <EffortBars glyph={effortGlyph({ index: effortIndex, total })} />
         </button>
       </HoverCardTrigger>
-      <HoverCardContent align="end" className="dshx-root dshx:w-auto dshx:p-1.5" collisionPadding={8} data-model-effort-popover hideWhenDetached side="bottom" sideOffset={4}>
+      <HoverCardContent
+        align="end"
+        className="dshx-root dshx:w-auto dshx:p-1.5"
+        collisionPadding={8}
+        data-model-effort-popover
+        hideWhenDetached
+        side="bottom"
+        sideOffset={4}
+      >
         <p className="dshx:px-1 dshx:pb-1.5 dshx:text-[10px] dshx:font-medium dshx:text-muted-foreground">Reasoning effort</p>
         <div className="dshx:flex dshx:items-stretch dshx:gap-0.5">
           {efforts.map((effort, index) => (
