@@ -1,12 +1,11 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { isApiError } from '@dshfiles/dshx/api'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import { AccountDraftModel } from './account-draft.js'
@@ -26,18 +25,17 @@ import { ProviderGlyph } from './provider-glyph.js'
 import { CopilotSignIn } from './copilot-sign-in.js'
 import { CodexSignIn } from './codex-sign-in.js'
 
-// A response/transport failure can occur after an accepted commit. Never infer
-// authentication failure or safe credential replacement from a missing receipt.
-const isUnknownConnectionResult = (error: unknown): boolean =>
-  isApiError(error) && (error.kind === 'contract' || error.kind === 'transport' || error.kind === 'unavailable')
-
-const CONNECTION_NOTES: Partial<Record<AccountProfile['kind'], string>> = {
-  claude:
+const CONNECTION_NOTES = new Map<AccountProfile['kind'], string>([
+  [
+    'claude',
     'Claude Code checks local sign-in configuration using the selected directory and Host environment, including CLAUDE_CODE_OAUTH_TOKEN. This is not remote token validation; quota may be unavailable. API keys have separate billing; setup-token verification requires access to the free token-count endpoint.',
-  codex:
+  ],
+  [
+    'codex',
     'Browser sign-in stages credentials privately before confirmation. Existing CLI homes are read in place, never copied or deleted. Custom shared homes need a distinct auth overlay.',
-  cursor: 'Cursor tracks quota only, without a DSH model route. CLI login and named credentials stay separate.',
-}
+  ],
+  ['cursor', 'Cursor tracks quota only, without a DSH model route. CLI login and named credentials stay separate.'],
+])
 
 interface SetupPorts {
   readonly controller: AccountSetupController
@@ -57,8 +55,6 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
   const { controller, request } = props
   const newAccount = request.accountId === undefined
   const queryKey = ['ai-accounts', 'account-connection', request.operationId] as const
-  const [notice, setNotice] = useState<string | null>(null)
-  const [connectAnother, setConnectAnother] = useState(false)
   const assertCurrent = (): void => {
     request.signal.throwIfAborted()
     if (!controller.isCurrent(request.id)) throw new Error('Setup was replaced.')
@@ -80,7 +76,7 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
       client.removeQueries({ queryKey: ['ai-accounts', 'account-connection', request.operationId], exact: true })
     })
   }, [api, client, controller, request])
-  const [snapshot, send] = useMachine(accountSetupMachine, {
+  const [snapshot, send, actor] = useMachine(accountSetupMachine, {
     input: {
       accountId: request.accountId,
       create: async (kind, actorSignal) => {
@@ -109,53 +105,46 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
   const connection = useQuery({
     queryKey,
     queryFn: ({ signal }) => api.getAccountConnection({ operationId: request.operationId }, { signal }),
-    enabled: snapshot.matches('connecting'),
+    enabled: snapshot.matches('connecting') || snapshot.matches('configuring') || snapshot.matches('verifying') || snapshot.matches('failed'),
     refetchInterval: query => (query.state.data?.status === 'pending' || query.state.data?.status === 'verifying' ? 1_000 : false),
     retry: false,
   })
   const account = connection.data?.account ?? undefined
-  const finish = useMutation({
-    mutationFn: async () => {
-      assertCurrent()
+  const configureOnce = async (input: Omit<ConfigureAccountConnectionInput, 'operationId'>): Promise<AccountConnectionSnapshot> => {
+    if (!actor.getSnapshot().can({ type: 'configure.begin' })) throw new Error('Setup is busy.')
+    send({ type: 'configure.begin' })
+    try {
+      const next = await runSetupStep(controller, request, signal => api.configureAccountConnection({ operationId: request.operationId, ...input }, { signal }))
+      if (controller.isCurrent(request.id)) await publishConnection(next)
+      send({ type: 'configure.succeeded' })
+      return next
+    } catch (error) {
+      send({ type: 'configure.failed' })
+      throw error
+    }
+  }
+  const verifyOnce = async (failure: 'verify' | 'key'): Promise<AccountConnectionSnapshot> => {
+    if (!actor.getSnapshot().can({ type: 'verify.begin', failure })) throw new Error('Setup is busy.')
+    send({ type: 'verify.begin', failure })
+    try {
       const next = await runSetupStep(controller, request, signal => api.completeAccountConnection({ operationId: request.operationId }, { signal }))
-      assertCurrent()
       if (next.status !== 'complete') throw new Error('Connection did not complete.')
       await publishConnection(next)
       await Promise.all([
         client.invalidateQueries({ queryKey: aiAccountsKeys.file, exact: true }),
         client.invalidateQueries({ queryKey: aiAccountsKeys.usage }),
       ])
+      send({ type: 'verify.succeeded' })
+      if (controller.isCurrent(request.id)) {
+        if (newAccount) request.onCreated?.(next.instanceId)
+        controller.close(request.id)
+      }
       return next
-    },
-    onSuccess: next => {
-      if (!controller.isCurrent(request.id)) return
-      if (newAccount) request.onCreated?.(next.instanceId)
-      controller.close(request.id)
-    },
-    onError: error => {
-      if (controller.isCurrent(request.id))
-        setNotice(
-          isUnknownConnectionResult(error)
-            ? null
-            : newAccount
-              ? 'Connection could not be verified. No account was added.'
-              : 'Sign-in could not be verified. Your saved account is unchanged.',
-        )
-    },
-  })
-  const configure = useMutation({
-    mutationFn: (input: Omit<ConfigureAccountConnectionInput, 'operationId'>) =>
-      runSetupStep(controller, request, signal => api.configureAccountConnection({ operationId: request.operationId, ...input }, { signal })),
-    onSuccess: async next => {
-      if (!controller.isCurrent(request.id)) return
-      await publishConnection(next)
-      setConnectAnother(false)
-      setNotice(null)
-    },
-    onError: () => {
-      if (controller.isCurrent(request.id)) setNotice('Connection settings could not be changed. Retry or cancel setup.')
-    },
-  })
+    } catch (error) {
+      send({ type: 'verify.failed', error })
+      throw error
+    }
+  }
   const ref = account?.apiKeyEnv ?? ''
   const credential = useQuery({
     queryKey: aiAccountsKeys.credential(ref),
@@ -173,12 +162,26 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
     })
   }
   const complete = (): void => {
-    if (controller.isCurrent(request.id)) finish.mutate()
+    if (controller.isCurrent(request.id)) void verifyOnce('verify').catch(() => undefined)
   }
-  const busy = finish.isPending || configure.isPending
-  const resultUnknown = isUnknownConnectionResult(finish.error)
+  const conduct = (input: Omit<ConfigureAccountConnectionInput, 'operationId'>): void => {
+    void configureOnce(input).catch(() => undefined)
+  }
+  const busy = snapshot.matches('verifying') || snapshot.matches('configuring')
+  const resultUnknown = snapshot.matches('unknownResult')
+  const connectAnother = snapshot.context.connectAnother
+  const noticeOf = (): string | null => {
+    if (resultUnknown) return null
+    if (snapshot.matches('failed')) {
+      if (snapshot.context.failure === 'key') return 'Connection could not be verified. Check the key and try again. No new account has been added.'
+      return newAccount ? 'Connection could not be verified. No account was added.' : 'Sign-in could not be verified. Your saved account is unchanged.'
+    }
+    if (snapshot.context.failure === 'configure') return 'Connection settings could not be changed. Retry or cancel setup.'
+    return null
+  }
+  const notice = noticeOf()
   const saveName = async (displayName: string): Promise<void> => {
-    const next = await configure.mutateAsync({ displayName })
+    const next = await configureOnce({ displayName })
     if (next.account?.displayName !== displayName) throw new Error('This Host does not support pending account names yet.')
   }
   const method = connection.data?.method ?? (account === undefined ? undefined : AccountConnectionMethodModel.defaultMethod(account.kind))
@@ -186,13 +189,10 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
   if (keyForm && props.credentialSetup !== undefined && !resultUnknown) {
     const stageAndFinish = async (stage: () => Promise<AccountConnectionSnapshot>): Promise<boolean> => {
       try {
-        assertCurrent()
         await runSetupStep(controller, request, stage)
-        assertCurrent()
-        await finish.mutateAsync()
+        await verifyOnce('key')
         return true
       } catch {
-        if (controller.isCurrent(request.id)) setNotice('Connection could not be verified. Check the key and try again. No new account has been added.')
         return false
       }
     }
@@ -207,7 +207,7 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
         credentialLabel={account.kind === 'claude' ? 'API key or setup token value' : 'API key value'}
         connectionControls={
           <div className="dshx:flex dshx:flex-col dshx:gap-3">
-            <AccountConnectionOptions account={account} method={method} busy={busy} configure={input => configure.mutate(input)} />
+            <AccountConnectionOptions account={account} method={method} busy={busy} configure={input => conduct(input)} />
             {account.kind === 'claude' ? (
               <p className="dshx:text-xs dshx:text-muted-foreground">API keys use separate billing. Setup tokens are also supported.</p>
             ) : null}
@@ -216,7 +216,7 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
                 key={`${account.instanceId}:${account.apiBaseUrl}`}
                 account={account}
                 busy={busy}
-                save={apiBaseUrl => configure.mutate({ apiBaseUrl })}
+                save={apiBaseUrl => conduct({ apiBaseUrl })}
               />
             ) : null}
           </div>
@@ -302,12 +302,12 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
             <Button onClick={() => send({ type: 'retry' })}>Try again</Button>
           </div>
         ) : null}
-        {resultUnknown || connection.isError || connection.data?.status === 'discarded' ? (
+        {resultUnknown || snapshot.matches('failed') || connection.isError || connection.data?.status === 'discarded' ? (
           <div className="dshx:flex dshx:flex-col dshx:gap-3">
             <p role="alert" className="dshx:text-sm dshx:text-destructive">
               {resultUnknown
                 ? 'The connection result could not be read. Sign-in may already be saved; close setup and check your accounts.'
-                : finish.isError
+                : snapshot.matches('failed')
                   ? 'This connection attempt ended after verification failed. Start a new attempt to sign in again.'
                   : 'This connection is no longer active. Start a new attempt.'}
             </p>
@@ -326,12 +326,10 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
                 key={`${account.instanceId}:${account.apiBaseUrl}`}
                 account={account}
                 busy={busy}
-                save={apiBaseUrl => configure.mutate({ apiBaseUrl })}
+                save={apiBaseUrl => conduct({ apiBaseUrl })}
               />
             ) : null}
-            {method === undefined ? null : (
-              <AccountConnectionOptions account={account} method={method} busy={busy} configure={input => configure.mutate(input)} />
-            )}
+            {method === undefined ? null : <AccountConnectionOptions account={account} method={method} busy={busy} configure={input => conduct(input)} />}
             <fieldset disabled={busy} className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3">
               {step === 'cli' && (
                 <>
@@ -352,7 +350,7 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
                     {account.kind === 'claude' ? 'Copy Claude Code sign-in command' : 'Copy CLI sign-in command'}
                   </Button>
                   <Button onClick={complete}>
-                    {finish.isPending
+                    {snapshot.matches('verifying')
                       ? 'Checking sign-in…'
                       : `Verify ${method === 'subscription' ? 'subscription' : 'CLI login'} and ${newAccount ? 'add account' : 'reconnect'}`}
                   </Button>
@@ -365,21 +363,23 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
                     account={account}
                     method="reference"
                     busy={busy}
-                    configure={input => configure.mutate(input)}
+                    configure={input => conduct(input)}
                   />
                   <p className="dshx:text-xs dshx:text-muted-foreground">
                     Using <code>{ref || 'no credential selected'}</code>
                   </p>
                   <Button disabled={ref === ''} onClick={complete}>
-                    {finish.isPending ? 'Verifying…' : newAccount ? 'Verify and add account' : 'Verify and reconnect'}
+                    {snapshot.matches('verifying') ? 'Verifying…' : newAccount ? 'Verify and add account' : 'Verify and reconnect'}
                   </Button>
                 </>
               )}
               {step === 'signed-in' && (
                 <>
                   <p className="dshx:text-sm">A credential is available. The Host will check the selected login before saving.</p>
-                  <Button onClick={complete}>{finish.isPending ? 'Verifying…' : newAccount ? 'Verify and add account' : 'Verify and reconnect'}</Button>
-                  <Button variant="outline" onClick={() => setConnectAnother(true)}>
+                  <Button onClick={complete}>
+                    {snapshot.matches('verifying') ? 'Verifying…' : newAccount ? 'Verify and add account' : 'Verify and reconnect'}
+                  </Button>
+                  <Button variant="outline" onClick={() => send({ type: 'signInAnother' })}>
                     Sign in to another account
                   </Button>
                 </>
@@ -403,7 +403,7 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
             <details className="dshx:text-xs dshx:text-muted-foreground">
               <summary className="dshx:cursor-pointer">How this works</summary>
               <p className="dshx:mt-2">
-                {CONNECTION_NOTES[account.kind] ??
+                {CONNECTION_NOTES.get(account.kind) ??
                   'Your selected sign-in method is checked before saving. Existing credentials are not replaced unless you explicitly choose to replace them.'}
               </p>
             </details>
