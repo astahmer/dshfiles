@@ -1,5 +1,5 @@
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
-import { Cache, Clock, Context, Duration, Effect, Exit, Fiber, FiberSet, FileSystem, Layer, Option, Path, Ref } from 'effect'
+import { Cache, Clock, Context, Duration, Effect, Exit, Fiber, FiberSet, FileSystem, Layer, Option, Path, SynchronizedRef } from 'effect'
 import type { RepositoryView, ThreadView } from './api.js'
 import type { HostCallFailed, ThreadWorkspaceError } from './errors.js'
 import { SessionReads, WorkspaceRegistry, type SessionActivityMap } from './host-edges-promise.js'
@@ -51,6 +51,11 @@ interface ViewsState {
   readonly failedAt: number | undefined
   readonly generation: number
   readonly scan: Fiber.Fiber<readonly RepositoryView[], ScanError> | undefined
+}
+
+interface ScanStart {
+  readonly started: boolean
+  readonly fiber: Fiber.Fiber<readonly RepositoryView[], ScanError>
 }
 
 export class RepositoryViews extends Context.Service<
@@ -212,29 +217,30 @@ export class RepositoryViews extends Context.Service<
         return repositories
       }).pipe(Effect.withSpan('repository views scan'))
 
-      const views = yield* Ref.make<ViewsState>({ cached: undefined, invalidated: false, failedAt: undefined, generation: 0, scan: undefined })
+      const views = yield* SynchronizedRef.make<ViewsState>({ cached: undefined, invalidated: false, failedAt: undefined, generation: 0, scan: undefined })
 
-      const startScan = Effect.gen(function* () {
-        const current = yield* Ref.get(views)
-        if (current.scan !== undefined) return { started: false, fiber: current.scan }
+      // Check and fork under the ref's lock, so callers that arrive together share one scan.
+      const startScan = SynchronizedRef.modifyEffect(views, (current): Effect.Effect<readonly [ScanStart, ViewsState]> => {
+        if (current.scan !== undefined) return Effect.succeed([{ started: false, fiber: current.scan }, current])
         const scanGeneration = current.generation
         const settle = (exit: Exit.Exit<readonly RepositoryView[], ScanError>) =>
           Effect.flatMap(Clock.currentTimeMillis, now =>
-            Ref.update(views, state => {
+            SynchronizedRef.update(views, state => {
               const released = { ...state, scan: state.generation === scanGeneration ? undefined : state.scan }
               if (state.generation !== scanGeneration) return released
               if (Exit.isSuccess(exit)) return { ...released, cached: { value: exit.value, at: now }, invalidated: false, failedAt: undefined }
               return { ...released, failedAt: now }
             }),
           )
-        const fiber = yield* FiberSet.run(scans, scanRepositories.pipe(Effect.onExit(settle)))
-        yield* Ref.update(views, state => ({ ...state, scan: fiber, failedAt: undefined }))
-        return { started: true, fiber }
+        return Effect.map(FiberSet.run(scans, scanRepositories.pipe(Effect.onExit(settle))), (fiber): readonly [ScanStart, ViewsState] => [
+          { started: true, fiber },
+          { ...current, scan: fiber, failedAt: undefined },
+        ])
       })
 
       const snapshot = Effect.gen(function* () {
         const now = yield* Clock.currentTimeMillis
-        const current = yield* Ref.get(views)
+        const current = yield* SynchronizedRef.get(views)
         const value = [...(current.cached?.value ?? [])]
         const recentFailure = current.failedAt !== undefined && now - current.failedAt < REPOSITORY_VIEW_TTL_MS
         if (current.scan !== undefined) return { repositories: value, refreshing: true, refreshFailed: false }
@@ -245,7 +251,7 @@ export class RepositoryViews extends Context.Service<
         return { repositories: value, refreshing: true, refreshFailed: false }
       })
 
-      const invalidateViews = Ref.update(views, state => ({
+      const invalidateViews = SynchronizedRef.update(views, state => ({
         ...state,
         generation: state.generation + 1,
         invalidated: true,
