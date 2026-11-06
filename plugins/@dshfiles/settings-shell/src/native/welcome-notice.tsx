@@ -5,15 +5,13 @@
  * shadows the `welcome-notice` onboarding entry and keeps it in this plugin's own namespace instead.
  */
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { createActor, fromPromise, waitFor, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
+import { createActor, fromPromise, useSelector, waitFor, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { defineLocale } from '@dshfiles/dshx/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { useCallback, useEffect, useRef } from 'react'
-import { useObservable } from './use-observable.js'
+import { useEffect, useRef } from 'react'
 import { welcomeNoticeMachine, type WelcomeNoticeScopeState } from './welcome-notice-machine.js'
 
 export const WELCOME_STEP_ID = 'welcome-notice'
@@ -50,13 +48,6 @@ export type WelcomeTranslate = TranslateNS<typeof WELCOME_LOCALE_NAMESPACE>
 
 export const welcomeLocale = defineLocale(WELCOME_LOCALE_NAMESPACE, { en, zh })
 
-/** Mutable: the snapshot store hands updates an immer draft. */
-interface WelcomeState {
-  status: 'idle' | 'loading' | 'saving' | 'ready' | 'error'
-  acknowledged: boolean
-  error: string | null
-}
-
 const ackSchema = Schema.Struct({ [WELCOME_NOTICE_ACK_FIELD]: Schema.String })
 
 type WelcomeNoticeActor = ActorRefFrom<typeof welcomeNoticeMachine>
@@ -80,54 +71,38 @@ const scopeState = (scope: ConfigForm<unknown>): WelcomeNoticeScopeState => {
   }
 }
 
-const welcomeStatus = (snapshot: ReturnType<WelcomeNoticeActor['getSnapshot']>): WelcomeState['status'] => {
-  if (snapshot.matches('loading')) return 'loading'
-  if (snapshot.matches('saving')) return 'saving'
-  if (snapshot.matches('error')) return 'error'
-  return 'ready'
-}
-
-const welcomeState = (snapshot: ReturnType<WelcomeNoticeActor['getSnapshot']>): WelcomeState => ({
-  status: welcomeStatus(snapshot),
-  acknowledged: snapshot.context.acknowledged,
-  error: snapshot.context.error,
-})
-
 /** Durable Host acknowledgement, or a process-local one for a remote browser whose settings stay in memory. */
 export class WelcomeNoticeStore {
-  readonly store = createSnapshotStore<WelcomeState>({ status: 'idle', acknowledged: false, error: null })
-  private actor: WelcomeNoticeActor | undefined
+  readonly actor: WelcomeNoticeActor
+  private started = false
   private following: (() => void) | undefined
-  private stopObservingActor: (() => void) | undefined
 
-  constructor(private readonly scope: ConfigForm<unknown>) {}
+  constructor(private readonly scope: ConfigForm<unknown>) {
+    this.actor = createActor(providedWelcomeNoticeMachine, {
+      input: {
+        scope: scopeState(scope),
+        write: () => scope.set(WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_VERSION),
+      },
+    })
+  }
 
   /** Begin following the bound scope (idempotent) and publish its current answer. */
   load(): void {
-    if (this.actor !== undefined) return
-    const actor = createActor(providedWelcomeNoticeMachine, {
-      input: {
-        scope: scopeState(this.scope),
-        write: () => this.scope.set(WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_VERSION),
-      },
-    })
-    const subscription = actor.subscribe(snapshot => this.store.set(welcomeState(snapshot)))
-    this.actor = actor
-    this.stopObservingActor = () => subscription.unsubscribe()
-    this.following = this.scope.subscribe(() => actor.send({ type: 'scope.changed', scope: scopeState(this.scope) }))
-    actor.start()
+    if (this.started) return
+    this.started = true
+    this.following = this.scope.subscribe(() => this.actor.send({ type: 'scope.changed', scope: scopeState(this.scope) }))
+    this.actor.start()
+    this.actor.send({ type: 'scope.changed', scope: scopeState(this.scope) })
   }
 
   /** Persist this copy version, or advance only this process for a remote browser. */
   async acknowledge(): Promise<boolean> {
-    const actor = this.actor
-    if (actor === undefined) return false
-    const current = actor.getSnapshot()
+    const current = this.actor.getSnapshot()
     if (current.context.acknowledged) return true
     if (current.matches('loading') || current.matches('sync')) return false
-    if (!current.matches('saving')) actor.send({ type: 'acknowledge' })
+    if (!current.matches('saving')) this.actor.send({ type: 'acknowledge' })
     try {
-      const result = await waitFor(actor, snapshot => snapshot.context.acknowledged || snapshot.matches('error'))
+      const result = await waitFor(this.actor, snapshot => snapshot.context.acknowledged || snapshot.matches('error'))
       return result.context.acknowledged
     } catch {
       return false
@@ -137,10 +112,7 @@ export class WelcomeNoticeStore {
   dispose(): void {
     this.following?.()
     this.following = undefined
-    this.stopObservingActor?.()
-    this.stopObservingActor = undefined
-    this.actor?.stop()
-    this.actor = undefined
+    this.actor.stop()
   }
 }
 
@@ -184,23 +156,18 @@ export const WelcomeNotice = (props: {
   readonly t: WelcomeTranslate
 }): JSX.Element | null => {
   const { complete, controller, t } = props
-  const state = useObservable(controller.store)
-  const finished = useRef(false)
-  const finish = useCallback(() => {
-    if (finished.current) return
-    finished.current = true
-    complete()
-  }, [complete])
+  const actor = controller.actor
+  const waiting = useSelector(actor, snapshot => snapshot.matches('sync') || snapshot.matches('loading'))
+  const saving = useSelector(actor, snapshot => snapshot.matches('saving'))
+  const acknowledged = useSelector(actor, snapshot => snapshot.context.acknowledged)
+  const error = useSelector(actor, snapshot => snapshot.context.error)
   useEffect(() => {
-    if (state.status === 'idle') void controller.load()
-  }, [controller, state.status])
+    controller.load()
+  }, [controller])
   useEffect(() => {
-    if (state.acknowledged) finish()
-  }, [finish, state.acknowledged])
-  if (state.status === 'idle' || state.status === 'loading' || state.acknowledged) return null
-  const acknowledge = async (): Promise<void> => {
-    if (await controller.acknowledge()) finish()
-  }
+    if (acknowledged) complete()
+  }, [acknowledged, complete])
+  if (waiting || acknowledged) return null
   return (
     <OnboardingModal focusTitle title={t('welcomeTitle')}>
       <div className="dshx:text-[14px] dshx:leading-6 dshx:text-[var(--dsw-alias-label-secondary)] dshx:[&_p]:m-0 dshx:[&_p+p]:mt-3">
@@ -210,18 +177,13 @@ export const WelcomeNotice = (props: {
             <p key={paragraph}>{paragraph}</p>
           ))}
       </div>
-      {state.error !== null && (
+      {error !== null && (
         <p className="dshx:mt-4 dshx:mb-0 dshx:text-[14px] dshx:leading-[22px] dshx:text-[var(--dsw-alias-state-error-primary)]" role="alert">
           {t('welcomeError')}
         </p>
       )}
       <div className="dshx:mt-6 dshx:flex dshx:justify-end">
-        <Button
-          className="dshx:min-w-[120px] dshx:max-[560px]:w-full"
-          disabled={state.status === 'saving'}
-          onClick={() => void acknowledge()}
-          variant="primary"
-        >
+        <Button className="dshx:min-w-[120px] dshx:max-[560px]:w-full" disabled={saving} onClick={() => void controller.acknowledge()} variant="primary">
           {t('welcomeContinue')}
         </Button>
       </div>
