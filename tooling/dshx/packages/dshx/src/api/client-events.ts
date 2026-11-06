@@ -23,11 +23,19 @@ interface Subscriber {
   readonly statusChanged: () => void
 }
 
-/** One page-wide stream: `missing` once the Host answered without one (an older dshx leads, or no EventSource here). */
+/**
+ * One page-wide stream, in exactly one phase: `closed` between the last and the next subscriber, `connecting` while
+ * the Host has not listed its events yet (a reconnecting source included), `live` once it did, and `missing` when no
+ * stream exists (an older dshx leads, or this page has no EventSource).
+ */
+type HubState =
+  | { readonly kind: 'closed' }
+  | { readonly kind: 'missing' }
+  | { readonly kind: 'connecting'; readonly source: EventSourceLike }
+  | { readonly kind: 'live'; readonly source: EventSourceLike; readonly catalog: ReadonlySet<string> }
+
 interface EventHub {
-  source: EventSourceLike | undefined
-  missing: boolean
-  catalog: ReadonlySet<string> | undefined
+  state: HubState
   readonly subscribers: Set<Subscriber>
 }
 
@@ -38,27 +46,39 @@ const frameSchema = Schema.Union([
 
 type EventFrame = Extract<(typeof frameSchema)['Type'], { readonly type: 'event' }>
 
-const HUB_KEY = Symbol.for('@dshfiles/dshx.api-events.v1')
+// v2: the hub keeps a phase union; a bundle still on v1 has its own stream rather than misreading this one.
+const HUB_KEY = Symbol.for('@dshfiles/dshx.api-events.v2')
 
 /** Every plugin bundles its own dshx copy, so the page keeps one stream for all of them. */
 const eventHub = (): EventHub => {
   // SAFETY: only this module writes the versioned symbol, and always an EventHub.
   const holder = globalThis as { [HUB_KEY]?: EventHub }
-  holder[HUB_KEY] ??= { source: undefined, missing: false, catalog: undefined, subscribers: new Set() }
+  holder[HUB_KEY] ??= { state: { kind: 'closed' }, subscribers: new Set() }
   return holder[HUB_KEY]
 }
 
 const statusOf = (hub: EventHub, key: string): ApiEventStatus => {
-  if (hub.missing) return 'unavailable'
-  if (hub.catalog === undefined) return 'connecting'
-  return hub.catalog.has(key) ? 'live' : 'unavailable'
+  switch (hub.state.kind) {
+    case 'missing':
+      return 'unavailable'
+    case 'live':
+      return hub.state.catalog.has(key) ? 'live' : 'unavailable'
+    case 'closed':
+    case 'connecting':
+      return 'connecting'
+  }
 }
 
 const notifyStatus = (hub: EventHub): void => {
   for (const subscriber of [...hub.subscribers]) subscriber.statusChanged()
 }
 
-const receive = (hub: EventHub, raw: unknown): void => {
+/** Only the stream that is open now may change the hub: a closed stream's late frame must not revive it. */
+const isCurrentSource = (hub: EventHub, source: EventSourceLike): boolean =>
+  (hub.state.kind === 'connecting' || hub.state.kind === 'live') && hub.state.source === source
+
+const receive = (hub: EventHub, source: EventSourceLike, raw: unknown): void => {
+  if (!isCurrentSource(hub, source)) return
   let parsed: unknown
   try {
     parsed = typeof raw === 'string' ? decodeJson(jsonValueSchema, raw) : undefined
@@ -68,7 +88,7 @@ const receive = (hub: EventHub, raw: unknown): void => {
   const frame = Schema.decodeUnknownOption(frameSchema)(parsed)
   if (Option.isNone(frame)) return
   if (frame.value.type === 'catalog') {
-    hub.catalog = new Set(frame.value.events)
+    hub.state = { kind: 'live', source, catalog: new Set(frame.value.events) }
     notifyStatus(hub)
     return
   }
@@ -77,35 +97,28 @@ const receive = (hub: EventHub, raw: unknown): void => {
 }
 
 const open = (hub: EventHub): void => {
-  if (hub.source !== undefined) return
+  if (hub.state.kind === 'connecting' || hub.state.kind === 'live') return
   // SAFETY: the page's EventSource is read structurally; a carrier without one has no browser event stream.
   const EventSourceClass = (globalThis as { EventSource?: EventSourceConstructor }).EventSource
   if (typeof EventSourceClass !== 'function') {
-    hub.missing = true
+    hub.state = { kind: 'missing' }
     return
   }
-  hub.missing = false
-  hub.catalog = undefined
   const source = new EventSourceClass(ApiChannelModel.eventsPath.slice(1))
-  hub.source = source
-  source.onmessage = message => receive(hub, message.data)
+  hub.state = { kind: 'connecting', source }
+  source.onmessage = message => receive(hub, source, message.data)
   source.onerror = () => {
-    if (hub.source !== source) return
+    if (!isCurrentSource(hub, source)) return
     // A closed source got a non-stream answer (a Host whose leader predates events); otherwise it is reconnecting.
-    if (source.readyState === EVENT_SOURCE_CLOSED) {
-      hub.source = undefined
-      hub.missing = true
-    }
-    hub.catalog = undefined
+    hub.state = source.readyState === EVENT_SOURCE_CLOSED ? { kind: 'missing' } : { kind: 'connecting', source }
     notifyStatus(hub)
   }
 }
 
 const close = (hub: EventHub): void => {
-  hub.source?.close()
-  hub.source = undefined
-  hub.catalog = undefined
-  hub.missing = false
+  const current = hub.state
+  if (current.kind === 'connecting' || current.kind === 'live') current.source.close()
+  hub.state = { kind: 'closed' }
 }
 
 /**
@@ -154,7 +167,7 @@ const subscribeApiEvent = <
   subscriber.statusChanged()
   // A Host restart may bring a leader that serves events; try again once its connection is back.
   const unsubscribeConnection = ApiRuntimeModel.subscribeConnection(client, () => {
-    if (!hub.missing || !ApiRuntimeModel.connectionAvailable(client)) return
+    if (hub.state.kind !== 'missing' || !ApiRuntimeModel.connectionAvailable(client)) return
     open(hub)
     notifyStatus(hub)
   })
