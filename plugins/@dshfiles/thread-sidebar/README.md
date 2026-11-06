@@ -29,6 +29,10 @@
 
 ![Group remote threads with each view](docs/screenshots/section-order.png)
 
+![Retained notification history with synthetic thread events](docs/screenshots/notification-history.png)
+
+![The same history on a phone, with its row actions wrapping](docs/screenshots/notification-history-phone.png)
+
 This bundle builds a full sidebar replacement with the repository's local
 `@dshfiles/dshx` fork. It groups the real DSH session list by project and
 activity, with pinned, active, parked, inactive, settled, and archived sections. Active
@@ -71,6 +75,28 @@ not compose.
 **Inbox and unread agree both ways.** Opening a thread acknowledges its finished turn, which resolves its inbox item;
 marking that item **Done** in the Inbox acknowledges the same turn here (the inbox emits `dshfiles/attention/done`),
 so the row's unread dot clears too. Done on an older turn's item leaves a newer finish unread.
+
+## Notification history
+
+**Observe › Notifications** keeps the last 500 thread events, newest first, on the Host. The history includes finished, failed, and stopped turns, approval requests, and input requests. Recording does not depend on a browser being open, notification permissions, sound settings, or toast delivery.
+
+**History** shows retained entries except dismissed ones. **Unread** filters unread entries. **Dismissed** lets you restore an entry without changing its read status. **Mark read**, **Mark unread**, and **Mark all read** affect notification history only. They do not answer questions, resolve Inbox items, or change thread attention.
+
+**Open thread** opens an existing thread and marks its notification read. Archived threads offer **Restore and open thread**. An unavailable thread leaves its notification readable and dismissible. **Clear history** asks for confirmation and permanently deletes the captured retained entries, including dismissed entries. Notifications that arrive after the dialog opens remain. Threads are never deleted.
+
+The versioned `thread_notification_history` storage domain holds one bounded snapshot. It stores event IDs, thread IDs, timestamps, categories, and read and dismissed flags. Finished-turn entries use a deterministic ID from the Session and turn sequence. A question request with a wait call ID uses that ID. Approval requests and unkeyed question requests have no stable occurrence ID on the Host event, so each live occurrence gets a unique ID. The history never replays old sessions, so that uniqueness cannot collide with a retained entry. Localized summaries come from fixed categories. Conversation contents, titles, approval details, question text, tool arguments, and raw errors are not stored. The UI resolves thread titles from the current session list.
+
+Collection begins when the plugin activates. It does not replay old sessions or import previous toasts. A crash between a session event and the history write can lose that event. This is a notification history, not a lossless audit log. Entries recorded before a restart remain available afterward.
+
+The same Host methods serve the UI and `notification_history_list`, `notification_history_set_read`, `notification_history_set_dismissed`, and `notification_history_clear`. Clearing requires explicit entry IDs and `confirm: true`.
+
+### Design choice
+
+The history belongs to Thread Sidebar, which already owns thread notifications. Its single-snapshot store keeps read, dismiss, clear, and retention changes in one durable write. The existing attention store cannot serve history because it keeps only the latest finish and deletes acknowledged rows. Extending Activity Timeline would couple notification retention to unrelated event payloads and require a storage migration. Browser-only persistence would miss events while no browser is open.
+
+Actual approval and question requests are observed through prepended, transparent Host interceptors. Observers always delegate the original continuation, including when storage fails. An invoked tool or `approval/asked` event alone is not proof of a request reaching an answerer, so neither creates a notification.
+
+## Sidebar controls
 
 **Status strip item.** With `@dshfiles/frame-layout` as the frame, the sidebar adds the strip's "N working" item
 (top-level threads with a running turn; hidden while none run). In the fixed layout the account preview moved from
