@@ -8,10 +8,8 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
 import * as Schema from 'effect/Schema'
+import { evictableIndex, IDLE_INDEX_MS } from './index-eviction.js'
 import { FffSearch } from './fff-search.js'
-
-/** An index nobody searched for this long is dropped; every jj thread workspace is its own root. */
-const IDLE_INDEX_MS = 30 * 60_000
 
 // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot that keeps the null-check narrowing inside the message callbacks.
 const port = parentPort
@@ -19,7 +17,7 @@ if (port === null) throw new Error('fff-search worker must run in a worker threa
 const { stateRoot } = Schema.decodeUnknownSync(Schema.Struct({ stateRoot: Schema.String }))(workerData)
 
 /** `scanned` is enough for path globs; content search waits for `contentReady`. */
-type ResidentIndex = { finder: FileFinder; scanned: Promise<unknown>; contentReady: Promise<unknown>; lastUsedAt: number }
+type ResidentIndex = { finder: FileFinder; scanned: Promise<unknown>; contentReady: Promise<unknown>; lastUsedAt: number; inUse: number }
 const indexes = new Map<string, ResidentIndex>()
 
 const indexFor = (root: string): ResidentIndex => {
@@ -41,14 +39,16 @@ const indexFor = (root: string): ResidentIndex => {
     scanned: created.value.waitForScan(60_000),
     contentReady: created.value.waitForIndexReady(60_000),
     lastUsedAt: Date.now(),
+    inUse: 0,
   }
   indexes.set(root, index)
   return index
 }
 
 const evictIdle = setInterval(() => {
+  const now = Date.now()
   for (const [root, index] of indexes) {
-    if (Date.now() - index.lastUsedAt < IDLE_INDEX_MS) continue
+    if (!evictableIndex(index, now)) continue
     indexes.delete(root)
     index.finder.destroy()
   }
@@ -61,18 +61,24 @@ const answer = async (request: typeof FffSearch.workerRequest.Type): Promise<typ
     return null
   }
   const index = indexFor(request.scope.root)
-  if (request.kind === 'grep') {
-    await index.contentReady
-    return FffSearch.grep({
-      finder: index.finder,
-      scope: request.scope,
-      pattern: request.pattern,
-      include: request.include,
-      workingDirectory: request.workingDirectory,
-    })
+  index.inUse += 1
+  try {
+    if (request.kind === 'grep') {
+      await index.contentReady
+      return FffSearch.grep({
+        finder: index.finder,
+        scope: request.scope,
+        pattern: request.pattern,
+        include: request.include,
+        workingDirectory: request.workingDirectory,
+      })
+    }
+    await index.scanned
+    return FffSearch.glob({ finder: index.finder, scope: request.scope, pattern: request.pattern, workingDirectory: request.workingDirectory })
+  } finally {
+    index.inUse -= 1
+    index.lastUsedAt = Date.now()
   }
-  await index.scanned
-  return FffSearch.glob({ finder: index.finder, scope: request.scope, pattern: request.pattern, workingDirectory: request.workingDirectory })
 }
 
 // oxlint-disable-next-line antislop/no-unknown-parameters -- The worker message boundary; `workerRequest.parse` runs on the next line.
