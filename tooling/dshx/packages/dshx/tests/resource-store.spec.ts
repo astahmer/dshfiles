@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ResourceStoreModel, type ResourceInvalidationSource } from '../src/api/resource-store.js'
+import type { JsonValue } from '../src/json.js'
 
 interface Deferred {
   readonly signal: AbortSignal
-  readonly resolve: (value: unknown) => void
+  readonly resolve: (value: JsonValue) => void
   readonly reject: (error: unknown) => void
 }
 
@@ -49,7 +50,7 @@ const fakeDocument = () => {
 }
 
 const fakeConnection = () => {
-  let generation: unknown = 1
+  let generation: number | undefined = 1
   const listeners = new Set<() => void>()
   return {
     connection: {
@@ -60,7 +61,7 @@ const fakeConnection = () => {
         return () => listeners.delete(listener)
       },
     },
-    setGeneration: (next: unknown) => {
+    setGeneration: (next: number | undefined) => {
       generation = next
       for (const listener of [...listeners]) listener()
     },

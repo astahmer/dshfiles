@@ -9,9 +9,17 @@ import { ApiResourceModel } from '../src/api/api-resource.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
 import { ApiChannelModel } from '../src/api/channel.js'
 import { ResourceStoreModel } from '../src/api/resource-store.js'
+import type { JsonValue } from '../src/json.js'
+
+interface TestRoot {
+  render(node: ReturnType<typeof createElement>): void
+  unmount(): void
+}
 
 const nodeRequire = createRequire(import.meta.url)
-const { createRoot } = nodeRequire('react-dom/client') as { createRoot(container: Element): { render(node: unknown): void; unmount(): void } }
+// SAFETY: react-dom/client and react are the jsdom test's own dependencies; only these two members are used.
+const { createRoot } = nodeRequire('react-dom/client') as { createRoot(container: Element): TestRoot }
+// SAFETY: as above.
 const { act } = nodeRequire('react') as { act(callback: () => void | Promise<void>): Promise<void> }
 
 const boardApi = defineApi({
@@ -38,7 +46,7 @@ class FakeEventSource {
   constructor(readonly url: string) {
     FakeEventSource.instances.push(this)
   }
-  send(value: { readonly type: string; readonly [field: string]: unknown }): void {
+  send(value: { readonly type: string; readonly [field: string]: JsonValue }): void {
     this.onmessage?.({ data: JSON.stringify(value) })
   }
 }
@@ -85,10 +93,13 @@ const callsTo = (call: ReturnType<typeof connectionFixture>['call'], method: str
 
 describe('useResource', () => {
   let container: HTMLElement
-  let root: { render(node: unknown): void; unmount(): void }
+  let root: TestRoot
 
   beforeEach(() => {
     Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true)
+    // The fixture counts per-call reads on its own Connection; the page batcher (jsdom has document and fetch) would
+    // send them to a batch route this fixture does not serve.
+    localStorage.setItem('dshx:batch', 'off')
     ResourceStoreModel.page().clear()
     FakeEventSource.instances.length = 0
     container = document.createElement('div')
@@ -97,6 +108,7 @@ describe('useResource', () => {
   afterEach(async () => {
     await act(() => root.unmount())
     vi.unstubAllGlobals()
+    localStorage.removeItem('dshx:batch')
     ResourceStoreModel.page().clear()
   })
 

@@ -121,7 +121,12 @@ const coalesce = (calls: Map<string, InflightCall>, key: string, request: (signa
 }
 
 /** A read joins the page's batch when there is one; it keeps its own route otherwise, and as the batch's fallback. */
-const sendRead = (rpc: Pick<ClientConnectionRpc, 'call'>, endpoint: string, request: unknown, signal: AbortSignal): Promise<RpcResult> => {
+const sendRead = (
+  rpc: Pick<ClientConnectionRpc, 'call'>,
+  endpoint: string,
+  request: Parameters<ClientConnectionRpc['call']>[2],
+  signal: AbortSignal,
+): Promise<RpcResult> => {
   const alone = (callSignal: AbortSignal | undefined): Promise<RpcResult> => rpc.call('/api', endpoint, request, callSignal)
   const batcher = ApiBatchModel.page()
   return batcher === undefined ? alone(signal) : batcher.call({ endpoint, payload: request, signal, send: alone })

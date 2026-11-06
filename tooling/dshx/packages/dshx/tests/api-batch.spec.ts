@@ -29,7 +29,7 @@ const lineSchema = Schema.Struct({
 const streamingHost = () => {
   const batches: SentBatch[] = []
   const fetch = vi.fn(async (_input: string, init: RequestInit) => {
-    const body = Schema.decodeUnknownSync(lineSchema)(JSON.parse(String(init.body)))
+    const body = Schema.decodeUnknownSync(Schema.fromJsonString(lineSchema))(String(init.body))
     const encoder = new TextEncoder()
     let controller!: ReadableStreamDefaultController<Uint8Array>
     const stream = new ReadableStream<Uint8Array>({ start: opened => void (controller = opened) })
@@ -46,10 +46,11 @@ const streamingHost = () => {
   return { batches, fetch }
 }
 
-const ok = (value: unknown): BatchRpcResult => ({ ok: true, value })
+const ok = (value: Extract<BatchRpcResult, { readonly ok: true }>['value']): BatchRpcResult => ({ ok: true, value })
 
 const batchCall = (endpoint: string, overrides: Partial<BatchCall> = {}): BatchCall & { readonly send: ReturnType<typeof vi.fn> } => {
   const send = vi.fn(async () => ok(`alone ${endpoint}`))
+  // SAFETY: `send` is the vi.fn built above unless an override replaces it with another mock.
   return { endpoint, payload: { version: 1, input: endpoint }, signal: undefined, send, ...overrides } as BatchCall & {
     readonly send: ReturnType<typeof vi.fn>
   }
@@ -249,7 +250,7 @@ const readLines = async (response: Response, count: number): Promise<unknown[]> 
     if (chunk.done) break
     text += decoder.decode(chunk.value)
     for (let boundary = text.indexOf('\n'); boundary !== -1; boundary = text.indexOf('\n')) {
-      lines.push(JSON.parse(text.slice(0, boundary)))
+      lines.push(Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json))(text.slice(0, boundary)))
       text = text.slice(boundary + 1)
     }
   }
@@ -333,6 +334,7 @@ describe('Host batch route', () => {
 
 describe('batched reads through createApiClient', () => {
   const BATCHER_KEY = Symbol.for('@dshfiles/dshx.api-batch.v1')
+  // SAFETY: the test only reads and resets these two globals it installs itself.
   const holder = globalThis as { [BATCHER_KEY]?: unknown; document?: unknown }
 
   afterEach(() => {

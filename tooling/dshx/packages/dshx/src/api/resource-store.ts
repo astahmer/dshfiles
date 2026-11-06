@@ -22,9 +22,12 @@ export interface ResourceSnapshot<T = unknown> {
  * The Connection a key's reads travel over. `generation()` is undefined while the Host is unreachable; a different
  * defined value is a new Host generation, which drops every unsubscribed key of this Connection and re-reads the rest.
  */
+/** An opaque value a Host generation is told apart by; only compared by identity. */
+export type HostGenerationToken = string | number | object
+
 export interface ResourceConnection {
   readonly identity: object
-  readonly generation: () => unknown
+  readonly generation: () => HostGenerationToken | undefined
   readonly subscribe: (listener: () => void) => () => void
 }
 
@@ -104,7 +107,7 @@ interface Entry {
 }
 
 interface ConnectionState {
-  generation: unknown
+  generation: HostGenerationToken | undefined
   readonly keys: Set<string>
 }
 
@@ -191,7 +194,7 @@ const createResourceStore = (): ResourceStore => {
     }, delay)
   }
 
-  const run = (entry: Entry): Promise<unknown> => {
+  const run = (entry: Entry): Promise<Entry['snapshot']['data']> => {
     if (entry.inflight !== undefined) return entry.inflight.promise
     clearTimer(entry)
     const controller = new AbortController()
