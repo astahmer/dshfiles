@@ -7,11 +7,16 @@ import { Duration, Effect, Layer, Option, Schedule, Schema, Stream } from 'effec
 import { backgroundJobsApi } from './api.js'
 import { HistoryConfig, HistoryIndex } from './history.js'
 import { JobRegistry, LiveJobs } from './live.js'
+import { OutlivedJobs, TurnActivity } from './outlived.js'
 import { JobsBoard } from './service.js'
+import { backgroundJobsSettings } from './settings.js'
+import { Settings } from '@dshfiles/dshx/effect/settings'
 
 const INDEX_INTERVAL = Duration.seconds(30)
 const CATCH_UP_DELAY = Duration.seconds(1)
 const CHANGE_EVENT_INTERVAL = Duration.seconds(1)
+const REAP_INTERVAL = Duration.minutes(1)
+const OBSERVE_INTERVAL = Duration.seconds(5)
 
 const decodePersistence = Schema.decodeUnknownOption(Schema.Struct({ config: Schema.Struct({ root: Schema.String.check(Schema.isMinLength(1)) }) }))
 
@@ -67,8 +72,26 @@ const ChangeEvents = Layer.effectDiscard(
   }),
 )
 
-const BackgroundJobsLive = Layer.mergeAll(IndexingLoop, ChangeEvents).pipe(
+/** Every few seconds, note which jobs outlived their turn; once a minute, stop those nobody read for the configured cap. */
+const ReapLoop = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const outlived = yield* OutlivedJobs
+    // A turn ends with no job event: reading the agent registry is in-memory, so a short tick keeps the badge current.
+    yield* outlived.current.pipe(Effect.repeat(Schedule.spaced(OBSERVE_INTERVAL)), DshxPlugin.detached, Effect.forkScoped)
+    yield* outlived.reap.pipe(
+      Effect.catchCause(cause => Effect.logError('background-jobs: stopping outlived jobs failed', cause)),
+      Effect.repeat(Schedule.spaced(REAP_INTERVAL)),
+      DshxPlugin.detached,
+      Effect.forkScoped,
+    )
+  }),
+)
+
+const BackgroundJobsLive = Layer.mergeAll(IndexingLoop, ChangeEvents, ReapLoop).pipe(
   Layer.provideMerge(JobsBoard.layer),
+  Layer.provideMerge(OutlivedJobs.layer),
+  Layer.provideMerge(TurnActivity.layer),
+  Layer.provideMerge(Settings.layer(backgroundJobsSettings)),
   Layer.provideMerge(LiveJobs.layer),
   Layer.provideMerge(HistoryIndex.layer),
   Layer.provide([HistoryConfigLive, JobRegistry.layer, NodeFileSystem.layer, NodePath.layer]),
@@ -76,6 +99,7 @@ const BackgroundJobsLive = Layer.mergeAll(IndexingLoop, ChangeEvents).pipe(
 
 export default DshxPlugin.make({
   name: '@dshfiles/background-jobs',
+  settings: [backgroundJobsSettings],
   layer: BackgroundJobsLive,
   apis: [
     Api.bind(backgroundJobsApi, {

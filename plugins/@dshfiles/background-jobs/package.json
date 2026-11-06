@@ -27,6 +27,7 @@
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
+    "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@effect/platform-node": "catalog:",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-agent": "catalog:",
     "@deepseek-ai/dsh-api-gateway": "catalog:",
     "@deepseek-ai/dsh-api-remotes": "catalog:",
     "@deepseek-ai/dsh-api-session-controller": "catalog:",
@@ -64,6 +66,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
     "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-agent": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-api-gateway": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-api-remotes": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-api-session-controller": ">=0.2.1-rc.2 <0.3.0-0",
@@ -79,7 +82,8 @@
     "@deepseek-ai/dsh-jobs": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-session": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-session-persistence": ">=0.2.1-rc.2 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0"
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/schemastery": "~3.18.4"
   },
   "dsh": {
     "bundle": {

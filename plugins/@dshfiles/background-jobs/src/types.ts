@@ -36,6 +36,8 @@ const jobRowSchema = struct({
   live: Schema.Boolean,
   outputTotal: nonnegativeInteger,
   spillPaths: boundedArray(boundedText(1000), 8),
+  /** When this live job was first seen outliving the turn that started it (its owner Session no longer runs); null otherwise. */
+  outlivedSince: Schema.NullOr(nonnegativeInteger),
 })
 export type JobRow = Schema.Schema.Type<typeof jobRowSchema>
 

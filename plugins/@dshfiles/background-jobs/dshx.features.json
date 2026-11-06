@@ -165,6 +165,76 @@
       "reach": ["click tab \"Observe\"", "click button \"Jobs\"", "expect checkbox \"Select all running jobs\""]
     },
     {
+      "id": "outlived-jobs",
+      "title": "Jobs that outlived their turn",
+      "summary": "A running job whose owner thread no longer runs a turn (finished, settled or archived) carries an \"outlived its turn\" badge with the time that was first seen, beside its Stop, on Observe › Processes and in the thread's Jobs facet; board rows expose it as `outlivedSince` to `background_jobs_board`. Once a minute the Host stops jobs that outlived their turn for `stopOutlivedAfterMinutes` (120 by default; 0 opts out), so nothing a finished turn left behind runs unread for hours.",
+      "surfaces": ["host", "tool", "client"],
+      "surface": "rowAction",
+      "destination": "observe",
+      "currentSurface": "left-nav: Background Jobs: Jobs › outlived its turn",
+      "configuration": [
+        {
+          "key": "stopOutlivedAfterMinutes",
+          "defaultValue": "120",
+          "constraints": "Natural number up to 10080 in the dshfiles-background-jobs namespace; 0 never stops an outlived job.",
+          "coveredBy": ["background-jobs.outlived.stop-after-cap", "background-jobs.outlived.reset-and-opt-out"]
+        }
+      ],
+      "states": ["in-turn", "outlived", "stopped-after-cap", "opted-out", "agents-unreadable"],
+      "failureModes": [
+        "When the Host's agent registry cannot be read, no job is marked outlived and none is stopped.",
+        "An owner that runs a turn again clears the mark, so the cap restarts the next time its turn ends.",
+        "A job with no owner Session is never marked or stopped.",
+        "A kill the registry refuses is logged and retried on the next pass, not reported as stopped."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@deepseek-ai/dsh-agent",
+          "boundary": "Reads `ctx.agents.list()` statuses only, to know which Sessions run a turn now.",
+          "deterministicFake": "src/service.test.ts substitutes TurnActivity with a Ref of running Session ids."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.outlived.stop-after-cap",
+          "file": "plugins/@dshfiles/background-jobs/src/service.test.ts",
+          "testName": "marks a job outlived once its owner stops running and stops it only after the cap"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.outlived.reset-and-opt-out",
+          "file": "plugins/@dshfiles/background-jobs/src/service.test.ts",
+          "testName": "forgets the outlived mark when the owner runs again, and stops nothing with a cap of 0 or no agent registry"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "background-jobs.outlived-browser",
+          "reason": "The badge is one more meta badge on the jobs-board row its Gherkin journey walks; a browser scenario needs a job whose owner turn ended, which the e2e seeds cannot produce yet. Proved in a scratch DSH (oc-agents) instead."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "background-jobs reap",
+          "file": "plugins/@dshfiles/background-jobs/src/service.test.ts",
+          "testName": "marks a job outlived once its owner stops running and stops it only after the cap"
+        }
+      ],
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call bash {\\\"command\\\":\\\"sleep 900\\\",\\\"description\\\":\\\"Hold a job past its turn\\\",\\\"run_in_background\\\":true}]]\"",
+        "press Enter",
+        "click tab \"Observe\"",
+        "click button \"Processes\"",
+        "expect text \"outlived its turn*\""
+      ]
+    },
+    {
       "id": "processes-page",
       "title": "Observe › Processes: jobs, dev servers and RAM on one page",
       "summary": "One Processes page (plans/ade-ux §6 \"Processes in 3 boards\") owned by background-jobs: Jobs, then the tabs other plugins add through the `@dshfiles/background-jobs/process-views` registry (Dev servers from preview, RAM from worktree-memory). Its navigation glyph carries their marks (RAM pressure and detached memory). `ProcessesNavigation` lets the former RAM page and saved tabs land on their tab; palette rows find it by the old names (Background Jobs: Jobs, Worktree Memory: RAM).",

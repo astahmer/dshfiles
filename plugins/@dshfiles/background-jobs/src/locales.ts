@@ -78,6 +78,7 @@ const en = {
   statusKilled: 'killed',
   statusFailed: 'failed',
   statusInterrupted: 'interrupted',
+  outlivedTurn: 'outlived its turn',
 } as const
 
 const zh = {
@@ -155,6 +156,7 @@ const zh = {
   statusKilled: '已终止',
   statusFailed: '失败',
   statusInterrupted: '已中断',
+  outlivedTurn: '已超出所属回合',
 } as const
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

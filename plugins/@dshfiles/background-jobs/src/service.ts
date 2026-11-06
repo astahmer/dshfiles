@@ -7,6 +7,7 @@ import { classifyJob, type JobCategory } from './classify.js'
 import { JobKillFailed, JobNotFound } from './errors.js'
 import { HistoryIndex, type HistorySnapshot } from './history.js'
 import { LiveJobs, type LiveJobsState } from './live.js'
+import { OutlivedJobs } from './outlived.js'
 import type { HistoryJob, JobBoard, JobBoardFilter, JobIndexing, JobKill, JobOutput, JobRow, JobSession, JobWait, JobWaitInput } from './types.js'
 
 const DEFAULT_LIMIT = 100
@@ -89,6 +90,7 @@ const rowFromHistory = (job: HistoryJob): JobRow => ({
   live: false,
   outputTotal: 0,
   spillPaths: [],
+  outlivedSince: null,
 })
 
 /**
@@ -114,6 +116,7 @@ const rowFromLive = (view: JobView): JobRow => {
     live: true,
     outputTotal: view.output.total,
     spillPaths: (view.output.spillPaths ?? []).slice(0, MAX_SPILL_PATHS).map(path => clampText({ text: path, limit: MAX_SPILL_PATH_LENGTH })),
+    outlivedSince: null,
   }
 }
 
@@ -163,6 +166,7 @@ export class JobsBoard extends Context.Service<
     Effect.gen(function* () {
       const history = yield* HistoryIndex
       const live = yield* LiveJobs
+      const outlived = yield* OutlivedJobs
       const merged = yield* Ref.make<Option.Option<MergedRows>>(Option.none())
 
       const states = Effect.all({ history: history.snapshot, live: live.state })
@@ -192,6 +196,7 @@ export class JobsBoard extends Context.Service<
 
       const board = Effect.fn('background-jobs board')(function* (filter: JobBoardFilter) {
         const current = yield* states
+        const outlivedSince = yield* outlived.current
         const limit = Math.min(filter.limit ?? DEFAULT_LIMIT, MAX_LIMIT)
         const needle = filter.search?.toLowerCase() ?? null
         const categories = filter.categories === undefined || filter.categories.length === 0 ? null : new Set<JobCategory>(filter.categories)
@@ -220,7 +225,10 @@ export class JobsBoard extends Context.Service<
         const hasMore = remaining.length > page.length
         const lastPageEntry = page.at(-1)
         return {
-          rows: page.map(entry => entry.row),
+          rows: page.map(entry => {
+            const since = outlivedSince.get(entry.row.id)
+            return since === undefined ? entry.row : { ...entry.row, outlivedSince: since }
+          }),
           total: inScope.length,
           hasMore,
           nextCursor: hasMore && lastPageEntry !== undefined ? cursorOf(lastPageEntry) : null,
@@ -286,7 +294,12 @@ export class JobsBoard extends Context.Service<
       })
 
       const updates = Stream.merge(Stream.as(history.changes, undefined), Stream.as(live.changes, undefined))
-      const changed = Stream.merge(history.changes.pipe(Stream.drop(1), Stream.as(undefined)), live.changes.pipe(Stream.drop(1), Stream.as(undefined)))
+      const changed = Stream.mergeAll(
+        [history.changes.pipe(Stream.drop(1), Stream.as(undefined)), live.changes.pipe(Stream.drop(1), Stream.as(undefined)), outlived.changes],
+        {
+          concurrency: 'unbounded',
+        },
+      )
 
       const wait = Effect.fn('background-jobs wait')(function* (input: JobWaitInput) {
         const until = input.until ?? 'settled'

@@ -78,6 +78,19 @@ that goes through the registry's owner fence. Running rows also take a checkbox
 selected stops them all after one confirmation naming the count, and every kill
 still passes the same owner fence.
 
+### Jobs that outlived their turn
+
+A running job whose owner thread no longer runs a turn — it finished, was settled or archived — carries an
+**outlived its turn** badge with the time that was first seen, beside its Stop, here and in the thread's Jobs facet.
+The Host reads which Sessions run from its agent registry (`ctx.agents`); when that registry is missing nothing is
+marked. The mark clears when the owner runs a turn again. Board rows carry it as `outlivedSince`, so
+`background_jobs_board` shows it to agents and `background_jobs_kill` stops it.
+
+Once a minute the Host stops every job that outlived its turn for `stopOutlivedAfterMinutes` (setting namespace
+`dshfiles-background-jobs`, 120 by default; `0` keeps them running until stopped by hand). It kills through the
+same owner fence with the reason `stopped: outlived its turn for N min with no reader`, and leaves a
+`background-jobs reap` span with the outlived and stopped counts. Jobs with no owner Session are never touched.
+
 The board reloads when the Host publishes the API's `changed` event (at most
 once a second, from registry events and history passes). It falls back to
 polling every 5 s (Running) or 15 s (otherwise) while that event is not live,

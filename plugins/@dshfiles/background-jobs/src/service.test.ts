@@ -3,11 +3,16 @@ import type { JobEvent, JobView } from '@deepseek-ai/dsh-jobs'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { describe, expect, it } from '@effect/vitest'
-import { Context, Effect, Fiber, FileSystem, Layer, Option, Path, Schema, Stream, SubscriptionRef } from 'effect'
+import { Clock, Context, Effect, Fiber, FileSystem, Layer, Option, Path, Ref, Schema, Stream, SubscriptionRef } from 'effect'
 import { TestClock } from 'effect/testing'
 import { HistoryConfig, HistoryIndex } from './history.js'
+import { DshxEffect } from '@dshfiles/dshx/effect'
+import { Settings } from '@dshfiles/dshx/effect/settings'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { JobRegistry, type JobRegistrySurface, LiveJobs } from './live.js'
+import { OutlivedJobs, TurnActivity } from './outlived.js'
 import { JobsBoard } from './service.js'
+import { backgroundJobsSettings } from './settings.js'
 import { type HistoryJob, jobBoardSchema } from './types.js'
 
 const historyJob = (overrides: Partial<HistoryJob> & { readonly id: string }): HistoryJob => ({
@@ -82,7 +87,13 @@ const registryStub = (options: { readonly chunks?: readonly { readonly at: numbe
 
 type RegistryStub = ReturnType<typeof registryStub>
 
-const makeBoard = Effect.fn(function* (input: { readonly jobs?: readonly HistoryJob[]; readonly title?: string; readonly registry?: RegistryStub }) {
+const makeBoard = Effect.fn(function* (input: {
+  readonly jobs?: readonly HistoryJob[]
+  readonly title?: string
+  readonly registry?: RegistryStub
+  readonly runningSessionIds?: Effect.Effect<Option.Option<ReadonlySet<string>>>
+  readonly stopOutlivedAfterMinutes?: number
+}) {
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: 'background-jobs-board-' })
@@ -95,15 +106,19 @@ const makeBoard = Effect.fn(function* (input: { readonly jobs?: readonly History
   const registry = yield* SubscriptionRef.make(Option.fromUndefinedOr(input.registry?.surface))
   const context = yield* Layer.build(
     JobsBoard.layer.pipe(
+      Layer.provideMerge(OutlivedJobs.layer),
       Layer.provideMerge(LiveJobs.layer),
       Layer.provideMerge(HistoryIndex.layer),
       Layer.provide([
         HistoryConfig.layer({ root, statePath: path.join(root, 'state.json') }),
         Layer.succeed(JobRegistry, JobRegistry.of({ changes: SubscriptionRef.changes(registry) })),
+        Layer.succeed(TurnActivity, TurnActivity.of({ runningSessionIds: input.runningSessionIds ?? Effect.succeedNone })),
+        Settings.layerTest(backgroundJobsSettings.namespace, { stopOutlivedAfterMinutes: input.stopOutlivedAfterMinutes ?? 120 }),
       ]),
     ),
   )
   const board = Context.get(context, JobsBoard)
+  const outlived = Context.get(context, OutlivedJobs)
   const live = Context.get(context, LiveJobs)
   const applied = (until: (revision: number) => boolean) =>
     live.changes.pipe(
@@ -114,6 +129,7 @@ const makeBoard = Effect.fn(function* (input: { readonly jobs?: readonly History
   yield* applied(revision => revision >= 1)
   return {
     board,
+    outlived,
     attach: Effect.fn(function* (stub: RegistryStub) {
       const before = (yield* live.state).revision
       yield* SubscriptionRef.set(registry, Option.some(stub.surface))
@@ -243,6 +259,56 @@ describe('background jobs board', () => {
         expect(yield* fixture.board.kill({ jobId: 'bash-now' })).toEqual({ jobId: 'bash-now', outcome: 'requested' })
         expect(registry.calls.some(call => call.startsWith('kill:bash-now:session-dddd:'))).toBe(true)
         expect(yield* fixture.board.kill({ jobId: 'bash-done' })).toEqual({ jobId: 'bash-done', outcome: 'already-finished' })
+      }),
+    )
+
+    it.effect('marks a job outlived once its owner stops running and stops it only after the cap', () =>
+      Effect.gen(function* () {
+        const registry = registryStub()
+        const running = yield* Ref.make<ReadonlySet<string>>(new Set(['session-eeee']))
+        const fixture = yield* makeBoard({ registry, runningSessionIds: Effect.map(Ref.get(running), Option.some), stopOutlivedAfterMinutes: 120 })
+        yield* fixture.emit(registry, { type: 'registered', job: liveView({ id: JobId('bash-long'), owner: SessionId('session-eeee') }) })
+        const outlivedSince = Effect.map(fixture.board.board({ scope: 'running' }), board => board.rows.map(row => [row.id, row.outlivedSince]))
+
+        expect(yield* outlivedSince).toEqual([['bash-long', null]])
+        const boardChanged = yield* Effect.forkScoped(fixture.board.changes.pipe(Stream.runHead))
+        yield* Effect.yieldNow
+        yield* TestClock.adjust('1 minute')
+        yield* Ref.set(running, new Set())
+        expect(yield* outlivedSince).toEqual([['bash-long', yield* Clock.currentTimeMillis]])
+        expect(Option.isSome(yield* Fiber.join(boardChanged))).toBe(true)
+        yield* TestClock.adjust('119 minutes')
+        expect(yield* fixture.outlived.reap).toEqual({ outlived: 1, stopped: [] })
+
+        yield* TestClock.adjust('1 minute')
+        using recorder = recordSpans()
+        expect(yield* fixture.outlived.reap.pipe(Effect.provide(DshxEffect.tracerLayer))).toEqual({ outlived: 1, stopped: ['bash-long'] })
+        expect(registry.calls).toContain('kill:bash-long:session-eeee:stopped: outlived its turn for 120 min with no reader')
+        expect(recorder.span('background-jobs reap').attributes).toMatchObject({
+          'dshx.jobs.outlived': 1,
+          'dshx.jobs.stopped': 1,
+          'dshx.jobs.cap_minutes': 120,
+        })
+      }),
+    )
+
+    it.effect('forgets the outlived mark when the owner runs again, and stops nothing with a cap of 0 or no agent registry', () =>
+      Effect.gen(function* () {
+        const registry = registryStub()
+        const running = yield* Ref.make<Option.Option<ReadonlySet<string>>>(Option.some(new Set()))
+        const fixture = yield* makeBoard({ registry, runningSessionIds: Ref.get(running), stopOutlivedAfterMinutes: 0 })
+        yield* fixture.emit(registry, { type: 'registered', job: liveView({ id: JobId('bash-dev'), owner: SessionId('session-ffff') }) })
+        const { owner: _owner, ...unowned } = liveView({ id: JobId('bash-host') })
+        yield* fixture.emit(registry, { type: 'registered', job: unowned })
+
+        expect(yield* fixture.outlived.current).toEqual(new Map([['bash-dev', yield* Clock.currentTimeMillis]]))
+        yield* TestClock.adjust('1 day')
+        expect(yield* fixture.outlived.reap).toEqual({ outlived: 1, stopped: [] })
+        yield* Ref.set(running, Option.some(new Set(['session-ffff'])))
+        expect(yield* fixture.outlived.current).toEqual(new Map())
+        yield* Ref.set(running, Option.none())
+        expect(yield* fixture.outlived.current).toEqual(new Map())
+        expect(registry.calls.some(call => call.startsWith('kill:'))).toBe(false)
       }),
     )
 

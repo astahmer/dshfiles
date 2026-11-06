@@ -216,6 +216,11 @@ export const JobLine = (props: {
             {props.t(STATUS_KEY[row.status])}
             {row.detail === null ? '' : ` · ${row.detail}`}
           </Badge>
+          {row.outlivedSince === null ? null : (
+            <Badge variant="warning" data-job-outlived>
+              {props.t('outlivedTurn')} · {formatStarted(row.outlivedSince, props.now)}
+            </Badge>
+          )}
           <span className="dshx:truncate">
             {row.kind} · {durationLabel(row, props.now)} · {formatStarted(row.startedAt, props.now)}
           </span>

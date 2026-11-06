@@ -18,6 +18,7 @@ const row = (input: { readonly id: string; readonly status: JobRow['status'] }):
   live: true,
   outputTotal: 0,
   spillPaths: [],
+  outlivedSince: null,
 })
 
 describe('job selection', () => {
