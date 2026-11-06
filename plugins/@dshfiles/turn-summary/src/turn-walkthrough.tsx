@@ -8,13 +8,15 @@ import { TurnWalkthroughModel } from './turn-walkthrough-model.js'
 const TAB = 'changes'
 
 /**
- * The walkthrough card under a turn that edited files: the files by folder, each folder's one-line summary, and the
- * way into the Changes view for that turn. It starts open; its icon folds it to one button.
+ * The walkthrough card under a turn that edited files: the files by folder (each opens in the editor), each folder's
+ * one-line summary when there are several folders, and the way into the Changes view for that turn. It starts open;
+ * its icon folds it to one button.
  */
 export const TurnWalkthrough = (props: {
   readonly summary: TurnActivitySummary
   readonly turn: number
   readonly openChanges: (() => void) | undefined
+  readonly openFile: (path: string) => void
 }): JSX.Element | null => {
   const [open, setOpen] = useState<string | null>(TAB)
   const files = props.summary.editedFileStats
@@ -49,8 +51,14 @@ export const TurnWalkthrough = (props: {
                   id: group.directory,
                   label: group.directory,
                   icon: <FolderIcon />,
-                  hint: group.summary,
-                  files: group.files,
+                  // A lone folder's summary would repeat the card title.
+                  ...(groups.length > 1 && { hint: group.summary }),
+                  files: group.files.map(file => ({
+                    path: file.name,
+                    added: file.added,
+                    removed: file.removed,
+                    onOpen: () => props.openFile(file.path),
+                  })),
                 }))}
               />
             ),

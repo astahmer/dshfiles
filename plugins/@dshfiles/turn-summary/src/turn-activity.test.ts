@@ -82,15 +82,16 @@ describe('TurnActivity.summarize', () => {
     ])
     expect(summary.tests).toEqual({ passed: 40, failed: 2, total: 42 })
     expect(summary.commandRuns.map(run => run.outcome)).toEqual(['exit 1', 'exit 1'])
-    expect(TurnActivity.segments(summary, { includeReads: true, lineCounts: true, testResults: true }).map(segment => segment.text)).toEqual([
-      'edited 2 files +4 −2',
-      'ran 2 commands',
-      'tests 40/42',
-    ])
-    expect(TurnActivity.segments(summary, { includeReads: true, lineCounts: false, testResults: false }).map(segment => segment.text)).toEqual([
-      'edited 2 files',
-      'ran 2 commands',
-    ])
+    expect(TurnActivity.segments(summary, { editedFiles: true, includeReads: true, lineCounts: true, testResults: true }).map(segment => segment.text)).toEqual(
+      ['edited 2 files +4 −2', 'ran 2 commands', 'tests 40/42'],
+    )
+    expect(
+      TurnActivity.segments(summary, { editedFiles: true, includeReads: true, lineCounts: false, testResults: false }).map(segment => segment.text),
+    ).toEqual(['edited 2 files', 'ran 2 commands'])
+    // The walkthrough card lists the edits, so the footer leaves them out.
+    expect(
+      TurnActivity.segments(summary, { editedFiles: false, includeReads: true, lineCounts: true, testResults: true }).map(segment => segment.text),
+    ).toEqual(['ran 2 commands', 'tests 40/42'])
     expect(TurnActivity.testCounts('===== 3 failed, 12 passed in 1.20s =====')).toEqual({ passed: 12, failed: 3, total: 15 })
     expect(TurnActivity.duration(72_000)).toBe('1m 12s')
   })

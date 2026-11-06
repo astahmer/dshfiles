@@ -69,6 +69,7 @@ const CommandList = (props: { readonly summary: TurnActivitySummary; readonly on
 /**
  * The footer under a finished Turn: "Edited 3 files +42 −7 · ran 6 commands · 1 failed · tests 40/42 · 1m 12s". The
  * file and command counts open their lists (each file opens in the editor), and the failure count opens the failures.
+ * When the walkthrough card shows, the edited files appear only in that card.
  */
 export const TurnSummaryLine = (props: {
   readonly turn: TurnLocation
@@ -81,13 +82,16 @@ export const TurnSummaryLine = (props: {
   const settings = useSettings(turnSummarySettings).value
   const [open, setOpen] = useState<OpenList | undefined>(undefined)
   if (summary === undefined || settings?.enabled === false || TurnActivity.isEmpty(summary)) return null
+  const walkthrough = settings?.walkthrough !== false && summary.editedFileStats.length > 0
   const segments = TurnActivity.segments(summary, {
+    editedFiles: !walkthrough,
     includeReads: settings?.includeReads !== false,
     lineCounts: settings?.lineCounts !== false,
     testResults: settings?.testResults !== false,
   })
   const failures = summary.failedCommands.length
-  if (segments.length === 0 && failures === 0) return null
+  const line = segments.length > 0 || failures > 0
+  if (!line && !walkthrough) return null
   const canList = failures > 0 && settings?.listFailures !== false
   const openLists = settings?.openLists !== false
   const toggle = (list: OpenList) => () => setOpen(current => (current === list ? undefined : list))
@@ -108,40 +112,43 @@ export const TurnSummaryLine = (props: {
   }
   return (
     <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs dshx:text-muted-foreground" data-dshfiles-turn-summary="">
-      <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-1.5 dshx:gap-y-0.5">
-        <ListChecksIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
-        {segments.map((segment, index) => (
-          <Fragment key={segment.key}>
-            {index > 0 && <span aria-hidden>·</span>}
-            {segmentView(segment, index)}
-          </Fragment>
-        ))}
-        {failures > 0 && (
-          <button
-            aria-expanded={canList ? open === 'failures' : undefined}
-            className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-destructive dshx:disabled:cursor-default"
-            disabled={!canList}
-            onClick={toggle('failures')}
-            type="button"
-          >
-            <span aria-hidden>·</span>
-            {failures} failed
-            {canList && (open === 'failures' ? <ChevronDownIcon className="dshx:size-3" /> : <ChevronRightIcon className="dshx:size-3" />)}
-          </button>
-        )}
-        {duration !== undefined && (
-          <span className="dshx:shrink-0 dshx:tabular-nums" data-dshfiles-turn-summary-duration="">
-            <span aria-hidden>· </span>
-            {duration}
-          </span>
-        )}
-      </div>
+      {line && (
+        <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-1.5 dshx:gap-y-0.5" data-dshfiles-turn-summary-line="">
+          <ListChecksIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
+          {segments.map((segment, index) => (
+            <Fragment key={segment.key}>
+              {index > 0 && <span aria-hidden>·</span>}
+              {segmentView(segment, index)}
+            </Fragment>
+          ))}
+          {failures > 0 && (
+            <button
+              aria-expanded={canList ? open === 'failures' : undefined}
+              className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-destructive dshx:disabled:cursor-default"
+              disabled={!canList}
+              onClick={toggle('failures')}
+              type="button"
+            >
+              <span aria-hidden>·</span>
+              {failures} failed
+              {canList && (open === 'failures' ? <ChevronDownIcon className="dshx:size-3" /> : <ChevronRightIcon className="dshx:size-3" />)}
+            </button>
+          )}
+          {duration !== undefined && (
+            <span className="dshx:shrink-0 dshx:tabular-nums" data-dshfiles-turn-summary-duration="">
+              <span aria-hidden>· </span>
+              {duration}
+            </span>
+          )}
+        </div>
+      )}
       {open === 'files' && <FileList openFile={props.openFile} summary={summary} />}
       {open === 'commands' && <CommandList onlyFailed={false} summary={summary} />}
       {open === 'failures' && canList && <CommandList onlyFailed summary={summary} />}
-      {settings?.walkthrough !== false && (
+      {walkthrough && (
         <TurnWalkthrough
           openChanges={changesSeq === undefined ? undefined : () => props.openChanges({ seq: changesSeq, turn: props.turn.turn })}
+          openFile={props.openFile}
           summary={summary}
           turn={props.turn.turn}
         />
