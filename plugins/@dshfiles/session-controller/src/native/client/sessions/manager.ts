@@ -114,6 +114,34 @@ type SessionListMutation =
   /** Local first-send flip: the sender clears blank without waiting for a host frame. */
   | { kind: 'engaged'; sessionId: SessionId }
 
+/** One in-flight full list pull; its identity is the fence a reconnect invalidates. */
+interface ListFlight {
+  readonly promise: Promise<void>
+  readonly mutations: SessionListMutation[]
+}
+
+/** List arrival lifecycle as one value: pull activity, monotone arrival phase and the single flight. */
+interface ListLifecycle {
+  readonly state: 'idle' | 'loading' | 'error'
+  readonly phase: SessionListPhase
+  readonly error: RemoteFailure | null
+  readonly flight: ListFlight | null
+}
+
+/**
+ * One provisional identity's lifecycle: its list row, the Host creation it waits on, and the
+ * local draft gate. The row is null when a creation settles without a published placeholder.
+ */
+type ProvisionalRecord =
+  | { readonly kind: 'row'; readonly summary: SessionSummary }
+  | { readonly kind: 'creating'; readonly summary: SessionSummary | null; readonly creation: Promise<SessionId> }
+  | {
+    readonly kind: 'deferred'
+    readonly summary: SessionSummary | null
+    readonly creation: Promise<SessionId>
+    readonly beforeRpc: (signal?: AbortSignal) => Promise<void>
+  }
+
 /** Instance cluster + frame entry + the session list. */
 export class SessionManager {
   private readonly sessions = new Map<SessionId, Session>()
@@ -134,13 +162,7 @@ export class SessionManager {
    *  same store so history-baseline seeding and frames converge on one row set. */
   private readonly projectionStores = new Map<SessionId, ProjectionValueStore>()
   private summaries: SessionSummary[] = []
-  private listState: 'idle' | 'loading' | 'error' = 'idle'
-  /** Arrival phase; the pending → ready edge fires on the first successful pull (see SessionListPhase). */
-  private listPhase: SessionListPhase = 'pending'
-  private listError: RemoteFailure | null = null
-  private listInflight: Promise<void> | null = null
-  /** Active list request's mutation log; its identity also fences completion after reconnect. */
-  private listMutations: SessionListMutation[] | null = null
+  private list: ListLifecycle = { state: 'idle', phase: 'pending', error: null, flight: null }
   private readonly addresses = new Map<SessionId, SubagentAddress>()
   private readonly projectionLoads = new Map<SessionId, ProjectionLoad>()
   private readonly projectionInflight = new Map<SessionId, ProjectionInflight>()
@@ -149,10 +171,7 @@ export class SessionManager {
    * (the Host cannot list a Session it has not created yet) and disappear when
    * the creation is refused.
    */
-  private readonly provisional = new Map<SessionId, SessionSummary>()
-  /** Creation still settling per provisional identity; history and RPCs wait on it. */
-  private readonly pendingCreations = new Map<SessionId, Promise<SessionId>>()
-  private readonly deferredRpc = new Map<SessionId, (signal?: AbortSignal) => Promise<void>>()
+  private readonly provisional = new Map<SessionId, ProvisionalRecord>()
   private readonly hostNonblank = new Set<SessionId>()
   private readonly hostKnown = new Set<SessionId>()
 
@@ -248,8 +267,8 @@ export class SessionManager {
    */
   async dispose(): Promise<void> {
     this.disposed = true
-    this.listMutations = null
-    this.listInflight = null
+    this.list = { ...this.list, state: 'idle', flight: null }
+    this.notifier.markDirty()
     this.engagedSessions.clear()
     const reads = [...this.projectionInflight.values()]
     for (const { controller } of reads) controller.abort()
@@ -319,8 +338,9 @@ export class SessionManager {
     const parentAvailable = address === undefined
       ? undefined
       : this.agentAvailable(address.parentSessionId)
-    const creation = this.pendingCreations.get(sessionId)
-    const beforeRpc = this.deferredRpc.get(sessionId)
+    const provisional = this.provisional.get(sessionId)
+    const creation = provisional === undefined || provisional.kind === 'row' ? undefined : provisional.creation
+    const beforeRpc = provisional?.kind === 'deferred' ? provisional.beforeRpc : undefined
     return new Session(sessionId, this.remote, {
       ...(address === undefined ? {} : {
         address,
@@ -396,7 +416,7 @@ export class SessionManager {
    */
   refreshProjections(sessionId: SessionId): Promise<void> {
     // Local blanks have no Host projection document. Reconnect must not address them either.
-    if (this.deferredRpc.has(sessionId)) return Promise.resolve()
+    if (this.provisional.get(sessionId)?.kind === 'deferred') return Promise.resolve()
     const existing = this.projectionInflight.get(sessionId)
     if (existing !== undefined) return existing.promise
     if (this.projectionLoads.get(sessionId)?.state === 'ready') return Promise.resolve()
@@ -450,7 +470,7 @@ export class SessionManager {
 
   private agentAvailable(sessionId: SessionId): boolean | undefined {
     return this.summaries.find(summary => summary.sessionId === sessionId)?.agentAvailable
-      ?? (this.listPhase === 'ready' ? false : undefined)
+      ?? (this.list.phase === 'ready' ? false : undefined)
   }
 
   private updateParentAvailability(): void {
@@ -464,78 +484,90 @@ export class SessionManager {
 
   /** Full refresh via session.list (single-flight within one Host generation). */
   refreshList(): Promise<void> {
-    if (this.listInflight !== null) return this.listInflight
-    this.listState = 'loading'
-    this.listError = null
+    if (this.disposed) return Promise.resolve()
+    const inFlight = this.list.flight
+    if (inFlight !== null) return inFlight.promise
+    const completion = Promise.withResolvers<void>()
+    const flight: ListFlight = { promise: completion.promise, mutations: [] }
+    const mutations = flight.mutations
     const established = this.summaries
-    const mutations: SessionListMutation[] = []
-    this.listMutations = mutations
+    const phase = this.list.phase
+    this.list = { state: 'loading', phase, error: null, flight }
     this.notifier.markDirty()
-    this.listInflight = (async () => {
+    void (async () => {
+      let failure: RemoteFailure | null = null
+      let crashed = false
       try {
         let result = await listSessions(this.remote.session, LIST_PROJECTIONS)
         // A Host older than this fork rejects the unknown field; retry the historical full read.
         if (!result.ok) result = await listSessions(this.remote.session)
-        if (this.listMutations !== mutations) return
-        if (result.ok) {
-          const baseline: SessionSummary[] = this.listPhase === 'pending'
-            ? [...result.value.items]
-            : mergeOrderedBaseline(established, result.value.items, summary => summary.sessionId)
-          // A removal supersedes running observed in the pull, including after re-addition.
-          const removedSincePull = new Set<SessionId>()
-          for (const mutation of mutations) {
-            if (mutation.kind === 'remove') removedSincePull.add(mutation.sessionId)
-          }
-          for (const s of result.value.items) {
-            this.hostKnown.add(s.sessionId)
-            if (!s.blank) this.hostNonblank.add(s.sessionId)
-          }
-          for (const s of baseline) {
-            if (s.running && !removedSincePull.has(s.sessionId)) this.engagedSessions.add(s.sessionId)
-          }
-          const summaries = [...this.provisional.values()].reduce(
-            (rows, summary) => applyMutation(rows, { kind: 'placeholder', summary }),
-            mutations.reduce(applyMutation, baseline),
-          )
-          this.summaries = summaries
-          // A full list can remove identities without a removal frame.
-          const retained = this.retainedIds(summaries)
-          for (const sessionId of this.engagedSessions) this.pruneEngagement(sessionId, retained)
-          this.listState = 'idle'
-          this.listPhase = 'ready'
-          this.updateParentAvailability()
-          // Resident Sessions and list rows share one display blank, reconciled with the metadata projection.
-          for (const s of this.summaries) {
-            const session = this.sessions.get(s.sessionId)
-            if (session === undefined) continue
-            session.handleBlank(this.effectiveBlank(s))
-            session.handleRunning(s.running)
-          }
-          // Land each row's projection block in the per-session value store
-          // (cold titles surface without opening the session). A list block is
-          // partial — only the keys its source holds — so an absent key never
-          // clears; how the present keys merge depends on the block's kind.
-          for (const s of result.value.items) {
-            if (s.projections !== undefined) this.applyListBlock(s.sessionId, s.projections)
-          }
-        } else {
-          this.listState = 'error'
-          this.listError = result.error
+        if (this.list.flight !== flight) return
+        if (!result.ok) {
+          failure = result.error
+          return
+        }
+        const baseline: SessionSummary[] = phase === 'pending'
+          ? [...result.value.items]
+          : mergeOrderedBaseline(established, result.value.items, summary => summary.sessionId)
+        // A removal supersedes running observed in the pull, including after re-addition.
+        const removedSincePull = new Set<SessionId>()
+        for (const mutation of mutations) {
+          if (mutation.kind === 'remove') removedSincePull.add(mutation.sessionId)
+        }
+        for (const s of result.value.items) {
+          this.hostKnown.add(s.sessionId)
+          if (!s.blank) this.hostNonblank.add(s.sessionId)
+        }
+        for (const s of baseline) {
+          if (s.running && !removedSincePull.has(s.sessionId)) this.engagedSessions.add(s.sessionId)
+        }
+        const summaries = [...this.provisional.values()].reduce(
+          (rows, record) => record.summary === null
+            ? rows
+            : applyMutation(rows, { kind: 'placeholder', summary: record.summary }),
+          mutations.reduce(applyMutation, baseline),
+        )
+        this.summaries = summaries
+        // A full list can remove identities without a removal frame.
+        const retained = this.retainedIds(summaries)
+        for (const sessionId of this.engagedSessions) this.pruneEngagement(sessionId, retained)
+        this.list = { state: 'idle', phase: 'ready', error: null, flight }
+        this.updateParentAvailability()
+        // Resident Sessions and list rows share one display blank, reconciled with the metadata projection.
+        for (const s of this.summaries) {
+          const session = this.sessions.get(s.sessionId)
+          if (session === undefined) continue
+          session.handleBlank(this.effectiveBlank(s))
+          session.handleRunning(s.running)
+        }
+        // Land each row's projection block in the per-session value store
+        // (cold titles surface without opening the session). A list block is
+        // partial — only the keys its source holds — so an absent key never
+        // clears; how the present keys merge depends on the block's kind.
+        for (const s of result.value.items) {
+          if (s.projections !== undefined) this.applyListBlock(s.sessionId, s.projections)
         }
       } catch (error) {
-        if (!isRemoteFailure(error)) throw error
-        if (this.listMutations !== mutations) return
-        this.listState = 'error'
-        this.listError = error
+        if (!isRemoteFailure(error)) {
+          crashed = true
+          completion.reject(error)
+          return
+        }
+        if (this.list.flight !== flight) return
+        failure = error
       } finally {
-        if (this.listMutations === mutations) {
-          this.listMutations = null
-          this.listInflight = null
+        if (this.list.flight === flight) {
+          this.list = failure !== null
+            ? { ...this.list, state: 'error', error: failure, flight: null }
+            : crashed
+              ? { ...this.list, state: 'idle', flight: null }
+              : { ...this.list, flight: null }
           this.notifier.markDirty()
         }
+        completion.resolve()
       }
     })()
-    return this.listInflight
+    return completion.promise
   }
 
   /**
@@ -622,7 +654,7 @@ export class SessionManager {
       blank: true,
       ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }),
     }
-    this.provisional.set(sessionId, summary)
+    this.provisional.set(sessionId, { kind: 'row', summary })
     this.recordMutation({ kind: 'placeholder', summary })
     return sessionId
   }
@@ -638,6 +670,7 @@ export class SessionManager {
     sessionId: SessionId,
     opts: { workspaceId?: WorkspaceId; cwd?: string; agentPreset?: string },
   ): Promise<RemoteResult<{ sessionId: SessionId }>> {
+    const summary = this.provisional.get(sessionId)?.summary ?? null
     const settled = this.create({ ...opts, sessionId }).then((result) => {
       this.provisional.delete(sessionId)
       const created = result.ok ? result.value.sessionId : undefined
@@ -651,38 +684,28 @@ export class SessionManager {
     const observable = settled.then(result => result.ok
       ? result.value.sessionId
       : Promise.reject(new Error(`session create failed: ${result.error.code}: ${result.error.message}`)))
-      .finally(() => { this.pendingCreations.delete(sessionId) })
-    this.pendingCreations.set(sessionId, observable)
+    this.provisional.set(sessionId, { kind: 'creating', summary, creation: observable })
     // The caller may not await the handle; an unobserved rejection must not surface as unhandled.
     void observable.catch(() => undefined)
     return settled
   }
 
-  /**
-   * Creation still in flight for a provisional identity.
-   * @param sessionId - any identity; non-provisional ones report undefined.
-   * @returns the settling identity, or undefined once creation finished.
-   */
   /** Install a local blank's success gate before any scope can open or issue RPCs. */
   deferCreation(sessionId: SessionId, created: Promise<SessionId>, beforeRpc: (signal?: AbortSignal) => Promise<void>): void {
-    this.pendingCreations.set(sessionId, created)
-    this.deferredRpc.set(sessionId, beforeRpc)
+    const summary = this.provisional.get(sessionId)?.summary ?? null
+    this.provisional.set(sessionId, { kind: 'deferred', summary, creation: created, beforeRpc })
   }
 
   /** Drop only the provisional overlay; the created Host row and unsent metadata remain. */
   finishDeferred(sessionId: SessionId): void {
     this.provisional.delete(sessionId)
-    this.pendingCreations.delete(sessionId)
-    this.deferredRpc.delete(sessionId)
     this.notifier.markDirty()
   }
 
   /** Forget an abandoned empty local identity without addressing the Host. */
   discardDeferred(sessionId: SessionId): void {
-    if (!this.deferredRpc.has(sessionId)) return
+    if (this.provisional.get(sessionId)?.kind !== 'deferred') return
     this.provisional.delete(sessionId)
-    this.pendingCreations.delete(sessionId)
-    this.deferredRpc.delete(sessionId)
     this.recordMutation({ kind: 'remove', sessionId })
   }
 
@@ -695,8 +718,14 @@ export class SessionManager {
     return { nonblank, hostIds: this.hostKnown }
   }
 
+  /**
+   * Creation still in flight for a provisional identity.
+   * @param sessionId - any identity; non-provisional ones report undefined.
+   * @returns the settling identity, or undefined once creation finished.
+   */
   creationFor(sessionId: SessionId): Promise<SessionId> | undefined {
-    return this.pendingCreations.get(sessionId)
+    const record = this.provisional.get(sessionId)
+    return record === undefined || record.kind === 'row' ? undefined : record.creation
   }
 
   /**
@@ -757,7 +786,7 @@ export class SessionManager {
   /** Apply immediately and retain for replay when a list response is in flight. */
   private recordMutation(mutation: SessionListMutation): void {
     if (this.disposed) return
-    this.listMutations?.push(mutation)
+    this.list.flight?.mutations.push(mutation)
     this.summaries = applyMutation(this.summaries, mutation)
     this.notifier.markDirty()
   }
@@ -920,8 +949,8 @@ export class SessionManager {
    */
   handleConnected(): void {
     for (const store of this.projectionStores.values()) store.clear()
-    this.listMutations = null
-    this.listInflight = null
+    // Dropping the flight fences the stale pass out of every write; the pull restarts below.
+    this.list = { ...this.list, flight: null }
     void this.refreshList()
     const parents = new Set(this.projectionLoads.keys())
     for (const id of this.sessions.keys()) {
@@ -973,9 +1002,9 @@ export class SessionManager {
     if (!sameOrder) this.itemsCache = items
     return {
       items: this.itemsCache,
-      state: this.listState,
-      phase: this.listPhase,
-      error: this.listError,
+      state: this.list.state,
+      phase: this.list.phase,
+      error: this.list.error,
       projectionsBySession: Object.fromEntries([...this.projectionStores].map(([sessionId, store]) => [
         sessionId,
         { values: store.values(), state: 'idle', error: null, ...this.projectionLoads.get(sessionId) },
