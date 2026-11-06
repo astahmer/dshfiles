@@ -5,7 +5,7 @@
     {
       "id": "turn-summary-line",
       "title": "A summary footer under each finished turn",
-      "summary": "Under each finished turn, one line says what the agent did with tools: files edited with lines added and removed, commands run, tests passed out of total from the last test-runner summary, files read and searches, and how long the turn took — \"Edited 3 files +42 −7 · ran 6 commands · 1 failed · tests 40/42 · 1m 12s\". The file count opens the edited files (each opens in the editor), the command count opens every command with its outcome, and the red failure count opens the failed commands with how each ended (exit code, signal, or a call the tool rejected). Each part can be switched off.",
+      "summary": "Under each finished turn, one line says what the agent did with tools: files edited with lines added and removed, commands run, tests passed out of total from the last test-runner summary, files read and searches, and how long the turn took — \"Edited 3 files +42 −7 · ran 6 commands · 1 failed · tests 40/42 · 1m 12s\". The file count opens the edited files (each opens in the editor); while the walkthrough card shows, the footer leaves the edited files to it. The command count opens every command with its outcome, and the red failure count opens the failed commands with how each ended (exit code, signal, or a call the tool rejected). Each part can be switched off.",
       "reach": ["seed tool-call-thread", "expect text \"Tool finished.\""],
       "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
@@ -105,7 +105,7 @@
     {
       "id": "turn-walkthrough",
       "title": "A walkthrough card after a turn that changed code",
-      "summary": "Under a finished turn that edited files, a compact card lists the changed files grouped by folder, each folder with a one-line summary (\"Edited 2 files · +40 −3\") and the turn's total lines added and removed. Review in Changes opens that turn's changed-files review in the right pane (the Changes facet when pulls-review is loaded, else the native review tab). The card's icon folds it to one button.",
+      "summary": "Under a finished turn that edited files, a compact card lists the changed files grouped by folder (each opens in the editor), each folder with a one-line summary (\"Edited 2 files · +40 −3\") when there are several, and the turn's total lines added and removed. It is the only place the turn's edits are summarized: the footer leaves them out while the card shows. Review in Changes opens that turn's changed-files review in the right pane (the Changes facet when pulls-review is loaded, else the native review tab). The card's icon folds it to one button.",
       "reach": [
         "seed tool-call-thread",
         "expect text \"Tool finished.\"",
@@ -123,7 +123,7 @@
           "defaultValue": "true",
           "constraints": "Boolean; show the walkthrough card after a turn that edited files.",
           "choices": ["true", "false"],
-          "coveredBy": ["turn-summary.walkthrough-groups"]
+          "coveredBy": ["turn-summary.walkthrough-groups", "turn-summary.edits-summarized-once"]
         }
       ],
       "states": ["no-edits", "edited", "changes-address-known", "folded", "disabled"],
@@ -136,6 +136,11 @@
         {
           "kind": "gherkin",
           "id": "turn-summary.walkthrough",
+          "featureFile": "tooling/dshx/e2e/features/turn-summary.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "turn-summary.edits-summarized-once",
           "featureFile": "tooling/dshx/e2e/features/turn-summary.feature"
         },
         {
