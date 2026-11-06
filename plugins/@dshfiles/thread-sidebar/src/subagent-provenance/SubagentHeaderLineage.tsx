@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react'
+import { useMemo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { SessionProjectionMap, SessionSummary, SessionProjectionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
@@ -11,6 +11,7 @@ import {
   Tooltip as NativeTooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import { createHoverIntentMachine, useMachine } from '@dshfiles/plugin-ui/machine'
 import { HostSnapshotsModel } from '../snapshots.js'
 import { NS } from './locales.js'
 import { SubagentRouteLabelModel } from './route-label.js'
@@ -433,6 +434,9 @@ type CatalogDropdownProps = CatalogDropdownSharedProps &
 
 const MENU_VIEWPORT_MARGIN = 16
 
+/** Hover opens after 150 ms and closes after 120 ms; a click pins the menu open against hover-out. */
+const catalogMenuHover = createHoverIntentMachine({ openDelayMs: 150, closeDelayMs: 120 })
+
 /** Place a portaled catalog below its trigger without crossing the viewport edge. */
 function catalogMenuPosition(trigger: HTMLButtonElement): CSSProperties {
   const rect = trigger.getBoundingClientRect()
@@ -480,16 +484,13 @@ function CatalogDropdown({
     [projections, summaries, statuses],
   )
   const catalog = catalogs[rootSessionId]
-  const [open, setOpen] = useState(false)
+  const [hoverMenu, sendHoverMenu] = useMachine(catalogMenuHover)
+  const open = hoverMenu.matches('openHover') || hoverMenu.matches('openPinned')
   const [menuPosition, setMenuPosition] = useState<CSSProperties>()
   const [expanded, setExpanded] = useState<ReadonlySet<SessionId>>(() => new Set())
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const hoverOpenTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  // A click-opened (pinned) menu ignores hover-out; only explicit dismissal closes it.
-  const pinnedRef = useRef(false)
   const currentEntry = currentSessionId === undefined ? undefined : catalog?.entries.find(entry => entry.id === currentSessionId)
   const switcherDisplayTitle = currentEntry !== undefined ? (currentEntry.label ?? currentEntry.id) : displayTitle
   const directChildren = catalog?.entries ?? []
@@ -498,59 +499,6 @@ function CatalogDropdown({
   const totalCountKey = directCount === 1 ? 'count.total.one' : 'count.total.other'
   const runningCountKey = runningCount === 1 ? 'count.running.one' : 'count.running.other'
   const presentedCatalog: SubagentCatalogSnapshot | undefined = catalog ?? (variant === 'switcher' ? { entries: [], state: 'loading', error: null } : undefined)
-
-  const cancelHoverClose = (): void => {
-    if (hoverCloseTimer.current === undefined) return
-    clearTimeout(hoverCloseTimer.current)
-    hoverCloseTimer.current = undefined
-  }
-
-  const cancelHoverOpen = (): void => {
-    if (hoverOpenTimer.current === undefined) return
-    clearTimeout(hoverOpenTimer.current)
-    hoverOpenTimer.current = undefined
-  }
-
-  const changeOpen = (next: boolean, restoreFocus = false): void => {
-    cancelHoverOpen()
-    cancelHoverClose()
-    if (next) {
-      const trigger = triggerRef.current
-      /* v8 ignore next -- a queued callback can outlive the trigger */
-      if (trigger === null) return
-      setOpen(true)
-      setMenuPosition(catalogMenuPosition(trigger))
-    } else {
-      pinnedRef.current = false
-      setOpen(false)
-      setMenuPosition(undefined)
-      setExpanded(new Set())
-    }
-    if (restoreFocus)
-      queueMicrotask(() => {
-        triggerRef.current?.focus()
-      })
-  }
-
-  const scheduleHoverOpen = (): void => {
-    cancelHoverOpen()
-    cancelHoverClose()
-    if (open) return
-    hoverOpenTimer.current = setTimeout(() => {
-      hoverOpenTimer.current = undefined
-      changeOpen(true)
-    }, 150)
-  }
-
-  const scheduleHoverClose = (): void => {
-    cancelHoverOpen()
-    cancelHoverClose()
-    if (pinnedRef.current) return
-    hoverCloseTimer.current = setTimeout(() => {
-      hoverCloseTimer.current = undefined
-      changeOpen(false)
-    }, 120)
-  }
 
   const closeBranch = (root: SessionId): void => {
     const closing = new Set<SessionId>()
@@ -575,18 +523,31 @@ function CatalogDropdown({
     refreshProjection(childSessionId)
   }
 
+  useLayoutEffect(() => {
+    if (!open) return
+    const trigger = triggerRef.current
+    /* v8 ignore next -- native resize or scroll can outlive the trigger */
+    if (trigger === null) return
+    setMenuPosition(catalogMenuPosition(trigger))
+  }, [open])
+
+  useEffect(() => {
+    if (open) return
+    setExpanded(current => (current.size === 0 ? current : new Set()))
+  }, [open])
+
   useEffect(() => {
     if (!open) return
     const closeOutside = (event: PointerEvent): void => {
       if (event.target instanceof Node && !rootRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) {
-        changeOpen(false)
+        sendHoverMenu({ type: 'dismiss' })
       }
     }
     document.addEventListener('pointerdown', closeOutside)
     return () => {
       document.removeEventListener('pointerdown', closeOutside)
     }
-  }, [open])
+  }, [open, sendHoverMenu])
 
   useEffect(() => {
     if (!open) return
@@ -604,26 +565,13 @@ function CatalogDropdown({
     }
   }, [open])
 
-  useEffect(
-    () => () => {
-      cancelHoverOpen()
-      cancelHoverClose()
-    },
-    [],
-  )
-
   // Visibility needs catalog evidence of children or a failed load worth retrying.
   // An empty loading catalog is not evidence of children.
   const visible = presentedCatalog !== undefined && (variant === 'switcher' || presentedCatalog.state === 'error' || presentedCatalog.entries.length > 0)
   useEffect(() => {
     if (visible) return
-    cancelHoverOpen()
-    cancelHoverClose()
-    if (!open) return
-    pinnedRef.current = false
-    setOpen(false)
-    setExpanded(new Set())
-  }, [visible, open])
+    sendHoverMenu({ type: 'hide' })
+  }, [sendHoverMenu, visible])
 
   if (!visible) return null
 
@@ -639,7 +587,10 @@ function CatalogDropdown({
     const index = items.indexOf(document.activeElement as HTMLElement)
     if (event.key === 'Escape') {
       event.preventDefault()
-      changeOpen(false, true)
+      sendHoverMenu({ type: 'dismiss' })
+      queueMicrotask(() => {
+        triggerRef.current?.focus()
+      })
     } else if (event.key === 'Home') {
       event.preventDefault()
       focusAt(0)
@@ -656,10 +607,15 @@ function CatalogDropdown({
   }
 
   return (
-    <div className={`${css.root} ${variant === 'switcher' ? css.switcherRoot : ''}`} ref={rootRef} onKeyDown={navigate} onMouseLeave={scheduleHoverClose}>
+    <div
+      className={`${css.root} ${variant === 'switcher' ? css.switcherRoot : ''}`}
+      ref={rootRef}
+      onKeyDown={navigate}
+      onMouseLeave={() => sendHoverMenu({ type: 'leave' })}
+    >
       <button
         ref={triggerRef}
-        onMouseEnter={scheduleHoverOpen}
+        onMouseEnter={() => sendHoverMenu({ type: 'hover' })}
         type="button"
         className={variant === 'switcher' ? `${css.switcherTrigger} ${ancestorSwitcher ? css.ancestorSwitcherTrigger : ''}` : css.trigger}
         aria-haspopup="tree"
@@ -672,21 +628,17 @@ function CatalogDropdown({
         onClick={
           openTitle === undefined
             ? () => {
-                cancelHoverOpen()
-                cancelHoverClose()
-                pinnedRef.current = true
-                if (!open) changeOpen(true)
+                sendHoverMenu({ type: 'pin' })
               }
             : () => {
-                cancelHoverOpen()
-                if (open) changeOpen(false)
+                sendHoverMenu({ type: 'dismiss' })
                 openTitle()
               }
         }
         onKeyDown={event => {
           if (event.key !== 'ArrowDown') return
           event.preventDefault()
-          if (!open) changeOpen(true)
+          if (!open) sendHoverMenu({ type: 'pin' })
           queueMicrotask(() => {
             focusAt(0)
           })
@@ -708,7 +660,13 @@ function CatalogDropdown({
       </button>
       {open &&
         createPortal(
-          <div ref={menuRef} className={css.menu} style={menuPosition} onMouseEnter={cancelHoverClose} onMouseLeave={scheduleHoverClose}>
+          <div
+            ref={menuRef}
+            className={css.menu}
+            style={menuPosition}
+            onMouseEnter={() => sendHoverMenu({ type: 'hover' })}
+            onMouseLeave={() => sendHoverMenu({ type: 'leave' })}
+          >
             <div className={css.menuBody} role="tree" aria-label={t('tree.aria')}>
               <CatalogRows
                 parentSessionId={rootSessionId}
@@ -723,7 +681,7 @@ function CatalogDropdown({
                 refreshProjection={refreshProjection}
                 toggleBranch={toggleBranch}
                 closeCatalog={() => {
-                  changeOpen(false)
+                  sendHoverMenu({ type: 'dismiss' })
                 }}
                 t={t}
               />
