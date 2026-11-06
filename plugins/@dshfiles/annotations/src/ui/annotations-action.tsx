@@ -4,13 +4,13 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { CrosshairIcon, SquareDashedIcon } from '@dshfiles/plugin-ui/icons'
-import { useApi, usePlugin, type ComposerActionProps } from '@dshfiles/dshx/client'
+import { useApi, usePlugin, useResource, type ComposerActionProps } from '@dshfiles/dshx/client'
 import { retryOnceUnlessTimedOut, runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { annotationsApi } from '../api.js'
 import { INGEST_PATH } from '../limits.js'
 import { formatAnnotationBlock } from '../draft.js'
-import { annotationsListPollMs } from '../list-poll.js'
+import { annotationsListPollMs, annotationsListResource } from '../list-poll.js'
 import type { Annotation } from '../schema.js'
 import { staleAnnotations } from '../stale.js'
 import { annotationsUi } from './state.js'
@@ -60,18 +60,12 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
     return () => annotationsUi.setSession(null)
   }, [sessionId])
 
-  const list = useQuery({
-    queryKey: ['annotations', sessionId],
-    queryFn: ({ signal }) =>
-      runHostRequest({ signal, request: hostSignal => api.list({ sessionId, statuses: [...OPEN_STATUSES], limit: 50 }, { signal: hostSignal }) }),
-    refetchInterval: annotationsListPollMs(open),
-    refetchOnWindowFocus: !open,
-    retry: retryOnceUnlessTimedOut,
-  })
-  const refetchList = list.refetch
-  useEffect(() => {
-    if (open) void refetchList()
-  }, [refetchList, open])
+  const list = useResource(
+    annotationsApi,
+    'list',
+    { sessionId, statuses: [...OPEN_STATUSES], limit: 50 },
+    { ...annotationsListResource, subscriberPollInterval: annotationsListPollMs(open) },
+  )
   const rows = useMemo(() => list.data?.annotations ?? [], [list.data])
   const count = rows.length
 
@@ -159,7 +153,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
   })
 
   const refresh = async (): Promise<void> => {
-    await queryClient.invalidateQueries({ queryKey: ['annotations', sessionId] })
+    list.refetch()
   }
 
   const stale = useMutation({
