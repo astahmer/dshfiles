@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Nettoyage des conversations",
+    "description": "Prévisualiser puis supprimer définitivement les journaux locaux des conversations settled ou archivées, avec confirmation et protection des écritures."
+  }
+}

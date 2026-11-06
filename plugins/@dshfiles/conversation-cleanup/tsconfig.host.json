@@ -1,0 +1,5 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": { "target": "ES2023", "module": "ESNext", "moduleResolution": "Bundler", "types": ["node"] },
+  "include": ["src/host.ts", "src/host.test.ts", "src/jsonl-files.ts", "src/jsonl-files.test.ts"]
+}
