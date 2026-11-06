@@ -46,7 +46,13 @@ import { defersIsolationToSend, ownsIsolatedThreadWorkspace, WorkspaceToggle, ty
 import { defaultJjIntegrationSettings, IntegratedNoticeActions, jjIntegrationSettings } from './settings.js'
 import { requestThreadSettle } from './settle-request.js'
 import { requestReplaceThreadTab } from './main-tab-replacement.js'
-import { TurnEndStatusRefresh } from './turn-end-status-refresh.js'
+import {
+  turnEndRefreshOnEnd,
+  turnEndRefreshOnMount,
+  turnEndRefreshPending,
+  turnEndRefreshStatusRead,
+  type TurnEndStatusRefresh,
+} from './turn-end-status-refresh.js'
 import { NativeAsideOwners } from '@dshfiles/workbench/registry'
 
 const PANEL_ID = 'jj-integration'
@@ -343,25 +349,36 @@ export default defineClient({
       // Refresh immediately when the newest Turn ends: the query was read while it ran, so its cached status still
       // says "nothing to integrate" and the offer would wait for the fallback poll.
       const queryClient = useQueryClient()
-      const statusRefresh = useRef<TurnEndStatusRefresh | null>(null)
-      statusRefresh.current ??= new TurnEndStatusRefresh(props.turn.end?.time)
-      const [statusRefreshBaseline, setStatusRefreshBaseline] = useState<number | null>(null)
+      const [statusRefresh, setStatusRefresh] = useState<TurnEndStatusRefresh>(() => turnEndRefreshOnMount(props.turn.end?.time))
       useLayoutEffect(() => {
-        if (!statusRefresh.current?.take({ newestTurnHasEnded, endedAt: props.turn.end?.time })) return
-        setStatusRefreshBaseline(status.dataUpdatedAt)
-        void queryClient.invalidateQueries({ queryKey: statusQueryKey, exact: true })
-      }, [newestTurnHasEnded, props.turn.end?.time, queryClient, status.dataUpdatedAt, statusQueryKey])
-      const turnEndRefreshPending = statusRefreshBaseline !== null && status.dataUpdatedAt <= statusRefreshBaseline
+        const read = turnEndRefreshStatusRead(statusRefresh, status.dataUpdatedAt)
+        const next = turnEndRefreshOnEnd(read, {
+          newestTurnHasEnded,
+          endedAt: props.turn.end?.time,
+          baseline: status.dataUpdatedAt,
+        })
+        if (next === statusRefresh) return
+        setStatusRefresh(next)
+        if (statusRefresh.phase !== 'refreshing' && next.phase === 'refreshing') {
+          void queryClient.invalidateQueries({ queryKey: statusQueryKey, exact: true })
+        }
+      }, [newestTurnHasEnded, props.turn.end?.time, queryClient, status.dataUpdatedAt, statusQueryKey, statusRefresh])
+      const turnEndRefreshIsPending = turnEndRefreshPending(statusRefresh)
       const bookmark = useBookmark()
       const thread = status.data?.thread
-      const previousThread = useRef(thread)
+      const [previousThread, setPreviousThread] = useState(thread)
       useEffect(() => {
-        const previous = previousThread.current
-        previousThread.current = thread
-        if (!newestTurnHasEnded || previous?.integrationQueuedAt === undefined || thread?.rebasedAt === undefined || previous.rebasedAt === thread.rebasedAt)
+        if (thread === previousThread) return
+        setPreviousThread(thread)
+        if (
+          !newestTurnHasEnded ||
+          previousThread?.integrationQueuedAt === undefined ||
+          thread?.rebasedAt === undefined ||
+          previousThread.rebasedAt === thread.rebasedAt
+        )
           return
         announceRepositoryChange()
-      }, [newestTurnHasEnded, thread])
+      }, [newestTurnHasEnded, thread, previousThread])
       const threadPath = thread?.path ?? path
       const threadSessionIds = useMemo(
         () => thread?.sessionIds ?? (path === undefined ? [] : [String(props.sessionId)]),
@@ -476,7 +493,7 @@ export default defineClient({
         archived,
         landing,
         queued: thread.integrationQueuedAt !== undefined,
-        turnEndRefreshPending,
+        turnEndRefreshPending: turnEndRefreshIsPending,
       })
       if (markers.length === 0 && !offered) return noticeToast.element
       return (
