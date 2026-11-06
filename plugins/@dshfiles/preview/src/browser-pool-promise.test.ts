@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import * as Schema from 'effect/Schema'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { PreviewBrowsers } from './browser-pool-promise.js'
 import { previewSettings, type PreviewSettings } from './settings.js'
@@ -83,7 +84,7 @@ describe('PreviewBrowsers', () => {
       expression: "(() => { const r = document.querySelector('#name').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()",
     })
     settings = previewSettings.schema({})
-    const box: { readonly x: number; readonly y: number } = JSON.parse(measured.result)
+    const box = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ x: Schema.Number, y: Schema.Number })))(measured.result)
     await browsers.input({ ...page, gesture: { kind: 'click', x: box.x, y: box.y } })
     await browsers.input({ ...page, gesture: { kind: 'text', text: 'mirror' } })
     await browsers.input({ ...page, gesture: { kind: 'key', key: 'Tab' } })
