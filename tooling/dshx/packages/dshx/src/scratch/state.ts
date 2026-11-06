@@ -189,6 +189,7 @@ const readScratchState = async (stateDir: string, name: string): Promise<Scratch
       'Run "dshx dev down --dry-run" to see what it would stop, then "dshx dev down".',
     )
   }
+  // SAFETY: `Mutable` only drops `readonly` from the decoded state; the value and its shape are the schema's own.
   return withLease(parsed.success as ScratchState, leaseOf(parsed.success as ScratchState))
 }
 

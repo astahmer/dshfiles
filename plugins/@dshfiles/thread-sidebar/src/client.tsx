@@ -14,7 +14,7 @@ import { HostSnapshotsModel } from './snapshots.js'
 import { DEFAULT_THREAD_BOARD_VIEW, storedThreadBoardView, ThreadBoardViewModel } from './thread-board-view.js'
 import { toggleCollapsedGroup } from './collapsed-groups.js'
 import { threadDragMachine, type ThreadDragCommands } from './thread-drag-machine.js'
-import { initialThreadRoute, pendingThreadRoute, reduceThreadRoute, threadUrlRoute } from './thread-route.js'
+import { ThreadRouteModel } from './thread-route.js'
 import { useNearViewport } from './use-near-viewport.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { ThreadGroupHeader } from './thread-group-header.js'
@@ -1676,8 +1676,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     return scheduleSuccessNoticeDismissal(notice, updateNotice)
   }, [notice, updateNotice])
   // Only the page-load route: a list remounted by the rail must not treat the URL it last wrote as a navigation.
-  const [route, dispatchRoute] = useReducer(reduceThreadRoute, undefined, () =>
-    initialThreadRoute(typeof window === 'undefined' || !isPrimarySurface ? null : pageLoadThreadRoute.pending(window.location.href)),
+  const [route, dispatchRoute] = useReducer(ThreadRouteModel.reduceThreadRoute, undefined, () =>
+    ThreadRouteModel.initialThreadRoute(typeof window === 'undefined' || !isPrimarySurface ? null : pageLoadThreadRoute.pending(window.location.href)),
   )
   const previousStatus = useRef<Readonly<Record<string, ThreadInteractionStatus>> | null>(null)
   const migrationStarted = useRef(false)
@@ -2198,7 +2198,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       if (route.sessionId === selectedSessionId) dispatchRoute({ type: 'settle', selectedSessionId })
       return
     }
-    const request = pendingThreadRoute(route)
+    const request = ThreadRouteModel.pendingThreadRoute(route)
     if (request === null) return
     pageLoadThreadRoute.settle()
     const target = sessions.find(session => session.id === request.sessionId)
@@ -2218,7 +2218,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   useEffect(() => {
     if (!isPrimarySurface || selectedSession === undefined) return
-    const projected = threadUrlRoute({ state: route, selectedSessionId: selectedSession.id })
+    const projected = ThreadRouteModel.threadUrlRoute({ state: route, selectedSessionId: selectedSession.id })
     if (projected.suppressionStale) dispatchRoute({ type: 'clear-suppression' })
     if (projected.sessionId === null) return
     const workspaceId =

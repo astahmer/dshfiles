@@ -1,4 +1,5 @@
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { describe, expect, it, vi } from 'vitest'
 import { editorDocumentMachine } from './editor-document-machine.js'
@@ -37,7 +38,15 @@ const feed = () => {
   return { changes, emit }
 }
 
-const start = (remote: unknown) => {
+/** One fixture read answer: the document it opened, or the Host refusal the machine reports. */
+type FakeReadAnswer =
+  | { readonly ok: true; readonly value: ReturnType<typeof documentValue> }
+  | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
+
+/** The one remote call the fixtures answer; they return a bare result, not the full remote envelope. */
+type FakeWorkspaceRead = (...args: Parameters<ClientRemote['workspaceFiles']['readBytes']>) => Promise<FakeReadAnswer>
+
+const start = (remote: { readonly readBytes: FakeWorkspaceRead }) => {
   const changes = feed()
   const actor = createActor(editorDocumentMachine, {
     // SAFETY: the fake serves exactly the readBytes/changes calls the machine makes.

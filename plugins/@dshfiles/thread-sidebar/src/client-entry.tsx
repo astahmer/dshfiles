@@ -160,7 +160,7 @@ export default defineClient({
         .flatMap(({ options }) => {
           const id = options.id
           if (id === undefined) return []
-          // SlotCore erases MainPanelId when exposing its heterogeneous entry ledger.
+          // SAFETY: SlotCore erases MainPanelId when exposing its heterogeneous entry ledger.
           const panelId = id as MainPanelId
           return {
             id: panelId,
@@ -1048,6 +1048,7 @@ export default defineClient({
         ctx.uiWorkspace.openSession(sessionId)
         if (activePanelId !== null) ctx.layout.selectPanel(activePanelId)
       },
+      // SAFETY: the multi-host plugin registers exactly this panel id.
       openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
       openRemoteSession: (sessionId: string) => {
         const id = SessionId(sessionId)
@@ -1121,6 +1122,7 @@ export default defineClient({
             aliases: ['thread board', 'board', 'kanban', 'columns'],
             icon: <LayoutGridIcon className="dshx:size-4" />,
             group: 'destination',
+            // SAFETY: BOARD_PANEL_ID names the board panel this plugin registers.
             run: () => ctx.layout.selectPanel(BOARD_PANEL_ID as MainPanelId),
           },
         ]),

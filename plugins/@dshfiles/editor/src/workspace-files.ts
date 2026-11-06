@@ -2,7 +2,6 @@ import type { WorkspaceFilesState } from '@dshfiles/dshx/client'
 import { createActor, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import { RETAINED_INDEX_LIMIT, workspaceIndexMachine } from './workspace-index-machine.js'
 import type { ListDirectory, WatchFrame } from './workspace-walk.js'
-import { WorkspaceWalk } from './workspace-walk.js'
 
 type FilesReply = Extract<WorkspaceFilesState, { readonly status: 'indexing' | 'ready' }>
 

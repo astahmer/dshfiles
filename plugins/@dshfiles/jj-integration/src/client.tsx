@@ -18,7 +18,7 @@ import { ArchiveIcon, CircleCheckIcon, ClockIcon, GitMergeIcon, Undo2Icon } from
 import { errorMessage, PluginQueryProvider, pluginQueryClient, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Schema } from 'effect'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
 import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
@@ -46,13 +46,7 @@ import { defersIsolationToSend, ownsIsolatedThreadWorkspace, WorkspaceToggle, ty
 import { defaultJjIntegrationSettings, IntegratedNoticeActions, jjIntegrationSettings } from './settings.js'
 import { requestThreadSettle } from './settle-request.js'
 import { requestReplaceThreadTab } from './main-tab-replacement.js'
-import {
-  turnEndRefreshOnEnd,
-  turnEndRefreshOnMount,
-  turnEndRefreshPending,
-  turnEndRefreshStatusRead,
-  type TurnEndStatusRefresh,
-} from './turn-end-status-refresh.js'
+import { TurnEndStatusRefreshModel, type TurnEndStatusRefresh } from './turn-end-status-refresh.js'
 import { NativeAsideOwners } from '@dshfiles/workbench/registry'
 
 const PANEL_ID = 'jj-integration'
@@ -349,10 +343,10 @@ export default defineClient({
       // Refresh immediately when the newest Turn ends: the query was read while it ran, so its cached status still
       // says "nothing to integrate" and the offer would wait for the fallback poll.
       const queryClient = useQueryClient()
-      const [statusRefresh, setStatusRefresh] = useState<TurnEndStatusRefresh>(() => turnEndRefreshOnMount(props.turn.end?.time))
+      const [statusRefresh, setStatusRefresh] = useState<TurnEndStatusRefresh>(() => TurnEndStatusRefreshModel.turnEndRefreshOnMount(props.turn.end?.time))
       useLayoutEffect(() => {
-        const read = turnEndRefreshStatusRead(statusRefresh, status.dataUpdatedAt)
-        const next = turnEndRefreshOnEnd(read, {
+        const read = TurnEndStatusRefreshModel.turnEndRefreshStatusRead(statusRefresh, status.dataUpdatedAt)
+        const next = TurnEndStatusRefreshModel.turnEndRefreshOnEnd(read, {
           newestTurnHasEnded,
           endedAt: props.turn.end?.time,
           baseline: status.dataUpdatedAt,
@@ -363,7 +357,7 @@ export default defineClient({
           void queryClient.invalidateQueries({ queryKey: statusQueryKey, exact: true })
         }
       }, [newestTurnHasEnded, props.turn.end?.time, queryClient, status.dataUpdatedAt, statusQueryKey, statusRefresh])
-      const turnEndRefreshIsPending = turnEndRefreshPending(statusRefresh)
+      const turnEndRefreshIsPending = TurnEndStatusRefreshModel.turnEndRefreshPending(statusRefresh)
       const bookmark = useBookmark()
       const thread = status.data?.thread
       const [previousThread, setPreviousThread] = useState(thread)

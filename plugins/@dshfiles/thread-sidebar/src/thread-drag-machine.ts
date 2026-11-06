@@ -53,6 +53,7 @@ const isSectionPointerEvent = (event: ThreadDragEvent): event is Extract<ThreadD
 const sectionDropIndex = (section: ThreadDragSection, position: number): number =>
   SidebarOrganization.dropIndexAt({ centers: section.centers ?? [], fromIndex: section.from, position })
 
+// SAFETY: xstate's `types` entries are empty type carriers; nothing reads their values.
 export const threadDragMachine = setup({
   types: {
     context: {} as ThreadDragContext,

@@ -15,24 +15,26 @@ export type FileOpenRequest =
 
 let lastRequest = 0
 
-/** Start one open: its id is what a settlement is matched against, so an older path cannot close a newer one. */
-export const beginFileOpen = (input: {
-  readonly path: string
-  readonly options: OpenFileOptions | undefined
-  readonly refusal?: string | undefined
-}): FileOpenRequest => ({
-  status: 'opening',
-  request: ++lastRequest,
-  path: input.path,
-  options: input.options,
-  refusal: input.refusal,
-})
+export class FileOpenRequestModel {
+  /** Start one open: its id is what a settlement is matched against, so an older path cannot close a newer one. */
+  static beginFileOpen = (input: {
+    readonly path: string
+    readonly options: OpenFileOptions | undefined
+    readonly refusal?: string | undefined
+  }): FileOpenRequest => ({
+    status: 'opening',
+    request: ++lastRequest,
+    path: input.path,
+    options: input.options,
+    refusal: input.refusal,
+  })
 
-/** Settle one open: success clears the gesture, a refusal keeps its dialog, a superseded gesture is ignored. */
-export const settleFileOpen = (state: FileOpenRequest, input: { readonly request: number; readonly message: string | undefined }): FileOpenRequest => {
-  if (state.status !== 'opening' || state.request !== input.request) return state
-  return input.message === undefined ? { status: 'idle' } : { status: 'refused', path: state.path, message: input.message }
+  /** Settle one open: success clears the gesture, a refusal keeps its dialog, a superseded gesture is ignored. */
+  static settleFileOpen = (state: FileOpenRequest, input: { readonly request: number; readonly message: string | undefined }): FileOpenRequest => {
+    if (state.status !== 'opening' || state.request !== input.request) return state
+    return input.message === undefined ? { status: 'idle' } : { status: 'refused', path: state.path, message: input.message }
+  }
+
+  /** Close the refusal (or the busy state) without settling the request that produced it. */
+  static idleFileOpen = (): FileOpenRequest => ({ status: 'idle' })
 }
-
-/** Close the refusal (or the busy state) without settling the request that produced it. */
-export const idleFileOpen = (): FileOpenRequest => ({ status: 'idle' })

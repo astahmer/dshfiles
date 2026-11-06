@@ -23,6 +23,12 @@ export interface DirectoryListing {
 }
 export type Directories = Map<string, DirectoryListing>
 
+/** The flattened listing: the capped file list, and whether the caps cut it. */
+export interface WalkedFiles {
+  readonly files: readonly string[]
+  readonly truncated: boolean
+}
+
 const IGNORED_DIRECTORIES = new Set(['.git', '.jj', 'node_modules'])
 
 const joinPath = (parent: string, name: string): string => (parent === '' ? name : `${parent}/${name}`)
@@ -80,7 +86,7 @@ export class WorkspaceWalk {
     return order
   }
 
-  static flatten = (directories: Directories): { readonly files: readonly string[]; readonly truncated: boolean } => {
+  static flatten = (directories: Directories): WalkedFiles => {
     const files = WorkspaceWalk.breadthFirst(directories).flatMap(path => directories.get(path)?.files ?? [])
     return { files: files.slice(0, MAX_FILES), truncated: files.length > MAX_FILES }
   }
@@ -128,7 +134,7 @@ export class WorkspaceWalk {
     readonly readText?: ReadText
     readonly signal: AbortSignal
     readonly onProgress: (files: readonly string[]) => void
-  }): Promise<{ readonly files: readonly string[]; readonly truncated: boolean }> => {
+  }): Promise<WalkedFiles> => {
     const directories: Directories = new Map()
     const truncated = await WorkspaceWalk.walkInto({
       list: options.list,

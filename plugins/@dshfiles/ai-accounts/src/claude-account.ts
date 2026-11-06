@@ -272,16 +272,17 @@ const abortableUsage = (request: Promise<UsageCard>, signal: AbortSignal | undef
   return new Promise<UsageCard>((resolve, reject) => {
     const onAbort = (): void => resolve(cancelledUsage())
     signal.addEventListener('abort', onAbort, { once: true })
-    void request.then(
-      card => {
+    const settle = async (): Promise<void> => {
+      try {
+        const card = await request
         signal.removeEventListener('abort', onAbort)
         resolve(card)
-      },
-      (error: unknown) => {
+      } catch (error) {
         signal.removeEventListener('abort', onAbort)
         reject(error)
-      },
-    )
+      }
+    }
+    void settle()
   })
 }
 

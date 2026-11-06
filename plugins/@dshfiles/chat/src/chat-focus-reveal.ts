@@ -117,6 +117,7 @@ interface ChatFocusRevealInput extends RevealTiming {
  * @param timing - retry deadline and highlight duration.
  * @returns the machine that serves every request addressed to one Chat view.
  */
+// SAFETY: xstate's `types` entries are empty type carriers; nothing reads their values.
 export const createChatFocusRevealMachine = (timing: RevealTiming) =>
   setup({
     types: {

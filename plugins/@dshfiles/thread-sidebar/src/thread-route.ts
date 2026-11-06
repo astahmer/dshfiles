@@ -22,32 +22,6 @@ export type ThreadRouteEvent =
   | { readonly type: 'missing' }
   | { readonly type: 'clear-suppression' }
 
-export const initialThreadRoute = (pageLoadSessionId: string | null): ThreadRouteState =>
-  pageLoadSessionId === null ? { status: 'idle', suppressedSessionId: null } : { status: 'pending', sessionId: pageLoadSessionId, source: 'page-load' }
-
-export const reduceThreadRoute = (state: ThreadRouteState, event: ThreadRouteEvent): ThreadRouteState => {
-  switch (event.type) {
-    case 'navigate':
-      return event.sessionId === null
-        ? { status: 'idle', suppressedSessionId: event.selectedSessionId }
-        : { status: 'pending', sessionId: event.sessionId, source: 'popstate' }
-    case 'select':
-      return state.status === 'idle' && state.suppressedSessionId === null ? state : { status: 'idle', suppressedSessionId: null }
-    case 'open':
-      return state.status === 'pending' ? { status: 'opening', sessionId: state.sessionId } : state
-    case 'settle':
-      return state.status !== 'idle' && state.sessionId === event.selectedSessionId ? { status: 'idle', suppressedSessionId: null } : state
-    case 'missing':
-      return state.status === 'idle' ? state : { status: 'idle', suppressedSessionId: null }
-    case 'clear-suppression':
-      return state.status === 'idle' && state.suppressedSessionId !== null ? { status: 'idle', suppressedSessionId: null } : state
-  }
-}
-
-/** The request a ready thread list must resolve, or null once it is opening or settled. */
-export const pendingThreadRoute = (state: ThreadRouteState): { readonly sessionId: string; readonly source: ThreadRouteSource } | null =>
-  state.status === 'pending' ? { sessionId: state.sessionId, source: state.source } : null
-
 export interface ThreadUrlRoute {
   /** The thread the URL should name now; null while a request is unresolved or while its write stays suppressed. */
   readonly sessionId: string | null
@@ -55,10 +29,38 @@ export interface ThreadUrlRoute {
   readonly suppressionStale: boolean
 }
 
-export const threadUrlRoute = (input: { readonly state: ThreadRouteState; readonly selectedSessionId: string | null }): ThreadUrlRoute => {
-  if (input.state.status !== 'idle') return { sessionId: null, suppressionStale: false }
-  const suppressedSessionId = input.state.suppressedSessionId
-  if (suppressedSessionId === null) return { sessionId: input.selectedSessionId, suppressionStale: false }
-  const suppressionStale = suppressedSessionId !== input.selectedSessionId
-  return { sessionId: suppressionStale ? input.selectedSessionId : null, suppressionStale }
+export class ThreadRouteModel {
+  static initialThreadRoute = (pageLoadSessionId: string | null): ThreadRouteState =>
+    pageLoadSessionId === null ? { status: 'idle', suppressedSessionId: null } : { status: 'pending', sessionId: pageLoadSessionId, source: 'page-load' }
+
+  static reduceThreadRoute = (state: ThreadRouteState, event: ThreadRouteEvent): ThreadRouteState => {
+    switch (event.type) {
+      case 'navigate':
+        return event.sessionId === null
+          ? { status: 'idle', suppressedSessionId: event.selectedSessionId }
+          : { status: 'pending', sessionId: event.sessionId, source: 'popstate' }
+      case 'select':
+        return state.status === 'idle' && state.suppressedSessionId === null ? state : { status: 'idle', suppressedSessionId: null }
+      case 'open':
+        return state.status === 'pending' ? { status: 'opening', sessionId: state.sessionId } : state
+      case 'settle':
+        return state.status !== 'idle' && state.sessionId === event.selectedSessionId ? { status: 'idle', suppressedSessionId: null } : state
+      case 'missing':
+        return state.status === 'idle' ? state : { status: 'idle', suppressedSessionId: null }
+      case 'clear-suppression':
+        return state.status === 'idle' && state.suppressedSessionId !== null ? { status: 'idle', suppressedSessionId: null } : state
+    }
+  }
+
+  /** The request a ready thread list must resolve, or null once it is opening or settled. */
+  static pendingThreadRoute = (state: ThreadRouteState): { readonly sessionId: string; readonly source: ThreadRouteSource } | null =>
+    state.status === 'pending' ? { sessionId: state.sessionId, source: state.source } : null
+
+  static threadUrlRoute = (input: { readonly state: ThreadRouteState; readonly selectedSessionId: string | null }): ThreadUrlRoute => {
+    if (input.state.status !== 'idle') return { sessionId: null, suppressionStale: false }
+    const suppressedSessionId = input.state.suppressedSessionId
+    if (suppressedSessionId === null) return { sessionId: input.selectedSessionId, suppressionStale: false }
+    const suppressionStale = suppressedSessionId !== input.selectedSessionId
+    return { sessionId: suppressionStale ? input.selectedSessionId : null, suppressionStale }
+  }
 }

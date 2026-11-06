@@ -7,7 +7,7 @@ const killed: JobKill = { jobId: 'job-1', outcome: 'requested' }
 
 const deferred = <Value>() => {
   let resolve: (value: Value | PromiseLike<Value>) => void = () => undefined
-  let reject: (reason?: unknown) => void = () => undefined
+  let reject: (error?: unknown) => void = () => undefined
   const promise = new Promise<Value>((onResolve, onReject) => {
     resolve = onResolve
     reject = onReject

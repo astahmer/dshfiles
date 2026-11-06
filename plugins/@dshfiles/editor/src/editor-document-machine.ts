@@ -5,14 +5,14 @@ import { errorMessage } from '@dshfiles/plugin-ui/query'
 
 const MAX_EDITABLE_BYTES = 5 * 1024 * 1024
 
-const IMAGE_TYPES: Readonly<Record<string, string>> = {
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  svg: 'image/svg+xml',
-}
+const IMAGE_TYPES = new Map<string, string>([
+  ['png', 'image/png'],
+  ['jpg', 'image/jpeg'],
+  ['jpeg', 'image/jpeg'],
+  ['gif', 'image/gif'],
+  ['webp', 'image/webp'],
+  ['svg', 'image/svg+xml'],
+])
 
 /** What the panel shows: text goes to the editor engine; images and other binary files never reach it. */
 export type DocumentContent =
@@ -107,7 +107,7 @@ const failedContext = (message: string): Partial<DocumentContext> => ({
   diskChanged: false,
 })
 
-const imageType = (path: string): string | undefined => IMAGE_TYPES[path.split('.').at(-1)?.toLowerCase() ?? '']
+const imageType = (path: string): string | undefined => IMAGE_TYPES.get(path.split('.').at(-1)?.toLowerCase() ?? '')
 
 /** A newer announced version that no refresh or reconcile has answered yet. */
 const pendingDiffers = (context: DocumentContext): boolean => context.pendingVersion !== null && context.pendingVersion !== context.version

@@ -35,8 +35,7 @@ export const planLegacyPreferencesMigration = (input: {
   const doneMigrated = shouldMigrateDone ? ThreadViewPreferencesModel.migrateDoneViewSettings(source) : source
   const migrated = shouldUpgradeShipped ? ThreadViewPreferencesModel.upgradeShippedViewFilters(doneMigrated) : doneMigrated
   const collapsedGroups = input.legacy.collapsedGroups.length > 0 && input.host.collapsedGroups.length === 0 ? [...input.legacy.collapsedGroups] : null
-  return {
-    ...(adoptLegacy || migrated !== source ? { threadViews: migrated } : {}),
-    ...(collapsedGroups === null ? {} : { collapsedGroups }),
-  }
+  const threadViewsChanged = adoptLegacy || migrated !== source
+  if (collapsedGroups === null) return threadViewsChanged ? { threadViews: migrated } : {}
+  return threadViewsChanged ? { threadViews: migrated, collapsedGroups } : { collapsedGroups }
 }

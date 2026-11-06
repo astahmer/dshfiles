@@ -4,11 +4,17 @@ import { provideRestartMachine, waitForNewHost, type RestartClient, type Restart
 
 type Availability = Awaited<ReturnType<RestartClient['availability']>>
 
+interface FakeHostState {
+  run: string | undefined
+  down: boolean
+  pending: RestartPending | null
+}
+
 const PENDING: RestartPending = { since: 1, running: 1 }
 
 /** A Host whose `run` the test changes; `down` makes availability fail like a Host that stopped answering. */
 const fakeHosts = (initialRun: string | undefined) => {
-  const state: { run: string | undefined; down: boolean; pending: RestartPending | null } = { run: initialRun, down: false, pending: null }
+  const state: FakeHostState = { run: initialRun, down: false, pending: null }
   const availability: RestartClient['availability'] = async () => {
     if (state.down) throw new Error('unreachable')
     const answer: Availability = { available: true, pending: state.pending }

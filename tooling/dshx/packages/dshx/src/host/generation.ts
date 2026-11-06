@@ -9,26 +9,18 @@ import type { Context, Fiber, Inject } from '@deepseek-ai/cordis'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { HostRuntimeModel, type HostPluginMetadata } from './runtime.js'
 import { hostGenerationManifestSchema, HOST_GENERATION_DIRECTORY } from './generation-contract.js'
-import {
-  activateGeneration,
-  attemptGeneration,
-  beginGenerationSwap,
-  closeGeneration,
-  closedGeneration,
-  commitGenerationSwap,
-  initialGenerationStore,
-  isGenerationClosed,
-  mountedGeneration,
-  settleGenerationSwap,
-} from './generation-state.js'
-import { decodeJson, jsonValueSchema } from '../json.js'
+import { HostGenerationStateModel } from './generation-state.js'
+import { decodeJson, jsonValueSchema, type JsonValue } from '../json.js'
+
+/** The Loader row config a generation receives after its own `Config` schema decoded it: JSON, as the profile wrote it. */
+export type HostGenerationConfig = JsonValue
 
 /** The Loader and lifecycle surface one generation must provide. */
 export interface HostGenerationImplementation {
   readonly name: string
   readonly inject?: Inject
   readonly Config?: StandardSchemaV1
-  readonly apply: (ctx: Context, config?: unknown) => unknown
+  readonly apply: (ctx: Context, config?: HostGenerationConfig) => void
 }
 
 const applySchema = Schema.declare<HostGenerationImplementation['apply']>(
@@ -76,7 +68,11 @@ const disposeFiber = async (fiber: Fiber): Promise<void> => {
   await fiber.dispose()
 }
 
-const mountImplementation = async (context: Context, implementation: HostGenerationImplementation, config: unknown): Promise<Fiber> => {
+const mountImplementation = async (
+  context: Context,
+  implementation: HostGenerationImplementation,
+  config: HostGenerationConfig | undefined,
+): Promise<Fiber> => {
   const plugin = {
     name: implementation.name,
     ...(implementation.inject !== undefined && { inject: implementation.inject }),
@@ -97,7 +93,7 @@ export const createHostGenerationPlugin = (options: HostGenerationPluginOptions)
   ...(options.implementation.inject !== undefined && { inject: options.implementation.inject }),
   ...(options.implementation.Config !== undefined && { Config: options.implementation.Config }),
   async apply(context, config) {
-    let store = initialGenerationStore<ActiveGeneration>()
+    let store = HostGenerationStateModel.initialGenerationStore<ActiveGeneration>()
     let watcher: FSWatcher | undefined
     let updateQueue = Promise.resolve()
     const logger = safeCordisLogger(context, 'dshx:host-hmr')
@@ -182,32 +178,32 @@ export const createHostGenerationPlugin = (options: HostGenerationPluginOptions)
         return
       }
       const candidate = decodeCandidate(imported, generation)
-      if (candidate === undefined || isGenerationClosed(store)) return
+      if (candidate === undefined || HostGenerationStateModel.isGenerationClosed(store)) return
 
-      const previous = mountedGeneration(store)
-      store = beginGenerationSwap(store, generation)
+      const previous = HostGenerationStateModel.mountedGeneration(store)
+      store = HostGenerationStateModel.beginGenerationSwap(store, generation)
       if (previous !== undefined) {
         if (!(await unmount(previous))) {
-          store = settleGenerationSwap(store, previous)
+          store = HostGenerationStateModel.settleGenerationSwap(store, previous)
           return
         }
       }
-      if (isGenerationClosed(store)) return
+      if (HostGenerationStateModel.isGenerationClosed(store)) return
       try {
         const mounted = await mount(candidate, generation)
-        if (isGenerationClosed(store)) {
+        if (HostGenerationStateModel.isGenerationClosed(store)) {
           await unmount(mounted)
           return
         }
-        store = commitGenerationSwap(store, mounted)
+        store = HostGenerationStateModel.commitGenerationSwap(store, mounted)
         logger.info('Host generation activated (plugin=%s generation=%s)', options.metadata.packageId, generation)
       } catch (error) {
         fail(generation, error)
-        if (previous === undefined || isGenerationClosed(store)) {
-          store = settleGenerationSwap(store, undefined)
+        if (previous === undefined || HostGenerationStateModel.isGenerationClosed(store)) {
+          store = HostGenerationStateModel.settleGenerationSwap(store, undefined)
           return
         }
-        store = settleGenerationSwap(store, await restore(previous))
+        store = HostGenerationStateModel.settleGenerationSwap(store, await restore(previous))
       }
     }
 
@@ -226,7 +222,7 @@ export const createHostGenerationPlugin = (options: HostGenerationPluginOptions)
       }
       const manifest = decodedManifest.value
       // One attempt per revision: a failed generation must not loop until its content changes.
-      const recorded = attemptGeneration(store, manifest.generation)
+      const recorded = HostGenerationStateModel.attemptGeneration(store, manifest.generation)
       if (recorded === undefined) return
       store = recorded
       if (manifest.hostContractVersion !== options.hostContractVersion) {
@@ -237,10 +233,10 @@ export const createHostGenerationPlugin = (options: HostGenerationPluginOptions)
     }
 
     const scheduleRefresh = (): void => {
-      if (isGenerationClosed(store)) return
+      if (HostGenerationStateModel.isGenerationClosed(store)) return
       updateQueue = updateQueue
         .then(async () => {
-          if (!isGenerationClosed(store)) await refresh()
+          if (!HostGenerationStateModel.isGenerationClosed(store)) await refresh()
         })
         .catch(error => fail(options.generation, error))
     }
@@ -250,30 +246,30 @@ export const createHostGenerationPlugin = (options: HostGenerationPluginOptions)
     // this effect and tear the mounted generation down.
     context.effect(
       () => async () => {
-        store = closeGeneration(store)
+        store = HostGenerationStateModel.closeGeneration(store)
         watcher?.close()
         await updateQueue
-        const remaining = closedGeneration(store)
+        const remaining = HostGenerationStateModel.closedGeneration(store)
         if (remaining !== undefined) await unmount(remaining)
       },
       'dshx:host-generation',
     )
 
     const initial = await mount(options.implementation, options.generation)
-    if (isGenerationClosed(store)) {
+    if (HostGenerationStateModel.isGenerationClosed(store)) {
       await unmount(initial)
       return
     }
-    store = activateGeneration(store, initial)
+    store = HostGenerationStateModel.activateGeneration(store, initial)
     const manifestPath = fileURLToPath(options.manifestUrl)
     watcher = watch(dirname(manifestPath), (_event, filename) => {
       if (filename !== null && filename.toString() !== basename(manifestPath)) return
       scheduleRefresh()
     })
     watcher.on('error', error => fail(options.generation, error))
-    if (isGenerationClosed(store)) {
+    if (HostGenerationStateModel.isGenerationClosed(store)) {
       watcher.close()
-      const remaining = closedGeneration(store)
+      const remaining = HostGenerationStateModel.closedGeneration(store)
       if (remaining !== undefined) await unmount(remaining)
       return
     }

@@ -151,7 +151,6 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
       setAttempted(false)
     })
     return () => subscription.unsubscribe()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the reset reads the current list, not a selection.
   }, [editorActor, agents])
 
   // A mention preview's "Open in Agents" lands here: select that agent, then drop the request.

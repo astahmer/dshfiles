@@ -58,6 +58,7 @@ type BootstrapEvent = { readonly type: 'retry' }
  * the conversation, and a refusal lands in `failed` (retry re-enters `creating`) or `unrecoverable` (the mutation
  * outcome is unknown, so a retry could create a second thread).
  */
+// SAFETY: xstate's `types` entries are empty type carriers; nothing reads their values.
 export const remoteSessionBootstrapMachine = setup({
   types: {
     context: {} as BootstrapContext,

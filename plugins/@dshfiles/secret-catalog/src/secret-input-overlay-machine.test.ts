@@ -7,6 +7,7 @@ import { SecretSetupSteps } from './secret-setup-step.js'
 // SAFETY: the machine only compares anchors by identity; a bare object stands in for the DOM field.
 const field = (name: string): HTMLInputElement => ({ dataset: { field: name } }) as unknown as HTMLInputElement
 
+// SAFETY: the machine only carries the anchor's rect; a bare object stands in for a DOM rect.
 const anchorOf = (element: HTMLInputElement): FieldAnchor => ({ element, rect: {} as DOMRect })
 
 const start = () => {

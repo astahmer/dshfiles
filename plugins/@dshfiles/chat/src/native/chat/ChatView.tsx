@@ -24,11 +24,8 @@ import { InlineReferenceScope } from '../../inline-references.tsx'
 import { mergeTurnRailItems } from './turn-rail-items.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
-import {
-  beginImagePreview, imagePreviewClosed, imagePreviewLoaded, imagePreviewOpened, imagePreviewOpening,
-  imagePreviewRequestIsCurrent, type ImagePreview,
-} from '../../image-preview-request.ts'
-import { beginFileOpen, idleFileOpen, settleFileOpen, type FileOpenRequest } from '../../file-open-request.ts'
+import { ImagePreviewRequestModel, type ImagePreview } from '../../image-preview-request.ts'
+import { FileOpenRequestModel, type FileOpenRequest } from '../../file-open-request.ts'
 import { MOTION_TAIL_MS, motionTailNext, type MotionTail } from '../../motion-tail.ts'
 import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 import css from './ChatView.module.css'
@@ -103,8 +100,10 @@ export function ChatView({
       dialog: t('image.dialog'), close: t('image.close'),
     },
   }), [cwd, t])
-  const [imagePreview, setImagePreview] = useState<ImagePreview<LightboxImage>>(imagePreviewClosed)
-  useEffect(() => { setImagePreview(imagePreviewClosed()) }, [sessionId])
+  const [imagePreview, setImagePreview] = useState<ImagePreview<LightboxImage>>(() =>
+    ImagePreviewRequestModel.imagePreviewClosed<LightboxImage>(),
+  )
+  useEffect(() => { setImagePreview(ImagePreviewRequestModel.imagePreviewClosed<LightboxImage>()) }, [sessionId])
   const imageLightboxLabels = useMemo<ImageLightboxLabels>(() => ({
     dialog: t('image.dialog'),
     close: t('image.close'),
@@ -114,14 +113,14 @@ export function ChatView({
     loading: t('image.loading'),
   }), [t])
   const openImagePreview = useCallback((image: LightboxImage, path?: string) => {
-    const request = beginImagePreview()
-    setImagePreview(imagePreviewOpening(request))
+    const request = ImagePreviewRequestModel.beginImagePreview()
+    setImagePreview(ImagePreviewRequestModel.imagePreviewOpening(request))
     const open = async (): Promise<void> => {
       const firstTurn = railItems[0]
       if (imageGalleryScope === 'thread' && firstTurn?.anchor.kind === 'unloaded') {
         await loadThrough(firstTurn.anchor.seq).catch(() => {})
       }
-      if (!imagePreviewRequestIsCurrent(request)) return
+      if (!ImagePreviewRequestModel.imagePreviewRequestIsCurrent(request)) return
       const nodes: ImageGalleryNode[] = []
       for (const { turn } of railItems) {
         nodes.push(
@@ -141,13 +140,13 @@ export function ChatView({
         fallbackImage: image,
       })
       const preview = { images: selection.images, initialIndex: selection.initialIndex }
-      setImagePreview(current => imagePreviewOpened(current, { request, ...preview }))
+      setImagePreview(current => ImagePreviewRequestModel.imagePreviewOpened(current, { request, ...preview }))
       void Promise.all(selection.images.map((candidate, index) => {
         if (candidate.src !== undefined) return Promise.resolve(candidate.src)
         const load = selection.loaders[index]
         return load === undefined ? Promise.resolve(undefined) : load().catch(() => undefined)
       })).then(sources => {
-        setImagePreview(current => imagePreviewLoaded(current, {
+        setImagePreview(current => ImagePreviewRequestModel.imagePreviewLoaded(current, {
           request,
           images: preview.images.map((candidate, index) => {
             const src = sources[index]
@@ -158,7 +157,7 @@ export function ChatView({
     }
     void open()
   }, [cwd, fileImages, imageGalleryScope, loadImage, loadThrough, nodeStore, railItems])
-  const closeImagePreview = useCallback(() => { setImagePreview(imagePreviewClosed()) }, [])
+  const closeImagePreview = useCallback(() => { setImagePreview(ImagePreviewRequestModel.imagePreviewClosed<LightboxImage>()) }, [])
   const running = useSession(s => s.running)
   // Fold transitions run while a Turn is live, while an input is pending, and briefly after settling.
   const [motionTail, setMotionTail] = useState<MotionTail>('off')
@@ -204,7 +203,7 @@ export function ChatView({
     if (transcript.hidden === 0 || firstMounted === null) return order
     return order.filter(key => (nodeStore.get(key)?.anchorSeq ?? firstMounted) >= firstMounted)
   }, [order, nodeStore, transcript.hidden, transcript.firstSeq])
-  const [fileOpen, setFileOpen] = useState<FileOpenRequest>(idleFileOpen)
+  const [fileOpen, setFileOpen] = useState<FileOpenRequest>(FileOpenRequestModel.idleFileOpen)
   /** The refusal dialog's content: the settled refusal, or the one a running retry keeps on screen. */
   const fileOpenFailure = fileOpen.status === 'refused'
     ? { path: fileOpen.path, message: fileOpen.message, busy: false }
@@ -213,13 +212,13 @@ export function ChatView({
       : null
 
   const startFileOpen = useCallback((input: { path: string; options: OpenFileOptions | undefined; refusal: string | undefined }) => {
-    const request = beginFileOpen(input)
+    const request = FileOpenRequestModel.beginFileOpen(input)
     if (request.status !== 'opening') return
     setFileOpen(request)
     void (input.options === undefined ? openFile(input.path) : openFile(input.path, input.options)).then(
-      () => { setFileOpen(current => settleFileOpen(current, { request: request.request, message: undefined })) },
+      () => { setFileOpen(current => FileOpenRequestModel.settleFileOpen(current, { request: request.request, message: undefined })) },
       (error: unknown) => {
-        setFileOpen(current => settleFileOpen(current, {
+        setFileOpen(current => FileOpenRequestModel.settleFileOpen(current, {
           request: request.request,
           message: openFailureMessage(error, t('fileOpen.unknown')),
         }))
@@ -258,7 +257,7 @@ export function ChatView({
     openMarkdownExternalLink({ href, kind, openImage: image => { openImagePreview(image) }, openExternalLink })
   }, [openExternalLink, openImagePreview])
 
-  const closeFileOpenError = useCallback(() => { setFileOpen(idleFileOpen()) }, [])
+  const closeFileOpenError = useCallback(() => { setFileOpen(FileOpenRequestModel.idleFileOpen()) }, [])
 
   const inboxSteering = useMemo(
     () => inbox?.['next-step'].filter(message => message.source.kind === 'user') ?? [],

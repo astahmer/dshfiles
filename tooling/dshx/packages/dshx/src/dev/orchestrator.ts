@@ -13,20 +13,7 @@ import { watchProjectFiles } from './project-watcher.js'
 import type { DevBuildEvent, DevChildProcess, DevEvent, DevProjectWatcher, DevSession, DevSessionOptions, DevState, DevWatcher } from './types.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import {
-  advanceBuild,
-  beginReload,
-  buildsReady,
-  finishReload,
-  initialBuilds,
-  initialChild,
-  initialReload,
-  isChildRunning,
-  isClosed,
-  nextBuildGeneration,
-  nextBuilds,
-  projectDevState,
-  requestReload,
-  transitionChild,
+  DevSessionStateModel,
   type BuildsState,
   type ChildPhase,
   type DevFace,
@@ -167,18 +154,18 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
   let activeWatchers: CompilerWatcherGroup | undefined
   let projectWatcher: DevProjectWatcher | undefined
   let lifecycle: DevLifecycle = 'open'
-  let builds: BuildsState = initialBuilds(facesOf(project))
-  let child: ChildPhase = initialChild
-  let reload: ReloadPhase = initialReload
+  let builds: BuildsState = DevSessionStateModel.initialBuilds(facesOf(project))
+  let child: ChildPhase = DevSessionStateModel.initialChild
+  let reload: ReloadPhase = DevSessionStateModel.initialReload
   let restartQueue: Promise<void> = Promise.resolve()
   let reloadCompletion: Promise<void> = Promise.resolve()
-  let state: DevState = projectDevState({ lifecycle, builds, child })
+  let state: DevState = DevSessionStateModel.projectDevState({ lifecycle, builds, child })
 
   const emit = (event: DevEvent): void => {
     for (const listener of [...listeners]) listener(event)
   }
   const publish = (): void => {
-    state = projectDevState({ lifecycle, builds, child })
+    state = DevSessionStateModel.projectDevState({ lifecycle, builds, child })
     emit({ type: 'state', state })
   }
   const emitDiagnostic = (item: DshxDiagnostic): void => {
@@ -229,10 +216,10 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
         await stopChild(started)
         return
       }
-      child = transitionChild(child, { kind: 'spawned', child: started })
+      child = DevSessionStateModel.transitionChild(child, { kind: 'spawned', child: started })
       started.on('error', error => {
         if (currentChild() !== started) return
-        child = transitionChild(child, { kind: 'exited' })
+        child = DevSessionStateModel.transitionChild(child, { kind: 'exited' })
         publish()
         emitDiagnostic(
           diagnostic(
@@ -245,7 +232,7 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
       })
       started.on('exit', (code, signal) => {
         if (currentChild() !== started) return
-        child = transitionChild(child, { kind: 'exited' })
+        child = DevSessionStateModel.transitionChild(child, { kind: 'exited' })
         publish()
         const item = diagnostic(
           code === null ? 'DSHX4403' : 'DSHX4402',
@@ -259,7 +246,7 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
       publish()
     } catch (error) {
       if (child !== input.starting) return
-      child = transitionChild(child, { kind: 'start-failed' })
+      child = DevSessionStateModel.transitionChild(child, { kind: 'start-failed' })
       publish()
       emitDiagnostic(
         diagnostic(
@@ -274,41 +261,40 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
 
   const startChild = (restarting = false): Promise<void> => {
     if (child.kind === 'starting') return child.completion
-    if (isClosed(lifecycle) || !buildsReady(builds)) return Promise.resolve()
+    if (DevSessionStateModel.isClosed(lifecycle) || !DevSessionStateModel.buildsReady(builds)) return Promise.resolve()
     let settle!: () => void
     const completion = new Promise<void>(resolve => {
       settle = resolve
     })
-    child = transitionChild(child, { kind: 'start', completion })
+    child = DevSessionStateModel.transitionChild(child, { kind: 'start', completion })
     if (child.kind !== 'starting') {
       settle()
       return Promise.resolve()
     }
-    const starting = child
     publish()
-    return runChildStart({ restarting, project: activeProject, profile: activeProfile, starting }).finally(settle)
+    return runChildStart({ restarting, project: activeProject, profile: activeProfile, starting: child }).finally(settle)
   }
 
   const startInitialChild = async (): Promise<void> => {
-    if (child.kind !== 'pending' || !buildsReady(builds)) return
+    if (child.kind !== 'pending' || !DevSessionStateModel.buildsReady(builds)) return
     await startChild()
   }
 
   const stopDsh = async (): Promise<void> => {
-    if (!isChildRunning(child)) {
+    if (!DevSessionStateModel.isChildRunning(child)) {
       if (child.kind !== 'failed') return
-      child = transitionChild(child, { kind: 'stopped' })
+      child = DevSessionStateModel.transitionChild(child, { kind: 'stopped' })
       publish()
       return
     }
     const target = currentChild()
-    child = transitionChild(child, { kind: 'stopped' })
+    child = DevSessionStateModel.transitionChild(child, { kind: 'stopped' })
     publish()
     if (target !== undefined) await stopChild(target)
   }
 
   const restartInternal = async (): Promise<void> => {
-    if (isClosed(lifecycle) || reload.kind !== 'idle') return
+    if (DevSessionStateModel.isClosed(lifecycle) || reload.kind !== 'idle') return
     await stopDsh()
     await startChild(true)
   }
@@ -319,16 +305,16 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
   }
 
   const handleBuildEvent = async (generation: number, face: DevFace, event: DevBuildEvent): Promise<void> => {
-    if (isClosed(lifecycle) || reload.kind !== 'idle') return
+    if (DevSessionStateModel.isClosed(lifecycle) || reload.kind !== 'idle') return
     if (event.code === 'START' || event.code === 'BUNDLE_START') {
-      const advanced = advanceBuild(builds, { generation, face, kind: 'begin' })
+      const advanced = DevSessionStateModel.advanceBuild(builds, { generation, face, kind: 'begin' })
       if (advanced === undefined) return
       builds = advanced.builds
       publish()
       return
     }
     if (event.code === 'ERROR') {
-      const advanced = advanceBuild(builds, { generation, face, kind: 'failed' })
+      const advanced = DevSessionStateModel.advanceBuild(builds, { generation, face, kind: 'failed' })
       if (advanced === undefined) return
       builds = advanced.builds
       publish()
@@ -344,12 +330,12 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
       return
     }
     if (event.code !== 'BUNDLE_END') return
-    const advanced = advanceBuild(builds, { generation, face, kind: 'succeeded' })
+    const advanced = DevSessionStateModel.advanceBuild(builds, { generation, face, kind: 'succeeded' })
     if (advanced === undefined) return
     builds = advanced.builds
     publish()
     emit({ type: 'build-success', face, initial: advanced.initial })
-    if (!advanced.initial && isChildRunning(child)) {
+    if (!advanced.initial && DevSessionStateModel.isChildRunning(child)) {
       if (face === 'client') {
         emit({ type: 'client-rebuilt' })
       } else if (activeProject.dev.hostHmr !== undefined) {
@@ -358,7 +344,7 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
         await restart()
       } else {
         if (child.kind === 'running') {
-          child = transitionChild(child, { kind: 'restart-required' })
+          child = DevSessionStateModel.transitionChild(child, { kind: 'restart-required' })
           publish()
         }
         emit({ type: 'host-restart-required' })
@@ -489,11 +475,11 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
     try {
       const resolver = options.resolveProject ?? resolveDshxConfig
       const candidate = await resolver({ cwd: activeProject.root })
-      if (isClosed(lifecycle)) return
+      if (DevSessionStateModel.isClosed(lifecycle)) return
       const candidateProfile = await ensureProfile(candidate, profileOptions)
-      if (isClosed(lifecycle)) return
+      if (DevSessionStateModel.isClosed(lifecycle)) return
       const candidateBuildPaths = buildOptions(candidate, candidateProfile.dsh.compatibility)
-      candidateWatchers = await createCompilerWatchers(candidate, candidateBuildPaths, nextBuildGeneration(builds))
+      candidateWatchers = await createCompilerWatchers(candidate, candidateBuildPaths, DevSessionStateModel.nextBuildGeneration(builds))
       try {
         candidateProjectWatcher = await createProjectWatcher(candidate)
       } catch (error) {
@@ -501,20 +487,20 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
         candidateWatchers = undefined
         throw error
       }
-      if (isClosed(lifecycle)) {
+      if (DevSessionStateModel.isClosed(lifecycle)) {
         await discardCandidates(candidateWatchers, candidateProjectWatcher)
         return
       }
 
       await restartQueue.catch(() => undefined)
-      if (isClosed(lifecycle)) {
+      if (DevSessionStateModel.isClosed(lifecycle)) {
         await discardCandidates(candidateWatchers, candidateProjectWatcher)
         return
       }
       if (activeWatchers !== undefined) await closeCompilerWatchers(activeWatchers)
       await stopDsh()
       await closeProjectWatcher()
-      if (isClosed(lifecycle)) {
+      if (DevSessionStateModel.isClosed(lifecycle)) {
         await discardCandidates(candidateWatchers, candidateProjectWatcher)
         return
       }
@@ -525,8 +511,8 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
       projectWatcher = candidateProjectWatcher
       candidateWatchers = undefined
       candidateProjectWatcher = undefined
-      builds = nextBuilds(builds, facesOf(candidate))
-      child = transitionChild(child, { kind: 'reset' })
+      builds = DevSessionStateModel.nextBuilds(builds, facesOf(candidate))
+      child = DevSessionStateModel.transitionChild(child, { kind: 'reset' })
       publish()
       activateCompilerWatchers(activeWatchers)
       for (const item of candidateProfile.diagnostics) emitDiagnostic(item)
@@ -534,7 +520,7 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
       await startInitialChild()
     } catch (error) {
       await discardCandidates(candidateWatchers, candidateProjectWatcher)
-      if (isClosed(lifecycle)) return
+      if (DevSessionStateModel.isClosed(lifecycle)) return
       const file = error instanceof DshxError && error.file !== undefined ? error.file : changedFile
       emitDiagnostic(
         diagnostic(
@@ -548,19 +534,19 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
   }
 
   const drainProjectReloads = async (): Promise<void> => {
-    while (!isClosed(lifecycle)) {
-      const started = beginReload(reload)
+    while (!DevSessionStateModel.isClosed(lifecycle)) {
+      const started = DevSessionStateModel.beginReload(reload)
       if (started === undefined) return
       reload = started.phase
       await reloadProject(started.changedFile)
-      reload = finishReload(reload)
+      reload = DevSessionStateModel.finishReload(reload)
     }
   }
 
   function requestProjectReload(file: string): void {
-    if (isClosed(lifecycle)) return
+    if (DevSessionStateModel.isClosed(lifecycle)) return
     const idle = reload.kind === 'idle'
-    reload = requestReload(reload, file)
+    reload = DevSessionStateModel.requestReload(reload, file)
     if (!idle) return
     reloadCompletion = drainProjectReloads()
     void reloadCompletion.catch(() => undefined)
@@ -590,9 +576,9 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
     },
     restart,
     async close() {
-      if (isClosed(lifecycle)) return
+      if (DevSessionStateModel.isClosed(lifecycle)) return
       lifecycle = 'closing'
-      reload = initialReload
+      reload = DevSessionStateModel.initialReload
       await closeProjectWatcher()
       await reloadCompletion.catch(() => undefined)
       if (activeWatchers !== undefined) await closeCompilerWatchers(activeWatchers)
@@ -600,7 +586,7 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
       if (child.kind === 'starting') await child.completion.catch(() => undefined)
       await restartQueue.catch(() => undefined)
       await stopDsh()
-      child = transitionChild(child, { kind: 'ended' })
+      child = DevSessionStateModel.transitionChild(child, { kind: 'ended' })
       lifecycle = 'closed'
       publish()
     },

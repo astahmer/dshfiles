@@ -31,6 +31,20 @@ const text = (value: string): QueuedBlock => ({ type: 'text', text: value })
 const image = (name: string): QueuedBlock => ({ type: 'image', attachment: { attachmentId: `stored:${name}`, mediaType: 'image/png', name } })
 const file = (name: string): QueuedBlock => ({ type: 'file', attachment: { attachmentId: `stored:${name}`, name, bytes: 3 } })
 
+/** The in-memory DSH the tests drive: queue rows, the composer draft, and the attachments both share. */
+interface FakeWorld {
+  running: boolean
+  failNextSubmit: boolean
+  rows: RawRow[]
+  started: RawRow[]
+  pending: string[]
+  composer: { draft: string; attachmentIds: string[]; idle: boolean }
+  drafts: Map<string, File>
+  released: string[]
+  stored: Map<string, File>
+  records: QueueEditRecord | null
+}
+
 /**
  * A working in-memory DSH: a queue that drains when a turn ends, a composer that sends through pending submissions
  * like the real one, and draft attachments backed by real `File`s.
@@ -41,17 +55,22 @@ const createWorld = (options: { readonly running?: boolean } = {}) => {
   const composerSubject = subject()
   let sequence = 0
   const nextId = (prefix: string) => `${prefix}-${(sequence += 1)}`
-  const world = {
+  const rows: RawRow[] = []
+  const started: RawRow[] = []
+  const pending: string[] = []
+  const released: string[] = []
+  const attachmentIds: string[] = []
+  const world: FakeWorld = {
     running: options.running ?? true,
     failNextSubmit: false,
-    rows: [] as RawRow[],
-    started: [] as RawRow[],
-    pending: [] as string[],
-    composer: { draft: '', attachmentIds: [] as string[], idle: true },
+    rows,
+    started,
+    pending,
+    composer: { draft: '', attachmentIds, idle: true },
     drafts: new Map<string, File>(),
-    released: [] as string[],
+    released,
     stored: new Map<string, File>(),
-    records: null as QueueEditRecord | null,
+    records: null,
   }
 
   const toBlock = (draftFile: File): QueuedBlock =>

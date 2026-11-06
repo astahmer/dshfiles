@@ -231,6 +231,7 @@ describe('createWorkspaceFileIndex relist bursts', () => {
         await vi.advanceTimersByTimeAsync(3)
       }
       await vi.advanceTimersByTimeAsync(200)
+      // SAFETY: `arrayContaining` is an asymmetric matcher, so `toMatchObject` reads it as an unknown partial.
       await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ files: expect.arrayContaining(['d0/b.ts', 'd29/b.ts']) as unknown }))
       expect(replies.at(-1)).toMatchObject({ status: 'ready', truncated: false })
 
@@ -243,6 +244,7 @@ describe('createWorkspaceFileIndex relist bursts', () => {
       d0['c.ts'] = 'file'
       emit('d0')
       await vi.advanceTimersByTimeAsync(200)
+      // SAFETY: `arrayContaining` is an asymmetric matcher, so `toMatchObject` reads it as an unknown partial.
       await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ files: expect.arrayContaining(['d0/c.ts']) as unknown }))
       stop()
       index.dispose()
@@ -315,6 +317,7 @@ describe('createWorkspaceFileIndex walk and relist overlap', () => {
       gateNextD0 = true
       index.request('ses_1', reply => replies.push(reply))
       await release()
+      // SAFETY: `arrayContaining` is an asymmetric matcher, so `toMatchObject` reads it as an unknown partial.
       await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ status: 'ready', files: expect.arrayContaining(['d0/old.ts']) as unknown }))
 
       clock = 60_000
@@ -330,6 +333,7 @@ describe('createWorkspaceFileIndex walk and relist overlap', () => {
 
       // The walk read d0 before the change, so only a trailing relist can show the new file.
       await release()
+      // SAFETY: `arrayContaining` is an asymmetric matcher, so `toMatchObject` reads it as an unknown partial.
       await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ status: 'ready', files: expect.arrayContaining(['d0/new.ts']) as unknown }))
       index.dispose()
     } finally {

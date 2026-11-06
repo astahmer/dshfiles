@@ -98,6 +98,12 @@ const GroupLoadMoreSentinel = (props: { readonly enabled: boolean; readonly rese
 
 type ToneClasses = { readonly solid: string; readonly text: string; readonly chip: string; readonly dot: string }
 
+/** The one-line notice a queued integration shows, in the tone its outcome earns. */
+interface IntegrationNotice {
+  readonly tone: 'default' | 'destructive'
+  readonly text: string
+}
+
 const toneClasses = {
   conflicts: {
     solid: 'dshx:bg-destructive',
@@ -868,7 +874,7 @@ export const ThreadWorkspacesPanel = (props: {
   })
   const integrationJobs = queueSnapshot.context.jobs
   const integrationNotice = queueSnapshot.context.notice
-  const noticeOf = (pending: NonNullable<typeof integrationNotice>): { tone: 'default' | 'destructive'; text: string } => {
+  const noticeOf = (pending: NonNullable<typeof integrationNotice>): IntegrationNotice => {
     if (pending.kind === 'queued') return { tone: 'default', text: t('integrationQueuedHint', { bookmark: props.bookmark }) }
     if (pending.kind === 'failed') return { tone: 'destructive', text: pending.message.length > 0 ? pending.message : t('loadFailed') }
     if (pending.result.status === 'nothing-to-land') return { tone: 'default', text: t('upToDateNoChanges') }

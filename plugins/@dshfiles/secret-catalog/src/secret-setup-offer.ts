@@ -23,13 +23,6 @@ const withRequirement = (state: SecretSetupOfferState, id: string, requirement: 
   requirements: { ...state.requirements, [id]: requirement },
 })
 
-const withoutRequirement = (state: SecretSetupOfferState, id: string): SecretSetupOfferState => {
-  if (state.requirements[id] === undefined) return state
-  const requirements = { ...state.requirements }
-  delete requirements[id]
-  return { ...state, requirements }
-}
-
 /** A closed panel keeps a form's stored reference as that requirement's retry, and nothing else. */
 const release = (requirement: SecretSetupRequirement): SecretSetupRequirement => {
   if (requirement.kind !== 'editing') return requirement
@@ -42,7 +35,7 @@ export const SecretSetupOffer = {
   initial: (): SecretSetupOfferState => ({ panel: 'closed', requirements: {} }),
 
   open: (input: { readonly state: SecretSetupOfferState; readonly ids: readonly string[] }): SecretSetupOfferState => {
-    const requirements: Record<string, SecretSetupRequirement> = { ...input.state.requirements }
+    const requirements = { ...input.state.requirements }
     for (const id of input.ids) requirements[id] ??= { kind: 'offered', createdReference: null }
     return { panel: 'open', requirements }
   },

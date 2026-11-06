@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineApi, method } from '../src/api/index.js'
 import { ApiClientLifecycle, useApiQuery } from '../src/api/client.js'
 import type { ApiQueryResult } from '../src/api/types.js'
+import type { JsonValue } from '../src/json.js'
 
 interface TestRoot {
   render(node: ReturnType<typeof createElement>): void
@@ -28,12 +29,12 @@ const queryApi = defineApi({
 
 /** A Connection whose reads settle only when the test says so, with a Host generation the test can replace. */
 const connectionFixture = () => {
-  const calls: Array<{ readonly resolve: (value: unknown) => void }> = []
+  const calls: Array<{ readonly resolve: (reply: JsonValue) => void }> = []
   let generation: { readonly id: number } | undefined = { id: 1 }
   const listeners = new Set<() => void>()
   const connection = {
     rpc: {
-      call: (_channel: string, _endpoint: string, _request: unknown, _signal?: AbortSignal) =>
+      call: (_channel: string, _endpoint: string, _request: JsonValue | undefined, _signal?: AbortSignal) =>
         new Promise<unknown>(resolve => {
           calls.push({ resolve })
         }),
@@ -86,43 +87,43 @@ describe('useApiQuery', () => {
 
   it('reads on a manual refetch of a disabled query, then reports idle', async () => {
     const fixture = connectionFixture()
-    let latest!: ApiQueryResult<number>
+    const latest: { current: ApiQueryResult<number> | undefined } = { current: undefined }
     const Read = () => {
-      latest = useApiQuery(queryApi, 'read', { enabled: false })
-      return createElement('span', null, latest.status)
+      latest.current = useApiQuery(queryApi, 'read', { enabled: false })
+      return createElement('span', null, latest.current!.status)
     }
     await mount(fixture, Read)
-    expect(latest.status).toBe('pending')
-    expect(latest.fetchStatus).toBe('idle')
+    expect(latest.current!.status).toBe('pending')
+    expect(latest.current!.fetchStatus).toBe('idle')
     expect(fixture.calls).toHaveLength(0)
 
     await act(async () => {
-      latest.refetch()
+      latest.current!.refetch()
     })
     await flush()
     expect(fixture.calls).toHaveLength(1)
-    expect(latest.fetchStatus).toBe('fetching')
+    expect(latest.current!.fetchStatus).toBe('fetching')
 
     await act(async () => {
       fixture.resolveLast(7)
     })
     await flush()
-    expect(latest.status).toBe('success')
-    expect(latest.fetchStatus).toBe('idle')
-    expect(latest.data).toBe(7)
+    expect(latest.current!.status).toBe('success')
+    expect(latest.current!.fetchStatus).toBe('idle')
+    expect(latest.current!.data).toBe(7)
     expect(container.textContent).toBe('success')
   })
 
   it('resumes an unanswered manual read on the next Host generation, then stops asking once it settled', async () => {
     const fixture = connectionFixture()
-    let latest!: ApiQueryResult<number>
+    const latest: { current: ApiQueryResult<number> | undefined } = { current: undefined }
     const Read = () => {
-      latest = useApiQuery(queryApi, 'read', { enabled: false })
-      return createElement('span', null, String(latest.data))
+      latest.current = useApiQuery(queryApi, 'read', { enabled: false })
+      return createElement('span', null, String(latest.current!.data))
     }
     await mount(fixture, Read)
     await act(async () => {
-      latest.refetch()
+      latest.current!.refetch()
     })
     await flush()
     expect(fixture.calls).toHaveLength(1)
@@ -131,37 +132,37 @@ describe('useApiQuery', () => {
       fixture.setGeneration(undefined)
     })
     await flush()
-    expect(latest.fetchStatus).toBe('paused')
+    expect(latest.current!.fetchStatus).toBe('paused')
 
     await act(async () => {
       fixture.setGeneration({ id: 2 })
     })
     await flush()
     expect(fixture.calls).toHaveLength(2)
-    expect(latest.fetchStatus).toBe('fetching')
+    expect(latest.current!.fetchStatus).toBe('fetching')
 
     await act(async () => {
       fixture.resolveLast(9)
     })
     await flush()
-    expect(latest.status).toBe('success')
-    expect(latest.data).toBe(9)
+    expect(latest.current!.status).toBe('success')
+    expect(latest.current!.data).toBe(9)
 
     await act(async () => {
       fixture.setGeneration({ id: 3 })
     })
     await flush()
     expect(fixture.calls).toHaveLength(2)
-    expect(latest.fetchStatus).toBe('idle')
+    expect(latest.current!.fetchStatus).toBe('idle')
     expect(container.textContent).toBe('9')
   })
 
   it('pauses a read when its Host generation goes away and reads it again on the next one', async () => {
     const fixture = connectionFixture()
-    let latest!: ApiQueryResult<number>
+    const latest: { current: ApiQueryResult<number> | undefined } = { current: undefined }
     const Read = () => {
-      latest = useApiQuery(queryApi, 'read')
-      return createElement('span', null, `${String(latest.data)}|${latest.fetchStatus}`)
+      latest.current = useApiQuery(queryApi, 'read')
+      return createElement('span', null, `${String(latest.current!.data)}|${latest.current!.fetchStatus}`)
     }
     await mount(fixture, Read)
     expect(fixture.calls).toHaveLength(1)
@@ -169,28 +170,28 @@ describe('useApiQuery', () => {
       fixture.resolveLast(3)
     })
     await flush()
-    expect(latest.status).toBe('success')
-    expect(latest.data).toBe(3)
+    expect(latest.current!.status).toBe('success')
+    expect(latest.current!.data).toBe(3)
 
     await act(async () => {
       fixture.setGeneration(undefined)
     })
     await flush()
-    expect(latest.fetchStatus).toBe('paused')
-    expect(latest.data).toBe(3)
+    expect(latest.current!.fetchStatus).toBe('paused')
+    expect(latest.current!.data).toBe(3)
 
     await act(async () => {
       fixture.setGeneration({ id: 2 })
     })
     await flush()
     expect(fixture.calls).toHaveLength(2)
-    expect(latest.fetchStatus).toBe('fetching')
+    expect(latest.current!.fetchStatus).toBe('fetching')
     await act(async () => {
       fixture.resolveLast(4)
     })
     await flush()
-    expect(latest.data).toBe(4)
-    expect(latest.fetchStatus).toBe('idle')
+    expect(latest.current!.data).toBe(4)
+    expect(latest.current!.fetchStatus).toBe('idle')
     expect(container.textContent).toBe('4|idle')
   })
 })

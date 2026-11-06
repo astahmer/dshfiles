@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest'
 import type { AccountConnectionSnapshot } from './api.js'
 import { AccountSetupPhaseModel, type SetupEvent, type SetupPhase } from './account-setup-phase.js'
 
+// SAFETY: the phase model only joins or discards this work, never reading the snapshot it resolves.
 const work = (): Promise<AccountConnectionSnapshot> => Promise.resolve({} as AccountConnectionSnapshot)
 
 const pending = (): SetupPhase => ({ kind: 'pending' })
 const configuring = (): SetupPhase => ({ kind: 'configuring', configuration: work() })
 const verifying = (): SetupPhase => ({ kind: 'verifying', completion: work() })
 const committing = (): SetupPhase => ({ kind: 'committing', completion: work() })
-const discarded = (): SetupPhase => ({ kind: 'discarded', joining: undefined, cleaned: false, cleanup: undefined, resourceCleanup: undefined })
+type DiscardedPhase = Extract<SetupPhase, { kind: 'discarded' }>
+const discarded = (): DiscardedPhase => ({ kind: 'discarded', joining: undefined, cleaned: false, cleanup: undefined, resourceCleanup: undefined })
 
 const events: readonly SetupEvent[] = [
   { kind: 'configure', configuration: work() },
@@ -64,7 +66,8 @@ describe('account setup operation phase', () => {
   })
 
   it('ignores every event once an operation is complete or discarded', () => {
-    for (const terminal of [{ kind: 'complete' } as SetupPhase, { ...discarded(), cleaned: true } as SetupPhase]) {
+    const terminals: readonly SetupPhase[] = [{ kind: 'complete' }, { ...discarded(), cleaned: true }]
+    for (const terminal of terminals) {
       for (const event of events) expect(AccountSetupPhaseModel.transition(terminal, event)).toBe(terminal)
     }
   })

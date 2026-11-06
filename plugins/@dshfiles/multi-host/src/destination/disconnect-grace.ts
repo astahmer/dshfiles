@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer } from 'react'
+import { useEffect, useMemo, useReducer, useState } from 'react'
 
 type HostTone = 'online' | 'idle' | 'error'
 type HostToneState = { readonly tone: HostTone; readonly label: string }
@@ -42,10 +42,14 @@ export const graceDisplay = (input: { readonly state: HostToneState; readonly ph
 /** The host state, reading as reconnecting while a host that was online moments ago starts failing. */
 const useDisconnectGrace = (state: HostToneState): HostToneState => {
   const [phase, dispatch] = useReducer(graceTransition, UNSEEN)
+  // The render reads the last observed time only; the observations themselves happen in the effects below.
+  const [now, setNow] = useState(0)
   // Every online observation moves the window: a host that keeps answering keeps the full grace period.
   useEffect(() => {
-    if (state.tone === 'online') dispatch({ kind: 'online', at: Date.now() })
-    else if (state.tone === 'error') dispatch({ kind: 'failure', at: Date.now() })
+    const at = Date.now()
+    setNow(at)
+    if (state.tone === 'online') dispatch({ kind: 'online', at })
+    else if (state.tone === 'error') dispatch({ kind: 'failure', at })
   }, [state.tone, state.label])
   useEffect(() => {
     if (state.tone !== 'error' || phase.phase !== 'grace') return
@@ -58,7 +62,7 @@ const useDisconnectGrace = (state: HostToneState): HostToneState => {
       clearTimeout(timer)
     }
   }, [state.tone, phase])
-  return useMemo(() => graceDisplay({ state, phase, now: Date.now() }), [state, phase])
+  return useMemo(() => graceDisplay({ state, phase, now }), [state, phase, now])
 }
 
 export class DisconnectGrace {

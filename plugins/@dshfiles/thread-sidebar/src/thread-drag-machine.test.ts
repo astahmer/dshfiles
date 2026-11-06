@@ -1,4 +1,4 @@
-import { createActor, waitFor } from '@dshfiles/plugin-ui/machine'
+import { createActor } from '@dshfiles/plugin-ui/machine'
 import { describe, expect, it, vi } from 'vitest'
 import { threadDragMachine } from './thread-drag-machine.js'
 

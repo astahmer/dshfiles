@@ -8,7 +8,7 @@ import { decodeJson, jsonValueSchema } from '../json.js'
 
 interface EventSourceLike {
   readonly readyState: number
-  onmessage: ((event: { readonly data: unknown }) => void) | null
+  onmessage: ((event: { readonly data: string }) => void) | null
   onerror: (() => void) | null
   close(): void
 }
@@ -77,11 +77,11 @@ const notifyStatus = (hub: EventHub): void => {
 const isCurrentSource = (hub: EventHub, source: EventSourceLike): boolean =>
   (hub.state.kind === 'connecting' || hub.state.kind === 'live') && hub.state.source === source
 
-const receive = (hub: EventHub, source: EventSourceLike, raw: unknown): void => {
+const receive = (hub: EventHub, source: EventSourceLike, raw: string): void => {
   if (!isCurrentSource(hub, source)) return
   let parsed: unknown
   try {
-    parsed = typeof raw === 'string' ? decodeJson(jsonValueSchema, raw) : undefined
+    parsed = decodeJson(jsonValueSchema, raw)
   } catch {
     return
   }
@@ -148,9 +148,10 @@ const subscribeApiEvent = <
     deliver: frame => {
       if (frame.version !== target.contract.version) return
       ApiProtocolModel.validate(definition.schema, frame.data).then(
-        // SAFETY: the event's own schema produced this value, which is its client payload type.
         payload => {
-          if (active) handlers.onEvent(payload as ApiEventClientPayload<Events[K]>)
+          // SAFETY: the event's own schema produced this value, which is its client payload type.
+          const eventPayload = payload as ApiEventClientPayload<Events[K]>
+          if (active) handlers.onEvent(eventPayload)
         },
         cause => console.warn(`dshx: dropped ${target.contract.id} event ${event}`, cause),
       )
