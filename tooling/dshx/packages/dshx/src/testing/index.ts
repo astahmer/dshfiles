@@ -102,12 +102,14 @@ export function provideTestConnection(ctx: Context): TestConnection {
       peer,
     )
   return {
-    /** Routes the mounted plugins registered, without the registry listing, browser-traces and plugin-storage APIs and event stream dshx serves on the first one's behalf. */
+    /** Routes the mounted plugins registered, without the registry listing, browser-traces and plugin-storage APIs, event stream and batch route dshx serves on the first one's behalf. */
     get routeCount() {
       const dshxPrefixes = [ApiDefinitionModel.registryApi.id, BROWSER_TRACES_API.id, PluginStorageContract.api.id].map(
         apiId => `/api${ApiChannelModel.apiChannel(ApiDefinitionModel.registryOwner, apiId)}/`,
       )
-      return [...routes.keys()].filter(path => path !== ApiChannelModel.eventsPath && !dshxPrefixes.some(prefix => path.startsWith(prefix))).length
+      return [...routes.keys()].filter(
+        path => path !== ApiChannelModel.eventsPath && path !== ApiChannelModel.batchPath && !dshxPrefixes.some(prefix => path.startsWith(prefix)),
+      ).length
     },
     requestApi: ({ packageId, apiId, method, version, input }) =>
       requestRpc({ endpoint: `${ApiChannelModel.apiChannel(packageId, apiId).slice(1)}/${method}`, payload: { version, input } }),

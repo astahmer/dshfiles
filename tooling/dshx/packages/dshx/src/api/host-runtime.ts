@@ -22,6 +22,7 @@ import { apiKey, apiRegistry, type ApiDispatch, type ApiRegistry, type Registere
 import { publishedJsonSchema, toToolSchema } from './json-schema.js'
 import { resolveApiSchema } from './schema.js'
 import { HostApiEventsModel } from './host-events.js'
+import { HostApiBatchModel } from './host-batch.js'
 import { TracerModel } from '../tracing/tracer.js'
 import { TraceparentModel } from '../tracing/traceparent.js'
 import { BrowserTracesIngest } from '../tracing/browser-ingest.js'
@@ -442,6 +443,19 @@ async function mountEvents(ctx: Context, registry: ApiRegistry): Promise<() => P
   }
 }
 
+/** Batched browser reads ride with the registry too: one route per process, served by the leader. */
+function mountBatch(ctx: Context, registry: ApiRegistry): () => Promise<void> {
+  // SAFETY: the `connection` service is the DSH Connection handle or absent; its register is checked before use.
+  const connection = ctx.get('connection') as HostConnectionHandle | undefined
+  if (connection?.fetch?.register === undefined) return async () => undefined
+  try {
+    return connection.fetch.register(HostApiBatchModel.route(registry, connection))
+  } catch (cause) {
+    warn(ctx, `dshx registry: batched API reads are not served: ${describeFailure(cause)}`)
+    return async () => undefined
+  }
+}
+
 /** Plugin storage rides with the registry: one API per process, and every write of the domain becomes a `changed` event. */
 async function mountStorage(ctx: Context): Promise<() => Promise<void>> {
   let mounted: Awaited<ReturnType<typeof mountApi>>
@@ -477,6 +491,7 @@ async function lead(registry: ApiRegistry): Promise<void> {
     const unmount = (await mountApi(member.ctx, ApiDefinitionModel.registryOwner, registration)).dispose
     const unmountBrowserTraces = await mountBrowserTraces(member.ctx)
     const unmountEvents = await mountEvents(member.ctx, registry)
+    const unmountBatch = mountBatch(member.ctx, registry)
     const unmountStorage = await mountStorage(member.ctx)
     const tools = toolsOf(member.ctx)
     const unregister = tools?.register(capabilitiesTool(registry))
@@ -487,6 +502,7 @@ async function lead(registry: ApiRegistry): Promise<void> {
         // The tools layer may already have released it with the Host fiber.
       }
       await unmountStorage()
+      await unmountBatch()
       await unmountEvents()
       await unmountBrowserTraces()
       await unmount()

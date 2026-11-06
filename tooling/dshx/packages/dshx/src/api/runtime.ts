@@ -7,6 +7,7 @@ import type { BrowserSpan } from '../tracing/browser.js'
 import { BrowserTracingRegistryModel } from '../tracing/browser-registry.js'
 import { TraceparentModel } from '../tracing/traceparent.js'
 import { ApiChannelModel } from './channel.js'
+import { ApiBatchModel } from './client-batch.js'
 
 type RpcResult =
   | { readonly ok: true; readonly value: unknown }
@@ -119,6 +120,13 @@ const coalesce = (calls: Map<string, InflightCall>, key: string, request: (signa
   })
 }
 
+/** A read joins the page's batch when there is one; it keeps its own route otherwise, and as the batch's fallback. */
+const sendRead = (rpc: Pick<ClientConnectionRpc, 'call'>, endpoint: string, request: unknown, signal: AbortSignal): Promise<RpcResult> => {
+  const alone = (callSignal: AbortSignal | undefined): Promise<RpcResult> => rpc.call('/api', endpoint, request, callSignal)
+  const batcher = ApiBatchModel.page()
+  return batcher === undefined ? alone(signal) : batcher.call({ endpoint, payload: request, signal, send: alone })
+}
+
 const decodeRemoteDetails = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown))
 
 function errorFromRemote(result: Extract<RpcResult, { readonly ok: false }>, apiId: string, method: string): ApiError {
@@ -170,7 +178,7 @@ function createApiClient<
         ? await coalesce(
             inflightCalls(rpc),
             `${endpoint}\0${contract.version}\0${ApiProtocolModel.stableJson(payload)}`,
-            signal => rpc.call('/api', endpoint, request, signal),
+            signal => sendRead(rpc, endpoint, request, signal),
             options?.signal,
           ).then(shared => {
             if (shared.joined) span?.setAttribute('dshx.api.coalesced', true)

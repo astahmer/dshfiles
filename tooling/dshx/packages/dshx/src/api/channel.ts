@@ -22,6 +22,9 @@ export class ApiChannelModel {
   /** The one browser event stream of a DSH process, below Connection's authenticated `/api` channel. */
   static readonly eventsPath = '/api/dshx-events'
 
+  /** The one batched-read route of a DSH process: many read calls in one POST, one NDJSON answer line per call. */
+  static readonly batchPath = '/api/dshx-batch'
+
   /** `<channel>/<event>`: the key a browser subscribes to, unique per owner, API and event. */
   static eventKey(owner: string, apiId: string, event: string): string {
     return `${ApiChannelModel.apiChannel(owner, apiId).slice(1)}/${event}`
