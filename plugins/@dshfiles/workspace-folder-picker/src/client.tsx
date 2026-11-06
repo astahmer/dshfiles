@@ -27,6 +27,12 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
   const lifecycleApi = useApi(projectLifecycleApi)
   const [view, setView] = useState<DirectoryFlowView>('browse')
   const tools = useQuery({ queryKey: ['workspace-folder-picker', 'project-tools'], queryFn: () => lifecycleApi.tools({}), retry: false, staleTime: 60_000 })
+  const pickerCapabilities = useQuery({
+    queryKey: ['workspace-folder-picker', 'capabilities'],
+    queryFn: ({ signal }) => browserApi.capabilities({}, { signal }),
+    retry: false,
+    staleTime: 60_000,
+  })
   const directoryPicker: DirectoryPickerPort = {
     pick: signal => props.directoryPicker.pick(signal),
     list: (path, signal) => browserApi.list(path === undefined ? {} : { path }, { signal }),
@@ -73,7 +79,8 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
       disabled={props.busy}
       headerActions={addActions}
       mode="directories"
-      showNativePicker={false}
+      showNativePicker={pickerCapabilities.data?.nativePicker === true}
+      pathStyle={pickerCapabilities.data?.pathStyle}
       onClose={props.onCancel}
       onRegisterWorkspace={props.registerWorkspace}
       onUseAbsolutePath={props.onPicked}

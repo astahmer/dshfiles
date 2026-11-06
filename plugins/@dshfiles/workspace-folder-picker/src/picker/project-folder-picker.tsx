@@ -25,7 +25,7 @@ import { ChevronDownIcon, FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon, X
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { ProjectFolderPickerModel, type PickerEntry, type PickerSectionId, type PickerTab } from './project-folder-picker-model.js'
+import { ProjectFolderPickerModel, type PathStyle, type PickerEntry, type PickerSectionId, type PickerTab } from './project-folder-picker-model.js'
 
 export interface RegisteredProject {
   readonly workspaceId: string
@@ -64,6 +64,8 @@ export interface ProjectFolderPickerProps {
   readonly onClose: () => void
   readonly mode?: 'projects' | 'directories'
   readonly showNativePicker?: boolean
+  /** How the Host spells paths, when the caller knows it; otherwise the listed home folder decides, and POSIX before any listing. */
+  readonly pathStyle?: PathStyle | undefined
   readonly disabled?: boolean
   readonly loading?: boolean
   readonly heading?: string
@@ -134,13 +136,21 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const [browseTarget, setBrowseTarget] = useState<{ readonly path: string | undefined } | null>(() => ProjectFolderPickerModel.initialBrowseTarget(props.mode))
   const pickRequest = useRef<AbortController | null>(null)
   const searchInput = useRef<HTMLInputElement | null>(null)
-  const pathMode = props.mode === 'directories' || ProjectFolderPickerModel.isPathQuery(query)
+  const listingQuery = useQuery({
+    queryKey: ['project-folder-picker', 'list', browseTarget?.path ?? null],
+    queryFn: ({ signal }) => props.directoryPicker.list(browseTarget?.path, signal),
+    enabled: browseTarget !== null,
+    placeholderData: keepPreviousData,
+    retry: false,
+  })
+  const pathStyle = props.pathStyle ?? (listingQuery.data === undefined ? 'posix' : ProjectFolderPickerModel.pathStyleOf(listingQuery.data.home))
+  const pathMode = props.mode === 'directories' || ProjectFolderPickerModel.isPathQuery(query, pathStyle)
   const [tab, setTab] = useState<PickerTab>(props.initialTab ?? 'projects')
   const recentFolders = props.recentFolders ?? noRecentFolders
   const pinnedWorkspaceIds = props.pinnedWorkspaceIds ?? noPinnedWorkspaces
   const sections = useMemo(
-    () => ProjectFolderPickerModel.pickerSections({ projects: props.projects, recentFolders, pinnedWorkspaceIds, query, tab }),
-    [props.projects, recentFolders, pinnedWorkspaceIds, query, tab],
+    () => ProjectFolderPickerModel.pickerSections({ projects: props.projects, recentFolders, pinnedWorkspaceIds, query, tab, pathStyle }),
+    [props.projects, recentFolders, pinnedWorkspaceIds, query, tab, pathStyle],
   )
   const entries = useMemo(() => sections.flatMap(section => section.entries), [sections])
   const entryIndices = useMemo(() => new Map(entries.map((entry, index) => [entry, index])), [entries])
@@ -149,20 +159,13 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     [props.projects, recentFolders, pinnedWorkspaceIds],
   )
 
-  const listingQuery = useQuery({
-    queryKey: ['project-folder-picker', 'list', browseTarget?.path ?? null],
-    queryFn: ({ signal }) => props.directoryPicker.list(browseTarget?.path, signal),
-    enabled: browseTarget !== null,
-    placeholderData: keepPreviousData,
-    retry: false,
-  })
   const listing = browseTarget === null ? null : (listingQuery.data ?? null)
   const absolutePath = query.trim()
-  const hasAbsolutePath = absolutePath.startsWith('/')
-  const requestedPath = listing === null ? null : ProjectFolderPickerModel.resolvePathQuery(query, listing.home)
+  const hasAbsolutePath = ProjectFolderPickerModel.isAbsolutePath(absolutePath, pathStyle)
+  const requestedPath = listing === null ? null : ProjectFolderPickerModel.resolvePathQuery(query, listing.home, pathStyle)
   const canUseTypedPath =
     pathMode && hasAbsolutePath && listing?.path !== absolutePath && (props.mode !== 'directories' || props.onUseAbsolutePath !== undefined)
-  const showListingActions = listing !== null && (!ProjectFolderPickerModel.isPathQuery(query) || requestedPath === listing.path)
+  const showListingActions = listing !== null && (!ProjectFolderPickerModel.isPathQuery(query, pathStyle) || requestedPath === listing.path)
   const matchingFolderPaths = listing === null ? null : ProjectFolderPickerModel.matchingDirectoryPaths(listing, query)
   const matchingFolderPathSet = matchingFolderPaths === null ? null : new Set(matchingFolderPaths)
   const folderEntries = pathMode ? (listing?.entries.filter(entry => matchingFolderPathSet === null || matchingFolderPathSet.has(entry.path)) ?? []) : []
@@ -192,8 +195,8 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     createMutation.isPending ||
     removeMutation.isPending
   let error: string | null = null
-  if (pickMutation.isError) error = 'The folder picker is unavailable on this Host.'
-  else if (registerMutation.isError) error = 'This folder could not be registered as a project.'
+  if (pickMutation.isError) error = 'The native folder picker is unavailable. Paste an absolute path instead.'
+  else if (registerMutation.isError) error = 'This folder could not be registered. Check that the absolute path exists and is accessible, then retry.'
   else if (createMutation.isError) error = 'This folder could not be created.'
   else if (removeMutation.isError) error = 'This project could not be removed from the registered projects.'
   else if (listingQuery.isError) error = canUseTypedPath ? 'Folder browsing failed. You can still use this absolute path.' : 'This folder could not be opened.'
@@ -207,9 +210,9 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     const currentListing = listingQuery.data
     setQuery(currentQuery => {
       if (ProjectFolderPickerModel.matchingDirectoryPaths(currentListing, currentQuery) !== null) return currentQuery
-      return browseTarget.path === undefined && ProjectFolderPickerModel.isPathQuery(currentQuery) ? currentQuery : currentListing.path
+      return browseTarget.path === undefined && ProjectFolderPickerModel.isPathQuery(currentQuery, pathStyle) ? currentQuery : currentListing.path
     })
-  }, [listingQuery.data, listingQuery.isPlaceholderData, browseTarget])
+  }, [listingQuery.data, listingQuery.isPlaceholderData, browseTarget, pathStyle])
 
   const browse = useCallback(
     (path: string | undefined): void => {
@@ -233,7 +236,9 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     createMutation.reset()
     pickMutation.mutate(undefined, {
       onSuccess: pickedPath => {
-        if (pickedPath !== null) browse(pickedPath)
+        if (pickedPath === null) return
+        if (props.mode === 'directories') props.onSelect(ProjectFolderPickerModel.folderSelection(pickedPath))
+        else registerWorkspacePath(pickedPath)
       },
     })
   }
@@ -307,8 +312,8 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
           if (entry !== undefined) browse(entry.path)
           return
         }
-        const requestedPath = ProjectFolderPickerModel.resolvePathQuery(pathQuery, listing?.home)
-        if (ProjectFolderPickerModel.isHomeRelativePathQuery(pathQuery) && requestedPath === null) return
+        const requestedPath = ProjectFolderPickerModel.resolvePathQuery(pathQuery, listing?.home, pathStyle)
+        if (ProjectFolderPickerModel.isHomeRelativePathQuery(pathQuery, pathStyle) && requestedPath === null) return
         const path = requestedPath ?? pathQuery
         if (listing?.path !== path) {
           browse(path)
@@ -355,13 +360,13 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                 className="dshx:h-9 dshx:pl-8"
                 onChange={event => {
                   const nextQuery = event.currentTarget.value
-                  const nextPath = ProjectFolderPickerModel.resolvePathQuery(nextQuery, listing?.home)
+                  const nextPath = ProjectFolderPickerModel.resolvePathQuery(nextQuery, listing?.home, pathStyle)
                   setQuery(nextQuery)
-                  if (ProjectFolderPickerModel.isHomeRelativePathQuery(nextQuery)) {
+                  if (ProjectFolderPickerModel.isHomeRelativePathQuery(nextQuery, pathStyle)) {
                     if (listing === null || nextPath === null || !ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.path)) {
                       setBrowseTarget(current => (current !== null && current.path === undefined ? current : { path: undefined }))
                     }
-                  } else if (nextQuery.trim().startsWith('/')) {
+                  } else if (ProjectFolderPickerModel.isAbsolutePath(nextQuery, pathStyle)) {
                     if (
                       listing === null ||
                       (nextPath !== null &&
@@ -370,7 +375,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                     ) {
                       setBrowseTarget(current => (current !== null && current.path === undefined ? current : { path: undefined }))
                     }
-                  } else if (!ProjectFolderPickerModel.isPathQuery(nextQuery)) {
+                  } else if (!ProjectFolderPickerModel.isPathQuery(nextQuery, pathStyle)) {
                     setBrowseTarget(null)
                   }
                   pickMutation.reset()

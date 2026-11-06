@@ -18,6 +18,25 @@ choosing one that already exists. The New-thread project picker also lets you
 remove a project registration after confirmation; its folder and files stay on
 disk, while its threads lose their project grouping.
 
+## Native folder dialog and Windows paths
+
+**Browse…** appears when the Host's global `directoryPicker` is native (the
+desktop app). Choosing a folder in that dialog adds it as a workspace, or in the
+New-thread picker registers and selects it; cancelling changes nothing. The
+read-only `workspace_folder_browser_capabilities` agent tool reports the same
+capability, and the Host's path style, without opening the dialog. A
+browse-only Host, a Host without a picker, or an older Host that cannot answer
+the read hides **Browse…** and keeps the in-app browser and absolute-path entry.
+
+On a Windows Host, paths can be typed or pasted as drive paths
+(`C:\projects\game` or `C:/projects/game`), UNC paths (`\\server\share\game`),
+Unix-style absolute paths or home-relative paths (`~/game`, `~\game`). They
+compare case-insensitively across both separators; drive-relative (`C:game`)
+and device (`\\?\`, `\\.\`) paths are not absolute and are never browsed. The
+picker learns the Host's style from the capability read, or else from the home
+folder the Host lists. On macOS and Linux, and before the style is known, drive,
+UNC and `~\` text stays a project search, as it always was.
+
 ## Clone a repository
 
 ![Clone a repository as a project](docs/screenshots/project-clone.png)
@@ -111,11 +130,12 @@ port, and a workspace registration callback.
 
 Optional props: `title`, `machineName`, `placeholder`, `recentFolders`,
 `initialTab`, `pinnedWorkspaceIds`, `disabled`, `mode`, `showNativePicker`,
+`pathStyle` (`'windows'` or `'posix'`, when the caller knows the Host's),
 `onUseAbsolutePath`, and `onRemoveProject`. When supplied, each registered
 project has a separate remove control. It asks for confirmation before calling
 `onRemoveProject`; consumers decide how to unregister the project. The default
 `projects` mode shows registered projects and switches to browsing when the
-query starts with `/` or `~/`. A unique matching folder opens as the path is
+query is an absolute or home-relative path. A unique matching folder opens as the path is
 typed; ambiguous matches remain available for keyboard selection, and truncated
 listings never trigger a guess. Home-relative paths resolve against the Host's
 reported home directory. While an absolute query is not the current listing,
@@ -126,7 +146,8 @@ the Host-canonical path.
 registration. It offers direct path submission only when `onUseAbsolutePath` is
 provided, so the caller can validate the uncanonicalized path. Set
 `showNativePicker` to `false` when the injected Host backend has no native
-chooser.
+chooser. A native pick selects the folder in `directories` mode and registers it through
+`onRegisterWorkspace` in `projects` mode.
 
 Project mode opens on the **Projects** tab: registered projects without JJ thread
 workspaces (any project carrying `isJjWorkspace: true`). Tabs mirror the command
@@ -145,7 +166,7 @@ Selection is a discriminated union:
 - `{ kind: 'directory', canonicalPath, title }`
 
 The component filters registered projects by title/path, enters path browsing
-when the query starts with `/` or `~/`, and supports arrows, Enter, and
+when the query is an absolute or home-relative path, and supports arrows, Enter, and
 Command/Ctrl+1–9. An absolute path can also be submitted without browsing: project
 mode uses the workspace-registration callback, and directory mode calls the
 opt-in `onUseAbsolutePath` callback. The callback owner must validate and

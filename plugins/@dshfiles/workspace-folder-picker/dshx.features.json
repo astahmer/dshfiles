@@ -5,7 +5,7 @@
     {
       "id": "workspace-folder-add-flow",
       "title": "Add workspaces from the folder browser",
-      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically.",
+      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the workspace_folder_browser_capabilities agent tool reports that, with the Host's path style, without opening it.",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose workspace\"",
@@ -17,14 +17,33 @@
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Add workspace",
       "configuration": [],
-      "states": ["closed", "browsing", "selected", "busy"],
+      "states": ["closed", "browsing", "native-available", "native-unavailable", "native-cancelled", "native-failed", "selected", "busy"],
       "failureModes": [
         "Directory listing and folder creation use an authenticated Host API; workspace registration stays behind the workspace Remote API.",
         "Ambiguous or truncated path matches do not auto-browse.",
-        "The add flow does not expose registered project choices or project registration actions."
+        "The add flow does not expose registered project choices or project registration actions.",
+        "A Host without a native directory picker, or one too old to answer the capability read, hides Browse… and keeps absolute-path entry and the in-app browser.",
+        "Cancelling the native dialog changes nothing; a failed dialog keeps absolute-path entry and offers Browse… again."
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.native-capability",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/directory-capabilities.test.ts",
+          "testName": "reports the native dialog without opening it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.host-path-style",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/directory-capabilities.test.ts",
+          "testName": "reports the path style of the folders it lists"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workspace-folder-picker.native-selection",
+          "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        },
         {
           "kind": "gherkin",
           "id": "workspace-folder-picker.header-folder-mode",
@@ -40,6 +59,10 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     },
@@ -214,13 +237,15 @@
     {
       "id": "registered-project-search",
       "title": "Search projects and browse folder paths",
-      "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host, automatically enter one unique matching folder, open on a Projects scope that leaves JJ thread workspaces out, offer Everything (recents, then projects, then workspaces), Recents and Workspaces scopes, and preserve project identity in returned choices.",
+      "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host (drive and UNC paths too on a Windows Host), automatically enter one unique matching folder, open on a Projects scope that leaves JJ thread workspaces out, offer Everything (recents, then projects, then workspaces), Recents and Workspaces scopes, and preserve project identity in returned choices.",
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["empty", "matched", "selected"],
       "failureModes": [
         "An empty result remains selectable-safe.",
         "Home-relative paths resolve against the Host-reported home before listing.",
+        "Windows paths compare case-insensitively across \\ and / separators; drive-relative (C:folder) and device (\\\\?\\, \\\\.\\) paths are not treated as absolute.",
+        "Drive, UNC and ~\\ text is a path only once the Host is known to be Windows (capability read or listed home); on macOS, Linux or an unknown Host it stays a project search.",
         "A unique folder match browses automatically; ambiguous matches and truncated listings never guess.",
         "Canonical path is returned separately from display name.",
         "Unavailable JJ classification leaves rows unmarked."
@@ -244,6 +269,18 @@
           "id": "workspace-folder-picker.picker-home-relative-paths",
           "file": "plugins/@dshfiles/workspace-folder-picker/src/picker/project-folder-picker-model.test.ts",
           "testName": "resolves home-relative queries using the Host-reported home path"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.picker-windows-paths",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/picker/project-folder-picker-model.test.ts",
+          "testName": "recognizes rooted Windows paths and UNC shares without accepting drive-relative or device paths"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.picker-posix-host-paths",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/picker/project-folder-picker-model.test.ts",
+          "testName": "keeps Windows path syntax a project search on a POSIX Host"
         },
         {
           "kind": "unit-test",
