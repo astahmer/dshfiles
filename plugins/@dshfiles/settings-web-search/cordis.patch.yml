@@ -1,0 +1,5 @@
+- id: ui-settings-web-search
+  disabled: true
+- insert:
+    - id: dshfiles-settings-web-search
+      name: '@dshfiles/settings-web-search'

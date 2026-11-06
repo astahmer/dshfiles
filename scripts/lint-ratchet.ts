@@ -76,6 +76,9 @@ const astGrepVendored = [
   'plugins/@dshfiles/settings-models/src/host.ts',
   'plugins/@dshfiles/settings-models/src/onboarding-*.ts',
   'plugins/@dshfiles/settings-models/src/css-modules.d.ts',
+  'plugins/@dshfiles/settings-web-search/src/native/**',
+  'plugins/@dshfiles/settings-web-search/src/host.ts',
+  'plugins/@dshfiles/settings-web-search/src/css-modules.d.ts',
 ]
 
 const ruleCapsSchema = Schema.Record(Schema.String, Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)))

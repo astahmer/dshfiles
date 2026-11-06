@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "web-search-settings",
+      "title": "Web search settings",
+      "summary": "The native Web search plugin page (provider switch, endpoint, limits and API key) from one owned fork of the stock row. Behaviour is the native one; the credential state behind the key field is read while the page shows, once per burst of settings changes.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "click button \"Plugins\"", "expect heading \"Web search*\""],
+      "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Plugins › Web search",
+      "configuration": [],
+      "states": ["configured", "missing-key", "unavailable", "stale-while-hidden"],
+      "failureModes": [
+        "A refused credential read keeps the last answer for the reference in force, as natively.",
+        "A settings or credential change while the page is hidden marks it stale; showing it reads the credential once."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@deepseek-ai/dsh-client-ui-settings",
+          "boundary": "configForms serves the web, web-search-deepseek and web-deepseek-api sections the page edits.",
+          "deterministicFake": "Focused tests drive typed section fakes; the scratch journey uses the real settings shell."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only fork: it calls native credentials and settings Remote methods whose Host spans belong to core."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "settings-web-search.registration",
+          "file": "plugins/@dshfiles/settings-web-search/tests/registration.test.ts",
+          "testName": "registers the Web search plugin page"
+        }
+      ]
+    }
+  ]
+}

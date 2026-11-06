@@ -130,7 +130,10 @@
     "plugins/@dshfiles/settings-models/src/native/**",
     "plugins/@dshfiles/settings-models/src/host.ts",
     "plugins/@dshfiles/settings-models/src/onboarding-*.ts",
-    "plugins/@dshfiles/settings-models/src/css-modules.d.ts"
+    "plugins/@dshfiles/settings-models/src/css-modules.d.ts",
+    "plugins/@dshfiles/settings-web-search/src/native/**",
+    "plugins/@dshfiles/settings-web-search/src/host.ts",
+    "plugins/@dshfiles/settings-web-search/src/css-modules.d.ts"
   ],
   "overrides": [
     {
