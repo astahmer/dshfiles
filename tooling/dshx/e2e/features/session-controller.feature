@@ -12,3 +12,11 @@ Feature: Another plugin drives a thread through the sessions API
     Then the thread is listed and opens on the answer to that prompt
     When the plugin adds an instruction and a message that wakes the thread
     Then the woken turn answers in the open thread and its request carried the instruction
+
+  @scenario:session-controller.cli-thread-model
+  Scenario: dshx models select changes one thread's model and keeps the default
+    Given the isolated plugin composition of "@dshfiles/session-controller, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a plugin starts a titled thread with a first prompt through the sessions API
+    And dshx models select picks another Command Code model for that thread
+    Then that thread uses the picked model and the default model is unchanged

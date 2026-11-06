@@ -1,18 +1,47 @@
 import { expect, type Page } from '@playwright/test'
+import { PassThrough } from 'node:stream'
 import * as Schema from 'effect/Schema'
 import { ApiChannelModel } from '../../../packages/dshx/src/api/channel.js'
 import { ApiProtocolModel } from '../../../packages/dshx/src/api/common.js'
+import { runCli } from '../../../packages/dshx/src/cli/run.js'
+import { decodeJson } from '../../../packages/dshx/src/json.js'
+import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
 import { createScratchDirectory } from '../threads.js'
 
 const TITLE = 'Driven by a plugin'
 const FIRST_ANSWER = 'Started through the sessions API'
 const WOKEN_ANSWER = 'Woken by a plugin message'
 const INSTRUCTION = 'SESSIONS-API-E2E-INSTRUCTION: keep answers short.'
+/** A fallback Command Code model the fake provider serves, distinct from the thread's `gpt-6-luna`. */
+const PICKED_MODEL = { provider: 'commandcode_work', model: 'deepseek/deepseek-v4-flash' }
 
 const threads = new WeakMap<Page, string>()
+
+const modelSelectionSchema = Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) })
+const defaultsBeforeSelect = new WeakMap<Page, typeof modelSelectionSchema.Type>()
+const cliEnvelope = <Data extends Schema.Top>(data: Data) => Schema.Struct({ ok: Schema.Literal(true), data })
+const modelsListOutput = cliEnvelope(Schema.Struct({ default: modelSelectionSchema }))
+const modelsSelectOutput = cliEnvelope(Schema.Struct({ sessionId: Schema.String, selected: modelSelectionSchema }))
+const threadModelSnapshot = Schema.Struct({ selection: modelSelectionSchema })
+
+/** Runs the real dshx CLI against this scenario's DSH and returns its JSON output; a failing command fails the step. */
+const dshx = async (page: Page, args: readonly string[]): Promise<string> => {
+  let stdout = ''
+  let stderr = ''
+  const out = new PassThrough().on('data', chunk => (stdout += String(chunk)))
+  const err = new PassThrough().on('data', chunk => (stderr += String(chunk)))
+  const exitCode = await runCli([...args, '--url', profileFor(page).url, '--json'], {
+    io: { stdin: new PassThrough(), stdout: out, stderr: err },
+    version: 'e2e',
+  })
+  expect(exitCode, `dshx ${args.join(' ')} failed: ${stdout}${stderr}`).toBe(0)
+  return stdout
+}
+
+const defaultModel = async (page: Page) => decodeJson(modelsListOutput, await dshx(page, ['models', 'list'])).data.default
 
 const rpcResultSchema = Schema.Struct({
   result: Schema.Union([
@@ -92,6 +121,27 @@ Then('the woken turn answers in the open thread and its request carried the inst
     const first = turns.find(request => request.messages.some(message => message.text.includes(FIRST_ANSWER)))
     expect(woken?.messages.some(message => message.text.includes(INSTRUCTION))).toBe(true)
     expect(first?.messages.some(message => message.text.includes(INSTRUCTION))).toBe(false)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('dshx models select picks another Command Code model for that thread', async ({ page }: { page: Page }) => {
+  const before = await defaultModel(page)
+  expect(before).not.toMatchObject(PICKED_MODEL)
+  defaultsBeforeSelect.set(page, before)
+  const sessionId = sessionOf(page)
+  const output = decodeJson(modelsSelectOutput, await dshx(page, ['models', 'select', '--session', sessionId, PICKED_MODEL.provider, PICKED_MODEL.model]))
+  expect(output.data).toMatchObject({ sessionId, selected: PICKED_MODEL })
+})
+
+Then('that thread uses the picked model and the default model is unchanged', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'session-controller-cli-selects-thread-model', async () => {
+    const call = await connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/session-controller', apiId: 'thread-model', version: 1 })
+    const snapshot = Schema.decodeUnknownSync(threadModelSnapshot)(await call('snapshot', { sessionId: sessionOf(page) }))
+    expect(snapshot.selection).toMatchObject(PICKED_MODEL)
+  })
+  await recordAssertion(page, 'session-controller-cli-keeps-default-model', async () => {
+    expect(await defaultModel(page)).toEqual(defaultsBeforeSelect.get(page))
   })
   await finishJourneyAssertions(page)
 })
