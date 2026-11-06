@@ -11,13 +11,24 @@ Build, import-check and HMR/restart rules stay in `dsh-plugin-verify`; run that
 first when the change is a plugin.
 
 ```sh
-dshx() { fnm exec --using=22.23.3 node "$PWD/tooling/dshx/packages/dshx/dist/cli/bin.js" "$@"; }   # from the repo root
-pnpm --dir tooling/dshx --filter @dshfiles/dshx build   # once per checkout, and after changing dshx
+dshx() { fnm exec --using="$(cat .node-version)" node "$PWD/tooling/dshx/packages/dshx/dist/cli/bin.js" "$@"; }   # from the repo root
 ```
+
+A fresh JJ workspace has no `node_modules` and no `dshx` build. Prepare it once
+(and rebuild `dshx` after changing it):
+
+```sh
+pnpm install --frozen-lockfile --prefer-offline
+pnpm exec turbo run build --filter=@dshfiles/dshx --filter=@dshfiles/plugin-ui --output-logs=errors-only
+```
+
+`dev up` builds the bundles it loads itself. The core it starts is the
+checkout's `node_modules/.bin/dsh` (before `dsh` on PATH), so a prepared
+workspace needs no `DSHX_DSH_EXECUTABLE`.
 
 ## Launch
 
-If your `dsh` command is a personal launcher that rewrites HOME, set `DSHX_DSH_EXECUTABLE` to the absolute executable file of the installed stock core (not that launcher); scratch `dev`, boot checks and E2E use it for both composition and startup while keeping isolated HOME/DSH_HOME.
+Set `DSHX_DSH_EXECUTABLE` only to run another core than the checkout's (or when it has none): the absolute executable file of an installed stock core, never a personal launcher that rewrites HOME. Scratch `dev`, boot checks and E2E use it for both composition and startup while keeping isolated HOME/DSH_HOME.
 If bundled Chromium is unavailable (for example on NixOS), set `DSHX_CHROMIUM_EXECUTABLE` to an absolute installed Chrome/Chromium executable; scratch, Chromium boot checks and E2E keep their isolated profiles and headless options, while actual browser compatibility still requires a successful live pass.
 
 ```sh
