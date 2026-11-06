@@ -70,6 +70,7 @@
     "src/native/chat/external-link-opening.ts",
     "src/native/chat/follow-policy.ts",
     "src/native/chat/fold-batch.ts",
+    "src/native/chat/fold-request.ts",
     "src/native/chat/image-gallery.ts",
     "src/native/chat/markdown-image-links.ts",
     "src/native/chat/session-sidebar.test.ts",

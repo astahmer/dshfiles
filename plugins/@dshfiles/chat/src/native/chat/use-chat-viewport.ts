@@ -2,6 +2,7 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { ChatScrollPosition } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
+import { applyFoldRequest, noFoldRequest, type FoldRequest } from './fold-request.ts'
 import { createFlowMotion, type InputFoldBox, type InputFoldDriver } from './flow-motion.ts'
 import { scrollMetrics, ScrollFollow, type ViewportMetrics } from './use-scroll-follow.ts'
 export type { ViewportMetrics } from './use-scroll-follow.ts'
@@ -67,10 +68,8 @@ export class ChatViewport {
   private observation: { top: number; landing: ViewportLanding | null } = { top: 0, landing: null }
   private paging: PagingPosition | null = null
   private reader: FoldReader | null = null
-  /** The pending or running fold batch lands at the tail. */
-  private tailRequested = false
-  /** Switches the running batch to a tail landing; null while no batch runs. */
-  private retarget: (() => void) | null = null
+  /** What the pending or running fold batch owns; a running batch carries its own retarget. */
+  private fold: FoldRequest = noFoldRequest
   /** When the reader last started a scrolling gesture, and whether a pointer (a scrollbar drag) is still held. */
   private gesture = { at: Number.NEGATIVE_INFINITY, pointerHeld: false }
   /** Transition state and row callbacks owned by this viewport's attachment. */
@@ -127,8 +126,7 @@ export class ChatViewport {
     this.observer = null
     this.elements = null
     this.events = null
-    this.tailRequested = false
-    this.retarget = null
+    this.fold = noFoldRequest
     this.turns = []
     this.observation = { top: 0, landing: null }
   }
@@ -195,8 +193,9 @@ export class ChatViewport {
     // Rows still closing on CSS transitions after a batch have no batch to consume the request.
     if (this.elements === null || this.reader === null || !this.motion.inputActive()) return false
     this.interruptFollow(follow)
-    this.tailRequested = true
-    this.retarget?.()
+    const step = applyFoldRequest(this.fold, { kind: 'requestTail' })
+    this.fold = step.request
+    if (step.retarget && this.fold.status === 'running') this.fold.retarget()
     return true
   }
 
@@ -254,8 +253,7 @@ export class ChatViewport {
     return {
       begin: (boxes) => {
         // Own input lands at the tail; otherwise an unsampled reading movement outranks follow intent.
-        tail = this.tailRequested || (follow.active && !reader.pending())
-        this.tailRequested = false
+        tail = this.fold.status === 'requested' || (follow.active && !reader.pending())
         viewportTop = elements.scroller.getBoundingClientRect().top
         start = elements.scroller.scrollTop
         const originalRoom = this.spacerHeight()
@@ -291,7 +289,7 @@ export class ChatViewport {
         this.setSpacer(Math.max(originalRoom, finalRoom, removed))
         if (tail) follow.setFollowing(true)
         // A newer tail request also takes over a batch whose target a reading gesture cancelled.
-        this.retarget = () => {
+        const retarget = (): void => {
           tail = true
           follow.setFollowing(true)
           this.motion.resumeInput()
@@ -304,6 +302,9 @@ export class ChatViewport {
             if (box.element.getBoundingClientRect().top - shift - box.marginTop >= viewportTop) travelling.add(box.element)
           }
         }
+        this.fold = applyFoldRequest(this.fold, {
+          kind: 'begin', landing: tail ? 'tail' : 'anchored', retarget,
+        }).request
         // Scrolling forward past closing rows shows them shrinking; faded rows would leave their space empty.
         if (tail && target > start) for (const element of below) travelling.add(element)
         return travelling
@@ -345,8 +346,7 @@ export class ChatViewport {
         return written - start
       },
       finish: (cancelled) => {
-        this.retarget = null
-        this.tailRequested = false
+        this.fold = applyFoldRequest(this.fold, { kind: 'finish' }).request
         if (this.elements !== elements) return
         // Commit the final sibling margins while their fold transition override still applies.
         void elements.column.offsetHeight
