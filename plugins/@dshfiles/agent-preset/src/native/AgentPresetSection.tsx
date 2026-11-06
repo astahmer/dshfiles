@@ -67,6 +67,16 @@ export function AgentPresetSection({
 }: AgentPresetSectionProps) {
   const state = useAgentPresetSection(value => value)
   const developerTools = useDeveloperTools(enabled => enabled)
+  // The section reports whichever flow last spoke: a roster read, a write, or the viewer.
+  const error = state.status === 'error'
+    ? state.error
+    : state.save.status === 'error'
+      ? state.save.error
+      : state.viewer.status === 'error'
+        ? state.viewer.error
+        : null
+  const saving = state.save.status === 'saving'
+  const viewed = state.viewer.status === 'open' ? state.viewer.view : null
   const [guide, setGuide] = useState<{
     content: NonNullable<ReturnType<typeof presetGuide>>
     page: PresetGuidePage
@@ -77,7 +87,6 @@ export function AgentPresetSection({
   useLayoutEffect(() => { closeViewOnUnmount.current = closeView }, [closeView])
   useEffect(() => () => { closeViewOnUnmount.current() }, [])
   const closeViewer = () => { closeView(); viewTrigger.current?.focus() }
-  const viewed = state.view
   const viewedRow = viewed === null ? undefined : state.rows.find(row => row.id === viewed.id)
   const viewedTitle = viewed === null ? '' : viewedRow === undefined ? viewed.title : presetDisplayText(viewedRow, t).name
   // Creator mode authors presets in conversation; it needs the flow to land a
@@ -91,7 +100,7 @@ export function AgentPresetSection({
       <button
         type="button"
         className={css.creatorButton}
-        disabled={state.saving}
+        disabled={saving}
         onClick={() => { creator(); closeSettings() }}
       >
         <IconPlusOutlineRegular size={14} />
@@ -101,7 +110,7 @@ export function AgentPresetSection({
   return <section className={css.section}>
     <h2 className={css.title}>{t('nav')}</h2>
     <p className={css.intro}>{t('sectionIntro')}</p>
-    {state.error === null ? null : <p className={css.error} role="alert">{state.error}</p>}
+    {error === null ? null : <p className={css.error} role="alert">{error}</p>}
     {([true, false] as const).map((builtIn) => {
       const rows = state.rows.filter(row => isBuiltInPreset(row) === builtIn
         && (developerTools || !requiresCodingTools(row)))
@@ -120,7 +129,7 @@ export function AgentPresetSection({
               row.isDefault ? css.cardActive : undefined,
             ].filter(Boolean).join(' ')}>
               <button type="button" className={css.cardMain} aria-pressed={row.isDefault}
-                disabled={row.isDefault || (row.broken === undefined && state.saving)}
+                disabled={row.isDefault || (row.broken === undefined && saving)}
                 aria-disabled={row.broken !== undefined} aria-label={`${selectionAction}: ${display.name}`} title={selectionAction}
                 onClick={() => { if (row.broken === undefined) void makeDefault(row.id) }}>
                 <span className={css.cardHead}>

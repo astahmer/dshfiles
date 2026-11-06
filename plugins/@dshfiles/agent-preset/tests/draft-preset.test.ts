@@ -167,7 +167,7 @@ describe('native preset seat with canonical Session drafts', () => {
     const b = fixture()
     const settings = new AgentPresetSectionController(b.ctx)
     await settings.makeDefault('cordis', preset => b.seat.syncBlankSession(b.sessionId, preset))
-    expect(settings.store.getSnapshot()).toMatchObject({ saving: false, error: null })
+    expect(settings.store.getSnapshot()).toMatchObject({ status: 'ready', save: { status: 'idle' } })
     expect(b.list.getSnapshot()[b.sessionId]?.agentPreset).toBe('cordis')
     expect(b.select).not.toHaveBeenCalled()
   })
