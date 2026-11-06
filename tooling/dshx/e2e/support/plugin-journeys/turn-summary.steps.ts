@@ -35,16 +35,15 @@ When('the fake model writes a file and runs a command in a fresh workspace', asy
 })
 
 Then('the footer names the command and the walkthrough card alone names the edited file', async ({ page }: { page: Page }) => {
-  const line = page.locator('[data-dshfiles-turn-summary-line]')
+  // The summary holds the footer and the card under it.
+  const summary = page.locator('[data-dshfiles-turn-summary]')
   const card = page.locator('[data-dshfiles-turn-walkthrough]')
-  await recordAssertion(page, 'turn-summary-footer-leaves-edits-to-walkthrough', async () => {
+  await recordAssertion(page, 'turn-summary-names-edit-once', async () => {
     await expect(card).toBeVisible({ timeout: 60_000 })
-    await expect(line).toContainText('Ran 1 command')
-    await expect(line).not.toContainText(/edited/i)
-  })
-  await recordAssertion(page, 'turn-summary-walkthrough-names-edit-once', async () => {
+    await expect(summary).toContainText(/ran 1 command/i)
     await expect(card).toContainText('Changed 1 file')
-    await expect(card).not.toContainText('Edited 1 file')
+    // Before, the footer and the card's only folder each repeated "Edited 1 file".
+    await expect(summary).not.toContainText(/edited/i)
     await expect(card.getByRole('button', { name: 'Review in Changes' })).toBeVisible({ timeout: 60_000 })
   })
 })

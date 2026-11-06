@@ -113,7 +113,7 @@ export const TurnSummaryLine = (props: {
   return (
     <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs dshx:text-muted-foreground" data-dshfiles-turn-summary="">
       {line && (
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-1.5 dshx:gap-y-0.5" data-dshfiles-turn-summary-line="">
+        <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-1.5 dshx:gap-y-0.5">
           <ListChecksIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
           {segments.map((segment, index) => (
             <Fragment key={segment.key}>
