@@ -223,7 +223,7 @@ export class DurableTasks extends Context.Service<
             const validation = yield* handler.validate(current.value)
             if (!validation.runnable) return yield* new HandlerUnavailable({ taskId: input.taskId })
             const status = current.value.status
-            if (status !== 'unknown' && status !== 'failed' && status !== 'timed-out' && status !== 'cancelled') return yield* new RetryNotAllowed({ status })
+            if (!DurableTaskModel.canRetry(status)) return yield* new RetryNotAllowed({ status })
             const task = yield* updateNow(input.taskId, DurableTaskModel.retry)
             yield* launch(input.taskId)
             return task
