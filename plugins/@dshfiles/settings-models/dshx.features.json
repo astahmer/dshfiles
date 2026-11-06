@@ -36,6 +36,18 @@
           "id": "settings-models.registration",
           "file": "plugins/@dshfiles/settings-models/tests/registration.test.ts",
           "testName": "registers the Models section and both onboarding steps"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-models.burst-refresh",
+          "file": "plugins/@dshfiles/settings-models/tests/refresh.test.ts",
+          "testName": "re-reads the provider directory once for a burst of Host change events"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-models.hidden-refresh",
+          "file": "plugins/@dshfiles/settings-models/tests/refresh.test.ts",
+          "testName": "reads nothing while no surface shows the page, then once when one shows it again"
         }
       ]
     }

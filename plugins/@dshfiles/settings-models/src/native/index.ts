@@ -24,6 +24,7 @@ import { WelcomeNotice } from './WelcomeNotice.tsx'
 import type { WelcomeNoticeInjected } from './WelcomeNotice.tsx'
 import { WelcomeNoticeStore } from './welcome-store.ts'
 import { ModelsSettingsStore } from './store.ts'
+import { createDemandRefresh } from './demand-refresh.ts'
 import { createModelsOperations } from './operations.ts'
 import { createSettingsSchemaOperations } from './schema-operations.ts'
 import { en, zh, type ModelsKey } from './locales.ts'
@@ -87,12 +88,13 @@ export function apply(ctx: ClientContext): void {
   // own `inject`; the cards receive callbacks and never a context.
   const operations = createModelsOperations(ctx)
   const controller = new ModelsSettingsStore(ctx, schema, ctx.configForms.describe())
+  const demand = createDemandRefresh({ store: controller.store, refresh: () => { refreshIfLoaded(controller) } })
   // Registration-time text (the nav label thunk) and the inject faces share
   // one bound translate; copy freshness rides the locale revision.
   const t = ctx.locale.bind(NS) as ModelsSectionInjected['t']
   const injected = (): ModelsSectionInjected => ({
     controller,
-    hooks: { snapshot: controller.store },
+    hooks: { snapshot: demand.observed },
     operations,
     schema,
     t,
@@ -101,7 +103,7 @@ export function apply(ctx: ClientContext): void {
     automatic: credentialOnboarding,
     track: (name, attributes) => ctx.get('productAnalytics')?.track(name, attributes),
     controller,
-    hooks: { models: controller.store },
+    hooks: { models: demand.observed },
     operations,
     schema,
     t,
@@ -119,9 +121,19 @@ export function apply(ctx: ClientContext): void {
   // mirror refresh before this store joins that refresh. The welcome notice
   // follows its settings scope, so it needs no subscription here.
   ctx.effect(() => {
-    const refreshModels = (): void => { refreshIfLoaded(controller) }
+    // An unopened page fetches nothing on background invalidations, as `refreshIfLoaded` does.
+    const refreshModels = (): void => {
+      if (controller.store.getSnapshot().status === 'idle') return
+      controller.markChanged()
+      demand.request()
+    }
+    // Every provider row, configured or not, already names its settings namespace; other namespaces cannot move it.
+    const providerNamespace = (namespace: string): boolean =>
+      controller.store.getSnapshot().rows.some(row => row.entry.settingsNs === namespace)
     const disposers = [
-      ctx.remote.$on('settings/document-updated', () => { refreshModels() }),
+      ctx.remote.$on('settings/document-updated', (namespace) => {
+        if (providerNamespace(namespace)) refreshModels()
+      }),
       ctx.remote.$on('credentials/record-updated', refreshModels),
       ctx.remote.$on('credentials/reference-updated', refreshModels),
       ctx.remote.$on('llm/adapters-updated', refreshModels),
@@ -129,6 +141,7 @@ export function apply(ctx: ClientContext): void {
     ]
     return () => {
       welcomeController.dispose()
+      demand.dispose()
       for (const dispose of disposers) dispose()
     }
   }, 'ui-settings-models: pushed invalidations')

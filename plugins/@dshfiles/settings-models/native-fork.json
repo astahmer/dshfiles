@@ -8,13 +8,31 @@
     "path": "packages/client/ui-settings-models"
   },
   "files": [
-    { "upstream": "src/client", "local": "src/native" },
-    { "upstream": "src/index.ts", "local": "src/host.ts" },
-    { "upstream": "src/onboarding-config.ts", "local": "src/onboarding-config.ts" },
-    { "upstream": "src/onboarding-copy.ts", "local": "src/onboarding-copy.ts" },
-    { "upstream": "src/css-modules.d.ts", "local": "src/css-modules.d.ts" },
-    { "upstream": "locale", "local": "locale" }
+    {
+      "upstream": "src/client",
+      "local": "src/native"
+    },
+    {
+      "upstream": "src/index.ts",
+      "local": "src/host.ts"
+    },
+    {
+      "upstream": "src/onboarding-config.ts",
+      "local": "src/onboarding-config.ts"
+    },
+    {
+      "upstream": "src/onboarding-copy.ts",
+      "local": "src/onboarding-copy.ts"
+    },
+    {
+      "upstream": "src/css-modules.d.ts",
+      "local": "src/css-modules.d.ts"
+    },
+    {
+      "upstream": "locale",
+      "local": "locale"
+    }
   ],
-  "added": [],
-  "delta": []
+  "added": ["src/native/demand-refresh.ts"],
+  "delta": ["src/native/index.ts", "src/native/store.ts"]
 }

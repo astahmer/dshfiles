@@ -1,9 +1,10 @@
 import { Context } from '@deepseek-ai/cordis'
 import type { ComponentType } from 'react'
 import { vi } from 'vitest'
-import { apply, inject } from '../src/native/index.ts'
+import { apply, inject } from '../src/native/index.js'
 
 interface Face {
+  readonly controller: { readonly load: () => Promise<void> }
   readonly hooks: Readonly<Record<string, { subscribe: (listener: () => void) => () => void; getSnapshot: () => { status: string } }>>
 }
 
@@ -24,7 +25,9 @@ export const bootModelsRow = async ({ answerMs = 5 }: { readonly answerMs?: numb
   const events = new Map<string, Set<(payload?: string) => void>>()
   const entries = new Map<string, Entry>()
   const listProviders = vi.fn(() => later(answered([])))
-  const listConfigurableProviders = vi.fn(() => later(answered([])))
+  const listConfigurableProviders = vi.fn(() =>
+    later(answered([{ provider: 'deepseek-official', displayName: 'DeepSeek', settingsNs: 'llm-deepseek', settingsPath: [] }])),
+  )
   const describeCredentials = vi.fn(() => later(answered({})))
   const modelCatalog = vi.fn(() => later(answered({ default: { provider: 'p', model: 'm' }, routableProviders: [], groups: [], failures: [] })))
   ctx.provide('slots', {

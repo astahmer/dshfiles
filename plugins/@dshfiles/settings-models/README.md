@@ -28,6 +28,16 @@ restart.
 Provenance and path mappings live in [native-fork.json](native-fork.json). Vendored files stay byte-identical except
 the recorded delta below.
 
+| File                                              | Owned delta                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [index.ts](src/native/index.ts)                   | Host change events go through `createDemandRefresh`: one refresh per burst (once quiet for 50 ms, at most 250 ms after it began) while the Models section or the onboarding step shows the store, none while nothing does (the page is marked stale and reloads once when a surface shows it again). An unloaded page ignores events, as natively, and `settings/document-updated` for a namespace no provider row names is ignored. |
+| [store.ts](src/native/store.ts)                   | `markChanged()` records each Host change; the `deepseek-account` availability read of `session/modelCatalog` is shared page-wide with model-selection through dshx `joinPageRead`, never joining a read that started before the change.                                                                                                                                                                                              |
+| [demand-refresh.ts](src/native/demand-refresh.ts) | Owned (no upstream file): the observed store surfaces bind and the coalesced, demand-gated trigger.                                                                                                                                                                                                                                                                                                                                  |
+
+The onboarding step still loads the store once at boot while the main view is blank: it is a surface that may show,
+and deciding whether to prompt needs the provider directory and the credential state. It stops being an observer
+once it completes, so later Host changes no longer re-read anything until Settings › Models opens.
+
 On a DSH upgrade, inspect upstream changes, reapply only the recorded deltas, and run:
 
 ```sh

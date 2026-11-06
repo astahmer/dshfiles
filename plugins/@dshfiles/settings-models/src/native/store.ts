@@ -13,6 +13,7 @@ import type {
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { joinPageRead } from '@dshfiles/dshx/client'
 import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
 
@@ -190,6 +191,14 @@ export class ModelsSettingsStore {
 
   /** Latest load wins; an older response never overwrites a newer one. */
   private generation = 0
+  /** `performance.now()` of the last Host change; the model-selection catalog read shared before it may predate it. */
+  private changedAt = Number.NEGATIVE_INFINITY
+
+  /** Record a Host change, so the next catalog read never joins one that started before it. */
+  markChanged(): void {
+    this.changedAt = performance.now()
+  }
+
   /** Callers follow the current refresh's outcome, including callers whose read was superseded. */
   private readonly pendingLoads = new Set<PromiseWithResolvers<void>>()
 
@@ -265,7 +274,11 @@ export class ModelsSettingsStore {
       }
     })
     if (rows.some(row => row.entry.provider === 'deepseek-account')) {
-      const catalog = await this.ctx.remote.session.modelCatalog()
+      const catalog = await joinPageRead({
+        key: 'remote:session/modelCatalog',
+        read: () => this.ctx.remote.session.modelCatalog(),
+        notBefore: this.changedAt,
+      })
       for (const row of rows) {
         if (row.entry.provider === 'deepseek-account') row.accountAvailable = catalog.ok
           && catalog.value.groups.some(group => group.id === 'deepseek-account' && group.models.length > 0)
