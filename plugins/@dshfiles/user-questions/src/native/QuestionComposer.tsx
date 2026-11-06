@@ -26,7 +26,7 @@ type Feedback = { key: 'error.incomplete' | 'error.unanswered' | 'error.unavaila
 
 /** A removed card can remain mounted until the composer seat updates. */
 const REMOVED_CARD: QuestionCardSnapshot = {
-  state: 'open', waitState: 'counting', countdown: undefined, channel: 'none', closed: true,
+  state: 'open', phase: { kind: 'closed' }, waitState: 'counting', countdown: undefined, channel: 'none', closed: true,
 }
 
 /**

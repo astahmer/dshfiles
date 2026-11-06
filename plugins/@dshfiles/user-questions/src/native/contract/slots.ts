@@ -200,10 +200,31 @@ export function createWaterfallRequest(
   return { channel, result: completion.promise, isDelegation: reason => reason === delegated }
 }
 
+/**
+ * Where one pending question's foreground wait stands. Exactly one phase is
+ * active, so a held question can never also be focused or editing, and a live
+ * deadline only exists while counting.
+ */
+export type QuestionWaitPhase =
+  /** Counting down to `deadline`; absent for a request that carried none. */
+  | { readonly kind: 'counting'; readonly deadline: number | undefined }
+  /** Frozen by focus, holding the remaining duration for a later resume. */
+  | { readonly kind: 'paused'; readonly remainingMs: number | undefined }
+  /** The user edited a draft: the request now waits indefinitely. */
+  | { readonly kind: 'editing'; readonly remainingMs: number | undefined }
+  /** The user took over the wait; the waterfall waits like a blocking question. */
+  | { readonly kind: 'waiting' }
+  /** The local countdown rejected the waterfall with `ASK_TIMED_OUT`. */
+  | { readonly kind: 'timedOut' }
+  /** The card left the registry; no wait runs any more. */
+  | { readonly kind: 'closed' }
+
 /** Reactive card state read by every mounted presentation of one question. */
 export interface QuestionCardSnapshot {
   /** Mirrors the projection row; `open` until the projection says otherwise. */
   readonly state: UserQuestionState
+  /** The single active wait phase. */
+  readonly phase: QuestionWaitPhase
   /** User-visible foreground wait presentation. */
   readonly waitState: 'counting' | 'focused' | 'editing' | 'waiting' | 'continued'
   /**
@@ -249,18 +270,12 @@ export class PendingQuestion {
    */
   readonly dismissal: 'hide' | 'cancel'
 
-  #state: UserQuestionState = 'open'
+  #projection: UserQuestionState = 'open'
+  #phase: QuestionWaitPhase = { kind: 'counting', deadline: undefined }
   #waterfall: QuestionWaterfallChannel | undefined
   #rpc: QuestionRpcChannel | undefined
   #seat: QuestionSeat | undefined
-  #timedWait = false
   #timer: ReturnType<typeof setInterval> | undefined
-  #deadline: number | undefined
-  #remainingMs: number | undefined
-  #focused = false
-  #engaged = false
-  #held = false
-  #closed = false
   readonly #siblings: (() => readonly string[]) | undefined
   readonly #listeners = new Set<() => void>()
   #snapshot: QuestionCardSnapshot
@@ -326,27 +341,53 @@ export class PendingQuestion {
   readonly getSnapshot = this.snapshot
 
   private createSnapshot(): QuestionCardSnapshot {
-    const channel = this.#waterfall !== undefined
-      ? 'waterfall'
-      : this.#state === 'continued' && this.#rpc !== undefined ? 'rpc' : 'none'
-    const waitState = this.#state === 'continued'
-      ? 'continued'
-      : this.#held ? 'waiting'
-        : this.#engaged ? 'editing'
-          : this.#focused ? 'focused' : 'counting'
+    const phase = this.#phase
     return {
-      state: this.#state,
-      waitState,
-      countdown: this.#timedWait
-        ? {
-          remainingMs: this.#deadline === undefined
-            ? this.#remainingMs ?? 0
-            : Math.max(0, this.#deadline - Date.now()),
-          running: this.#deadline !== undefined,
+      state: this.#projection,
+      phase,
+      waitState: this.#waitStateOf(phase),
+      countdown: this.#countdownOf(phase),
+      channel: this.#channelOf(),
+      closed: phase.kind === 'closed',
+    }
+  }
+
+  #channelOf(): QuestionCardSnapshot['channel'] {
+    if (this.#waterfall !== undefined) return 'waterfall'
+    return this.#projection === 'continued' && this.#rpc !== undefined ? 'rpc' : 'none'
+  }
+
+  #waitStateOf(phase: QuestionWaitPhase): QuestionCardSnapshot['waitState'] {
+    if (this.#projection === 'continued') return 'continued'
+    switch (phase.kind) {
+      case 'paused': return 'focused'
+      case 'editing': return 'editing'
+      case 'waiting': return 'waiting'
+      case 'counting':
+      case 'timedOut':
+      case 'closed': return 'counting'
+    }
+  }
+
+  /**
+   * The countdown a timed request shows. Its presence follows the attached
+   * waterfall, because a request without a deadline never displayed one.
+   */
+  #countdownOf(phase: QuestionWaitPhase): QuestionCardSnapshot['countdown'] {
+    if (this.#waterfall?.deadline === undefined) return undefined
+    switch (phase.kind) {
+      case 'counting': {
+        const deadline = phase.deadline
+        return {
+          remainingMs: deadline === undefined ? 0 : Math.max(0, deadline - Date.now()),
+          running: deadline !== undefined,
         }
-        : undefined,
-      channel,
-      closed: this.#closed,
+      }
+      case 'paused':
+      case 'editing': return { remainingMs: phase.remainingMs ?? 0, running: false }
+      case 'waiting': return { remainingMs: 0, running: false }
+      case 'timedOut':
+      case 'closed': return undefined
     }
   }
 
@@ -362,7 +403,8 @@ export class PendingQuestion {
    * the component would leave the tool call waiting past its deadline.
    */
   #reschedule(): void {
-    const wanted = this.#deadline !== undefined && !this.#closed
+    const phase = this.#phase
+    const wanted = phase.kind === 'counting' && phase.deadline !== undefined
     if (wanted === (this.#timer !== undefined)) return
     if (!wanted) {
       clearInterval(this.#timer)
@@ -373,10 +415,10 @@ export class PendingQuestion {
   }
 
   #tick(): void {
-    const deadline = this.#deadline
-    /* v8 ignore next -- #reschedule clears the interval in the same publish that drops the deadline. */
-    if (deadline === undefined) return
-    if (Date.now() >= deadline) {
+    const phase = this.#phase
+    /* v8 ignore next -- #reschedule clears the interval in the same publish that leaves the counting phase. */
+    if (phase.kind !== 'counting' || phase.deadline === undefined) return
+    if (Date.now() >= phase.deadline) {
       this.timeout()
       return
     }
@@ -389,13 +431,11 @@ export class PendingQuestion {
    */
   attachWaterfall(channel: QuestionWaterfallChannel): void {
     this.#waterfall = channel
-    this.#timedWait = channel.deadline !== undefined
-    if (!this.#held && !this.#engaged) {
-      this.#deadline = channel.deadline
-      if (this.#focused && channel.deadline !== undefined) {
-        this.#remainingMs = Math.max(0, channel.deadline - Date.now())
-        this.#deadline = undefined
-      }
+    const phase = this.#phase
+    if (phase.kind === 'counting') {
+      this.#phase = { kind: 'counting', deadline: channel.deadline }
+    } else if (phase.kind === 'paused' && channel.deadline !== undefined) {
+      this.#phase = { kind: 'paused', remainingMs: Math.max(0, channel.deadline - Date.now()) }
     }
     this.publish()
   }
@@ -407,8 +447,7 @@ export class PendingQuestion {
   detachWaterfall(channel: QuestionWaterfallChannel): void {
     if (this.#waterfall !== channel) return
     this.#waterfall = undefined
-    this.#timedWait = false
-    this.#deadline = undefined
+    if (this.#phase.kind === 'counting') this.#phase = { kind: 'counting', deadline: undefined }
     this.publish()
   }
 
@@ -442,18 +481,16 @@ export class PendingQuestion {
    * @param state - `open` or `continued`.
    */
   setState(state: UserQuestionState): void {
-    if (this.#state === state) return
-    this.#state = state
+    if (this.#projection === state) return
+    this.#projection = state
     this.publish()
   }
 
   /** Stop this Client's countdown indefinitely; the waterfall then waits like a blocking question. */
   takeTime(): void {
-    if (this.#held) return
-    this.#held = true
-    this.#focused = false
-    this.#remainingMs = undefined
-    this.#deadline = undefined
+    const phase = this.#phase
+    if (phase.kind === 'waiting' || phase.kind === 'timedOut' || phase.kind === 'closed') return
+    this.#phase = { kind: 'waiting' }
     this.publish()
   }
 
@@ -462,10 +499,12 @@ export class PendingQuestion {
    * @param now - current Client epoch time.
    */
   holdFocus(now = Date.now()): void {
-    if (this.#held || this.#engaged || this.#focused) return
-    this.#remainingMs = this.#deadline === undefined ? undefined : Math.max(0, this.#deadline - now)
-    this.#deadline = undefined
-    this.#focused = true
+    const phase = this.#phase
+    if (phase.kind !== 'counting') return
+    this.#phase = {
+      kind: 'paused',
+      remainingMs: phase.deadline === undefined ? undefined : Math.max(0, phase.deadline - now),
+    }
     this.publish()
   }
 
@@ -474,10 +513,11 @@ export class PendingQuestion {
    * @param now - current Client epoch time.
    */
   releaseFocus(now = Date.now()): void {
-    if (!this.#focused) return
-    this.#focused = false
-    this.#deadline = this.#timedWait && this.#remainingMs !== undefined ? now + this.#remainingMs : undefined
-    this.#remainingMs = undefined
+    const phase = this.#phase
+    if (phase.kind !== 'paused') return
+    const remainingMs = phase.remainingMs
+    const resumed = remainingMs !== undefined && this.#waterfall?.deadline !== undefined
+    this.#phase = { kind: 'counting', deadline: resumed ? now + remainingMs : undefined }
     this.publish()
   }
 
@@ -486,25 +526,23 @@ export class PendingQuestion {
    * @param now - current Client epoch time used to preserve the remaining duration.
    */
   engage(now = Date.now()): void {
-    if (this.#held || this.#engaged) return
-    if (this.#remainingMs === undefined && this.#deadline !== undefined) {
-      this.#remainingMs = Math.max(0, this.#deadline - now)
-    }
-    this.#engaged = true
-    this.#focused = false
-    this.#deadline = undefined
+    const phase = this.#phase
+    if (phase.kind !== 'counting' && phase.kind !== 'paused') return
+    const remainingMs = phase.kind === 'paused'
+      ? phase.remainingMs
+      : phase.deadline === undefined ? undefined : Math.max(0, phase.deadline - now)
+    this.#phase = { kind: 'editing', remainingMs }
     this.publish()
   }
 
   /** Local countdown reached zero: settle the waterfall with `ASK_TIMED_OUT`, keep the card. */
   timeout(): void {
-    if (this.#held || this.#engaged || this.#focused) return
+    if (this.#phase.kind !== 'counting') return
     const channel = this.#waterfall
     if (channel === undefined) return
     this.#waterfall = undefined
-    this.#timedWait = false
-    this.#deadline = undefined
     channel.reject('ASK_TIMED_OUT')
+    this.#phase = { kind: 'timedOut' }
     this.publish()
   }
 
@@ -515,8 +553,8 @@ export class PendingQuestion {
 
   /** Mark the card removed from the registry; the mounted composer clears its draft. */
   close(): void {
-    if (this.#closed) return
-    this.#closed = true
+    if (this.#phase.kind === 'closed') return
+    this.#phase = { kind: 'closed' }
     this.publish()
   }
 
@@ -531,7 +569,7 @@ export class PendingQuestion {
       return settlePendingComposer(() => { waterfall.resolve(answer) }, 'pending question settlement failed')
     }
     const rpc = this.#rpc
-    if (this.#state === 'continued' && rpc !== undefined) {
+    if (this.#projection === 'continued' && rpc !== undefined) {
       return rpc.answer(answer).then((accepted) => {
         if (!accepted) throw new Error('this question is no longer answerable')
       })
