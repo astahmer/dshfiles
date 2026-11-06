@@ -2,12 +2,17 @@
 
 ![Thread dev servers](docs/screenshots/thread-dev-servers.png)
 
-Two things a thread needs while it builds a web app:
+Three things a thread needs while it builds a web app:
 
 - **Agent preview browser.** Agent tools drive a headless Chromium on the DSH Host, one isolated browser context per
   thread.
-- **Thread dev servers.** The thread header lists the TCP ports the thread's processes listen on, with **Open** (in the
-  browser tab beside the thread) and **Stop**.
+- **Thread dev servers.** The thread header lists the TCP ports the thread's processes listen on, with **Open** and
+  **Stop**. Open loads the URL in the right-Sidebar Browser tab beside the thread on screen (the native
+  `ui-sidebar-browser` row, which the `web` seed enables), or in a new browser tab when no pane takes it.
+- **Agent browser.** **Watch** on a preview page opens the thread panel's **Agent browser** tab: the agent's own
+  headless page, mirrored about twice a second while the tab and window are visible (an unchanged frame sends only its
+  hash). Clicks, scrolls, typed text and named keys replay on that page, so you can see and take over what the agent
+  sees, logins and forms included, even from a GUI on another machine.
 
 The dev-server list is also the **Dev servers** tab of **Observe › Processes** (every thread that runs a job) and part of
 the thread panel's **Jobs** tab, through `@dshfiles/background-jobs/process-views`.
@@ -71,7 +76,11 @@ thread header chip ─► previewApi.devServers ─► lsof/ss + ps + cwd probe 
 - **Cleanup.** A thread's browser context closes when the thread is disposed or idles for `idleMinutes`; unloading the
   plugin closes Chromium.
 - **Reveal.** `preview_open` with `reveal` or `preview_reveal` publishes a `pagesChanged` event; the header chip of
-  that thread opens the URL through the `Browser` contract (`@dshfiles/chat`).
+  that thread opens the URL through the `Browser` contract (`@dshfiles/chat`). A reveal never falls back to a new tab:
+  without a click the browser would block it as a popup.
+- **Mirror.** `mirrorFrame` returns a JPEG viewport (quality 55) and its SHA-1; the view sends the hash it shows and
+  gets `image: null` while the page is still. `mirrorInput` replays one click, wheel, key or text gesture in page
+  viewport pixels. Both are Client methods; agents keep `preview_screenshot`, `preview_click` and `preview_type`.
 
 ## Security
 

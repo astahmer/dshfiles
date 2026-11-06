@@ -3,7 +3,7 @@ import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { Browser, useApi, useApiEvent, useContract } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
-import { ExternalLinkIcon, GlobeIcon, PanelRightIcon, SquareIcon } from '@dshfiles/plugin-ui/icons'
+import { ExternalLinkIcon, GlobeIcon, MonitorIcon, PanelRightIcon, SquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { previewApi, type DevServerView, type PreviewPageView } from './api.js'
@@ -19,7 +19,11 @@ const portLabel = (servers: readonly DevServerView[], pages: readonly PreviewPag
   return pages.length === 1 ? '1 preview' : `${String(pages.length)} previews`
 }
 
-export const DevServersChip = (props: { readonly sessionId: string }) => {
+export const DevServersChip = (props: {
+  readonly sessionId: string
+  /** Show the agent's own page, live, in the thread panel. */
+  readonly onWatch: (input: { readonly sessionId: string; readonly pageId: string }) => void
+}) => {
   const api = useApi(previewApi)
   const browser = useContract(Browser)
   const queryClient = useQueryClient()
@@ -127,6 +131,18 @@ export const DevServersChip = (props: { readonly sessionId: string }) => {
                   {page.pageId} · {page.url}
                 </span>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="dshx:h-6 dshx:px-2 dshx:text-xs"
+                onClick={() => {
+                  setOpen(false)
+                  props.onWatch({ sessionId: props.sessionId, pageId: page.pageId })
+                }}
+              >
+                <MonitorIcon className="dshx:size-3" />
+                Watch
+              </Button>
               <Button variant="outline" size="sm" className="dshx:h-6 dshx:px-2 dshx:text-xs" onClick={() => opener.open(page.url)}>
                 <OpenIcon className="dshx:size-3" />
                 Open

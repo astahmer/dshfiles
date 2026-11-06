@@ -106,6 +106,25 @@ const previewHandlers = Api.handlers(previewApi, {
       const pages = yield* PreviewPages
       return yield* pages.evaluate({ sessionId, pageId: input.pageId, expression: input.expression })
     }),
+  mirrorFrame: (input, call) =>
+    Effect.gen(function* () {
+      const sessionId = yield* ownThread(call, input.sessionId)
+      const pages = yield* PreviewPages
+      const frame = yield* pages.frame({ sessionId, pageId: input.pageId, knownHash: input.knownHash })
+      return {
+        ...frame.summary,
+        hash: frame.hash,
+        image: frame.image === null ? null : Buffer.from(frame.image).toString('base64'),
+        width: frame.width,
+        height: frame.height,
+      }
+    }),
+  mirrorInput: (input, call) =>
+    Effect.gen(function* () {
+      const sessionId = yield* ownThread(call, input.sessionId)
+      const pages = yield* PreviewPages
+      return yield* pages.input({ sessionId, pageId: input.pageId, gesture: input.gesture })
+    }),
   close: (input, call) =>
     Effect.gen(function* () {
       const sessionId = yield* ownThread(call, input.sessionId)

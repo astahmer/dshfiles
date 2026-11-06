@@ -54,7 +54,7 @@
           "kind": "unit-test",
           "id": "preview.thread-isolation",
           "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
-          "testName": "isolates threads and closes a thread\u2019s pages when it ends"
+          "testName": "isolates threads and closes a thread’s pages when it ends"
         },
         {
           "kind": "unit-test",
@@ -95,7 +95,7 @@
     {
       "id": "thread-dev-servers",
       "title": "Thread dev servers",
-      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on \u2014 processes from its jobs or bash calls, and processes running inside its workspace \u2014 plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop. The same list is the Dev servers tab of Observe \u203a Processes (every thread that runs a job) and part of the thread panel's Jobs facet.",
+      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on — processes from its jobs or bash calls, and processes running inside its workspace — plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop. The same list is the Dev servers tab of Observe › Processes (every thread that runs a job) and part of the thread panel's Jobs facet.",
       "reach": ["click button \"Dev servers and previews\"", "expect region \"Dev servers\""],
       "surfaces": ["host", "tool", "client"],
       "surface": "threadFacet",
@@ -132,7 +132,7 @@
           "kind": "unit-test",
           "id": "preview.dev-server-attribution",
           "file": "plugins/@dshfiles/preview/src/dev-servers.test.ts",
-          "testName": "attributes a Host job\u2019s descendant to the job owner and an orphan to the thread whose workspace holds it"
+          "testName": "attributes a Host job’s descendant to the job owner and an orphan to the thread whose workspace holds it"
         },
         {
           "kind": "unit-test",
@@ -215,6 +215,61 @@
           "span": "preview render-html",
           "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
           "testName": "renders untrusted HTML offline in a sandboxed frame, grows a full-page capture and records a render span"
+        }
+      ]
+    },
+    {
+      "id": "agent-browser",
+      "title": "Agent browser",
+      "summary": "The thread panel's Agent browser tab mirrors the headless page the thread's agent drives: the dev-server chip's Watch on a preview page (or the panel guide, for the thread on screen) opens it. Frames poll about twice a second only while the tab and the window are visible, an unchanged frame costs a hash instead of a JPEG, and clicks, scrolls, typed text and named keys replay on the same page, so the user sees and can take over exactly what the agent sees (logins, forms).",
+      "surfaces": ["client", "host"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "thread panel: Agent browser",
+      "configuration": [],
+      "states": ["no-pages", "watching", "hidden", "page-closed", "input-failed"],
+      "failureModes": [
+        "A page the agent closed stops capturing and says to ask the agent to reopen it.",
+        "An input that fails (a closed page, a timeout) is reported under the frame and the next frame shows the page as it is.",
+        "Frames stop while the tab or the browser window is hidden, so a forgotten tab costs nothing."
+      ],
+      "externalDependencies": [
+        {
+          "id": "playwright-core + Chromium headless shell",
+          "boundary": "Viewport screenshots and mouse/keyboard input on the agent's existing page.",
+          "deterministicFake": "src/browser-pool-promise.test.ts drives the real headless shell against a fixture page served on 127.0.0.1 by node:http."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "preview.mirror-frames-input",
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
+          "testName": "mirrors a page: frames skip an unchanged image, and a forwarded click and keys reach the page"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.mirror-gestures",
+          "file": "plugins/@dshfiles/preview/src/mirror-gestures.test.ts",
+          "testName": "scales a point on the shrunken frame to the page viewport"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "preview mirror-frame",
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
+          "testName": "mirrors a page: frames skip an unchanged image, and a forwarded click and keys reach the page"
+        },
+        {
+          "kind": "custom",
+          "span": "preview mirror-input",
+          "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
+          "testName": "mirrors a page: frames skip an unchanged image, and a forwarded click and keys reach the page"
         }
       ]
     }

@@ -19,6 +19,8 @@ export class PreviewPages extends Context.Service<
     readonly navigate: (input: Parameters<PreviewBrowsers['navigate']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['navigate']>>, PreviewRefused>
     readonly revealRequest: (input: Parameters<PreviewBrowsers['revealRequest']>[0]) => Effect.Effect<number | null>
     readonly snapshot: (input: Parameters<PreviewBrowsers['snapshot']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['snapshot']>>, PreviewRefused>
+    readonly frame: (input: Parameters<PreviewBrowsers['frame']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['frame']>>, PreviewRefused>
+    readonly input: (input: Parameters<PreviewBrowsers['input']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['input']>>, PreviewRefused>
     readonly click: (input: Parameters<PreviewBrowsers['click']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['click']>>, PreviewRefused>
     readonly type: (input: Parameters<PreviewBrowsers['type']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['type']>>, PreviewRefused>
     readonly evaluate: (input: Parameters<PreviewBrowsers['evaluate']>[0]) => Effect.Effect<Awaited<ReturnType<PreviewBrowsers['evaluate']>>, PreviewRefused>
@@ -70,6 +72,8 @@ export class PreviewPages extends Context.Service<
         navigate: input => call('preview_navigate', () => browsers.navigate(input)),
         revealRequest: input => Effect.sync(() => browsers.revealRequest(input)),
         snapshot: input => call('preview_snapshot', () => browsers.snapshot(input)),
+        frame: input => call('preview mirror', () => browsers.frame(input)),
+        input: input => call('preview mirror', () => browsers.input(input)),
         click: input => call('preview_click', () => browsers.click(input)),
         type: input => call('preview_type', () => browsers.type(input)),
         evaluate: input => call('preview_evaluate', () => browsers.evaluate(input)),

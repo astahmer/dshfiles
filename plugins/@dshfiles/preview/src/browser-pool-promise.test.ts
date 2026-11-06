@@ -67,6 +67,36 @@ describe('PreviewBrowsers', () => {
     expect(recorder.span('preview click').attributes).toEqual({ 'dshx.preview.page': 'p1' })
   })
 
+  it('mirrors a page: frames skip an unchanged image, and a forwarded click and keys reach the page', { timeout: 60_000 }, async () => {
+    using recorder = recordSpans()
+    const opened = await browsers.open({ sessionId: 'session-mirror', url: origin, reveal: false })
+    const first = await browsers.frame({ sessionId: 'session-mirror', pageId: opened.pageId, knownHash: undefined })
+    expect(first.image).not.toBeNull()
+    expect({ width: first.width, height: first.height }).toEqual({ width: 1280, height: 800 })
+    const still = await browsers.frame({ sessionId: 'session-mirror', pageId: opened.pageId, knownHash: first.hash })
+    expect(still).toMatchObject({ hash: first.hash, image: null })
+
+    const page = { sessionId: 'session-mirror', pageId: opened.pageId }
+    settings = previewSettings.schema({ allowEvaluate: true })
+    const measured = await browsers.evaluate({
+      ...page,
+      expression: "(() => { const r = document.querySelector('#name').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()",
+    })
+    settings = previewSettings.schema({})
+    const box: { readonly x: number; readonly y: number } = JSON.parse(measured.result)
+    await browsers.input({ ...page, gesture: { kind: 'click', x: box.x, y: box.y } })
+    await browsers.input({ ...page, gesture: { kind: 'text', text: 'mirror' } })
+    await browsers.input({ ...page, gesture: { kind: 'key', key: 'Tab' } })
+    await browsers.input({ ...page, gesture: { kind: 'key', key: 'Enter' } })
+    const after = await browsers.snapshot({ ...page, maxChars: 20_000 })
+    expect(after.snapshot).toContain('Hello mirror')
+    const changed = await browsers.frame({ ...page, knownHash: first.hash })
+    expect(changed.hash).not.toBe(first.hash)
+    expect(changed.image).not.toBeNull()
+    expect(recorder.spans.map(span => span.name)).toEqual(expect.arrayContaining(['preview mirror-frame', 'preview mirror-input']))
+    await browsers.closeThread('session-mirror')
+  })
+
   it('bounds a snapshot and reports the truncation', { timeout: 30_000 }, async () => {
     const snapshot = await browsers.snapshot({ sessionId: 'session-a', pageId: 'p1', maxChars: 500 })
     expect(snapshot.snapshot.length).toBeLessThan(600)

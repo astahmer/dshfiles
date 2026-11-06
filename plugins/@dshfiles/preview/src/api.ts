@@ -162,6 +162,41 @@ export const previewApi = defineApi({
       description: 'Close one preview page, or every preview page of the thread with all: true. The pages can be opened again with preview_open.',
       tool: { name: 'preview_close', readOnly: false, render: compactJson },
     }),
+    mirrorFrame: method({
+      input: Schema.Struct({
+        pageId: pageIdField,
+        knownHash: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(64))),
+        sessionId: sessionIdField,
+      }),
+      output: Schema.Struct({
+        ...pageSummarySchema.fields,
+        hash: Schema.String,
+        image: Schema.NullOr(Schema.String),
+        width: Schema.Number,
+        height: Schema.Number,
+      }),
+      description:
+        'The current viewport of a preview page as a base64 JPEG for the Agent browser view; image is null when it matches knownHash. Agents use preview_screenshot.',
+    }),
+    mirrorInput: method({
+      input: Schema.Struct({
+        pageId: pageIdField,
+        gesture: Schema.Union([
+          Schema.Struct({ kind: Schema.Literal('click'), x: Schema.Number.check(Schema.isFinite()), y: Schema.Number.check(Schema.isFinite()) }),
+          Schema.Struct({
+            kind: Schema.Literal('wheel'),
+            x: Schema.Number.check(Schema.isFinite()),
+            y: Schema.Number.check(Schema.isFinite()),
+            deltaY: Schema.Number.check(Schema.isFinite()),
+          }),
+          Schema.Struct({ kind: Schema.Literal('key'), key: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(40)) }),
+          Schema.Struct({ kind: Schema.Literal('text'), text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_000)) }),
+        ]),
+        sessionId: sessionIdField,
+      }),
+      output: pageSummarySchema,
+      description: 'Replay one click, scroll, key or text gesture from the Agent browser view on a preview page. Agents use preview_click and preview_type.',
+    }),
     list: method({
       input: Schema.Struct({ sessionId: sessionIdField }),
       output: Schema.Struct({ pages: Schema.Array(pageSummarySchema) }),

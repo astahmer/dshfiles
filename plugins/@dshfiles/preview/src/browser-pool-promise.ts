@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { homedir, userInfo } from 'node:os'
 import { Effect } from 'effect'
 import { chromium, type Browser, type BrowserContext, type Locator, type Page, type Route } from 'playwright-core'
@@ -6,6 +7,7 @@ import type { JsonValue } from '@dshfiles/dshx/json'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { PreviewSettings } from './settings.js'
+import type { MirrorGesture } from './mirror-gestures.js'
 import { checkPreviewUrl } from './url-policy.js'
 
 const NAVIGATION_TIMEOUT_MS = 30_000
@@ -21,6 +23,9 @@ export interface PreviewPageSummary {
   readonly openedAt: number
   readonly revealRequestedAt: number | null
 }
+
+/** Mirror frames are smaller than an agent screenshot: they repeat while the user watches. */
+const MIRROR_QUALITY = 55
 
 export interface ActionTarget {
   readonly ref?: string | undefined
@@ -314,6 +319,37 @@ export class PreviewBrowsers {
       summary: await this.#summary(entry),
       image: await entry.page.screenshot({ type: 'jpeg', quality: 75, fullPage: input.fullPage, timeout: SNAPSHOT_TIMEOUT_MS }),
     }))
+  }
+
+  /**
+   * The viewport as the mirror view shows it. A frame identical to the one the viewer already has comes back without
+   * its image, so a still page costs a hash instead of a JPEG per poll.
+   */
+  frame(input: { readonly sessionId: string; readonly pageId: string; readonly knownHash: string | undefined }) {
+    const { entry } = this.#page(input.sessionId, input.pageId)
+    return pageSpan('preview mirror-frame', entry.id, async () => {
+      const image = await entry.page.screenshot({ type: 'jpeg', quality: MIRROR_QUALITY, timeout: SNAPSHOT_TIMEOUT_MS })
+      const hash = createHash('sha1').update(image).digest('hex')
+      const size = entry.page.viewportSize() ?? VIEWPORT
+      return { summary: await this.#summary(entry), hash, image: hash === input.knownHash ? null : image, width: size.width, height: size.height }
+    })
+  }
+
+  /** Replay one gesture from the mirror view on the page the agent drives. */
+  input(input: { readonly sessionId: string; readonly pageId: string; readonly gesture: MirrorGesture }) {
+    const { entry } = this.#page(input.sessionId, input.pageId)
+    const gesture = input.gesture
+    return pageSpan('preview mirror-input', entry.id, async () => {
+      const page = entry.page
+      if (gesture.kind === 'click') await page.mouse.click(gesture.x, gesture.y)
+      if (gesture.kind === 'wheel') {
+        await page.mouse.move(gesture.x, gesture.y)
+        await page.mouse.wheel(0, gesture.deltaY)
+      }
+      if (gesture.kind === 'key') await page.keyboard.press(gesture.key)
+      if (gesture.kind === 'text') await page.keyboard.insertText(gesture.text)
+      return this.#summary(entry)
+    })
   }
 
   click(input: { readonly sessionId: string; readonly pageId: string; readonly target: ActionTarget; readonly doubleClick: boolean }) {
