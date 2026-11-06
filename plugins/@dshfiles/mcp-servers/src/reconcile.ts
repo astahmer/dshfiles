@@ -15,10 +15,13 @@ export interface ReconcilePlan<Target extends ClientTarget> {
 
 export type ClientLifecycle = 'inactive' | 'starting' | 'loaded' | 'start-failed' | 'manually-disconnected'
 
-interface ActiveClient {
-  readonly fingerprint: string
-  readonly scope: Scope.Closeable
-}
+/** One entry per target: a loaded client is the only state that owns a running child Scope. */
+type ClientEntry =
+  | { readonly state: 'inactive' }
+  | { readonly state: 'manually-disconnected' }
+  | { readonly state: 'start-failed' }
+  | { readonly state: 'starting'; readonly fingerprint: string }
+  | { readonly state: 'loaded'; readonly fingerprint: string; readonly scope: Scope.Closeable }
 
 /** Serializes native client start/stop transitions; each running client owns a child Scope of the reconciler's. */
 export interface ClientReconciler<Target extends ClientTarget> {
@@ -39,6 +42,11 @@ const withoutEntry = <V>(map: ReadonlyMap<string, V>, key: string): ReadonlyMap<
   return next
 }
 
+const loadedEntries = (map: ReadonlyMap<string, ClientEntry>): ReadonlyArray<readonly [string, Extract<ClientEntry, { readonly state: 'loaded' }>]> =>
+  [...map].flatMap(([id, entry]) => (entry.state === 'loaded' ? [[id, entry] as const] : []))
+
+const closeScope = (scope: Scope.Closeable) => Scope.close(scope, Exit.void)
+
 /**
  * Create a reconciler whose `start` runs in a fresh child Scope per client; closing that Scope stops the client, and
  * closing the surrounding Scope stops every client still running.
@@ -49,53 +57,50 @@ export const makeClientReconciler = <Target extends ClientTarget>(
   Effect.gen(function* () {
     const root = yield* Scope.Scope
     const lock = yield* Semaphore.make(1)
-    const active = yield* Ref.make<ReadonlyMap<string, ActiveClient>>(new Map())
-    const lifecycle = yield* Ref.make<ReadonlyMap<string, ClientLifecycle>>(new Map())
+    const clients = yield* Ref.make<ReadonlyMap<string, ClientEntry>>(new Map())
 
+    /** Drops the entry and closes the client's Scope: a stopped client is never left with a running Scope. */
     const stop = Effect.fnUntraced(function* (id: string) {
-      const current = (yield* Ref.get(active)).get(id)
-      if (current === undefined) return
-      yield* Ref.update(active, map => withoutEntry(map, id))
-      yield* Scope.close(current.scope, Exit.void)
+      const entry = yield* Ref.modify(clients, current => [current.get(id), withoutEntry(current, id)] as const)
+      if (entry?.state === 'loaded') yield* closeScope(entry.scope)
     })
 
     const launch = Effect.fnUntraced(function* (target: Target) {
-      yield* Ref.update(lifecycle, map => withEntry(map, target.id, 'starting'))
+      yield* Ref.update(clients, map => withEntry(map, target.id, { state: 'starting', fingerprint: target.fingerprint }))
       const scope = yield* Scope.fork(root)
       const started = yield* Effect.exit(start(target).pipe(Scope.provide(scope)))
       if (Exit.isFailure(started)) {
-        yield* Scope.close(scope, started)
-        yield* Ref.update(lifecycle, map => withEntry(map, target.id, 'start-failed'))
+        yield* closeScope(scope)
+        yield* Ref.update(clients, map => withEntry(map, target.id, { state: 'start-failed' }))
         return
       }
-      yield* Ref.update(active, map => withEntry(map, target.id, { fingerprint: target.fingerprint, scope }))
-      yield* Ref.update(lifecycle, map => withEntry(map, target.id, 'loaded'))
+      yield* Ref.update(clients, map => withEntry(map, target.id, { state: 'loaded', fingerprint: target.fingerprint, scope }))
     })
 
     const apply = Effect.fnUntraced(function* (targets: ReadonlyArray<Target>) {
       const byId = new Map(targets.map(target => [target.id, target]))
       const desired = new Map(targets.filter(target => target.enabled && target.ready && target.suspended !== true).map(target => [target.id, target]))
-      for (const [id, current] of yield* Ref.get(active)) {
+      for (const [id, entry] of loadedEntries(yield* Ref.get(clients))) {
         const next = desired.get(id)
-        if (next === undefined || next.fingerprint !== current.fingerprint) yield* stop(id)
+        if (next === undefined || next.fingerprint !== entry.fingerprint) yield* stop(id)
       }
-      const running = yield* Ref.get(active)
-      yield* Ref.update(lifecycle, previous => {
-        const next = new Map<string, ClientLifecycle>()
-        for (const [id, target] of byId) {
-          if (target.suspended === true) next.set(id, 'manually-disconnected')
-          else if (!target.enabled || !target.ready) next.set(id, 'inactive')
-          else if (running.has(id)) next.set(id, 'loaded')
-          else next.set(id, previous.get(id) === 'start-failed' ? 'start-failed' : 'starting')
-        }
-        return next
-      })
-      for (const [id, target] of desired) if (!running.has(id)) yield* launch(target)
+      const current = yield* Ref.get(clients)
+      const running = new Set(loadedEntries(current).map(([id]) => id))
+      const next = new Map<string, ClientEntry>()
+      for (const [id, target] of byId) {
+        if (target.suspended === true) next.set(id, { state: 'manually-disconnected' })
+        else if (!target.enabled || !target.ready) next.set(id, { state: 'inactive' })
+        else if (running.has(id)) {
+          const entry = current.get(id)
+          if (entry?.state === 'loaded') next.set(id, entry)
+        } else next.set(id, current.get(id)?.state === 'start-failed' ? { state: 'start-failed' } : { state: 'starting', fingerprint: target.fingerprint })
+      }
+      yield* Ref.set(clients, next)
+      for (const target of desired.values()) if (!running.has(target.id)) yield* launch(target)
     })
 
     const restartNow = Effect.fnUntraced(function* (id: string, targets: ReadonlyArray<Target>) {
       yield* stop(id)
-      yield* Ref.update(lifecycle, map => withoutEntry(map, id))
       yield* apply(targets)
     })
 
@@ -108,15 +113,12 @@ export const makeClientReconciler = <Target extends ClientTarget>(
           Effect.gen(function* () {
             const next = yield* plan
             // Every restarted client stops before anything starts, then one apply starts them all.
-            for (const id of next.restart) {
-              yield* stop(id)
-              yield* Ref.update(lifecycle, map => withoutEntry(map, id))
-            }
+            for (const id of next.restart) yield* stop(id)
             yield* apply(next.targets)
           }),
         ),
       restart: (id, targets) => lock.withPermit(restartNow(id, targets)),
-      state: id => Effect.map(Ref.get(lifecycle), map => map.get(id) ?? 'inactive'),
+      state: id => Effect.map(Ref.get(clients), map => map.get(id)?.state ?? 'inactive'),
       dispose: update([]),
     }
     return reconciler
