@@ -3,6 +3,7 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ModelCatalog, ModelSelection, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { joinPageRead } from '@dshfiles/dshx/client'
 
 /** Observable lifecycle of the shared model catalog. */
 export interface ModelCatalogState {
@@ -12,6 +13,9 @@ export interface ModelCatalogState {
 }
 
 const CATALOG_REFRESH_COALESCE_MS = 50
+
+/** Page-wide key: the native Models settings store reads the same catalog in the same Host event bursts. */
+const MODEL_CATALOG_READ = 'remote:session/modelCatalog'
 
 /** Loads at most one model catalog for the current Host generation. */
 export class ModelCatalogDirectory {
@@ -35,6 +39,8 @@ export class ModelCatalogDirectory {
 
   private generation = 0
   private inflight: Promise<ModelCatalog> | undefined
+  /** `performance.now()` of the last Host change: a shared read that started earlier may predate it. */
+  private changedAt = Number.NEGATIVE_INFINITY
 
   /**
    * @param ctx - the providing plugin's context, whose `remote.session`
@@ -55,7 +61,11 @@ export class ModelCatalogDirectory {
       draft.status = 'loading'
       draft.error = null
     })
-    const operation = this.ctx.remote.session.modelCatalog().then((response) => {
+    const operation = joinPageRead({
+      key: MODEL_CATALOG_READ,
+      read: () => this.ctx.remote.session.modelCatalog(),
+      notBefore: this.changedAt,
+    }).then((response) => {
       if (!response.ok) {
         throw new Error(`${response.error.code}: ${response.error.message}`)
       }
@@ -107,6 +117,7 @@ export class ModelCatalogDirectory {
    * within a few milliseconds; refreshing on each started one `session/modelCatalog` read per event.
    */
   scheduleRefresh(): void {
+    this.changedAt = performance.now()
     if (this.pendingRefresh !== undefined) return
     this.pendingRefresh = setTimeout(() => {
       this.pendingRefresh = undefined
@@ -123,6 +134,7 @@ export class ModelCatalogDirectory {
   /** Clear Host-specific values and load the replacement Host generation. */
   resetGeneration(): void {
     this.cancelScheduledRefresh()
+    this.changedAt = performance.now()
     this.reasoning.clear()
     this.invalidate(true)
     void this.load().catch(() => { /* the selector exposes the shared error */ })

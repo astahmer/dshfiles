@@ -45,12 +45,12 @@ this client with an older controller. The Host half is the native no-op.
 Provenance and path mappings live in [native-fork.json](native-fork.json).
 Vendored files stay byte-identical except:
 
-| File                                    | Owned delta                                                                                                                                |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| [directory.ts](src/native/directory.ts) | Subscribe to the public draft list; stage local choices without RPC; resolve local defaults without projection; clean up the subscription. |
-| [catalog.ts](src/native/catalog.ts)     | `scheduleRefresh()`: one catalog read per 50 ms burst of Host change events instead of one per event.                                      |
-| [service.ts](src/native/service.ts)     | Inject `sessionDrafts` and pass it to the single directory owner; refresh the catalog through `scheduleRefresh()`.                         |
-| [index.ts](src/native/index.ts)         | Require the draft service before activating the native surfaces.                                                                           |
+| File                                    | Owned delta                                                                                                                                                                                                                                         |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [directory.ts](src/native/directory.ts) | Subscribe to the public draft list; stage local choices without RPC; resolve local defaults without projection; clean up the subscription.                                                                                                          |
+| [catalog.ts](src/native/catalog.ts)     | `scheduleRefresh()`: one catalog read per 50 ms burst of Host change events instead of one per event; the read is shared page-wide with the Models settings store through dshx `joinPageRead`, never joining a read that started before the change. |
+| [service.ts](src/native/service.ts)     | Inject `sessionDrafts` and pass it to the single directory owner; refresh the catalog through `scheduleRefresh()`.                                                                                                                                  |
+| [index.ts](src/native/index.ts)         | Require the draft service before activating the native surfaces.                                                                                                                                                                                    |
 
 On a DSH upgrade, inspect upstream changes, preserve the native public service and
 all surfaces, reapply only these deltas, and run:
