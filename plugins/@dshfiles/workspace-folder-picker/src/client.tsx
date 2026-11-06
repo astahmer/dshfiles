@@ -80,6 +80,7 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
       headerActions={addActions}
       mode="directories"
       showNativePicker={pickerCapabilities.data?.nativePicker === true}
+      pathStyle={pickerCapabilities.data?.pathStyle}
       onClose={props.onCancel}
       onRegisterWorkspace={props.registerWorkspace}
       onUseAbsolutePath={props.onPicked}

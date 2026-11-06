@@ -22,7 +22,10 @@ const toolsStatus = Effect.fn('project tools status')(function* () {
 /** Read per call: the Host's picker is optional and may come or go, and a browse-only one cannot open a native dialog. */
 const pickerCapabilities = Effect.fn('directory picker read capability')(function* () {
   const picker = yield* hostService('directoryPicker').pipe(Effect.option)
-  return { nativePicker: Option.isSome(picker) && picker.value.capability().kind === 'native' }
+  return {
+    nativePicker: Option.isSome(picker) && picker.value.capability().kind === 'native',
+    pathStyle: process.platform === 'win32' ? ('windows' as const) : ('posix' as const),
+  }
 })
 
 export default DshxPlugin.make({

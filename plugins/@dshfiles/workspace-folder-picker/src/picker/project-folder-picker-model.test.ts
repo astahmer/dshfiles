@@ -30,23 +30,41 @@ describe('project and folder selection', () => {
     expect(ProjectFolderPickerModel.resolvePathQuery('dev', '/Users/me')).toBeNull()
   })
 
+  it('takes the path style from the paths a Host reports', () => {
+    expect(ProjectFolderPickerModel.pathStyleOf('C:\\Users\\me')).toBe('windows')
+    expect(ProjectFolderPickerModel.pathStyleOf('C:/')).toBe('windows')
+    expect(ProjectFolderPickerModel.pathStyleOf('\\\\server\\share')).toBe('windows')
+    expect(ProjectFolderPickerModel.pathStyleOf('/Users/me')).toBe('posix')
+    expect(ProjectFolderPickerModel.pathStyleOf('//server/share')).toBe('posix')
+  })
+
+  it('keeps Windows path syntax a project search on a POSIX Host', () => {
+    for (const query of ['C:/projects', 'c:\\projects', '\\\\server\\share', '~\\dev']) {
+      expect(ProjectFolderPickerModel.isPathQuery(query), query).toBe(false)
+      expect(ProjectFolderPickerModel.resolvePathQuery(query, '/Users/me'), query).toBeNull()
+      expect(ProjectFolderPickerModel.isPathQuery(query, 'windows'), query).toBe(true)
+    }
+    expect(ProjectFolderPickerModel.resolvePathQuery('//server/share///', '/Users/me')).toBe('//server/share')
+    expect(ProjectFolderPickerModel.isPathAtOrWithin('//server/Share/folder', '//server/share')).toBe(false)
+  })
+
   it('recognizes rooted Windows paths and UNC shares without accepting drive-relative or device paths', () => {
     for (const path of ['C:\\', 'C:/', ' C:\\_WORKSPACE\\GameDev ', 'C:/_WORKSPACE/GameDev', '\\\\server\\share', '//server/share/']) {
-      expect(ProjectFolderPickerModel.isAbsolutePath(path), path).toBe(true)
-      expect(ProjectFolderPickerModel.isPathQuery(path), path).toBe(true)
+      expect(ProjectFolderPickerModel.isAbsolutePath(path, 'windows'), path).toBe(true)
+      expect(ProjectFolderPickerModel.isPathQuery(path, 'windows'), path).toBe(true)
     }
     for (const path of ['C:', 'C:relative', '\\relative', '\\\\server', '\\\\?\\C:\\project', '\\\\.\\pipe\\name', '//?/C:/project']) {
-      expect(ProjectFolderPickerModel.isAbsolutePath(path), path).toBe(false)
+      expect(ProjectFolderPickerModel.isAbsolutePath(path, 'windows'), path).toBe(false)
       expect(ProjectFolderPickerModel.resolvePathQuery(path, 'C:\\Users\\me'), path).toBeNull()
     }
   })
 
   it('retains drive and share roots while normalizing trailing and mixed Windows separators', () => {
-    expect(ProjectFolderPickerModel.resolvePathQuery('C:\\\\', undefined)).toBe('C:\\')
-    expect(ProjectFolderPickerModel.resolvePathQuery('C:////', undefined)).toBe('C:/')
-    expect(ProjectFolderPickerModel.resolvePathQuery('C:\\projects/tools\\', undefined)).toBe('C:\\projects\\tools')
-    expect(ProjectFolderPickerModel.resolvePathQuery('\\\\server\\share\\', undefined)).toBe('\\\\server\\share')
-    expect(ProjectFolderPickerModel.resolvePathQuery('//server/share///', undefined)).toBe('//server/share')
+    expect(ProjectFolderPickerModel.resolvePathQuery('C:\\\\', undefined, 'windows')).toBe('C:\\')
+    expect(ProjectFolderPickerModel.resolvePathQuery('C:////', undefined, 'windows')).toBe('C:/')
+    expect(ProjectFolderPickerModel.resolvePathQuery('C:\\projects/tools\\', undefined, 'windows')).toBe('C:\\projects\\tools')
+    expect(ProjectFolderPickerModel.resolvePathQuery('\\\\server\\share\\', undefined, 'windows')).toBe('\\\\server\\share')
+    expect(ProjectFolderPickerModel.resolvePathQuery('//server/share///', undefined, 'windows')).toBe('//server/share')
     expect(ProjectFolderPickerModel.resolvePathQuery('/', undefined)).toBe('/')
   })
 
@@ -54,7 +72,7 @@ describe('project and folder selection', () => {
     expect(ProjectFolderPickerModel.resolvePathQuery('~/projects/tools/', 'C:\\Users\\me')).toBe('C:\\Users\\me\\projects\\tools')
     expect(ProjectFolderPickerModel.resolvePathQuery('~\\projects\\', 'C:\\Users\\me')).toBe('C:\\Users\\me\\projects')
     expect(ProjectFolderPickerModel.resolvePathQuery('~/projects', 'C:\\')).toBe('C:\\projects')
-    expect(ProjectFolderPickerModel.resolvePathQuery('~/projects', '//server/share/')).toBe('//server/share/projects')
+    expect(ProjectFolderPickerModel.resolvePathQuery('~/projects', '\\\\server\\share\\')).toBe('\\\\server\\share\\projects')
     expect(ProjectFolderPickerModel.resolvePathQuery('~', 'C:\\')).toBe('C:\\')
   })
 
@@ -82,7 +100,7 @@ describe('project and folder selection', () => {
     expect(ProjectFolderPickerModel.isPathAtOrWithin('c:/Projects/Tools', 'C:\\projects\\')).toBe(true)
     expect(ProjectFolderPickerModel.isPathAtOrWithin('C:\\Projects', 'C:/')).toBe(true)
     expect(ProjectFolderPickerModel.isPathAtOrWithin('D:\\Projects', 'C:/')).toBe(false)
-    expect(ProjectFolderPickerModel.isPathAtOrWithin('\\\\SERVER\\Share\\folder', '//server/share/')).toBe(true)
+    expect(ProjectFolderPickerModel.isPathAtOrWithin('\\\\SERVER\\Share\\folder', '\\\\server\\share\\')).toBe(true)
     expect(ProjectFolderPickerModel.isPathAtOrWithin('\\\\server\\share-other', '\\\\server\\share')).toBe(false)
     expect(ProjectFolderPickerModel.isPathAtOrWithin('/Users/Me/dev', '/Users/me')).toBe(false)
     expect(ProjectFolderPickerModel.isPathAtOrWithin('C:\\Projects-other', 'C:\\Projects')).toBe(false)
@@ -92,8 +110,8 @@ describe('project and folder selection', () => {
     expect(ProjectFolderPickerModel.folderSelection('C:\\Projects\\Tools\\').title).toBe('Tools')
     expect(ProjectFolderPickerModel.folderSelection('\\\\server\\share\\Tools').title).toBe('Tools')
     expect(ProjectFolderPickerModel.folderSelection('/tmp/back\\slash').title).toBe('back\\slash')
-    expect(ProjectFolderPickerModel.filterRegisteredProjects(projects, 'C:\\Projects')).toEqual([])
-    expect(ProjectFolderPickerModel.pickerSections({ projects, recentFolders: [], query: 'C:\\Projects', tab: 'all' })).toEqual([])
+    expect(ProjectFolderPickerModel.filterRegisteredProjects(projects, 'C:\\Projects', 'windows')).toEqual([])
+    expect(ProjectFolderPickerModel.pickerSections({ projects, recentFolders: [], query: 'C:\\Projects', tab: 'all', pathStyle: 'windows' })).toEqual([])
   })
 
   it('browses one matching directory and keeps ambiguous or incomplete listings explicit', () => {

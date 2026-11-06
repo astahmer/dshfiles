@@ -24,15 +24,18 @@ disk, while its threads lose their project grouping.
 desktop app). Choosing a folder in that dialog adds it as a workspace, or in the
 New-thread picker registers and selects it; cancelling changes nothing. The
 read-only `workspace_folder_browser_capabilities` agent tool reports the same
-capability without opening the dialog. A browse-only Host, a Host without a
-picker, or an older Host that cannot answer the read hides **Browse…** and
-keeps the in-app browser and absolute-path entry.
+capability, and the Host's path style, without opening the dialog. A
+browse-only Host, a Host without a picker, or an older Host that cannot answer
+the read hides **Browse…** and keeps the in-app browser and absolute-path entry.
 
-Paths can be typed or pasted as Unix (`/srv/game`), Windows drive
-(`C:\projects\game` or `C:/projects/game`), UNC (`\\server\share\game`) or
-home-relative (`~/game`, `~\game`). Windows paths compare case-insensitively
-across both separators; drive-relative (`C:game`) and device (`\\?\`, `\\.\`)
-paths are not absolute and are never browsed.
+On a Windows Host, paths can be typed or pasted as drive paths
+(`C:\projects\game` or `C:/projects/game`), UNC paths (`\\server\share\game`),
+Unix-style absolute paths or home-relative paths (`~/game`, `~\game`). They
+compare case-insensitively across both separators; drive-relative (`C:game`)
+and device (`\\?\`, `\\.\`) paths are not absolute and are never browsed. The
+picker learns the Host's style from the capability read, or else from the home
+folder the Host lists. On macOS and Linux, and before the style is known, drive,
+UNC and `~\` text stays a project search, as it always was.
 
 ## Clone a repository
 
@@ -127,6 +130,7 @@ port, and a workspace registration callback.
 
 Optional props: `title`, `machineName`, `placeholder`, `recentFolders`,
 `initialTab`, `pinnedWorkspaceIds`, `disabled`, `mode`, `showNativePicker`,
+`pathStyle` (`'windows'` or `'posix'`, when the caller knows the Host's),
 `onUseAbsolutePath`, and `onRemoveProject`. When supplied, each registered
 project has a separate remove control. It asks for confirmation before calling
 `onRemoveProject`; consumers decide how to unregister the project. The default

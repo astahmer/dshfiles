@@ -28,8 +28,8 @@ export const workspaceFolderBrowserApi = defineApi({
   methods: {
     capabilities: WorkspaceFolderPickerSchema.method({
       input: Schema.Struct({}),
-      output: Schema.Struct({ nativePicker: Schema.Boolean }),
-      description: 'Check whether this Host offers its native folder-selection dialog without opening it.',
+      output: Schema.Struct({ nativePicker: Schema.Boolean, pathStyle: Schema.Literals(['posix', 'windows']) }),
+      description: "Check whether this Host offers its native folder-selection dialog without opening it, and how the Host's folder paths are written.",
       tool: {
         name: 'workspace_folder_browser_capabilities',
         readOnly: true,

@@ -1177,7 +1177,7 @@
     {
       "id": "new-thread-project-picker",
       "title": "Pick a New-thread project",
-      "summary": "The New-thread project picker opens on registered projects only with No folder pinned first; Everything lists No folder, then up to five projects of the latest threads (a thread workspace counts as its project), then the other projects, then JJ thread workspaces, and Workspaces lists only thread workspaces whose folders still exist. A pasted absolute Unix, Windows drive or UNC path registers that folder, and Browse… registers the folder chosen in the Host's native dialog when it has one.",
+      "summary": "The New-thread project picker opens on registered projects only with No folder pinned first; Everything lists No folder, then up to five projects of the latest threads (a thread workspace counts as its project), then the other projects, then JJ thread workspaces, and Workspaces lists only thread workspaces whose folders still exist. A pasted absolute path registers that folder (also a drive or UNC path on a Windows Host), and Browse… registers the folder chosen in the Host's native dialog when it has one.",
       "reach": [
         "seed rebase-ready-thread",
         "click button \"New session\"",

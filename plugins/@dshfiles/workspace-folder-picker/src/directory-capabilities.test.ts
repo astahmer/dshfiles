@@ -6,6 +6,7 @@ import { describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import { workspaceFolderBrowserApi } from './directory-browser-api.js'
 import plugin from './host.js'
+import { ProjectFolderPickerModel } from './picker/project-folder-picker-model.js'
 
 let nativePicks = 0
 
@@ -46,7 +47,7 @@ describe('directory picker capabilities', () => {
   it.live('reports the native dialog without opening it', () =>
     Effect.gen(function* () {
       const { api } = yield* mountedPicker('native')
-      expect(yield* Effect.promise(() => api.capabilities({}))).toEqual({ nativePicker: true })
+      expect(yield* Effect.promise(() => api.capabilities({}))).toMatchObject({ nativePicker: true })
       expect(nativePicks).toBe(0)
     }),
   )
@@ -54,7 +55,7 @@ describe('directory picker capabilities', () => {
   it.live('keeps the in-app folder browser when the Host picker is browse-only', () =>
     Effect.gen(function* () {
       const { api } = yield* mountedPicker('browse')
-      expect(yield* Effect.promise(() => api.capabilities({}))).toEqual({ nativePicker: false })
+      expect(yield* Effect.promise(() => api.capabilities({}))).toMatchObject({ nativePicker: false })
       expect(yield* Effect.promise(() => api.list({}))).toMatchObject({ path: expect.any(String), home: expect.any(String), entries: expect.any(Array) })
     }),
   )
@@ -62,7 +63,7 @@ describe('directory picker capabilities', () => {
   it.live('keeps the in-app folder browser when the Host has no picker', () =>
     Effect.gen(function* () {
       const { api } = yield* mountedPicker('none')
-      expect(yield* Effect.promise(() => api.capabilities({}))).toEqual({ nativePicker: false })
+      expect(yield* Effect.promise(() => api.capabilities({}))).toMatchObject({ nativePicker: false })
       expect(yield* Effect.promise(() => api.list({}))).toMatchObject({ path: expect.any(String), home: expect.any(String) })
     }),
   )
@@ -70,9 +71,17 @@ describe('directory picker capabilities', () => {
   it.live('stops offering the native dialog once the Host picker is unloaded', () =>
     Effect.gen(function* () {
       const { api, picker } = yield* mountedPicker('native')
-      expect(yield* Effect.promise(() => api.capabilities({}))).toEqual({ nativePicker: true })
+      expect(yield* Effect.promise(() => api.capabilities({}))).toMatchObject({ nativePicker: true })
       yield* Effect.promise(async () => picker?.dispose())
-      expect(yield* Effect.promise(() => api.capabilities({}))).toEqual({ nativePicker: false })
+      expect(yield* Effect.promise(() => api.capabilities({}))).toMatchObject({ nativePicker: false })
+    }),
+  )
+
+  it.live('reports the path style of the folders it lists', () =>
+    Effect.gen(function* () {
+      const { api } = yield* mountedPicker('browse')
+      const listing = yield* Effect.promise(() => api.list({}))
+      expect((yield* Effect.promise(() => api.capabilities({}))).pathStyle).toBe(ProjectFolderPickerModel.pathStyleOf(listing.home))
     }),
   )
 

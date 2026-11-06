@@ -204,6 +204,7 @@ export const HeroWorkspacePicker = (
         onSelect={selection => void choose(selection).catch(() => props.onClose())}
         onClose={props.onClose}
         showNativePicker={pickerCapabilities.data?.nativePicker === true}
+        pathStyle={pickerCapabilities.data?.pathStyle}
         disabled={projects.isLoading}
         loading={projects.isLoading}
         heading={props.t('chooseProject')}
