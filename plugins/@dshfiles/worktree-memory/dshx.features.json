@@ -207,7 +207,7 @@
         {
           "kind": "not-applicable",
           "id": "worktree-memory.orphan-browser-journey",
-          "reason": "A journey needs a live orphaned --profile dshx-boot process with a record in the shared $TMPDIR/dshx-scratch directory, which the dshx sweeper of any concurrent scratch boot reaps mid-run; the section, Stop orphans and the status warning were proven in a scratch DSH with a fake orphan (plans/orphan-cleanup.md P7)."
+          "reason": "A journey needs a live orphaned --profile dshx-boot process with a record in the shared $TMPDIR/dshx-scratch directory, which the dshx sweeper of any concurrent scratch boot reaps mid-run; the section, Stop orphans and the status warning were proven in a scratch DSH with a fake orphan (docs/orphan-cleanup.md)."
         }
       ],
       "telemetry": [

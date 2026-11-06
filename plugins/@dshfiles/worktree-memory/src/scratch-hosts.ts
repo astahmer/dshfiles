@@ -13,8 +13,7 @@ export interface ScratchProcessRow {
 }
 
 /**
- * `${os.tmpdir()}/dshx-scratch/<hostPid>.json`, written by dshx for every scratch Host it starts (plans/orphan-cleanup
- * P2). Read here directly: the contract is a file shape, not a dshx module this plugin could import.
+ * `${os.tmpdir()}/dshx-scratch/<hostPid>.json`, written by dshx for every scratch Host it starts (docs/orphan-cleanup.md). Read here directly: the contract is a file shape, not a dshx module this plugin could import.
  */
 const scratchRecordSchema = Schema.Struct({
   hostPid: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),

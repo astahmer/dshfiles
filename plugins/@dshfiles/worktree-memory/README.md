@@ -59,7 +59,7 @@ section and in the footer.
 The RAM tab lists every scratch DSH Host of this user (`--profile dshx-boot`: E2E fixtures and `dshx dev up`) by owner,
 with CPU and resident memory summed over its tree. The owner comes from the record dshx writes for each scratch Host,
 `$TMPDIR/dshx-scratch/<hostPid>.json` = `{ hostPid, hostStartedAt, ownerPid, ownerStartedAt, workspace, kind, command }`
-([orphan cleanup plan](../../../plans/orphan-cleanup.md), P2). The Host reads those files itself and decodes them with
+([orphan cleanup](../../../docs/orphan-cleanup.md)). The Host reads those files itself and decodes them with
 Effect Schema; a missing directory means no records and a malformed file is skipped.
 
 A Host is an **orphan** when:
