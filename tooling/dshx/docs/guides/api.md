@@ -167,6 +167,12 @@ its own; a batch route would re-implement dispatch, per-call abort and trace pro
 every call of a tick would wait for the slowest one. Coalescing removes the duplicate-read storms batching was meant
 for without that head-of-line blocking.
 
+Native core reads through `ctx.remote` (`session/modelCatalog`, `agentPresets/list`) bypass this. When several
+owners read the same core method, wrap the call in `joinPageRead({ key, read, notBefore })` from
+`@dshfiles/dshx/client`: callers of one key share the read still in flight, page-wide across bundles. Pass the
+`performance.now()` of the Host event that asked for the read as `notBefore`, so a read that started before that
+change is not joined; a settled read is never served again.
+
 ## `useApiQuery`
 
 ```tsx

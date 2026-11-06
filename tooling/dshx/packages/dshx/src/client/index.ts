@@ -57,6 +57,10 @@ export type {
 import { HostStorageModel } from './host-storage.js'
 /** Host-backed key-value storage and stores for a plugin; see the plugin-context guide. */
 export const hostStorage = HostStorageModel.forPlugin
+import { PageReadModel } from './page-read.js'
+export type { JoinPageReadInput } from './page-read.js'
+/** Share one in-flight native `ctx.remote` read page-wide between owners of the same Host method. */
+export const joinPageRead = PageReadModel.join
 import { ApiClientEventsModel } from '../api/client-events.js'
 /** Follow a Host-published API event outside React; see `useApiEvent`. */
 export const subscribeApiEvent = ApiClientEventsModel.subscribe

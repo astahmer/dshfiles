@@ -63,6 +63,7 @@ const API_CLIENT_EVENTS_PATH = fileURLToPath(new URL('../../api/client-events.js
 const API_RESOURCE_PATH = fileURLToPath(new URL('../../api/api-resource.js', import.meta.url))
 const API_RESOURCE_STORE_PATH = fileURLToPath(new URL('../../api/resource-store.js', import.meta.url))
 const CLIENT_HOST_STORAGE_PATH = fileURLToPath(new URL('../../client/host-storage.js', import.meta.url))
+const CLIENT_PAGE_READ_PATH = fileURLToPath(new URL('../../client/page-read.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
 const API_ZOD_VIEW_PATH = fileURLToPath(new URL('../../api/zod-view.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
@@ -188,6 +189,8 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `export { hostStorage } from ${JSON.stringify(VIRTUAL_CLIENT_HOST_STORAGE)}`,
           `import { ApiClientEventsModel } from ${JSON.stringify(API_CLIENT_EVENTS_PATH)}`,
           'export const subscribeApiEvent = ApiClientEventsModel.subscribe',
+          `import { PageReadModel } from ${JSON.stringify(CLIENT_PAGE_READ_PATH)}`,
+          'export const joinPageRead = PageReadModel.join',
           `import { ApiRuntimeModel } from ${JSON.stringify(API_RUNTIME_PATH)}`,
           'export const createApiClient = ApiRuntimeModel.createClient',
           'export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient',
