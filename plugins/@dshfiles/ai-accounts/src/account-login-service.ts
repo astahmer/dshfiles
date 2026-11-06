@@ -3,6 +3,7 @@ import type { AccountLoginState } from './account-login-api.js'
 import { codexLoginFiles, type CodexLoginFiles } from './codex-login-files.js'
 import { CodexLoginUnsupported, createCodexLoginRunner, type RunCodexLogin } from './codex-login-process.js'
 import type { CodexHomeLayout } from './codex-home.js'
+import { DeviceLoginModel, type DeviceLoginEvent, type DeviceLoginPhase } from './device-login-machine.js'
 
 export interface AccountLoginAccount {
   readonly instanceId: string
@@ -10,24 +11,38 @@ export interface AccountLoginAccount {
   readonly layout?: CodexHomeLayout
 }
 
+type LoginFailure = NonNullable<AccountLoginState['errorCode']>
+
 const LOGIN_TIMEOUT_MS = 15 * 60_000
 const OUTPUT_LIMIT = 16 * 1024
 const DEVICE_URI = 'https://auth.openai.com/codex/device'
-const idle = (instanceId: string): AccountLoginState => ({
-  instanceId,
-  status: 'idle',
-  message: 'Sign-in has not started.',
-  errorCode: null,
-  verificationUri: null,
-  userCode: null,
-  expiresAt: null,
-})
-const errorState = (instanceId: string, errorCode: NonNullable<AccountLoginState['errorCode']>, message: string): AccountLoginState => ({
-  ...idle(instanceId),
-  status: 'error',
-  errorCode,
+const CANCELLED_BY_ACCOUNT_CHANGE = 'Sign-in cancelled because the account changed or was removed.'
+const CANCELLED_BY_USER = 'Sign-in cancelled. The existing account login was not replaced.'
+const CANCELLED_ON_CLOSE = 'Sign-in stopped because AI Accounts closed.'
+
+const idlePhase = (): DeviceLoginPhase<LoginFailure> => ({ kind: 'idle', message: null })
+const startPhase = (message: string): DeviceLoginPhase<LoginFailure> => ({ kind: 'starting', message })
+const failedPhase = (failure: LoginFailure, message: string): DeviceLoginPhase<LoginFailure> => ({
+  kind: 'failed',
   message,
+  failure,
+  prompt: null,
 })
+const cancelledPhase = (message: string): DeviceLoginPhase<LoginFailure> => ({ kind: 'cancelled', message })
+
+const project = (instanceId: string, phase: DeviceLoginPhase<LoginFailure>, expiresAt: number | null): AccountLoginState => {
+  const view = DeviceLoginModel.view(phase)
+  const prompt = view.status === 'waiting' ? view.prompt : null
+  return {
+    instanceId,
+    status: view.status,
+    message: view.message ?? 'Sign-in has not started.',
+    errorCode: view.failure,
+    verificationUri: prompt === null ? null : DEVICE_URI,
+    userCode: prompt?.userCode ?? null,
+    expiresAt: view.status === 'starting' || view.status === 'waiting' ? expiresAt : null,
+  }
+}
 
 /** Pinned official CLI prompt, never a general URL/code scraper. Parse complete lines only. */
 export const parseCodexDeviceInstructions = (raw: string): { verificationUri: typeof DEVICE_URI; userCode: string } | undefined => {
@@ -40,10 +55,24 @@ export const parseCodexDeviceInstructions = (raw: string): { verificationUri: ty
   return code === undefined ? undefined : { verificationUri: DEVICE_URI, userCode: code }
 }
 
-interface Attempt {
+interface AttemptWork {
   readonly controller: AbortController
   readonly home: string
   readonly timer: ReturnType<typeof setTimeout>
+}
+
+interface Attempt {
+  /** Identity of one attempt: a saved-account lookup and the CLI it later starts share it. */
+  readonly token: symbol
+  readonly phase: DeviceLoginPhase<LoginFailure>
+  readonly expiresAt: number | null
+  readonly work: AttemptWork | null
+}
+
+interface PendingAdoption {
+  readonly stage: CodexHomeLayout
+  readonly target: CodexHomeLayout
+  readonly fingerprint: string | null
 }
 
 export const createAccountLoginService = (input: {
@@ -57,12 +86,44 @@ export const createAccountLoginService = (input: {
   const files = input.files ?? codexLoginFiles
   const run = input.run ?? createCodexLoginRunner()
   const attempts = new Map<string, Attempt>()
-  const lookups = new Map<string, object>()
-  const states = new Map<string, AccountLoginState>()
   const tasks = new Set<Promise<void>>()
   const tasksByAccount = new Map<string, Promise<void>>()
-  const pendingAdoptions = new Map<string, { stage: CodexHomeLayout; target: CodexHomeLayout; fingerprint: string | null }>()
+  const pendingAdoptions = new Map<string, PendingAdoption>()
   const cleanups = new Map<string, Promise<void>>()
+  let disposed = false
+
+  const attempt = (id: string): Attempt | undefined => attempts.get(id)
+  const owns = (id: string, token: symbol): boolean => attempts.get(id)?.token === token
+  const live = (id: string, token: symbol, work: AttemptWork): boolean => !disposed && owns(id, token) && !work.controller.signal.aborted
+  const write = (id: string, token: symbol, phase: DeviceLoginPhase<LoginFailure>): void => {
+    const current = attempts.get(id)
+    if (current === undefined || current.token !== token) return
+    attempts.set(id, { ...current, phase })
+  }
+  const send = (id: string, token: symbol, event: DeviceLoginEvent<LoginFailure>): void => {
+    const current = attempts.get(id)
+    if (current === undefined || current.token !== token) return
+    write(id, token, DeviceLoginModel.transition(current.phase, event))
+  }
+  const stop = (id: string, token: symbol, event: DeviceLoginEvent<LoginFailure>): void => {
+    const current = attempts.get(id)
+    if (current === undefined || current.token !== token) return
+    if (current.work !== null) {
+      clearTimeout(current.work.timer)
+      current.work.controller.abort()
+    }
+    write(id, token, DeviceLoginModel.transition(current.phase, event))
+  }
+  const fail = (id: string, token: symbol, work: AttemptWork, failure: LoginFailure, message: string): void => {
+    if (!live(id, token, work)) return
+    stop(id, token, { type: 'fail', failure, message })
+  }
+  const state = (id: string): AccountLoginState => {
+    const current = attempts.get(id)
+    return current === undefined ? project(id, idlePhase(), null) : project(id, current.phase, current.expiresAt)
+  }
+  const reject = (id: string, failure: LoginFailure, message: string): AccountLoginState => project(id, failedPhase(failure, message), null)
+
   const discardPending = (id: string): Promise<void> => {
     const pending = pendingAdoptions.get(id)
     pendingAdoptions.delete(id)
@@ -76,93 +137,105 @@ export const createAccountLoginService = (input: {
       .catch(() => undefined)
     return cleanup
   }
-  let disposed = false
-  const state = (id: string): AccountLoginState => ({ ...(states.get(id) ?? idle(id)) })
-  const live = (id: string, attempt: Attempt): boolean => !disposed && attempts.get(id) === attempt && !attempt.controller.signal.aborted
-  const stop = (id: string, next: AccountLoginState): void => {
-    const attempt = attempts.get(id)
-    if (attempt !== undefined) {
-      clearTimeout(attempt.timer)
-      attempt.controller.abort()
-    }
-    states.set(id, next)
-  }
-  const fail = (id: string, attempt: Attempt, code: NonNullable<AccountLoginState['errorCode']>, message: string): void => {
-    if (live(id, attempt)) stop(id, errorState(id, code, message))
+
+  const cancelPhase = (id: string, message: string): void => {
+    const current = attempts.get(id)
+    attempts.set(
+      id,
+      current === undefined
+        ? { token: Symbol('codex-login-cancelled'), phase: cancelledPhase(message), expiresAt: null, work: null }
+        : { ...current, phase: cancelledPhase(message) },
+    )
   }
 
   const begin = async (id: string, replaceExisting?: true): Promise<AccountLoginState> => {
-    if (disposed) return errorState(id, 'unavailable', 'Account sign-in is unavailable.')
-    if (lookups.has(id)) return { ...state(id), status: 'starting', message: 'Reading the saved account…' }
+    if (disposed) return reject(id, 'unavailable', 'Account sign-in is unavailable.')
+    const previous = attempt(id)
+    if (previous !== undefined && (previous.work !== null || DeviceLoginModel.isActive(previous.phase))) return state(id)
     // Establish cancellation identity before the first I/O; even a late saved-account lookup must not resurrect an intent.
-    const lookup = {}
-    lookups.set(id, lookup)
+    const token = Symbol('codex-login-attempt')
+    attempts.set(id, { token, phase: startPhase('Reading the saved account…'), expiresAt: null, work: null })
+    const restore = (): void => {
+      if (!owns(id, token)) return
+      if (previous === undefined) attempts.delete(id)
+      else attempts.set(id, previous)
+    }
     let account: AccountLoginAccount | undefined
     try {
       account = await input.account(id)
     } catch {
-      if (lookups.get(id) !== lookup) return state(id)
-      lookups.delete(id)
-      return errorState(id, 'unavailable', 'The saved account could not be read.')
+      restore()
+      return reject(id, 'unavailable', 'The saved account could not be read.')
     }
-    if (disposed || lookups.get(id) !== lookup) return state(id)
-    lookups.delete(id)
-    if (account === undefined) return errorState(id, 'unavailable', 'This saved account is no longer available.')
-    if (account.kind !== 'codex')
-      return errorState(
+    const started = attempts.get(id)
+    if (disposed || !owns(id, token) || started === undefined || !DeviceLoginModel.isActive(started.phase)) return state(id)
+    if (account === undefined) {
+      restore()
+      return reject(id, 'unavailable', 'This saved account is no longer available.')
+    }
+    if (account.kind !== 'codex') {
+      restore()
+      return reject(
         id,
         'unsupported',
         account.kind === 'claude'
           ? 'Managed Claude sign-in is unavailable: an installed official Claude CLI flow is required. DSH does not recreate Claude.ai OAuth.'
           : 'This provider does not support managed Codex device sign-in. Use its existing key or Copilot setup.',
       )
+    }
     const layout = account.layout
-    if (layout === undefined) return errorState(id, 'unsafe-home', 'A valid private Codex account home is required.')
+    if (layout === undefined) {
+      restore()
+      return reject(id, 'unsafe-home', 'A valid private Codex account home is required.')
+    }
     // The filesystem owner validates either a legacy overlay or an exact Host-managed setup home.
     // Do not infer that every direct layout is a private account home.
     // Includes a cancelled CLI that is still exiting. Never race two writers for one account.
-    if (attempts.has(id) || pendingAdoptions.has(id) || cleanups.has(id)) return state(id)
+    if (pendingAdoptions.has(id) || cleanups.has(id)) {
+      restore()
+      return state(id)
+    }
     const controller = new AbortController()
     const expiresAt = Date.now() + (input.timeoutMs ?? LOGIN_TIMEOUT_MS)
-    const attempt: Attempt = {
+    const work: AttemptWork = {
       controller,
       home: layout.effectiveHomePath,
-      timer: setTimeout(() => fail(id, attempt, 'timeout', 'Codex sign-in expired. Start again from the Web GUI.'), input.timeoutMs ?? LOGIN_TIMEOUT_MS),
+      timer: setTimeout(() => fail(id, token, work, 'timeout', 'Codex sign-in expired. Start again from the Web GUI.'), input.timeoutMs ?? LOGIN_TIMEOUT_MS),
     }
-    attempt.timer.unref()
-    attempts.set(id, attempt)
-    states.set(id, { ...idle(id), status: 'starting', message: 'Starting the official Codex device sign-in…', expiresAt })
+    work.timer.unref()
+    attempts.set(id, { token, phase: startPhase('Starting the official Codex device sign-in…'), expiresAt, work })
     const task = (async () => {
       let staging: CodexHomeLayout | undefined
-      let phase: 'home' | 'login' | 'auth' | 'refresh' = 'home'
       try {
         await files.prepare(layout)
-        if (!live(id, attempt)) return
+        if (!live(id, token, work)) return
         const before = await files.auth(layout)
-        if (!live(id, attempt)) return
+        if (!live(id, token, work)) return
         if (before.hasCredential && replaceExisting !== true) {
           fail(
             id,
-            attempt,
+            token,
+            work,
             'replace-required',
             'This account already has CLI credentials. Confirm replacement to connect another account; the existing login is preserved until successful authorization.',
           )
           return
         }
         staging = await files.stage(layout)
-        if (!live(id, attempt)) return
-        phase = 'login'
+        if (!live(id, token, work)) return
+        send(id, token, { type: 'run' })
         let output = ''
         let outputBytes = 0
         const code = await run({
           home: staging.effectiveHomePath,
           signal: controller.signal,
           onOutput: chunk => {
-            if (!live(id, attempt) || state(id).status === 'waiting') return
+            const current = attempt(id)
+            if (!live(id, token, work) || current === undefined || (current.phase.kind !== 'starting' && current.phase.kind !== 'running')) return
             outputBytes += Buffer.byteLength(chunk)
             if (outputBytes > OUTPUT_LIMIT) {
               output = ''
-              fail(id, attempt, 'invalid-output', 'Codex returned an unsupported device prompt. Update the official CLI and retry.')
+              fail(id, token, work, 'invalid-output', 'Codex returned an unsupported device prompt. Update the official CLI and retry.')
               return
             }
             output += chunk
@@ -170,81 +243,89 @@ export const createAccountLoginService = (input: {
               const instructions = parseCodexDeviceInstructions(output)
               if (instructions === undefined) return
               output = ''
-              states.set(id, {
-                ...idle(id),
-                ...instructions,
-                status: 'waiting',
-                expiresAt,
+              send(id, token, {
+                type: 'device',
+                prompt: instructions,
                 message: 'Open the OpenAI link and enter this code yourself. Continue only if you started this sign-in.',
               })
             } catch {
               output = ''
-              fail(id, attempt, 'invalid-output', 'Codex returned an untrusted verification link. Sign-in was stopped.')
+              fail(id, token, work, 'invalid-output', 'Codex returned an untrusted verification link. Sign-in was stopped.')
             }
           },
         })
         output = ''
-        if (!live(id, attempt)) return
+        if (!live(id, token, work)) return
         if (code !== 0) {
-          fail(id, attempt, 'failed', 'Official Codex device sign-in failed. Check Host connectivity, CLI device-auth support and account policy, then retry.')
+          fail(
+            id,
+            token,
+            work,
+            'failed',
+            'Official Codex device sign-in failed. Check Host connectivity, CLI device-auth support and account policy, then retry.',
+          )
           return
         }
-        phase = 'auth'
+        send(id, token, { type: 'adopt' })
         const auth = await files.auth(staging)
-        if (!live(id, attempt)) return
+        if (!live(id, token, work)) return
         const current = await input.account(id)
-        if (!live(id, attempt)) return
-        if (current?.kind !== 'codex' || current.layout?.effectiveHomePath !== layout.effectiveHomePath) {
-          stop(id, { ...idle(id), status: 'cancelled', message: 'Sign-in cancelled because the account changed or was removed.' })
-          return
-        }
+        if (!live(id, token, work)) return
+        if (current?.kind !== 'codex' || current.layout?.effectiveHomePath !== layout.effectiveHomePath)
+          return stop(id, token, { type: 'cancel', message: CANCELLED_BY_ACCOUNT_CHANGE })
         if (!auth.signedIn) {
-          fail(id, attempt, 'auth-not-saved', 'Codex exited successfully but did not save a valid ChatGPT token pair. The existing login was preserved.')
+          fail(id, token, work, 'auth-not-saved', 'Codex exited successfully but did not save a valid ChatGPT token pair. The existing login was preserved.')
           return
         }
         if (input.deferAdoption?.(id) === true) {
           pendingAdoptions.set(id, { stage: staging, target: layout, fingerprint: before.fingerprint })
           staging = undefined // The connection owner now owns cleanup/adoption of this exact stage.
         } else if (!files.adopt(staging, layout, before.fingerprint)) {
-          fail(id, attempt, 'auth-changed', 'The account credentials changed during sign-in. The newer login was preserved; retry if needed.')
+          fail(id, token, work, 'auth-changed', 'The account credentials changed during sign-in. The newer login was preserved; retry if needed.')
           return
         }
-        clearTimeout(attempt.timer)
-        states.set(id, { ...idle(id), status: 'complete', message: 'Codex is connected. The official CLI credential is saved in this account’s private home.' })
-        phase = 'refresh'
+        clearTimeout(work.timer)
+        send(id, token, { type: 'complete', message: 'Codex is connected. The official CLI credential is saved in this account’s private home.' })
         await input.onComplete(id)
       } catch (error) {
-        if (error instanceof CodexLoginUnsupported) fail(id, attempt, 'unsupported', error.message)
-        else if (phase === 'home')
-          fail(
-            id,
-            attempt,
-            'unsafe-home',
-            'The private Codex home could not be prepared safely. Check its owner, permissions and path; symlinked homes or auth files are not accepted.',
-          )
-        else if (phase === 'refresh')
-          fail(id, attempt, 'refresh-failed', 'Codex credentials were saved, but account routes could not refresh. Reload the Accounts page.')
-        else fail(id, attempt, 'failed', 'Official Codex sign-in failed. The existing login was preserved; check the Host and retry.')
+        if (error instanceof CodexLoginUnsupported) fail(id, token, work, 'unsupported', error.message)
+        else {
+          const phase = attempt(id)?.phase
+          if (phase?.kind === 'starting') {
+            fail(
+              id,
+              token,
+              work,
+              'unsafe-home',
+              'The private Codex home could not be prepared safely. Check its owner, permissions and path; symlinked homes or auth files are not accepted.',
+            )
+          } else if (phase?.kind === 'complete')
+            fail(id, token, work, 'refresh-failed', 'Codex credentials were saved, but account routes could not refresh. Reload the Accounts page.')
+          else fail(id, token, work, 'failed', 'Official Codex sign-in failed. The existing login was preserved; check the Host and retry.')
+        }
       } finally {
-        clearTimeout(attempt.timer)
+        clearTimeout(work.timer)
         if (staging !== undefined) {
           try {
             await files.cleanup(staging)
           } catch {
-            if (!disposed && attempts.get(id) === attempt) {
-              const saved = state(id).status === 'complete'
-              states.set(
-                id,
-                errorState(
-                  id,
-                  'cleanup-failed',
-                  `${saved ? 'Codex credentials were saved, but' : 'Sign-in stopped, but'} private temporary sign-in files could not be removed. Check Host private-home permissions before retrying.`,
-                ),
-              )
+            const settled = attempt(id)
+            if (!disposed && settled?.token === token) {
+              attempts.set(id, {
+                ...settled,
+                phase: DeviceLoginModel.transition(settled.phase, {
+                  type: 'cleanup-failed',
+                  failure: 'cleanup-failed',
+                  message: `${
+                    settled.phase.kind === 'complete' ? 'Codex credentials were saved, but' : 'Sign-in stopped, but'
+                  } private temporary sign-in files could not be removed. Check Host private-home permissions before retrying.`,
+                }),
+              })
             }
           }
         }
-        if (attempts.get(id) === attempt) attempts.delete(id)
+        const finished = attempt(id)
+        if (finished?.token === token) attempts.set(id, { ...finished, work: null })
       }
     })()
     tasks.add(task)
@@ -272,38 +353,43 @@ export const createAccountLoginService = (input: {
       await files.cleanup(pending.stage)
     },
     cancel: (id: string): AccountLoginState => {
-      if (lookups.delete(id)) states.set(id, { ...idle(id), status: 'cancelled', message: 'Sign-in cancelled before the account lookup finished.' })
+      const current = attempt(id)
+      if (current !== undefined && current.work === null && DeviceLoginModel.isActive(current.phase))
+        cancelPhase(id, 'Sign-in cancelled before the account lookup finished.')
       if (pendingAdoptions.has(id)) {
         void discardPending(id).catch(() => undefined)
-        states.set(id, { ...idle(id), status: 'cancelled', message: 'Sign-in cancelled. The existing account login was not replaced.' })
+        cancelPhase(id, CANCELLED_BY_USER)
+        return state(id)
       }
-      if (attempts.has(id) && ['starting', 'waiting'].includes(state(id).status))
-        stop(id, { ...idle(id), status: 'cancelled', message: 'Sign-in cancelled. The existing account login was not replaced.' })
+      const running = attempt(id)
+      if (running !== undefined && running.work !== null && DeviceLoginModel.isActive(running.phase))
+        stop(id, running.token, { type: 'cancel', message: CANCELLED_BY_USER })
       return state(id)
     },
     reconcile: (accounts: readonly AccountLoginAccount[]): void => {
       const byId = new Map(accounts.map(account => [account.instanceId, account]))
-      for (const id of lookups.keys())
-        if (!byId.has(id)) {
-          lookups.delete(id)
-          states.set(id, { ...idle(id), status: 'cancelled', message: 'Sign-in cancelled because the account changed or was removed.' })
-        }
-      for (const [id, attempt] of attempts) {
-        if (!['starting', 'waiting'].includes(state(id).status)) continue
+      for (const [id, current] of attempts) {
         const account = byId.get(id)
-        if (account?.kind === 'codex' && account.layout?.effectiveHomePath === attempt.home) continue
-        stop(id, { ...idle(id), status: 'cancelled', message: 'Sign-in cancelled because the account changed or was removed.' })
+        if (DeviceLoginModel.isActive(current.phase)) {
+          if (current.work === null) {
+            if (account === undefined) cancelPhase(id, CANCELLED_BY_ACCOUNT_CHANGE)
+            continue
+          }
+          if (account?.kind === 'codex' && account.layout?.effectiveHomePath === current.work.home) continue
+          stop(id, current.token, { type: 'cancel', message: CANCELLED_BY_ACCOUNT_CHANGE })
+          continue
+        }
+        if (account === undefined && current.work === null) attempts.delete(id)
       }
-      for (const id of states.keys()) if (!byId.has(id) && !attempts.has(id)) states.delete(id)
     },
     dispose: (): void => {
       disposed = true
-      for (const id of lookups.keys()) states.set(id, { ...idle(id), status: 'cancelled', message: 'Sign-in stopped because AI Accounts closed.' })
-      lookups.clear()
+      for (const [id, current] of attempts) {
+        if (current.work === null && DeviceLoginModel.isActive(current.phase)) cancelPhase(id, CANCELLED_ON_CLOSE)
+      }
       for (const id of pendingAdoptions.keys()) void discardPending(id).catch(() => undefined)
-      for (const id of attempts.keys()) {
-        if (['starting', 'waiting'].includes(state(id).status))
-          stop(id, { ...idle(id), status: 'cancelled', message: 'Sign-in stopped because AI Accounts closed.' })
+      for (const [id, current] of attempts) {
+        if (current.work !== null && DeviceLoginModel.isActive(current.phase)) stop(id, current.token, { type: 'cancel', message: CANCELLED_ON_CLOSE })
       }
     },
     settledAccount: async (id: string): Promise<void> => {
