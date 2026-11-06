@@ -5,10 +5,6 @@ const LOOKAHEAD_VIEWPORTS = 2
 type GraphPageScope = { readonly repoId: string | null; readonly query: string; readonly generation: string }
 
 export class GraphPagingModel {
-  /** Cached pages and delayed responses belong only to the exact repository/search/refresh snapshot that requested them. */
-  static readonly samePageSet = (left: GraphPageScope, right: GraphPageScope): boolean =>
-    left.repoId === right.repoId && left.query === right.query && left.generation === right.generation
-
   /**
    * Older pages belong to one first-page snapshot. A refresh that reads the same repository keeps the same query data
    * reference, so only a changed snapshot starts a new page set and scrolled history survives every unchanged poll.
@@ -18,6 +14,20 @@ export class GraphPagingModel {
     state: State | undefined,
   ): { readonly state: State | undefined; readonly generation: number } =>
     previous.state === state ? previous : { state, generation: previous.generation + 1 }
+
+  /** A search reads its own history from the top; the graph's own first page is already in the repository read. */
+  static readonly firstPageExclude = (input: { readonly query: string; readonly baseCommitIds: readonly string[] }): readonly string[] =>
+    input.query.length > 0 ? [] : input.baseCommitIds
+
+  /** The next page excludes what is already loaded; a page that added nothing ends the chain, whatever the Host says. */
+  static readonly nextPageExclude = (input: {
+    readonly hasMore: boolean
+    readonly addedCommitIds: readonly string[]
+    readonly excludeCommitIds: readonly string[]
+  }): readonly string[] | undefined => (input.hasMore && input.addedCommitIds.length > 0 ? [...input.excludeCommitIds, ...input.addedCommitIds] : undefined)
+
+  /** A repository read and the search text name the page set an infinite query is keyed by. */
+  static readonly pageSetScope = (pageSet: GraphPageScope): string => `${pageSet.repoId ?? ''}|${pageSet.query}|${pageSet.generation}`
 
   /** Revisions the graph loads before anything scrolls, so a first look is never a single page. */
   static readonly revisionFloor = 40
@@ -39,19 +49,4 @@ export class GraphPagingModel {
   }): boolean =>
     input.loadedRevisions < GraphPagingModel.revisionLimit &&
     (input.loadedRevisions < GraphPagingModel.revisionFloor || GraphPagingModel.needsAnotherPage(input))
-
-  /** Where the next page starts. The loaded revisions it excludes only grow, so their count and last id name the request. */
-  static readonly cursor = (excludeCommitIds: readonly string[]): string => `${excludeCommitIds.length}:${excludeCommitIds.at(-1) ?? ''}`
-
-  /** A page that failed at a cursor fails again there, so it is asked for again only once the loaded history moves. */
-  static readonly canRequestPage = (input: {
-    readonly hasMore: boolean
-    readonly pending: boolean
-    readonly cursor: string
-    readonly failedCursor: string | null
-  }): boolean => input.hasMore && !input.pending && input.cursor !== input.failedCursor
-
-  /** A page that adds no new revision leaves the cursor where it was; asking again would return the same page. */
-  static readonly hasMoreAfterPage = (input: { readonly hasMore: boolean; readonly addedRevisions: number }): boolean =>
-    input.hasMore && input.addedRevisions > 0
 }

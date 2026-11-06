@@ -65,7 +65,7 @@ import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { errorMessage, keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, keepPreviousData, useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/workspace-folder-picker/picker'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
@@ -451,7 +451,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     },
   })
 
-  const graphGenerationRef = useRef('')
   const [graphGeneration, setGraphGeneration] = useState(0)
   const stateQuery = useQuery({
     queryKey: jujutsuQueryKeys.state(path, REVISION_PAGE_SIZE),
@@ -464,7 +463,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const loadedState = useRef<{ readonly state: typeof state; readonly generation: number }>({ state: undefined, generation: 0 })
   loadedState.current = GraphPagingModel.snapshotGeneration(loadedState.current, state)
   const graphSnapshotGeneration = `${graphGeneration}:${loadedState.current.generation}`
-  graphGenerationRef.current = graphSnapshotGeneration
   const graphOnScreen = autoRefresh.visible && view === 'graph' && !diffTabOpen
   useEffect(() => {
     if (stateQuery.error === null) return
@@ -474,64 +472,34 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     if (state !== undefined) sendRegistration({ type: 'state.loaded' })
   }, [state, sendRegistration])
   const debouncedSearch = useDebouncedValue({ value: textFilter.trim(), delayMs: 250 })
-  const debouncedSearchRef = useRef(debouncedSearch)
-  debouncedSearchRef.current = debouncedSearch
-  const [graphPageState, setGraphPageState] = useState<{
-    readonly repoId: string | null
-    readonly query: string
-    readonly generation: string
-    readonly revisions: readonly Revision[]
-    readonly hasMore: boolean
-    readonly failedCursor: string | null
-  }>({ repoId: null, query: '', generation: '', revisions: [], hasMore: false, failedCursor: null })
-  const graphPageMutation = useMutation({
-    mutationFn: async (input: { readonly repoId: string; readonly query: string; readonly generation: string; readonly excludeCommitIds: readonly string[] }) =>
-      throwReadFailure(await api.graphPage({ repoId: input.repoId, query: input.query, excludeCommitIds: [...input.excludeCommitIds] }, {})),
-    onSuccess: (page, input) => {
-      if (!GraphPagingModel.samePageSet(input, { repoId, query: debouncedSearchRef.current, generation: graphGenerationRef.current })) return
-      setGraphPageState(current => {
-        const samePageSet = GraphPagingModel.samePageSet(current, input)
-        const loaded = samePageSet ? current.revisions : []
-        const seen = new Set(loaded.map(revision => revision.commitId))
-        // Two triggers can overlap on one page; a revision already loaded is appended only once.
-        const added = page.revisions.filter(revision => !seen.has(revision.commitId))
-        return {
-          repoId: input.repoId,
-          query: input.query,
-          generation: input.generation,
-          revisions: [...loaded, ...added],
-          hasMore: GraphPagingModel.hasMoreAfterPage({ hasMore: page.hasMore, addedRevisions: added.length }),
-          failedCursor: null,
-        }
-      })
-    },
-    onError: (_error, input) => {
-      if (!GraphPagingModel.samePageSet(input, { repoId, query: debouncedSearchRef.current, generation: graphGenerationRef.current })) return
-      setGraphPageState(current =>
-        GraphPagingModel.samePageSet(current, input) ? { ...current, failedCursor: GraphPagingModel.cursor(input.excludeCommitIds) } : current,
-      )
-    },
+  // The key owns the page set: a changed repository read or search starts over, an unchanged poll keeps the pages.
+  const pageSet = useMemo(() => ({ repoId, query: debouncedSearch, generation: graphSnapshotGeneration }), [repoId, debouncedSearch, graphSnapshotGeneration])
+  const pageSetScope = GraphPagingModel.pageSetScope(pageSet)
+  const [requestedPageSet, setRequestedPageSet] = useState<string | null>(null)
+  const [failedPageSet, setFailedPageSet] = useState<string | null>(null)
+  const graphPageFailed = failedPageSet === pageSetScope
+  const graphPagesQuery = useInfiniteQuery({
+    queryKey: jujutsuQueryKeys.graphPages(path, pageSet),
+    initialPageParam: GraphPagingModel.firstPageExclude({ query: debouncedSearch, baseCommitIds: state?.revisions.map(revision => revision.commitId) ?? [] }),
+    queryFn: async ({ signal, pageParam }) =>
+      throwReadFailure(await api.graphPage({ repoId: repoId ?? '', query: debouncedSearch, excludeCommitIds: [...pageParam] }, { signal })),
+    getNextPageParam: (page, _pages, excludeCommitIds) =>
+      GraphPagingModel.nextPageExclude({ hasMore: page.hasMore, addedCommitIds: page.revisions.map(revision => revision.commitId), excludeCommitIds }),
+    // A search reads its own page set; the graph's own history waits for a top-up or a scroll to ask for it.
+    enabled: repoId !== null && (debouncedSearch.length > 0 || (graphOnScreen && requestedPageSet === pageSetScope)),
+    ...REPOSITORY_QUERY_CACHE,
+    retry: false,
   })
-  const { isPending: graphPagePending, mutate: requestGraphPage } = graphPageMutation
   // A fresh repository read is the retry for a failed page: at most one attempt per refresh, never a loop.
   useEffect(() => {
-    setGraphPageState(current => (current.failedCursor === null ? current : { ...current, failedCursor: null }))
+    setFailedPageSet(null)
   }, [stateQuery.dataUpdatedAt])
   useEffect(() => {
-    setGraphPageState({
-      repoId,
-      query: debouncedSearch,
-      generation: graphSnapshotGeneration,
-      revisions: [],
-      hasMore: debouncedSearch.length > 0 || (state?.graphHasMore ?? false),
-      failedCursor: null,
-    })
-    if (repoId !== null && debouncedSearch.length > 0)
-      requestGraphPage({ repoId, query: debouncedSearch, generation: graphSnapshotGeneration, excludeCommitIds: [] })
-  }, [repoId, debouncedSearch, graphSnapshotGeneration, state?.graphHasMore, requestGraphPage])
+    if (graphPagesQuery.isFetchNextPageError) setFailedPageSet(pageSetScope)
+  }, [graphPagesQuery.isFetchNextPageError, pageSetScope])
 
-  const graphPageIsCurrent = GraphPagingModel.samePageSet(graphPageState, { repoId, query: debouncedSearch, generation: graphSnapshotGeneration })
-  const graphPageRevisions = useMemo(() => (graphPageIsCurrent ? graphPageState.revisions : EMPTY_REVISIONS), [graphPageIsCurrent, graphPageState.revisions])
+  const graphPageRevisions = useMemo(() => graphPagesQuery.data?.pages.flatMap(page => page.revisions) ?? EMPTY_REVISIONS, [graphPagesQuery.data])
+  const { data: graphPagesData, isFetching: graphPagesFetching, fetchNextPage: fetchNextGraphPage } = graphPagesQuery
   // Older history arrives page by page, and those rows are selectable too: selection resolves against every loaded
   // revision, not just the first page the repository query returned.
   const graphRowsInput = useMemo(
@@ -781,31 +749,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   })
   const virtualItems = listVirtualizer.getVirtualItems()
   const stickyDayIndex = activeDayIndex(listItems, listVirtualizer.range?.startIndex ?? 0)
-  const graphHasMore = graphPageIsCurrent ? graphPageState.hasMore : debouncedSearch.length > 0 || (state?.graphHasMore ?? false)
+  const graphHasMore = graphPagesQuery.data === undefined ? debouncedSearch.length > 0 || (state?.graphHasMore ?? false) : graphPagesQuery.hasNextPage === true
   const loadedGraphRevisions = (state?.revisions.length ?? 0) + graphPageRevisions.length
-  const graphPageFailedCursor = graphPageIsCurrent ? graphPageState.failedCursor : null
+  const graphPageLoading = graphPagesQuery.isFetchingNextPage || (graphPagesQuery.isFetching && graphPagesQuery.data === undefined)
   const loadMoreGraphRevisions = useCallback((): void => {
     if (repoId === null || !graphOnScreen || stateQuery.isFetching) return
-    const excludeCommitIds = [
-      ...(debouncedSearch.length === 0 ? (state?.revisions.map(revision => revision.commitId) ?? []) : []),
-      ...graphPageRevisions.map(revision => revision.commitId),
-    ]
-    const cursor = GraphPagingModel.cursor(excludeCommitIds)
-    if (!GraphPagingModel.canRequestPage({ hasMore: graphHasMore, pending: graphPagePending, cursor, failedCursor: graphPageFailedCursor })) return
-    requestGraphPage({ repoId, query: debouncedSearch, generation: graphSnapshotGeneration, excludeCommitIds })
-  }, [
-    repoId,
-    graphOnScreen,
-    stateQuery.isFetching,
-    graphHasMore,
-    graphPagePending,
-    graphPageFailedCursor,
-    debouncedSearch,
-    graphSnapshotGeneration,
-    state?.revisions,
-    graphPageRevisions,
-    requestGraphPage,
-  ])
+    if (!graphHasMore || graphPageFailed || graphPagesFetching) return
+    if (graphPagesData === undefined) {
+      setRequestedPageSet(pageSetScope)
+      return
+    }
+    void fetchNextGraphPage()
+  }, [repoId, graphOnScreen, stateQuery.isFetching, graphHasMore, graphPageFailed, graphPagesFetching, graphPagesData, fetchNextGraphPage, pageSetScope])
   // Each page lands below the viewport, so the list tops itself up instead of waiting for a scroll event at the very end of the loaded history.
   useEffect(() => {
     const element = listScrollRef.current
@@ -817,7 +772,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       clientHeight: element.clientHeight,
     })
     if (needsTopUp) loadMoreGraphRevisions()
-  }, [loadedGraphRevisions, graphHasMore, graphPagePending, listItems.length, loadMoreGraphRevisions])
+  }, [loadedGraphRevisions, graphHasMore, graphPageFailed, graphPagesFetching, listItems.length, loadMoreGraphRevisions])
 
   const locateRevision = useCallback(
     (revision: Revision): void => {
@@ -933,7 +888,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const errorMessages = [
     stateQuery.error && errorMessage(stateQuery.error, 'Could not load this repository.'),
-    graphPageMutation.error && errorMessage(graphPageMutation.error, 'Could not load revision results.'),
+    graphPagesQuery.error && errorMessage(graphPagesQuery.error, 'Could not load revision results.'),
     registrationError ?? undefined,
     actionSnapshot.context.error,
     launchMutation.error && errorMessage(launchMutation.error, 'A thread could not be opened in this workspace. Try again.'),
@@ -1828,13 +1783,13 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               )
             })}
           </div>
-          {graphPagePending && (
+          {graphPageLoading && (
             <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:p-3 dshx:text-xs dshx:text-muted-foreground" role="status">
               <Spinner className="dshx:size-3" />
               {debouncedSearch.length > 0 ? 'Searching all revisions…' : 'Loading older revisions…'}
             </div>
           )}
-          {visibleRevisions.length === 0 && !graphPagePending && (
+          {visibleRevisions.length === 0 && !graphPageLoading && (
             <EmptyState className="dshx:py-6">No revisions match these filters. Change the search or the filters above to see more.</EmptyState>
           )}
         </div>

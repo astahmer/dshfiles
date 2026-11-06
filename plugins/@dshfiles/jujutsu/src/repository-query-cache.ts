@@ -7,5 +7,7 @@ export const jujutsuQueryKeys = {
   details: (root: string, commitId: string) => ['jujutsu', root, 'details', commitId] as const,
   revisionFiles: (root: string, commitIds: readonly string[]) => ['jujutsu', root, 'revision-files', commitIds.join(',')] as const,
   editTimes: (root: string, commitIds: readonly string[]) => ['jujutsu', root, 'edit-times', commitIds.join(',')] as const,
+  graphPages: (root: string, pageSet: { readonly repoId: string | null; readonly query: string; readonly generation: string }) =>
+    ['jujutsu', 'graph-pages', root, pageSet.repoId, pageSet.query, pageSet.generation] as const,
   reviewProgress: () => ['jujutsu', 'review-progress'] as const,
 }
