@@ -1,4 +1,4 @@
-import type { QueuedBlock, QueuedImageAttachment } from './queue-edit.js'
+import type { QueuedBlock, QueuedImageAttachment } from './queue-edit-model.js'
 
 export type AttachmentPreview =
   | { readonly kind: 'image'; readonly key: string; readonly name: string; readonly attachment: QueuedImageAttachment }

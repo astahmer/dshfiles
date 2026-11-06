@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react'
+import { useEffect, useMemo, useReducer } from 'react'
 
 type HostTone = 'online' | 'idle' | 'error'
 type HostToneState = { readonly tone: HostTone; readonly label: string }
@@ -58,7 +58,7 @@ const useDisconnectGrace = (state: HostToneState): HostToneState => {
       clearTimeout(timer)
     }
   }, [state.tone, phase])
-  return graceDisplay({ state, phase, now: Date.now() })
+  return useMemo(() => graceDisplay({ state, phase, now: Date.now() }), [state, phase])
 }
 
 export class DisconnectGrace {

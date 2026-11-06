@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { createQueueEditor, QueueEditModel, type QueueEditRecord, type QueuedBlock } from './queue-edit.js'
+import { createQueueEditor } from './queue-edit.js'
+import { QueueEditModel, type QueueEditRecord, type QueuedBlock } from './queue-edit-model.js'
 
 interface RawRow {
   readonly id: string

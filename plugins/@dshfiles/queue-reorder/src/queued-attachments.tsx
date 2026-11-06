@@ -2,7 +2,7 @@ import { FileIcon, ImageIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo } from 'react'
 import type { AttachmentPreview } from './message-preview.js'
-import type { QueuedImageAttachment } from './queue-edit.js'
+import type { QueuedImageAttachment } from './queue-edit-model.js'
 
 /** Reads a queued image's bytes from the session that holds it. */
 export type ReadQueuedImage = (attachment: QueuedImageAttachment) => Promise<Blob>

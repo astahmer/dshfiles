@@ -1,7 +1,7 @@
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { describe, expect, it, vi } from 'vitest'
 import { RETAINED_INDEX_TTL_MS, WATCH_IDLE_MS, workspaceIndexMachine } from './workspace-index-machine.js'
-import { walkWorkspaceFiles } from './workspace-files.js'
+import { WorkspaceWalk } from './workspace-walk.js'
 
 interface Tree {
   [name: string]: Tree | 'file'
@@ -128,7 +128,7 @@ describe('workspaceIndexMachine', () => {
 describe('walkWorkspaceFiles', () => {
   it('lists breadth-first and skips the fixed directory list', async () => {
     const { list } = lister({ 'a.ts': 'file', src: { 'b.ts': 'file' }, node_modules: { 'c.ts': 'file' } })
-    const result = await walkWorkspaceFiles({ list, signal: new AbortController().signal, onProgress: () => undefined })
+    const result = await WorkspaceWalk.walkWorkspaceFiles({ list, signal: new AbortController().signal, onProgress: () => undefined })
     expect(result.files).toEqual(['a.ts', 'src/b.ts'])
   })
 })

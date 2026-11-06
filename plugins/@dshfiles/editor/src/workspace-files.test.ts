@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createWorkspaceFileIndex, RETAINED_INDEX_LIMIT, RETAINED_INDEX_TTL_MS, walkWorkspaceFiles } from './workspace-files.js'
+import { createWorkspaceFileIndex } from './workspace-files.js'
+import { RETAINED_INDEX_LIMIT, RETAINED_INDEX_TTL_MS } from './workspace-index-machine.js'
+import { WorkspaceWalk } from './workspace-walk.js'
 import type { WorkspaceFilesState } from '@dshfiles/dshx/client'
 
 interface Tree {
@@ -31,7 +33,7 @@ const workspace: Tree = {
 describe('walkWorkspaceFiles', () => {
   it('lists files breadth-first, skips .git/.jj/node_modules and directories it cannot list', async () => {
     const { list, listed } = lister(workspace, new Set(['locked']))
-    const result = await walkWorkspaceFiles({ list, signal: new AbortController().signal, onProgress: () => undefined })
+    const result = await WorkspaceWalk.walkWorkspaceFiles({ list, signal: new AbortController().signal, onProgress: () => undefined })
     expect(result).toEqual({ files: ['README.md', 'src/index.ts', 'src/lib/deep.ts'], truncated: false })
     expect(listed.some(path => path.startsWith('node_modules') || path.startsWith('.git') || path.startsWith('.jj'))).toBe(false)
   })
@@ -44,7 +46,7 @@ describe('walkWorkspaceFiles', () => {
       ]),
     )
     const { list } = lister(wide)
-    const result = await walkWorkspaceFiles({ list, signal: new AbortController().signal, onProgress: () => undefined })
+    const result = await WorkspaceWalk.walkWorkspaceFiles({ list, signal: new AbortController().signal, onProgress: () => undefined })
     expect(result.truncated).toBe(true)
     expect(result.files).toHaveLength(20_000)
   })
@@ -266,7 +268,7 @@ describe('walkWorkspaceFiles with .gitignore', () => {
       ['packages/app/.gitignore', 'generated/\n!keep.log\n'],
     ])
     const { list, listed } = lister(tree)
-    const result = await walkWorkspaceFiles({
+    const result = await WorkspaceWalk.walkWorkspaceFiles({
       list,
       readText: async path => gitignores.get(path) ?? '',
       signal: new AbortController().signal,

@@ -15,21 +15,6 @@ import type { QueueEditPorts, QueueEditView, QueuedRow } from './queue-edit-mode
  * reload still offers Cancel.
  */
 
-export {
-  queueEditRecordsSchema,
-  QueueEditModel,
-  type ComposerSnapshot,
-  type Observable,
-  type PromptPart,
-  type QueuedBlock,
-  type QueuedFileAttachment,
-  type QueuedImageAttachment,
-  type QueueEditPorts,
-  type QueueEditRecord,
-  type QueueEditView,
-  type QueuedRow,
-} from './queue-edit-model.js'
-
 /** How long a caller waits for a transition instead of hanging on a flow that cannot finish. */
 const SETTLE_TIMEOUT_MS = 60_000
 

@@ -4,9 +4,6 @@ import { RETAINED_INDEX_LIMIT, workspaceIndexMachine } from './workspace-index-m
 import type { ListDirectory, WatchFrame } from './workspace-walk.js'
 import { WorkspaceWalk } from './workspace-walk.js'
 
-export { RETAINED_INDEX_LIMIT, RETAINED_INDEX_TTL_MS } from './workspace-index-machine.js'
-export const walkWorkspaceFiles = WorkspaceWalk.walkWorkspaceFiles
-
 type FilesReply = Extract<WorkspaceFilesState, { readonly status: 'indexing' | 'ready' }>
 
 interface SessionEntry {

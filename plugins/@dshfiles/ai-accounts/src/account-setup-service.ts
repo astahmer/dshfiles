@@ -2,7 +2,7 @@ import * as Schema from 'effect/Schema'
 import { AccountDraftModel } from './account-draft.js'
 import { AccountConnectionMethodModel } from './account-connection-method.js'
 import { AccountHomePolicy } from './account-home-policy.js'
-import { joiningOf, statusOf, transition, type SetupPhase } from './account-setup-phase.js'
+import { AccountSetupPhaseModel, type SetupPhase } from './account-setup-phase.js'
 import {
   accountDraftSchema,
   configureAccountConnectionInputSchema,
@@ -84,7 +84,7 @@ export const createAccountSetupService = (input: {
     detail: null,
   })
   const snapshot = (operation: Operation): AccountConnectionSnapshot => {
-    const status = statusOf(operation.phase)
+    const status = AccountSetupPhaseModel.statusOf(operation.phase)
     return {
       operationId: operation.operationId,
       instanceId: operation.draft.instanceId,
@@ -123,7 +123,7 @@ export const createAccountSetupService = (input: {
               AccountHomePolicy.containsConfiguredHome(allocated.homePath, operation.draft.shadowHomePath)))
         if (allocated !== undefined && !selectedOwnedDescendant) await input.cleanupCandidate(allocated)
       } finally {
-        operation.phase = transition(operation.phase, { kind: 'cleaned' })
+        operation.phase = AccountSetupPhaseModel.transition(operation.phase, { kind: 'cleaned' })
         releaseReconnect(operation)
       }
     })()
@@ -135,7 +135,7 @@ export const createAccountSetupService = (input: {
     if (phase.kind === 'discarded' && phase.cleanup !== undefined) return phase.cleanup
     const task = (async () => {
       // Join in-flight verification/commit before removing the operation's private staging.
-      await joiningOf(phase)?.catch(() => undefined)
+      await AccountSetupPhaseModel.joiningOf(phase)?.catch(() => undefined)
       await cleanupResources(operation)
     })()
     if (phase.kind === 'discarded') operation.phase = { ...phase, cleanup: task }
@@ -144,7 +144,7 @@ export const createAccountSetupService = (input: {
     return task
   }
   const invalidate = (operation: Operation): void => {
-    const discarded = transition(operation.phase, { kind: 'discard' })
+    const discarded = AccountSetupPhaseModel.transition(operation.phase, { kind: 'discard' })
     if (discarded === operation.phase) return
     // Must precede every await, including subprocess shutdown or credential cleanup.
     operation.phase = discarded
@@ -294,7 +294,7 @@ export const createAccountSetupService = (input: {
           beforeCommit: async () => {
             // Accepted commit runs inside the store queue, after checking latest account settings/removal.
             if (!live(operation)) throw new Error('Account connection cancelled.')
-            operation.phase = transition(operation.phase, { kind: 'commit' })
+            operation.phase = AccountSetupPhaseModel.transition(operation.phase, { kind: 'commit' })
             if (operation.method === 'device') await input.adoptCredential?.(operation.draft.instanceId)
             if (operation.key !== undefined && operation.keyReference !== undefined) {
               await input.saveKey(operation.keyReference, operation.operationId, operation.key, () => operation.phase.kind === 'committing')
@@ -303,7 +303,7 @@ export const createAccountSetupService = (input: {
           },
           claimCommit: () => operation.phase.kind === 'committing',
           didCommit: () => {
-            operation.phase = transition(operation.phase, { kind: 'committed' })
+            operation.phase = AccountSetupPhaseModel.transition(operation.phase, { kind: 'committed' })
             releaseReconnect(operation)
           },
         })
@@ -321,7 +321,7 @@ export const createAccountSetupService = (input: {
         // A successful atomic publication cannot be undone by a route refresh failure.
         if (operation.phase.kind === 'complete') return snapshot(operation)
         if (operation.phase.kind === 'committing') {
-          operation.phase = transition(operation.phase, { kind: 'commitFailed' })
+          operation.phase = AccountSetupPhaseModel.transition(operation.phase, { kind: 'commitFailed' })
           throw new Error('Verified connection could not be saved. Retry completion; no account was published.')
         }
         invalidate(operation)
@@ -329,7 +329,7 @@ export const createAccountSetupService = (input: {
         throw new Error('Account connection could not be verified. Start again; no account was saved.')
       }
     })
-    operation.phase = transition(phase, { kind: 'verify', completion: task })
+    operation.phase = AccountSetupPhaseModel.transition(phase, { kind: 'verify', completion: task })
     return task
   }
   return {
@@ -392,10 +392,10 @@ export const createAccountSetupService = (input: {
           operation.draft = next
           return snapshot(operation)
         } finally {
-          operation.phase = transition(operation.phase, { kind: 'configured' })
+          operation.phase = AccountSetupPhaseModel.transition(operation.phase, { kind: 'configured' })
         }
       })
-      operation.phase = transition(operation.phase, { kind: 'configure', configuration: task })
+      operation.phase = AccountSetupPhaseModel.transition(operation.phase, { kind: 'configure', configuration: task })
       input.cancelLogin(operation.draft.instanceId)
       return task
     },

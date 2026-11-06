@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { MessagePreviewModel } from './message-preview.js'
-import type { QueuedBlock } from './queue-edit.js'
+import type { QueuedBlock } from './queue-edit-model.js'
 
 test('preserves complete text blocks for rich reference rendering', () => {
   const reference = 'b:412 "queue refs rendering" (backlog item; backlog_get has its details)'

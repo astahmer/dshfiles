@@ -10,16 +10,15 @@ import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { queueApi } from './api.js'
 import {
-  createQueueEditor,
   QueueEditModel,
   queueEditRecordsSchema,
   type PromptPart,
   type QueuedFileAttachment,
   type QueuedImageAttachment,
-  type QueueEditor,
   type QueueEditRecord,
   type QueuedRow,
-} from './queue-edit.js'
+} from './queue-edit-model.js'
+import { createQueueEditor, type QueueEditor } from './queue-edit.js'
 import { startQueueTransfer, type QueueTransferActor } from './queue-transfer.js'
 
 /**
