@@ -4,12 +4,13 @@ import type { SecretScope } from '@dshfiles/credential-port'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useEffect, useState, type FormEvent } from 'react'
+import { type FormEvent } from 'react'
 import { secretSetupApi } from './api.js'
 import type { SecretCreateInput } from './secret-catalog.js'
 import { bindStoredSecret, storeAndBindSecret } from './secret-setup-flow.js'
 import type { SecretSetupResult } from './secret-setup-flow.js'
 import { SecretSetupModel } from './secret-setup-model.js'
+import { SecretSetupSteps, type SecretSetupStep } from './secret-setup-step.js'
 import { secretCatalogSettings } from './settings.js'
 import type { SecretCatalogTranslate } from './locales.js'
 
@@ -23,10 +24,10 @@ export interface SecretSetupTarget {
 interface SecretSetupFormProps {
   readonly target: SecretSetupTarget
   readonly t: SecretCatalogTranslate
-  readonly createdReference?: string | undefined
-  readonly onCreatedReference: (reference: string) => void
+  /** The step is owned by whoever offers the form, so a requirement keeps its step across renders. */
+  readonly step: SecretSetupStep
+  readonly onStepChange: (step: SecretSetupStep) => void
   readonly onBound: (reference: string) => void
-  readonly onBusyChange?: (busy: boolean) => void
   readonly onCancel: () => void
   readonly onBind: (reference: string) => Promise<void>
 }
@@ -54,6 +55,19 @@ const scopeHint = (scope: SecretScope, t: SecretCatalogTranslate): string => {
   return t('targetGlobalHint')
 }
 
+const messageOf = (step: SecretSetupStep): 'load' | 'folder' | 'create' | 'bind' | null => {
+  if (step.kind === 'draft') return step.error
+  if (step.kind === 'created') return step.error
+  return null
+}
+
+const messageTextFor = (message: 'load' | 'folder' | 'create' | 'bind', t: SecretCatalogTranslate): string => {
+  if (message === 'load') return t('setupLoadFailed')
+  if (message === 'folder') return t('needsProjectFolder')
+  if (message === 'create') return t('setupCreateFailed')
+  return t('setupBindFailed')
+}
+
 export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
   const api = useApi(secretSetupApi)
   const settings = useSettings(secretCatalogSettings)
@@ -67,9 +81,6 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
   const catalogScope = settings.value?.defaultScope ?? 'all'
   const defaultScope = props.target.scope ?? defaultScopeFor({ filter: catalogScope, cwd: props.target.cwd })
   const defaultEnvironment = settings.value?.defaultEnvironment ?? DEFAULT_SECRET_ENVIRONMENT
-  const [createdReference, setCreatedReference] = useState(props.createdReference)
-  const [message, setMessage] = useState<'load' | 'folder' | 'create' | 'bind' | null>(null)
-  const [binding, setBinding] = useState(false)
   const createMutation = useMutation({
     mutationFn: (request: SecretCreateInput) =>
       storeAndBindSecret({
@@ -87,18 +98,17 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
       }
     },
   })
-  const bindReference = async (reference: string): Promise<void> => {
-    setBinding(true)
-    props.onBusyChange?.(true)
-    const bound = await bindStoredSecret({ reference, bind: props.onBind })
-    setBinding(false)
-    props.onBusyChange?.(false)
-    setMessage(bound ? null : 'bind')
-    if (bound) props.onBound(reference)
+  const storedReference = SecretSetupSteps.createdReference(props.step)
+  const busy = SecretSetupSteps.busy(props.step)
+  const bindReference = async (input: { readonly reference: string; readonly origin: 'created' | 'existing' }): Promise<void> => {
+    const binding = SecretSetupSteps.startBind({ step: props.step, ...input })
+    props.onStepChange(binding)
+    const bound = await bindStoredSecret({ reference: input.reference, bind: props.onBind })
+    props.onStepChange(SecretSetupSteps.bindSettled({ step: binding, bound }))
+    if (bound) props.onBound(input.reference)
   }
-  const retryBinding = async (): Promise<void> => {
-    if (createdReference === undefined) return
-    await bindReference(createdReference)
+  const retryBinding = async (reference: string): Promise<void> => {
+    await bindReference({ reference, origin: 'created' })
   }
   const draftDefaultsInput = {
     environment: props.target.environment ?? defaultEnvironment,
@@ -113,8 +123,8 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
     validationLogic: revalidateLogic({ mode: 'blur', modeAfterSubmission: 'change' }),
     validators: { onDynamic: SecretSetupModel.draftSchema },
     onSubmit: async ({ value }) => {
-      if (createdReference !== undefined) {
-        await retryBinding()
+      if (storedReference !== undefined) {
+        await retryBinding(storedReference)
         return
       }
       let rows: Awaited<ReturnType<typeof api.list>>
@@ -122,24 +132,24 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
         rows = await api.list({ cwd: props.target.cwd })
         queryClient.setQueryData(setupListKey(props.target.cwd), rows)
       } catch {
-        setMessage('load')
+        props.onStepChange(SecretSetupSteps.createFailed({ step: props.step, error: 'load' }))
         return
       }
       const issue = SecretSetupModel.issue({ draft: value, cwd: props.target.cwd, rows })
       if (issue === 'duplicate') {
         form.setFieldValue('value', '')
-        setMessage(null)
+        props.onStepChange(SecretSetupSteps.draft())
         return
       }
       if (issue === 'folder') {
-        setMessage('folder')
+        props.onStepChange(SecretSetupSteps.createFailed({ step: props.step, error: 'folder' }))
         return
       }
       if (issue !== null) return
-      setMessage(null)
       const request = SecretSetupModel.createInput({ draft: value, cwd: props.target.cwd })
       form.setFieldValue('value', '')
-      props.onBusyChange?.(true)
+      const creating = SecretSetupSteps.startCreate(props.step)
+      props.onStepChange(creating)
       let result: SecretSetupResult
       try {
         result = await createMutation.mutateAsync(request)
@@ -148,31 +158,21 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
           rows = await api.list({ cwd: props.target.cwd })
           queryClient.setQueryData(setupListKey(props.target.cwd), rows)
           const duplicate = SecretSetupModel.issue({ draft: value, cwd: props.target.cwd, rows }) === 'duplicate'
-          setMessage(duplicate ? null : 'create')
+          props.onStepChange(SecretSetupSteps.createFailed({ step: creating, error: duplicate ? null : 'create' }))
         } catch {
-          setMessage('create')
+          props.onStepChange(SecretSetupSteps.createFailed({ step: creating, error: 'create' }))
         }
         return
       } finally {
         createMutation.reset()
-        props.onBusyChange?.(false)
       }
-      setCreatedReference(result.reference)
-      props.onCreatedReference(result.reference)
-      setMessage(result.status === 'bound' ? null : 'bind')
+      props.onStepChange(SecretSetupSteps.createSettled({ reference: result.reference, bound: result.status === 'bound' }))
       if (result.status === 'bound') props.onBound(result.reference)
     },
   })
 
-  useEffect(() => setCreatedReference(props.createdReference), [props.createdReference])
-
-  const messageText = (() => {
-    if (message === 'load') return props.t('setupLoadFailed')
-    if (message === 'folder') return props.t('needsProjectFolder')
-    if (message === 'create') return props.t('setupCreateFailed')
-    if (message === 'bind') return props.t('setupBindFailed')
-    return null
-  })()
+  const message = messageOf(props.step)
+  const messageText = message === null ? null : messageTextFor(message, props.t)
 
   return (
     <form
@@ -181,7 +181,7 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
       noValidate
       onSubmit={submitWith(form.handleSubmit)}
     >
-      {createdReference !== undefined ? (
+      {storedReference !== undefined ? (
         <p className="dshx:text-xs dshx:text-muted-foreground" role="status">
           {props.t('setupStoredReference')}
         </p>
@@ -191,7 +191,7 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
           {messageText}
         </p>
       ) : null}
-      {createdReference === undefined ? (
+      {storedReference === undefined ? (
         <>
           <form.AppField
             name="alias"
@@ -249,7 +249,7 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
           {props.t('setupLoadFailed')}
         </p>
       ) : null}
-      {createdReference === undefined ? (
+      {storedReference === undefined ? (
         <form.Subscribe selector={state => [state.values.alias, state.values.environment] as const}>
           {([alias, environment]) => {
             const rows = aliases.data ?? []
@@ -260,7 +260,7 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
               <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2 dshx:text-xs dshx:text-destructive" role="alert">
                 <span>{props.t(reference === null ? 'setupDuplicateAmbiguous' : 'setupDuplicateDetected')}</span>
                 {reference === null ? null : (
-                  <Button disabled={binding} onClick={() => void bindReference(reference)} size="sm" type="button" variant="outline">
+                  <Button disabled={busy} onClick={() => void bindReference({ reference, origin: 'existing' })} size="sm" type="button" variant="outline">
                     {props.t('setupUseExisting')}
                   </Button>
                 )}
@@ -270,24 +270,20 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
         </form.Subscribe>
       ) : null}
       <div className="dshx:flex dshx:flex-wrap dshx:justify-end dshx:gap-2">
-        <Button disabled={createMutation.isPending || binding} onClick={props.onCancel} size="sm" type="button" variant="ghost">
+        <Button disabled={busy} onClick={props.onCancel} size="sm" type="button" variant="ghost">
           {props.t('cancel')}
         </Button>
-        {createdReference !== undefined ? (
-          <Button disabled={createMutation.isPending || binding} onClick={() => void retryBinding()} size="sm" type="button">
-            {binding ? props.t('saving') : props.t('setupRetryBind')}
+        {storedReference !== undefined ? (
+          <Button disabled={busy} onClick={() => void retryBinding(storedReference)} size="sm" type="button">
+            {busy ? props.t('saving') : props.t('setupRetryBind')}
           </Button>
         ) : (
           <form.Subscribe selector={state => [state.values, state.isSubmitting] as const}>
             {([draft, submitting]) => {
               const issue = SecretSetupModel.issue({ draft, cwd: props.target.cwd, rows: aliases.data ?? [] })
               return (
-                <Button
-                  disabled={createMutation.isPending || submitting || binding || aliases.data === undefined || aliases.isError || issue !== null}
-                  size="sm"
-                  type="submit"
-                >
-                  {createMutation.isPending ? props.t('adding') : props.t('setupCreateAndBind')}
+                <Button disabled={busy || submitting || aliases.data === undefined || aliases.isError || issue !== null} size="sm" type="submit">
+                  {props.step.kind === 'creating' ? props.t('adding') : props.t('setupCreateAndBind')}
                 </Button>
               )
             }}

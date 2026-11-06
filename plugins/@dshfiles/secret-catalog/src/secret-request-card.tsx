@@ -9,6 +9,7 @@ import { secretRequestsApi, type secretRequestViewSchema } from './api.js'
 import { JevChatTurnTimeline } from './jev-chat-turn-timeline.js'
 import type { SecretCatalogTranslate } from './locales.js'
 import { SecretSetupForm } from './secret-setup-form.js'
+import { SecretSetupSteps, type SecretSetupStep } from './secret-setup-step.js'
 
 type SecretRequestView = typeof secretRequestViewSchema.Type
 
@@ -28,6 +29,7 @@ const RequestCard = (props: {
 }): JSX.Element => {
   const api = useApi(secretRequestsApi)
   const [phase, setPhase] = useState<CardPhase>('asking')
+  const [step, setStep] = useState<SecretSetupStep>(SecretSetupSteps.draft)
   const decline = useMutation({
     mutationFn: () => api.decline({ requestId: props.request.requestId }),
     onSuccess: () => props.onAnswered({ kind: 'declined' }),
@@ -77,7 +79,8 @@ const RequestCard = (props: {
           }}
           onBound={reference => props.onAnswered({ kind: 'stored', reference })}
           onCancel={() => setPhase('asking')}
-          onCreatedReference={() => undefined}
+          onStepChange={setStep}
+          step={step}
           t={t}
           target={{ cwd: props.request.cwd, suggestedAlias: props.request.alias, environment: props.request.environment, scope: props.request.scope }}
         />
@@ -86,7 +89,15 @@ const RequestCard = (props: {
           <Button disabled={decline.isPending} onClick={() => decline.mutate()} size="sm" type="button" variant="ghost">
             {decline.isPending ? t('requestDeclining') : t('requestDecline')}
           </Button>
-          <Button disabled={decline.isPending} onClick={() => setPhase('editing')} size="sm" type="button">
+          <Button
+            disabled={decline.isPending}
+            onClick={() => {
+              setStep(SecretSetupSteps.draft())
+              setPhase('editing')
+            }}
+            size="sm"
+            type="button"
+          >
             {t('requestEnterValue')}
           </Button>
         </div>

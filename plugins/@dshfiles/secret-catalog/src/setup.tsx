@@ -7,6 +7,7 @@ import { secretSetupApi } from './api.js'
 import { SECRET_CATALOG_LOCALE_NAMESPACE } from './locales.js'
 import type { SecretCatalogTranslate } from './locales.js'
 import { SecretSetupForm, type SecretSetupTarget } from './secret-setup-form.js'
+import { SecretSetupSteps, type SecretSetupStep } from './secret-setup-step.js'
 
 export { SECRET_CATALOG_LOCALE_NAMESPACE }
 export type { SecretCatalogTranslate } from './locales.js'
@@ -56,16 +57,28 @@ export const SecretSetupOffer = (props: SecretSetupOfferProps): JSX.Element | nu
   })
   const [opened, setOpened] = useState(false)
   const [editingIds, setEditingIds] = useState<ReadonlySet<string>>(new Set())
-  const [createdReferences, setCreatedReferences] = useState<Readonly<Record<string, string>>>({})
-  const [boundIds, setBoundIds] = useState<ReadonlySet<string>>(new Set())
-  const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(new Set())
+  const [steps, setSteps] = useState<Readonly<Record<string, SecretSetupStep>>>({})
   useEffect(() => {
     const active = new Set(props.missing.map(requirement => requirement.id))
-    setBoundIds(current => new Set([...current].filter(id => active.has(id))))
     setEditingIds(current => new Set([...current].filter(id => active.has(id))))
-    setBusyIds(current => new Set([...current].filter(id => active.has(id))))
-    setCreatedReferences(current => Object.fromEntries(Object.entries(current).filter(([id]) => active.has(id))))
+    setSteps(current => Object.fromEntries(Object.entries(current).filter(([id]) => active.has(id))))
   }, [props.missing])
+  const busyIds = new Set(
+    Object.entries(steps)
+      .filter(([, step]) => SecretSetupSteps.busy(step))
+      .map(([id]) => id),
+  )
+  const boundIds = new Set(
+    Object.entries(steps)
+      .filter(([, step]) => step.kind === 'bound')
+      .map(([id]) => id),
+  )
+  const createdReferences = Object.fromEntries(
+    Object.entries(steps).flatMap(([id, step]) => {
+      const reference = SecretSetupSteps.createdReference(step)
+      return reference === undefined ? [] : [[id, reference]]
+    }),
+  )
 
   if (props.missing.length === 0 || catalog.isError || catalog.data === undefined) return null
 
@@ -128,15 +141,14 @@ export const SecretSetupOffer = (props: SecretSetupOfferProps): JSX.Element | nu
               <div className="dshx:flex dshx:flex-col dshx:gap-2" key={requirement.id}>
                 <h4 className="dshx:text-sm dshx:font-medium">{requirement.label}</h4>
                 <SecretSetupForm
-                  {...(createdReferences[requirement.id] === undefined ? {} : { createdReference: createdReferences[requirement.id] })}
                   onBind={reference => props.onBind({ id: requirement.id, reference })}
-                  onBound={() => {
-                    setBoundIds(current => addId(current, requirement.id))
+                  onBound={reference => {
+                    setSteps(current => ({ ...current, [requirement.id]: { kind: 'bound', reference } }))
                     setEditingIds(current => removeId(current, requirement.id))
                   }}
-                  onBusyChange={busy => setBusyIds(current => (busy ? addId(current, requirement.id) : removeId(current, requirement.id)))}
                   onCancel={() => setEditingIds(current => removeId(current, requirement.id))}
-                  onCreatedReference={reference => setCreatedReferences(current => ({ ...current, [requirement.id]: reference }))}
+                  onStepChange={step => setSteps(current => ({ ...current, [requirement.id]: step }))}
+                  step={steps[requirement.id] ?? SecretSetupSteps.restore(createdReferences[requirement.id])}
                   t={props.t}
                   target={targetOf(requirement)}
                 />

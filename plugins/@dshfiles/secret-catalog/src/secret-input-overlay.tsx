@@ -21,6 +21,7 @@ import { placeSecretButton, placeSecretPanel } from './secret-input-placement.js
 import { SecretSetupForm } from './secret-setup-form.js'
 import type { SecretSetupTarget } from './secret-setup-form.js'
 import { SecretSetupModel } from './secret-setup-model.js'
+import { SecretSetupSteps } from './secret-setup-step.js'
 import { referenceStatusKey, SecretReferenceRepair } from './secret-reference-repair.js'
 
 const noProbeFolders: readonly string[] = []
@@ -301,7 +302,6 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
             />
           ) : creating ? (
             <SecretSetupForm
-              {...(referenceToRetry === undefined ? {} : { createdReference: referenceToRetry })}
               onBind={async reference => {
                 if (!anchor.element.isConnected) throw new Error('The reference field is no longer available.')
                 SecretInputBinding.writeValue(anchor.element, reference)
@@ -316,7 +316,11 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
                 setCreating(false)
                 anchor.element.focus()
               }}
-              onCreatedReference={reference => setCreatedReference({ element: anchor.element, reference })}
+              onStepChange={step => {
+                const reference = SecretSetupSteps.createdReference(step)
+                setCreatedReference(reference === undefined ? null : { element: anchor.element, reference })
+              }}
+              step={SecretSetupSteps.restore(referenceToRetry)}
               t={props.t}
               target={targetOf(anchor.element)}
             />
