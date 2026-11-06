@@ -74,31 +74,42 @@ const stallGuard = (threshold: number) =>
   Layer.effectDiscard(
     Effect.gen(function* () {
       const host = yield* GoalHost
-      const detector = StallDetector({ threshold })
+      const detectors = new Map<string, StallDetector>()
+      const detectorFor = (sessionId: string): StallDetector => {
+        const existing = detectors.get(sessionId)
+        if (existing !== undefined) return existing
+        const created = StallDetector({ threshold })
+        detectors.set(sessionId, created)
+        return created
+      }
       const pendingPauses = yield* Queue.unbounded<PendingPause>()
       yield* DshxPlugin.worker(Effect.forever(Queue.take(pendingPauses).pipe(Effect.flatMap(pauseStalled))))
       yield* HostEvents.on('session/event', (session, event) =>
         Effect.sync(() => {
+          const detector = detectors.get(session.id)
           switch (event.type) {
             case 'turn/start':
-              detector.turnStarted()
+              detectorFor(session.id).turnStarted()
               return
             case 'user/message': {
               // DSH appends its runtime-context snapshot after the turn's prompt; it is bookkeeping, not a new prompt,
               // and reading it as one dropped the goal round it follows.
               if (isRuntimeContext(event.data)) return
               const text = promptText(event.data)
-              if (text.length > 0) detector.promptEntered(text)
+              if (text.length > 0) detectorFor(session.id).promptEntered(text)
               return
             }
             case 'step/start':
-              detector.turnIdentified(event.data.turn)
+              detector?.turnIdentified(event.data.turn)
               return
             case 'assistant/message':
-              if (assistantSaidAnything(event.data)) detector.contentProduced()
+              if (assistantSaidAnything(event.data)) detector?.contentProduced()
               return
             case 'turn/end': {
+              if (detector === undefined) return
               const decision = detector.turnEnded()
+              // A Session with no empty run left carries no state worth keeping between turns.
+              if (decision.consecutiveEmptyRounds === 0) detectors.delete(session.id)
               if (!decision.stalled) return
               const agent = host.liveAgent(session.id)
               if (agent === undefined || agent.session !== session) return

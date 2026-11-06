@@ -73,7 +73,7 @@ const fixture = (config: { readonly stallThreshold?: number } = {}) =>
       }
       const emptyRounds = (input: { readonly agent: FixtureAgent; readonly rounds: readonly number[]; readonly prompt?: (round: number) => string }) =>
         rounds(input)
-      return { host, createAgent, turnStart, stepStart, prompt, turnEnd, rounds, emptyRounds, handles }
+      return { host, createAgent, turnStart, stepStart, prompt, answer, turnEnd, rounds, emptyRounds, handles }
     }),
     f =>
       Effect.promise(async () => {
@@ -130,6 +130,28 @@ describe('goal-stall-guard wiring', () => {
         f.turnEnd(agent, { turn: round, reason: { kind: 'error', error: { code: 'EMPTY_RESPONSE', message: 'no content' } } })
       }
       yield* waitForPhase({ f, agent, phase: 'paused' })
+    }),
+  )
+
+  it.effect('counts each Session on its own when their rounds interleave', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      const stalling = yield* Effect.promise(() => f.createAgent(true))
+      const working = yield* Effect.promise(() => f.createAgent(true))
+      for (const round of [1, 2, 3]) {
+        f.turnStart(stalling.agent, round)
+        f.prompt(stalling.agent, { text: roundPrompt(round) })
+        f.turnStart(working.agent, round)
+        f.prompt(working.agent, { text: roundPrompt(round) })
+        f.stepStart(stalling.agent, round)
+        f.stepStart(working.agent, round)
+        f.answer(working.agent, { turn: round, content: [{ type: 'text', text: 'progress' }] })
+        f.answer(stalling.agent, { turn: round, content: [] })
+        f.turnEnd(working.agent, { turn: round })
+        f.turnEnd(stalling.agent, { turn: round })
+      }
+      yield* waitForPhase({ f, agent: stalling.agent, phase: 'paused' })
+      expect(phaseOf(f, working.agent)).toBe('active')
     }),
   )
 
