@@ -19,6 +19,7 @@ const policyOf = (value: SidebarSettingsValue): AutoSettlePolicy => ({
   excludedSessionIds: [...value.excludedSessionIds],
   excludedWorkspaceIds: [...value.excludedWorkspaceIds],
   idleMinutes: value.idleMinutes,
+  subagentSettleHours: value.subagentSettleHours,
   rebasedThreadSettleDelay: value.rebasedThreadSettleDelay,
   scanIntervalMinutes: value.scanIntervalMinutes,
 })

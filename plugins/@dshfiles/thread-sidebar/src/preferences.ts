@@ -69,6 +69,10 @@ const preferencesInputFields = {
   rebasedThreadSettleDelay: SchemaHelpers.withDecodedDefault(Schema.Literals(THREAD_DELAYS), () => DEFAULT_PREFERENCES.rebasedThreadSettleDelay),
   settledArchiveDelay: SchemaHelpers.withDecodedDefault(Schema.Literals(THREAD_DELAYS), () => DEFAULT_PREFERENCES.settledArchiveDelay),
   idleMinutes: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(15)).check(Schema.isLessThanOrEqualTo(10080)),
+  subagentSettleHours: SchemaHelpers.withDecodedDefault(
+    Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)).check(Schema.isLessThanOrEqualTo(720)),
+    () => DEFAULT_PREFERENCES.subagentSettleHours,
+  ),
   scanIntervalMinutes: Schema.Number.check(Schema.isFinite())
     .check(Schema.isInt())
     .check(Schema.isGreaterThanOrEqualTo(1))

@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-cmdline'
+import type {} from '@deepseek-ai/dsh-jobs'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type {} from '@deepseek-ai/dsh-session-query'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -76,6 +77,8 @@ export class SidebarHost extends Context.Service<
     readonly rebasedThreads: Effect.Effect<Option.Option<ReadonlyArray<RebasedThread>>, HostCallFailed>
     /** The DSH process exit hook, present only where DSH may exit on a plugin's request. */
     readonly appExit: Option.Option<(code: number) => void>
+    /** Stop every running job these Sessions own, through the job registry's owner fence; answers the ids stopped. */
+    readonly stopJobs: (input: { readonly sessionIds: ReadonlyArray<string>; readonly reason: string }) => Effect.Effect<ReadonlyArray<string>>
   }
 >()('@dshfiles/thread-sidebar/SidebarHost') {
   static readonly layer = Layer.effect(
@@ -145,6 +148,23 @@ export class SidebarHost extends Context.Service<
           Effect.withSpan('host jj threads read'),
         ),
         appExit: Option.fromNullishOr(ctx.appExit),
+        stopJobs: Effect.fn('host jobs stop')(function* (input) {
+          const jobs = ctx.get('jobs')
+          if (jobs === undefined || jobs === null) return []
+          const owned = input.sessionIds.flatMap(sessionId =>
+            jobs
+              .list(SessionId(sessionId))
+              .filter(job => job.owner === sessionId && job.status === 'running')
+              .map(job => ({ sessionId, jobId: job.id })),
+          )
+          const stopped = yield* Effect.forEach(owned, job =>
+            Effect.try(() => jobs.kill(job.jobId, SessionId(job.sessionId), input.reason)).pipe(
+              Effect.map(outcome => (outcome === 'requested' ? [String(job.jobId)] : [])),
+              Effect.catch(error => Effect.as(Effect.logWarning(`thread-sidebar: could not stop job ${job.jobId}`, error), [])),
+            ),
+          )
+          return stopped.flat()
+        }),
       })
     }),
   )

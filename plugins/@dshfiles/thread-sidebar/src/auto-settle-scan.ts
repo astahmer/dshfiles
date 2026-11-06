@@ -29,14 +29,20 @@ export interface AutoSettleDecision {
   readonly idle: readonly string[]
   /** Threads whose jj workspace was rebased and stayed quiet through the configured delay. */
   readonly rebased: readonly string[]
+  /** Subagent threads idle past `subagentSettleHours`; their running jobs are stopped with the settle. */
+  readonly subagents: readonly string[]
 }
 
 const scansIdle = (policy: AutoSettlePolicy): boolean => SidebarOrganization.shouldScanForAutoSettle(policy)
 
 const scansRebased = (policy: AutoSettlePolicy): boolean => policy.rebasedThreadSettleDelay !== 'disabled'
 
+const scansSubagents = (policy: AutoSettlePolicy): boolean => policy.subagentSettleHours > 0
+
 /** Whether any trigger the scan owns is switched on; when none is, the scan reads nothing. */
-const isActive = (policy: AutoSettlePolicy): boolean => scansIdle(policy) || scansRebased(policy)
+const isActive = (policy: AutoSettlePolicy): boolean => scansIdle(policy) || scansRebased(policy) || scansSubagents(policy)
+
+const HOUR_MS = 60 * 60_000
 
 /** Which threads one scan settles: the same idle and rebased rules the sidebar applied in the browser. */
 const decide = (input: AutoSettleScanInput): AutoSettleDecision => {
@@ -75,7 +81,19 @@ const decide = (input: AutoSettleScanInput): AutoSettleDecision => {
     }
   }
 
-  return { idle, rebased }
+  const subagents: string[] = []
+  if (scansSubagents(input.policy)) {
+    const taken = new Set([...idle, ...rebased])
+    for (const session of input.sessions) {
+      if (session.parentId === undefined || taken.has(session.id)) continue
+      if (!Number.isFinite(session.updatedAt) || input.now - session.updatedAt < input.policy.subagentSettleHours * HOUR_MS) continue
+      if (requestOutcome({ ...input, sessionId: session.id }) !== 'settle') continue
+      if (input.policy.parkedSessionIds.includes(session.id) || input.policy.excludedSessionIds.includes(session.id)) continue
+      subagents.push(session.id)
+    }
+  }
+
+  return { idle, rebased, subagents }
 }
 
 export type SettleRequestSkip = 'unknown' | 'running' | 'running-descendant' | 'pending-question' | 'blank' | 'archived' | 'pinned' | 'opted-out'

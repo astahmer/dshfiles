@@ -242,7 +242,18 @@ settle with no browser open. It skips running, blank, archived, pinned, parked,
 already-settled, excluded-session, excluded-project, waiting-for-an-answer and
 still-running-descendant entries. The same scan settles rebased threads once
 `rebasedThreadSettleDelay` passes, reading jj-integration's thread workspaces
-through its Host API. A browser runs its own scan only against a Host from before
+through its Host API.
+
+**Finished subagents settle on their own.** Independently of the idle switch, the
+same Host scan settles a subagent thread (one with a parent) that stayed idle for
+`subagentSettleHours` (24 by default, 0 turns it off) and stops every background
+job it still owns through the job registry's owner fence, so a finished subagent
+keeps neither a live row nor a running dev server or watcher. It keeps the same
+safety rules as a settle trigger: running, waiting, blank, archived, pinned,
+parked, excluded and opted-out threads stay. `thread_auto_settle_status` reports
+them with the `subagent` source, and the last scan counts the settled subagents
+and the jobs stopped. Unsettle reverses it; stopped jobs are not restarted.
+A browser runs its own scan only against a Host from before
 this one (the `thread-sidebar-auto-settle` API answers owner-missing); otherwise
 it never scans, so a thread is never settled twice. `thread_auto_settle_status`
 (read-only) shows the last and next scan and the newest automatic settles. A

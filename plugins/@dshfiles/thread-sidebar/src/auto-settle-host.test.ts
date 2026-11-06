@@ -23,6 +23,7 @@ const policy = (overrides: Partial<AutoSettlePolicy> = {}): AutoSettlePolicy => 
   excludedSessionIds: [],
   excludedWorkspaceIds: [],
   idleMinutes: DEFAULT_PREFERENCES.idleMinutes,
+  subagentSettleHours: 0,
   rebasedThreadSettleDelay: 'disabled',
   scanIntervalMinutes: 10,
   ...overrides,
@@ -44,6 +45,7 @@ const fakeSources = (input: {
   readonly sessions: readonly ScannedSession[]
   readonly pinned: Ref.Ref<ReadonlySet<string>>
   readonly failing: Ref.Ref<boolean>
+  readonly stops: Ref.Ref<ReadonlyArray<{ readonly sessionIds: ReadonlyArray<string>; readonly reason: string }>>
 }) =>
   Layer.effect(
     AutoSettleSources,
@@ -61,6 +63,11 @@ const fakeSources = (input: {
           }
         }),
         rebasedThreads: Effect.succeedNone,
+        stopJobs: stop =>
+          Effect.as(
+            Ref.update(input.stops, stops => [...stops, stop]),
+            stop.sessionIds.map(sessionId => `job-of-${sessionId}`),
+          ),
       })
     }),
   )
@@ -71,19 +78,21 @@ const withAutoSettle = <A, E>(
   body: (host: {
     readonly pinned: Ref.Ref<ReadonlySet<string>>
     readonly failing: Ref.Ref<boolean>
+    readonly stops: Ref.Ref<ReadonlyArray<{ readonly sessionIds: ReadonlyArray<string>; readonly reason: string }>>
   }) => Effect.Effect<A, E, AutoSettle | SidebarSettings | Settings.SettingsOf<SidebarSettingsValue>>,
 ) =>
   Effect.gen(function* () {
     yield* TestClock.setTime(BOOT)
     const pinned = yield* Ref.make<ReadonlySet<string>>(new Set())
     const failing = yield* Ref.make(false)
-    const service = AutoSettle.layer.pipe(Layer.provideMerge(fakeSources({ sessions: input.sessions, pinned, failing })))
+    const stops = yield* Ref.make<ReadonlyArray<{ readonly sessionIds: ReadonlyArray<string>; readonly reason: string }>>([])
+    const service = AutoSettle.layer.pipe(Layer.provideMerge(fakeSources({ sessions: input.sessions, pinned, failing, stops })))
     const withLoop = input.scheduled === true ? AutoSettle.schedule().pipe(Layer.provideMerge(service), Layer.provide(OutsideReload.layerTest)) : service
     const layer = withLoop.pipe(
       Layer.provideMerge(SidebarSettings.layer),
       Layer.provideMerge(Settings.layerTest<SidebarSettingsValue>('thread-sidebar', settingsValue(input.policy))),
     )
-    return yield* body({ pinned, failing }).pipe(Effect.provide(layer))
+    return yield* body({ pinned, failing, stops }).pipe(Effect.provide(layer))
   })
 
 const settledIds = SidebarSettings.use(settings => settings.settledSessionIds)
@@ -157,6 +166,31 @@ describe('AutoSettleScanModel.decide', () => {
     expect(both.idle).toEqual(['rebased'])
     expect(both.rebased).toEqual([])
   })
+
+  it('settles a subagent idle for subagentSettleHours, and keeps top-level, busy, pinned, opted-out and younger ones', () => {
+    const HOUR = 60 * MINUTE
+    const sessions = [
+      session({ id: 'parent', updatedAt: BOOT }),
+      session({ id: 'finished', updatedAt: BOOT, parentId: 'parent' }),
+      session({ id: 'young', updatedAt: BOOT + 2 * HOUR, parentId: 'parent' }),
+      session({ id: 'busy', updatedAt: BOOT, parentId: 'parent', running: true }),
+      session({ id: 'asking', updatedAt: BOOT, parentId: 'parent', pendingInteraction: true }),
+      session({ id: 'pinned', updatedAt: BOOT, parentId: 'parent' }),
+      session({ id: 'opted-out', updatedAt: BOOT, parentId: 'parent' }),
+    ]
+    const decide = (subagentSettleHours: number, now: number) =>
+      AutoSettleScanModel.decide({
+        ...base,
+        now,
+        policy: policy({ autoSettleEnabled: false, subagentSettleHours, autoSettleDisabledSessionIds: ['opted-out'] }),
+        sessions,
+        pinnedSessionIds: new Set(['pinned']),
+      })
+    expect(decide(24, BOOT + 24 * HOUR - 1).subagents).toEqual([])
+    expect(decide(24, BOOT + 24 * HOUR)).toEqual({ idle: [], rebased: [], subagents: ['finished'] })
+    expect(decide(0, BOOT + 100 * HOUR).subagents).toEqual([])
+    expect(AutoSettleScanModel.isActive(policy({ autoSettleEnabled: false, subagentSettleHours: 24 }))).toBe(true)
+  })
 })
 
 describe('AutoSettle', () => {
@@ -223,6 +257,27 @@ describe('AutoSettle', () => {
           'thread_sidebar.settled.rebased': 0,
         })
       }),
+    ),
+  )
+
+  it.effect('settles an idle subagent, stops the jobs it left running and reports both', () =>
+    withAutoSettle(
+      {
+        sessions: [session({ id: 'parent', updatedAt: BOOT }), session({ id: 'child', updatedAt: BOOT - 25 * 60 * MINUTE, parentId: 'parent' })],
+        policy: policy({ autoSettleEnabled: false, subagentSettleHours: 24 }),
+      },
+      host =>
+        Effect.gen(function* () {
+          using recorder = recordSpans()
+          const autoSettle = yield* AutoSettle
+          yield* autoSettle.scan.pipe(Effect.provide(DshxEffect.tracerLayer))
+          expect(yield* settledIds).toEqual(['child'])
+          expect(yield* Ref.get(host.stops)).toEqual([{ sessionIds: ['child'], reason: 'stopped: subagent thread settled after 24 h idle' }])
+          const status = yield* autoSettle.status
+          expect(status.lastScan).toMatchObject({ idleSettled: 0, rebasedSettled: 0, subagentSettled: 1, jobsStopped: 1 })
+          expect(status.recent[0]).toMatchObject({ sessionId: 'child', source: 'subagent', reason: 'subagent idle for 24 h; its jobs stopped' })
+          expect(recorder.span('auto-settle scan').attributes).toMatchObject({ 'thread_sidebar.settled.subagents': 1, 'thread_sidebar.jobs.stopped': 1 })
+        }),
     ),
   )
 

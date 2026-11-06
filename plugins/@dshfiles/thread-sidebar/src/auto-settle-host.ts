@@ -24,6 +24,8 @@ export class AutoSettleSources extends Context.Service<
     readonly snapshot: Effect.Effect<AutoSettleSnapshot, HostCallFailed>
     /** jj-integration's thread workspaces, or none when it is not installed. */
     readonly rebasedThreads: Effect.Effect<Option.Option<ReadonlyArray<RebasedThread>>, HostCallFailed>
+    /** Stop the running jobs these Sessions own; answers the job ids a stop was requested for. */
+    readonly stopJobs: (input: { readonly sessionIds: ReadonlyArray<string>; readonly reason: string }) => Effect.Effect<ReadonlyArray<string>>
   }
 >()('@dshfiles/thread-sidebar/AutoSettleSources') {
   static readonly layer = Layer.effect(
@@ -51,6 +53,7 @@ export class AutoSettleSources extends Context.Service<
           }
         }),
         rebasedThreads: host.rebasedThreads,
+        stopJobs: host.stopJobs,
       })
     }),
   )
@@ -114,10 +117,19 @@ export class AutoSettle extends Context.Service<
             'thread_sidebar.sessions.count': snapshot.sessions.length,
             'thread_sidebar.settled.idle': result.idle.length,
             'thread_sidebar.settled.rebased': result.rebased.length,
+            'thread_sidebar.settled.subagents': result.subagents.length,
           })
-          const due = [...result.idle, ...result.rebased]
+          const due = [...result.idle, ...result.rebased, ...result.subagents]
           if (due.length > 0) yield* settings.settle(due)
-          return result
+          const jobsStopped =
+            result.subagents.length === 0
+              ? []
+              : yield* sources.stopJobs({
+                  sessionIds: result.subagents,
+                  reason: `stopped: subagent thread settled after ${String(policy.subagentSettleHours)} h idle`,
+                })
+          yield* Effect.annotateCurrentSpan({ 'thread_sidebar.jobs.stopped': jobsStopped.length })
+          return { ...result, jobsStopped: jobsStopped.length }
         }).pipe(Effect.withSpan('auto-settle scan', { attributes: { 'dshx.plugin.package': '@dshfiles/thread-sidebar' } }))
 
       const runScan = Effect.gen(function* () {
@@ -127,17 +139,33 @@ export class AutoSettle extends Context.Service<
         const decision = yield* Effect.result(decide(policy))
         const at = yield* Clock.currentTimeMillis
         if (decision._tag === 'Failure') {
-          return yield* recordScan({ at: startedAt, durationMs: at - startedAt, idleSettled: 0, rebasedSettled: 0, error: errorText(decision.failure) })
+          return yield* recordScan({
+            at: startedAt,
+            durationMs: at - startedAt,
+            idleSettled: 0,
+            rebasedSettled: 0,
+            subagentSettled: 0,
+            jobsStopped: 0,
+            error: errorText(decision.failure),
+          })
         }
         yield* remember([
           ...decision.success.idle.map(sessionId => ({ sessionId, reason: `idle for ${String(policy.idleMinutes)} min`, source: 'idle', at })),
           ...decision.success.rebased.map(sessionId => ({ sessionId, reason: 'jj workspace rebased', source: 'rebased', at })),
+          ...decision.success.subagents.map(sessionId => ({
+            sessionId,
+            reason: `subagent idle for ${String(policy.subagentSettleHours)} h; its jobs stopped`,
+            source: 'subagent',
+            at,
+          })),
         ])
         yield* recordScan({
           at: startedAt,
           durationMs: at - startedAt,
           idleSettled: decision.success.idle.length,
           rebasedSettled: decision.success.rebased.length,
+          subagentSettled: decision.success.subagents.length,
+          jobsStopped: decision.success.jobsStopped,
         })
       })
 

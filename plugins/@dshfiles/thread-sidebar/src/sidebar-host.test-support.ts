@@ -51,5 +51,6 @@ export const fakeSidebarHost = (fake: FakeHost, options: { readonly exitHook?: b
       updateQueue: () => Effect.fail(new HostCapabilityMissing({ capability: 'session-controller' })),
       rebasedThreads: Effect.succeedNone,
       appExit: options.exitHook === false ? Option.none() : Option.some(fake.recordExit),
+      stopJobs: () => Effect.succeed([]),
     }),
   )

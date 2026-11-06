@@ -160,6 +160,12 @@ export const threadSidebarSettings = defineSettings({
       .max(10080)
       .default(DEFAULT_PREFERENCES.idleMinutes)
       .description('Idle threshold in minutes before threads move to Inactive; auto-settle uses the same threshold.'),
+    subagentSettleHours: Schema.natural()
+      .max(720)
+      .default(DEFAULT_PREFERENCES.subagentSettleHours)
+      .description(
+        'Settle a subagent thread idle for this many hours and stop the background jobs it left running. Pinned, opted-out, waiting or running threads stay. 0 turns it off.',
+      ),
     scanIntervalMinutes: Schema.natural()
       .min(1)
       .max(120)

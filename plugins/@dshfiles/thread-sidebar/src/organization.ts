@@ -77,6 +77,8 @@ export interface SidebarPreferences {
   /** Archive a settled thread once this delay has passed; disabled keeps every settled thread listed. */
   settledArchiveDelay: ThreadDelay
   idleMinutes: number
+  /** Settle a finished subagent thread after this many idle hours and stop its jobs; 0 leaves subagents to the idle rule. */
+  subagentSettleHours: number
   scanIntervalMinutes: number
   excludedWorkspaceIds: string[]
   excludedSessionIds: string[]
@@ -169,6 +171,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   rebasedThreadSettleDelay: 'disabled',
   settledArchiveDelay: 'disabled',
   idleMinutes: 120,
+  subagentSettleHours: 24,
   scanIntervalMinutes: 10,
   excludedWorkspaceIds: [],
   excludedSessionIds: [],
@@ -250,6 +253,7 @@ export type AutoSettlePolicy = Pick<
   | 'excludedSessionIds'
   | 'excludedWorkspaceIds'
   | 'idleMinutes'
+  | 'subagentSettleHours'
   | 'rebasedThreadSettleDelay'
   | 'scanIntervalMinutes'
 >

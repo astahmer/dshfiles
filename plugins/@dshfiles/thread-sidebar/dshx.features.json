@@ -928,7 +928,7 @@
     {
       "id": "idle-archive-policy",
       "title": "Automatically settle eligible idle threads",
-      "summary": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, settled, and explicitly excluded sessions and workspaces. The Host scans on the configured interval, so threads settle with no browser open; other plugins ask it to settle a thread for their own trigger through the auto-settle-api contract, and thread_auto_settle_status reads the last and next scan and the newest automatic settles. Settling is the plugin's own status: the thread stays listed and openable, the native archive verb is never called, and the Host pre-step gate stops its model steps until it is unsettled.",
+      "summary": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, settled, and explicitly excluded sessions and workspaces. Subagent threads idle for `subagentSettleHours` (24 by default) settle on their own and their running background jobs are stopped. The Host scans on the configured interval, so threads settle with no browser open; other plugins ask it to settle a thread for their own trigger through the auto-settle-api contract, and thread_auto_settle_status reads the last and next scan and the newest automatic settles. Settling is the plugin's own status: the thread stays listed and openable, the native archive verb is never called, and the Host pre-step gate stops its model steps until it is unsettled.",
       "reach": [
         "click button \"All threads\"",
         "click button \"New thread\"",
@@ -960,6 +960,12 @@
           "defaultValue": "120",
           "constraints": "Integer from 15 to 10080 minutes.",
           "coveredBy": ["thread-sidebar.idle-archive"]
+        },
+        {
+          "key": "subagentSettleHours",
+          "defaultValue": "24",
+          "constraints": "Integer from 0 to 720 hours; the Host settles a subagent thread idle that long and stops the jobs it owns. 0 turns it off.",
+          "coveredBy": ["thread-sidebar.idle-archive-policy-unit-subagent-model", "thread-sidebar.idle-archive-policy-unit-subagent-jobs"]
         },
         {
           "key": "scanIntervalMinutes",
@@ -1084,6 +1090,18 @@
           "id": "thread-sidebar.idle-archive-policy-unit-settle-trigger",
           "file": "plugins/@dshfiles/thread-sidebar/src/auto-settle-host.test.ts",
           "testName": "settles a trigger request with its reason and reports what it skipped"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.idle-archive-policy-unit-subagent-model",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-settle-host.test.ts",
+          "testName": "settles a subagent idle for subagentSettleHours, and keeps top-level, busy, pinned, opted-out and younger ones"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.idle-archive-policy-unit-subagent-jobs",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-settle-host.test.ts",
+          "testName": "settles an idle subagent, stops the jobs it left running and reports both"
         }
       ],
       "telemetry": [

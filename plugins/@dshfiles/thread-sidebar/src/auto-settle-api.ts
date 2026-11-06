@@ -23,6 +23,9 @@ const scanSchema = SchemaHelpers.strictStruct(
     durationMs: Schema.Number.check(Schema.isFinite()),
     idleSettled: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
     rebasedSettled: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+    /** Absent from a Host that predates the subagent trigger. */
+    subagentSettled: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),
+    jobsStopped: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),
     error: Schema.optional(Schema.String.check(Schema.isMaxLength(500))),
   }),
 )
@@ -69,7 +72,7 @@ const renderStatus = (status: AutoSettleStatus): string => {
     const scan = status.lastScan
     lines.push(
       scan.error === undefined
-        ? `Last scan ${new Date(scan.at).toISOString()}: ${String(scan.idleSettled)} idle and ${String(scan.rebasedSettled)} rebased threads settled.`
+        ? `Last scan ${new Date(scan.at).toISOString()}: ${String(scan.idleSettled)} idle, ${String(scan.rebasedSettled)} rebased and ${String(scan.subagentSettled ?? 0)} subagent threads settled; ${String(scan.jobsStopped ?? 0)} subagent jobs stopped.`
         : `Last scan ${new Date(scan.at).toISOString()} failed: ${scan.error}`,
     )
   }
