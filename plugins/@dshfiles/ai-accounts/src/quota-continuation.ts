@@ -15,6 +15,7 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import { quotaContinuationDomain, type QuotaContinuationTable } from './quota-continuation-store.js'
 import type { QuotaContinuationRecord, QuotaContinuationSummary } from './quota-continuation-model.js'
 import { QuotaContinuationMessage, type UserActivityIdentity } from './quota-continuation-message.js'
+import { isActive, transition } from './quota-continuation-transition.js'
 import { resetAtFromMessage } from './quota-reset.js'
 
 const MAX_CONTINUATIONS = 500
@@ -84,8 +85,6 @@ declare module '@deepseek-ai/dsh-workspace/types' {
 }
 
 const isReady = (record: QuotaContinuationRecord, now: number): boolean => record.resetAt !== null && Math.max(record.resetAt, record.snoozedUntil ?? 0) <= now
-
-const isActive = (record: QuotaContinuationRecord): boolean => record.state === 'waiting' || record.state === 'queued'
 
 const collectUserActivities = <Event extends { readonly seq: number }>(
   events: readonly Event[],
@@ -237,12 +236,10 @@ const createQuotaContinuationService = ({
     }
   }
 
-  const invalidate = async (record: QuotaContinuationRecord): Promise<void> => {
+  const invalidate = async (record: QuotaContinuationRecord, cause: 'newerWork' | 'dropped' = 'dropped'): Promise<void> => {
     if (!isActive(record)) return
     const storage = await table()
-    await storage.update(record.continuationId, current =>
-      isActive(current) ? { ...current, state: 'invalidated', scheduleId: null, queueSource: null } : current,
-    )
+    await storage.update(record.continuationId, current => transition(current, { kind: cause }))
     await cancelScheduled(record)
   }
 
@@ -279,7 +276,7 @@ const createQuotaContinuationService = ({
       )
       for (const record of records) {
         if (hasNewerUserWork(record, activities) || isQueuedExternalWork(agent)) {
-          await invalidate(record)
+          await invalidate(record, 'newerWork')
           for (const message of [...agent.inbox.nextTurn, ...agent.inbox.nextStep]) {
             if (QuotaContinuationMessage.continuationIdOf(message) === record.continuationId) agent.inbox.remove(message.id)
           }
@@ -298,29 +295,23 @@ const createQuotaContinuationService = ({
           const queuedMessage = pending.find(message => !(record.queueSource === 'manual' && String(message.source.kind) === 'schedule'))
           const storage = await table()
           await storage.update(record.continuationId, current =>
-            isActive(current)
-              ? {
-                  ...current,
-                  state: 'queued',
-                  scheduleId: null,
-                  queueSource: queuedMessage === undefined ? null : QuotaContinuationMessage.userActivityForMessage(queuedMessage).queueSource,
-                }
-              : current,
+            transition(current, {
+              kind: 'queued',
+              queueSource: queuedMessage === undefined ? null : QuotaContinuationMessage.userActivityForMessage(queuedMessage).queueSource,
+            }),
           )
           await cancelScheduled(record)
           continue
         }
         if (continuationInHistory !== undefined) {
           const storage = await table()
-          await storage.update(record.continuationId, current =>
-            isActive(current) ? { ...current, state: 'completed', scheduleId: null, queueSource: null } : current,
-          )
+          await storage.update(record.continuationId, current => transition(current, { kind: 'ranInHistory' }))
           continue
         }
         if (record.state === 'queued') {
           const storage = await table()
           const waiting = await storage.update(record.continuationId, current =>
-            current.state === 'queued' ? { ...current, state: 'waiting', scheduleId: null, queueSource: null } : current,
+            current.state === 'queued' ? transition(current, { kind: 'notReady' }) : current,
           )
           await ensureScheduled(waiting)
           continue
@@ -345,7 +336,7 @@ const createQuotaContinuationService = ({
           event.type === 'user/message' ? QuotaContinuationMessage.userActivityForMessage(event.data) : undefined,
         )
         if (hasNewerUserWork(record, activities)) {
-          await invalidate(record)
+          await invalidate(record, 'newerWork')
           if (isScheduledMessage) agent.inbox.remove(message.id)
           return
         }
@@ -359,21 +350,12 @@ const createQuotaContinuationService = ({
           return
         }
         const storage = await table()
-        await storage.update(record.continuationId, current =>
-          isActive(current)
-            ? {
-                ...current,
-                state: 'queued',
-                scheduleId: null,
-                queueSource: isScheduledMessage ? 'schedule' : 'manual',
-              }
-            : current,
-        )
+        await storage.update(record.continuationId, current => transition(current, { kind: 'queued', queueSource: isScheduledMessage ? 'schedule' : 'manual' }))
         return
       }
 
       for (const record of records) {
-        await invalidate(record)
+        await invalidate(record, 'newerWork')
         for (const pending of [...agent.inbox.nextTurn, ...agent.inbox.nextStep]) {
           if (QuotaContinuationMessage.continuationIdOf(pending) === record.continuationId) agent.inbox.remove(pending.id)
         }
@@ -412,20 +394,16 @@ const createQuotaContinuationService = ({
         const newerWork = competingWork || hasNewerUserWork(record, activities)
         const notReady = isScheduleMessage && !isReady(record, now())
         const competingManual = isScheduleMessage && record.queueSource === 'manual'
-        if (newerWork) await invalidate(record)
+        if (newerWork) await invalidate(record, 'newerWork')
         if (newerWork || notReady || competingManual) {
           if (notReady && !newerWork && !competingManual) {
-            const updated = await storage.update(record.continuationId, current =>
-              isActive(current) ? { ...current, state: 'waiting', scheduleId: null, queueSource: null } : current,
-            )
+            const updated = await storage.update(record.continuationId, current => transition(current, { kind: 'notReady' }))
             await ensureScheduled(updated)
           }
           continue
         }
 
-        await storage.update(record.continuationId, current =>
-          isActive(current) ? { ...current, state: 'completed', scheduleId: null, queueSource: null } : current,
-        )
+        await storage.update(record.continuationId, current => transition(current, { kind: 'ranInHistory' }))
         kept.push(message)
       } catch (error) {
         context.logger.warn(`ai-accounts: quota recovery failed closed before a Session step: ${String(error)}`)
@@ -486,7 +464,7 @@ const createQuotaContinuationService = ({
         const continuationId = randomUUID()
         const hasQueuedWork = isQueuedExternalWork(agent)
         const failedRouteFields = failedSelection === undefined ? {} : { failedProvider: failedSelection.provider, failedModel: failedSelection.model }
-        const record = quotaContinuationDomain.tables.continuations.valueSchema.parse({
+        const waiting = quotaContinuationDomain.tables.continuations.valueSchema.parse({
           continuationId,
           sessionId: agent.id,
           accountId,
@@ -499,8 +477,9 @@ const createQuotaContinuationService = ({
           snoozedUntil: null,
           scheduleId: null,
           queueSource: null,
-          state: hasQueuedWork ? 'invalidated' : 'waiting',
+          state: 'waiting',
         })
+        const record = hasQueuedWork ? transition(waiting, { kind: 'newerWork' }) : waiting
         await storage.put(continuationId, record)
         if (record.state === 'waiting') await ensureScheduled(record)
       })
@@ -558,13 +537,13 @@ const createQuotaContinuationService = ({
           event.type === 'user/message' ? QuotaContinuationMessage.userActivityForMessage(event.data) : undefined,
         )
         if (hasNewerUserWork(current, activities)) {
-          await invalidate(current)
+          await invalidate(current, 'newerWork')
           return { accepted: false }
         }
         if (selection !== undefined) {
           await controller.selectModel?.({ sessionId: SessionId(current.sessionId), ...selection })
         }
-        await storage.put(continuationId, { ...current, state: 'queued', scheduleId: null, queueSource: 'manual', snoozedUntil: null })
+        await storage.put(continuationId, { ...transition(current, { kind: 'queued', queueSource: 'manual' }), snoozedUntil: null })
         await cancelScheduled(current)
         await controller.prompt(
           {
