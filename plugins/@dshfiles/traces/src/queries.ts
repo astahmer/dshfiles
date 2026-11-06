@@ -1,4 +1,4 @@
-import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
+import { retryOnceUnlessTimedOut, runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { infiniteQueryOptions, queryOptions, type InfiniteData } from '@dshfiles/plugin-ui/query'
 import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
 import type { ListInput, LogsInput, tracesApi } from './api.js'
@@ -29,7 +29,7 @@ export const tracesQueries = {
       queryKey: tracesKeys.status,
       queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.status({}, { signal: hostSignal }) }),
       refetchInterval: POLL_MS,
-      retry: 1,
+      retry: retryOnceUnlessTimedOut,
     }),
   list: (client: TracesClient, filters: Omit<ListInput, 'cursor'>) =>
     infiniteQueryOptions<TraceList, Error, InfiniteData<TraceList, string | null>, ReturnType<typeof tracesKeys.list>, string | null>({
@@ -42,7 +42,7 @@ export const tracesQueries = {
         }),
       getNextPageParam: page => page.nextCursor,
       refetchInterval: POLL_MS,
-      retry: 1,
+      retry: retryOnceUnlessTimedOut,
     }),
   logs: (client: TracesClient, filters: Omit<LogsInput, 'cursor'>) =>
     infiniteQueryOptions<LogList, Error, InfiniteData<LogList, string | null>, ReturnType<typeof tracesKeys.logs>, string | null>({
@@ -55,7 +55,7 @@ export const tracesQueries = {
         }),
       getNextPageParam: page => page.nextCursor,
       refetchInterval: POLL_MS,
-      retry: 1,
+      retry: retryOnceUnlessTimedOut,
     }),
   trace: (client: TracesClient, traceId: string) =>
     queryOptions({
@@ -69,7 +69,7 @@ export const tracesQueries = {
       queryKey: tracesKeys.stats(windowMinutes),
       queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.stats({ windowMinutes, limit: 100 }, { signal: hostSignal }) }),
       refetchInterval: POLL_MS * 2,
-      retry: 1,
+      retry: retryOnceUnlessTimedOut,
     }),
   metrics: (client: TracesClient, windowMinutes: number, search: string) =>
     queryOptions({
@@ -80,7 +80,7 @@ export const tracesQueries = {
           request: hostSignal => client.metrics(search.length === 0 ? { windowMinutes } : { windowMinutes, search }, { signal: hostSignal }),
         }),
       refetchInterval: POLL_MS * 2,
-      retry: 1,
+      retry: retryOnceUnlessTimedOut,
     }),
   metric: (client: TracesClient, input: { readonly name: string; readonly service: string; readonly windowMinutes: number }) =>
     queryOptions({
@@ -94,7 +94,7 @@ export const tracesQueries = {
       queryKey: tracesKeys.serviceMap(windowMinutes),
       queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.serviceMap({ windowMinutes }, { signal: hostSignal }) }),
       refetchInterval: POLL_MS * 2,
-      retry: 1,
+      retry: retryOnceUnlessTimedOut,
     }),
   /** The newest trace holding one of the thread's turns; a Host older than the `turn` filter fails it. */
   turnTrace: (client: TracesClient, input: { readonly sessionId: string; readonly turn: number }) =>
@@ -116,6 +116,6 @@ export const tracesQueries = {
       queryKey: tracesKeys.errors(windowMinutes),
       queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.errors({ windowMinutes, limit: 100 }, { signal: hostSignal }) }),
       refetchInterval: POLL_MS * 2,
-      retry: 1,
+      retry: retryOnceUnlessTimedOut,
     }),
 }

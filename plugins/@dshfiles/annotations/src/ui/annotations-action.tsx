@@ -5,7 +5,7 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { CrosshairIcon, SquareDashedIcon } from '@dshfiles/plugin-ui/icons'
 import { useApi, usePlugin, type ComposerActionProps } from '@dshfiles/dshx/client'
-import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
+import { retryOnceUnlessTimedOut, runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { annotationsApi } from '../api.js'
 import { INGEST_PATH } from '../limits.js'
@@ -66,7 +66,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
       runHostRequest({ signal, request: hostSignal => api.list({ sessionId, statuses: [...OPEN_STATUSES], limit: 50 }, { signal: hostSignal }) }),
     refetchInterval: annotationsListPollMs(open),
     refetchOnWindowFocus: !open,
-    retry: 1,
+    retry: retryOnceUnlessTimedOut,
   })
   const refetchList = list.refetch
   useEffect(() => {
@@ -80,7 +80,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.intake({ limit: 20 }, { signal: hostSignal }) }),
     enabled: open,
     refetchInterval: 6_000,
-    retry: 1,
+    retry: retryOnceUnlessTimedOut,
   })
   const attach = useMutation({
     mutationFn: async (ids: readonly string[]) => runHostRequest({ request: signal => api.attach({ sessionId, ids: [...ids] }, { signal }) }),

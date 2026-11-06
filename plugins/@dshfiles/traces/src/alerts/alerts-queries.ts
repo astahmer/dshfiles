@@ -1,6 +1,6 @@
 import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
+import { retryOnceUnlessTimedOut, runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { queryOptions } from '@dshfiles/plugin-ui/query'
 import type { tracesAlertsApi } from './alerts-api.js'
 
@@ -29,7 +29,7 @@ export const alertsQueries = {
       queryKey: alertsKeys.state,
       queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.state({ historyLimit: 50 }, { signal: hostSignal }) }),
       refetchInterval: pollUnlessMissing(STATE_POLL_MS),
-      retry: (failures, error) => !alertsOwnerMissing(error) && failures < 1,
+      retry: (failures, error) => !alertsOwnerMissing(error) && retryOnceUnlessTimedOut(failures, error),
     }),
   feed: (client: AlertsClient, afterId: number | null) =>
     queryOptions({

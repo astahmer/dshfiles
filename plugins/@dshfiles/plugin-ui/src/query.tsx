@@ -1,6 +1,7 @@
 import { keepPreviousData, QueryClient } from '@tanstack/query-core'
 import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
+import { retryOnceUnlessTimedOut } from './lib/host-request.js'
 
 export * from '@tanstack/react-query'
 export { keepPreviousData }
@@ -10,7 +11,7 @@ let pluginQueryClientInstance: QueryClient | undefined
 /**
  * One client per plugin bundle: dshx inlines this module into each plugin's
  * chunk, so every slot of a plugin shares a cache and no two plugins do.
- * Host calls are local RPC, so a failure is rarely transient — retry once,
+ * Host calls are local RPC, so a failure is rarely transient — retry once, never after a client timeout,
  * and leave focus refetching off because the Host pushes its own updates.
  * Thirty seconds of staleness keeps a remounting panel from re-reading what it
  * already has; mutations invalidate their keys and live views poll explicitly.
@@ -18,7 +19,7 @@ let pluginQueryClientInstance: QueryClient | undefined
 export const pluginQueryClient = (): QueryClient => {
   pluginQueryClientInstance ??= new QueryClient({
     defaultOptions: {
-      queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 30_000 },
+      queries: { retry: retryOnceUnlessTimedOut, refetchOnWindowFocus: false, staleTime: 30_000 },
       mutations: { retry: false },
     },
   })

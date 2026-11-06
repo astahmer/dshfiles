@@ -12,11 +12,21 @@ export const HOST_REQUEST_TIMEOUT_MS = 15_000
  * navigated away, the request timed out, or the Host rejected it.
  */
 export class HostTimeoutError extends Error {
-  constructor(readonly timeoutMs: number) {
+  readonly timeoutMs: number
+
+  constructor(timeoutMs: number) {
     super(`The Host did not answer within ${Math.round(timeoutMs / 1000)}s. It may still be starting; retry in a moment.`)
+    this.timeoutMs = timeoutMs
     this.name = 'HostTimeoutError'
   }
 }
+
+/**
+ * Query `retry` for Host reads: once, except after a client timeout. The timer starts when the read is issued, not
+ * when it leaves the browser, so a timeout usually means the six HTTP/1.1 sockets were busy and the read never reached
+ * the Host; a retry would only rejoin the back of that queue.
+ */
+export const retryOnceUnlessTimedOut = (failureCount: number, error: unknown): boolean => !(error instanceof HostTimeoutError) && failureCount < 1
 
 export const runHostRequest = <Value>({ request, signal, timeoutMs = HOST_REQUEST_TIMEOUT_MS }: HostRequestOptions<Value>): Promise<Value> => {
   const controller = new AbortController()
