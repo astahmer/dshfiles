@@ -45,6 +45,16 @@ describe('ModelCatalogs', () => {
     }),
   )
 
+  it.effect('clears the account when a refresh is interrupted before it settles', () =>
+    Effect.gen(function* () {
+      const catalogs = yield* ModelCatalogs.make
+      const fiber = yield* catalogs.start('go_a', Effect.never)
+      expect(yield* catalogs.isRefreshing('go_a')).toBe(true)
+      yield* Fiber.interrupt(fiber)
+      expect(yield* catalogs.isRefreshing('go_a')).toBe(false)
+    }),
+  )
+
   it.effect('reports none when a refresh fails, and clears the account afterwards', () =>
     Effect.gen(function* () {
       const catalogs = yield* ModelCatalogs.make

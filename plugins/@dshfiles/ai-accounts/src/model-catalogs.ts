@@ -10,6 +10,12 @@ export interface DiscoveredCatalog {
 
 export const CATALOG_REFRESH_TIMEOUT = '15 seconds'
 
+/** One account's in-flight refresh; the token lets a replaced run leave the newer entry alone. */
+interface CatalogRefresh {
+  readonly token: number
+  readonly fiber: Fiber.Fiber<Option.Option<unknown>> | undefined
+}
+
 /**
  * The model catalogs this Host discovered at runtime. Discovery is per keyed account and outlives any one request:
  * `start` keeps one refresh per account, interrupting the previous one so a slow fetch cannot outlive the route that
@@ -32,8 +38,7 @@ export class ModelCatalogs extends Context.Service<
 >()('@dshfiles/ai-accounts/ModelCatalogs') {
   static readonly make = Effect.gen(function* () {
     const discovered = yield* Ref.make(HashMap.empty<string, DiscoveredCatalog>())
-    const running = yield* Ref.make(HashMap.empty<string, Fiber.Fiber<Option.Option<unknown>>>())
-    const generation = yield* Ref.make(HashMap.empty<string, number>())
+    const refreshes = yield* Ref.make(HashMap.empty<string, CatalogRefresh>())
 
     const record = Effect.fn('ai-accounts model catalog record')(function* (input: {
       readonly instanceId: string
@@ -45,23 +50,17 @@ export class ModelCatalogs extends Context.Service<
 
     /** Only the run that still owns the account drops its entry; a replaced run leaves the newer one in place. */
     const settle = (instanceId: string, token: number) =>
-      Ref.get(generation).pipe(
-        Effect.flatMap(current =>
-          HashMap.get(current, instanceId) === Option.some(token) ? Ref.update(running, entries => HashMap.remove(entries, instanceId)) : Effect.void,
-        ),
-        Effect.andThen(
-          Ref.get(generation).pipe(
-            Effect.flatMap(current =>
-              HashMap.get(current, instanceId) === Option.some(token) ? Ref.update(generation, entries => HashMap.remove(entries, instanceId)) : Effect.void,
-            ),
-          ),
-        ),
-      )
+      Ref.update(refreshes, current => {
+        const entry = Option.getOrUndefined(HashMap.get(current, instanceId))
+        return entry?.token === token ? HashMap.remove(current, instanceId) : current
+      })
 
     const start = Effect.fnUntraced(function* <A, E, R>(instanceId: string, task: Effect.Effect<A, E, R>) {
-      const token = (Option.getOrUndefined(HashMap.get(Ref.getUnsafe(generation), instanceId)) ?? 0) + 1
-      const previous = Option.getOrUndefined(HashMap.get(Ref.getUnsafe(running), instanceId))
-      yield* Ref.update(generation, current => HashMap.set(current, instanceId, token))
+      const { previous, token } = yield* Ref.modify(refreshes, current => {
+        const entry = Option.getOrUndefined(HashMap.get(current, instanceId))
+        const token = (entry?.token ?? 0) + 1
+        return [{ previous: entry?.fiber, token }, HashMap.set(current, instanceId, { token, fiber: entry?.fiber })]
+      })
       if (previous !== undefined) yield* Fiber.interrupt(previous)
       // Settled as data: a failed, timed-out or interrupted refresh answers `None` instead of failing its joiner.
       const fiber = yield* Effect.forkChild(
@@ -69,10 +68,13 @@ export class ModelCatalogs extends Context.Service<
           Effect.timeoutOption(CATALOG_REFRESH_TIMEOUT),
           Effect.exit,
           Effect.map(exit => (Exit.isSuccess(exit) ? exit.value : Option.none<A>())),
+          Effect.ensuring(settle(instanceId, token)),
         ),
       )
-      yield* Ref.update(running, current => HashMap.set(current, instanceId, fiber))
-      yield* Effect.forkChild(Fiber.await(fiber).pipe(Effect.andThen(settle(instanceId, token)), Effect.asVoid))
+      yield* Ref.update(refreshes, current => {
+        const entry = Option.getOrUndefined(HashMap.get(current, instanceId))
+        return entry?.token === token ? HashMap.set(current, instanceId, { token, fiber }) : current
+      })
       return fiber
     })
 
@@ -90,8 +92,8 @@ export class ModelCatalogs extends Context.Service<
       start,
       isRefreshing: instanceId =>
         Effect.gen(function* () {
-          const fiber = Option.getOrUndefined(HashMap.get(yield* Ref.get(running), instanceId))
-          return fiber !== undefined && fiber.pollUnsafe() === undefined
+          const entry = Option.getOrUndefined(HashMap.get(yield* Ref.get(refreshes), instanceId))
+          return entry?.fiber !== undefined && entry.fiber.pollUnsafe() === undefined
         }),
     })
   })
