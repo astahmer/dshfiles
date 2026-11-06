@@ -109,6 +109,13 @@ describe('Mistral model catalog', () => {
     expect(mistralTemplateId('devstral-2604', known)).toBe('devstral-latest')
     expect(mistralTemplateId('unknown-model', known)).toBe('mistral-medium-latest')
   })
+
+  it('templates a variant on its catalogued base model and GLM aliases on GLM 5.3', () => {
+    const known = ['mistral-large-4', 'mistral-large-latest', 'mistral-medium-latest', 'zai-glm-5-2', 'zai-glm-5-3']
+    expect(mistralTemplateId('mistral-large-4-0', known)).toBe('mistral-large-4')
+    expect(mistralTemplateId('zai-glm-5-3-flash', known)).toBe('zai-glm-5-3')
+    expect(mistralTemplateId('zai-glm-latest', known)).toBe('zai-glm-5-3')
+  })
 })
 
 describe('Mistral plan quota', () => {

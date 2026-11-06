@@ -422,7 +422,8 @@
         "All eligible accounts are cooling down and no route can be selected.",
         "Distribution never mixes provider kinds or models with incompatible request capabilities.",
         "Under Priority, a thread with a model fallback chain fails over along that chain (any provider, enabled and healthy routes only) instead of across compatible accounts.",
-        "Only manually added IDs absent from the provider catalog get a delete action; provider models remain provider-owned."
+        "Only manually added IDs absent from the provider catalog get a delete action; provider models remain provider-owned.",
+        "A Mistral model offers only the reasoning efforts Mistral accepts for it, never an Off that would send a rejected `none`."
       ],
       "externalDependencies": [
         {
@@ -495,6 +496,12 @@
           "id": "ai-accounts.fast-mode-default",
           "file": "plugins/@dshfiles/ai-accounts/src/codex-fast-mode.test.ts",
           "testName": "applies the configured default while preserving per-session route overrides"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.mistral-reasoning-efforts",
+          "file": "plugins/@dshfiles/ai-accounts/src/provider-profile.test.ts",
+          "testName": "offers Mistral account models only the reasoning efforts Mistral accepts"
         }
       ],
       "telemetry": [
