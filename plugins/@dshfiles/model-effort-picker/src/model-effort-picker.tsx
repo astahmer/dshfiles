@@ -134,10 +134,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   // the full list only, so typing a search never resizes it under the cursor.
   useLayoutEffect(() => {
     if (!open || query !== '' || rows.length === 0) return
-    const list = listNode
-    const popover = list?.closest<HTMLElement>('[data-slot=popover-content]') ?? null
-    if (popover === null || list === null) return
-    const shortfall = nameWidthShortfall(list)
+    const popover = listNode?.closest<HTMLElement>('[data-slot=popover-content]') ?? null
+    if (popover === null || listNode === null) return
+    const shortfall = nameWidthShortfall(listNode)
     if (shortfall === undefined || Math.abs(shortfall) < 1) return
     const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
     const max = Math.min(POPOVER_MAX_REM * rem, window.innerWidth - rem)
