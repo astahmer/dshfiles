@@ -1,11 +1,13 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AccountDraftModel } from './account-draft.js'
 import { AccountWriteQueue } from './account-write-queue.js'
 import type { AccountRemovalTarget } from './account-remove-machine.js'
-import { useAutoSaver } from './auto-save.js'
+import { accountEditorMachine, type AccountEditorActor } from './account-editor-machine.js'
+import { createAutoSaver, type AutoSaver } from './auto-save.js'
 import { connectHintFor } from './account-labels.js'
 import { acceptAccountOrder, aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { AccountsRules, aiAccountsApi, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
@@ -19,16 +21,9 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   const preferences = usePreferences()
   const { usage } = useAccountsUsage()
   const [historyDays, setHistoryDays] = useState(7)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [draft, setDraft] = useState<AccountDraft | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [enqueueWrite] = useState(() => AccountWriteQueue.create())
   const reordering = useIsMutating({ mutationKey: aiAccountsKeys.orderMutation }) > 0
-  // The slug the store holds for the selection when a queued write runs; an earlier rename in the queue moves it.
-  const storedSelectionId = useRef<string | null>(null)
-  useEffect(() => {
-    storedSelectionId.current = selectedId
-  }, [selectedId])
 
   const fileQuery = useQuery(aiAccountsQueries.file(accounts))
   const file = fileQuery.data ?? null
@@ -37,18 +32,37 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     void acceptAccountOrder(queryClient, next)
     void queryClient.invalidateQueries({ queryKey: aiAccountsKeys.usage })
   }
+
+  // The editor machine owns selection and draft; its auto-saver outlives a render, so the write reads the latest port.
+  const writePort = useRef({ save: async (_draft: AccountDraft): Promise<void> => undefined, delayMs: preferences.autoSaveDelayMs })
+  writePort.current = { save: async draft => setFile(await enqueueWrite(() => accounts.save({ draft }))), delayMs: preferences.autoSaveDelayMs }
+  const editorRef = useRef<AccountEditorActor | null>(null)
+  const saver = useRef<AutoSaver<AccountDraft> | null>(null)
+  saver.current ??= createAutoSaver<AccountDraft>({
+    save: draft => writePort.current.save(draft),
+    equals: AccountDraftModel.sameDraft,
+    onStatus: status => editorRef.current?.send({ type: 'autoSave.status', status }),
+    delayMs: () => writePort.current.delayMs,
+  })
+  const [snapshot, send, editor] = useMachine(accountEditorMachine, { input: { saver: saver.current, saveMode: preferences.saveMode } })
+  const selectedId = snapshot.context.selectedId
+  const draft = snapshot.context.draft
+  useEffect(() => {
+    editorRef.current = editor
+  }, [editor])
+
+  // Leaving the page writes what is waiting rather than dropping it.
+  useEffect(
+    () => () => {
+      void saver.current?.flush().catch(() => undefined)
+    },
+    [],
+  )
+
   const load = async (): Promise<void> => {
     const result = await fileQuery.refetch({ throwOnError: true })
-    setSelectedId(current => current ?? result.data?.accounts[0]?.instanceId ?? null)
+    send({ type: 'selection.selectIfNone', instanceId: result.data?.accounts[0]?.instanceId ?? null })
   }
-
-  // The first read opens the first account; later reads keep the selection, even an empty one after a remove.
-  const initialSelectionDone = useRef(false)
-  useEffect(() => {
-    if (file === null || initialSelectionDone.current) return
-    initialSelectionDone.current = true
-    setSelectedId(current => current ?? file.accounts[0]?.instanceId ?? null)
-  }, [file])
 
   // Keyed per account, so a slow answer for the previous account never lands on this one.
   const catalogQuery = useQuery({ ...aiAccountsQueries.catalog(accounts, selectedId ?? ''), enabled: selectedId !== null })
@@ -72,24 +86,22 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
 
   const selected = useMemo(() => file?.accounts.find(account => account.instanceId === selectedId) ?? null, [file, selectedId])
 
-  // The editor follows the selection, and keeps unsaved edits across re-reads and renames.
-  const followedId = useRef<string | null>(null)
-  const previousSelected = useRef<AccountProfile | null>(null)
-  // A store update and the old editor draft coexist for one render. That frame is not a local edit.
-  const reconcilingSelection = previousSelected.current !== selected
+  // The editor follows the selection and the store: the first read picks an account, a later read never re-picks one.
   useEffect(() => {
-    const previouslyFollowed = followedId.current
-    const baseline = previousSelected.current
-    setDraft(current => {
-      const next = AccountDraftModel.followSelection({ current, selected, selectedId, followedId: previouslyFollowed, previousSelected: baseline })
-      // Retained local edits also need one render with the newly adopted store baseline before autosave can run.
-      return next !== null && next === current ? { ...next } : next
-    })
-    previousSelected.current = selected
-    if (selected !== null) followedId.current = selected.instanceId
-  }, [selected, selectedId])
+    if (file === null) return
+    send({ type: 'store.loaded', firstInstanceId: file.accounts[0]?.instanceId ?? null })
+  }, [file, send])
 
-  const dirty = selected !== null && draft !== null && !AccountDraftModel.sameDraft(selected, draft)
+  // Keyed on the profile object, so a re-read or another surface's write reaches the draft even when the id stays.
+  useEffect(() => {
+    send({ type: 'selection.follow', selected })
+  }, [selected, selectedId, send])
+
+  useEffect(() => {
+    send({ type: 'saveMode.change', mode: preferences.saveMode })
+  }, [preferences.saveMode, send])
+
+  const dirty = snapshot.matches({ editing: 'dirty' }) || snapshot.matches({ editing: 'renaming' })
   const problem = draft === null ? null : AccountDraftModel.draftProblem(draft)
   const credentialRefName = draft?.apiKeyEnv.trim() ?? ''
   const credentialInfoQuery = useQuery({
@@ -99,56 +111,22 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     staleTime: 10_000,
     retry: false,
   })
-  const { saver, status: autoSave } = useAutoSaver<AccountDraft>({
-    save: async next => setFile(await enqueueWrite(() => accounts.save({ draft: next }))),
-    equals: AccountDraftModel.sameDraft,
-    delayMs: preferences.autoSaveDelayMs,
-  })
-
-  // Renames are committed explicitly (on blur), so a half-typed slug never
-  // becomes a route; every other field saves itself after a pause.
-  useEffect(() => {
-    if (preferences.saveMode !== 'auto' || selected === null || draft === null) return
-    if (reconcilingSelection) {
-      saver.cancel()
-      return
-    }
-    if (AccountDraftModel.sameDraft(selected, draft)) {
-      saver.cancel()
-      saver.markSaved(draft)
-      return
-    }
-    if (draft.instanceId !== selected.instanceId || AccountDraftModel.draftProblem(draft) !== null) return
-    saver.schedule(draft)
-  }, [draft, selected, reconcilingSelection, preferences.saveMode, saver])
-
-  useEffect(() => {
-    if (preferences.saveMode === 'manual') saver.cancel()
-  }, [preferences.saveMode, saver])
-
-  // Leaving an account (or the page) writes what is waiting rather than dropping it.
-  useEffect(
-    () => () => {
-      void saver.flush().catch(() => undefined)
-    },
-    [selectedId, saver],
-  )
 
   // Explicit saves and new accounts show as busy; auto-save and switch toggles write quietly.
   // A rename reads the slug it renames when it runs, so a save queued behind another rename renames nothing twice.
   const saveMutation = useMutation({
     mutationFn: (input: { readonly draft: AccountDraft; readonly renamesSelection: boolean }) =>
       enqueueWrite(async () => {
-        const storedId = storedSelectionId.current
+        const storedId = editor.getSnapshot().context.storedId
         const previousInstanceId = input.renamesSelection && storedId !== null && storedId !== input.draft.instanceId ? storedId : undefined
         const file = await accounts.save(previousInstanceId === undefined ? { draft: input.draft } : { draft: input.draft, previousInstanceId })
-        storedSelectionId.current = input.draft.instanceId
+        send({ type: 'selection.stored', instanceId: input.draft.instanceId })
         return { file, renamed: previousInstanceId !== undefined }
       }),
     onMutate: () => setNotice(null),
     onSuccess: (next, input) => {
       setFile(next.file)
-      setSelectedId(input.draft.instanceId)
+      send({ type: 'selection.select', instanceId: input.draft.instanceId })
     },
   })
   const moveAccountMutation = useMutation({
@@ -170,7 +148,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     },
     onMutate: () => setNotice(null),
     onSuccess: (_next, target) => {
-      setSelectedId(current => (current === target.instanceId ? null : current))
+      send({ type: 'selection.selectIfCurrent', instanceId: target.instanceId, next: null })
       setNotice(`Removed ${target.displayName}. Credentials were left on disk.`)
     },
   })
@@ -178,7 +156,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   const save = async (next: AccountDraft): Promise<boolean> => {
     try {
       const { renamed } = await saveMutation.mutateAsync({ draft: next, renamesSelection: true })
-      saver.markSaved(next)
+      send({ type: 'draft.saved', draft: next })
       setNotice(renamed ? `Renamed to ${next.instanceId}.` : 'Saved. New sessions use the updated route settings.')
       return true
     } catch (error) {
@@ -245,33 +223,33 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
 
   /** Commit a route-slug edit: in auto mode on blur, in manual mode with Save. */
   const commitRename = async () => {
-    if (preferences.saveMode !== 'auto' || selected === null || draft === null || draft.instanceId === selected.instanceId) return
-    if (AccountDraftModel.draftProblem(draft) !== null) return
-    await save(draft)
+    const current = editor.getSnapshot().context
+    if (current.saveMode !== 'auto' || current.baseline === null || current.draft === null) return
+    if (current.draft.instanceId === current.baseline.instanceId) return
+    if (AccountDraftModel.draftProblem(current.draft) !== null) return
+    await save(current.draft)
   }
 
   // An edit supersedes the last notice (e.g. "Added Codex 1…"), which would otherwise hide the manual-mode "Unsaved changes." status.
   const editDraft = (next: AccountDraft) => {
     setNotice(null)
-    setDraft(next)
+    send({ type: 'draft.edit', draft: next })
   }
 
-  const revert = () => {
-    saver.cancel()
-    setDraft(selected === null ? null : AccountDraftModel.toDraft(selected))
-  }
+  const revert = () => send({ type: 'draft.revert' })
 
   /** Write straight through, for the toggles the reference page saves on click. */
   const persist = async (patch: Partial<AccountDraft>) => {
-    if (selected === null) return
-    const next = { ...AccountDraftModel.toDraft(selected), ...patch }
-    setDraft(current => (current === null ? next : { ...current, ...patch }))
+    const current = editor.getSnapshot().context
+    if (current.baseline === null) return
+    const next = { ...AccountDraftModel.toDraft(current.baseline), ...patch }
+    send({ type: 'draft.edit', draft: current.draft === null ? next : { ...current.draft, ...patch } })
     try {
       setFile(await enqueueWrite(() => accounts.save({ draft: next })))
-      saver.markSaved(next)
+      send({ type: 'draft.saved', draft: next })
     } catch (error) {
       setNotice(`Could not save: ${String(error)}`)
-      setDraft(AccountDraftModel.toDraft(selected))
+      send({ type: 'draft.revert' })
     }
   }
 
@@ -346,7 +324,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     file,
     setFile,
     selectedId,
-    setSelectedId,
+    setSelectedId: (instanceId: string | null) => send({ type: 'selection.select', instanceId }),
     selected,
     draft,
     setDraft: editDraft,
@@ -359,8 +337,8 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     storeCredential,
     importSecretCatalogKey,
     saveMode: preferences.saveMode,
-    autoSave,
-    retryAutoSave: () => void saver.retry().catch(() => undefined),
+    autoSave: snapshot.context.autoSave,
+    retryAutoSave: () => send({ type: 'autoSave.retry' }),
     commitRename,
     revert,
     notice: notice ?? (fileQuery.isError && file === null ? 'The account host did not answer.' : null),

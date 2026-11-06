@@ -183,4 +183,23 @@ describe('actual accounts panel hook following external account changes', () => 
     expect(stored.accounts[0]).toMatchObject({ displayName: 'Locally edited name', enabled: false })
     expect(view.client.getQueryData<AccountsFile>(aiAccountsKeys.file)?.accounts[0]?.enabled).toBe(false)
   })
+
+  it('saves an edited field by itself and reports the auto-save status', async () => {
+    const view = await mount()
+    const draft = view.current().draft
+    if (draft === null) throw new Error('Expected an initialized account draft.')
+    await act(async () => {
+      view.current().setDraft({ ...draft, displayName: 'Auto saved name' })
+    })
+    expect(view.current().autoSave.kind).toBe('pending')
+
+    await advance(DEFAULT_CLIENT_SETTINGS.autoSaveDelayMs + 1)
+    await advance()
+    await advance()
+
+    expect(api.save).toHaveBeenCalledOnce()
+    expect(view.current().dirty).toBe(false)
+    expect(view.current().autoSave.kind).not.toBe('pending')
+    expect(view.current().draft).toMatchObject({ displayName: 'Auto saved name' })
+  })
 })
