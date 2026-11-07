@@ -5,25 +5,45 @@
     {
       "id": "workspace-folder-add-flow",
       "title": "Add workspaces from the folder browser",
-      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the workspace_folder_browser_capabilities agent tool reports that, with the Host's path style, without opening it.",
+      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the workspace_folder_browser_capabilities agent tool reports that, with the Host's path style, without opening it. Choosing a folder first reports what it is: no repository, a Git checkout with its origin and default branch, or a Jujutsu repository. A Git checkout offers Enable Jujutsu and add, which runs the same guarded colocated init the graph uses; a folder without a repository offers Initialize repository, which starts Jujutsu in place and keeps the files already in it. The project_inspect and project_init agent tools drive the same read and write.",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose workspace\"",
         "click menuitem \"Add workspace*\"",
         "expect textbox \"Enter a folder path\""
       ],
-      "surfaces": ["client", "integration"],
+      "surfaces": [
+        "client",
+        "integration"
+      ],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Add workspace",
       "configuration": [],
-      "states": ["closed", "browsing", "native-available", "native-unavailable", "native-cancelled", "native-failed", "selected", "busy"],
+      "states": [
+        "closed",
+        "browsing",
+        "native-available",
+        "native-unavailable",
+        "native-cancelled",
+        "native-failed",
+        "selected",
+        "busy",
+        "inspecting",
+        "enabling",
+        "initializing"
+      ],
       "failureModes": [
         "Directory listing and folder creation use an authenticated Host API; workspace registration stays behind the workspace Remote API.",
         "Ambiguous or truncated path matches do not auto-browse.",
         "The add flow does not expose registered project choices or project registration actions.",
         "A Host without a native directory picker, or one too old to answer the capability read, hides Browse… and keeps absolute-path entry and the in-app browser.",
-        "Cancelling the native dialog changes nothing; a failed dialog keeps absolute-path entry and offers Browse… again."
+        "Cancelling the native dialog changes nothing; a failed dialog keeps absolute-path entry and offers Browse… again.",
+        "The setup step never initializes a repository by itself: every write follows an explicit click.",
+        "A folder already inside a checkout is reported with that checkout's root, and adding it registers the folder you chose.",
+        "Enable Jujutsu is offered only while the Jujutsu bundle is loaded and jj is installed; otherwise the panel offers the plain add and says why.",
+        "A folder with broken .jj metadata is reported as broken and is never repaired or replaced.",
+        "Initialize repository refuses a folder that is already a repository or sits inside one, naming the checkout to add instead."
       ],
       "externalDependencies": [],
       "verification": [
@@ -53,6 +73,29 @@
           "kind": "gherkin",
           "id": "workspace-folder-picker.sidebar-folder-mode",
           "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.inspect-repository-kinds",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/folder-inspection.test.ts",
+          "testName": "reads a Git checkout with its root, origin and default branch, and offers Jujutsu"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.inspect-nested-folder",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/folder-inspection.test.ts",
+          "testName": "reports a nested folder as part of the checkout above it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.initialize-folder",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "turns an existing folder into a project in place and keeps its files"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workspace-folder-picker.folder-setup",
+          "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
         }
       ],
       "telemetry": [
@@ -78,12 +121,24 @@
         "click menuitem \"Clone repository…\"",
         "expect textbox \"Repository URL\""
       ],
-      "surfaces": ["client", "host", "tool"],
+      "surfaces": [
+        "client",
+        "host",
+        "tool"
+      ],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Add workspace › Clone repository",
       "configuration": [],
-      "states": ["form", "cloning", "colocating", "registering", "succeeded", "failed", "cancelled"],
+      "states": [
+        "form",
+        "cloning",
+        "colocating",
+        "registering",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
       "failureModes": [
         "An existing destination folder is refused before anything runs; a second start for the same folder returns the running job.",
         "A failed or cancelled clone deletes the folder it created and registers nothing; a failed jj colocation keeps the clone and names the command to finish it.",
@@ -136,13 +191,25 @@
       "id": "project-registration-removal",
       "title": "Remove a project registration",
       "summary": "Remove a project from the New thread picker without deleting its folder or files; threads lose their project grouping.",
-      "reach": ["click button \"Choose workspace\"", "expect textbox \"Search projects or enter a folder path\""],
-      "surfaces": ["client", "host", "integration"],
+      "reach": [
+        "click button \"Choose workspace\"",
+        "expect textbox \"Search projects or enter a folder path\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "integration"
+      ],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Remove",
       "configuration": [],
-      "states": ["listed", "confirmation", "removed", "failed"],
+      "states": [
+        "listed",
+        "confirmation",
+        "removed",
+        "failed"
+      ],
       "failureModes": [
         "Removal requires explicit confirmation.",
         "The folder and files stay on disk; project threads lose their grouping.",
@@ -175,12 +242,22 @@
         "click menuitem \"New project…\"",
         "expect textbox \"Project name\""
       ],
-      "surfaces": ["client", "host", "tool"],
+      "surfaces": [
+        "client",
+        "host",
+        "tool"
+      ],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Add workspace › New project",
       "configuration": [],
-      "states": ["form", "creating", "created", "created-with-warning", "failed"],
+      "states": [
+        "form",
+        "creating",
+        "created",
+        "created-with-warning",
+        "failed"
+      ],
       "failureModes": [
         "An existing folder, a missing parent or a missing jj is refused before anything is written.",
         "A failure before registration removes the folder it created, so the same request can be retried.",
@@ -238,9 +315,16 @@
       "id": "registered-project-search",
       "title": "Search projects and browse folder paths",
       "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host (drive and UNC paths too on a Windows Host), automatically enter one unique matching folder, open on a Projects scope that leaves JJ thread workspaces out, offer Everything (recents, then projects, then workspaces), Recents and Workspaces scopes, and preserve project identity in returned choices.",
-      "surfaces": ["client", "integration"],
+      "surfaces": [
+        "client",
+        "integration"
+      ],
       "configuration": [],
-      "states": ["empty", "matched", "selected"],
+      "states": [
+        "empty",
+        "matched",
+        "selected"
+      ],
       "failureModes": [
         "An empty result remains selectable-safe.",
         "Home-relative paths resolve against the Host-reported home before listing.",
@@ -308,10 +392,19 @@
       "id": "keyboard-folder-selection",
       "title": "Select project folders with keyboard navigation",
       "summary": "Move through result rows with wrapped selection and handle empty lists without selecting an invalid row.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["focused", "next", "previous", "empty"],
-      "failureModes": ["Keyboard actions on an empty list do not invent a selection."],
+      "states": [
+        "focused",
+        "next",
+        "previous",
+        "empty"
+      ],
+      "failureModes": [
+        "Keyboard actions on an empty list do not invent a selection."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -340,10 +433,20 @@
       "id": "unregistered-recent-folders",
       "title": "Offer recent folders not yet registered as projects",
       "summary": "List recent folders in order on their own scope and first on Everything (before projects, then JJ thread workspaces, each folder once), show a registered recent as its project, and keep an unregistered folder's canonical path distinct from registered project identity.",
-      "surfaces": ["client", "host", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "integration"
+      ],
       "configuration": [],
-      "states": ["registered-match", "recent-unregistered", "selected"],
-      "failureModes": ["Recent directory selection cannot claim an existing project ID until Host registration succeeds."],
+      "states": [
+        "registered-match",
+        "recent-unregistered",
+        "selected"
+      ],
+      "failureModes": [
+        "Recent directory selection cannot claim an existing project ID until Host registration succeeds."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -378,10 +481,19 @@
       "id": "directory-only-mode",
       "title": "Start directly in the Host folder browser",
       "summary": "Consumers can open the picker with directory browsing active while omitting registered-project choices and registration actions.",
-      "surfaces": ["client", "integration"],
+      "surfaces": [
+        "client",
+        "integration"
+      ],
       "configuration": [],
-      "states": ["projects-default", "directory-browsing"],
-      "failureModes": ["The default project mode remains unchanged for existing consumers.", "Directory-only mode begins at the Host home listing."],
+      "states": [
+        "projects-default",
+        "directory-browsing"
+      ],
+      "failureModes": [
+        "The default project mode remains unchanged for existing consumers.",
+        "Directory-only mode begins at the Host home listing."
+      ],
       "externalDependencies": [],
       "verification": [
         {

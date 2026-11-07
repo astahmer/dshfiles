@@ -60,6 +60,31 @@ const createdProjectSchema = Schema.Struct({
 
 export type CreatedProject = typeof createdProjectSchema.Type
 
+/** What a folder is before it becomes a project, and whether Jujutsu can be enabled alongside its Git checkout. */
+export const folderInspectionSchema = Schema.Struct({
+  path: Schema.String,
+  kind: Schema.Literals(['none', 'git', 'jujutsu']),
+  repositoryRoot: Schema.NullOr(Schema.String.check(Schema.isMaxLength(MAX_PATH_LENGTH))),
+  remoteUrl: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_048))),
+  defaultBranch: Schema.NullOr(Schema.String.check(Schema.isMaxLength(255))),
+  gitAbove: Schema.Boolean,
+  brokenJjMetadata: Schema.Boolean,
+  canEnableJujutsu: Schema.Boolean,
+  reason: Schema.NullOr(Schema.String.check(Schema.isMaxLength(400))),
+})
+
+export type FolderInspection = typeof folderInspectionSchema.Type
+
+const initializedProjectSchema = Schema.Struct({ path: Schema.String, workspaceId: Schema.String, title: Schema.String })
+
+const describeInspection = (inspection: FolderInspection): string => {
+  const where = inspection.repositoryRoot ?? inspection.path
+  const kind = inspection.kind === 'none' ? 'no repository' : inspection.kind === 'git' ? 'Git' : 'Jujutsu'
+  const remote = inspection.remoteUrl === null ? '' : ` · ${inspection.remoteUrl}`
+  const enable = inspection.canEnableJujutsu ? ' · Jujutsu can be enabled' : ''
+  return `${kind} · ${where}${remote}${enable}`
+}
+
 export const projectToolsSchema = Schema.Struct({
   home: Schema.String,
   git: Schema.Boolean,
@@ -115,6 +140,20 @@ export const projectLifecycleApi = defineApi({
         name: 'project_create',
         render: created => `Created ${created.path}${created.gitHubRepository === null ? '' : ` · ${created.gitHubRepository}`}`,
       },
+    }),
+    inspect: WorkspaceFolderPickerSchema.method({
+      input: Schema.Struct({ path: parentPathSchema }),
+      output: folderInspectionSchema,
+      description:
+        'Report what a folder is before it becomes a project: no repository, a Git checkout or a Jujutsu repository, its root, origin URL and default branch, and whether Jujutsu can be enabled alongside Git. Never writes. Read-only.',
+      tool: { name: 'project_inspect', readOnly: true, render: describeInspection },
+    }),
+    initProject: WorkspaceFolderPickerSchema.method({
+      input: Schema.Struct({ path: parentPathSchema }),
+      output: initializedProjectSchema,
+      description:
+        'Turn an existing folder into a project in place: jj git init (colocated), a README.md when it has none, a first described commit and a main bookmark, then register it as a project. Existing files are kept and become the first revision. Refuses a folder that is already a repository or sits inside one. Call only when the user asked to initialize that folder.',
+      tool: { name: 'project_init', render: project => `Initialized ${project.path}` },
     }),
     removeProject: WorkspaceFolderPickerSchema.method({
       input: Schema.Struct({ workspaceId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)) }),

@@ -1,5 +1,5 @@
 import { homedir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, dirname, join, parse } from 'node:path'
 import { Clock, Context, Duration, Effect, FiberMap, FileSystem, Layer, Option, Ref, Schema, Semaphore, Stream } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import type { CloneJob, CreatedProject } from './project-lifecycle-api.js'
@@ -464,6 +464,92 @@ const requireGh = (lookup: ExecutableLookup['Service']) =>
     }),
   )
 
+/** A repository marker found at or above a folder: the nearest one wins, `jj` before `git` in the same folder. */
+export interface RepositoryMarker {
+  readonly kind: 'git' | 'jujutsu'
+  readonly root: string
+  readonly broken: boolean
+}
+
+const markerIn = (fs: FileSystem.FileSystem, dir: string) =>
+  Effect.gen(function* () {
+    const jj = join(dir, '.jj')
+    const jjInfo = yield* fs.stat(jj).pipe(Effect.option)
+    if (Option.isSome(jjInfo)) {
+      const broken =
+        jjInfo.value.type === 'File' &&
+        (yield* fs.readFileString(jj).pipe(
+          Effect.map(text => text.trim().length === 0),
+          Effect.orElseSucceed(() => true),
+        ))
+      return Option.some<RepositoryMarker>({ kind: 'jujutsu', root: dir, broken })
+    }
+    if (yield* fs.exists(join(dir, '.git')).pipe(Effect.orElseSucceed(() => false)))
+      return Option.some<RepositoryMarker>({ kind: 'git', root: dir, broken: false })
+    return Option.none<RepositoryMarker>()
+  })
+
+/** Walks up from a folder to the filesystem root; the root marker is the checkout a nested folder belongs to. */
+export const nearestRepositoryMarker = (fs: FileSystem.FileSystem, path: string) =>
+  Effect.gen(function* () {
+    let dir = path
+    const filesystemRoot = parse(dir).root
+    for (;;) {
+      const marker = yield* markerIn(fs, dir)
+      if (Option.isSome(marker)) return marker
+      if (dir === filesystemRoot) return Option.none<RepositoryMarker>()
+      const parent = dirname(dir)
+      if (parent === dir) return Option.none<RepositoryMarker>()
+      dir = parent
+    }
+  })
+
+/** The folder is already part of (or is) a repository, so initializing one in place would nest or replace it. */
+export class AlreadyARepository extends Schema.TaggedError<AlreadyARepository>()(
+  'AlreadyARepository',
+  { path: Schema.String, root: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'already-a-repository' },
+) {
+  override get message(): string {
+    return this.path === this.root
+      ? `${this.path} is already a repository. Add it as a project instead.`
+      : `${this.path} sits inside the repository at ${this.root}. Add it as a project, or enable Jujutsu for that checkout instead.`
+  }
+}
+
+const runWithTimeout = (commands: ProjectCommands['Service'], argv: readonly [string, ...string[]], cwd: string) =>
+  commands.run({ argv, cwd }).pipe(
+    Effect.timeoutOrElse({
+      duration: STEP_TIMEOUT,
+      orElse: () => Effect.succeed<CommandResult>({ exitCode: 1, stdout: '', stderr: 'timed out after 2 minutes' }),
+    }),
+  )
+
+const requireStep = (commands: ProjectCommands['Service'], name: string, argv: readonly [string, ...string[]], cwd: string) =>
+  Effect.flatMap(runWithTimeout(commands, argv, cwd), result =>
+    result.exitCode === 0
+      ? Effect.succeed(result)
+      : Effect.fail(new ProjectCreateFailed({ step: name, detail: excerpt(result.stderr) || `exit ${String(result.exitCode)}` })),
+  )
+
+/** The repository steps shared by a new folder and an existing one: colocated jj, README when missing, first commit, `main`. */
+const initializeJujutsu = (input: {
+  readonly commands: ProjectCommands['Service']
+  readonly fs: FileSystem.FileSystem
+  readonly jj: string
+  readonly path: string
+  readonly name: string
+}) =>
+  Effect.gen(function* () {
+    const { commands, fs, jj, path, name } = input
+    yield* requireStep(commands, 'jj git init', [jj, 'git', 'init', '--colocate', '.'], path)
+    if (!(yield* fs.exists(join(path, 'README.md')).pipe(Effect.orElseSucceed(() => true)))) {
+      yield* fs.writeFileString(join(path, 'README.md'), `# ${name}\n`).pipe(Effect.mapError(cause => new ProjectFolderFailed({ path, cause })))
+    }
+    yield* requireStep(commands, 'jj commit', [jj, 'commit', '-m', `chore: initialize ${name}`], path)
+    yield* requireStep(commands, 'jj bookmark create', [jj, 'bookmark', 'create', 'main', '-r', '@-'], path)
+  })
+
 export type CreateProjectFailure =
   | ParentMissing
   | DestinationExists
@@ -479,6 +565,14 @@ export type CreateProjectFailure =
  * optionally a private GitHub repository. A failure before registration removes the folder it created, so the same
  * request can simply be retried; GitHub problems after registration only add a warning.
  */
+export type InitializeProjectFailure = AlreadyARepository | JjMissing | ProjectCreateFailed | ProjectCommandFailed | ProjectFolderFailed | ProjectRegisterFailed
+
+/**
+ * Creates a jj project: folder, colocated repository, README, a described first commit on `main`, registration, and
+ * optionally a private GitHub repository. A failure before registration removes the folder it created, so the same
+ * request can simply be retried; GitHub problems after registration only add a warning. The same repository steps also
+ * turn an existing folder into a project in place, keeping the files it already had.
+ */
 export class ProjectCreator extends Context.Service<
   ProjectCreator,
   {
@@ -487,6 +581,9 @@ export class ProjectCreator extends Context.Service<
       readonly name: string
       readonly createGitHubRepository: boolean
     }) => Effect.Effect<CreatedProject, CreateProjectFailure>
+    readonly initialize: (input: {
+      readonly path: string
+    }) => Effect.Effect<{ readonly path: string; readonly workspaceId: string; readonly title: string }, InitializeProjectFailure>
   }
 >()('@dshfiles/workspace-folder-picker/ProjectCreator') {
   static readonly layer = Layer.effect(
@@ -514,20 +611,11 @@ export class ProjectCreator extends Context.Service<
               orElse: () => Effect.succeed<CommandResult>({ exitCode: 1, stdout: '', stderr: 'timed out after 2 minutes' }),
             }),
           )
-        const step = (name: string, argv: readonly [string, ...string[]]) =>
-          Effect.flatMap(run(argv), result =>
-            result.exitCode === 0
-              ? Effect.succeed(result)
-              : Effect.fail(new ProjectCreateFailed({ step: name, detail: excerpt(result.stderr) || `exit ${String(result.exitCode)}` })),
-          )
         const folderFailed = (cause: unknown) => new ProjectFolderFailed({ path, cause })
 
         yield* fs.makeDirectory(path).pipe(Effect.mapError(folderFailed))
         const registered = yield* Effect.gen(function* () {
-          yield* step('jj git init', [jj, 'git', 'init', '--colocate', '.'])
-          yield* fs.writeFileString(join(path, 'README.md'), `# ${input.name}\n`).pipe(Effect.mapError(folderFailed))
-          yield* step('jj commit', [jj, 'commit', '-m', `chore: initialize ${input.name}`])
-          yield* step('jj bookmark create', [jj, 'bookmark', 'create', 'main', '-r', '@-'])
+          yield* initializeJujutsu({ commands, fs, jj, path, name: input.name })
           return yield* registry.register(path)
         }).pipe(Effect.onError(() => fs.remove(path, { recursive: true, force: true }).pipe(Effect.ignore)))
 
@@ -557,7 +645,21 @@ export class ProjectCreator extends Context.Service<
         return { ...created, gitHubRepository: repository, warning: null }
       })
 
-      return ProjectCreator.of({ create })
+      /** Turns a folder that is not part of any repository into a project, keeping the files it already holds. */
+      const initialize = Effect.fn('project initialize')(function* (input: { readonly path: string }) {
+        const path = expandHome(input.path, home)
+        const info = yield* fs.stat(path).pipe(Effect.mapError(cause => new ProjectFolderFailed({ path, cause })))
+        if (info.type !== 'Directory') return yield* new ProjectFolderFailed({ path })
+        const marker = yield* nearestRepositoryMarker(fs, path)
+        if (Option.isSome(marker)) return yield* new AlreadyARepository({ path, root: marker.value.root })
+        const jj = yield* requireJj(lookup)
+        yield* Effect.annotateCurrentSpan({ 'dshx.project.initialize': path })
+        yield* initializeJujutsu({ commands, fs, jj, path, name: basename(path) })
+        const registered = yield* registry.register(path)
+        return { path, workspaceId: registered.workspaceId, title: registered.title }
+      })
+
+      return ProjectCreator.of({ create, initialize })
     }),
   )
 }

@@ -193,18 +193,18 @@ Worktree location and branch naming are settings, overridable per project.
 Goal: adding an existing folder tells you what it is, and one click gives you the composer
 controls you were missing.
 
-- [ ] Add `projectInspect` to `@dshfiles/workspace-folder-picker` (read-only, tool
+- [x] Add `projectInspect` to `@dshfiles/workspace-folder-picker` (read-only, tool
       `project_inspect`): resolve the folder's real path, then report
       `{ kind: 'none' | 'git' | 'jujutsu', repositoryRoot, remoteUrl, bookmark, workingCopy,
       nestedGitBoundary, brokenJjMetadata, canEnableJujutsu, reason }`. Reuse
       `registerRepositories` from `@dshfiles/jujutsu` for jj detection instead of a second
       marker check, and `git rev-parse --show-toplevel` / `git remote get-url origin` through
       the existing `ProjectCommands` service.
-- [ ] Show the result in the picker row and after selection: one line, the repository state;
+- [x] Show the result in the picker row and after selection: one line, the repository state;
       an **Enable Jujutsu** button when `canEnableJujutsu`, calling the existing
       `jj_open_repository` (`openGraphRepository` already wraps old-Host fallback). Never
       initialize without that click; remember the answer per folder for the session.
-- [ ] For `kind: 'none'`, offer **New project in this folder** (P1 uses the existing
+- [x] For `kind: 'none'`, offer **New project in this folder** (P1 uses the existing
       `project_create` path semantics) instead of a dead end.
 - [ ] Wire the same inspect into `project_register` (`thread-sidebar`) and the New-thread
       picker registration so no surface registers blind; the `project_register` tool
@@ -383,9 +383,9 @@ Filled as tasks land; empty means unverified.
 
 | Phase | Task | Evidence |
 | --- | --- | --- |
-| P1 | project inspect method | — |
-| P1 | Enable Jujutsu action | — |
-| P1 | jj-integration non-repo state | — |
+| P1 | project inspect method | `src/folder-inspection.test.ts` 6 tests green; `project_inspect` + `project_init` bound in `src/host.ts` |
+| P1 | Enable Jujutsu action | `repository-setup-contract` provided by `@dshfiles/jujutsu`; `project-folder-setup.tsx` renders it; gherkin `workspace-folder-picker.folder-setup` added (run pending) |
+| P1 | jj-integration non-repo state | — (open) |
 | P2 | clone stages + retry | — |
 | P3 | project_publish | — |
 | P4 | dsh.project.json | — |

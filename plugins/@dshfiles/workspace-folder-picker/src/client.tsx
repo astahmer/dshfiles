@@ -14,18 +14,20 @@ import { useState } from 'react'
 import { workspaceFolderBrowserApi } from './directory-browser-api.js'
 import { ProjectCloneDialog } from './project-clone-dialog.js'
 import { ProjectCreateDialog } from './project-create-dialog.js'
+import { ProjectFolderSetup } from './project-folder-setup.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
 
 const directoryFlowSlotNames: readonly DirectoryFlowSlotName[] = ['sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']
 
 const directoryFlowLabels = { heading: 'Add workspace' } satisfies { readonly heading: string }
 
-type DirectoryFlowView = 'browse' | 'clone' | 'create'
+type DirectoryFlowView = 'browse' | 'clone' | 'create' | 'inspect'
 
 const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): JSX.Element => {
   const browserApi = useApi(workspaceFolderBrowserApi)
   const lifecycleApi = useApi(projectLifecycleApi)
   const [view, setView] = useState<DirectoryFlowView>('browse')
+  const [candidate, setCandidate] = useState<string | null>(null)
   const tools = useQuery({ queryKey: ['workspace-folder-picker', 'project-tools'], queryFn: () => lifecycleApi.tools({}), retry: false, staleTime: 60_000 })
   const pickerCapabilities = useQuery({
     queryKey: ['workspace-folder-picker', 'capabilities'],
@@ -37,6 +39,19 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
     pick: signal => props.directoryPicker.pick(signal),
     list: (path, signal) => browserApi.list(path === undefined ? {} : { path }, { signal }),
     createDirectory: (path, name) => browserApi.createDirectory({ path, name }),
+  }
+  if (view === 'inspect' && candidate !== null) {
+    return (
+      <ProjectFolderSetup
+        api={lifecycleApi}
+        path={candidate}
+        onAdded={path => props.onPicked(path)}
+        onClose={() => {
+          setCandidate(null)
+          setView('browse')
+        }}
+      />
+    )
   }
   if (view === 'clone') {
     return <ProjectCloneDialog api={lifecycleApi} home={tools.data?.home} onClose={() => setView('browse')} onCloned={path => props.onPicked(path)} />
@@ -83,8 +98,18 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
       pathStyle={pickerCapabilities.data?.pathStyle}
       onClose={props.onCancel}
       onRegisterWorkspace={props.registerWorkspace}
-      onUseAbsolutePath={props.onPicked}
-      onSelect={selection => props.onPicked(selection.canonicalPath)}
+      onUseAbsolutePath={path => {
+        setCandidate(path)
+        setView('inspect')
+      }}
+      onSelect={selection =>
+        selection.kind === 'workspace'
+          ? props.onPicked(selection.canonicalPath)
+          : (() => {
+              setCandidate(selection.canonicalPath)
+              setView('inspect')
+            })()
+      }
       placeholder="Browse for a workspace folder…"
       projects={[]}
     />

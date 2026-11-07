@@ -45,6 +45,47 @@ Then('the picker starts in folder browsing mode without project actions', async 
   await finishJourneyAssertions(page)
 })
 
+Then('an existing Git checkout reports its repository and offers Jujutsu before it is added', async ({ page }: { page: Page }) => {
+  const scratchRoot = await mkdtemp(join(tmpdir(), 'dsh-folder-setup-e2e-'))
+  const repositoryName = 'existing-checkout'
+  const repositoryPath = join(scratchRoot, repositoryName)
+  const origin = 'https://example.invalid/owner/repo.git'
+  await mkdir(repositoryPath)
+  const git = (...args: readonly string[]) =>
+    execFileSync('git', ['-c', 'user.email=e2e@example.invalid', '-c', 'user.name=E2E', ...args], { cwd: repositoryPath })
+  git('init', '--initial-branch=main')
+  await writeFile(join(repositoryPath, 'README.md'), '# existing checkout\n')
+  git('add', '.')
+  git('commit', '-m', 'one')
+  git('remote', 'add', 'origin', origin)
+  const dialog = folderPickerDialog(page)
+  try {
+    const pathInput = dialog.getByRole('textbox', { name: 'Enter a folder path' })
+    await pathInput.fill(repositoryPath)
+    await pathInput.press('Enter')
+    await dialog.getByRole('button', { name: 'Select this folder', exact: true }).click()
+    const setup = page.getByRole('dialog', { name: `Add ${repositoryName}` })
+    await recordAssertion(page, 'setup-reports-a-git-checkout', async () => {
+      await expect(setup).toBeVisible()
+      await expect(setup.getByText(/Git checkout/u)).toBeVisible()
+      await expect(setup.getByText(repositoryPath)).toBeVisible()
+      await expect(setup.getByText(origin)).toBeVisible()
+    })
+    await recordAssertion(page, 'setup-offers-enable-jujutsu', () => expect(setup.getByRole('button', { name: 'Enable Jujutsu and add' })).toBeVisible())
+    await setup.getByRole('button', { name: 'Enable Jujutsu and add' }).click()
+    await recordAssertion(page, 'enabling-jujutsu-initializes-the-checkout-in-place', async () => {
+      await expect(setup).toBeHidden()
+      await access(join(repositoryPath, '.jj'))
+    })
+    await recordAssertion(page, 'the-checkout-is-registered-after-enabling', () =>
+      expect(page.getByRole('treeitem').filter({ hasText: repositoryName })).toBeVisible(),
+    )
+    await finishJourneyAssertions(page)
+  } finally {
+    await rm(scratchRoot, { recursive: true, force: true })
+  }
+})
+
 Then('a new folder can be created and registered as a workspace', async ({ page }: { page: Page }) => {
   const scratchRoot = await mkdtemp(join(tmpdir(), 'dsh-folder-picker-e2e-'))
   const workspaceName = 'registered-workspace'
@@ -59,7 +100,13 @@ Then('a new folder can be created and registered as a workspace', async ({ page 
     await dialog.getByRole('button', { name: 'Create folder', exact: true }).click()
     await recordAssertion(page, 'new-folder-is-created-and-opened', () => expect(dialog.locator('p').filter({ hasText: workspacePath }).first()).toBeVisible())
     await dialog.getByRole('button', { name: 'Select this folder', exact: true }).click()
-    await recordAssertion(page, 'folder-picker-closes-after-selection', () => expect(dialog).toBeHidden())
+    const setup = page.getByRole('dialog', { name: `Add ${workspaceName}` })
+    await recordAssertion(page, 'choosing-a-folder-opens-the-setup-step', () => expect(setup).toBeVisible())
+    await recordAssertion(page, 'a-folder-without-a-repository-offers-initialize', () =>
+      expect(setup.getByRole('button', { name: 'Initialize repository' })).toBeVisible(),
+    )
+    await setup.getByRole('button', { name: 'Add without a repository' }).click()
+    await recordAssertion(page, 'folder-picker-closes-after-selection', () => expect(setup).toBeHidden())
     await recordAssertion(page, 'created-folder-is-registered-as-workspace', () =>
       expect(page.getByRole('treeitem').filter({ hasText: workspaceName })).toBeVisible(),
     )

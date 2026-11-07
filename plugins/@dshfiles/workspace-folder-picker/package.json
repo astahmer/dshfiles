@@ -30,6 +30,10 @@
       "types": "./src/picker/index.ts",
       "default": "./dist/picker.js"
     },
+    "./repository-setup-contract": {
+      "types": "./src/repository-setup-contract.ts",
+      "default": "./dist/repository-setup-contract.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },

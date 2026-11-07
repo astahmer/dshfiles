@@ -3,7 +3,12 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/workspace-folder-picker',
-  modules: { 'directory-browser-api': 'src/directory-browser-api.ts', 'project-lifecycle-api': 'src/project-lifecycle-api.ts', picker: 'src/picker/index.ts' },
+  modules: {
+    'directory-browser-api': 'src/directory-browser-api.ts',
+    'project-lifecycle-api': 'src/project-lifecycle-api.ts',
+    picker: 'src/picker/index.ts',
+    'repository-setup-contract': 'src/repository-setup-contract.ts',
+  },
   host: { entry: 'src/host.ts' },
   client: { entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } },
   build: {

@@ -37,6 +37,18 @@ picker learns the Host's style from the capability read, or else from the home
 folder the Host lists. On macOS and Linux, and before the style is known, drive,
 UNC and `~\` text stays a project search, as it always was.
 
+## Inspect a folder before adding it
+
+Choosing a folder opens one step that says what it is, instead of registering it blind:
+
+- **No repository**: **Initialize repository** runs `jj git init --colocate` in place, keeps the files already there as the first revision, writes a `README.md` when the folder has none, commits it and creates `main`; **Add without a repository** registers the folder as a plain project.
+- **Git checkout**: shows the checkout root and its `origin`; **Enable Jujutsu and add** calls the Jujutsu bundle's guarded initializer (the same one the graph uses: colocated, history and files preserved), then registers the project, so the composer's bookmark and workspace controls appear. **Add project** registers it without Jujutsu.
+- **Jujutsu repository**: shows the root and offers the plain add.
+
+A folder inside another checkout is reported with that checkout's root and never initialized; broken `.jj` metadata is reported and never repaired. The Host side is read-only: `project_inspect` (folder → kind, root, origin, default branch, whether Jujutsu can be enabled) and `project_init` (in-place initialization, refusing a folder that is already a repository or sits inside one).
+
+The Enable action is a dshx contract (`@dshfiles/workspace-folder-picker/repository-setup-contract`), provided by `@dshfiles/jujutsu`. Without that bundle, the panel keeps the plain add and says why Jujutsu cannot be enabled.
+
 ## Clone a repository
 
 ![Clone a repository as a project](docs/screenshots/project-clone.png)

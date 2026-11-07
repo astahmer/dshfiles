@@ -300,4 +300,41 @@ describe.skipIf(!toolsAvailable)('project lifecycle against real git and jj', ()
       }),
     ),
   )
+
+  it.live('turns an existing folder into a project in place and keeps its files', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { root, registered, creator, fs } = yield* lifecycle({ installed: ['git', 'jj'] })
+        const folder = join(root, 'existing')
+        yield* fs.makeDirectory(folder)
+        yield* fs.writeFileString(join(folder, 'notes.md'), 'kept\n')
+        const project = yield* creator.initialize({ path: folder })
+        expect(project).toMatchObject({ path: folder, workspaceId: 'ws-1' })
+        expect(registered).toEqual([folder])
+        expect(yield* fs.exists(join(folder, '.jj'))).toBe(true)
+        expect(yield* fs.readFileString(join(folder, 'notes.md'))).toBe('kept\n')
+        expect(yield* fs.readFileString(join(folder, 'README.md'))).toBe('# existing\n')
+        const log = execFileSync('jj', ['log', '--no-graph', '-T', 'description.first_line() ++ "\\n"', '-r', '@-'], { cwd: folder, encoding: 'utf8' })
+        expect(log.trim()).toBe('chore: initialize existing')
+        const bookmarks = execFileSync('jj', ['bookmark', 'list', '--template', 'self.name()'], { cwd: folder, encoding: 'utf8' })
+        expect(bookmarks.trim()).toBe('main')
+      }),
+    ),
+  )
+
+  it.live('refuses to initialize a folder that is already a repository or sits inside one', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { root, creator, fs } = yield* lifecycle({ installed: ['git', 'jj'] })
+        const inside = join(root, 'existing', 'nested')
+        const existing = join(root, 'existing')
+        yield* fs.makeDirectory(existing)
+        yield* creator.initialize({ path: existing })
+        yield* fs.makeDirectory(inside)
+        const failure = yield* Effect.flip(creator.initialize({ path: inside }))
+        expect(failure._tag).toBe('AlreadyARepository')
+        expect(failure.message).toMatch(/inside the repository/u)
+      }),
+    ),
+  )
 })

@@ -20,6 +20,8 @@ import { workbenchPanels, NativeAsideOwners, type WorkbenchPanelProps } from '@d
 import * as Schema from 'effect/Schema'
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { jujutsuApi } from './api.js'
+import { openGraphRepository } from './repository-opening.js'
+import { RepositorySetup } from '@dshfiles/workspace-folder-picker/repository-setup-contract'
 import { ChatReferenceLinks } from './chat-reference-links.js'
 import { ChatReferenceOverlay } from './chat-reference-overlay.js'
 import { ChatReferenceTitleStore } from './chat-reference-titles.js'
@@ -51,6 +53,14 @@ export default defineClient({
   // renders outside the API context and its useApi throws while rendering.
   setup(ctx, decorate, metadata) {
     const jujutsu = createApiClient(ctx, jujutsuApi)
+    // The add-workspace flow asks this bundle to enable Jujutsu, so both sides use one guarded initializer instead of
+    // the picker shelling out to `jj git init` on its own.
+    metadata?.plugin?.provide(RepositorySetup, {
+      enableJujutsu: async ({ path }) => {
+        const opened = await openGraphRepository(jujutsu, path)
+        return { root: opened.root, initialized: 'initialized' in opened ? opened.initialized : false }
+      },
+    })
     ChatReferenceLinks.setTitles(
       new ChatReferenceTitleStore({
         load: input => jujutsu.referenceTitles({ paths: input.paths, references: input.references }),
