@@ -27,10 +27,13 @@ const selected =
   selector =>
     selector(value)
 const dispose: Array<() => void> = []
+const resizeCallbacks: Array<() => void> = []
 afterEach(() => {
   for (const release of dispose.splice(0).reverse()) release()
+  resizeCallbacks.splice(0)
   document.body.replaceChildren()
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 const barProps = (overrides: Partial<ComposerBarProps>, queue: InputState['queue'] = []): ComposerBarProps => {
@@ -115,8 +118,12 @@ const barProps = (overrides: Partial<ComposerBarProps>, queue: InputState['queue
 const mount = (props: ComposerBarProps): HTMLElement => {
   vi.stubGlobal(
     'ResizeObserver',
-    class {
+    class implements ResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallbacks.push(() => callback([], this))
+      }
       observe() {}
+      unobserve() {}
       disconnect() {}
     },
   )
@@ -127,6 +134,20 @@ const mount = (props: ComposerBarProps): HTMLElement => {
   dispose.push(() => act(() => root.unmount()))
   act(() => root.render(<InputBar {...props} />))
   return element
+}
+
+/** jsdom has no layout: give the run row, the model seat and the other segments a width to measure. */
+const stubWidths = (widths: { row: number; model: number; segment: number }): void => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const width = this.hasAttribute('data-run-row') ? widths.row : this.hasAttribute('data-model-seat') ? widths.model : widths.segment
+    return new DOMRect(0, 0, width, 0)
+  })
+}
+
+const remeasure = (): void => {
+  act(() => {
+    for (const trigger of resizeCallbacks) trigger()
+  })
 }
 
 describe('composer run row', () => {
@@ -140,6 +161,28 @@ describe('composer run row', () => {
     // Moved, not duplicated: the toolbar no longer carries the two seats.
     expect(element.querySelectorAll('[data-seat="conversation.input.model"]')).toHaveLength(1)
     expect(element.querySelectorAll('[data-seat="conversation.input.permission"]')).toHaveLength(1)
+  })
+
+  it('moves the model seat into the tool row when the run row cannot hold it', () => {
+    stubWidths({ row: 400, model: 380, segment: 150 })
+    const element = mount(barProps({ runRow: <span data-run-segment="project">sample</span> }))
+    expect(element.querySelector('[data-run-row] [data-run-segment="model"]')).toBeNull()
+    expect(element.querySelector('[data-composer-card] [data-model-seat] [data-seat="conversation.input.model"]')).not.toBeNull()
+    // Moved, not duplicated: the run row keeps the file-access seat and the card gains the only model seat.
+    expect(element.querySelectorAll('[data-seat="conversation.input.model"]')).toHaveLength(1)
+    expect(element.querySelector('[data-run-row] [data-run-segment="file-access"] [data-seat="conversation.input.permission"]')).not.toBeNull()
+  })
+
+  it('keeps the model seat in the run row once the row has room again', () => {
+    const widths = { row: 400, model: 380, segment: 150 }
+    stubWidths(widths)
+    const element = mount(barProps({ runRow: <span data-run-segment="project">sample</span> }))
+    expect(element.querySelector('[data-composer-card] [data-model-seat]')).not.toBeNull()
+    widths.row = 1200
+    remeasure()
+    expect(element.querySelector('[data-run-row] [data-run-segment="model"] [data-seat="conversation.input.model"]')).not.toBeNull()
+    expect(element.querySelector('[data-composer-card] [data-model-seat]')).toBeNull()
+    expect(element.querySelectorAll('[data-seat="conversation.input.model"]')).toHaveLength(1)
   })
 
   it('collapses to a summary chip on the meter line once the thread has started', () => {

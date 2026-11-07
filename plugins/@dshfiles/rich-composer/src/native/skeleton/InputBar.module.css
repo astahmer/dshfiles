@@ -446,6 +446,10 @@
 }
 
 .standardControls { display: flex; align-items: center; gap: 12px; min-width: 0; }
+/* The model seat when the hero run row cannot hold it: it keeps its drawn width
+   in the tool row beside the submit action, exactly where a started thread
+   keeps it, instead of squeezing the row's own segments. */
+.modelSeat { display: flex; flex: none; align-items: center; min-width: 0; }
 .tools[hidden], .standardControls[hidden] { display: none; }
 .trailingActive { flex: 1; margin-left: 0; }
 .activity { display: flex; align-items: center; flex: none; }
@@ -488,7 +492,9 @@
   display: none;
 }
 
-/* "Who answers" sits at the trailing edge, above the send button. */
+/* "Who answers" sits at the trailing edge, above the send button, while the row
+   can hold it beside its own segments; the bar keeps it in the tool row
+   otherwise (run-row-placement.ts). */
 .runModel {
   margin-left: auto;
 }
