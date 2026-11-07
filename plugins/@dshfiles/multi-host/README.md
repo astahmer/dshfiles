@@ -8,6 +8,8 @@ one tunnel open per host. Works on stock DSH 0.2.0-rc.2, no core patch.
 
 Manage hosts on a dedicated page:
 
+![Answer a remote agent's questions and approvals in this client](docs/screenshots/remote-interactions.png)
+
 ![Manage remote hosts and inspect the resource pressure used by Auto placement](docs/screenshots/host-management.png)
 
 Update every host's dshfiles checkout from the same page:
@@ -113,8 +115,14 @@ With a host chosen:
   review, and the answer goes to the runtime that owns the thread. A question
   that outlives its wait stays answerable as usual. The first answer from any
   client wins, including the host's own UI, and the other card closes.
+- ![A remote tool call waiting on approval in this client](docs/screenshots/remote-interactions-approval.png)
+
+  A tool call that needs approval opens the same way, with the reason and the
+  command: **Allow once** and **Reject** (or Enter and Escape with the details
+  focused) go to the runtime that owns the thread, which decides whether the
+  request is still waiting. No agent can answer one; there is no tool for it.
 - **Open on remote host** in the mirrored thread header opens the owner's DSH on
-  that same thread, for what the mirror does not reach (terminals, approvals).
+  that same thread, for what the mirror does not reach (terminals).
 - The thread sidebar shows a **Remote** section: every thread started from
   here, badged with its host and whether its connection is open. A row opens the
   mirrored Session; a brand-new thread appears in the sidebar as soon as the host
@@ -223,7 +231,7 @@ title}` for threads started here, so the sidebar and view can list them.
 | Credentials                       | hostKey file 0600                                       | system ssh + askpass, safeStorage                          | system ssh agent/keys only; no password prompt                        |
 | Pairing without SSH               | —                                                       | `t3 pair` token/QR, Tailscale routes, T3 Connect relay     | none                                                                  |
 | Automatic placement               | —                                                       | Auto balance (cpu × free memory, 15 s freshness)           | Auto: lowest max(load/cores, memory used)                             |
-| Remote approvals, terminal, diffs | —                                                       | native: each environment is a full server connection       | open the host's own DSH (Host UI)                                     |
+| Remote approvals, terminal, diffs | —                                                       | native: each environment is a full server connection       | approvals in this client; terminal and diffs on the host's own DSH    |
 | Fleet update                      | —                                                       | Update Everything dialog, version-mismatch banner          | Update hosts dialog (sync + rebuild, restart left to you), drift line |
 | Delegate across machines          | —                                                       | `delegate_task` with `target.environmentId`                | `multi_host_delegate`: host or Auto, waits for the answer             |
 
@@ -245,10 +253,12 @@ title}` for threads started here, so the sidebar and view can list them.
   list, not the sidebar.
 - The remote transcript is polled (1.5 s while a turn runs, 8 s idle), not
   streamed; the conversation is still written and read on the host.
-- Questions reach this client only while the thread is open here: following it
-  is what opens the owner's event stream. Elsewhere the row shows nothing until
-  you open it; the request stays on the owner meanwhile. A child Session's
-  question is not offered, because the owner refuses to ask from one.
+- Questions and approvals reach this client only while the thread is open here:
+  following it is what opens the owner's event stream. Elsewhere the row shows
+  nothing until you open it; the request stays on the owner meanwhile. A child
+  Session's question is not offered, because the owner refuses to ask from one.
+  An approval from a child Session opens under that child Session, not its
+  parent.
 - Remote JJ data can be read through the read-only
   `sessionJjRepositories(sessionId)` API, which resolves the Session's owner and
   reads that runtime's repository/workspace status. It sends no path and cannot

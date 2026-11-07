@@ -76,6 +76,17 @@ Feature: Multi-host loopback SSH lifecycle
     When the remote question is answered "Production" here
     Then the remote agent receives the answer "Production"
 
+  @scenario:multi-host.remote-approval
+  Scenario: A remote tool call is approved in the controlling chat
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the remote agent asks to run a command with wider access
+    Then the remote approval opens in the controlling chat with its command
+    When the remote approval is allowed once here
+    Then the remote command runs on its owning host
+
   @scenario:multi-host.host-resources
   Scenario: The Hosts page shows live SSH resource pressure
     Given a loopback SSH DSH pair is booted

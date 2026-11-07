@@ -682,6 +682,44 @@ Then('the remote agent learns the question was dismissed', async ({ page }: { re
   await finishJourneyAssertions(page)
 })
 
+const APPROVAL_MARKER = 'approved-on-the-owning-host'
+const remoteApproval = (page: Page) => page.locator('[data-remote-approval]')
+
+When('the remote agent asks to run a command with wider access', async ({ page }: { readonly page: Page }) => {
+  const directive = `[[title Remote approval fixture]] [[once call bash ${JSON.stringify({
+    command: `echo ${APPROVAL_MARKER}`,
+    description: 'Echo a marker',
+    sandbox_permissions: 'danger-full-access',
+    justification: 'The journey asks for wider access.',
+  })}]]`
+  await remoteComposer(page).fill(directive)
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+})
+
+Then('the remote approval opens in the controlling chat with its command', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-approval-panel', async () => {
+    await expect(remoteApproval(page)).toBeVisible({ timeout: 45_000 })
+    await expect(remoteApproval(page).getByText(`echo ${APPROVAL_MARKER}`, { exact: true })).toBeVisible()
+  })
+})
+
+When('the remote approval is allowed once here', async ({ page }: { readonly page: Page }) => {
+  await remoteApproval(page).getByRole('button', { name: 'Allow once', exact: true }).click()
+})
+
+Then('the remote command runs on its owning host', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-approval-applied', async () => {
+    await expect(remoteApproval(page)).toHaveCount(0, { timeout: 30_000 })
+    const fake = fakeCommandCodeFor(page)
+    await expect
+      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.role === 'tool' && message.text.includes(APPROVAL_MARKER)), {
+        timeout: 30_000,
+      })
+      .toBe(true)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('a message naming this machine is refused and keeps its draft', async ({ page }: { readonly page: Page }) => {
   await recordAssertion(page, 'multi-host-local-path-refused', async () => {
     const draft = 'please read @~/notes-on-this-machine.md'

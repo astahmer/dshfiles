@@ -4,20 +4,24 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
-import { defineClient } from '@dshfiles/dshx/client'
+import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { ServerIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { HostsPage } from './destination/hosts-page.js'
 import { HOSTS_PANEL_ID, OPEN_HOSTS_EVENT } from './destination/state.js'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { RemoteThreadView } from './remote-thread-view.js'
+import { multiHostApi } from './api.js'
+import { watchRemoteInteractions } from './interaction-feed.js'
+import { RemoteApprovalPanel } from './remote-approval-panel.js'
+import { PendingRemoteApproval, RemoteApprovals } from './remote-approvals.js'
 import { RemoteHostFallback } from './remote-host-fallback.js'
 
 const HostsGlyph = (props: { readonly size?: number }): JSX.Element => <ServerIcon aria-hidden size={props.size ?? 18} strokeWidth={1.5} />
 
 export default defineClient({
   name: '@dshfiles/multi-host',
-  inject: ['slots', 'layout', 'uiWorkspace', 'sessions'],
+  inject: ['slots', 'layout', 'uiWorkspace', 'sessions', 'uiSession'],
   setup(ctx, decorate) {
     const openRemoteSession = (rawSessionId: string): void => {
       const sessionId = SessionId(rawSessionId)
@@ -48,6 +52,24 @@ export default defineClient({
       window.addEventListener(OPEN_HOSTS_EVENT, openHosts)
       return () => window.removeEventListener(OPEN_HOSTS_EVENT, openHosts)
     }, 'multi-host: open hosts page')
+    const api = createApiClient(ctx, multiHostApi, '@dshfiles/multi-host')
+    const approvals = new RemoteApprovals({
+      publish: ctx.uiSession.registerPendingInteraction<PendingRemoteApproval>(() => 0),
+      decide: input => api.sessionApprovalDecide(input),
+    })
+    ctx.effect(() => watchRemoteInteractions({ client: api, onChange: rows => approvals.sync(rows) }), 'multi-host: remote interactions')
+    ctx.effect(() => () => approvals.dispose(), 'multi-host: remote approval cards')
+    ctx.slots.inject('conversation.composer', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.composer',
+          // Above the question chain, as the native approval panel is: a tool call cannot run until it is decided.
+          priority: 1,
+          select: ({ pendingInteraction }) => (pendingInteraction instanceof PendingRemoteApproval ? pendingInteraction : null),
+        },
+        RemoteApprovalPanel,
+      ),
+    )
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: 'dshfiles-multi-host-hosts', order: 8, label: 'Hosts' }, HostsGlyph),
     )

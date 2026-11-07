@@ -332,7 +332,8 @@ describe('multi-host tool exposure', () => {
     if ('issues' in missingApi) throw new Error('The missing remote API result was rejected.')
     expect(missingApi.value).toMatchObject({ ok: false })
   })
-  test('no tool declines a question for the person it was asked of', () => {
+  test('an approval is the human decision: no tool answers one, and no tool declines a question for them', () => {
+    expect(multiHostApi.methods.sessionApprovalDecide.tool).toBeUndefined()
     expect(multiHostApi.methods.sessionQuestionDecline.tool).toBeUndefined()
   })
 

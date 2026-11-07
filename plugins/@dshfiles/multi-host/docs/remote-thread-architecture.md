@@ -272,7 +272,19 @@ value to the Session controller through `SessionSourceRegistry.publishProjection
 is also what keeps a mirrored thread's other live values, such as its inbox, current
 after the opening snapshot.
 
+## Approvals
+
+`approval/request` arrives on the same stream and is held the same way. The native panel
+is private to `@deepseek-ai/dsh-client-ui-approval` (its selector tests a private class),
+so `remote-approval-panel.tsx` is a small owned panel in the same composer seat, with the
+native keys and one lock across keys and pointer. The decision goes to the owner as that
+waterfall's result, and the owner writes the `approval/decided` audit event.
+
+`sessionApprovalDecide` deliberately has no agent tool: an approval is the human's, and
+[row 41](../../../../plans/dsh-host-gaps.md) keeps it out of reach of any Agent. It is an
+exception to the rule that a user capability carries a tool, stated here so nobody adds one.
+
 ## Remaining boundaries
 
 - `sessionJjRepositories(sessionId)` is read-only status, not a local JJ panel. Per-thread path-scoped JJ reads, workspace mutations and landing are not mirrored; the native thread still offers Host UI.
-- Approvals and terminal access are not mirrored; Host UI is the fallback.
+- Terminal access is not mirrored; Host UI is the fallback.
