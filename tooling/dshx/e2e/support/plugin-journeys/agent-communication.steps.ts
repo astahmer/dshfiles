@@ -39,6 +39,15 @@ Then('a human post is browsable and remains passive', async ({ page }: { page: P
     await expect(page.getByText('Untrusted peer text', { exact: true })).toBeVisible()
     await expect(page.getByText(/Browsing never starts, resumes, or redirects an agent/)).toBeVisible()
   })
+  await page.getByRole('button', { name: 'All messages', exact: true }).click()
+  await page
+    .getByRole('button', { name: /^e2e\/passive-check/u })
+    .first()
+    .click()
+  await recordAssertion(page, 'communication-channel-selection', async () => {
+    await expect(page.getByText('e2e/passive-check', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('A stored message, not an Agent turn.', { exact: true })).toBeVisible()
+  })
   await finishJourneyAssertions(page)
 })
 
