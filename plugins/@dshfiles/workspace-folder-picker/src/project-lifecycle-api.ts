@@ -83,6 +83,13 @@ export type FolderInspection = typeof folderInspectionSchema.Type
 
 const initializedProjectSchema = Schema.Struct({ path: Schema.String, workspaceId: Schema.String, title: Schema.String })
 
+const publishedProjectSchema = Schema.Struct({
+  path: Schema.String,
+  repository: Schema.String,
+  pushed: Schema.Boolean,
+  warning: Schema.NullOr(Schema.String.check(Schema.isMaxLength(1_000))),
+})
+
 const describeInspection = (inspection: FolderInspection): string => {
   const where = inspection.repositoryRoot ?? inspection.path
   const kind = inspection.kind === 'none' ? 'no repository' : inspection.kind === 'git' ? 'Git' : 'Jujutsu'
@@ -167,6 +174,17 @@ export const projectLifecycleApi = defineApi({
       description:
         'Turn an existing folder into a project in place: jj git init (colocated), a README.md when it has none, a first described commit and a main bookmark, then register it as a project. Existing files are kept and become the first revision. Refuses a folder that is already a repository or sits inside one. Call only when the user asked to initialize that folder.',
       tool: { name: 'project_init', render: project => `Initialized ${project.path}` },
+    }),
+    publishProject: WorkspaceFolderPickerSchema.method({
+      input: Schema.Struct({
+        path: parentPathSchema,
+        visibility: Schema.Literals(['private', 'public']),
+        bookmark: Schema.optional(WorkspaceFolderPickerSchema.trimmedText.check(Schema.isMinLength(1), Schema.isMaxLength(200))),
+      }),
+      output: publishedProjectSchema,
+      description:
+        'Publish a local repository that has no origin: create the GitHub repository with the GitHub CLI, add it as origin and push the bookmark. visibility is required so nothing is created by default; a repository that already has an origin, or no commits, is refused with the next command. Call only when the user asked to publish that repository.',
+      tool: { name: 'project_publish', render: project => `${project.repository}${project.pushed ? ' · pushed' : ''}` },
     }),
     removeProject: WorkspaceFolderPickerSchema.method({
       input: Schema.Struct({ workspaceId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)) }),

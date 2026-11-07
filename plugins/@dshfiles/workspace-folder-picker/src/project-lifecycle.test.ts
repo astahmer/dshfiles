@@ -344,6 +344,60 @@ describe.skipIf(!toolsAvailable)('project lifecycle against real git and jj', ()
     ),
   )
 
+  it.live('publishes a local jj checkout that has no origin and pushes its bookmark', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const bareRepository = { path: '' }
+        const fakeGh = (command: CommandInput) =>
+          command.argv[0] === 'gh'
+            ? Option.some(
+                Effect.sync(() => {
+                  execFileSync('git', ['remote', 'add', 'origin', bareRepository.path], { cwd: command.cwd })
+                  return { exitCode: 0, stdout: 'https://github.com/test/published\n', stderr: '' }
+                }),
+              )
+            : Option.none()
+        const { root, creator, fs } = yield* lifecycle({ installed: ['git', 'jj', 'gh'], fakeCommand: fakeGh })
+        const path = join(root, 'to-publish')
+        bareRepository.path = join(root, 'remote.git')
+        execFileSync('git', ['init', '--bare', bareRepository.path], { stdio: 'ignore' })
+        yield* fs.makeDirectory(path)
+        yield* creator.initialize({ path })
+        const published = yield* creator.publish({ path, visibility: 'private' })
+        expect(published).toMatchObject({ repository: 'https://github.com/test/published', pushed: true, warning: null })
+        expect(execFileSync('git', ['--git-dir', bareRepository.path, 'log', '--format=%s', 'main'], { encoding: 'utf8' }).trim()).toBe(
+          'chore: initialize to-publish',
+        )
+      }),
+    ),
+  )
+
+  it.live('refuses to publish a folder without a repository, a repository with an origin, and one without commits', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { root, creator, fs } = yield* lifecycle({ installed: ['git', 'jj', 'gh'] })
+        const plain = join(root, 'plain-publish')
+        yield* fs.makeDirectory(plain)
+        expect((yield* Effect.flip(creator.publish({ path: plain, visibility: 'private' })))._tag).toBe('NotARepository')
+
+        const initialized = join(root, 'with-origin')
+        yield* fs.makeDirectory(initialized)
+        yield* creator.initialize({ path: initialized })
+        execFileSync('git', ['remote', 'add', 'origin', 'https://example.invalid/owner/repo.git'], { cwd: initialized })
+        const withOrigin = yield* Effect.flip(creator.publish({ path: initialized, visibility: 'private' }))
+        expect(withOrigin._tag).toBe('RemoteExists')
+        expect(withOrigin.message).toContain('https://example.invalid/owner/repo.git')
+
+        const empty = join(root, 'no-commits')
+        yield* fs.makeDirectory(empty)
+        execFileSync('git', ['init', '--initial-branch=main'], { cwd: empty, stdio: 'ignore' })
+        const noCommits = yield* Effect.flip(creator.publish({ path: empty, visibility: 'private' }))
+        expect(noCommits._tag).toBe('ProjectCreateFailed')
+        expect(noCommits.message).toContain('No commits yet')
+      }),
+    ),
+  )
+
   it.live('refuses to initialize a folder that is already a repository or sits inside one', () =>
     Effect.scoped(
       Effect.gen(function* () {

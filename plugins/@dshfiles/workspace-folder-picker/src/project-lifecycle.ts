@@ -560,6 +560,27 @@ export const nearestRepositoryMarker = (fs: FileSystem.FileSystem, path: string)
     }
   })
 
+export class NotARepository extends Schema.TaggedError<NotARepository>()(
+  'NotARepository',
+  { path: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'not-a-repository' },
+) {
+  override get message(): string {
+    return `${this.path} is not a Git or Jujutsu repository. Initialize one there first, then publish it.`
+  }
+}
+
+/** The repository already has an origin, so publishing would replace the remote it pushes to. */
+export class RemoteExists extends Schema.TaggedError<RemoteExists>()(
+  'RemoteExists',
+  { path: Schema.String, remoteUrl: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'remote-exists' },
+) {
+  override get message(): string {
+    return `${this.path} already pushes to ${this.remoteUrl}. Publish a repository without an origin, or push this one with jj git push.`
+  }
+}
+
 /** The folder is already part of (or is) a repository, so initializing one in place would nest or replace it. */
 export class AlreadyARepository extends Schema.TaggedError<AlreadyARepository>()(
   'AlreadyARepository',
@@ -621,6 +642,8 @@ export type CreateProjectFailure =
  * optionally a private GitHub repository. A failure before registration removes the folder it created, so the same
  * request can simply be retried; GitHub problems after registration only add a warning.
  */
+export type PublishProjectFailure = NotARepository | RemoteExists | GhMissing | JjMissing | ProjectCreateFailed | ProjectCommandFailed | ProjectFolderFailed
+
 export type InitializeProjectFailure = AlreadyARepository | JjMissing | ProjectCreateFailed | ProjectCommandFailed | ProjectFolderFailed | ProjectRegisterFailed
 
 /**
@@ -640,6 +663,15 @@ export class ProjectCreator extends Context.Service<
     readonly initialize: (input: {
       readonly path: string
     }) => Effect.Effect<{ readonly path: string; readonly workspaceId: string; readonly title: string }, InitializeProjectFailure>
+    /** Creates a GitHub repository for a local checkout that has no origin, then pushes its bookmark. */
+    readonly publish: (input: {
+      readonly path: string
+      readonly visibility: 'private' | 'public'
+      readonly bookmark?: string | undefined
+    }) => Effect.Effect<
+      { readonly path: string; readonly repository: string; readonly pushed: boolean; readonly warning: string | null },
+      PublishProjectFailure
+    >
   }
 >()('@dshfiles/workspace-folder-picker/ProjectCreator') {
   static readonly layer = Layer.effect(
@@ -715,7 +747,70 @@ export class ProjectCreator extends Context.Service<
         return { path, workspaceId: registered.workspaceId, title: registered.title }
       })
 
-      return ProjectCreator.of({ create, initialize })
+      /** One remote creation path, shared by publishing an existing checkout and the optional step in project create. */
+      const publish = Effect.fn('project publish')(function* (input: {
+        readonly path: string
+        readonly visibility: 'private' | 'public'
+        readonly bookmark?: string | undefined
+      }) {
+        const path = expandHome(input.path, home)
+        const info = yield* fs.stat(path).pipe(Effect.mapError(cause => new ProjectFolderFailed({ path, cause })))
+        if (info.type !== 'Directory') return yield* new ProjectFolderFailed({ path })
+        const marker = yield* nearestRepositoryMarker(fs, path)
+        if (Option.isNone(marker) || marker.value.root !== path) return yield* new NotARepository({ path })
+        yield* Effect.annotateCurrentSpan({ 'dshx.project.visibility': input.visibility })
+        const origin = yield* runWithTimeout(commands, ['git', '-C', path, 'config', '--get', 'remote.origin.url'], path)
+        const existingRemote = origin.exitCode === 0 ? origin.stdout.trim() : ''
+        if (existingRemote.length > 0) return yield* new RemoteExists({ path, remoteUrl: existingRemote })
+        const head = yield* runWithTimeout(commands, ['git', '-C', path, 'rev-parse', '--verify', 'HEAD'], path)
+        if (head.exitCode !== 0) {
+          return yield* new ProjectCreateFailed({
+            step: 'check for commits',
+            detail: `No commits yet in ${path}. Commit first (jj commit -m "chore: initialize"), then publish.`,
+          })
+        }
+        const gh = yield* requireGh(lookup)
+        const jujutsu = marker.value.kind === 'jujutsu'
+        const jj = jujutsu ? Option.some(yield* requireJj(lookup)) : Option.none<string>()
+        const name = basename(path)
+        const created = yield* runWithTimeout(
+          commands,
+          [gh, 'repo', 'create', name, input.visibility === 'private' ? '--private' : '--public', '--source', '.', '--remote', 'origin'],
+          path,
+        )
+        if (created.exitCode !== 0) {
+          return yield* new ProjectCreateFailed({ step: 'gh repo create', detail: excerpt(created.stderr) || `exit ${String(created.exitCode)}` })
+        }
+        const repository = excerpt(created.stdout, 400).split('\n').at(-1) ?? name
+        const bookmark = input.bookmark ?? 'main'
+        if (Option.isSome(jj)) {
+          yield* runWithTimeout(commands, [jj.value, 'git', 'import'], path)
+          const pushed = yield* runWithTimeout(commands, [jj.value, 'git', 'push', '--bookmark', bookmark, '--remote', 'origin'], path)
+          if (pushed.exitCode !== 0) {
+            return {
+              path,
+              repository,
+              pushed: false,
+              warning: `The GitHub repository exists but ${bookmark} was not pushed: ${excerpt(pushed.stderr, 400)} Run \`jj git push --bookmark ${bookmark} --remote origin\` in ${path}.`,
+            }
+          }
+          return { path, repository, pushed: true, warning: null }
+        }
+        const git = yield* lookup.resolve('git')
+        if (Option.isNone(git)) return yield* new GhMissing({ hint: 'Install git, then push the repository yourself.' })
+        const pushed = yield* runWithTimeout(commands, [git.value, 'push', '--set-upstream', 'origin', 'HEAD'], path)
+        if (pushed.exitCode !== 0) {
+          return {
+            path,
+            repository,
+            pushed: false,
+            warning: `The GitHub repository exists but HEAD was not pushed: ${excerpt(pushed.stderr, 400)} Run \`git push --set-upstream origin HEAD\` in ${path}.`,
+          }
+        }
+        return { path, repository, pushed: true, warning: null }
+      })
+
+      return ProjectCreator.of({ create, initialize, publish })
     }),
   )
 }

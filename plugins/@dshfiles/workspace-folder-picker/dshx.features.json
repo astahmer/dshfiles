@@ -212,7 +212,7 @@
     {
       "id": "project-create",
       "title": "Create a new project",
-      "summary": "New → New project… in the Add workspace flow creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a private GitHub repository runs gh repo create --private and pushes main when the GitHub CLI is installed. The project_create agent tool takes the same explicit inputs.",
+      "summary": "New → New project… in the Add workspace flow creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a private GitHub repository runs gh repo create --private and pushes main when the GitHub CLI is installed. The project_create agent tool takes the same explicit inputs. The same remote creation is available for an existing checkout through project_publish: it refuses no-repository, an existing origin, and a repository without commits, then pushes the bookmark with jj (git for a plain checkout).",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose workspace\"",
@@ -261,6 +261,18 @@
           "kind": "gherkin",
           "id": "workspace-folder-picker.new-project",
           "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.publish-repository",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "publishes a local jj checkout that has no origin and pushes its bookmark"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.publish-refusals",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "refuses to publish a folder without a repository, a repository with an origin, and one without commits"
         }
       ],
       "telemetry": [

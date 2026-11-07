@@ -96,6 +96,17 @@ job. The `project_create` agent tool takes the same inputs, with
 by default, and `project_tools_status` reports which of git, jj and gh are
 installed. Each run leaves one `project create` span.
 
+## Publish an existing repository
+
+`project_publish` gives a local checkout that has no `origin` a GitHub repository:
+`gh repo create <name> --private|--public --source . --remote origin`, then
+`jj git push --bookmark <bookmark> --remote origin` for a Jujutsu repository
+(`git push --set-upstream origin HEAD` for a plain checkout). The visibility is a
+required argument, so nothing is created by default. A folder that is not a
+repository, one whose `origin` already exists, and one without commits are
+refused before anything is created, each naming the next command. A failed push
+keeps the repository and returns the command that finishes it.
+
 ## Runtime support
 
 The plugin builds against the published

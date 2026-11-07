@@ -48,6 +48,7 @@ export default DshxPlugin.make({
       createProject: input => ProjectCreator.use(creator => creator.create(input)),
       inspect: input => FolderInspector.use(inspector => inspector.inspect(input.path)),
       initProject: input => ProjectCreator.use(creator => creator.initialize(input)),
+      publishProject: input => ProjectCreator.use(creator => creator.publish(input)),
       removeProject: input => ProjectRemover.use(remover => remover.remove(input.workspaceId)),
     }),
   ],

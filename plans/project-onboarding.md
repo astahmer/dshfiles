@@ -250,12 +250,12 @@ retry, assert project row.
 
 Goal: a local checkout without a remote can get one without leaving DSH.
 
-- [ ] Add `projectPublish` (tool `project_publish`, `createPrivate` required, no default):
+- [x] Add `projectPublish` (tool `project_publish`, `visibility` required, no default):
       detect no remote → `gh repo create <name> --private --source . --remote origin` → push.
       For a jj repo push the bookmark with `jj git push --bookmark <bookmark>` after adding
       the remote; refuse when the repo has no commits, naming the first commit as recovery.
-- [ ] Reuse it from the New project dialog instead of its inline `gh` call, so one code path
-      owns remote creation, and surface it in the project row menu when `origin` is absent.
+- [ ] Reuse it from the New project dialog instead of its inline `gh` call, and surface it in
+      the project row menu when `origin` is absent. (open: no shared project row menu yet)
 
 Acceptance: a fresh `git init` folder with one commit gains `origin` and a pushed `main`; a
 jj repo pushes its bookmark; a repo without commits refuses with the exact next command.
@@ -388,7 +388,8 @@ Filled as tasks land; empty means unverified.
 | P1 | jj-integration non-repo state | — (open) |
 | P2 | clone stages + retry | 15 tests in `project-lifecycle.test.ts`; retry refuses running/succeeded jobs |
 | P2 | clone surface outside the dialog | — (open: needs a global slot owner) |
-| P3 | project_publish | — |
+| P3 | project_publish | 2 tests: jj bookmark push to a bare remote, and the three refusals |
+| P3 | publish UI entry | — (open) |
 | P4 | dsh.project.json | — |
 | P5 | setup on workspace create | — |
 | P6 | icons, grouping, promotion, cleanup reasons | — |
