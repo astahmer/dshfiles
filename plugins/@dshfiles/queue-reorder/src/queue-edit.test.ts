@@ -39,6 +39,7 @@ interface FakeWorld {
   started: RawRow[]
   pending: string[]
   composer: { draft: string; attachmentIds: string[]; idle: boolean }
+  references: { id: string; label: string; offset: number; length: number }[]
   drafts: Map<string, File>
   released: string[]
   stored: Map<string, File>
@@ -67,6 +68,7 @@ const createWorld = (options: { readonly running?: boolean } = {}) => {
     started,
     pending,
     composer: { draft: '', attachmentIds, idle: true },
+    references: [],
     drafts: new Map<string, File>(),
     released,
     stored: new Map<string, File>(),
@@ -105,6 +107,15 @@ const createWorld = (options: { readonly running?: boolean } = {}) => {
         world.composer = { ...world.composer, attachmentIds: [...world.composer.attachmentIds, ...ids] }
         composerSubject.notify()
         return true
+      },
+      restoreImageReferences: ({ text, imageIds }: { readonly text: string; readonly imageIds: readonly string[] }) => {
+        world.references = QueueEditModel.imageReferenceTokens({ text, imageIds }).map(token => ({
+          id: token.id,
+          label: token.label,
+          offset: token.offset,
+          length: token.length,
+        }))
+        composerSubject.notify()
       },
       removeAttachment: (id: string) => {
         world.composer = { ...world.composer, attachmentIds: world.composer.attachmentIds.filter(candidate => candidate !== id) }
@@ -280,6 +291,26 @@ test('Edit moves the text and attachments into the composer and keeps the user d
   assert.equal(QueueEditModel.restoredIndex({ rows: rowsOf(world), before: record?.before ?? [] }), 1)
 })
 
+test('Edit turns queued image tokens into attachment references without changing the text', async () => {
+  const { world, enqueueRow, editor } = createWorld()
+  const target = enqueueRow([text('look [Image 1]'), image('shot.png')])
+  const queueEditor = editor()
+  const row = rowsOf(world)[0]
+  assert.ok(row)
+
+  await queueEditor.begin(row)
+
+  assert.equal(world.composer.draft, 'look [Image 1]')
+  assert.deepEqual(world.references, [{ id: world.composer.attachmentIds[0], label: 'Image 1', offset: 5, length: 9 }])
+
+  queueEditor.submit()
+  await settle()
+
+  assert.ok(!world.rows.some(candidate => candidate.id === target.id))
+  assert.deepEqual(textsOf(world), ['look [Image 1] [shot.png]'])
+  assert.ok(world.rows[0]?.content.some(block => block.type === 'image'))
+})
+
 test('Submit queues the edited message, with its attachments, back at the same position', async () => {
   const { world, enqueueRow, editor } = createWorld()
   enqueueRow([text('first')])
@@ -406,7 +437,7 @@ test('A rejected submit keeps the edit open with the draft in the composer', asy
 test('After a reload the saved record still offers Cancel, which restores the original once', async () => {
   const { world, ports, enqueueRow, editor } = createWorld()
   enqueueRow([text('first')])
-  enqueueRow([text('original'), image('shot.png')])
+  enqueueRow([text('original [Image 1]'), image('shot.png')])
   const first = editor()
   const row = rowsOf(world)[1]
   assert.ok(row)
@@ -415,7 +446,7 @@ test('After a reload the saved record still offers Cancel, which restores the or
 
   // A reload keeps the persisted draft text and record, but not the page-owned draft attachments.
   world.drafts.clear()
-  world.composer = { draft: 'original', attachmentIds: [], idle: true }
+  world.composer = { draft: 'original [Image 1]', attachmentIds: [], idle: true }
   const reloaded = createQueueEditor(ports)
   await settle()
   assert.equal(reloaded.getSnapshot().record?.status, 'editing')
@@ -423,12 +454,16 @@ test('After a reload the saved record still offers Cancel, which restores the or
     world.composer.attachmentIds.map(id => world.drafts.get(id)?.name),
     ['shot.png'],
   )
+  assert.deepEqual(
+    world.references.map(reference => reference.label),
+    ['Image 1'],
+  )
 
   await reloaded.cancel()
   await reloaded.cancel()
   await settle()
 
-  assert.deepEqual(textsOf(world), ['first', 'original [shot.png]'])
+  assert.deepEqual(textsOf(world), ['first', 'original [Image 1] [shot.png]'])
   assert.equal(world.records, null)
 })
 

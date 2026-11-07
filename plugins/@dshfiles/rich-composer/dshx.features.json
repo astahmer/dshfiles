@@ -158,6 +158,12 @@
           "id": "rich-composer.image-attachment-references",
           "file": "plugins/@dshfiles/rich-composer/src/native/image-attachment-references.test.ts",
           "testName": "inserts ordered inline labels tied to each image attachment"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.queued-image-reference-restore",
+          "file": "plugins/@dshfiles/rich-composer/src/image-attachment-reference-restore.test.ts",
+          "testName": "renders it as the same attachment reference a normal composer message shows"
         }
       ],
       "telemetry": [

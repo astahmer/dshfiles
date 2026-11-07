@@ -95,6 +95,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "queue-reorder.composer-message-editing-unit-image-reference",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "Edit turns queued image tokens into attachment references without changing the text"
+        },
+        {
+          "kind": "unit-test",
           "id": "queue-reorder.composer-message-editing-unit-hydrates-composer",
           "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
           "testName": "Edit moves the text and attachments into the composer and keeps the user draft aside"

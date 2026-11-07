@@ -163,12 +163,18 @@ export const createQueueEditMachine = <DraftId extends string, Attachment>() =>
       adoptComposerForEdit: assign(({ context }): Partial<EditContext<DraftId, Attachment>> => {
         const composer = context.ports.composer
         for (const id of context.backupIds) composer.removeAttachment(id)
-        composer.setDraft(QueueEditModel.textOf(context.row?.blocks ?? []))
+        const text = QueueEditModel.textOf(context.row?.blocks ?? [])
+        composer.setDraft(text)
         const hydrated = context.ports.drafts.create(context.files)
         let notice: string | null = null
         if (hydrated.length > 0 && !composer.addAttachments(hydrated)) {
           context.ports.drafts.release(hydrated)
           notice = 'The composer refused the attachments; Cancel still puts the original back.'
+        } else {
+          composer.restoreImageReferences({
+            text,
+            imageIds: QueueEditModel.imageIdsForBlocks({ blocks: context.row?.blocks ?? [], attachmentIds: hydrated }),
+          })
         }
         composer.focus()
         return { notice }
@@ -268,7 +274,14 @@ export const createQueueEditMachine = <DraftId extends string, Attachment>() =>
         { readonly ports: QueueEditPorts<DraftId, Attachment>; readonly blocks: readonly QueuedBlock[]; readonly cache: Map<string, File> }
       >(async ({ input }) => {
         const hydrated = input.ports.drafts.create(await readBlocks(input))
-        if (hydrated.length > 0 && !input.ports.composer.addAttachments(hydrated)) input.ports.drafts.release(hydrated)
+        if (hydrated.length > 0 && !input.ports.composer.addAttachments(hydrated)) {
+          input.ports.drafts.release(hydrated)
+          return
+        }
+        input.ports.composer.restoreImageReferences({
+          text: QueueEditModel.textOf(input.blocks),
+          imageIds: QueueEditModel.imageIdsForBlocks({ blocks: input.blocks, attachmentIds: hydrated }),
+        })
       }),
       place: fromPromise<void, { readonly ports: QueueEditPorts<DraftId, Attachment>; readonly itemId: string; readonly before: readonly string[] }>(
         ({ input }) => moveIntoPlace({ ports: input.ports, itemId: input.itemId, before: input.before }),

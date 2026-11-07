@@ -188,6 +188,7 @@ const createEditor = (input: {
   readonly session: SessionFace
   readonly composer: SessionInput
   readonly drafts: DraftAttachmentApi
+  readonly canRestoreReferences: boolean
 }): QueueEditor => {
   const inbox = input.session.projections.faceOf('inbox')
   const key: string = input.sessionId
@@ -216,6 +217,26 @@ const createEditor = (input: {
       subscribe: listener => input.composer.state.subscribe(listener),
       setDraft: text => input.composer.setDraft(text),
       addAttachments: ids => input.composer.addAttachments(ids),
+      restoreImageReferences: ({ text, imageIds }) => {
+        // Without the trigger service the composer has no reference codec, so a chip would fail the send.
+        if (!input.canRestoreReferences) return
+        const tokens = QueueEditModel.imageReferenceTokens({ text, imageIds })
+        for (const token of [...tokens].reverse()) {
+          const state = input.composer.state.getSnapshot()
+          if (!state.draft.startsWith(text)) return
+          const inserted = input.composer.insertReference(
+            {
+              source: 'image-attachment',
+              ref: token.id,
+              label: token.label,
+              appearance: 'file',
+              clipboardText: `[${token.label}]`,
+            },
+            { start: token.offset, end: token.offset + token.length, draftRev: state.draftRev },
+          )
+          if (!inserted) return
+        }
+      },
       removeAttachment: id => {
         input.composer.removeAttachment(id)
       },
@@ -260,7 +281,13 @@ const sessionQueueEditor = (ctx: Context, sessionId: SessionFace['sessionId']): 
   existing?.editor.dispose()
   const conversation = scoped.get('conversation')
   if (!hasDraftAttachmentApi(conversation) || !hasSessionInput(conversation)) return undefined
-  const editor = createEditor({ sessionId, session: binding.session, composer: conversation.input.for(scoped), drafts: conversation })
+  const editor = createEditor({
+    sessionId,
+    session: binding.session,
+    composer: conversation.input.for(scoped),
+    drafts: conversation,
+    canRestoreReferences: ctx.get('inputTriggers') !== undefined,
+  })
   let reference: { release(): void } | undefined
   const retainWhileEditing = (): void => {
     const editing = QueueEditModel.retainsSession(editor.getSnapshot())
