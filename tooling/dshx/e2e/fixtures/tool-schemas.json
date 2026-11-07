@@ -70,12 +70,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 572,
-  "apiToolBindings": 391,
-  "apiToolNameCount": 391,
-  "apiToolSchemas": 390,
+  "apiMethods": 579,
+  "apiToolBindings": 396,
+  "apiToolNameCount": 396,
+  "apiToolSchemas": 395,
   "definedTools": 24,
-  "tools": 414,
+  "tools": 419,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -6489,6 +6489,63 @@
       }
     },
     {
+      "name": "multi_host_answer_question",
+      "description": "Answer one question on a remote thread with one answer per question, on the runtime that owns the thread. Call only when the user asked you to give that answer; never choose one yourself.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "interactionId": {
+            "type": "string"
+          },
+          "callId": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "object",
+            "properties": {
+              "answers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "selected": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "custom": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "selected"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "answers"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "sessionId",
+          "answer"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "multi_host_browse",
       "description": "List folders on a remote runtime at one path (default: the runtime home), for choosing where a remote thread runs. Read-only.",
       "parameters": {
@@ -6751,6 +6808,15 @@
       "parameters": {
         "type": "object",
         "properties": {}
+      }
+    },
+    {
+      "name": "multi_host_land_repositories",
+      "description": "The thread workspaces of every visible remote host, limited to threads recorded on this DSH, plus the hosts that did not answer. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
@@ -7136,6 +7202,49 @@
       }
     },
     {
+      "name": "multi_host_session_interactions",
+      "description": "Questions and approvals remote threads are waiting on right now, read from the runtimes this Host is following. A thread that is not open here may hold more on its own host. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "multi_host_session_jj",
+      "description": "Run one JJ thread action in a remote thread's own folder, on the runtime that owns the thread: threadAt and integrationProgress read it; land, queueLand, cancelQueuedLand and discard change it (discard needs an explicit force, and force: true abandons unlanded work). Call only when the user asked for that action.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "threadAt",
+              "integrationProgress",
+              "land",
+              "queueLand",
+              "cancelQueuedLand",
+              "discard"
+            ]
+          },
+          "input": {}
+        },
+        "required": [
+          "sessionId",
+          "method",
+          "input"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "multi_host_session_jj_repositories",
       "description": "Read JJ repository and thread-workspace status from the runtime that owns this mirrored Session. Read-only.",
       "parameters": {
@@ -7147,6 +7256,56 @@
         },
         "required": [
           "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "multi_host_session_repository",
+      "description": "Read or change a remote thread's own repository on the runtime that owns it: revision graph, details, diffs and composer context, or a prepared jujutsu action. The call must name the thread's folder or the repository id it resolves to. Reads are safe. confirm and openRepository change the repository: Call only when the user asked for that action.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "api": {
+            "type": "string",
+            "enum": [
+              "jujutsu",
+              "jujutsu-composer"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "registerRepository",
+              "load",
+              "graphPage",
+              "workspaces",
+              "graphNavigation",
+              "revisionRelationship",
+              "graphSlice",
+              "referenceGraph",
+              "referenceTitles",
+              "details",
+              "revisionFiles",
+              "editTimes",
+              "workingDiff",
+              "prepare",
+              "context",
+              "diff",
+              "openRepository",
+              "confirm"
+            ]
+          },
+          "input": {}
+        },
+        "required": [
+          "sessionId",
+          "api",
+          "method",
+          "input"
         ],
         "additionalProperties": false
       }

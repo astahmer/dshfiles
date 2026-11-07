@@ -121,11 +121,13 @@ With a host chosen:
   command: **Allow once** and **Reject** (or Enter and Escape with the details
   focused) go to the runtime that owns the thread, which decides whether the
   request is still waiting. No agent can answer one; there is no tool for it.
+
 - ![A terminal tab on a remote thread offering the host's own DSH](docs/screenshots/remote-terminal-handoff.png)
 
   A terminal belongs to the machine the thread runs on. **New terminal** on a
   remote thread, however it is opened, shows **Open terminal on host**, which opens
   that thread in the host's own DSH.
+
 - **Open on remote host** in the mirrored thread header opens the owner's DSH on
   that same thread.
 - The thread sidebar shows a **Remote** section: every thread started from
@@ -237,7 +239,7 @@ title}` for threads started here, so the sidebar and view can list them.
 | Credentials                       | hostKey file 0600                                       | system ssh + askpass, safeStorage                          | system ssh agent/keys only; no password prompt                        |
 | Pairing without SSH               | —                                                       | `t3 pair` token/QR, Tailscale routes, T3 Connect relay     | none                                                                  |
 | Automatic placement               | —                                                       | Auto balance (cpu × free memory, 15 s freshness)           | Auto: lowest max(load/cores, memory used)                             |
-| Terminals | Open on the host | **Open terminal on host** in the terminal tab |
+| Terminals                         | Open on the host                                        | **Open terminal on host** in the terminal tab              |
 | Fleet update                      | —                                                       | Update Everything dialog, version-mismatch banner          | Update hosts dialog (sync + rebuild, restart left to you), drift line |
 | Delegate across machines          | —                                                       | `delegate_task` with `target.environmentId`                | `multi_host_delegate`: host or Auto, waits for the answer             |
 

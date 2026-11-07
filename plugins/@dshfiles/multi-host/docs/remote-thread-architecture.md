@@ -155,7 +155,7 @@ the owning runtime before forwarding.
 | ------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | **A. Embed the host's own client** in the remote panel                                | 100%, forever                 | No: the host's own plugins act                              | none               | small: iframe on the stable loopback origin + `?thread=` consumer + embed chrome hide; probed working (token→cookie→UI) |
 | **B. Port capabilities into the local remote composer**                               | partial, per feature          | Yes, for the ported ones                                    | a second composer  | each feature needs a remote endpoint; never converges                                                                   |
-| **C. Give the data plane an environment dimension** (this is what bb/t3code/Codex do) | 100% (native composer + chat) | Yes, once path services are proxied                         | none               | large: session source for remote Sessions, then models/uploads/mentions, then the owner's event stream                |
+| **C. Give the data plane an environment dimension** (this is what bb/t3code/Codex do) | 100% (native composer + chat) | Yes, once path services are proxied                         | none               | large: session source for remote Sessions, then models/uploads/mentions, then the owner's event stream                  |
 
 C splits into two implementations, and one of them is much cheaper here:
 
@@ -223,14 +223,14 @@ looks it up there, so a path from this machine fails or silently names another f
 `remote-prompt-guard.ts` applies the rule the owner chose on 2026-11-07 to every message
 the Session source forwards (`prompt`, a queued edit) and to `threadReply`/`threadStart`:
 
-| Message on a remote thread                                         | Result  |
-| ------------------------------------------------------------------ | ------- |
-| `@~/x`, or `@/abs/path` under this Host's home                     | refused |
-| `@relative/path`, or `@/abs/path` inside the thread's folder       | sent    |
-| `@/abs/path` anywhere else, such as `@/etc/hosts`                  | sent    |
-| a path in plain prose, such as a stack trace                       | sent    |
-| an upload this Host staged for another thread or runtime           | refused |
-| an upload this Host has no record of                               | sent; the owner decides |
+| Message on a remote thread                                   | Result                  |
+| ------------------------------------------------------------ | ----------------------- |
+| `@~/x`, or `@/abs/path` under this Host's home               | refused                 |
+| `@relative/path`, or `@/abs/path` inside the thread's folder | sent                    |
+| `@/abs/path` anywhere else, such as `@/etc/hosts`            | sent                    |
+| a path in plain prose, such as a stack trace                 | sent                    |
+| an upload this Host staged for another thread or runtime     | refused                 |
+| an upload this Host has no record of                         | sent; the owner decides |
 
 Two machines can share a home path, so the thread's folder wins over the home. The
 upload ledger is in memory: after a local restart a receipt is unknown rather than
