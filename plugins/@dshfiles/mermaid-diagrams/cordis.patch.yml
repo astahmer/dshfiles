@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-mermaid-diagrams
+      name: '@dshfiles/mermaid-diagrams'

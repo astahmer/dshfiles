@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "chat-diagram",
+      "title": "Mermaid diagrams in the conversation",
+      "summary": "A ```mermaid fence renders as a themed diagram card wherever Chat's code-fence registry applies: assistant answers, reasoning, compaction summaries, ask_user_question text and backlog item text. A fence becomes a diagram once it is complete (another block follows it, or the message settles); until then the native code card stays. The card keeps the code's height while pele loads and fades the diagram in; its header toggles between the diagram and its highlighted source and copies the source; clicking the diagram expands it full size. pele (Obsidian's Mermaid renderer, MIT) draws the SVG through DOMPurify with links, images, styles and foreignObject removed; $$…$$ labels are typeset with KaTeX MathML, loaded only for such a diagram, under a profile that admits only KaTeX's MathML inside foreignObject. Colors come from the DSH theme, so light and dark switch without re-rendering. Neither renderer is in client.js: the Host serves pele's ES module build and katex.mjs from /dshfiles-mermaid-diagrams/renderer/ through dshx StaticAssets, and the Client imports them on first use.",
+      "surfaces": [
+        "host",
+        "client"
+      ],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: mermaid code fence",
+      "configuration": [],
+      "states": [
+        "incomplete",
+        "loading",
+        "ready",
+        "code",
+        "render-failed",
+        "download-failed",
+        "outdated",
+        "expanded",
+        "copied"
+      ],
+      "failureModes": [
+        "Source pele cannot parse shows the parse error above the highlighted source, with the recovery to fix the source or ask the agent to correct it.",
+        "The renderer cannot be downloaded (no web server route, a dropped connection, a diagram type's parser that fails to load): the card names the cause and offers Retry, which imports the module again under a new URL; the source stays readable through Show code.",
+        "dist/renderer holds a pele without mountAsync: the card says the renderer is out of date and to rebuild the plugin, then reload.",
+        "KaTeX cannot be loaded: math labels stay readable TeX.",
+        "The renderer route meets a file-system fault other than a missing file: it answers 500 with the fault on the span instead of a 404.",
+        "A renderer exception falls back to the native code card (Chat's code-fence boundary)."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "mermaid-diagrams.chat-diagram",
+          "featureFile": "tooling/dshx/e2e/features/mermaid-diagrams.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mermaid-diagrams.incomplete-native",
+          "file": "plugins/@dshfiles/mermaid-diagrams/tests/mermaid-fence.test.tsx",
+          "testName": "keeps the native card while the fence is incomplete and loads nothing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mermaid-diagrams.sanitized-render",
+          "file": "plugins/@dshfiles/mermaid-diagrams/tests/mermaid-fence.test.tsx",
+          "testName": "renders the settled diagram with pele, links and images off, through the sanitizer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mermaid-diagrams.math-labels",
+          "file": "plugins/@dshfiles/mermaid-diagrams/tests/mermaid-fence.test.tsx",
+          "testName": "typesets $$ labels through the math loader and the math sanitizer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mermaid-diagrams.render-error",
+          "file": "plugins/@dshfiles/mermaid-diagrams/tests/mermaid-fence.test.tsx",
+          "testName": "shows a render error with a recovery hint above the source"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mermaid-diagrams.load-retry",
+          "file": "plugins/@dshfiles/mermaid-diagrams/tests/mermaid-fence.test.tsx",
+          "testName": "offers Retry when the renderer cannot be downloaded, and renders after it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mermaid-diagrams.retry-url",
+          "file": "plugins/@dshfiles/mermaid-diagrams/tests/mermaid-fence.test.tsx",
+          "testName": "adds an attempt query after a failed load so a cached failure is not reused"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mermaid-diagrams.copy-timer",
+          "file": "plugins/@dshfiles/mermaid-diagrams/tests/mermaid-fence.test.tsx",
+          "testName": "confirms a copy for a second and clears its timer when the card goes away"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mermaid-diagrams.route-confinement",
+          "file": "plugins/@dshfiles/mermaid-diagrams/tests/renderer-assets.test.ts",
+          "testName": "refuses traversal, symbolic links, non-scripts and writes"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "mermaid-diagrams renderer-asset serve",
+          "file": "tests/renderer-assets.test.ts",
+          "testName": "records one mermaid-diagrams renderer-asset serve span per request"
+        }
+      ]
+    }
+  ]
+}

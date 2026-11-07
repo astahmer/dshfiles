@@ -916,7 +916,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "key": "module:@dshfiles/chat/inline-reference-markdown",
       "kind": "module",
       "title": "@dshfiles/chat/inline-reference-markdown",
-      "summary": "The native Markdown renderer with the inline-reference registry applied (see `./inline-references.tsx`). A separate module so a provider that only defines references never loads the native renderer.",
+      "summary": "The native Markdown renderer with the inline-reference registry (see `./inline-references.tsx`) and the code-fence registry (see `./code-fences.tsx`) applied. A separate module so a provider that only defines references or fences never loads the native renderer.",
       "publicSymbol": "InlineReferenceMarkdown",
       "importFrom": "@dshfiles/chat/inline-reference-markdown",
       "owner": "@dshfiles/chat",
@@ -929,6 +929,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/chat/src/inline-reference-markdown.tsx",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "CodeFences",
+      "importFrom": "@dshfiles/chat/code-fences",
+      "owner": "@dshfiles/chat",
+      "source": "plugins/@dshfiles/chat/src/code-fences.tsx:37",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/chat.code-fence",
+      "kind": "registry",
+      "title": "CodeFences",
+      "summary": "Add one with `plugin.add(CodeFences, { id, languages: ['mermaid'], Component })`.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(CodeFences, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/chat renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/chat.code-fence"
+      ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -1129,7 +1151,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "jjIntegrationApi",
       "importFrom": "@dshfiles/jj-integration/api",
       "owner": "@dshfiles/jj-integration",
-      "source": "plugins/@dshfiles/jj-integration/src/api.ts:176",
+      "source": "plugins/@dshfiles/jj-integration/src/api.ts:183",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/jj-integration:jj-threads",
@@ -2384,7 +2406,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-communication › agent-directory"
       ],
       "details": [
-        "Used by 75 catalog feature(s)",
+        "Used by 77 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2412,7 +2434,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/background-jobs › thread-jobs-facet"
       ],
       "details": [
-        "Used by 28 catalog feature(s)",
+        "Used by 29 catalog feature(s)",
         "Destinations in use: thread-panel"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2521,7 +2543,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 25 catalog feature(s)",
+        "Used by 26 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2549,7 +2571,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agents › agent-mentions"
       ],
       "details": [
-        "Used by 55 catalog feature(s)",
+        "Used by 56 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2717,7 +2739,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › auxiliary-and-wait-spans"
       ],
       "details": [
-        "Used by 99 catalog feature(s)",
+        "Used by 100 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
