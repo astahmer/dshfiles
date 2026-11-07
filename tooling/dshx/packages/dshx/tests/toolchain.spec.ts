@@ -56,6 +56,44 @@ describe('normal plugin toolchain', () => {
     }
   })
 
+  it('refuses a Host bundle that imports a package no install would provide', async () => {
+    const root = await mkdtemp(resolve(tmpdir(), 'dshx-publish-'))
+    try {
+      await mkdir(resolve(root, 'dist'))
+      await writeFile(
+        resolve(root, 'dist/index.js'),
+        [
+          '/**',
+          ' * import { Effect } from "not-a-real-import"',
+          ' */',
+          'import { Schema } from "effect/Schema"',
+          'import { z } from "zod"',
+          'import fs from "node:fs"',
+          'import { x } from "@deepseek-ai/dsh-tools"',
+          'export { y } from "@scope/pkg/deep/path"',
+          'export function apply() {}',
+        ].join('\n'),
+      )
+      await writeFile(resolve(root, 'cordis.patch.yml'), '- insert: []')
+      const manifest = {
+        name: '@test/publish',
+        version: '0.2.0',
+        license: 'MIT',
+        files: ['dist', 'cordis.patch.yml'],
+        dependencies: { zod: '4.4.3' },
+        peerDependencies: { effect: '4.1.0' },
+      }
+      await writeFile(resolve(root, 'package.json'), JSON.stringify(manifest))
+      const preview = await previewPublish(root, manifest, ['dist/index.js', 'cordis.patch.yml'])
+      expect(preview.diagnostics.map(item => `${item.code} ${item.message.split(',')[0]}`)).toEqual([
+        'DSHX6409 The Host bundle imports effect',
+        'DSHX6409 The Host bundle imports @scope/pkg',
+      ])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('explains how to install the project-local test runner', async () => {
     const root = await mkdtemp(resolve(tmpdir(), 'dshx-test-'))
     try {

@@ -2,8 +2,9 @@ import { execa } from 'execa'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
+import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile, rm } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import semver from 'semver'
@@ -12,6 +13,9 @@ import { Document, isMap, isSeq, parse, parseDocument } from 'yaml'
 import { decodeJson, jsonObjectSchema, jsonValueSchema, type JsonObject } from '../json.js'
 import { HostRuntimeModel } from '../host/runtime.js'
 import { DSHFILES_ROOT, LocalBundleModel } from '../project/local-bundles.js'
+import { RegistryClient, type LoadedItem } from '../registry/client.js'
+import { RegistryError, itemNameForPackage, type PluginItem, type PluginRecord } from '../registry/format.js'
+import { RegistryRecords } from '../registry/records.js'
 import { runProjectDsh } from './command.js'
 import type { DshCommandRunner } from './types.js'
 
@@ -38,7 +42,15 @@ const addPluginInputSchema = Schema.Struct({
 })
 type AddPluginInput = Schema.Codec.Encoded<typeof addPluginInputSchema>
 
-const updatePluginInputSchema = Schema.Struct({ ...profileTargetFields, latest: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))) })
+const forceField = { force: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))) }
+const addItemInputSchema = Schema.Struct({ ...addPluginInputSchema.fields, ...forceField })
+type AddItemInput = Schema.Codec.Encoded<typeof addItemInputSchema>
+
+const updatePluginInputSchema = Schema.Struct({
+  ...profileTargetFields,
+  latest: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  ...forceField,
+})
 type UpdatePluginInput = Schema.Codec.Encoded<typeof updatePluginInputSchema>
 type RemovePluginInput = Schema.Codec.Encoded<typeof profileTargetSchema>
 
@@ -64,7 +76,8 @@ interface ProfilePluginParts {
 export interface ProfilePluginPlan {
   readonly action: 'add' | 'update' | 'remove'
   readonly packageName: string
-  readonly source: 'owned' | 'local' | 'registry'
+  /** `registry` is an npm package; `registry-item` came from a dshx registry document. */
+  readonly source: 'owned' | 'local' | 'registry' | 'registry-item'
   readonly requested: string | null
   readonly profile: string
   readonly profileRoot: string
@@ -78,6 +91,9 @@ export interface ProfilePluginPlan {
   readonly warnings: readonly string[]
   readonly restart: string | null
   readonly dryRun: boolean
+  /** Registry items this one pulled in, in install order. */
+  readonly dependencies?: readonly ProfilePluginPlan[]
+  readonly registryItem?: { readonly item: string; readonly itemUrl: string; readonly integrity: string | null }
 }
 
 export class ProfilePluginError extends Error {
@@ -225,9 +241,11 @@ const mergedPatch = (source: string, row: { id: string; name: string; baseConfig
 
 interface ResolvedPackage {
   readonly packageName: string
-  readonly source: 'owned' | 'local' | 'registry'
+  readonly source: ProfilePluginPlan['source']
   readonly projectRoot: string | undefined
   readonly version: string | undefined
+  /** A registry item's `dsh plugin add` arguments; undefined when the profile already holds exactly that item. */
+  readonly installArgs?: readonly string[] | undefined
 }
 
 const splitVersion = (packageSpec: string): { readonly name: string; readonly version: string | undefined } => {
@@ -327,6 +345,18 @@ const addPluginToProfile = async (input: AddPluginInput, dependencies: ProfilePl
   const request = Schema.decodeUnknownSync(addPluginInputSchema)(input)
   const profile = await openProfile(request)
   const resolved = await resolvePackage(request.packageSpec, request.cwd, dependencies.pluginsRoot)
+  const plan = await installResolved(request, profile, resolved, dependencies)
+  // Installing it by another route ends the registry's claim on it; the next `update` must not move it back.
+  if (!request.dryRun) await RegistryRecords.dropProfile(profile.profileRoot, resolved.packageName)
+  return plan
+}
+
+const installResolved = async (
+  request: Schema.Schema.Type<typeof addPluginInputSchema>,
+  profile: OpenProfile,
+  resolved: ResolvedPackage,
+  dependencies: ProfilePluginDependencies,
+): Promise<ProfilePluginPlan> => {
   const options = parseOptions(request.options)
   const warnings: string[] = []
   const log: StepLog = { commands: [], files: [] }
@@ -349,6 +379,11 @@ const addPluginToProfile = async (input: AddPluginInput, dependencies: ProfilePl
           'link: dependency and bundle entry',
           'Check that the directory is a built DSH plugin package.',
         )
+      return
+    }
+    if (resolved.source === 'registry-item') {
+      if (resolved.installArgs !== undefined)
+        await steps.dsh(['add', ...resolved.installArgs], 'registry item dependency and bundle entry', 'DSH refused the package; read the reason above.')
       return
     }
     const range = resolved.version === undefined ? null : semver.validRange(resolved.version)
@@ -388,7 +423,7 @@ const addPluginToProfile = async (input: AddPluginInput, dependencies: ProfilePl
   }
 
   // A local package's options are validated before anything is installed; a registry package must be installed before its schema is readable.
-  const configPlan = resolved.source === 'registry' ? undefined : await planConfig()
+  const configPlan = resolved.projectRoot === undefined ? undefined : await planConfig()
   await install()
   const { row, config, write } = configPlan ?? (await planConfig())
   await write()
@@ -413,6 +448,145 @@ const addPluginToProfile = async (input: AddPluginInput, dependencies: ProfilePl
   }
 }
 
+const tarballFileName = (item: PluginItem, integrity: string): string =>
+  `${itemNameForPackage(item.package)}-${item.version}-${createHash('sha256').update(integrity).digest('hex').slice(0, 12)}.tgz`
+
+/** One registry item, without its dependencies. The bytes are verified before `dsh plugin add` sees them; DSH stays the judge of compatibility. */
+const installItem = async (
+  request: Schema.Schema.Type<typeof addItemInputSchema>,
+  loaded: LoadedItem,
+  item: PluginItem,
+  dependencies: ProfilePluginDependencies,
+): Promise<ProfilePluginPlan> => {
+  if (item.package.startsWith('@dshfiles/'))
+    throw new RegistryError(`${loaded.itemUrl} claims ${item.package}, an owned bundle.`, `Owned bundles follow this checkout: run "dshx add ${item.package}".`)
+  const profile = await openProfile(request)
+  const records = await RegistryRecords.readProfile(profile.profileRoot)
+  const previous = records[item.package]
+  const integrity = item.source.type === 'tarball' ? item.source.integrity : null
+  if (previous !== undefined && previous.version === item.version && previous.integrity !== integrity && !request.force)
+    throw new RegistryError(
+      `${item.package} ${item.version} changed content without a new version (recorded ${String(previous.integrity)}, now ${String(integrity)}).`,
+      'Nothing was installed. A release should never change in place: ask the registry owner why, or pass --force to accept the new content.',
+    )
+  const listed = Object.hasOwn(profile.manifest.dependencies, item.package) && profile.manifest.dsh.profile.bundles.includes(item.package)
+  const installed = await installedVersion(join(profile.profileRoot, 'node_modules', item.package))
+  const upToDate = listed && installed === item.version && previous?.version === item.version && previous.integrity === integrity
+
+  const warnings: string[] = []
+  const runDsh = dependencies.runDsh ?? runProjectDsh
+  const running = RegistryClient.parseDshVersion((await runDsh(['--version'], { cwd: request.cwd, env: profile.env, timeoutMs: 30_000 })).stdout)
+  if (running !== undefined && !RegistryClient.enginesAllow(item.engines.dsh, running))
+    warnings.push(
+      `${loaded.itemUrl} declares engines.dsh ${item.engines.dsh ?? ''}, which excludes DSH ${running}; DSH decides from the package's own manifest.`,
+    )
+
+  const tarball = integrity === null ? null : tarballFileName(item, integrity)
+  const tarballPath = tarball === null ? null : join(RegistryRecords.tarballDirectory(profile.profileRoot), tarball)
+  if (tarballPath !== null && item.source.type === 'tarball' && !upToDate && !request.dryRun) {
+    const bytes = await RegistryClient.readTarball(item.source, loaded)
+    await mkdir(RegistryRecords.tarballDirectory(profile.profileRoot), { recursive: true })
+    await writeFileAtomic(tarballPath, bytes)
+    await RegistryClient.assertTarballMatches(tarballPath, item).catch(async (error: unknown) => {
+      await rm(tarballPath, { force: true })
+      throw error
+    })
+  }
+
+  const installArgs =
+    tarballPath !== null
+      ? [`file:${tarballPath}`]
+      : [`${item.package}@${item.version}`, ...(item.source.type === 'npm' && item.source.registry !== undefined ? [`--registry=${item.source.registry}`] : [])]
+  const resolved: ResolvedPackage = {
+    packageName: item.package,
+    source: 'registry-item',
+    projectRoot: undefined,
+    version: item.version,
+    installArgs: upToDate ? undefined : installArgs,
+  }
+  const plan = await installResolved(request, profile, resolved, dependencies).catch(async (error: unknown) => {
+    // DSH rejected it and restored the profile, so the copy it never adopted has no owner.
+    if (tarball !== null && previous?.tarball !== tarball) await RegistryRecords.dropTarball(profile.profileRoot, tarball)
+    throw error
+  })
+
+  const requires = (await RegistryClient.resolveGraph(loaded))
+    .filter(dependency => dependency.itemUrl !== loaded.itemUrl)
+    .flatMap(dependency => (dependency.item.type === 'dsh:plugin' ? [dependency.item.package] : []))
+  if (!request.dryRun && !upToDate) {
+    const record: PluginRecord = { item: item.name, address: loaded.address, itemUrl: loaded.itemUrl, version: item.version, integrity, tarball, requires }
+    await RegistryRecords.setProfile(profile.profileRoot, item.package, record)
+    if (previous?.tarball !== tarball) await RegistryRecords.dropTarball(profile.profileRoot, previous?.tarball ?? null)
+  }
+  return { ...plan, warnings: [...warnings, ...plan.warnings], registryItem: { item: item.name, itemUrl: loaded.itemUrl, integrity } }
+}
+
+/** A registry item and every item it needs, dependencies first. */
+const installItemGraph = async (
+  request: Schema.Schema.Type<typeof addItemInputSchema>,
+  root: LoadedItem,
+  dependencies: ProfilePluginDependencies,
+): Promise<ProfilePluginPlan> => {
+  const plans: ProfilePluginPlan[] = []
+  for (const loaded of await RegistryClient.resolveGraph(root)) {
+    if (loaded.item.type !== 'dsh:plugin')
+      throw new RegistryError(
+        `${loaded.item.name} is a ${loaded.item.type} item, not a plugin.`,
+        'Install source items into a plugin project: dshx add <item> --project <dir>.',
+      )
+    const options = loaded === root ? request.options : []
+    plans.push(await installItem({ ...request, packageSpec: loaded.item.package, options }, loaded, loaded.item, dependencies))
+  }
+  const plan = plans.at(-1)
+  if (plan === undefined) throw new Error('A registry graph always contains its root item.')
+  return { ...plan, dependencies: plans.slice(0, -1) }
+}
+
+const addRegistryItem = async (input: AddItemInput, root: LoadedItem, dependencies: ProfilePluginDependencies = {}): Promise<ProfilePluginPlan> =>
+  installItemGraph(Schema.decodeUnknownSync(addItemInputSchema)(input), root, dependencies)
+
+/** The record a spec names: a package name, or the address or URL the item was installed from. */
+const findRecord = (records: Readonly<Record<string, PluginRecord>>, spec: string, cwd: string) => {
+  const address = RegistryClient.parseAddress(spec, cwd)
+  if (address === undefined) return undefined
+  const url = address.kind === 'location' ? address.url : undefined
+  return Object.entries(records).find(([, record]) => record.address === spec || record.itemUrl === url)
+}
+
+const notRecorded = (spec: string, command: string): RegistryError =>
+  new RegistryError(
+    `No plugin in this profile came from ${spec}.`,
+    `Run "dshx ${command} <package>" with the package name, or "dshx add ${spec}" to install it.`,
+  )
+
+/** Move a registry item to what its registry now publishes; the registry names the version, so there is nothing to pass. */
+const updateRegistryItem = async (
+  request: Schema.Schema.Type<typeof updatePluginInputSchema>,
+  profile: OpenProfile,
+  packageName: string,
+  record: PluginRecord,
+  dependencies: ProfilePluginDependencies,
+): Promise<ProfilePluginPlan> => {
+  if (request.latest || splitVersion(request.packageSpec).version !== undefined)
+    throw new RegistryError(`${packageName} follows ${record.itemUrl}, which names its version.`, `Run "dshx update ${packageName}" with no version.`)
+  if (!Object.hasOwn(profile.manifest.dependencies, packageName))
+    throw new RegistryError(`${packageName} is recorded but no longer in profile ${request.profile}.`, `Reinstall it with "dshx add ${record.address}".`)
+  const loaded: LoadedItem = await RegistryClient.load({ kind: 'location', spec: record.address, url: record.itemUrl }, request.dshHome)
+  if (loaded.item.type !== 'dsh:plugin' || loaded.item.package !== packageName)
+    throw new RegistryError(
+      `${record.itemUrl} no longer describes ${packageName}.`,
+      `Nothing changed. Run "dshx remove ${packageName}" and install what the registry now offers explicitly.`,
+    )
+  const moved = await installItemGraph({ ...request, packageSpec: packageName, options: [] }, loaded, dependencies)
+  const downgrade = semver.lt(loaded.item.version, record.version)
+  return {
+    ...moved,
+    action: 'update',
+    versions: { before: record.version, after: request.dryRun ? record.version : moved.versions.after },
+    warnings: [...moved.warnings, ...(downgrade ? [`The registry moved ${packageName} back from ${record.version} to ${loaded.item.version}.`] : [])],
+  }
+}
+
 /** Where an installed plugin comes from, read back from the profile manifest rather than from the spec. */
 const installedPackage = (profile: OpenProfile, packageSpec: string) => {
   const { name, version } = splitVersion(packageSpec)
@@ -432,6 +606,12 @@ const installedPackage = (profile: OpenProfile, packageSpec: string) => {
 const updatePluginInProfile = async (input: UpdatePluginInput, dependencies: ProfilePluginDependencies = {}): Promise<ProfilePluginPlan> => {
   const request = Schema.decodeUnknownSync(updatePluginInputSchema)(input)
   const profile = await openProfile(request)
+  const records = await RegistryRecords.readProfile(profile.profileRoot)
+  const named = findRecord(records, request.packageSpec, request.cwd)
+  if (named === undefined && RegistryClient.parseAddress(request.packageSpec, request.cwd) !== undefined) throw notRecorded(request.packageSpec, 'update')
+  const recordName = named?.[0] ?? splitVersion(request.packageSpec).name
+  const record = named?.[1] ?? records[recordName]
+  if (record !== undefined) return updateRegistryItem(request, profile, recordName, record, dependencies)
   const target = installedPackage(profile, request.packageSpec)
   if (!target.listed)
     throw new ProfilePluginError(`${target.name} is not installed in profile ${request.profile}.`, `Install it with "dshx add ${request.packageSpec}".`)
@@ -484,9 +664,14 @@ const updatePluginInProfile = async (input: UpdatePluginInput, dependencies: Pro
 
 /** Uninstall one plugin and drop its row override from the profile patch; never restarts DSH. */
 const removePluginFromProfile = async (input: RemovePluginInput, dependencies: ProfilePluginDependencies = {}): Promise<ProfilePluginPlan> => {
-  const request = Schema.decodeUnknownSync(profileTargetSchema)(input)
-  const profile = await openProfile(request)
+  const decoded = Schema.decodeUnknownSync(profileTargetSchema)(input)
+  const profile = await openProfile(decoded)
+  const records = await RegistryRecords.readProfile(profile.profileRoot)
+  const named = findRecord(records, decoded.packageSpec, decoded.cwd)
+  if (named === undefined && RegistryClient.parseAddress(decoded.packageSpec, decoded.cwd) !== undefined) throw notRecorded(decoded.packageSpec, 'remove')
+  const request = named === undefined ? decoded : { ...decoded, packageSpec: named[0] }
   const target = installedPackage(profile, request.packageSpec)
+  const record = records[target.name]
   if (target.version !== undefined) throw new ProfilePluginError('dshx remove takes a package name without a version.', `Run "dshx remove ${target.name}".`)
   const warnings: string[] = []
   const log: StepLog = { commands: [], files: [] }
@@ -512,10 +697,17 @@ const removePluginFromProfile = async (input: RemovePluginInput, dependencies: P
   if (existsSync(seedPath) && Object.hasOwn(decodeJson(seedManifestSchema, await readFile(seedPath, 'utf8')).dependencies, target.name))
     warnings.push(`The checked-in ${request.profile} seed lists ${target.name}, so the next profile-sync adds it back; drop it from ${seedPath} too.`)
 
+  const dependents = Object.entries(records).filter(([, candidate]) => candidate.requires.includes(target.name))
+  if (dependents.length > 0)
+    warnings.push(`${dependents.map(([name]) => name).join(', ')} declared ${target.name} as a registry dependency and may stop working.`)
+  if (record !== undefined && record.requires.length > 0)
+    warnings.push(`Its registry dependencies stay installed, because something else may use them: ${record.requires.join(', ')}.`)
+  if (!request.dryRun) await RegistryRecords.dropProfile(profile.profileRoot, target.name)
+
   return {
     action: 'remove',
     packageName: target.name,
-    source: target.source,
+    source: record === undefined ? target.source : 'registry-item',
     requested: null,
     profile: request.profile,
     profileRoot: profile.profileRoot,
@@ -535,6 +727,7 @@ const removePluginFromProfile = async (input: RemovePluginInput, dependencies: P
 /** One plugin's lifecycle in one DSH profile: install, move to another version, uninstall. */
 export class ProfilePlugins {
   static readonly add = addPluginToProfile
+  static readonly addItem = addRegistryItem
   static readonly update = updatePluginInProfile
   static readonly remove = removePluginFromProfile
 }

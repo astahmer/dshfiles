@@ -92,4 +92,6 @@ interface CreateProjectOptions {
 
 The result reports `root`, `packageId`, selected `template` and `style`, written `files`, selected package manager, installation status, and structured diagnostics. Defaults are exported as `DEFAULT_TEMPLATE`, `DEFAULT_STYLE`, `DEFAULT_DSH_VERSION`, and `DEFAULT_DSH_RANGE`.
 
-Generation is compositional but not a public plugin system: DSHX does not expose a generic template registry or `dshx add api/settings/prompt/conversation` commands.
+Generation is compositional but not a public plugin system: DSHX does not expose a generic template registry or `dshx add api/settings/prompt/conversation` commands. To share a building block between projects, publish it as a `dsh:source` item in a [plugin registry](../registry.md).
+
+A generated Host entry bundles `effect` and `zod` (`host.bundleDependencies`), so the package runs wherever it is installed. Without that, the imports resolve only beside the project's `node_modules`, and `dshx publish --dry-run` reports `DSHX6409`.

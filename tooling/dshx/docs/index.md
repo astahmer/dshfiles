@@ -26,6 +26,7 @@ DSHX exposes a small authoring surface and keeps compiler/runtime internals out 
 Additional references:
 
 - [CLI reference](./cli-reference.md)
+- [Plugin registry](./registry.md)
 - [Agent communication](./agent-communication.md) — the shared typed service, quiet delivery model, CLI, MCP, and activation steps.
 - [Compatibility and verification](./compatibility.md)
 - [Installed verification binaries](./verification-binaries.md) — optional stock DSH and Chromium selection for isolated checks.

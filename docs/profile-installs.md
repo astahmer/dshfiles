@@ -17,6 +17,11 @@ uninstall plus its row override), and any other plugin directory installs throug
 `dsh plugin add link:<path>`, which works where a bare path does not (below). See the
 [CLI reference](../tooling/dshx/docs/cli-reference.md#dshx-add-package-install-a-plugin-into-a-profile).
 
+`dshx add` also accepts a [registry item](../tooling/dshx/docs/registry.md): a URL, a
+`.json` path or `alias:item`. A plugin item ends in the same `dsh plugin add`. A tarball
+item appears here as a `file:` dependency on a verified copy in the profile's
+`.dshx-registry/tarballs/`, which is why that directory must stay with the profile.
+
 ```sh
 dsh --profile web --dump-config          # full composed tree
 dsh --profile web --dump-config-schema   # JSON Schema for entries and patches

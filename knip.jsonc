@@ -39,7 +39,8 @@
       // oxlint runs through `pnpm exec` inside scripts/lint-ratchet.ts. Cordis and the typert generator are
       // unreferenced, but removing them re-resolves dsh peer variants in the undeduped lockfile (docs/guardrails.md).
       // The measurement scripts resolve Playwright from the tooling/dshx workspace they are run with.
-      "ignoreDependencies": ["oxlint", "@playwright/test", "playwright"],
+      // Built Host bundles keep zod as a bare import and resolve it from this root at runtime, which knip cannot see.
+      "ignoreDependencies": ["oxlint", "@playwright/test", "playwright", "zod"],
     },
     "plugins": {
       "entry": ["scripts/*.ts!"],
