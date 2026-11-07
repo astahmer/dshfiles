@@ -24,7 +24,8 @@ import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { ChevronDownIcon, FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { initialPickerFlow, pickerFlowReducer } from './picker-flow.js'
 import { ProjectFolderPickerModel, type PathStyle, type PickerEntry, type PickerSectionId, type PickerTab } from './project-folder-picker-model.js'
 
 export interface RegisteredProject {
@@ -129,11 +130,12 @@ const emptyLabels = {
 } satisfies Readonly<Record<PickerTab, string>>
 
 export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Element => {
-  const [query, setQuery] = useState('')
+  const [flow, dispatchFlow] = useReducer(pickerFlowReducer, props.mode, initialPickerFlow)
+  const query = flow.query
+  const browseTarget = flow.browse
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [newDirectoryName, setNewDirectoryName] = useState('')
   const [projectToRemove, setProjectToRemove] = useState<RegisteredProject | null>(null)
-  const [browseTarget, setBrowseTarget] = useState<{ readonly path: string | undefined } | null>(() => ProjectFolderPickerModel.initialBrowseTarget(props.mode))
   const pickRequest = useRef<AbortController | null>(null)
   const searchInput = useRef<HTMLInputElement | null>(null)
   const listingQuery = useQuery({
@@ -207,29 +209,15 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
 
   useEffect(() => {
     if (listingQuery.data === undefined || listingQuery.isPlaceholderData || browseTarget === null) return
-    const currentListing = listingQuery.data
-    setQuery(currentQuery => {
-      if (ProjectFolderPickerModel.matchingDirectoryPaths(currentListing, currentQuery) !== null) return currentQuery
-      return browseTarget.path === undefined && ProjectFolderPickerModel.isPathQuery(currentQuery, pathStyle) ? currentQuery : currentListing.path
-    })
-  }, [listingQuery.data, listingQuery.isPlaceholderData, browseTarget, pathStyle])
+    dispatchFlow({ type: 'listing.loaded', listing: listingQuery.data, pathStyle, directories: props.mode === 'directories' })
+  }, [browseTarget, listingQuery.data, listingQuery.isPlaceholderData, pathStyle, props.mode])
 
-  const browse = useCallback(
-    (path: string | undefined): void => {
-      pickMutation.reset()
-      registerMutation.reset()
-      createMutation.reset()
-      setBrowseTarget({ path })
-    },
-    [createMutation, pickMutation, registerMutation],
-  )
-
-  useEffect(() => {
-    if (listingQuery.data === undefined || listingQuery.isPlaceholderData || browseTarget === null || !pathMode) return
-    const matchedPath = ProjectFolderPickerModel.uniqueMatchingDirectoryPath(listingQuery.data, query)
-    if (matchedPath === null || matchedPath === listingQuery.data.path) return
-    browse(matchedPath)
-  }, [browse, browseTarget, listingQuery.data, listingQuery.isPlaceholderData, pathMode, query])
+  const browse = (path: string | undefined): void => {
+    pickMutation.reset()
+    registerMutation.reset()
+    createMutation.reset()
+    dispatchFlow({ type: 'browse.requested', path })
+  }
 
   const chooseWithSystemPicker = (): void => {
     registerMutation.reset()
@@ -359,25 +347,13 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                 autoComplete="off"
                 className="dshx:h-9 dshx:pl-8"
                 onChange={event => {
-                  const nextQuery = event.currentTarget.value
-                  const nextPath = ProjectFolderPickerModel.resolvePathQuery(nextQuery, listing?.home, pathStyle)
-                  setQuery(nextQuery)
-                  if (ProjectFolderPickerModel.isHomeRelativePathQuery(nextQuery, pathStyle)) {
-                    if (listing === null || nextPath === null || !ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.path)) {
-                      setBrowseTarget(current => (current !== null && current.path === undefined ? current : { path: undefined }))
-                    }
-                  } else if (ProjectFolderPickerModel.isAbsolutePath(nextQuery, pathStyle)) {
-                    if (
-                      listing === null ||
-                      (nextPath !== null &&
-                        ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.home) &&
-                        !ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.path))
-                    ) {
-                      setBrowseTarget(current => (current !== null && current.path === undefined ? current : { path: undefined }))
-                    }
-                  } else if (!ProjectFolderPickerModel.isPathQuery(nextQuery, pathStyle)) {
-                    setBrowseTarget(null)
-                  }
+                  dispatchFlow({
+                    type: 'query.typed',
+                    query: event.currentTarget.value,
+                    listing,
+                    pathStyle,
+                    directories: props.mode === 'directories',
+                  })
                   pickMutation.reset()
                   registerMutation.reset()
                   createMutation.reset()
