@@ -90,5 +90,5 @@ Ordered by leverage: how much daily loop it closes against how much it costs. Mo
 6. ~~**A4 + A5: composer quick wins.**~~ Done: prompt recall with ArrowUp, large-paste-to-file, editing a queued message (UI and `thread_queue_edit`), prompt links (`?prompt=`).
 7. ~~**B6: MCP endpoint for outside agents.**~~ Done: `@dshfiles/mcp-endpoint`.
 8. ~~**A6: multi-model fan-out.**~~ Done: thread-sidebar `thread_fan_out` and Send to several models…. One prompt, N threads, each isolated with jj. Cheap on top of the sessions API `create`.
-9. ~~**C7 + C6: worktree policies, auto-fetch, local clone and new project.**~~ Done: jj-integration `autoCleanup.onSettle` and `autoFetch`; workspace-folder-picker Clone repository and New project.
+9. ~~**C7 + C6: worktree policies, auto-fetch, local clone and new project.**~~ Done: jj-integration `autoCleanup.onSettle` and `autoFetch`; workspace-folder-picker Clone repository and New project. **Narrow:** that covers creating a project, not onboarding an existing folder — see [project onboarding](project-onboarding.md) for the rest of C6/C7.
 10. Defer: A1/D2/D3 (mobile, relay, guests), B1 (ACP client), A9/A10/D4. Each costs a lot or depends on a new client or a relay.
