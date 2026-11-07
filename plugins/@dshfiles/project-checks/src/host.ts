@@ -22,7 +22,7 @@ import { ProjectChecksActivityModel } from './receipt-activity.js'
 import { ReceiptStore } from './receipt-store.js'
 import { ReceiptViewModel } from './receipt-view.js'
 import { storedReceiptSchema, type StoredReceipt } from './store.js'
-import { preparationActionsFor } from './workspace-setup.js'
+import { preparationActionsFor } from './workspace-setup-selection.js'
 
 const PACKAGE_NAME = '@dshfiles/project-checks'
 

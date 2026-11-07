@@ -76,6 +76,7 @@ const projectChecksProvider = (verdict: () => CandidateVerdict) =>
         receipts: unsupported,
         hookEvents: unsupported,
         run: unsupported,
+        setupActions: unsupported,
         dispatch: unsupported,
         tasks: unsupported,
         cancelTask: unsupported,

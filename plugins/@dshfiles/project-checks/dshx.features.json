@@ -392,7 +392,7 @@
         {
           "kind": "unit-test",
           "id": "project-checks.trusted-actions-unit-workspace-setup-selection",
-          "file": "plugins/@dshfiles/project-checks/src/workspace-setup.test.ts",
+          "file": "plugins/@dshfiles/project-checks/src/workspace-setup-selection.test.ts",
           "testName": "refuses an action rooted at the checkout alone instead of widening its trusted root"
         },
         {
@@ -422,7 +422,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "composer: Project checks › hook events",
+      "currentSurface": "composer: Project checks \u203a hook events",
       "configuration": [],
       "states": ["invoked", "passed", "failed", "not-reported"],
       "failureModes": ["A missing native event remains not-reported rather than being inferred as skipped."],

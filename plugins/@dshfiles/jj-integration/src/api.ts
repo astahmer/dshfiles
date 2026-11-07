@@ -32,6 +32,10 @@ import {
   reviewHistoryOutputSchema,
   revisionGraphOutputSchema,
   startedOutputSchema,
+  workspaceSetupInputSchema,
+  workspaceSetupSchema,
+  workspaceSetupTaskSchema,
+  cancelWorkspaceSetupInputSchema,
   workspaceSyncOutputSchema,
   workspaceSyncSchema,
 } from './api-effect-schemas.js'
@@ -65,6 +69,8 @@ const landResultSchema = Schema.Struct({
 export type LandResult = typeof landResultSchema.Type
 
 export type WorkspaceSyncView = typeof workspaceSyncSchema.Type
+export type WorkspaceSetupTask = typeof workspaceSetupTaskSchema.Type
+export type WorkspaceSetup = typeof workspaceSetupSchema.Type
 export type DestinationView = typeof destinationSchema.Type
 
 export const threadWorkspaceNameEffect = Schema.String.check(Schema.isPattern(/^thread-[0-9a-f]{6}$/u))
@@ -371,6 +377,26 @@ export const jjIntegrationApi = defineApi({
       description:
         'Integrate this thread’s described work into the target bookmark (main by default): rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.',
       tool: { name: 'jj_thread_rebase', render: output => output.summary },
+    }),
+    workspaceSetup: method({
+      input: workspaceSetupInputSchema,
+      output: workspaceSetupSchema,
+      description:
+        'Prepare a new thread workspace with the trusted setup actions this project flags: dispatch each once through the durable project-check queue and report their phases. Runs nothing outside a thread workspace of a local repository, and nothing from dsh.project.json. Call only when the user asked to start that setup.',
+      tool: {
+        name: 'jj_workspace_setup',
+        render: output =>
+          output.tasks.length === 0
+            ? 'No trusted setup action is flagged for a new workspace of this project.'
+            : output.tasks.map(task => `${task.label}: ${task.status} (${task.phase})`).join('\n'),
+      },
+    }),
+    cancelWorkspaceSetup: method({
+      input: cancelWorkspaceSetupInputSchema,
+      output: workspaceSetupSchema,
+      description:
+        'Cancel one queued or running setup action of a thread workspace. The durable task reports cancelled only after its process group exits, and effects applied before cancellation are not undone. Call only when the user asked to stop it.',
+      tool: { name: 'jj_cancel_workspace_setup', render: output => output.tasks.map(task => `${task.label}: ${task.status}`).join('\n') },
     }),
     workspaceSync: method({
       input: emptyInputSchema,

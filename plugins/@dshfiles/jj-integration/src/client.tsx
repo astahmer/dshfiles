@@ -37,6 +37,8 @@ import { createSessionLogDownloadPort, SessionLogDownloadFeedback, type SessionL
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { ThreadNotices, ThreadNoticeToast } from './thread-notices.js'
 import { ThreadPreparation, ThreadWarmup } from './thread-warmup.js'
+import { awaitWorkspaceSetup, SETUP_WAIT_TIMEOUT_MS, setupWaitsForRun } from './workspace-setup-wait.js'
+import { WorkspaceSetupDock } from './workspace-setup-dock.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { ThreadWorkspaceControl } from './thread-workspace-control.js'
 import { useToast } from './toast.js'
@@ -786,6 +788,35 @@ export default defineClient({
         if (ctx.sessions.list.getSnapshot().byId[sessionId]?.blank === false) done()
       })
     }
+    /** Sleep that a cancelled send cuts short, so waiting for a setup never outlives the send. */
+    const sleepAbortable = (milliseconds: number, signal: AbortSignal): Promise<void> =>
+      new Promise((resolve, reject) => {
+        if (signal.aborted) return reject(new Error('The send was cancelled.'))
+        const timer = setTimeout(() => {
+          signal.removeEventListener('abort', cancel)
+          resolve()
+        }, milliseconds)
+        const cancel = (): void => {
+          clearTimeout(timer)
+          reject(new Error('The send was cancelled.'))
+        }
+        signal.addEventListener('abort', cancel, { once: true })
+      })
+    /**
+     * Dispatch the trusted setup actions this project flags for a fresh thread workspace, and hold the first turn only
+     * when one of them asked for it. A Host without the read, or a project that flags nothing, costs one request and
+     * changes nothing; a failure never blocks a send.
+     */
+    const prepareWorkspaceSetup = async (input: { readonly sessionId: SessionId; readonly workspaceId: string; readonly signal: AbortSignal }) => {
+      const path = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === input.workspaceId)?.path
+      if (path === undefined) return
+      const read = () => jjThreads.workspaceSetup({ sessionId: input.sessionId, path }, { signal: input.signal })
+      const first = await read()
+      if (!setupWaitsForRun(first)) return
+      const outcome = await awaitWorkspaceSetup({ read, signal: input.signal, now: () => Date.now(), wait: sleepAbortable })
+      if (outcome === 'timed-out')
+        ThreadNotices.show({ text: translate('setupTimedOut', { seconds: String(Math.round(SETUP_WAIT_TIMEOUT_MS / 1000)) }), sessionId: input.sessionId })
+    }
     /** The blank Session of a thread workspace, created or reused without changing what the main view shows. */
     const threadComposerIn = async (workspaceId: string, signal: AbortSignal) => {
       // SAFETY: the id names a workspace the Host's registry just provisioned or listed.
@@ -796,6 +827,10 @@ export default defineClient({
       releaseOnceSent(sessionId, () => held.release())
       const scoped = ctx.sessions.scope(sessionId)
       if (scoped === undefined) throw new Error('This thread is not available. Refresh the thread list and try again.')
+      // A setup the project flagged for new workspaces starts here, with a Session whose cwd the queue can trust.
+      await prepareWorkspaceSetup({ sessionId, workspaceId, signal }).catch(error => {
+        console.warn('jj-integration: workspace setup was not prepared', error)
+      })
       return { sessionId, workspaceId, blank: true, input: ctx.conversation.input.for(scoped) }
     }
     const warmups = new ThreadWarmup<Awaited<ReturnType<typeof threadComposerIn>>>()
@@ -1159,6 +1194,21 @@ export default defineClient({
             />
           </PluginQueryProvider>
         )),
+      ),
+    )
+    // The composer card for a workspace setup: it sits above the composer of the Session whose workspace is prepared,
+    // and disappears once nothing is left to show.
+    ctx.slots.inject('conversation.input.dock', () =>
+      ctx.slots.register(
+        { name: 'conversation.input.dock', id: 'dshfiles-jj-integration-workspace-setup', order: 4, inject: sessionId => ({ sessionId }) },
+        decorate((props: { readonly sessionId: SessionId }) => {
+          const path = ctx.sessions.list.getSnapshot().byId[props.sessionId]?.cwd
+          return (
+            <PluginQueryProvider>
+              <WorkspaceSetupDock sessionId={props.sessionId} path={path} t={translate} />
+            </PluginQueryProvider>
+          )
+        }),
       ),
     )
     ctx.slots.inject('shell.overlay', () =>

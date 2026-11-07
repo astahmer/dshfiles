@@ -1149,7 +1149,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "jjIntegrationApi",
       "importFrom": "@dshfiles/jj-integration/api",
       "owner": "@dshfiles/jj-integration",
-      "source": "plugins/@dshfiles/jj-integration/src/api.ts:183",
+      "source": "plugins/@dshfiles/jj-integration/src/api.ts:189",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/jj-integration:jj-threads",
@@ -1162,8 +1162,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/jj-integration owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: ownWorkspaceFor, provision, destination, classifyWorkspaces, projects, noFolder, repositories, refreshRepositories, threadAt, revisionGraph, isolate, land, queueLand, cancelQueuedLand, integrationProgress, reviewHistory, threadStatus, landThread, workspaceSync, discard, discardMany, cleanupWorkspaces, startCleanup, cleanupJobs",
-        "Agent tools: jj_thread_destination (read-only), jj_thread_projects (read-only), jj_thread_repositories (read-only), jj_thread_refresh_repositories (read-only), jj_thread_isolate, jj_thread_review_history (read-only), jj_thread_status (read-only), jj_thread_rebase, jj_thread_workspace_sync (read-only), jj_thread_discard, jj_thread_discard_many, jj_thread_cleanup, jj_thread_cleanup_jobs (read-only)"
+        "Methods: ownWorkspaceFor, provision, destination, classifyWorkspaces, projects, noFolder, repositories, refreshRepositories, threadAt, revisionGraph, isolate, land, queueLand, cancelQueuedLand, integrationProgress, reviewHistory, threadStatus, landThread, workspaceSetup, cancelWorkspaceSetup, workspaceSync, discard, discardMany, cleanupWorkspaces, startCleanup, cleanupJobs",
+        "Agent tools: jj_thread_destination (read-only), jj_thread_projects (read-only), jj_thread_repositories (read-only), jj_thread_refresh_repositories (read-only), jj_thread_isolate, jj_thread_review_history (read-only), jj_thread_status (read-only), jj_thread_rebase, jj_workspace_setup, jj_cancel_workspace_setup, jj_thread_workspace_sync (read-only), jj_thread_discard, jj_thread_discard_many, jj_thread_cleanup, jj_thread_cleanup_jobs (read-only)"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -1411,7 +1411,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "projectChecksApi",
       "importFrom": "@dshfiles/project-checks/api",
       "owner": "@dshfiles/project-checks",
-      "source": "plugins/@dshfiles/project-checks/src/api.ts:135",
+      "source": "plugins/@dshfiles/project-checks/src/api.ts:152",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/project-checks:project-checks",
@@ -1424,8 +1424,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/project-checks owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: actions, receipts, hookEvents, run, dispatch, tasks, cancelTask, retryTask, assertVerifiedCompletion, verifyCandidate",
-        "Agent tools: project_checks_actions (read-only), project_checks_receipts (read-only), project_checks_hook_events (read-only), project_checks_run, project_checks_dispatch, project_checks_tasks (read-only), project_checks_cancel, project_checks_retry"
+        "Methods: actions, receipts, hookEvents, run, setupActions, dispatch, tasks, cancelTask, retryTask, assertVerifiedCompletion, verifyCandidate",
+        "Agent tools: project_checks_actions (read-only), project_checks_receipts (read-only), project_checks_hook_events (read-only), project_checks_run, project_checks_setup_actions (read-only), project_checks_dispatch, project_checks_tasks (read-only), project_checks_cancel, project_checks_retry"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -1447,6 +1447,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/project-checks/src/completion-event.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/project-checks/workspace-setup",
+      "kind": "module",
+      "title": "@dshfiles/project-checks/workspace-setup",
+      "summary": "How a dispatched setup action reads: whether it still holds the first turn, and whether the card has anything to say. Client-safe (no node: imports): `@dshfiles/jj-integration` imports this module in both halves to render the same view.",
+      "publicSymbol": "SetupTaskStatus, SetupTaskView, isSetupOpen, setupView",
+      "importFrom": "@dshfiles/project-checks/workspace-setup",
+      "owner": "@dshfiles/project-checks",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/project-checks/src/workspace-setup.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2316,7 +2336,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "projectLifecycleApi",
       "importFrom": "@dshfiles/workspace-folder-picker/project-lifecycle-api",
       "owner": "@dshfiles/workspace-folder-picker",
-      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle-api.ts:74",
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle-api.ts:120",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/workspace-folder-picker:workspace-folder-picker.project-lifecycle",
@@ -2329,8 +2349,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/workspace-folder-picker owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: tools, startClone, cloneJobs, cancelClone, createProject, removeProject",
-        "Agent tools: project_tools_status (read-only), project_clone, project_clone_jobs (read-only), project_clone_cancel, project_create"
+        "Methods: tools, startClone, cloneJobs, cancelClone, retryClone, createProject, inspect, initProject, readProjectConfig, publishProject, removeProject",
+        "Agent tools: project_tools_status (read-only), project_clone, project_clone_jobs (read-only), project_clone_cancel, project_clone_retry, project_create, project_inspect (read-only), project_init, project_config_read (read-only), project_publish"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -2352,6 +2372,48 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/workspace-folder-picker/src/picker/index.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/workspace-folder-picker/project-config",
+      "kind": "module",
+      "title": "@dshfiles/workspace-folder-picker/project-config",
+      "summary": "`dsh.project.json` at a repository root: the checked-in settings a repository can declare about how it is worked in. Published as the `@dshfiles/workspace-folder-picker/project-config` dshx module, so both the project lifecycle and the Jujutsu bundle read one schema. Only non-executable settings live here: a script is…",
+      "publicSymbol": "PROJECT_CONFIG_FILE, projectConfigScriptSchema, projectConfigSchema, ProjectConfig, LoadedProjectConfig, loadProjectConfig",
+      "importFrom": "@dshfiles/workspace-folder-picker/project-config",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-config.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "RepositorySetup",
+      "importFrom": "@dshfiles/workspace-folder-picker/repository-setup-contract",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/repository-setup-contract.ts:13",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/workspace-folder-picker.repository-setup",
+      "kind": "contract",
+      "title": "RepositorySetup",
+      "summary": "Client service contract provided by @dshfiles/workspace-folder-picker.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(RepositorySetup) to consume; only @dshfiles/workspace-folder-picker provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/workspace-folder-picker's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/workspace-folder-picker.repository-setup"
+      ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2569,7 +2631,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agents › agent-mentions"
       ],
       "details": [
-        "Used by 57 catalog feature(s)",
+        "Used by 58 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

@@ -14,6 +14,7 @@ import { SettleCleanupModel } from './settle-cleanup.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 import { ThreadWorkspaces } from './thread-workspaces.js'
 import { WorkspaceCleanupModel } from './workspace-cleanup.js'
+import { WorkspaceSetupService } from './workspace-setup.js'
 
 const HOUR_MS = 60 * 60_000
 const FIRST_SWEEP_DELAY = Duration.seconds(30)
@@ -39,6 +40,7 @@ export const MaintenanceLive = Layer.effectDiscard(
     const log = yield* ActivityLog
     const apis = yield* HostApis
     const executables = yield* Executables
+    const workspaceSetup = yield* WorkspaceSetupService
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const fileSystem = yield* FileSystem.FileSystem
     const path = yield* Path.Path
@@ -202,6 +204,8 @@ export const MaintenanceLive = Layer.effectDiscard(
             const next = yield* settled.read
             const previous = yield* Ref.getAndSet(snapshot, next)
             const justSettled = previous === undefined || next === undefined ? [] : SettleCleanupModel.newlySettled({ previous, next })
+            // A project can flag trusted actions for a settle; they run in the workspace the settled thread works in.
+            if (justSettled.length > 0) yield* workspaceSetup.onSettle({ sessionIds: justSettled })
             const current = yield* settings.get
             if (next === undefined || justSettled.length === 0 || !current.autoCleanup.onSettle) return
             const request = AutoCleanupModel.request(current.autoCleanup, null)

@@ -123,3 +123,28 @@ export const noFolderOutputSchema = Schema.Struct({ workspaceId: Schema.String }
 export const workspaceSyncOutputSchema = Schema.Struct({ sync: Schema.NullOr(workspaceSyncSchema) })
 
 export const emptyInputSchema = Schema.Struct({})
+
+/** The durable task a trusted setup action runs in a fresh thread workspace, as the composer card shows it. */
+/** The queue mints task ids as the sha256 of session, idempotency key: 64 lowercase hex characters. */
+const durableTaskIdSchema = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u))
+
+export const workspaceSetupTaskSchema = Schema.Struct({
+  id: durableTaskIdSchema,
+  actionId: nonEmptyString,
+  label: boundedString(80),
+  status: Schema.Literals(['queued', 'running', 'cancel-requested', 'succeeded', 'failed', 'cancelled', 'timed-out', 'unknown', 'blocked']),
+  phase: Schema.Literals(['queued', 'resolving', 'starting', 'recording', 'reconciling']),
+})
+
+export const workspaceSetupSchema = Schema.Struct({
+  /** Actions selected for this workspace: the checkout's trusted root spans both it and the checkout. */
+  tasks: Schema.Array(workspaceSetupTaskSchema).check(Schema.isMaxLength(32)),
+  /** A selected action asked the first turn to wait for it. */
+  awaitsFirstTurn: Schema.Boolean,
+  /** Whether this Session works in a thread workspace at all; anywhere else nothing runs. */
+  applies: Schema.Boolean,
+})
+
+export const workspaceSetupInputSchema = Schema.Struct({ sessionId: nonEmptyString, path: nonEmptyString })
+
+export const cancelWorkspaceSetupInputSchema = Schema.Struct({ sessionId: nonEmptyString, taskId: nonEmptyString })
