@@ -16,6 +16,7 @@ import { ProjectCloneDialog } from './project-clone-dialog.js'
 import { ProjectCreateDialog } from './project-create-dialog.js'
 import { ProjectFolderSetup } from './project-folder-setup.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
+import { ProjectSettingsSection } from './project-settings-section.js'
 
 const directoryFlowSlotNames: readonly DirectoryFlowSlotName[] = ['sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']
 
@@ -133,6 +134,22 @@ export default defineClient({
   inject: ['slots', 'remote', 'remote.directoryPicker', 'remote.workspace'],
   setup(ctx, decorate) {
     const ports = createWorkspacePickerPorts(ctx.remote)
+    ctx.slots.inject('settings.section', () =>
+      ctx.slots.register(
+        {
+          name: 'settings.section',
+          registrant: '@dshfiles/workspace-folder-picker',
+          id: 'dshfiles-workspace-folder-picker-projects',
+          order: 34,
+          label: () => 'Projects',
+        },
+        decorate(() => (
+          <PluginQueryProvider>
+            <ProjectSettingsSection />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
     for (const name of directoryFlowSlotNames) {
       ctx.slots.inject(name, () =>
         ctx.slots.register(

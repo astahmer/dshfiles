@@ -91,6 +91,8 @@ const projectConfigOutput = Schema.Struct({
   invalid: Schema.NullOr(Schema.String.check(Schema.isMaxLength(400))),
 })
 
+export type LoadedProjectConfigOutput = typeof projectConfigOutput.Type
+
 const publishedProjectSchema = Schema.Struct({
   path: Schema.String,
   repository: Schema.String,
@@ -114,6 +116,14 @@ export const projectToolsSchema = Schema.Struct({
 })
 
 const jobsOutput = Schema.Struct({ jobs: Schema.Array(cloneJobSchema) })
+
+const registeredProjectSchema = Schema.Struct({
+  workspaceId: Schema.String.check(Schema.isMinLength(1)),
+  title: Schema.String,
+  path: Schema.String.check(Schema.isMinLength(1)),
+})
+
+const projectsOutput = Schema.Struct({ projects: Schema.Array(registeredProjectSchema).check(Schema.isMaxLength(1_000)) })
 
 const compact = (job: CloneJob): string => `${job.state} · ${job.phase} · ${job.path}`
 
@@ -197,6 +207,17 @@ export const projectLifecycleApi = defineApi({
             : `${output.path} · workspace ${output.config.defaultThreadWorkspace ?? 'inherit'} · ${String(output.config.checks?.length ?? 0)} check(s)`,
       },
     }),
+    projects: WorkspaceFolderPickerSchema.method({
+      input: Schema.Struct({}),
+      output: projectsOutput,
+      description:
+        'List registered projects (DSH Workspaces) on this machine with their workspace id, title and path, leaving out jj thread workspaces. Read-only.',
+      tool: {
+        name: 'project_projects',
+        readOnly: true,
+        render: output => output.projects.map(project => `${project.title} · ${project.path}`).join('\n') || 'No registered projects.',
+      },
+    }),
     projectIdentities: WorkspaceFolderPickerSchema.method({
       input: Schema.Struct({ paths: Schema.Array(parentPathSchema).check(Schema.isMinLength(1), Schema.isMaxLength(100)) }),
       output: Schema.Struct({
@@ -228,7 +249,11 @@ export const projectLifecycleApi = defineApi({
       }),
       description:
         'The icon of the project at a folder: the iconPath declared in dsh.project.json, then a short list of conventional paths, then a monogram from the folder name. Cached on the Host. Read-only.',
-      tool: { name: 'project_icon', readOnly: true, render: output => (output.kind === 'monogram' ? `Monogram ${output.value}` : `${output.source} (${output.mediaType ?? 'image'})`) },
+      tool: {
+        name: 'project_icon',
+        readOnly: true,
+        render: output => (output.kind === 'monogram' ? `Monogram ${output.value}` : `${output.source} (${output.mediaType ?? 'image'})`),
+      },
     }),
     publishProject: WorkspaceFolderPickerSchema.method({
       input: Schema.Struct({

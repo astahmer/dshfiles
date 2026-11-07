@@ -51,6 +51,8 @@ The Enable action is a dshx contract (`@dshfiles/workspace-folder-picker/reposit
 
 ## Clone a repository
 
+![Inspect a folder before adding it](docs/screenshots/workspace-folder-setup.png)
+
 ![Clone a repository as a project](docs/screenshots/project-clone.png)
 
 **New → Clone repository…** in the same dialog clones a Git repository

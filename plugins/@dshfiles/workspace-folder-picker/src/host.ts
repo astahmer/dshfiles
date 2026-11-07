@@ -12,12 +12,11 @@ import { Clock } from 'effect'
 import { makeProjectIconCache } from './project-icon.js'
 import { loadProjectConfig } from './project-config.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
+import { registeredProjects } from './registered-projects.js'
 
 const projectLayer = Layer.mergeAll(CloneJobs.layer, ProjectCreator.layer, FolderInspector.layer).pipe(
   Layer.provide(ProjectCommands.layer),
-  Layer.provideMerge(
-    Layer.mergeAll(executableLookupLayer, projectRegistryLayer, DshChildProcessSpawner.layer, nodeFileSystemLayer, nodePathLayer),
-  ),
+  Layer.provideMerge(Layer.mergeAll(executableLookupLayer, projectRegistryLayer, DshChildProcessSpawner.layer, nodeFileSystemLayer, nodePathLayer)),
 )
 
 const toolsStatus = Effect.fn('project tools status')(function* () {
@@ -37,7 +36,7 @@ const pickerCapabilities = Effect.fn('directory picker read capability')(functio
 
 export default DshxPlugin.make({
   name: 'dshfiles-workspace-folder-picker',
-  inject: ['subprocess', 'workspaceController'],
+  inject: ['subprocess', 'workspaceController', 'workspaceRegistry'],
   layer: Layer.mergeAll(projectLayer, DirectoryBrowser.layer, ProjectRemover.layer),
   apis: [
     Api.bind(workspaceFolderBrowserApi, {
@@ -55,6 +54,10 @@ export default DshxPlugin.make({
       inspect: input => FolderInspector.use(inspector => inspector.inspect(input.path)),
       initProject: input => ProjectCreator.use(creator => creator.initialize(input)),
       publishProject: input => ProjectCreator.use(creator => creator.publish(input)),
+      projects: () =>
+        Effect.map(hostService('workspaceRegistry'), registry => ({
+          projects: registeredProjects(registry.list().map(workspace => ({ workspaceId: String(workspace.id), title: workspace.title, path: workspace.path }))),
+        })),
       projectIdentities: input =>
         Effect.gen(function* () {
           const inspector = yield* FolderInspector
