@@ -2,8 +2,9 @@ import { execFileSync } from 'node:child_process'
 import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { expect, type Page, type Route } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 import * as Schema from 'effect/Schema'
+import * as Option from 'effect/Option'
 import { ApiChannelModel } from '../../../packages/dshx/src/api/channel.js'
 import { Then, When } from '../bdd.js'
 import { confirmFolderSetupStep } from '../threads.js'
@@ -17,8 +18,19 @@ const capabilityResult = Schema.Struct({
   result: Schema.Struct({ ok: Schema.Literal(true), value: Schema.Struct({ output: Schema.Struct({ nativePicker: Schema.Boolean }) }) }),
 })
 
+/** A fresh scratch profile opens the Get started dialog over the composer; the header flow needs it dismissed. */
+const dismissGetStarted = async (page: Page): Promise<void> => {
+  const dialog = page.getByRole('dialog', { name: 'Get started', exact: true })
+  if (!(await dialog.isVisible())) return
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(dialog).toBeHidden()
+}
+
 When('the header workspace Add workspace action is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+  await dismissGetStarted(page)
+  const choose = page.getByRole('button', { name: 'Choose workspace', exact: true })
+  await expect(choose).toBeVisible({ timeout: 60_000 })
+  await choose.click()
   await page.getByRole('menuitem', { name: /Add workspace/ }).click()
 })
 
@@ -150,45 +162,48 @@ Then('native folder selection supports cancellation, recovery and registration',
   let picked = 0
   let capabilityAvailable = false
   const pathStyle = process.platform === 'win32' ? 'windows' : 'posix'
-  const nativeRoute = async (route: Route) => {
-    const request = Schema.decodeUnknownSync(rpcIdentity)(route.request().postDataJSON())
-    if (request.method === capabilityEndpoint) {
-      if (!capabilityAvailable) {
-        return route.fulfill({
-          json: {
-            type: 'server-response',
-            rpcId: request.rpcId,
-            result: { ok: false, error: { code: 'gateway/method-not-found', message: 'An older Host has no capability query', details: {} } },
-          },
-        })
-      }
-      return route.fulfill({
-        json: { type: 'server-response', rpcId: request.rpcId, result: { ok: true, value: { version: 1, output: { nativePicker: true, pathStyle } } } },
-      })
-    }
+  // Browser reads travel in one NDJSON batch: answering an entry leaves the rest to their own routes, which retry.
+  const batchRequest = Schema.Struct({ entries: Schema.Array(Schema.Struct({ id: Schema.Number, endpoint: Schema.String })) })
+  const answer = (id: number, result: unknown): string => `${JSON.stringify({ id, result })}\n`
+  const pickResult = () =>
+    picked === 1
+      ? { ok: true, value: null }
+      : picked === 2
+        ? { ok: false, error: { code: 'directory-picker/unavailable', message: 'Injected native chooser failure', details: {} } }
+        : { ok: true, value: selectedPath }
+  // Picks are writes, so they travel on their own endpoint rather than in the read batch.
+  await page.context().route('**/api/**', async route => {
+    if (route.request().url().endsWith('/api/dshx-batch')) return route.continue()
+    const request = Schema.decodeUnknownOption(rpcIdentity)(route.request().postDataJSON())
+    if (Option.isNone(request) || !request.value.method.endsWith('/pick')) return route.continue()
     picked += 1
-    const result =
-      picked === 1
-        ? { ok: true, value: null }
-        : picked === 2
-          ? { ok: false, error: { code: 'directory-picker/unavailable', message: 'Injected native chooser failure', details: {} } }
-          : { ok: true, value: selectedPath }
-    return route.fulfill({ json: { type: 'server-response', rpcId: request.rpcId, result } })
-  }
-  const capabilityPattern = `**/api/${capabilityEndpoint}`
-  const pickPattern = '**/api/directoryPicker/pick'
-  await page.route(capabilityPattern, nativeRoute)
-  await page.route(pickPattern, nativeRoute)
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ type: 'server-response', rpcId: request.value.rpcId, result: pickResult() }),
+    })
+  })
+  await page.context().route('**/api/dshx-batch', async route => {
+    const parsed = Schema.decodeUnknownOption(batchRequest)(route.request().postDataJSON())
+    if (parsed._tag === 'None') return route.continue()
+    const capabilityIds = parsed.value.entries.filter(entry => entry.endpoint === capabilityEndpoint).map(entry => entry.id)
+    const pickIds: number[] = []
+    if (capabilityIds.length === 0 && pickIds.length === 0) return route.continue()
+    const lines = capabilityIds.map(id => answer(id, { ok: true, value: { version: 1, output: { nativePicker: capabilityAvailable, pathStyle } } }))
+    return route.fulfill({ status: 200, contentType: 'application/x-ndjson', body: lines.join('') })
+  })
   const dialog = folderPickerDialog(page)
   const pathInput = dialog.getByRole('textbox', { name: 'Enter a folder path' })
   const browse = dialog.getByRole('button', { name: 'Browse…', exact: true })
-  // Every opening mounts a fresh flow; wait for its capability read and its home listing before asserting on either.
   const openAddWorkspace = async (): Promise<void> => {
-    const capabilityRead = page.waitForResponse(response => response.url().endsWith(`/${capabilityEndpoint}`))
     await page.getByRole('button', { name: 'Add workspace', exact: true }).click()
-    await capabilityRead
     await expect(dialog.getByRole('listbox', { name: 'Folders' })).toBeVisible()
     await expect(pathInput).toHaveValue(absolutePathPattern)
+    // The capability answer settles a beat after the listing, and Browse… appears with it.
+    await expect(async () => {
+      const expected = capabilityAvailable ? 1 : 0
+      await expect(browse).toHaveCount(expected, { timeout: 2_000 })
+    }).toPass({ timeout: 20_000 })
   }
   const pickNative = async (expectedPicks: number): Promise<void> => {
     await browse.click()
@@ -229,8 +244,8 @@ Then('native folder selection supports cancellation, recovery and registration',
     })
     await finishJourneyAssertions(page)
   } finally {
-    await page.unroute(capabilityPattern, nativeRoute)
-    await page.unroute(pickPattern, nativeRoute)
+    await page.unroute('**/api/**')
+    await page.unroute('**/api/dshx-batch')
     await rm(scratchRoot, { recursive: true, force: true })
   }
 })

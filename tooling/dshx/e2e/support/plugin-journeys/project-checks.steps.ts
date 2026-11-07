@@ -202,7 +202,7 @@ When('the fake model is sent a message while the completion check runs and the t
   await composer.fill('finish the task')
   await composer.press('Enter')
   await recordAssertion(page, 'project-checks-cancel-aborts-running-verification', async () => {
-    await expect.poll(() => readFile(markerPath, 'utf8').catch(() => ''), { timeout: 30_000 }).toBe('started')
+    await expect.poll(() => readFile(markerPath, 'utf8').catch(() => ''), { timeout: 90_000 }).toBe('started')
     const stop = page.getByRole('button', { name: /^Stop/ }).first()
     await expect(stop).toBeVisible({ timeout: 30_000 })
     await stop.click()

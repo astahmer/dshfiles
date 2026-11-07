@@ -34,8 +34,9 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
     queryFn: ({ signal }) => browserApi.capabilities({}, { signal }),
     retry: false,
     staleTime: 60_000,
-    // The flow mounts again on every opening, and a read that failed on the previous one must not hide Browse… forever.
-    refetchOnMount: 'always',
+    // The flow mounts again on every opening, and a read that failed on the previous one must not hide Browse… for the
+    // rest of the session: it is dropped with the mount instead of being cached.
+    gcTime: 0,
   })
   const directoryPicker: DirectoryPickerPort = {
     pick: signal => props.directoryPicker.pick(signal),
