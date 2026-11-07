@@ -1144,6 +1144,12 @@ const handlers = Api.handlers(multiHostApi, {
         : { code: 'ASK_TIMED_OUT', message: 'ask_user_question timed out before the user answered' }
     return yield* settleHeld({ interaction: held.interaction, outcome: { kind: 'rejected', error: { name: 'UserQuestionError', ...rejection } } })
   }),
+  sessionApprovalDecide: Effect.fn('multi-host session approval decide')(function* (input) {
+    const held = yield* heldInteraction({ sessionId: input.sessionId, id: input.interactionId })
+    if (!held.ok) return held
+    if (held.interaction.request.kind !== 'approval') return interactionKindMismatch
+    return yield* settleHeld({ interaction: held.interaction, outcome: { kind: 'result', value: input.outcome } })
+  }),
   sessionJjRepositories: Effect.fn('multi-host session jj repositories')(function* (input) {
     return yield* Effect.gen(function* () {
       const owner = yield* sessionOwner(input.sessionId)

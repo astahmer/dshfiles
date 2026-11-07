@@ -779,8 +779,8 @@
     },
     {
       "id": "remote-interactions",
-      "title": "Answer a remote agent's question in this client",
-      "summary": "While a mirrored thread is followed, this Host opens the owning runtime's forwarded-event stream as an owner client, holds what the runtime waits on, and shows it in the native question card. Answers go back to that runtime, which stays the authority; the first answer from any client wins and nothing is delegated away from the owner's own UI.",
+      "title": "Answer a remote agent's questions and approvals in this client",
+      "summary": "While a mirrored thread is followed, this Host opens the owning runtime's forwarded-event stream as an owner client, holds what the runtime waits on, and shows it in the native question card or an approval panel in the same seat. Answers go back to that runtime, which stays the authority; the first answer from any client wins and nothing is delegated away from the owner's own UI.",
       "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -815,6 +815,11 @@
         {
           "kind": "gherkin",
           "id": "multi-host.remote-question-dismissed",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-approval",
           "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
         },
         {

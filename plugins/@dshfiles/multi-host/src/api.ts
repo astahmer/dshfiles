@@ -933,6 +933,12 @@ const effectMultiHostApi = defineApi({
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true) }), failedSchema]),
       description: 'End one waiting question on a remote thread without answering it. Not an agent tool: the card calls it when the person cancels or the countdown ends.',
     }),
+    /** Deliberately no agent tool: an approval is the human's decision (plans/dsh-host-gaps.md row 41). */
+    sessionApprovalDecide: method({
+      input: Schema.Struct({ sessionId: sessionIdSchema, interactionId: interactionIdSchema, outcome: Schema.Literals(['allowed-once', 'rejected']) }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true) }), failedSchema]),
+      description: 'Send one human approval decision to the runtime that owns the thread. Not an agent tool: only the approval panel calls it.',
+    }),
     sessionJjRepositories: method({
       input: Schema.Struct({ sessionId: sessionIdSchema }),
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), repositories: jjRepositoriesEffectSchema }), failedSchema]),
