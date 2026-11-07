@@ -61,7 +61,7 @@ const describeOutcome = (output: typeof outputSchema.Type): string =>
 export const applyPatchTool = Tool.make({
   name: 'apply_patch',
   description:
-    'Edit one existing text file atomically: reads it first, applies literal replacements in order, ignores identical old/new pairs, then writes once. Whitespace-tolerant fallback finds a reindented or rewrapped anchor; an ambiguous or missing anchor fails without writing and names the candidate lines. Use it after inspecting a file with ast-outline, bash or grep instead of `edit`. Read-only when it fails; it never creates a file.',
+    'Edit one existing text file atomically: reads it first, applies literal replacements in order, ignores identical old/new pairs, then writes once. Whitespace-tolerant fallback finds a reindented or rewrapped anchor; an ambiguous or missing anchor fails without writing and names the candidate lines. Read the target immediately before patching and keep each anchor unique; shell or script edits invalidate the native read snapshot, so re-read before the native write rather than mixing writers. Use it after inspecting a file with ast-outline, bash or grep instead of `edit`. Read-only when it fails; it never creates a file.',
   input: inputSchema,
   output: outputSchema,
   render: describeOutcome,
