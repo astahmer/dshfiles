@@ -45,6 +45,12 @@ Feature: Thread sidebar journeys
     When an archived thread and a settled thread fill the bottom sections
     Then separate remote grouping is opt-in, reorderable and persists across reloads
 
+  @scenario:thread-sidebar.remote-row-verbs
+  Scenario: A remote row offers this sidebar's own verbs
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host" is booted
+    When a peer runtime thread is seeded into the status list
+    Then the remote row offers the sidebar's own verbs and no Host verb
+
   @scenario:thread-sidebar.settled-auto-archive
   Scenario: A settled thread archives itself once its archive delay has passed
     Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted

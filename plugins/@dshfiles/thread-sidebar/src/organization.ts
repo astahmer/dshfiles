@@ -671,6 +671,20 @@ const sectionDropPlan = (section: SidebarSection): SectionDropPlan => {
   }
 }
 
+/**
+ * The part of a section drop a remote row can honour. Parked, settled and the idle override are this sidebar's own
+ * sets, keyed by Session id; pin, unpin and archive are Host verbs on the runtime that owns the Session, so a
+ * remote row never unpins and never enters Pinned or Archived.
+ * @returns the plan to apply, or null for a section a mirrored Session cannot move into.
+ */
+const remoteSectionDropPlan = (section: SidebarSection): SectionDropPlan | null => {
+  const plan = sectionDropPlan(section)
+  return plan.archive || plan.pin ? null : { ...plan, unarchive: false, unpin: false }
+}
+
+/** The sections a remote row offers, in render order. */
+const remoteDropSections: readonly SidebarSection[] = SIDEBAR_SECTIONS.filter(section => remoteSectionDropPlan(section) !== null)
+
 const sectionForSession = ({
   session,
   archivedSessionIds,
@@ -751,5 +765,7 @@ export class SidebarOrganization {
   static readonly hasRunningDescendant = hasRunningDescendant
   static readonly sectionForSession = sectionForSession
   static readonly sectionDropPlan = sectionDropPlan
+  static readonly remoteSectionDropPlan = remoteSectionDropPlan
+  static readonly remoteDropSections = remoteDropSections
   static readonly fitItems = fitItems
 }

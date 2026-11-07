@@ -1645,6 +1645,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [workspaceState.items],
   )
   const remoteThreads = useRemoteSidebarThreads(props.wide !== false, localProjectsForRemoteThreads)
+  const remoteRunningSessionIds = useMemo(
+    () => new Set(remoteThreads.filter(thread => thread.running).map(thread => SessionId(thread.sessionId))),
+    [remoteThreads],
+  )
   const [now, setNow] = useState(() => Date.now())
   // The render path reads `now`; gestures and notices stamp with this reader instead, outside render.
   const readNow = useCallback(() => Date.now(), [])
@@ -2634,6 +2638,33 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   /**
+   * Settle or unsettle one remote row. A mirrored Session's settled state is this sidebar's own preference, so only
+   * its sets change: settling a local thread also unpins it, and that Host verb belongs to the owning runtime.
+   */
+  const applyRemoteSettled = (sessionId: SessionSummary['id'], shouldSettle: boolean): void => {
+    if (shouldSettle && remoteRunningSessionIds.has(sessionId)) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
+      return
+    }
+    const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
+    if (shouldSettle) {
+      changePreferences(
+        SettledThreadsModel.settleAndUnpark({
+          status,
+          parkedSessionIds: preferences.parkedSessionIds,
+          sessionIds: [sessionId],
+          now: readNow(),
+        }),
+      )
+    } else changePreferences(SettledThreadsModel.unsettle(status, [sessionId]))
+    setNotice(shouldSettle ? { tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') } : null)
+  }
+
+  const toggleRemoteSettled = (sessionId: SessionSummary['id']): void => {
+    applyRemoteSettled(sessionId, !settledSessionIds.has(sessionId))
+  }
+
+  /**
    * Drop a row into another status section. A section is a status, so entering one sets it and clears
    * the statuses that outrank it: dragging a settled thread out unsettles it and dragging an archived
    * thread out restores it. Active and Inactive are derived from idleness, so those drops record an
@@ -2685,6 +2716,36 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     changePreferences(isBoard ? nextPreferences : { ...nextPreferences, collapsedSections: [...nextCollapsedSections] })
     if (failed) setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
     else if (!plan.archive) setNotice(null)
+  }
+
+  /**
+   * Drop a remote row into another status section. A mirrored Session answers the preference half of the same plan a
+   * local drop uses — parked, settled and the idle override key by Session id — while pin, unpin and archive stay on
+   * the runtime that owns it, which is why only the sections that plan reaches are offered.
+   */
+  const moveRemoteThreadToSection = (sessionId: SessionSummary['id'], section: SidebarSection): void => {
+    const plan = SidebarOrganization.remoteSectionDropPlan(section)
+    if (plan === null) return
+    if ((plan.park || plan.settle) && remoteRunningSessionIds.has(sessionId)) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
+      return
+    }
+    const nextParked = new Set(preferences.parkedSessionIds)
+    if (plan.park) nextParked.add(sessionId)
+    if (plan.unpark) nextParked.delete(sessionId)
+    const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
+    const idleSectionOverrides = { ...preferences.idleSectionOverrides }
+    if (plan.idleOverride === null) delete idleSectionOverrides[sessionId]
+    else idleSectionOverrides[sessionId] = { section: plan.idleOverride, at: readNow() }
+    const nextCollapsedSections = collapsedSections.filter(item => item !== section)
+    const nextPreferences = {
+      parkedSessionIds: [...nextParked],
+      ...(plan.settle ? SettledThreadsModel.settle(status, [sessionId], readNow()) : plan.unsettle ? SettledThreadsModel.unsettle(status, [sessionId]) : {}),
+      idleSectionOverrides,
+    }
+    if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
+    changePreferences(isBoard ? nextPreferences : { ...nextPreferences, collapsedSections: [...nextCollapsedSections] })
+    setNotice(null)
   }
 
   /**
@@ -3596,6 +3657,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         pinnedSessionIds,
         parkedSessionIds,
         settledSessionIds,
+        idleSectionOverrides: preferences.idleSectionOverrides,
         now,
         idleMinutes: preferences.idleMinutes,
       })
@@ -3603,7 +3665,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     for (const entries of rows.values()) entries.sort((left, right) => right.updatedAt - left.updatedAt)
     return rows
-  }, [archivedSessionIds, now, parkedSessionIds, pinnedSessionIds, preferences.idleMinutes, settledSessionIds, visibleRemoteThreads])
+  }, [
+    archivedSessionIds,
+    now,
+    parkedSessionIds,
+    pinnedSessionIds,
+    preferences.idleMinutes,
+    preferences.idleSectionOverrides,
+    settledSessionIds,
+    visibleRemoteThreads,
+  ])
   const activityAtBySessionId = useMemo(() => new Map(visibleThreadEntries.map(entry => [entry.session.id, entry.activity.updatedAt])), [visibleThreadEntries])
   const rowsBySection = useMemo(() => {
     const rows = new Map<SidebarSection, SessionSummary[]>(SIDEBAR_SECTIONS.map(section => [section, []]))
@@ -4399,10 +4470,21 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       unsettle: tSidebar('threadSidebarUnsettle'),
       park: tSidebar('threadSidebarPark'),
       unpark: tSidebar('threadSidebarUnpark'),
+      moveToSection: tSidebar('threadSidebarMoveToSection'),
+      copyId: tSidebar('threadSidebarCopyId'),
+      contextMenu: tSidebar('threadSidebarContextMenu'),
+      sectionLabels: {
+        pinned: tSidebar(sectionLabels.pinned),
+        active: tSidebar(sectionLabels.active),
+        parked: tSidebar(sectionLabels.parked),
+        settled: tSidebar(sectionLabels.settled),
+        inactive: tSidebar(sectionLabels.inactive),
+        archived: tSidebar(sectionLabels.archived),
+      },
     }),
     [tSidebar],
   )
-  const renderRemoteThreadRow = (thread: RemoteSidebarThread): JSX.Element => {
+  const renderRemoteThreadRow = (thread: RemoteSidebarThread, section?: SidebarSection): JSX.Element => {
     const sessionId = SessionId(thread.sessionId)
     return (
       <RemoteThreadItem
@@ -4420,10 +4502,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         selected={selectedSession?.id === sessionId}
         compact={rowStyle.density === 'compact'}
         age={formatAge(thread.updatedAt)}
+        section={section}
+        dropSections={SidebarOrganization.remoteDropSections}
         labels={remoteThreadRowLabels}
         onOpen={() => (props.openRemoteSession === undefined ? props.openRemoteThreads?.() : props.openRemoteSession(thread.sessionId))}
-        onToggleSettled={() => toggleSettled(sessionId)}
+        onToggleSettled={() => toggleRemoteSettled(sessionId)}
         onToggleParked={() => toggleParked(sessionId)}
+        onMoveToSection={next => moveRemoteThreadToSection(sessionId, next)}
+        // The copied id names the Session on its own runtime; a link built here would point at this origin and drop the host.
+        onCopyId={() => void rowActions.copy(thread.sessionId, props.tSidebar('threadSidebarIdCopied'))}
       />
     )
   }
@@ -5272,7 +5359,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       </button>
                       {!collapsed
                         ? sectionRows.map(entry =>
-                            entry.kind === 'local' ? renderThreadRow(entry.session, undefined, section) : renderRemoteThreadRow(entry.remote),
+                            entry.kind === 'local' ? renderThreadRow(entry.session, undefined, section) : renderRemoteThreadRow(entry.remote, section),
                           )
                         : null}
                     </section>

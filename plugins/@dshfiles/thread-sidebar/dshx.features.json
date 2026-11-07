@@ -1143,11 +1143,12 @@
       "destination": "threads",
       "currentSurface": "thread-list: Thread list settings › Remote group",
       "configuration": [],
-      "states": ["integrated-by-default", "separate-remote", "reordered", "empty-sections-folded"],
+      "states": ["integrated-by-default", "separate-remote", "reordered", "empty-sections-folded", "remote-row-own-verbs"],
       "failureModes": [
         "Remote grouping is shown by default instead of following the current view.",
         "Empty sections can shift the drag position even though they are not rendered.",
-        "A reordered section order or separate-group choice does not survive a reload."
+        "A reordered section order or separate-group choice does not survive a reload.",
+        "A remote row offers archive or pin, which only the runtime owning the Session can run."
       ],
       "externalDependencies": [
         {
@@ -1160,6 +1161,11 @@
         {
           "kind": "gherkin",
           "id": "thread-sidebar.section-order",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.remote-row-verbs",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {

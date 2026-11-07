@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page, type Response, type TestInfo } from '@playwright/test'
 import { openGlobalPanel, reusableViewName, viewNamePattern } from '../plugin-view-names.js'
 import { DEFAULT_PREFERENCES } from '../../../../../plugins/@dshfiles/thread-sidebar/src/organization.js'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
@@ -643,6 +643,97 @@ Then('separate remote grouping is opt-in, reorderable and persists across reload
     await separateRemoteThreads.uncheck()
     await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
     await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)'])
+  })
+  await finishJourneyAssertions(page)
+})
+
+const REMOTE_ROW_RUNTIME_ID = '10000000-0000-4000-8000-0000000d5e11'
+const REMOTE_ROW_SESSION_ID = 'session-remote-row-e2e'
+
+/** The row this scenario's peer runtime started, drawn in the sidebar's status list. */
+const remoteRow = (page: Page): Locator => threadSidebar(page).locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)
+
+/**
+ * A host and a thread multi-host already recorded, written as its own files: no short UI path mirrors a peer runtime
+ * into this profile, and the row only needs the inventory the sidebar reads. The runtime stays unreachable, so the
+ * row comes from the started-here list with its host name.
+ */
+const seedRemoteThread = async (page: Page): Promise<void> => {
+  const createdAt = new Date().toISOString()
+  const directory = {
+    schemaVersion: 2,
+    hosts: [{ schemaVersion: 2, id: 'peer', name: 'Peer machine', connector: { kind: 'local' }, hidden: false, position: 0, createdAt }],
+    runtimes: [
+      {
+        schemaVersion: 2,
+        id: REMOTE_ROW_RUNTIME_ID,
+        hostId: 'peer',
+        name: 'Peer machine',
+        locator: { kind: 'local', launchUrl: 'http://127.0.0.1:1/?token=dshx-e2e-remote-row' },
+        identity: null,
+        originPort: 43_401,
+        createdAt,
+      },
+    ],
+    retiredPorts: [],
+  }
+  const threads = {
+    schemaVersion: 1,
+    threads: [{ runtimeId: REMOTE_ROW_RUNTIME_ID, sessionId: REMOTE_ROW_SESSION_ID, cwd: '/peer/dev/sample', title: 'Peer parser fix', createdAt }],
+  }
+  const dataDirectory = join(profileFor(page).homeRoot, 'plugins', 'multi-host')
+  await mkdir(dataDirectory, { recursive: true, mode: 0o700 })
+  await writeFile(join(dataDirectory, 'directory.json'), `${JSON.stringify(directory, null, 2)}\n`, { mode: 0o600 })
+  await writeFile(join(dataDirectory, 'threads.json'), `${JSON.stringify(threads, null, 2)}\n`, { mode: 0o600 })
+}
+
+When('a peer runtime thread is seeded into the status list', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
+  await seedRemoteThread(page)
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await expect(remoteRow(page)).toHaveCount(1, { timeout: 30_000 })
+  await expect(sectionOfSidebar(page, 'active').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(1)
+})
+
+/** Sections open folded once they hold a row, so a row assertion opens the section it landed in first. */
+const expandSection = async (page: Page, section: string): Promise<void> => {
+  const header = sectionOfSidebar(page, section).locator('[data-thread-section-header]')
+  if ((await header.getAttribute('aria-expanded')) === 'false') await header.click()
+  await expect(header).toHaveAttribute('aria-expanded', 'true')
+}
+
+/**
+ * The host tooltip a hovered remote row shows sits over the menu its right-click just opened, so a pointer click on an
+ * item never becomes actionable; the keyboard walks the same items.
+ */
+const pressRemoteRowMenuItem = async (page: Page, item: string): Promise<void> => {
+  const menu = page.getByRole('menu', { name: 'Thread actions', exact: true })
+  await expect(menu).toBeVisible()
+  const labels = await menu.getByRole('menuitem').evaluateAll(items => items.map(element => element.textContent?.trim() ?? ''))
+  const index = labels.indexOf(item)
+  if (index < 0) throw new Error(`The remote row menu has no ${item}: ${labels.join(', ')}`)
+  for (let step = 0; step <= index; step += 1) await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+}
+
+Then("the remote row offers the sidebar's own verbs and no Host verb", async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-remote-row-menu-omits-host-verbs', async () => {
+    await openThreadRowMenu(remoteRow(page))
+    const menu = page.getByRole('menu', { name: 'Thread actions', exact: true })
+    await expect(menu).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Settle', exact: true })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Park', exact: true })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Copy thread ID', exact: true })).toBeVisible()
+    // Archive, pin and rename run on the runtime that owns the Session, so a mirrored row never offers them.
+    await expect(menu.getByRole('menuitem', { name: 'Archive', exact: true })).toHaveCount(0)
+    await expect(menu.getByRole('menuitem', { name: /Pin/u })).toHaveCount(0)
+    await expect(menu.getByRole('menuitem', { name: 'Rename thread', exact: true })).toHaveCount(0)
+    await pressRemoteRowMenuItem(page, 'Settle')
+    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
+    await expect(sectionOfSidebar(page, 'active').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(0)
+    await expandSection(page, 'settled')
+    await expect(sectionOfSidebar(page, 'settled').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(1)
   })
   await finishJourneyAssertions(page)
 })
@@ -2514,7 +2605,10 @@ When('a thread delegates a long command to a subagent', async ({ page }: { page:
   const root = await createScratchDirectory('dshx-thread-sidebar-subagent-')
   const workspace = join(root, 'subagent-preview-project')
   await mkdir(workspace)
-  await page.getByRole('button', { name: /^New (thread|session)$/ }).first().click()
+  await page
+    .getByRole('button', { name: /^New (thread|session)$/ })
+    .first()
+    .click()
   await registerWorkspaceFolder(page, workspace, openNewThreadAddWorkspace)
   await startThreadWithModel(page, { project: 'subagent-preview-project', model: 'commandcode_work/gpt-6-luna' })
   const composer = page.getByRole('textbox', { name: /(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions/ })
@@ -2546,7 +2640,10 @@ Then('stopping the subagent from the dock takes a confirmation', async ({ page }
 
 Then("the transcript row opens the subagent's thread", async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-subagent-preview-owner-link', async () => {
-    await page.getByText(/^Completed in /).first().click()
+    await page
+      .getByText(/^Completed in /)
+      .first()
+      .click()
     await page.getByText('Coordinated subagents', { exact: true }).first().click()
     const row = page.locator('[data-dshfiles-live-preview="agent"]').first()
     await expect(row).toHaveAttribute('data-state', /^(interrupted|idle)$/, { timeout: 30_000 })
