@@ -2,7 +2,7 @@ import { Settings } from '@dshfiles/dshx/effect/settings'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import { TestClock } from 'effect/testing'
-import { AlertEngine, RunningSessions, ThreadAttention } from './alerts/alert-engine.js'
+import { AlertEngine, ThreadAttention } from './alerts/alert-engine.js'
 import type { NormalizedSpan } from './otlp/normalize.js'
 import { ReceiverHarness } from './receiver.test-support.js'
 import { tracesSettings } from './settings.js'
@@ -31,10 +31,7 @@ const span: NormalizedSpan = {
   linkCount: 0,
 }
 
-const edges = Layer.mergeAll(
-  Layer.succeed(ThreadAttention, ThreadAttention.of({ mark: () => Effect.succeed(true) })),
-  Layer.succeed(RunningSessions, RunningSessions.of({ ids: Effect.succeed(new Set<string>()) })),
-)
+const edges = Layer.succeed(ThreadAttention, ThreadAttention.of({ mark: () => Effect.succeed(true) }))
 
 const services = Layer.mergeAll(TraceRepoTest, AlertRepoTest, edges, Settings.layerTest(tracesSettings.namespace, ReceiverHarness.defaultSettings))
 const engine = AlertEngine.layer.pipe(Layer.provideMerge(services))

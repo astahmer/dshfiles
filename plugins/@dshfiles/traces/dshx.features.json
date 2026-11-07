@@ -596,7 +596,7 @@
     {
       "id": "alert-rules",
       "title": "Alert rules over stored telemetry",
-      "summary": "Rules evaluated on the Host every minute over the stored spans: error rate, latency percentile, throughput, span count and span duration over a threshold, each with a service, span-name (exact or prefix*) and attribute filter, window, threshold, comparator and severity. A rule is ok or firing, resolves after two clear evaluations so a flapping signal fires once, and keeps a bounded history. A firing rule shows in the Alerts tab with its value, sample trace and threads, marks the Alerts tab and the panel with a red count and a banner, announces itself in an in-app banner (and a browser notification when allowed) wherever the user is, and marks the threads its spans carry unread through thread-sidebar. Rules can be created, edited, enabled, muted and deleted (with confirmation) in the tab or by agent tools. Four built-in rules ship with conservative thresholds.",
+      "summary": "Rules evaluated on the Host every minute over the stored spans: error rate, latency percentile, throughput, span count and span duration over a threshold, each with a service, span-name (exact or prefix*) and attribute filter, window, threshold, comparator and severity. A rule is ok or firing, resolves after two clear evaluations so a flapping signal fires once, and keeps a bounded history. A firing rule shows in the Alerts tab with its value, sample trace and threads, marks the Alerts tab and the panel with a red count and a banner, announces itself in an in-app banner (and a browser notification when allowed) wherever the user is, and marks the threads its spans carry unread through thread-sidebar. Rules can be created, edited, enabled, muted and deleted (with confirmation) in the tab or by agent tools. Four built-in rules ship; only the two that name a failure (model call errors, jj latency) are enabled, and the long-turn and plugin API error-rate rules ship off.",
       "reach": [
         "seed otlp-sample-trace",
         "click tab \"Observe\"",
@@ -620,6 +620,7 @@
         "Error-rate and latency rules stay quiet below their minimum span count, so one failed span is not a 100% error rate.",
         "A firing rule resolves only after two clear evaluations in a row, so a signal that swings every minute fires once.",
         "A span counts in the window it ended in, so a 20-minute turn that started before the window still trips a duration rule.",
+        "The long-turn rule ships off: a turn span exists only once the turn ended, so a long successful turn is finished, expected work rather than a failure, and only a user who wants that report enables it.",
         "A muted rule still evaluates and records its incident but announces nothing and marks no thread.",
         "Disabling or deleting a firing rule resolves its incident instead of leaving it firing in history.",
         "Without thread-sidebar the alert still fires and its event says why no thread was marked.",

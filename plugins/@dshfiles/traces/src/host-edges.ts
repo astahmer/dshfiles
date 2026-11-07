@@ -1,9 +1,9 @@
 import { createHostApiClient } from '@dshfiles/dshx/host'
-import { Api, DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { publishLocalOtlpEndpoint } from '@dshfiles/dshx/tracing'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
-import { Effect, FiberHandle, Layer, Option, Stream } from 'effect'
-import { RunningSessions, ThreadAttention, ThreadMarkFailed } from './alerts/alert-engine.js'
+import { Effect, FiberHandle, Layer, Stream } from 'effect'
+import { ThreadAttention, ThreadMarkFailed } from './alerts/alert-engine.js'
 import { Receiver, type ListenStatus } from './receiver.js'
 
 const OWNER = '@dshfiles/traces'
@@ -34,28 +34,6 @@ export const ThreadAttentionLive = Layer.effect(
               : Effect.fail(new ThreadMarkFailed({ sessionId, reason: error.message, cause: error })),
           ),
         ),
-    })
-  }),
-)
-
-export const RunningSessionsLive = Layer.effect(
-  RunningSessions,
-  Effect.gen(function* () {
-    const host = yield* HostContext
-    const agents = Effect.option(hostService('agents')).pipe(Effect.provideService(HostContext, host))
-    return RunningSessions.of({
-      ids: Effect.map(agents, service =>
-        Option.match(service, {
-          onNone: () => new Set<string>(),
-          onSome: current =>
-            new Set(
-              current
-                .list()
-                .filter(agent => agent.status === 'running')
-                .map(agent => String(agent.id)),
-            ),
-        }),
-      ),
     })
   }),
 )

@@ -262,8 +262,11 @@ resolves after two clear evaluations, and keeps a bounded history. Firing shows
 in the panel's Alerts tab (red count, banner), is announced in-app through the
 Host `Toast` from a shell overlay (a browser notification once allowed), and
 marks the threads its spans carry unread through thread-sidebar's attention
-contract. Built-in rules ship enabled with conservative thresholds (model call
-error rate > 20 %, jj p95 > 5 s, turn > 15 min; plugin API errors off). The
+contract. Built-in rules ship enabled only where they name a failure (model
+call error rate > 20 %, jj p95 > 5 s); the long-turn rule (turn > 15 min) and
+plugin API error rate ship off, because a turn span exists only once the turn
+ended, so a long successful turn is finished work rather than a failure —
+enable either in the Alerts tab. The
 Boards tab groups spans by tool, plugin, provider (with time to first token),
 job kind and jj command, and named views save the panel's filters. Agents use
 `traces_alerts`, `traces_alert_save` / `_mute` / `_delete`,
