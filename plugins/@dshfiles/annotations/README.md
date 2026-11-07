@@ -2,6 +2,8 @@
 
 ![Pick an element, note it, insert a source-linked block into the draft](docs/screenshots/pick-element.png)
 
+![Annotate from Backlog composers](docs/screenshots/backlog-composers.png)
+
 Element-linked visual feedback for DSH. Point at an element of the running UI,
 write a note, and the composer draft receives a bounded block with the
 selector, the page, and — when the bundle ships a source map — the exact
