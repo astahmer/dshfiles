@@ -341,7 +341,8 @@ The confirmation dialog explains these effects before removal.
 The Jujutsu panel's repository menu (⋮) offers **Clean up thread workspaces…**.
 Pick how long a workspace must have been unused (1h, 6h or 24h) and which kinds
 to remove: **Empty** (never landed anything) and/or **Already integrated**
-(landed, nothing left above the bookmark). The dialog previews the list before
+(landed, nothing left above the bookmark, or all of its work is already on
+another bookmark). The dialog previews the list before
 anything is removed. One confirmation then discards every match exactly as the
 row's own Remove does (never forced) and abandons the empty, undescribed
 revisions nothing builds on: no working copy, bookmark, tag or revision with
@@ -364,6 +365,15 @@ modified for the chosen time, never under an hour. Dotfiles (the plugin's own
 metadata) stay. An entry counts as owned when its name matches a workspace, it
 is jj's recorded root, or a working `.jj` sits inside it: a renamed workspace
 folder leaves jj's recorded root stale.
+
+A workspace whose revisions are not on the target bookmark is still offered when
+one other local bookmark (git: branch) holds all of them. Its preview row names
+that bookmark, and removal rechecks it under the repository lock and leaves the
+bookmark and its revisions alone. Uncommitted edits, work spread across several
+bookmarks, a conflicted bookmark, a remote-only bookmark and another thread's
+`dsh/` branch do not count. A workspace with revisions on no bookmark is never
+offered, and automatic and settle cleanup have no preview, so they keep these
+workspaces.
 
 A workspace is kept when it holds unlanded revisions, a non-archived Session in
 it is working, waiting for an answer or its activity cannot be read, or an

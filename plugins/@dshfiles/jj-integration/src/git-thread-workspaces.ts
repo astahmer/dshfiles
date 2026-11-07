@@ -211,6 +211,24 @@ const make = Effect.gen(function* () {
   const branchExists = (repoRoot: string, name: string) =>
     Effect.map(run(['rev-parse', '--verify', '--quiet', `refs/heads/${threadBranch(name)}`], repoRoot), output => output.exitCode === 0)
 
+  /**
+   * Thread branches never count: one is the thread itself, and another thread's branch is unlanded work too. A dirty
+   * worktree holds edits no branch has, so it answers none.
+   */
+  const containingBookmarks = Effect.fn('git thread workspaces containing bookmarks')(function* (input: { readonly repoRoot: string; readonly name: string }) {
+    const workspacePath = path.join(yield* threadsDirectory(input.repoRoot), input.name)
+    const present = yield* exists(path.join(workspacePath, '.git'))
+    if (present ? yield* isDirty(workspacePath) : !(yield* branchExists(input.repoRoot, input.name))) return []
+    const target = yield* targetRef(input.repoRoot)
+    const tip = present ? 'HEAD' : threadBranch(input.name)
+    const cwd = present ? workspacePath : input.repoRoot
+    if ((yield* revisions(`${target}..${tip}`, cwd, 1)).length === 0) return []
+    const branches = lines(yield* git(['for-each-ref', `--contains=${tip}`, '--format=%(refname)', 'refs/heads/'], cwd))
+      .map(ref => ref.slice('refs/heads/'.length))
+      .filter(branch => branch !== target && !(branch.startsWith('dsh/') && THREAD_WORKSPACE_NAME.test(branch.slice('dsh/'.length))))
+    return branches.toSorted()
+  })
+
   const statusOf = Effect.fnUntraced(function* (input: {
     readonly repoRoot: string
     readonly name: string
@@ -571,6 +589,7 @@ const make = Effect.gen(function* () {
     readonly name: string
     readonly force: boolean
     readonly target: string
+    readonly acceptBookmarkedWork?: boolean | undefined
   }) {
     yield* ensureSafeName(input.name, 'discard workspace')
     if (!THREAD_WORKSPACE_NAME.test(input.name)) return yield* new UnsafePath({ detail: `Refusing to discard ${input.name}: it is not a managed thread name.` })
@@ -584,7 +603,9 @@ const make = Effect.gen(function* () {
       : hasBranch
         ? yield* revisions(`${input.target}..${threadBranch(input.name)}`, input.repoRoot, MAX_UNLANDED_REVISIONS)
         : []
-    if (work.length > 0 && !input.force) return { status: 'has-work', revisions: work } satisfies DiscardOutcome
+    const kept = work.length > 0 && !input.force
+    if (kept && (input.acceptBookmarkedWork !== true || (yield* containingBookmarks({ repoRoot: input.repoRoot, name: input.name })).length === 0))
+      return { status: 'has-work', revisions: work } satisfies DiscardOutcome
     if (present) yield* git(['worktree', 'remove', '--force', workspaceRoot], input.repoRoot)
     yield* removeTree(workspaceRoot)
     yield* git(['worktree', 'prune'], input.repoRoot)
@@ -600,13 +621,14 @@ const make = Effect.gen(function* () {
     readonly repoRoot: string
     readonly names: readonly string[]
     readonly force: boolean
+    readonly acceptBookmarkedWork?: boolean
   }) {
     return yield* locks.withRepo(input.repoRoot)(
       Effect.gen(function* () {
         const target = yield* targetRef(input.repoRoot)
         // Each removal prunes the same worktree registry, so they run one at a time.
         const results = yield* Effect.forEach([...new Set(input.names)], name =>
-          discardOne({ repoRoot: input.repoRoot, name, force: input.force, target }).pipe(
+          discardOne({ repoRoot: input.repoRoot, name, force: input.force, target, acceptBookmarkedWork: input.acceptBookmarkedWork }).pipe(
             Effect.map((outcome): ThreadDiscardResult =>
               outcome.status === 'has-work'
                 ? { name, status: 'has-work', revisions: outcome.revisions, error: null }
@@ -875,6 +897,7 @@ const make = Effect.gen(function* () {
     landVerified,
     discard,
     discardMany,
+    containingBookmarks,
     secondaryWorkspaces,
     discardSecondaryMany,
     workingCopyChangedAt,

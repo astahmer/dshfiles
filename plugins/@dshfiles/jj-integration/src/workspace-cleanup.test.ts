@@ -38,6 +38,25 @@ describe('WorkspaceCleanupModel.isFinishedWorkspaceReadyToRemove', () => {
 })
 
 describe('WorkspaceCleanupModel.decide', () => {
+  it('offers unlanded work another bookmark holds as integrated, even when the thread never landed', () => {
+    expect(decide(idleThread({ unlandedCount: 2, integratedInto: ['release'] }))).toEqual({ action: 'remove', kind: 'integrated', lastUsedAt: now - 10 * HOUR })
+  })
+
+  it('keeps unlanded work no bookmark holds', () => {
+    expect(decide(idleThread({ unlandedCount: 2, integratedInto: [] }))).toMatchObject({ action: 'skip', reason: 'has-work' })
+    expect(decide(idleThread({ unlandedCount: 2 }))).toMatchObject({ action: 'skip', reason: 'has-work' })
+  })
+
+  it('keeps bookmarked work while its Session runs', () => {
+    expect(decide(idleThread({ unlandedCount: 1, integratedInto: ['release'] }), { running: true })).toMatchObject({ action: 'skip', reason: 'busy' })
+  })
+
+  it('reads bookmarked work only for a manual run that offers integrated workspaces', () => {
+    expect(WorkspaceCleanupModel.readsBookmarkedWork({ trigger: 'manual', kinds: ['integrated'] })).toBe(true)
+    expect(WorkspaceCleanupModel.readsBookmarkedWork({ trigger: 'automatic', kinds: ['integrated'] })).toBe(false)
+    expect(WorkspaceCleanupModel.readsBookmarkedWork({ trigger: 'manual', kinds: ['empty'] })).toBe(false)
+  })
+
   it('removes an idle empty workspace unused for longer than the threshold', () => {
     expect(decide(idleThread())).toEqual({ action: 'remove', kind: 'empty', lastUsedAt: now - 10 * HOUR })
   })

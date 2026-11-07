@@ -93,7 +93,9 @@ export const promiseThreads = (input: { readonly service: Service; readonly run:
         }),
       ),
     discard: (target: { readonly repoRoot: string; readonly name: string; readonly force: boolean }) => call(service.discard(target)),
-    discardMany: (target: { readonly repoRoot: string; readonly names: readonly string[]; readonly force: boolean }) => call(service.discardMany(target)),
+    discardMany: (target: { readonly repoRoot: string; readonly names: readonly string[]; readonly force: boolean; readonly acceptBookmarkedWork?: boolean }) =>
+      call(service.discardMany(target)),
+    containingBookmarks: (target: { readonly repoRoot: string; readonly name: string }) => call(service.containingBookmarks(target)),
     secondaryWorkspaces: (repoRoot: string) => call(service.secondaryWorkspaces(repoRoot)),
     discardSecondaryMany: (target: Parameters<Service['discardSecondaryMany']>[0]) => call(service.discardSecondaryMany(target)),
     workingCopyChangedAt: (repoRoot: string) => call(service.workingCopyChangedAt(repoRoot)),

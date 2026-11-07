@@ -43,6 +43,7 @@ interface CleanupRow {
   readonly target: CleanupTarget
   readonly at: number
   readonly missing: boolean
+  readonly integratedInto?: readonly string[] | undefined
 }
 
 const cleanupRows = (result: CleanupResult): CleanupRow[] => [
@@ -51,6 +52,7 @@ const cleanupRows = (result: CleanupResult): CleanupRow[] => [
     target: { repoRoot: workspace.repoRoot, name: workspace.name, kind: workspace.kind },
     at: workspace.lastUsedAt,
     missing: workspace.missing,
+    integratedInto: workspace.integratedInto,
   })),
   ...result.untracked.map(entry => ({
     key: JSON.stringify([entry.repoRoot, entry.name, 'untracked']),
@@ -59,6 +61,11 @@ const cleanupRows = (result: CleanupResult): CleanupRow[] => [
     missing: false,
   })),
 ]
+
+const rowMeta = (row: CleanupRow): string =>
+  [row.missing ? 'Folder missing' : undefined, row.integratedInto === undefined ? undefined : `On ${row.integratedInto.join(', ')}`, formatAge(row.at)]
+    .filter(part => part !== undefined)
+    .join(' · ')
 
 const selectedCount = (rows: readonly CleanupRow[], selected: ReadonlySet<string>): number => rows.filter(row => selected.has(row.key)).length
 
@@ -231,7 +238,7 @@ export const WorkspaceCleanupDialog = (props: {
                     items={groupRows.map(row => ({
                       id: row.key,
                       title: row.target.name,
-                      meta: row.missing ? `Folder missing · ${formatAge(row.at)}` : formatAge(row.at),
+                      meta: rowMeta(row),
                       tag: KIND_TAG[row.target.kind],
                       tone: row.missing ? 'warning' : 'muted',
                     }))}
