@@ -383,15 +383,17 @@ list does not move, and the notice offers an immediate undo before it disappears
 Clicking an archived row restores it and then opens it, because DSH drops an
 archived Session from the main view on every list change; a refused restore
 reports the failure and leaves the thread archived. An open archived thread
-blocks its composer behind a **Restore to reply** banner. Persistent warnings —
-storage failures and restart requests — stay in the list flow instead.
+blocks its composer behind an **Archived** banner whose **Restore** action
+reopens it. Persistent warnings — storage failures and restart requests — stay
+in the list flow instead.
 
 **Settled composer.** A settled thread opens normally and reads as history: the
-composer carries a **This thread is settled.** banner
-(`src/settled-thread-dock.tsx`), one compact card beside the jj rebase notice
-with the settle age once it stops reading "now" and the archive deadline in the
-sidebar's own relative buckets, an **Archive** button and **Unsettle to reply**,
-because the Host rejects the next model step while the thread is settled. The
+composer carries a **Settled** status strip
+(`src/settled-thread-dock.tsx`), one compact line beside the jj rebase notice
+titled with the settle age once it stops reading "now", the archive deadline
+in the sidebar's own relative buckets beside it, and an **Archive** button next
+to the primary **Unsettle** that lifts the block, because the Host
+rejects the next model step while the thread is settled. The
 rejection is a `agent/pre-step` listener in `src/host.ts` over
 `src/settled-gate.ts`: a settled
 Session, or a subagent descendant of one, runs no model step until it is

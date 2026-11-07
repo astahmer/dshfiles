@@ -467,7 +467,7 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
     await expect(targetRow).toHaveCount(1)
     const banner = page.getByRole('status', { name: 'This thread is settled.' })
     await expect(banner).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Unsettle to reply', exact: true })).toBeVisible()
+    await expect(banner.getByRole('button', { name: 'Unsettle', exact: true })).toBeVisible()
   })
   await recordAssertion(page, 'thread-sidebar-settled-stays-out-of-finished-turns', async () => {
     // A settled thread is storage, like an archived one: a view that lists finished turns never lists it.
@@ -479,8 +479,8 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
   })
   await recordAssertion(page, 'thread-sidebar-settled-banner-carries-actions', async () => {
     const banner = page.getByRole('status', { name: 'This thread is settled.' })
-    // The label already says settled, so a freshly settled thread shows no redundant "Settled now" age; no archive
-    // delay is set here, so the banner carries no date at all.
+    // The banner is already titled "Settled", so a freshly settled thread shows no redundant "Settled now" age; no
+    // archive delay is set here, so the banner carries no date at all.
     await expect(banner).not.toContainText('Settled now')
     await expect(banner.getByRole('button', { name: 'Archive', exact: true })).toBeVisible()
     // The banner reads like the jj rebase notice: capped and centred, never the dock's full width.
@@ -490,7 +490,7 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
     expect(Number.isFinite(maxWidth)).toBe(true)
     expect(bounds.width).toBeLessThanOrEqual(maxWidth + 1)
   })
-  await page.getByRole('button', { name: 'Unsettle to reply', exact: true }).click()
+  await page.getByRole('status', { name: 'This thread is settled.' }).getByRole('button', { name: 'Unsettle', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-unsettle-restores-the-composer', async () => {
     await expect(page.getByRole('status', { name: 'This thread is settled.' })).toHaveCount(0, { timeout: 15_000 })
     // A settled Composer refuses input; a fill that lands and an enabled Send button prove it is live.
