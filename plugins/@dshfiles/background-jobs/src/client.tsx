@@ -4,10 +4,14 @@ import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient, useRegistry } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
+import { ToolCallSections, type ToolCallSectionProps } from '@dshfiles/tool-meta/tool-call-sections'
+import type { JobsClient } from './job-preview-model.js'
+import { JobPreviewSection } from './job-preview.js'
 import { Processes } from './processes-page.js'
 import { ThreadJobsFacet } from './thread-jobs-facet.js'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
@@ -38,7 +42,7 @@ const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element 
 export default defineClient({
   name: '@dshfiles/background-jobs',
   locales: [backgroundJobsLocale],
-  inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'sidebarRightTabs'],
+  inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'sidebarRightTabs', 'jobs'],
   setup(ctx, decorate, metadata) {
     const translate = ctx.locale.bind(BACKGROUND_JOBS_LOCALE_NAMESPACE)
     // The Processes glyph carries the marks its tabs contribute (RAM pressure and detached memory).
@@ -69,6 +73,23 @@ export default defineClient({
     const plugin = metadata?.plugin
     if (plugin !== undefined) {
       plugin.provide(ProcessesNavigation, { open: openProcesses })
+      // SAFETY: in the browser `ctx.jobs` is the job-controller's client service; the Host registry's declaration of the
+      // same Context key is the one this program sees (job-preview-model.ts says why).
+      const jobs = ctx.jobs as unknown as JobsClient
+      const JobPreview = (props: ToolCallSectionProps): JSX.Element => (
+        <PluginQueryProvider>
+          <JobPreviewSection
+            {...props}
+            jobs={jobs}
+            t={translate}
+            useThreadLabel={() => EntityLabels.useSessionLabel(ctx.sessions)}
+            // SAFETY: a job's owner is a Host-issued Session id.
+            openThread={sessionId => ctx.uiWorkspace.openSession(sessionId as SessionId)}
+            openProcesses={() => openProcesses()}
+          />
+        </PluginQueryProvider>
+      )
+      plugin.add(ToolCallSections, { id: '@dshfiles/background-jobs/job-preview', Section: plugin.bind(JobPreview) })
       const rows = [
         { id: 'processes', label: 'Observe › Processes', aliases: ['Processes', 'Jobs', 'Background jobs'], tab: PROCESSES_JOBS_TAB },
         { id: 'processes-dev-servers', label: 'Observe › Processes › Dev servers', aliases: ['Dev servers', 'Preview servers', 'Ports'], tab: 'dev-servers' },
