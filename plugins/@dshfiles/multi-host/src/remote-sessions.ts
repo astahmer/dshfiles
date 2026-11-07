@@ -21,7 +21,7 @@ import type {
   SessionUpdateQueueValue,
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { SessionPayload, SessionPromptRefused, type EffectSessionSource } from '@dshfiles/session-source-port'
+import { SessionPayload, SessionForkUnavailable, SessionPromptRefused, type EffectSessionSource } from '@dshfiles/session-source-port'
 import { Clock, Context, Effect, Fiber, FiberMap, Layer, Option, Ref, Schema, Stream } from 'effect'
 import { homedir } from 'node:os'
 import { RemoteRequestFailed, SessionOwnerMissing } from './errors.js'
@@ -343,7 +343,14 @@ export class RemoteSessions extends Context.Service<
       /** A fork of a mirrored thread stays on its host, so this Host records it as that host's thread. */
       const fork = Effect.fn('multi-host remote session fork')(function* (request: SessionForkRequest) {
         const runtime = yield* requireRuntime(request.sessionId)
-        const created = yield* forward({ sessionId: request.sessionId, method: 'fork', request, mutation: true, decode: SessionPayload.forked })
+        const created = yield* forward({ sessionId: request.sessionId, method: 'fork', request, mutation: true, decode: SessionPayload.forked }).pipe(
+          // The native client reads this code to say why a thread cannot fork yet.
+          Effect.mapError(error =>
+            error instanceof RemoteRequestFailed && error.code === 'session/fork-unavailable'
+              ? new SessionForkUnavailable({ sessionId: request.sessionId, reason: error.detail })
+              : error,
+          ),
+        )
         const cwd = yield* cwdFor(request.sessionId, runtime)
         if (cwd !== undefined)
           yield* threads.record({ runtimeId: runtime.id, sessionId: created.sessionId, cwd, title: '', createdAt: new Date().toISOString() })

@@ -49,6 +49,22 @@ export class SessionPromptRefused extends Schema.TaggedError<SessionPromptRefuse
 
 const refusedShape = Schema.is(Schema.Struct({ _tag: Schema.Literal('SessionPromptRefused'), reason: Schema.String }))
 
+/** The owner refused a fork, usually because no turn has finished; a client reads this to say why. */
+export class SessionForkUnavailable extends Schema.TaggedError<SessionForkUnavailable>()('SessionForkUnavailable', {
+  sessionId: Schema.String,
+  reason: Schema.String,
+}) {
+  override get message(): string {
+    return this.reason
+  }
+}
+
+const forkUnavailableShape = Schema.is(Schema.Struct({ _tag: Schema.Literal('SessionForkUnavailable'), sessionId: Schema.String, reason: Schema.String }))
+
+/** Structural, because each bundle holds its own copy of the class. */
+export const isSessionForkUnavailable = (error: unknown): error is SessionForkUnavailable =>
+  error instanceof SessionForkUnavailable || forkUnavailableShape(error)
+
 /** Structural, because each bundle holds its own copy of the class. */
 export const isSessionPromptRefused = (error: unknown): error is SessionPromptRefused => error instanceof Error && refusedShape(error)
 

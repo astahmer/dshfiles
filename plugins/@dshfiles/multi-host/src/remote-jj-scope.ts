@@ -1,5 +1,6 @@
 import { posix } from 'node:path'
 import { Option, Schema } from 'effect'
+import type { JsonValue } from './api.js'
 
 const decodeScope = Schema.decodeUnknownOption(Schema.Struct({ path: Schema.String, sessionId: Schema.optional(Schema.String) }))
 
@@ -22,6 +23,19 @@ const refusal = (input: { readonly sessionId: string; readonly folder: string | 
   if (scope.value.sessionId !== undefined && scope.value.sessionId !== input.sessionId) return outsideThread
   return undefined
 }
+
+const decodeAsking = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Json))
+
+/**
+ * Name the thread on a land, so its owner counts that Session's own activity: the owner's workspace never lists a thread
+ * started with a bare cwd, and would otherwise land under a running agent.
+ * @param input - the method, the authorized Session and the action.
+ * @returns the action to send.
+ */
+const asking = (input: { readonly method: string; readonly sessionId: string; readonly action: JsonValue }): JsonValue =>
+  input.method !== 'land' && input.method !== 'queueLand'
+    ? input.action
+    : Option.match(decodeAsking(input.action), { onNone: () => input.action, onSome: action => ({ ...action, sessionId: input.sessionId }) })
 
 const decodeRepo = Schema.decodeUnknownOption(Schema.Struct({ repoId: Schema.String }))
 const decodePath = Schema.decodeUnknownOption(Schema.Struct({ path: Schema.String }))
@@ -58,4 +72,5 @@ const repositoryRefusal = (input: {
 export class RemoteJjScope {
   static readonly refusal = refusal
   static readonly repositoryRefusal = repositoryRefusal
+  static readonly asking = asking
 }

@@ -1,7 +1,13 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { createSessionSourceRegistry, isSessionPromptRefused, type MirroredSessionSource, type SessionSourceRegistry } from '@dshfiles/session-source-port'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
+import {
+  createSessionSourceRegistry,
+  isSessionPromptRefused,
+  isSessionForkUnavailable,
+  type MirroredSessionSource,
+  type SessionSourceRegistry,
+} from '@dshfiles/session-source-port'
 import type {
   SessionAddress,
   SessionCancelRequest,
@@ -84,6 +90,7 @@ export class MirroredSessions {
     if (error instanceof RemoteError) return error
     // The source answered: its refusal is written for the composer, so it does not read as a runtime that went away.
     if (isSessionPromptRefused(error)) return new RemoteError('gateway/bad-request', error.message, {})
+    if (isSessionForkUnavailable(error)) return new RemoteError('session/fork-unavailable', error.reason, { sessionId: SessionId(error.sessionId) })
     return new RemoteError('gateway/internal', `The runtime that owns this Session did not answer ${endpoint}: ${messageOf(error)}`, {}, { cause: error })
   }
 

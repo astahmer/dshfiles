@@ -752,6 +752,7 @@ const runScratchJj = (cwd: string, ...args: readonly string[]): string => {
   return result.stdout
 }
 
+const remoteForks = new WeakMap<Page, string>()
 const remoteJjJourneys = new WeakMap<Page, { readonly repository: string; readonly threadPath: string; readonly sessionId: string; readonly description: string }>()
 const jjCallResultSchema = Schema.Struct({
   ok: Schema.Boolean,
@@ -899,6 +900,62 @@ Then('the workspace is removed from the Land page', async ({ page }: { readonly 
     await page.getByRole('menuitem', { name: 'Remove workspace…', exact: true }).click()
     await page.getByRole('alertdialog').getByRole('button', { name: 'Remove workspace and folder', exact: true }).click()
     await expect.poll(() => existsSync(journey.threadPath), { timeout: 30_000 }).toBe(false)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a turn is running on that thread', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await page.goto(new URL(`/?thread=${journey.sessionId}`, page.url()).href)
+  await expect(page.getByText('Ready.', { exact: true })).toBeVisible({ timeout: 45_000 })
+  const composer = remoteComposer(page)
+  await composer.fill('[[hold]]')
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+  // The Stop button lights before the owner starts the turn, and an idle owner would land at once rather than queue.
+  const fake = fakeCommandCodeFor(page)
+  await expect.poll(() => fake.requests.some(request => request.messages.some(message => message.text.includes('[[hold]]'))), { timeout: 30_000 }).toBe(true)
+})
+
+Then('landing is queued and undone from this client', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await recordAssertion(page, 'multi-host-remote-land-queue', async () => {
+    await page.getByRole('button', { name: /^Current thread workspace: / }).click()
+    await page.getByRole('button', { name: /^Queue/u }).first().click({ timeout: 30_000 })
+    await page.getByRole('button', { name: 'Cancel the queued landing on main', exact: true }).first().click({ timeout: 30_000 })
+    await expect(page.getByRole('button', { name: /^Queue/u }).first()).toBeVisible({ timeout: 30_000 })
+    expect(runScratchJj(journey.repository, 'log', '--no-graph', '-r', 'main', '-T', 'description')).not.toContain(journey.description)
+  })
+  fakeCommandCodeFor(page).releaseHeldTurns()
+  await finishJourneyAssertions(page)
+})
+
+When('the remote thread is forked', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await page.goto(new URL(`/?thread=${journey.sessionId}`, page.url()).href)
+  await expect(page.getByText('Ready.', { exact: true })).toBeVisible({ timeout: 45_000 })
+  const created = await page.evaluate(async sessionId => {
+    const response = await fetch('/api/session/fork', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method: 'session/fork', payload: { args: { request: { sessionId } } } }),
+    })
+    return await response.json()
+  }, journey.sessionId)
+  const fork = Schema.decodeUnknownSync(withUnknownProperties({ result: withUnknownProperties({ ok: Schema.Literal(true), value: withUnknownProperties({ sessionId: Schema.String }) }) }))(created)
+  remoteForks.set(page, fork.result.value.sessionId)
+})
+
+Then('the fork is a thread of the same host', async ({ page }: { readonly page: Page }) => {
+  const forkId = remoteForks.get(page)
+  if (forkId === undefined) throw new Error('The journey has no fork.')
+  await recordAssertion(page, 'multi-host-remote-fork', async () => {
+    const call = await hostApi(pairFor(page).manager)
+    const threads = Schema.decodeUnknownSync(remoteThreadListSchema)(await call('threadList')).threads
+    expect(threads.some(thread => thread.sessionId === forkId)).toBe(true)
+    expect(Schema.decodeUnknownSync(sessionRuntimeSchema)(await call('sessionRuntime', { sessionId: SessionId(forkId) }))).toMatchObject({ ok: true })
   })
   await finishJourneyAssertions(page)
 })
