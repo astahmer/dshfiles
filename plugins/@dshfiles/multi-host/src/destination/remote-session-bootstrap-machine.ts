@@ -69,9 +69,14 @@ export const remoteSessionBootstrapMachine = setup({
     create: fromPromise<string, { readonly target: string; readonly create: () => Promise<string> }>(async ({ input }) =>
       createSessionOnce({ target: input.target, create: input.create }),
     ),
-    open: fromPromise<void, { readonly sessionId: string; readonly onStarted: (sessionId: string) => void | Promise<void> }>(async ({ input }) => {
-      await input.onStarted(input.sessionId)
-    }),
+    open: fromPromise<void, { readonly target: string; readonly sessionId: string; readonly onStarted: (sessionId: string) => void | Promise<void> }>(
+      async ({ input }) => {
+        await input.onStarted(input.sessionId)
+        // Here, not on the machine's `onDone`: opening the thread unmounts this screen and stops the machine, and a cache
+        // entry that outlives it would send the next New thread back to this thread.
+        forgetCreatedSession(input.target)
+      },
+    ),
   },
 }).createMachine({
   id: 'remoteSessionBootstrap',
@@ -103,13 +108,8 @@ export const remoteSessionBootstrapMachine = setup({
       invoke: {
         src: 'open',
         // SAFETY of the fallback: `opening` is only entered by `creating` once it assigned the created id.
-        input: ({ context }) => ({ sessionId: context.sessionId ?? '', onStarted: context.onStarted }),
-        onDone: {
-          target: 'started',
-          actions: ({ context }) => {
-            forgetCreatedSession(context.target)
-          },
-        },
+        input: ({ context }) => ({ target: context.target, sessionId: context.sessionId ?? '', onStarted: context.onStarted }),
+        onDone: { target: 'started' },
         onError: {
           target: 'refused',
           actions: assign({ failure: ({ context, event }) => context.describeFailure(event.error) }),
