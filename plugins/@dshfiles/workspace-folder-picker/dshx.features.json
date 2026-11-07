@@ -5,7 +5,7 @@
     {
       "id": "workspace-folder-add-flow",
       "title": "Add workspaces from the folder browser",
-      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the workspace_folder_browser_capabilities agent tool reports that, with the Host's path style, without opening it. Choosing a folder first reports what it is: no repository, a Git checkout with its origin and default branch, or a Jujutsu repository. A Git checkout offers Enable Jujutsu and add, which runs the same guarded colocated init the graph uses; a folder without a repository offers Initialize repository, which starts Jujutsu in place and keeps the files already in it. The project_inspect and project_init agent tools drive the same read and write. A repository can also check in dsh.project.json, read by project_config_read: icon path, default thread workspace, bookmark, trusted check ids and suggested scripts, where a missing or invalid file is reported instead of thrown.",
+      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse\u2026 opens the Host's native folder dialog when its directory picker is native, and the workspace_folder_browser_capabilities agent tool reports that, with the Host's path style, without opening it. Choosing a folder first reports what it is: no repository, a Git checkout with its origin and default branch, or a Jujutsu repository. A Git checkout offers Enable Jujutsu and add, which runs the same guarded colocated init the graph uses; a folder without a repository offers Initialize repository, which starts Jujutsu in place and keeps the files already in it. The project_inspect and project_init agent tools drive the same read and write. A repository can also check in dsh.project.json, read by project_config_read: icon path, default thread workspace, bookmark, trusted check ids and suggested scripts, where a missing or invalid file is reported instead of thrown. A repository with no origin says so and offers Publish privately or Publish publicly, which creates the GitHub repository, adds it as origin and pushes the bookmark.",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose workspace\"",
@@ -15,7 +15,7 @@
       "surfaces": ["client", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Add workspace",
+      "currentSurface": "composer: Choose workspace \u203a Add workspace",
       "configuration": [],
       "states": [
         "closed",
@@ -34,8 +34,8 @@
         "Directory listing and folder creation use an authenticated Host API; workspace registration stays behind the workspace Remote API.",
         "Ambiguous or truncated path matches do not auto-browse.",
         "The add flow does not expose registered project choices or project registration actions.",
-        "A Host without a native directory picker, or one too old to answer the capability read, hides Browse… and keeps absolute-path entry and the in-app browser.",
-        "Cancelling the native dialog changes nothing; a failed dialog keeps absolute-path entry and offers Browse… again.",
+        "A Host without a native directory picker, or one too old to answer the capability read, hides Browse\u2026 and keeps absolute-path entry and the in-app browser.",
+        "Cancelling the native dialog changes nothing; a failed dialog keeps absolute-path entry and offers Browse\u2026 again.",
         "The setup step never initializes a repository by itself: every write follows an explicit click.",
         "A folder already inside a checkout is reported with that checkout's root, and adding it registers the folder you chose.",
         "Enable Jujutsu is offered only while the Jujutsu bundle is loaded and jj is installed; otherwise the panel offers the plain add and says why.",
@@ -45,6 +45,11 @@
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "workspace-folder-picker.publish-entry",
+          "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workspace-folder-picker.native-capability",
@@ -128,19 +133,19 @@
     {
       "id": "project-clone",
       "title": "Add a project by cloning a repository",
-      "summary": "New → Clone repository… in the Add workspace flow clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. A failed or cancelled job can be retried into the same folder as a new job. The project_clone, project_clone_jobs, project_clone_cancel and project_clone_retry agent tools drive the same jobs.",
+      "summary": "New \u2192 Clone repository\u2026 in the Add workspace flow clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. A failed or cancelled job can be retried into the same folder as a new job. The project_clone, project_clone_jobs, project_clone_cancel and project_clone_retry agent tools drive the same jobs.",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose workspace\"",
         "click menuitem \"Add workspace*\"",
         "click button \"New\"",
-        "click menuitem \"Clone repository…\"",
+        "click menuitem \"Clone repository\u2026\"",
         "expect textbox \"Repository URL\""
       ],
       "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Add workspace › Clone repository",
+      "currentSurface": "composer: Choose workspace \u203a Add workspace \u203a Clone repository",
       "configuration": [],
       "states": ["form", "cloning", "colocating", "registering", "succeeded", "failed", "cancelled", "retrying"],
       "failureModes": [
@@ -205,7 +210,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Remove",
+      "currentSurface": "composer: Choose workspace \u203a Remove",
       "configuration": [],
       "states": ["listed", "confirmation", "removed", "failed"],
       "failureModes": [
@@ -231,19 +236,19 @@
     {
       "id": "project-create",
       "title": "Create a new project",
-      "summary": "New → New project… in the Add workspace flow creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a private GitHub repository runs gh repo create --private and pushes main when the GitHub CLI is installed. The project_create agent tool takes the same explicit inputs. The same remote creation is available for an existing checkout through project_publish: it refuses no-repository, an existing origin, and a repository without commits, then pushes the bookmark with jj (git for a plain checkout).",
+      "summary": "New \u2192 New project\u2026 in the Add workspace flow creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a private GitHub repository runs gh repo create --private and pushes main when the GitHub CLI is installed. The project_create agent tool takes the same explicit inputs. The same remote creation is available for an existing checkout through project_publish: it refuses no-repository, an existing origin, and a repository without commits, then pushes the bookmark with jj (git for a plain checkout).",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose workspace\"",
         "click menuitem \"Add workspace*\"",
         "click button \"New\"",
-        "click menuitem \"New project…\"",
+        "click menuitem \"New project\u2026\"",
         "expect textbox \"Project name\""
       ],
       "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Add workspace › New project",
+      "currentSurface": "composer: Choose workspace \u203a Add workspace \u203a New project",
       "configuration": [],
       "states": ["form", "creating", "created", "created-with-warning", "failed"],
       "failureModes": [
@@ -379,7 +384,7 @@
       ],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › search"
+      "currentSurface": "composer: Choose workspace \u203a search"
     },
     {
       "id": "keyboard-folder-selection",
@@ -411,7 +416,7 @@
       ],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › keyboard rows"
+      "currentSurface": "composer: Choose workspace \u203a keyboard rows"
     },
     {
       "id": "unregistered-recent-folders",
@@ -449,7 +454,7 @@
       ],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: Choose workspace › Recent"
+      "currentSurface": "composer: Choose workspace \u203a Recent"
     },
     {
       "id": "directory-only-mode",
@@ -481,7 +486,7 @@
       ],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "Hosts › Add folder (directory-only picker)"
+      "currentSurface": "Hosts \u203a Add folder (directory-only picker)"
     }
   ]
 }

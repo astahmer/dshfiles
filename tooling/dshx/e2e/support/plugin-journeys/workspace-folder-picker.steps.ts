@@ -99,6 +99,37 @@ Then('an existing Git checkout reports its repository and offers Jujutsu before 
   }
 })
 
+Then('a Git checkout without an origin offers to publish it', async ({ page }: { page: Page }) => {
+  const scratchRoot = await mkdtemp(join(tmpdir(), 'dsh-folder-publish-e2e-'))
+  const repositoryName = 'local-only'
+  const repositoryPath = join(scratchRoot, repositoryName)
+  const dialog = folderPickerDialog(page)
+  try {
+    await mkdir(repositoryPath)
+    const git = (...args: readonly string[]) =>
+      execFileSync('git', ['-c', 'user.email=e2e@example.invalid', '-c', 'user.name=E2E', ...args], { cwd: repositoryPath })
+    git('init', '--initial-branch=main')
+    await writeFile(join(repositoryPath, 'README.md'), '# local only\n')
+    git('add', '.')
+    git('commit', '-m', 'one')
+    const pathInput = dialog.getByRole('textbox', { name: 'Enter a folder path' })
+    await pathInput.fill(repositoryPath)
+    await pathInput.press('Enter')
+    await dialog.getByRole('button', { name: 'Select this folder', exact: true }).click()
+    const setup = page.getByRole('dialog', { name: `Add ${repositoryName}`, exact: true })
+    await recordAssertion(page, 'setup-offers-publish-without-an-origin', async () => {
+      await expect(setup).toBeVisible()
+      await expect(setup.getByText('No origin yet.', { exact: true })).toBeVisible()
+      await expect(setup.getByRole('button', { name: 'Publish privately', exact: true })).toBeVisible()
+      await expect(setup.getByRole('button', { name: 'Publish publicly', exact: true })).toBeVisible()
+    })
+    await setup.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await finishJourneyAssertions(page)
+  } finally {
+    await rm(scratchRoot, { recursive: true, force: true })
+  }
+})
+
 Then('a new folder can be created and registered as a workspace', async ({ page }: { page: Page }) => {
   const scratchRoot = await mkdtemp(join(tmpdir(), 'dsh-folder-picker-e2e-'))
   const workspaceName = 'registered-workspace'
