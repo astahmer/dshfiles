@@ -468,6 +468,15 @@ turn instead of waiting again in the same turn — the user can steer, and the
 job's completion notice resumes you. The same cap applies to
 `job_output { wait: true }`.
 
+### Asking questions
+
+`ask_user_question` is timed, and its `timeout` is the mode selector: `-1`
+blocks until the user answers (only when the work cannot continue), while any
+positive number returns `{ pending, callId }`, keeps the turn running, and
+delivers the answer later as a `user-question-reply`. Batch related questions
+into one call. This is DSH runtime behavior, so it lives here rather than in the
+harness-neutral global contract.
+
 ## Warnings and errors
 
 Every user-facing warning or error must include an actionable recovery path: tell the user what they can change or do next, and offer a direct control or exact command when available. If no safe recovery exists, explain the limitation and the next practical alternative; never leave the user with a dead-end message.
