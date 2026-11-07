@@ -859,8 +859,8 @@
     },
     {
       "id": "remote-thread-jj",
-      "title": "Work a remote thread's own JJ workspace from this client",
-      "summary": "The thread workspace control and the integrate offer of a mirrored thread read its JJ status from the runtime that owns it, and land, queue and undo run there. Each action is authorized for that Session and limited to its own folder.",
+      "title": "Work a remote thread's repository from this client",
+      "summary": "The thread workspace control, the integrate offer, the JJ side panel and the composer's changes bar of a mirrored thread read from the runtime that owns it, and land, queue, undo and prepared jujutsu actions run there. Each call is authorized for that Session and limited to its own folder or a repository id the owner issued for that folder.",
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "threads",
@@ -890,6 +890,12 @@
           "id": "multi-host.jj-path-scope",
           "file": "plugins/@dshfiles/multi-host/src/remote-jj-scope.test.ts",
           "testName": "reaches the thread folder, with or without naming the thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.repository-scope",
+          "file": "plugins/@dshfiles/multi-host/src/remote-jj-scope.test.ts",
+          "testName": "reaches the thread folder and the repository it resolves to"
         }
       ],
       "telemetry": [

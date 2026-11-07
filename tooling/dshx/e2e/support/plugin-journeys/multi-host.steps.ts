@@ -362,7 +362,7 @@ const startScratchGitServer = async (input: { readonly projectPath: string; read
 
 const bootLoopbackPair = async (
   page: Page,
-  remote_: { readonly cordisPatch?: string; readonly packageIds?: readonly string[] } = {},
+  remote_: { readonly cordisPatch?: string; readonly packageIds?: readonly string[]; readonly managerPackageIds?: readonly string[] } = {},
 ): Promise<void> => {
   const fakeCommandCode = await startFakeCommandCode(page)
   const sshd = await startLoopbackSshd({ gitSslNoVerify: true })
@@ -419,6 +419,7 @@ const bootLoopbackPair = async (
         '@dshfiles/session-controller',
         '@dshfiles/model-effort-picker',
         '@dshfiles/user-questions',
+        ...(remote_.managerPackageIds ?? []),
       ],
       profileLabel: 'multi-host-manager',
       seedHome: async homeRoot => {
@@ -456,7 +457,7 @@ Given('a loopback SSH DSH pair with timed questions is booted', async ({ page }:
 })
 
 Given('a loopback SSH DSH pair with JJ on the remote is booted', async ({ page }: { readonly page: Page }) => {
-  await bootLoopbackPair(page, { packageIds: ['@dshfiles/jj-integration'] })
+  await bootLoopbackPair(page, { packageIds: ['@dshfiles/jj-integration', '@dshfiles/jujutsu'], managerPackageIds: ['@dshfiles/jujutsu'] })
 })
 
 When('the scratch remote is added from the host UI', async ({ page }: { readonly page: Page }) => {
@@ -824,11 +825,42 @@ Then('this client reads that workspace from its owner and refuses any other path
   })
 })
 
-When('the thread is integrated from this client', async ({ page }: { readonly page: Page }) => {
+When('a revision of that thread is described through the owner', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  const call = await hostApi(pairFor(page).manager)
+  const repositoryCall = async (method: string, input: Record<string, Schema.Json>) =>
+    Schema.decodeUnknownSync(jjCallResultSchema)(await call('sessionRepositoryCall', { sessionId: journey.sessionId, api: 'jujutsu', method, input }))
+  const refused = await repositoryCall('registerRepository', { path: journey.repository })
+  expect(refused).toMatchObject({ ok: false, code: 'session/path-mismatch' })
+  const registered = await repositoryCall('registerRepository', { path: journey.threadPath })
+  expect(registered.ok, registered.message).toBe(true)
+  const { repoId } = Schema.decodeUnknownSync(withUnknownProperties({ repoId: Schema.String }))(registered.value)
+  const commitId = runScratchJj(journey.threadPath, 'log', '--no-graph', '-r', '@', '-T', 'commit_id').trim()
+  const description = `${journey.description} described here`
+  const prepared = await repositoryCall('prepare', { repoId, action: { kind: 'describe', commitId, message: description } })
+  expect(prepared.ok, prepared.message).toBe(true)
+  const preview = Schema.decodeUnknownSync(withUnknownProperties({ id: Schema.String }))(prepared.value)
+  const confirmed = await repositoryCall('confirm', { repoId, previewId: preview.id })
+  expect(confirmed.ok, confirmed.message).toBe(true)
+  remoteJjJourneys.set(page, { ...journey, description })
+})
+
+Then('the revision panel shows that thread from its owner', async ({ page }: { readonly page: Page }) => {
   const journey = remoteJjJourneys.get(page)
   if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
   await page.goto(new URL(`/?thread=${journey.sessionId}`, page.url()).href)
   await expect(page.getByText('Ready.', { exact: true })).toBeVisible({ timeout: 45_000 })
+  await recordAssertion(page, 'multi-host-remote-jj-panel', async () => {
+    await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+    await page.getByRole('button', { name: /^Jujutsu/u }).first().click({ timeout: 15_000 })
+    await expect(page.getByText(journey.description).first()).toBeVisible({ timeout: 30_000 })
+  })
+})
+
+When('the thread is integrated from this client', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
   const workspace = page.getByRole('button', { name: /^Current thread workspace: / })
   await expect(workspace).toBeVisible({ timeout: 30_000 })
   await workspace.click()

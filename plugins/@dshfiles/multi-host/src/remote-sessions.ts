@@ -19,7 +19,7 @@ import type {
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { SessionPayload, SessionPromptRefused, type EffectSessionSource } from '@dshfiles/session-source-port'
-import { Clock, Context, Effect, Fiber, FiberMap, Layer, Option, Ref, Stream } from 'effect'
+import { Clock, Context, Effect, Fiber, FiberMap, Layer, Option, Ref, Schema, Stream } from 'effect'
 import { homedir } from 'node:os'
 import { RemoteRequestFailed, SessionOwnerMissing } from './errors.js'
 import { HostDirectory } from './host-directory.js'
@@ -32,6 +32,7 @@ import { RuntimePool } from './runtime-pool.js'
 const ownedSessionOf = (address: SessionAddress): SessionId => (address.kind === 'session' ? address.sessionId : address.childSessionId)
 
 const listCacheMillis = 2_000
+const decodeRegisteredRepository = Schema.decodeUnknownOption(Schema.Struct({ repoId: Schema.String }))
 const maxRemembered = 20_000
 const maxStagedUploads = 2_000
 const followTimeout = 15_000
@@ -57,6 +58,10 @@ export class RemoteSessions extends Context.Service<
     readonly source: EffectSessionSource
     /** One conversation snapshot from the runtime owning `sessionId`, or nothing when no runtime answers. */
     readonly snapshot: (input: { readonly sessionId: string; readonly maxMessages: number }) => Effect.Effect<readonly unknown[] | undefined>
+    /** The repository ids the owner issued for this thread's own folder: it mints a new one per registration. */
+    readonly threadRepositoryIds: (sessionId: string) => Effect.Effect<ReadonlySet<string>>
+    /** Note the id a registration of the thread's folder returned. */
+    readonly rememberRepository: (input: { readonly sessionId: string; readonly reply: unknown }) => Effect.Effect<void>
     /** The folder a mirrored thread works in, as its runtime reports it. */
     readonly threadFolder: (sessionId: string) => Effect.Effect<string | undefined, SessionOwnerMissing>
     /** Remember where an upload was staged, so a message on another thread or machine is refused here. */
@@ -363,7 +368,16 @@ export class RemoteSessions extends Context.Service<
 
       const threadFolder = (sessionId: string) => Effect.flatMap(requireRuntime(sessionId), runtime => cwdFor(sessionId, runtime))
 
-      return RemoteSessions.of({ source, snapshot, recordUpload, threadFolder })
+      const threadRepositories = yield* Ref.make<ReadonlyMap<string, ReadonlySet<string>>>(new Map())
+      const threadRepositoryIds = (sessionId: string) => Effect.map(Ref.get(threadRepositories), known => known.get(sessionId) ?? new Set<string>())
+      const rememberRepository = (input: { readonly sessionId: string; readonly reply: unknown }) =>
+        Option.match(decodeRegisteredRepository(input.reply), {
+          onNone: () => Effect.void,
+          onSome: ({ repoId }) =>
+            Ref.update(threadRepositories, current => new Map(current).set(input.sessionId, new Set([...(current.get(input.sessionId) ?? []), repoId]))),
+        })
+
+      return RemoteSessions.of({ source, snapshot, recordUpload, threadFolder, threadRepositoryIds, rememberRepository })
     }),
   )
 }

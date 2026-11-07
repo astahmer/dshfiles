@@ -86,6 +86,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_session_interactions',
       'multi_host_session_jj',
       'multi_host_session_jj_repositories',
+      'multi_host_session_repository',
       'multi_host_set_host_hidden',
       'multi_host_set_host_settings',
       'multi_host_ssh_hosts',

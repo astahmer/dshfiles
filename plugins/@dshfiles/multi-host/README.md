@@ -299,13 +299,14 @@ title}` for threads started here, so the sidebar and view can list them.
   child Session's question is not offered, because the owner refuses to ask from
   one. An approval from a child Session opens under that child Session, not its
   parent.
-- A remote thread's own JJ workspace works from here: the thread's workspace
-  control and its integrate offer read its status from the runtime that owns it,
-  and **Land**, queue and undo run there. `sessionJjCall` (`multi_host_session_jj`)
-  reaches that thread's folder and nothing else, so another path is refused here
-  before it leaves. The JJ panel's revision graph, diffs and the Land page still
-  read this machine's repositories; terminal interactions and session handoff
-  are not proxied. Use the owning Host UI for those.
+- A remote thread's repository works from here: the workspace control, the
+  integrate offer, the JJ side panel (graph, details, diffs, prepared actions) and
+  the composer's changes bar all read from the runtime that owns the thread.
+  `sessionJjCall` (`multi_host_session_jj`) and `sessionRepositoryCall`
+  (`multi_host_session_repository`) reach that thread's folder, or a repository id
+  the owner issued for it, and nothing else on the machine; another path is
+  refused here before it leaves. The host needs `@dshfiles/jujutsu` installed for
+  the panel. Global panels with no thread still read this machine.
 - LSP is not advertised by remote runtimes (unchanged from earlier
   validation).
 

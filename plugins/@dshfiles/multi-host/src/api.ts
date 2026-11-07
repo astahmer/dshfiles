@@ -228,6 +228,33 @@ const remoteThreadSchema = Schema.Struct({
 const remotePluginMethodSchema = Schema.Literals(['projects', 'classifyWorkspaces', 'destination', 'provision', 'noFolder'])
 /** The JJ thread actions a mirrored thread reaches on its owner; each one names that thread's own folder. */
 const sessionJjMethodSchema = Schema.Literals(['threadAt', 'land', 'queueLand', 'cancelQueuedLand', 'discard'])
+/** The repository reads and actions a mirrored thread reaches on its owner, by the API that serves them there. */
+export const sessionRepositoryReads = {
+  jujutsu: [
+    'registerRepository',
+    'load',
+    'graphPage',
+    'workspaces',
+    'graphNavigation',
+    'revisionRelationship',
+    'graphSlice',
+    'referenceGraph',
+    'referenceTitles',
+    'details',
+    'revisionFiles',
+    'editTimes',
+    'workingDiff',
+    'prepare',
+  ],
+  'jujutsu-composer': ['context', 'diff'],
+} as const
+/** These change the repository, so a reply lost after sending is never treated as safe to repeat. */
+export const sessionRepositoryWrites = ['openRepository', 'confirm'] as const
+const sessionRepositoryMethodSchema = Schema.Literals([
+  ...sessionRepositoryReads.jujutsu,
+  ...sessionRepositoryReads['jujutsu-composer'],
+  ...sessionRepositoryWrites,
+])
 /**
  * Read-only plugin methods another plugin of this Host may call on a remote runtime, as `<api id>/<method>`. Only these
  * pass: a peer can read what it replicates and nothing else, and no call here writes on the remote runtime.
@@ -956,6 +983,18 @@ const effectMultiHostApi = defineApi({
       description:
         "Run one JJ thread action in a remote thread's own folder, on the runtime that owns the thread: threadAt reads it; land, queueLand, cancelQueuedLand and discard change it (discard needs an explicit force, and force: true abandons unlanded work). Call only when the user asked for that action.",
       tool: { name: 'multi_host_session_jj', render: compactJson },
+    }),
+    sessionRepositoryCall: method({
+      input: Schema.Struct({
+        sessionId: sessionIdSchema,
+        api: Schema.Literals(['jujutsu', 'jujutsu-composer']),
+        method: sessionRepositoryMethodSchema,
+        input: jsonValueSchema,
+      }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }), failedSchema]),
+      description:
+        "Read or change a remote thread's own repository on the runtime that owns it: revision graph, details, diffs and composer context, or a prepared jujutsu action. The call must name the thread's folder or the repository id it resolves to. Reads are safe. confirm and openRepository change the repository: Call only when the user asked for that action.",
+      tool: { name: 'multi_host_session_repository', render: compactJson },
     }),
     runtimeFileReferences: method({
       input: Schema.Struct({ runtimeId: idSchema, sessionId: sessionIdSchema, query: Schema.String.check(Schema.isMaxLength(4096)) }),

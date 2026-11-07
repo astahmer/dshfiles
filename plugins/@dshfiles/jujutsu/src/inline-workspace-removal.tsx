@@ -5,9 +5,9 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi, type ThreadView } from '@dshfiles/jj-integration/api'
-import { jujutsuApi } from './api.js'
 import { jujutsuQueryKeys } from './repository-query-cache.js'
 import { isWorkspaceMissing } from './workspace-removal-state.js'
+import { useJujutsuApi } from './use-jujutsu-api.js'
 
 const workspacesKey = (repoRoot: string) => ['jujutsu', repoRoot, 'workspace-removal', 'workspaces'] as const
 const threadKey = (repoRoot: string, name: string) => ['jujutsu', repoRoot, 'workspace-removal', 'thread', name] as const
@@ -42,7 +42,7 @@ export const InlineWorkspaceRemoval = (props: {
   readonly onRemoved: () => void
 }): JSX.Element => {
   const jj = useApi(jjIntegrationApi)
-  const jujutsu = useApi(jujutsuApi)
+  const jujutsu = useJujutsuApi()
   const queryClient = useQueryClient()
   const workspaces = useQuery({
     queryKey: workspacesKey(props.repoRoot),
