@@ -70,14 +70,10 @@ const decide = (input: {
     if (activity?.running === true || activity?.pendingUserQuestion === true) return skip('busy')
     if (activity?.running === undefined || activity.pendingUserQuestion === undefined) return skip('activity-unknown')
   }
-  const kind: WorkspaceKind =
-    thread.secondary === true
-      ? 'secondary'
-      : thread.rebasedAt === undefined && !onAnotherBookmark
-        ? 'empty'
-        : (thread.mergedPullRequests?.length ?? 0) > 0
-          ? 'merged'
-          : 'integrated'
+  let kind: WorkspaceKind = 'integrated'
+  if (thread.secondary === true) kind = 'secondary'
+  else if (thread.rebasedAt === undefined && !onAnotherBookmark) kind = 'empty'
+  else if ((thread.mergedPullRequests?.length ?? 0) > 0) kind = 'merged'
   if (!input.kinds.includes(kind)) return skip('kind-excluded')
   if (input.now - usedAt < input.olderThanMs) return skip('too-recent')
   return { action: 'remove', kind, lastUsedAt: usedAt }

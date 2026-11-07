@@ -206,8 +206,9 @@ const NotARepository = (props: { readonly t: JjIntegrationTranslate; readonly pa
   const [enabling, setEnabling] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const found = inspection.data
-  const verb: 'enable' | 'initialize' | null =
-    found === undefined ? null : found.kind === 'none' ? 'initialize' : found.kind === 'git' && found.canEnableJujutsu ? 'enable' : null
+  let verb: 'enable' | 'initialize' | null = null
+  if (found?.kind === 'none') verb = 'initialize'
+  else if (found?.kind === 'git' && found.canEnableJujutsu) verb = 'enable'
   const run = async (): Promise<void> => {
     if (props.path === undefined || verb === null) return
     setEnabling(true)
@@ -513,11 +514,15 @@ export const DestinationBar = (props: {
               // location and ask again, so the segment becomes the real one without a reload.
               void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'repositories'] })
               // The Host caches repository locations, so ask it for a fresh scan before asking again.
-              void runHostRequest({ timeoutMs: 120_000, request: signal => api.refreshRepositories({}, { signal }) })
-                .catch(() => undefined)
-                .then(() => {
-                  for (const delay of [0, 750, 2_000]) setTimeout(() => void destination.refetch(), delay)
-                })
+              const rescan = async (): Promise<void> => {
+                try {
+                  await runHostRequest({ timeoutMs: 120_000, request: signal => api.refreshRepositories({}, { signal }) })
+                } catch {
+                  // The segment refetches either way: a failed rescan still shows the next scan's answer.
+                }
+                for (const delay of [0, 750, 2_000]) setTimeout(() => void destination.refetch(), delay)
+              }
+              void rescan()
             }}
           />
         ) : null}
