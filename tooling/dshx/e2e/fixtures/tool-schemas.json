@@ -70,12 +70,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 572,
-  "apiToolBindings": 391,
-  "apiToolNameCount": 391,
-  "apiToolSchemas": 390,
+  "apiMethods": 574,
+  "apiToolBindings": 392,
+  "apiToolNameCount": 392,
+  "apiToolSchemas": 391,
   "definedTools": 24,
-  "tools": 414,
+  "tools": 415,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -8209,6 +8209,32 @@
         },
         "required": [
           "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "pulls_review_revisions",
+      "description": "Review several Jujutsu revisions together: each revision with its own changed files and line counts, ancestors first. The revisions need not be adjacent, and a selection with gaps is reported as such; use jj_details for a patch.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "description": "Absolute path of a workspace of the repository.",
+            "type": "string"
+          },
+          "revisions": {
+            "description": "The revisions to review together; they need not be adjacent.",
+            "type": "array",
+            "items": {
+              "description": "A commit id, or a change id, in full or as a unique prefix, as jj log prints them. A revset expression is refused.",
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "path",
+          "revisions"
         ],
         "additionalProperties": false
       }
