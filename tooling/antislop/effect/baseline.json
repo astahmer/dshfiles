@@ -31,7 +31,6 @@
     "plugins/@dshfiles/diff-viewed/src/viewed-marks.ts": 2,
     "plugins/@dshfiles/jj-integration/src/client.tsx": 1,
     "plugins/@dshfiles/settings-shell/src/client.tsx": 1,
-    "plugins/@dshfiles/settings-shell/src/schema-form/settings-form.tsx": 2,
     "plugins/@dshfiles/thread-sidebar/src/client.tsx": 3,
     "tooling/dshx/packages/dshx/src/client/app-services.ts": 1,
     "tooling/dshx/packages/dshx/src/communication/bridge.ts": 1,
