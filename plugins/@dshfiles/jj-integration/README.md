@@ -38,6 +38,9 @@ A blank thread shows a destination bar above its composer:
   the shared checkout instead.
 - **workspace** toggle: run the thread in its own jj workspace,
   `<repository>-threads/thread-<id>`, created with `jj workspace add -r <bookmark>`.
+  The bookmark must name one revision: an unknown name, an ambiguous prefix or a
+  conflicted bookmark is refused before anything is created, so a retry cannot
+  leave a second workspace.
 
 A Session's directory is fixed once created, so each change opens a blank
 thread at the new destination. Leaving an unused thread workspace keeps it as

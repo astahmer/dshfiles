@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -28,6 +28,27 @@ const bookmarkTargetCommitId = (cwd: string): string =>
 const commitIdAt = (cwd: string, revset: string): string => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'commit_id').trim()
 const changeIdAt = (cwd: string, revset: string): string => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'change_id').trim()
 const fullChangeIdAt = (cwd: string, revset: string): string => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'change_id').trim()
+
+const workspaceNames = (cwd: string): readonly string[] =>
+  jj(cwd, '--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"')
+    .split('\n')
+    .filter(name => name.length > 0)
+    .sort()
+
+/** Two concurrent operations moved `name` apart, so it points at two commits, as a fetch or a second checkout can leave it. */
+const conflictBookmark = (cwd: string, name: string): void => {
+  writeFileSync(join(cwd, 'left.txt'), 'left\n')
+  jj(cwd, 'commit', '-m', 'left')
+  const left = commitIdAt(cwd, '@-')
+  writeFileSync(join(cwd, 'right.txt'), 'right\n')
+  jj(cwd, 'commit', '-m', 'right')
+  jj(cwd, 'bookmark', 'create', name, '-r', left)
+  const operation = jj(cwd, '--ignore-working-copy', 'op', 'log', '-n', '1', '--no-graph', '-T', 'self.id()').trim()
+  jj(cwd, 'bookmark', 'set', name, '-r', commitIdAt(cwd, '@-'))
+  jj(cwd, '--at-op', operation, 'bookmark', 'set', name, '-r', 'main', '--allow-backwards')
+}
+
+const settled = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
 describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
   let root: string
@@ -311,6 +332,106 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     const spares = join(`${repo}-threads`, '.dshfiles-spare-workspaces.json')
     await expect.poll(() => existsSync(spares), { timeout: 20_000 }).toBe(true)
     expect((await gatedThreads.list(repo)).map(entry => entry.name)).toEqual([thread.name])
+  })
+
+  describe('a destination that does not name one revision', () => {
+    const threadsDirectory = (): string => `${repo}-threads`
+    const threadFolders = (): readonly string[] =>
+      existsSync(threadsDirectory()) ? readdirSync(threadsDirectory()).filter(name => name.startsWith('thread-')) : []
+
+    it('refuses a conflicted bookmark every time and creates no workspace, however often it is retried', async () => {
+      conflictBookmark(repo, 'forked')
+      for (const attempt of [1, 2, 3]) {
+        await expect(threads.provision(repo, 'forked', 'thread-c0ffee'), `attempt ${attempt}`).rejects.toThrow(
+          /"forked" points at more than one revision.*no workspace was created/su,
+        )
+        expect(workspaceNames(repo)).toEqual(['default'])
+        expect(threadFolders()).toEqual([])
+      }
+    })
+
+    it('still gives the thread its name once a real destination is picked after a refusal', async () => {
+      conflictBookmark(repo, 'forked')
+      await expect(threads.provision(repo, 'forked', 'thread-c0ffee')).rejects.toThrow(/more than one revision/u)
+      const thread = await threads.provision(repo, 'main', 'thread-c0ffee')
+      expect(thread.name).toBe('thread-c0ffee')
+      expect(commitIdAt(repo, 'thread-c0ffee@-')).toBe(bookmarkTargetCommitId(repo))
+    })
+
+    it('refuses an ambiguous commit prefix', async () => {
+      for (let index = 0; index < 40; index += 1) jj(repo, 'new', 'main', '-m', `sibling ${index}`)
+      const commits = jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'all()', '-T', 'commit_id.short(1) ++ "\\n"')
+        .split('\n')
+        .filter(prefix => prefix.length > 0)
+      const shared = commits.find((prefix, index) => commits.indexOf(prefix) !== index)
+      if (shared === undefined) throw new Error('expected two of the commits to share a first hex digit')
+      await expect(threads.provision(repo, shared)).rejects.toThrow(/more than one revision/u)
+      expect(workspaceNames(repo)).toEqual(['default'])
+      expect(threadFolders()).toEqual([])
+    })
+
+    it.each([
+      ['an unknown revision', 'no-such-revision', /"no-such-revision" is not a bookmark or revision/u],
+      ['a revset of several revisions', 'main|@', /"main\|@" points at more than one revision/u],
+      ['a revset of no revision', 'none()', /"none\(\)" is not a bookmark or revision/u],
+      ['a malformed revset', 'main(', /"main\(" is not a bookmark or revision/u],
+      ['something that reads as an option', '--output=/tmp/x', /"--output=\/tmp\/x" is not a bookmark or revision/u],
+    ])('refuses %s with a recovery path', async (_label, base, message) => {
+      await expect(threads.provision(repo, base)).rejects.toThrow(message)
+      await expect(threads.provision(repo, base)).rejects.toThrow(/destination bar/u)
+      expect(workspaceNames(repo)).toEqual(['default'])
+      expect(threadFolders()).toEqual([])
+    })
+
+    it('makes no spare for it in the background', async () => {
+      conflictBookmark(repo, 'forked')
+      threads.prewarm(repo, 'forked')
+      threads.prewarm(repo, 'no-such-revision')
+      await settled(1_500)
+      expect(workspaceNames(repo)).toEqual(['default'])
+      expect(threadFolders()).toEqual([])
+    })
+
+    it('still branches from an exact commit id', async () => {
+      const thread = await threads.provision(repo, bookmarkTargetCommitId(repo))
+      expect(commitIdAt(repo, `${thread.name}@-`)).toBe(bookmarkTargetCommitId(repo))
+    })
+  })
+
+  it('removes what a failed jj workspace add left behind, so a retry cannot pile a second workspace up', async () => {
+    // jj registers the workspace and creates its folder before later steps can fail: the shape every leak here takes.
+    const failingAdd: JjExecutor = async input => {
+      const result = await executor(input)
+      if (input.args[0] !== 'workspace' || input.args[1] !== 'add') return result
+      return { exitCode: 1, stdout: '', stderr: 'Error: injected failure after registering' }
+    }
+    const failing = ThreadWorkspacesTestSupport.promiseThreads({ executor: failingAdd })
+    await expect(failing.provision(repo, undefined, 'thread-c0ffee')).rejects.toThrow(/injected failure/u)
+    await expect(failing.provision(repo, undefined, 'thread-c0ffee')).rejects.toThrow(/injected failure/u)
+    expect(workspaceNames(repo)).toEqual(['default'])
+    expect(existsSync(join(`${repo}-threads`, 'thread-c0ffee'))).toBe(false)
+    expect(
+      jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'visible_heads() & empty() & description(exact:"")', '-T', 'working_copies'),
+    ).not.toContain('thread-')
+    const thread = await threads.provision(repo, undefined, 'thread-c0ffee')
+    expect(thread.name).toBe('thread-c0ffee')
+    expect((await threads.locate(thread.path)).threadName).toBe('thread-c0ffee')
+  })
+
+  it('replaces a spare it cannot claim instead of stranding it', async () => {
+    await threads.provision(repo)
+    const spares = join(`${repo}-threads`, '.dshfiles-spare-workspaces.json')
+    await expect.poll(() => existsSync(spares), { timeout: 20_000 }).toBe(true)
+    const spareName = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Record(Schema.String, Schema.String)))(readFileSync(spares, 'utf8')).main
+    if (spareName === undefined) throw new Error('expected a spare for main')
+    writeFileSync(join(`${repo}-threads`, spareName, '.jj', 'repo'), '/no/such/store\n')
+
+    const thread = await threads.provision(repo, undefined, 'thread-beef00')
+
+    expect(thread.name).toBe('thread-beef00')
+    expect((await threads.locate(thread.path)).threadName).toBe('thread-beef00')
+    expect(workspaceNames(repo)).not.toContain(spareName)
+    expect(existsSync(join(`${repo}-threads`, spareName))).toBe(false)
   })
 
   it('checks the next thread out ahead, then hands it over under the requested name on the bookmark as it is now', async () => {
