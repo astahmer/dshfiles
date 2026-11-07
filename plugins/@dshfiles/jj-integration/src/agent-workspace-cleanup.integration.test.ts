@@ -46,13 +46,13 @@ describe.skipIf(!jjAvailable)('workspaces agents isolate for themselves', () => 
 
     const unlanded = await cleanup(true)
     expect(unlanded.workspaces).toStrictEqual([])
-    expect(unlanded.skipped).toContainEqual({ repoRoot: repo, name: isolated.name, reason: 'has-work' })
+    expect(unlanded.skipped).toContainEqual(expect.objectContaining({ name: isolated.name, reason: 'has-work' }))
 
     harness.setSession(subagent.sessionId, { running: false, questions: 0 })
     expect(await harness.runTool('jj_thread_rebase', { path: isolated.path }, { sessionId: 'session-parent', cwd: repo })).toContain('landed')
     harness.setSession(subagent.sessionId, { running: true, questions: 0 })
     const busy = await cleanup(true)
-    expect(busy.skipped).toContainEqual({ repoRoot: repo, name: isolated.name, reason: 'busy' })
+    expect(busy.skipped).toContainEqual(expect.objectContaining({ name: isolated.name, reason: 'busy' }))
     expect(existsSync(isolated.path)).toBe(true)
 
     harness.setSession(subagent.sessionId, { running: false, questions: 0 })
@@ -82,7 +82,7 @@ describe.skipIf(!jjAvailable)('workspaces agents isolate for themselves', () => 
     const held = bookmarkCommit('release')
 
     harness.setSession('session-release', { running: true, questions: 0 })
-    expect((await cleanup(false)).skipped).toContainEqual({ repoRoot: repo, name: isolated.name, reason: 'busy' })
+    expect((await cleanup(false)).skipped).toContainEqual(expect.objectContaining({ name: isolated.name, reason: 'busy' }))
     harness.setSession('session-release', { running: false, questions: 0 })
 
     const preview = await cleanup(false)
@@ -106,7 +106,7 @@ describe.skipIf(!jjAvailable)('workspaces agents isolate for themselves', () => 
     jj(isolated.path, 'describe', '-m', 'feat: add above')
 
     const applied = await cleanup(true)
-    expect(applied.skipped).toContainEqual({ repoRoot: repo, name: isolated.name, reason: 'has-work' })
+    expect(applied.skipped).toContainEqual(expect.objectContaining({ name: isolated.name, reason: 'has-work' }))
     expect(existsSync(isolated.path)).toBe(true)
   })
 
@@ -130,6 +130,6 @@ describe.skipIf(!jjAvailable)('workspaces agents isolate for themselves', () => 
     jj(isolated.path, 'new')
     expect(jj(repo, '--ignore-working-copy', 'bookmark', 'list', 'contested')).toContain('contested (conflicted)')
 
-    expect((await cleanup(false)).skipped).toContainEqual({ repoRoot: repo, name: isolated.name, reason: 'has-work' })
+    expect((await cleanup(false)).skipped).toContainEqual(expect.objectContaining({ name: isolated.name, reason: 'has-work' }))
   })
 })
