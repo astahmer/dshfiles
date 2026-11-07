@@ -2,6 +2,10 @@ import type {} from '@deepseek-ai/cordis'
 import type {
   SessionCancelRequest,
   SessionCancelValue,
+  SessionForkRequest,
+  SessionForkValue,
+  SessionRenameRequest,
+  SessionRenameValue,
   SessionSelectModelRequest,
   SessionSelectModelValue,
   SessionFollowFrame,
@@ -51,6 +55,8 @@ export interface MirroredSessionSource {
   updateQueue?(request: SessionUpdateQueueRequest): Promise<SessionUpdateQueueValue>
   projections?(request: SessionProjectionsRequest, signal: AbortSignal): Promise<SessionProjectionsValue>
   selectModel?(request: SessionSelectModelRequest): Promise<SessionSelectModelValue>
+  fork?(request: SessionForkRequest): Promise<SessionForkValue>
+  rename?(request: SessionRenameRequest): Promise<SessionRenameValue>
 }
 
 /** The registry the Session controller provides as `sessionSources`. */

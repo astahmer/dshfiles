@@ -502,7 +502,7 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote('rename')
   rename(request: SessionRenameRequest): Promise<SessionRenameValue> {
-    return this.commands.rename(request)
+    return this.mirrored.rename(request, value => this.commands.rename(value))
   }
 
   /**
@@ -514,6 +514,10 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote('fork')
   async fork(request: SessionForkRequest): Promise<SessionForkValue> {
+    return this.mirrored.fork(request, value => this.forkLocal(value))
+  }
+
+  private async forkLocal(request: SessionForkRequest): Promise<SessionForkValue> {
     if (request.allowMigration === false && this.ctx.sessions.get(request.sessionId) === undefined) {
       const stored = await this.ctx.get('sessionPersistence')?.stat(request.sessionId)
       if (stored?.formatStatus === 'migration-required' && this.ctx.sessions.get(request.sessionId) === undefined) {

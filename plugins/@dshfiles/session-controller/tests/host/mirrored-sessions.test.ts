@@ -3,7 +3,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createSessionSourceRegistry, SessionPromptRefused, SessionSourcePayload, type MirroredSessionSource } from '@dshfiles/session-source-port'
 import { MirroredSessions } from '../../src/mirrored-sessions.ts'
-import type { SessionFollowFrame, SessionSummary } from '../../src/native/types.ts'
+import type { SessionFollowFrame, SessionForkRequest, SessionRenameRequest, SessionSummary } from '../../src/native/types.ts'
 
 const contexts = new Set<Context>()
 
@@ -208,6 +208,31 @@ describe('mirrored sessions', () => {
         throw new Error('local fallback must not run')
       }),
     ).resolves.toMatchObject({ values: { modelSelection: { next: { model: 'reasoner' } } } })
+  })
+
+  it('forks and renames on the owner, and keeps a local Session on this Host', async () => {
+    const { mirrored, source } = await fixture()
+    const forked: unknown[] = []
+    mirrored.registry.register(
+      source({
+        rows: [summary('session-remote', 100)],
+        fork: async (request: SessionForkRequest) => {
+          forked.push(request)
+          return { sessionId: SessionId('session-forked') }
+        },
+        rename: async (request: SessionRenameRequest) => ({ title: request.title, seq: 5 }),
+      }),
+    )
+    await mirrored.merge([], {}, new AbortController().signal)
+    const mustNotRun = async () => {
+      throw new Error('local fallback must not run')
+    }
+    await expect(mirrored.fork({ sessionId: SessionId('session-remote') }, mustNotRun)).resolves.toEqual({ sessionId: 'session-forked' })
+    expect(forked).toHaveLength(1)
+    await expect(mirrored.rename({ sessionId: SessionId('session-remote'), title: 'New' }, mustNotRun)).resolves.toEqual({ title: 'New', seq: 5 })
+    await expect(mirrored.fork({ sessionId: SessionId('session-local') }, async () => ({ sessionId: SessionId('session-here') }))).resolves.toEqual({
+      sessionId: 'session-here',
+    })
   })
 
   it('refuses model selection for a mirrored Session whose source cannot select', async () => {

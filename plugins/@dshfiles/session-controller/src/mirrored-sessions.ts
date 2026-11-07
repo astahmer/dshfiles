@@ -6,6 +6,10 @@ import type {
   SessionAddress,
   SessionCancelRequest,
   SessionCancelValue,
+  SessionForkRequest,
+  SessionForkValue,
+  SessionRenameRequest,
+  SessionRenameValue,
   SessionSelectModelRequest,
   SessionSelectModelValue,
   SessionFollowFrame,
@@ -278,6 +282,42 @@ export class MirroredSessions {
       return await source.selectModel(request)
     } catch (error) {
       throw MirroredSessions.failure('session/selectModel', error)
+    }
+  }
+
+  /**
+   * Fork a mirrored Session on the runtime that owns it: its log lives there, so this Host cannot.
+   * @param request - the Session and the event to fork at.
+   * @param local - the Host's own fork.
+   * @returns the new Session.
+   */
+  async fork(request: SessionForkRequest, local: (request: SessionForkRequest) => Promise<SessionForkValue>): Promise<SessionForkValue> {
+    const source = await this.resolve(request.sessionId)
+    if (source === undefined) return local(request)
+    if (source.fork === undefined)
+      throw new RemoteError('gateway/bad-request', 'This host cannot fork that Session. Update DSH there, or open the thread on its host.', {})
+    try {
+      return await source.fork(request)
+    } catch (error) {
+      throw MirroredSessions.failure('session/fork', error)
+    }
+  }
+
+  /**
+   * Rename a mirrored Session on the runtime that owns it.
+   * @param request - the Session and its new title.
+   * @param local - the Host's own rename.
+   * @returns the committed title.
+   */
+  async rename(request: SessionRenameRequest, local: (request: SessionRenameRequest) => Promise<SessionRenameValue>): Promise<SessionRenameValue> {
+    const source = await this.resolve(request.sessionId)
+    if (source === undefined) return local(request)
+    if (source.rename === undefined)
+      throw new RemoteError('gateway/bad-request', 'This host cannot rename that Session. Update DSH there, or open the thread on its host.', {})
+    try {
+      return await source.rename(request)
+    } catch (error) {
+      throw MirroredSessions.failure('session/rename', error)
     }
   }
 }

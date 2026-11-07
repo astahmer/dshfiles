@@ -10,6 +10,10 @@ import type {
   SessionProjectionsValue,
   SessionPromptRequest,
   SessionPromptValue,
+  SessionForkRequest,
+  SessionForkValue,
+  SessionRenameRequest,
+  SessionRenameValue,
   SessionSelectModelRequest,
   SessionSelectModelValue,
   SessionSummary,
@@ -102,5 +106,7 @@ export interface EffectSessionSource<R = never> {
   readonly cancel?: (request: SessionCancelRequest) => Effect.Effect<SessionCancelValue, unknown, R>
   readonly updateQueue?: (request: SessionUpdateQueueRequest) => Effect.Effect<SessionUpdateQueueValue, unknown, R>
   readonly projections?: (request: SessionProjectionsRequest) => Effect.Effect<SessionProjectionsValue, unknown, R>
+  readonly fork?: (request: SessionForkRequest) => Effect.Effect<SessionForkValue, unknown, R>
+  readonly rename?: (request: SessionRenameRequest) => Effect.Effect<SessionRenameValue, unknown, R>
   readonly selectModel?: (request: SessionSelectModelRequest) => Effect.Effect<SessionSelectModelValue, unknown, R>
 }
