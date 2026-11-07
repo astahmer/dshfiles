@@ -1,9 +1,17 @@
 import { VcsDetector } from '@dshfiles/vcs-provider-port/detect'
 import { Context, Effect, FileSystem, Layer, Option, Path, Schema } from 'effect'
-import { MAX_PATCH_CHARS, type ReviewFailureReason, type ReviewResult } from './api.js'
+import {
+  MAX_PATCH_CHARS,
+  type ReviewFailureReason,
+  type ReviewResult,
+  type RevisionReview,
+  type RevisionsReviewInput,
+  type RevisionsReviewResult,
+} from './api.js'
 import { ReviewGit } from './git.js'
-import { ReviewJj } from './jj.js'
+import { type JjReadFailed, ReviewJj } from './jj.js'
 import type { ReviewBackend } from './review-backend.js'
+import { RevisionReviewModel, type ResolvedRevision } from './revision-review.js'
 import { groupPatch } from './scopes.js'
 
 /** Base bookmarks tried in order when the caller does not name one. */
@@ -31,6 +39,8 @@ export interface ReviewInput {
   readonly toChangeId?: string | undefined
 }
 
+type UnresolvedRevision = Extract<RevisionsReviewResult, { readonly status: 'ok' }>['unresolved'][number]
+
 const failure = (path: string, reason: ReviewFailureReason, message: string): ReviewResult => ({ status: 'failed', path, reason, message })
 
 /** The argv the Host builds for a review; exported so a test can drive the same one. */
@@ -51,7 +61,7 @@ const jjBackend = (jj: ReviewJj['Service']): ReviewBackend => ({
     jj.read({ path: input.path, args: revisionArgs(input.revision), outputLimit: 4_096 }).pipe(
       Effect.map(output => output.stdout.trim().length > 0),
       Effect.catchIf(
-        error => error.reason === 'jj-failed',
+        error => error.reason === 'jj-failed' || error.reason === 'ambiguous-revision',
         () => Effect.succeed(false),
       ),
     ),
@@ -70,12 +80,16 @@ const jjBackend = (jj: ReviewJj['Service']): ReviewBackend => ({
  */
 export class ReviewWorkspace extends Context.Service<
   ReviewWorkspace,
-  { readonly review: (input: ReviewInput) => Effect.Effect<ReviewResult, PullsReviewOperationError> }
+  {
+    readonly review: (input: ReviewInput) => Effect.Effect<ReviewResult, PullsReviewOperationError>
+    readonly reviewRevisions: (input: RevisionsReviewInput) => Effect.Effect<RevisionsReviewResult, PullsReviewOperationError>
+  }
 >()('@dshfiles/pulls-review/ReviewWorkspace') {
   static readonly layer = Layer.effect(
     ReviewWorkspace,
     Effect.gen(function* () {
-      const jj = jjBackend(yield* ReviewJj)
+      const jjReads = yield* ReviewJj
+      const jj = jjBackend(jjReads)
       const git = yield* Effect.serviceOption(ReviewGit)
       const detector = yield* VcsDetector
       const fileSystem = yield* FileSystem.FileSystem
@@ -145,7 +159,9 @@ export class ReviewWorkspace extends Context.Service<
             JjReadFailed: error => {
               if (error.reason === 'jj-missing') return Effect.succeed(failure(input.path, 'jj-missing', backend.messages.missing))
               if (error.reason === 'not-a-repository') return Effect.succeed(failure(input.path, 'not-a-repository', backend.messages.notARepository))
-              if (error.reason === 'jj-failed') return Effect.succeed(failure(input.path, 'jj-failed', backend.messages.failed))
+              if (error.reason === 'jj-failed' || error.reason === 'ambiguous-revision') {
+                return Effect.succeed(failure(input.path, 'jj-failed', backend.messages.failed))
+              }
               return Effect.fail(new PullsReviewOperationError({ operation: 'review', cause: error }))
             },
             PatchGroupingFailed: error => Effect.fail(new PullsReviewOperationError({ operation: 'review', cause: error })),
@@ -153,7 +169,127 @@ export class ReviewWorkspace extends Context.Service<
         )
       })
 
-      return ReviewWorkspace.of({ review })
+      /** One requested id: the revision it names now, or why the selection has to go on without it. */
+      const resolveRevision = (input: { readonly path: string; readonly revision: string }) =>
+        jjReads.read({ path: input.path, args: RevisionReviewModel.describeArgs(input.revision), outputLimit: 8_192 }).pipe(
+          Effect.map((output): UnresolvedRevision | ResolvedRevision => {
+            const resolved = RevisionReviewModel.decodeResolved(input.revision, output.stdout)
+            return (
+              resolved ?? {
+                revision: input.revision,
+                reason: 'missing',
+                message: 'jj returned no single revision for this id. Refresh the graph and select it again.',
+              }
+            )
+          }),
+          Effect.catchIf(
+            error => error.reason === 'jj-failed' || error.reason === 'ambiguous-revision',
+            (error): Effect.Effect<UnresolvedRevision> =>
+              Effect.succeed(
+                error.reason === 'ambiguous-revision'
+                  ? {
+                      revision: input.revision,
+                      reason: 'divergent',
+                      message: 'Several commits share this change id. Select one commit from the graph instead.',
+                    }
+                  : { revision: input.revision, reason: 'missing', message: 'This revision no longer exists. Refresh the graph and select it again.' },
+              ),
+          ),
+        )
+
+      /** One revision's change, within what is left of the review's one patch budget. */
+      const readRevision = Effect.fn('review revision read')(function* (input: {
+        readonly path: string
+        readonly revision: ResolvedRevision
+        readonly budget: number
+      }) {
+        // An exhausted budget still lists the revision, flagged, instead of dropping it from the review.
+        const diff =
+          input.budget <= 0
+            ? { stdout: '', truncated: true }
+            : yield* jjReads.read({ path: input.path, args: RevisionReviewModel.diffArgs(input.revision.commitId), outputLimit: input.budget })
+        const patch = diff.stdout
+        const grouped = yield* groupPatch({ patch, title: input.revision.shortChangeId })
+        return {
+          changeId: input.revision.changeId,
+          shortChangeId: input.revision.shortChangeId,
+          commitId: input.revision.commitId,
+          description: input.revision.description,
+          patch,
+          truncated: diff.truncated || grouped.clipped,
+          fileCount: grouped.fileCount,
+          additions: grouped.additions,
+          deletions: grouped.deletions,
+          files: [...grouped.files],
+        } satisfies RevisionReview
+      })
+
+      const readRevisions = Effect.fn('review revisions read')(function* (input: RevisionsReviewInput) {
+        const requested = [...new Set(input.revisions)]
+        const outcomes = yield* Effect.forEach(requested, revision => resolveRevision({ path: input.path, revision }), { concurrency: 4 })
+        const found = new Map<string, ResolvedRevision>()
+        for (const outcome of outcomes) if ('commitId' in outcome && !found.has(outcome.commitId)) found.set(outcome.commitId, outcome)
+        const resolved = [...found.values()]
+        const ordering =
+          resolved.length < 2
+            ? ''
+            : (yield* jjReads.read({ path: input.path, args: RevisionReviewModel.orderArgs(resolved.map(revision => revision.commitId)), outputLimit: 16_384 }))
+                .stdout
+        const ordered = RevisionReviewModel.inOrder(resolved, ordering)
+        const revisions: RevisionReview[] = []
+        let budget = MAX_PATCH_CHARS
+        // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- oldest first, each read takes what the earlier ones left of one patch budget.
+        for (const revision of ordered) {
+          const read = yield* readRevision({ path: input.path, revision, budget })
+          revisions.push(read)
+          budget -= read.patch.length
+        }
+        return {
+          status: 'ok',
+          path: input.path,
+          revisions,
+          unresolved: outcomes.filter((outcome): outcome is UnresolvedRevision => !('commitId' in outcome)),
+          segments: RevisionReviewModel.segments(ordered),
+          truncated: revisions.some(revision => revision.truncated),
+          fileCount: revisions.reduce((total, revision) => total + revision.fileCount, 0),
+          additions: revisions.reduce((total, revision) => total + revision.additions, 0),
+          deletions: revisions.reduce((total, revision) => total + revision.deletions, 0),
+        } satisfies RevisionsReviewResult
+      })
+
+      const revisionsFailure = (path: string, error: JjReadFailed): Effect.Effect<RevisionsReviewResult, PullsReviewOperationError> => {
+        if (error.reason === 'jj-missing') return Effect.succeed(RevisionReviewModel.failure(path, 'jj-missing', jj.messages.missing))
+        if (error.reason === 'not-a-repository') return Effect.succeed(RevisionReviewModel.failure(path, 'not-a-repository', jj.messages.notARepository))
+        if (error.reason === 'jj-failed' || error.reason === 'ambiguous-revision') {
+          return Effect.succeed(RevisionReviewModel.failure(path, 'jj-failed', jj.messages.failed))
+        }
+        return Effect.fail(new PullsReviewOperationError({ operation: 'review', cause: error }))
+      }
+
+      const reviewRevisions = Effect.fn('pulls-review revisions review')(function* (input: RevisionsReviewInput) {
+        if (!(yield* isDirectory(input.path))) {
+          return RevisionReviewModel.failure(
+            input.path,
+            'workspace-missing',
+            'That workspace is no longer on disk. Open the graph from a workspace that still exists.',
+          )
+        }
+        if ((yield* detector.detect(input.path)) === 'git') {
+          return RevisionReviewModel.failure(
+            input.path,
+            'not-a-repository',
+            'Reviewing selected revisions needs a Jujutsu repository, and this one is git-only.',
+          )
+        }
+        return yield* readRevisions(input).pipe(
+          Effect.catchTags({
+            JjReadFailed: error => revisionsFailure(input.path, error),
+            PatchGroupingFailed: error => Effect.fail(new PullsReviewOperationError({ operation: 'review', cause: error })),
+          }),
+        )
+      })
+
+      return ReviewWorkspace.of({ review, reviewRevisions })
     }),
   ).pipe(Layer.provide(VcsDetector.layer), Layer.provide(Path.layer))
 }
