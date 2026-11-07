@@ -46,6 +46,18 @@ Feature: Multi-host loopback SSH lifecycle
     And the Hosts page is opened
     Then the Hosts page shows live resource metrics
 
+  @scenario:multi-host.checkout-sync
+  Scenario: A checkout on another host syncs without losing unpushed work
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And a checkout on the host has unpushed work and origin moved
+    And the Hosts page is opened
+    And the checkout is checked from the Sync checkout dialog
+    Then the dialog refuses over the unpushed work and says what to do
+    When that work is marked as local on the host and checked again
+    And the incoming revision is synced from the dialog
+    Then the checkout holds both its own work and the incoming revision and origin did not move
+
   @scenario:multi-host.remote-host-fallback
   Scenario: A selected mirrored thread opens its owning host UI
     Given a loopback SSH DSH pair is booted

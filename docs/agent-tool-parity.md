@@ -284,8 +284,9 @@ fnm, checkout, install, build, CLI, profile and headless runtime; `dryRun` plans
 `confirm: 'next'` runs one step per call and `confirm: 'all'` runs the named
 steps), `multi_host_runtime_status`, `multi_host_runtime_control` (start/stop; a
 stop refuses a pid whose command is not that machine's DSH web),
-`multi_host_runtime_logs` and `multi_host_checkout_sync` (`apply: false` only
-reports the fetch and rebase commands). Provisioning never installs fnm itself:
+`multi_host_runtime_logs` and `multi_host_checkout_sync` (the Hosts page's Sync
+checkout; `apply: false` fetches and reports without changing files, and it never
+pushes). Provisioning never installs fnm itself:
 that is the machine's own setup, reported as a blocked step.
 
 The remote inventory adds no user verb: it renders the `sessions` that

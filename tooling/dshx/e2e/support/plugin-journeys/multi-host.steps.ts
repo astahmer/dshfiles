@@ -608,6 +608,90 @@ Then('the Hosts page shows live resource metrics', async ({ page }: { readonly p
   await expect(hostsPage.getByText(/^Every machine this one can run threads on/)).toHaveCount(0)
 })
 
+/** One scratch repository trio per page: a bare origin, whoever else publishes to it, and the checkout on the host. */
+const checkoutSyncRepositories = new WeakMap<Page, { readonly origin: string; readonly publisher: string; readonly checkout: string }>()
+
+const scratchRun = (cwd: string, command: string, ...args: readonly string[]): string => {
+  const result = spawnSync(command, [...args], {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, JJ_USER: 'Scratch', JJ_EMAIL: 'scratch@example.invalid' },
+  })
+  if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed: ${result.stderr}`)
+  return result.stdout
+}
+
+const syncDialog = (page: Page) => page.getByTestId('checkout-sync-dialog')
+
+When('a checkout on the host has unpushed work and origin moved', async ({ page }: { readonly page: Page }) => {
+  const root = join(pairFor(page).remote.homeRoot, 'checkout-sync')
+  await mkdir(root, { recursive: true })
+  const origin = join(root, 'origin.git')
+  const publisher = join(root, 'publisher')
+  const checkout = join(root, 'host checkout')
+  scratchRun(root, 'git', 'init', '--quiet', '--bare', origin)
+  scratchRun(root, 'jj', 'git', 'init', '--colocate', publisher)
+  scratchRun(publisher, 'jj', 'git', 'remote', 'add', 'origin', origin)
+  await writeFile(join(publisher, 'base.txt'), 'base\n')
+  scratchRun(publisher, 'jj', 'describe', '-m', 'base')
+  scratchRun(publisher, 'jj', 'bookmark', 'create', 'main', '-r', '@')
+  scratchRun(publisher, 'jj', 'git', 'push', '--bookmark', 'main')
+  scratchRun(root, 'jj', 'git', 'clone', origin, checkout)
+  scratchRun(checkout, 'jj', 'new', 'main@origin')
+  await writeFile(join(checkout, 'mine.txt'), 'mine\n')
+  scratchRun(checkout, 'jj', 'describe', '-m', 'feat: unpushed on this host')
+  scratchRun(publisher, 'jj', 'new', 'main@origin')
+  await writeFile(join(publisher, 'incoming.txt'), 'incoming\n')
+  scratchRun(publisher, 'jj', 'describe', '-m', 'feat: pushed from elsewhere')
+  scratchRun(publisher, 'jj', 'bookmark', 'set', 'main', '-r', '@')
+  scratchRun(publisher, 'jj', 'git', 'push', '--bookmark', 'main')
+  checkoutSyncRepositories.set(page, { origin, publisher, checkout })
+})
+
+When('the checkout is checked from the Sync checkout dialog', async ({ page }: { readonly page: Page }) => {
+  const repositories = checkoutSyncRepositories.get(page)
+  if (repositories === undefined) throw new Error('The checkout sync journey created no repositories.')
+  await page.getByTestId(/^host-row-/u).filter({ hasText: scratchRemoteName }).getByRole('button', { name: 'Sync checkout', exact: true }).click()
+  const dialog = syncDialog(page)
+  await expect(dialog).toBeVisible()
+  await dialog.getByLabel(`Checkout on ${scratchRemoteName}`).fill(repositories.checkout)
+  await dialog.getByRole('button', { name: 'Check', exact: true }).click()
+})
+
+Then('the dialog refuses over the unpushed work and says what to do', async ({ page }: { readonly page: Page }) => {
+  const dialog = syncDialog(page)
+  await expect(dialog.getByTestId('checkout-sync-status')).toHaveAttribute('data-status', 'unpushed-work', { timeout: 60_000 })
+  await expect(dialog.getByRole('list', { name: 'Incoming from origin' })).toContainText('feat: pushed from elsewhere')
+  await expect(dialog.getByRole('list', { name: 'Not pushed, in this working copy' })).toContainText('feat: unpushed on this host')
+  await expect(dialog.getByRole('list', { name: 'Workspaces in this repository' })).toContainText('default')
+  await expect(dialog.getByRole('list', { name: 'Recovery steps' })).toContainText('rebase -b @')
+  await expect(dialog.getByRole('button', { name: /^Sync \d+ incoming/u })).toHaveCount(0)
+})
+
+When('that work is marked as local on the host and checked again', async ({ page }: { readonly page: Page }) => {
+  const repositories = checkoutSyncRepositories.get(page)
+  if (repositories === undefined) throw new Error('The checkout sync journey created no repositories.')
+  scratchRun(repositories.checkout, 'jj', 'describe', '-m', 'wip')
+  const dialog = syncDialog(page)
+  await dialog.getByRole('button', { name: 'Check again', exact: true }).click()
+  await expect(dialog.getByTestId('checkout-sync-status')).toHaveAttribute('data-status', 'would-sync', { timeout: 60_000 })
+})
+
+When('the incoming revision is synced from the dialog', async ({ page }: { readonly page: Page }) => {
+  const dialog = syncDialog(page)
+  await dialog.getByRole('button', { name: 'Sync 1 incoming revision', exact: true }).click()
+  await expect(dialog.getByTestId('checkout-sync-status')).toHaveAttribute('data-status', 'synced', { timeout: 60_000 })
+})
+
+Then('the checkout holds both its own work and the incoming revision and origin did not move', async ({ page }: { readonly page: Page }) => {
+  const repositories = checkoutSyncRepositories.get(page)
+  if (repositories === undefined) throw new Error('The checkout sync journey created no repositories.')
+  expect(await readFile(join(repositories.checkout, 'mine.txt'), 'utf8')).toBe('mine\n')
+  expect(await readFile(join(repositories.checkout, 'incoming.txt'), 'utf8')).toBe('incoming\n')
+  const originTip = scratchRun(repositories.origin, 'git', 'log', '-1', '--format=%s', 'main').trim()
+  expect(originTip).toBe('feat: pushed from elsewhere')
+})
+
 When('the manager composer selects the recorded remote thread mention', async ({ page }: { readonly page: Page }) => {
   const observation = autoDestinationObservations.get(page)
   if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')

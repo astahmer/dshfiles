@@ -220,13 +220,14 @@
     {
       "id": "fleet-update",
       "title": "Update every host from the Hosts page",
-      "summary": "Update hosts checks every visible SSH host: it fetches the host repository and dry-runs that host's own dshx checkout sync, then lists what would change. Update all syncs each host that has changes (rebase onto main@origin, install, rebuild) and says per host whether DSH there needs a restart. Hosts are never restarted from here. Agents get the same operation as multi_host_update.",
+      "summary": "Update hosts checks every visible SSH host: it fetches the host repository and dry-runs that host's own dshx checkout sync, then lists incoming and unpushed revisions and what would rebuild. Update all syncs each host that has changes (rebase onto main@origin, install, rebuild) and says per host whether DSH there needs a restart. Hosts are never restarted from here. Agents get the same operation as multi_host_update.",
       "surfaces": ["client", "host"],
       "configuration": [],
       "states": ["checking", "up-to-date", "update-available", "updating", "updated", "restart-needed", "failed"],
       "failureModes": [
         "A host without a built checkout, jj or an official Node build is reported with the provisioning step it needs.",
         "A conflicted or refused sync leaves the host checkout as dshx checkout sync left it and names the recovery on that host.",
+        "A conflicted bookmark stops the update before dshx runs and names how to keep either side.",
         "Only commits on main@origin reach a host; local commits that are not pushed stay here.",
         "A failed row keeps its error and offers Retry; other hosts continue."
       ],
@@ -274,6 +275,96 @@
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: Hosts › Update hosts"
+    },
+    {
+      "id": "checkout-sync",
+      "title": "Sync a jj checkout on another host",
+      "summary": "Sync checkout on a host row compares one jj checkout with its bookmark on origin: it fetches, simulates the rebase off disk and lists incoming and unpushed revisions, the bookmark state, which workspace this is and the others sharing the repository with the threads running in them. Confirming rebases the checkout, keeping undescribed local edits. Sync never pushes and never moves a bookmark. Agents get the same operation as multi_host_checkout_sync, and multi_host_doctor warns of a conflicted bookmark.",
+      "surfaces": ["client", "host"],
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "left-nav: Hosts › Sync checkout",
+      "configuration": [],
+      "states": [
+        "up-to-date",
+        "ahead",
+        "would-sync",
+        "synced",
+        "jj-missing",
+        "no-checkout",
+        "not-jj",
+        "fetch-failed",
+        "no-remote-bookmark",
+        "stale",
+        "bookmark-conflict",
+        "workspace-busy",
+        "unpushed-work",
+        "conflicted",
+        "moved",
+        "failed"
+      ],
+      "failureModes": [
+        "Described work origin lacks refuses the sync and stays where it is; the report names commands to rebase and publish it, or to mark it local.",
+        "A rebase that would conflict is simulated and undone without touching files, and the report lists the conflicting files.",
+        "A conflicted bookmark refuses the sync; the report shows both sides and how to keep the local commits or follow origin.",
+        "Another workspace built on these revisions refuses the sync and is named with its path.",
+        "A stale working copy refuses the sync and names jj workspace update-stale, because jj cannot record edits while it is stale.",
+        "A confirmed sync whose checkout or origin moved after the preview refuses and asks to check again.",
+        "Only commits on the bookmark at origin reach a host; a report keeps unpushed work visible as outgoing and names the push command to run there."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj-and-origin",
+          "boundary": "jj on the host and its Git remote named origin, reached over SSH.",
+          "deterministicFake": "tests/remote-checkout.test.ts runs the exact remote scripts on real scratch jj repositories behind a fake ssh and a local bare origin; the journey does the same over a loopback sshd."
+        }
+      ],
+      "reach": [
+        "seed multi-host-hosts",
+        "click tab \"Observe\"",
+        "click button \"Hosts\"",
+        "expect heading \"Hosts\"",
+        "click button \"Sync checkout\"",
+        "expect textbox \"Checkout on Build box\"",
+        "expect button \"Check\""
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "multi-host.checkout-sync-unpushed",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-checkout.test.ts",
+          "testName": "described work origin lacks refuses the sync and stays"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.checkout-sync-conflict",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-checkout.test.ts",
+          "testName": "a conflicting rebase names the files and changes nothing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.checkout-sync-bookmark-conflict",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-checkout.test.ts",
+          "testName": "refuses the sync, names both sides and loses neither"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.checkout-sync",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "ssh command",
+          "file": "plugins/@dshfiles/multi-host/tests/ssh-spans.test.ts",
+          "testName": "records an ssh command span that fails on a refused target before ssh starts"
+        }
+      ]
     },
     {
       "id": "host-settings",
