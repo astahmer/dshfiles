@@ -85,20 +85,14 @@ const WorkspaceRow = (props: { readonly workspace: Workspace; readonly current?:
 const RecoveryStep = (props: { readonly label: string; readonly command?: string | undefined }) => {
   const [copied, setCopied] = useState<boolean | undefined>(undefined)
   const { command } = props
+  const copy = async (text: string) => setCopied(await writeClipboard(text))
   return (
     <li className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:text-sm">
       <span>{props.label}</span>
       {command === undefined ? null : (
         <span className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-1">
           <code className="dshx:min-w-0 dshx:flex-1 dshx:rounded dshx:bg-muted dshx:px-2 dshx:py-1 dshx:font-mono dshx:text-xs dshx:break-all">{command}</code>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="dshx:size-7"
-            aria-label={`Copy command: ${command}`}
-            onClick={() => void writeClipboard(command).then(setCopied)}
-          >
+          <Button type="button" size="icon" variant="ghost" className="dshx:size-7" aria-label={`Copy command: ${command}`} onClick={() => void copy(command)}>
             {copied === true ? <CheckIcon className="dshx:size-3.5" /> : <CopyIcon className="dshx:size-3.5" />}
           </Button>
         </span>

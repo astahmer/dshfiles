@@ -6509,7 +6509,7 @@
     },
     {
       "name": "multi_host_checkout_sync",
-      "description": "Fetch and rebase one checkout on an SSH host onto its bookmark origin, keeping that machine edits. Without apply it only reports the commands. Call only when the user asked to update that checkout.",
+      "description": "Sync one jj checkout on an SSH host with <bookmark>@origin. Without apply it fetches (which moves remote bookmarks only), simulates the rebase and reports the incoming and outgoing revisions, the bookmark state, which workspace this is, the others that share the repository, and the recovery commands for that host; no file changes. With apply it rebases, keeping undescribed local edits. It never pushes and never moves a bookmark. Described work origin lacks, a conflict, a conflicted bookmark, a stale working copy or another workspace built on these revisions refuses the sync and leaves the checkout as it was. Pass the head and target of the report as expectedHead and expectedTarget to refuse when the checkout moved since. Call only when the user asked to check or update that checkout.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -6524,6 +6524,12 @@
           },
           "apply": {
             "type": "boolean"
+          },
+          "expectedHead": {
+            "type": "string"
+          },
+          "expectedTarget": {
+            "type": "string"
           }
         },
         "required": [
