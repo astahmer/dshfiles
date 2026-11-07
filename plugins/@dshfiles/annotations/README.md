@@ -23,15 +23,20 @@ preview and extension halves here reuse their _ideas_ (instrumented renderer,
 
 ## Use
 
-- **Pick**: the crosshair action on the left of the composer, or the panel it
-  opens. Hover highlights the element under the pointer; click captures it;
+- **Pick**: the crosshair action in a composer, or the panel it opens. It joins
+  every composer that offers tools: the conversation, and Backlog's capture box,
+  item description and replies. Hover highlights the element under the pointer; click captures it;
   `Esc` leaves pick mode without storing anything.
 - **Note**: the popover collects the note plus an optional intent (`fix`,
   `change`, `question`, `approve`) and severity (`blocking`, `important`,
   `suggestion`).
-- **Insert**: the panel lists this thread's annotations and adds them to the
-  draft at the composer cursor. `Annotated UI feedback (n)` is plain text: it
+- **Insert**: the panel lists the annotations of this thread, or of this Backlog
+  item or capture box, and adds them to the draft at the composer cursor. `Annotated UI feedback (n)` is plain text: it
   stays editable and is only sent when you send the message.
+- **Scope**: `ComposerTool` hands the tool a `scope`, and the Host's `sessionId`
+  field stores it opaquely: a Session id, `backlog:item:<id>` or
+  `backlog:capture:<key>`. Nothing closes a Backlog annotation on its own, because
+  no Agent owns that scope; Resolve or Dismiss it in the panel once it was sent.
 - **Lifecycle**: annotations stay `pending` until an Agent acknowledges them
   (`annotations_ack`) or resolves them (`annotations_resolve`, bound to the exact
   revision it read). `annotations_dismiss` requires a reason. A target that no

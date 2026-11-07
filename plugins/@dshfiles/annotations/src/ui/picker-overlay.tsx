@@ -51,15 +51,15 @@ const CommentForm = ({ picked }: { readonly picked: PickedTarget }): JSX.Element
   const [intent, setIntent] = useState<AnnotationIntent | null>('fix')
   const [severity, setSeverity] = useState<AnnotationSeverity | null>('important')
   const [error, setError] = useState<string | null>(null)
-  const sessionId = ui.sessionId
+  const { scope, owner } = ui
   const create = useMutation({
     mutationFn: async (pickAgain: boolean) => {
-      if (sessionId === null) throw new Error('Open a thread first.')
+      if (scope === null) throw new Error('Open a thread first, or a Backlog item.')
       await runHostRequest({
         request: signal =>
           api.create(
             {
-              sessionId,
+              sessionId: scope,
               items: [
                 {
                   kind: picked.mode === 'region' ? 'region' : 'element',
@@ -76,8 +76,8 @@ const CommentForm = ({ picked }: { readonly picked: PickedTarget }): JSX.Element
       return pickAgain
     },
     onSuccess: async pickAgain => {
-      await queryClient.invalidateQueries({ queryKey: ['annotations', sessionId] })
-      if (pickAgain && sessionId !== null) annotationsUi.beginPick({ sessionId, mode: picked.mode })
+      await queryClient.invalidateQueries({ queryKey: ['annotations', scope] })
+      if (pickAgain && scope !== null && owner !== null) annotationsUi.beginPick({ scope, owner, mode: picked.mode })
       else annotationsUi.clearPicked()
     },
     onError: (cause: unknown) => {
