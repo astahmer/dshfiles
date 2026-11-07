@@ -292,8 +292,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   )
   const [locateSnapshot, sendLocate] = useMachine(revisionLocateMachine)
   useEffect(() => {
-    const reference = initialRequest?.reference
-    if (reference !== undefined) sendLocate({ type: 'reference', reference })
+    if (initialRequest?.reference !== undefined) sendLocate({ type: 'reference', reference: initialRequest.reference, path: initialRequest.path })
   }, [initialRequest, sendLocate])
   const [repoHistory, setRepoHistory] = useState(() => storedRepoHistory.get().slice(0, REPO_HISTORY_LIMIT))
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -530,8 +529,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const allRevisions = useMemo(() => mergeGraphRevisions(navigation.extraRevisions, graphRowsInput), [navigation.extraRevisions, graphRowsInput])
   const revisionsLoaded = state !== undefined
   useEffect(() => {
-    sendLocate({ type: 'revisions', revisions: allRevisions, loaded: revisionsLoaded })
-  }, [allRevisions, revisionsLoaded, sendLocate])
+    sendLocate({ type: 'revisions', revisions: allRevisions, loaded: revisionsLoaded, root: state?.root ?? null })
+  }, [allRevisions, revisionsLoaded, sendLocate, state?.root])
   const editTimeCommitIds = useMemo(
     () =>
       preferences.revisionDate === 'created' && fromDate === '' && toDate === ''
@@ -555,7 +554,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   })
   const selectedRevision = navigation.selectedRevision
   useEffect(() => {
-    sendLocate({ type: 'reset' })
+    sendLocate({ type: 'repository.changed' })
     setComparisonSelection(null)
   }, [repoId, sendLocate, setComparisonSelection])
 
@@ -583,7 +582,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   useEffect(() => {
     if (!sidePanel) return
     return sidePanelRepository.onRequest(requested => {
-      if (requested.reference !== undefined) sendLocate({ type: 'reference', reference: requested.reference })
+      if (requested.reference !== undefined) sendLocate({ type: 'reference', reference: requested.reference, path: requested.path })
       if (shownRootRef.current !== null && containsPath(shownRootRef.current, requested.path)) return
       sendRegistration({ type: 'register', path: requested.path })
     })
@@ -2193,6 +2192,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             onSelect={selected => {
               setPickerOpen(false)
               setPath(selected.canonicalPath)
+              // The user chose another repository, so a reference still waiting for the last one no longer applies.
+              sendLocate({ type: 'cancel' })
               sendRegistration({ type: 'register', path: selected.canonicalPath })
             }}
             projects={props.projects}
