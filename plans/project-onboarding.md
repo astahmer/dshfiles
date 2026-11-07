@@ -1,9 +1,11 @@
 # Project onboarding, the way t3code does it
 
 P1 (folder inspection + Enable Jujutsu), P2 (clone stages + retry), P3 (publish) and the
-read side of P4 (`dsh.project.json` + thread default) shipped on 2026-11-07 as four revisions.
-P5 (setup on workspace create) and P6 (icons, grouping, promotion, cleanup reasons) are not
-started; each still needs its own pass. Compared 2026-11-07 against our `main` at `1eebe26d` and
+read side of P4 (`dsh.project.json` + thread default) shipped on 2026-11-07 as four revisions;
+P5 (setup on workspace create) shipped the same day as two more (the trusted action flags in
+`project-checks`, then the dispatch and composer card in `jj-integration`). P6 (icons, grouping,
+promotion, cleanup reasons) is not started; it still needs its own pass. Compared 2026-11-07
+against our `main` at `1eebe26d` and
 [pingdotgg/t3code](https://github.com/pingdotgg/t3code) at tag
 `v0.1.8-nightly.20261104.4179` (commit `9e85538`, 2026-11-04). t3code paths below are
 relative to that tag; our paths are relative to this repository.
@@ -39,20 +41,20 @@ The controls are not missing. The **onboarding step that would make them appear 
 717 commits on `main`; these are the ones touching project/workspace surface. None of them
 changed folder → project detection.
 
-| Date | Commit | What it did for project setup |
-| --- | --- | --- |
-| 11-04 | `00fda92f` | Absorbed the project folder picker component into this bundle |
-| 11-04 | `376e58c0`, `d56cf1b6`, `6276680f` | New-thread label, catalog rules, published tool arguments |
-| 11-05 | `85f4c426`, `22c41a57` | Thread-workspace VCS port with jj **and git** adapters; git-only repos served through the jj tools and UI |
-| 11-05 | `954a221c` | Automatic fetch for git-only repositories |
-| 11-05 | `5267075a`, `8c94a899` | Hardened git thread-workspace adapter; bounded reads |
-| 11-05 | `28d2ac29` | pulls-review reviews git-only thread workspaces |
-| 11-07 | `411a9890` | Windows paths + native folder dialog in the picker (PR #55) |
-| 11-07 | `471bc0b9` | Clone job tracked by state, one admission per destination |
-| 11-07 | `f79cd993` | Picker path query and browse target in one reducer |
-| 11-07 | `951d4ae0` | Add-workspace pick flow is one state union |
-| 11-07 | `1c93a99d`, `a0700b1b` | Duplicate/ambiguous jj workspace destinations fixed |
-| 11-07 | `67972b66` | `multi_host_checkout_sync` |
+| Date  | Commit                             | What it did for project setup                                                                             |
+| ----- | ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 11-04 | `00fda92f`                         | Absorbed the project folder picker component into this bundle                                             |
+| 11-04 | `376e58c0`, `d56cf1b6`, `6276680f` | New-thread label, catalog rules, published tool arguments                                                 |
+| 11-05 | `85f4c426`, `22c41a57`             | Thread-workspace VCS port with jj **and git** adapters; git-only repos served through the jj tools and UI |
+| 11-05 | `954a221c`                         | Automatic fetch for git-only repositories                                                                 |
+| 11-05 | `5267075a`, `8c94a899`             | Hardened git thread-workspace adapter; bounded reads                                                      |
+| 11-05 | `28d2ac29`                         | pulls-review reviews git-only thread workspaces                                                           |
+| 11-07 | `411a9890`                         | Windows paths + native folder dialog in the picker (PR #55)                                               |
+| 11-07 | `471bc0b9`                         | Clone job tracked by state, one admission per destination                                                 |
+| 11-07 | `f79cd993`                         | Picker path query and browse target in one reducer                                                        |
+| 11-07 | `951d4ae0`                         | Add-workspace pick flow is one state union                                                                |
+| 11-07 | `1c93a99d`, `a0700b1b`             | Duplicate/ambiguous jj workspace destinations fixed                                                       |
+| 11-07 | `67972b66`                         | `multi_host_checkout_sync`                                                                                |
 
 Shipped just before that thread (2026-10-29), so it was already on screen but still not
 wired to folder registration: clone with progress and cancel (`c4cd3b0d`), new project with
@@ -125,30 +127,30 @@ Worktree location and branch naming are settings, overridable per project.
 
 ## Where we stand
 
-| Dimension | t3code | Ours today | Verdict |
-| --- | --- | --- | --- |
-| Entry point | Add Project → machine → source (`New project` / `Local folder` / `Git URL` / provider) | Add workspace → browse; **New** menu holds Clone and New project | Ours hides the three verbs and offers no provider source |
-| Folder state | Repository identity resolved on add (remote, forge, icon) | Nothing inspected; a plain folder, a Git checkout and a jj repo all look the same | **Main gap** |
-| Enable Jujutsu | n/a (git-first) | `RepositoryInitializer` + `jj_open_repository` exist but only the graph client calls them | Verb exists, onboarding does not |
-| Composer after add | Env mode (local/worktree) chosen per project, remembered | Workspace/bookmark segments appear only when the folder is already a jj repo | Complaint still reproducible |
-| Clone | Project first, files later, draft allowed, send gated, toast on every client | Folder cloned, then jj colocated, then registered; dialog-local progress; no other surface | Project appears only on success |
-| Clone failure | Partial checkout deleted, project kept, **retry** into the same destination | Partial folder deleted, failure text only, **no retry** | Retry is missing |
-| Clone progress | Stage + percent + detail, repository `owner/repo` | Last stderr line parsed to percent + message | Close enough; add stages |
-| Publish repository | Publish Repository for a local repo without a remote | Only as a checkbox in New project (`gh repo create`) | **Missing** for existing checkouts |
-| Project during clone | Created immediately, empty root is a valid record | Created after the clone | Decision needed (native send path) |
-| Checked-in project config | `t3.json`: icon, env mode, submodules, scripts (imported) | None | **Missing** |
-| Scripts on workspace create | `runOnWorktreeCreate`, `onSettle`, async flag, progress card | `project-checks` runs profile-trusted actions **manually**; nothing runs on workspace create | Plan-time gap, safe by design |
-| Project settings overrides | project → environment → file → built-in, with a layers UI | Only global plugin settings; no project tier anywhere | **Missing** |
-| Project identity | Identity + favicon + grouping + badges | `multi-host` groups remote threads by repository origin; no project icon | Partial |
-| Cleanup | Inactivity / merged / no-commits, protection tiers, report, delete-with-thread | `autoCleanup` kinds `empty`/`integrated`/`untracked`, `olderThanHours`, `onSettle`, `removeFinishedThreads` | Close; no merged kind, no protection tiers, no reasons report |
-| Auto-pull | Fast-forward the checkout when clean | `autoFetch.fastForwardBookmark` on `main` (off by default), `syncWorkspaceAfterLand` | Ours moves a bookmark, not the checkout — acceptable for jj |
-| No-project threads | `~/.t3/scratch/<date>-words-id`, promoted by **Turn into project** | `No folder` workspace (`~/.dsh/no-folder`), no promotion | Small gap |
-| Agent tools | `t3_project_*`, `t3_thread_launch` (worktree-bound) | `project_list/register/rename/delete/reorder`, `project_clone*`, `project_create`, `jj_open_repository` | Parity except inspect/publish/retry/config |
+| Dimension                   | t3code                                                                                 | Ours today                                                                                                  | Verdict                                                       |
+| --------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Entry point                 | Add Project → machine → source (`New project` / `Local folder` / `Git URL` / provider) | Add workspace → browse; **New** menu holds Clone and New project                                            | Ours hides the three verbs and offers no provider source      |
+| Folder state                | Repository identity resolved on add (remote, forge, icon)                              | Nothing inspected; a plain folder, a Git checkout and a jj repo all look the same                           | **Main gap**                                                  |
+| Enable Jujutsu              | n/a (git-first)                                                                        | `RepositoryInitializer` + `jj_open_repository` exist but only the graph client calls them                   | Verb exists, onboarding does not                              |
+| Composer after add          | Env mode (local/worktree) chosen per project, remembered                               | Workspace/bookmark segments appear only when the folder is already a jj repo                                | Complaint still reproducible                                  |
+| Clone                       | Project first, files later, draft allowed, send gated, toast on every client           | Folder cloned, then jj colocated, then registered; dialog-local progress; no other surface                  | Project appears only on success                               |
+| Clone failure               | Partial checkout deleted, project kept, **retry** into the same destination            | Partial folder deleted, failure text only, **no retry**                                                     | Retry is missing                                              |
+| Clone progress              | Stage + percent + detail, repository `owner/repo`                                      | Last stderr line parsed to percent + message                                                                | Close enough; add stages                                      |
+| Publish repository          | Publish Repository for a local repo without a remote                                   | Only as a checkbox in New project (`gh repo create`)                                                        | **Missing** for existing checkouts                            |
+| Project during clone        | Created immediately, empty root is a valid record                                      | Created after the clone                                                                                     | Decision needed (native send path)                            |
+| Checked-in project config   | `t3.json`: icon, env mode, submodules, scripts (imported)                              | None                                                                                                        | **Missing**                                                   |
+| Scripts on workspace create | `runOnWorktreeCreate`, `onSettle`, async flag, progress card                           | `project-checks` runs profile-trusted actions **manually**; nothing runs on workspace create                | Plan-time gap, safe by design                                 |
+| Project settings overrides  | project → environment → file → built-in, with a layers UI                              | Only global plugin settings; no project tier anywhere                                                       | **Missing**                                                   |
+| Project identity            | Identity + favicon + grouping + badges                                                 | `multi-host` groups remote threads by repository origin; no project icon                                    | Partial                                                       |
+| Cleanup                     | Inactivity / merged / no-commits, protection tiers, report, delete-with-thread         | `autoCleanup` kinds `empty`/`integrated`/`untracked`, `olderThanHours`, `onSettle`, `removeFinishedThreads` | Close; no merged kind, no protection tiers, no reasons report |
+| Auto-pull                   | Fast-forward the checkout when clean                                                   | `autoFetch.fastForwardBookmark` on `main` (off by default), `syncWorkspaceAfterLand`                        | Ours moves a bookmark, not the checkout — acceptable for jj   |
+| No-project threads          | `~/.t3/scratch/<date>-words-id`, promoted by **Turn into project**                     | `No folder` workspace (`~/.dsh/no-folder`), no promotion                                                    | Small gap                                                     |
+| Agent tools                 | `t3_project_*`, `t3_thread_launch` (worktree-bound)                                    | `project_list/register/rename/delete/reorder`, `project_clone*`, `project_create`, `jj_open_repository`     | Parity except inspect/publish/retry/config                    |
 
 ## What they do better, ranked
 
 1. **Folder → project is an inspected onboarding, not a registration.** They resolve what
-   the folder *is* (repository, remote, forge, icon, env default) at add time and put the
+   the folder _is_ (repository, remote, forge, icon, env default) at add time and put the
    choices in front of you. We register bytes on disk and let the composer look empty.
 2. **Clone is project-first.** The project and its draft exist while the clone runs, the send
    is refused with a reason instead of racing an empty tree, and progress is a stream every
@@ -199,7 +201,7 @@ controls you were missing.
 - [x] Add `projectInspect` to `@dshfiles/workspace-folder-picker` (read-only, tool
       `project_inspect`): resolve the folder's real path, then report
       `{ kind: 'none' | 'git' | 'jujutsu', repositoryRoot, remoteUrl, bookmark, workingCopy,
-      nestedGitBoundary, brokenJjMetadata, canEnableJujutsu, reason }`. Reuse
+    nestedGitBoundary, brokenJjMetadata, canEnableJujutsu, reason }`. Reuse
       `registerRepositories` from `@dshfiles/jujutsu` for jj detection instead of a second
       marker check, and `git rev-parse --show-toplevel` / `git remote get-url origin` through
       the existing `ProjectCommands` service.
@@ -274,7 +276,7 @@ Goal: a repository can declare how it wants to be worked in, safely.
       published `exports` subpath, per the repository contract): `iconPath`,
       `defaultThreadWorkspace: 'isolated' | 'shared'`, `bookmark`, and `checks` — ids of
       **trusted** `project-checks` actions to offer in this repo, never commands to run.
-      A command may only live in the file as an *importable* suggestion
+      A command may only live in the file as an _importable_ suggestion
       (`scripts: [{ name, command, hint }]`) that the user imports into the trusted profile
       with one click; the Host refuses to run anything from the file directly.
 - [x] Resolve it at the workspace root, validate with the published schema, and treat a
@@ -302,13 +304,13 @@ thread.
 
 Goal: "run the setup" stops being a manual thing you remember.
 
-- [ ] Let a `project-checks` action carry `runOnWorkspaceCreate` and `onSettle` flags (trusted
+- [x] Let a `project-checks` action carry `runOnWorkspaceCreate` and `onSettle` flags (trusted
       configuration only, same file), and have `jj-integration`'s thread warmup invoke the
       Host's durable dispatch for the flagged action after the workspace exists.
-- [ ] Publish the run as warmup phases (the warmup already has explicit phases) so the
+- [x] Publish the run as warmup phases (the warmup already has explicit phases) so the
       composer shows "Setting up · pnpm install" while the first turn is prepared, with a
       cancel control, and an opt-in "wait for setup before the first turn" flag.
-- [ ] Keep the existing safety: durable tasks stay idempotent, cancellation reports
+- [x] Keep the existing safety: durable tasks stay idempotent, cancellation reports
       `cancelled` only after the process group exits, effects before cancellation are not
       undone.
 
@@ -334,7 +336,7 @@ Goal: projects look like projects and say where they are.
 - [ ] Cleanup parity leftovers: a `merged` kind (only when the PR merged and every revision is
       on the target line), protection tiers stated in the settings copy, and a reasons report
       on the cleanup result (`kept because: unlanded revisions | live session | queued
-      integration | recent use`).
+    integration | recent use`).
 
 Acceptance: a repo with `assets/icon.svg` shows it without configuration; a monogram appears
 otherwise; two checkouts of one origin group together; cleanup reports one reason per kept
@@ -384,16 +386,18 @@ promise about shape.
 
 Filled as tasks land; empty means unverified.
 
-| Phase | Task | Evidence |
-| --- | --- | --- |
-| P1 | project inspect method | `src/folder-inspection.test.ts` 6 tests green; `project_inspect` + `project_init` bound in `src/host.ts` |
-| P1 | Enable Jujutsu action | `repository-setup-contract` provided by `@dshfiles/jujutsu`; `project-folder-setup.tsx` renders it; gherkin `workspace-folder-picker.folder-setup` added (run pending) |
-| P1 | jj-integration non-repo state | — (open) |
-| P2 | clone stages + retry | 15 tests in `project-lifecycle.test.ts`; retry refuses running/succeeded jobs |
-| P2 | clone surface outside the dialog | — (open: needs a global slot owner) |
-| P3 | project_publish | 2 tests: jj bookmark push to a bare remote, and the three refusals |
-| P3 | publish UI entry | — (open) |
-| P4 | dsh.project.json | `project-config.test.ts` 3 tests; `project_config_read` bound; jj-integration `threads.integration.test.ts` 72 tests green |
-| P4 | project settings section + import button | — (open) |
-| P5 | setup on workspace create | — |
-| P6 | icons, grouping, promotion, cleanup reasons | — |
+| Phase | Task                                        | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P1    | project inspect method                      | `src/folder-inspection.test.ts` 6 tests green; `project_inspect` + `project_init` bound in `src/host.ts`                                                                                                                                                                                                                                                                                                                                         |
+| P1    | Enable Jujutsu action                       | `repository-setup-contract` provided by `@dshfiles/jujutsu`; `project-folder-setup.tsx` renders it; gherkin `workspace-folder-picker.folder-setup` added (run pending)                                                                                                                                                                                                                                                                           |
+| P1    | jj-integration non-repo state               | — (open)                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| P2    | clone stages + retry                        | 15 tests in `project-lifecycle.test.ts`; retry refuses running/succeeded jobs                                                                                                                                                                                                                                                                                                                                                                    |
+| P2    | clone surface outside the dialog            | — (open: needs a global slot owner)                                                                                                                                                                                                                                                                                                                                                                                                              |
+| P3    | project_publish                             | 2 tests: jj bookmark push to a bare remote, and the three refusals                                                                                                                                                                                                                                                                                                                                                                               |
+| P3    | publish UI entry                            | — (open)                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| P4    | dsh.project.json                            | `project-config.test.ts` 3 tests; `project_config_read` bound; jj-integration `threads.integration.test.ts` 72 tests green                                                                                                                                                                                                                                                                                                                       |
+| P4    | project settings section + import button    | — (open)                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| P1    | e2e helper reaches the setup step           | `tooling/dshx/e2e/support/threads.ts` confirms the step's register button; every journey that adds a workspace was parked on the new dialog and failed its next selector (a P1 regression no journey had run since)                                                                                                                                                                                                                              |
+| P5    | trusted action flags                        | `project-checks` config tests + `workspace-setup-selection.test.ts` 6 tests: a flagged action whose root spans the checkout **and** the thread workspace is selected; a root covering the checkout alone is refused rather than widened                                                                                                                                                                                                          |
+| P5    | dispatch + composer card                    | `jj-integration` 474 tests green (incl. `workspace-setup-wait.test.ts` 5), both typechecks, `feature-coverage --check`; the card's own browser journey is **unverified**: the scratch composition activates `project-checks` as a bundle, so the harness's post-boot profile row double-activates it and all six project-checks journeys die on the same `PluginInactive` host failure (recorded as a `not-applicable` rationale on the feature) |
+| P6    | icons, grouping, promotion, cleanup reasons | —                                                                                                                                                                                                                                                                                                                                                                                                                                                |
