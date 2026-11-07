@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -10,7 +10,7 @@ import { seedChatImageLinkSession } from '../seed-chat-image-link-session.mjs'
 const replayMarker = 'provider-replay-private-marker'
 const browserFrames = new WeakMap<Page, string[]>()
 
-const seedTranscript = async (homeRoot: string, rowCount: number): Promise<void> => {
+const seedTranscript = async (homeRoot: string, rowCount: number, answerText?: string): Promise<void> => {
   const projectRequire = createRequire(new URL('../../../../../plugins/@dshfiles/session-controller/package.json', import.meta.url))
   const require = createRequire(projectRequire.resolve('@deepseek-ai/dsh/package.json'))
   const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href)
@@ -54,7 +54,12 @@ const seedTranscript = async (homeRoot: string, rowCount: number): Promise<void>
         seq: seq++,
         time: 303 + row * 10,
         surfaceOp: 'append',
-        data: { turn: row, step: 1, message: createAssistantMessage({ content: [{ type: 'text', text: `Transcript answer ${row}` }], source }), stream: [] },
+        data: {
+          turn: row,
+          step: 1,
+          message: createAssistantMessage({ content: [{ type: 'text', text: answerText ?? `Transcript answer ${row}` }], source }),
+          stream: [],
+        },
       })
       events.push({ type: 'step/end', seq: seq++, time: 304 + row * 10, data: { turn: row, step: 1 } })
       events.push({ type: 'turn/end', seq: seq++, time: 305 + row * 10, data: { turn: row, reason: { kind: 'completed' } } })
@@ -162,6 +167,67 @@ const openTranscriptFixture = async (page: Page, rowCount: number): Promise<void
     .toBeGreaterThan(0)
   await fixture.first().click()
 }
+
+When('a thread with a multiline answer is opened for quoting', async ({ page }: { page: Page }) => {
+  await seedTranscript(profileFor(page).homeRoot, 1, 'Answer introduction.\n\nSelected first line.\n\nSelected second line.\n\nAnswer conclusion.')
+  await openSeededThread(page, /Untitled|Chat transcript window fixture/)
+  await expect(page.getByText('Selected second line.', { exact: true })).toBeVisible()
+})
+
+Then('user messages and selected assistant text become editable unsent quotes', async ({ page }: { page: Page }) => {
+  const composer = page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+  const user = page.locator('[data-chat-flow-kind="user"]')
+  const assistant = page.locator('[data-chat-flow-kind="assistant-step"]')
+  const tail = page.locator('[data-chat-flow-kind="turn-tail"]')
+  await composer.fill('Existing draft')
+  await page.keyboard.press('ControlOrMeta+A')
+  await user.getByRole('button', { name: 'Quote message', exact: true }).click()
+  await recordAssertion(page, 'chat-user-quote-preserves-draft-and-source', async () => {
+    await expect(composer).toContainText('Existing draft')
+    await expect(composer).toContainText('Transcript question 1')
+    await expect(composer).toContainText('session-chat-transcript-window-fixture')
+    await expect(composer).toContainText('message 3')
+    await expect(composer).toContainText(/user/i)
+    await expect(composer).toBeFocused()
+  })
+
+  await composer.fill('Existing draft')
+  await assistant.evaluate(element => {
+    const paragraphs = Array.from(element.querySelectorAll('p'))
+    const first = paragraphs.find(paragraph => paragraph.textContent === 'Selected first line.')?.firstChild
+    const last = paragraphs.find(paragraph => paragraph.textContent === 'Selected second line.')?.firstChild
+    if (first === null || first === undefined || last === null || last === undefined) throw new Error('The multiline quote fixture is not rendered.')
+    const range = document.createRange()
+    range.setStart(first, 0)
+    range.setEnd(last, last.textContent?.length ?? 0)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+  })
+  await tail.getByRole('button', { name: 'Quote message', exact: true }).click()
+  await recordAssertion(page, 'chat-selected-quote-keeps-lines-and-source', async () => {
+    await expect(composer).toContainText('Existing draft')
+    await expect(composer).toContainText('session-chat-transcript-window-fixture')
+    await expect(composer).toContainText('message 5')
+    await expect(composer).toContainText(/assistant/i)
+    await expect.poll(() => composer.innerText()).toContain('> Selected first line.\n> \n> Selected second line.')
+    await expect(composer).not.toContainText('Answer introduction.')
+    await expect(composer).not.toContainText('Answer conclusion.')
+    await expect(composer).toBeFocused()
+    await expect(composer.locator('[data-composer-chip]')).toHaveCount(0)
+  })
+  await page.keyboard.press('ControlOrMeta+End')
+  await page.keyboard.type('My editable reply')
+  await recordAssertion(page, 'chat-quote-remains-editable-and-unsent', async () => {
+    await expect(composer).toContainText('My editable reply')
+    await expect(user).toHaveCount(1)
+    await expect(assistant).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeEnabled()
+    await expect(page.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(0)
+  })
+  await page.screenshot({ path: test.info().outputPath('quote-message.png'), animations: 'disabled' })
+  await finishJourneyAssertions(page)
+})
 
 When('a real thread with one hundred eighty transcript turns is opened', async ({ page }: { page: Page }) => {
   await openTranscriptFixture(page, 180)

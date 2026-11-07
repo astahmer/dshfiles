@@ -6,6 +6,8 @@
 
 ![Choose how widely Chat image previews can browse](docs/screenshots/image-gallery-scope.png)
 
+![Quote selected text into an editable draft](docs/screenshots/quote-message.png)
+
 Owned fork of DSH's native Chat client plugin. It keeps the native transcript, its Slots, renderers, settings and
 scroll behaviour, and mounts only the newest transcript rows plus the ones the reader scrolls up to (see Local delta):
 on the live profile a single thread used to mount up to 42k DOM nodes on open.
@@ -71,6 +73,18 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/pinned-tool-names.ts` | new: the registered names, set from `client-entry.tsx` and read synchronously while tool nodes build |
 | `src/inline-references.tsx`, `src/inline-reference-markdown.tsx` | new: the published `@dshfiles/chat/inline-references` registry and `@dshfiles/chat/inline-reference-markdown` renderer (below) |
 | `src/native/chat/AssistantMarkdown.tsx` (also), `UserContent.tsx`, `ChatView.tsx` (also) | text blocks render through `InlineReferenceMarkdown`, the Referenced-session line through `InlineReferenceText`, and the transcript sits in an `InlineReferenceScope` naming its Session |
+
+### Quote a conversation message
+
+Select text in a user or assistant message, then choose **Quote message** beside its copy action.
+Without a matching selection, the action quotes the whole message. The composer receives editable
+Markdown with the author, Session ID and message sequence; line breaks and any existing draft remain.
+Nothing is queued or sent until you explicitly send. Edit or remove the quote like any other draft text.
+The action uses the supported dshx `Composer.insert` contract, not an attachment chip or a Host send API.
+
+The local delta adds the action in `MessageIconActions.tsx`, supplies message identity from
+`MessageItem.tsx` and `TurnTailNodeView.tsx`, and localizes its labels in `locale.ts`.
+`src/quote-message.ts` owns selection scoping and draft insertion; `src/quote-message-action.tsx` renders the control.
 
 ### Focus a Turn, Step or tool call from another plugin
 
