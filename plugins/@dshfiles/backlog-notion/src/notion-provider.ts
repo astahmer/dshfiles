@@ -442,19 +442,19 @@ export const makeNotionProvider = Effect.fn('backlog notion provider')(function*
       return { account: workspace === null ? name : `${name} (${workspace})`, credentialSource: source, containers: yield* discover(connection) }
     })
 
-  const fetch = (scope: Scope & { readonly key: string; readonly fields: readonly ProviderField[] }) =>
+  const fetchItem = (scope: Scope & { readonly key: string; readonly fields: readonly ProviderField[] }) =>
     Effect.flatMap(layoutOf(scope), ({ layout }) => recordOf({ scope, id: scope.key, layout, fields: scope.fields, comments: true }))
 
   const resolve = (scope: Scope & { readonly reference: string }) => {
     const id = NotionMapping.idOf(scope.reference)
-    return id === undefined ? Effect.fail(failed('not-found', scope.reference)) : fetch({ ...scope, key: id, fields: allFields })
+    return id === undefined ? Effect.fail(failed('not-found', scope.reference)) : fetchItem({ ...scope, key: id, fields: allFields })
   }
 
   const provider: BacklogProvider & { readonly remove: NonNullable<BacklogProvider['remove']> } = {
     descriptor,
     identity,
     pull,
-    fetch,
+    fetch: fetchItem,
     resolve,
     push,
     create,
