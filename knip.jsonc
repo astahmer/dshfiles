@@ -35,7 +35,7 @@
   "workspaces": {
     ".": {
       // Measurement scripts under .agents, docs and plans run by hand with the arguments in their headers.
-      "entry": ["scripts/*.{ts,mjs}!", "scripts/dsh-lkg/*.mjs!", ".agents/skills/*/scripts/*.mjs", "docs/ade-performance/*.mjs", "plans/**/*.mjs"],
+      "entry": ["scripts/*.{ts,mjs}!", "scripts/dsh-lkg/*.mjs!", ".agents/skills/*/scripts/*.mjs", "docs/ade-performance/*.mjs", "docs/ade-ux/**/*.mjs", "plans/**/*.mjs"],
       // oxlint runs through `pnpm exec` inside scripts/lint-ratchet.ts. Cordis and the typert generator are
       // unreferenced, but removing them re-resolves dsh peer variants in the undeduped lockfile (docs/guardrails.md).
       // The measurement scripts resolve Playwright from the tooling/dshx workspace they are run with.

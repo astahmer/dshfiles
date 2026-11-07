@@ -70,12 +70,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 579,
-  "apiToolBindings": 397,
-  "apiToolNameCount": 397,
-  "apiToolSchemas": 396,
+  "apiMethods": 582,
+  "apiToolBindings": 400,
+  "apiToolNameCount": 400,
+  "apiToolSchemas": 399,
   "definedTools": 24,
-  "tools": 420,
+  "tools": 423,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -4712,6 +4712,26 @@
       }
     },
     {
+      "name": "jj_cancel_workspace_setup",
+      "description": "Cancel one queued or running setup action of a thread workspace. The durable task reports cancelled only after its process group exits, and effects applied before cancellation are not undone. Call only when the user asked to stop it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "taskId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "jj_confirm_action",
       "description": "Apply one prepared jujutsu action by its previewId and return the command message and output. Call only when the user asked, after jj_prepare_action showed them the plan.",
       "parameters": {
@@ -5709,6 +5729,26 @@
         },
         "required": [
           "repoId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jj_workspace_setup",
+      "description": "Prepare a new thread workspace with the trusted setup actions this project flags: dispatch each once through the durable project-check queue and report their phases. Runs nothing outside a thread workspace of a local repository, and nothing from dsh.project.json. Call only when the user asked to start that setup.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "path"
         ],
         "additionalProperties": false
       }
@@ -7753,7 +7793,7 @@
     },
     {
       "name": "project_checks_actions",
-      "description": "The trusted project actions configured for a thread directory, with each action command line and where it applies. Defaults to the calling thread. Read-only.",
+      "description": "The trusted project actions configured for a thread directory, with each action command line and where it applies, including the runOnWorkspaceCreate / awaitBeforeFirstTurn / onSettle setup flags. Defaults to the calling thread. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -7875,6 +7915,26 @@
           "actionId"
         ],
         "additionalProperties": true
+      }
+    },
+    {
+      "name": "project_checks_setup_actions",
+      "description": "The trusted actions flagged to prepare a thread workspace or run on settle, for one workspace and the checkout it belongs to. An action qualifies only when its trusted root contains both. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "workspacePath": {
+            "type": "string"
+          },
+          "repoRoot": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspacePath",
+          "repoRoot"
+        ],
+        "additionalProperties": false
       }
     },
     {
