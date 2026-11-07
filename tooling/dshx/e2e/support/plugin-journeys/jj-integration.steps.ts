@@ -1200,6 +1200,10 @@ Then('the end of the turn offers one revision to integrate into main', async ({ 
     await expect(offer).toBeVisible({ timeout: 20_000 })
     await expect(offer).toContainText('1 revision(s) ready to land on main.')
     await expect(offer.getByRole('button', { name: 'Land on main', exact: true })).toBeEnabled()
+    // The offer names the exact revisions the button moves, so landing is never blind.
+    await offer.getByRole('button', { name: 'Show the revisions that will land' }).click()
+    await expect(offer.getByRole('list', { name: 'Revisions landing on main' })).toContainText('One click work')
+    await expect(offer.getByRole('button', { name: 'Hide the revisions that will land' })).toHaveAttribute('aria-expanded', 'true')
   })
   // One click away means inside the reading flow: above the composer, not hidden in the header.
   const offerBounds = await offer.boundingBox()

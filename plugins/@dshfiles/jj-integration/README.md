@@ -6,6 +6,8 @@
 
 ![New thread destination and workspace isolation](docs/screenshots/thread-destination.png)
 
+![Integrate from the end of a turn](docs/screenshots/turn-end-integrate.png)
+
 Lets many agents work on one jj repository at once: a thread can run in its own
 jj workspace beside the repository, and **Integrate** moves its finished work
 into `main` by default. The integration page lets each ready workspace choose
@@ -136,7 +138,10 @@ turn ends and the thread workspace is ready (described, conflict-free revisions,
 no Session writing, no question waiting), an inline row beside the answer names
 the pending revisions and offers **Integrate into the configured bookmark**. It runs the header
 control's own land action; the header stays the permanent entry point, and the
-row disappears as soon as the work lands.
+row disappears as soon as the work lands. The count toggles open the exact
+revisions that click will land — change id, description and any conflict — so
+landing is never blind; a long list scrolls inside the row instead of growing
+the transcript entry.
 
 - Only the newest turn offers it: older turns keep their dated notices, so a
   long thread never grows a column of stale buttons.

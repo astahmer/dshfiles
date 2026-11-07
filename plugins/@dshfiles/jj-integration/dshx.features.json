@@ -861,23 +861,31 @@
     {
       "id": "turn-end-integrate",
       "title": "Integrate from the end of a turn",
-      "summary": "The newest completed turn of an isolated thread workspace offers the same integration one click from the answer: a row beside the answer names the pending revisions and its button lands them. It appears only while the workspace is ready — described, conflict-free revisions with no Session writing and no question waiting — and disappears once the work lands, a queue waits, or a Session works again. The header control stays the permanent entry point.",
+      "summary": "The newest completed turn of an isolated thread workspace offers the same integration one click from the answer: a row beside the answer names the pending revisions and its button lands them. The row expands in place to list those revisions — change id, description and any conflict — in a bounded scroll region, so a one-revision thread and a forty-revision thread both read at a glance, and the disclosure is a button instead of a hover-only layer so the keyboard can open it. It appears only while the workspace is ready — described, conflict-free revisions with no Session writing and no question waiting — and disappears once the work lands, a queue waits, or a Session works again. The header control stays the permanent entry point.",
       "reach": [
         "seed rebase-ready-thread",
         "expect button \"Land on main\"",
-        "click button \"Land on main\"",
-        "click button \"Current thread workspace: thread-*\"",
-        "expect text \"Nothing to land\""
+        "click button \"1 revision(s) ready to land on main.*\"",
+        "expect text \"Seeded work to rebase\""
       ],
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: turn tail › Land on main",
+      "currentSurface": "transcript: turn tail › Land on main › revisions",
       "configuration": [],
-      "states": ["offer-shown", "offer-hidden-without-work", "offer-hidden-blocked", "offer-hidden-queued", "landing-from-turn-end"],
+      "states": [
+        "offer-shown",
+        "revisions-collapsed",
+        "revisions-expanded",
+        "offer-hidden-without-work",
+        "offer-hidden-blocked",
+        "offer-hidden-queued",
+        "landing-from-turn-end"
+      ],
       "failureModes": [
         "Only the newest completed turn offers it; older turns keep their dated notices, so a long thread never grows a column of stale buttons.",
         "A shared checkout, an archived thread, a queued or running integration, an unverified activity check, or work the control center calls blocked never shows the row.",
+        "A long revision list scrolls inside the card instead of growing the transcript entry, and a long description is clamped to two lines.",
         "It runs the header control's own land action: a refused integration reports the same toast and leaves the bookmark where it was."
       ],
       "externalDependencies": [

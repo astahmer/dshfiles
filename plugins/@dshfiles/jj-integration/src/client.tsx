@@ -12,7 +12,6 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-session-log-export/client'
 import { Changes, createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArchiveIcon, CircleCheckIcon, ClockIcon, GitMergeIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, PluginQueryProvider, pluginQueryClient, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -28,6 +27,7 @@ import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { IntegrationTimeline, type IntegrationRecord } from './integration-timeline.js'
 import { InlineIntegrateOffer } from './inline-integrate.js'
+import { LandPreview } from './land-preview.js'
 import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
@@ -572,31 +572,14 @@ export default defineClient({
           {offered ? (
             // The header control stays the permanent entry point; this is the same land action one click from the
             // answer the user just read, and it disappears as soon as the work is integrated.
-            <div
-              className="dshx-root dshx:my-3 dshx:flex dshx:w-full dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-3 dshx:py-2"
-              data-testid="jj-inline-integrate-offer"
-            >
-              <GitMergeIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
-              <p className="dshx:min-w-0 dshx:flex-1 dshx:text-sm dshx:text-muted-foreground">
-                {translate('inlineIntegrateHint', { count: thread.unlanded.length, bookmark })}
-              </p>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-label={translate('rebaseOnto', { bookmark })}
-                    className="dshx-root dshx:shrink"
-                    disabled={landing}
-                    onClick={() => land.mutate(thread.path)}
-                    size="sm"
-                    type="button"
-                  >
-                    {land.isPending ? <Spinner /> : <GitMergeIcon aria-hidden="true" className="dshx:size-3.5" />}
-                    {land.isPending ? translate('rebasing') : translate('rebaseOnto', { bookmark })}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{translate('rebaseThread', { bookmark })}</TooltipContent>
-              </Tooltip>
-            </div>
+            <LandPreview
+              bookmark={bookmark}
+              landing={landing}
+              onLand={() => land.mutate(thread.path)}
+              pending={land.isPending}
+              revisions={thread.unlanded}
+              t={translate}
+            />
           ) : null}
           {noticeToast.element}
         </TooltipProvider>
