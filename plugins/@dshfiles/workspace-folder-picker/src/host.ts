@@ -2,17 +2,22 @@ import type {} from '@deepseek-ai/dsh-host-directory-picker'
 import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
-import { Effect, FileSystem, Layer, Option } from 'effect'
+import { layer as nodePathLayer } from '@effect/platform-node/NodePath'
+import { Effect, FileSystem, Layer, Option, Path } from 'effect'
 import { workspaceFolderBrowserApi } from './directory-browser-api.js'
 import { FolderInspector } from './folder-inspection.js'
 import { DirectoryBrowser, executableLookupLayer, ProjectRemover, projectRegistryLayer } from './host-edge-promise.js'
 import { CloneJobs, ExecutableLookup, ProjectCommands, ProjectCreator, ProjectHome } from './project-lifecycle.js'
+import { Clock } from 'effect'
+import { makeProjectIconCache } from './project-icon.js'
 import { loadProjectConfig } from './project-config.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
 
 const projectLayer = Layer.mergeAll(CloneJobs.layer, ProjectCreator.layer, FolderInspector.layer).pipe(
   Layer.provide(ProjectCommands.layer),
-  Layer.provideMerge(Layer.mergeAll(executableLookupLayer, projectRegistryLayer, DshChildProcessSpawner.layer, nodeFileSystemLayer)),
+  Layer.provideMerge(
+    Layer.mergeAll(executableLookupLayer, projectRegistryLayer, DshChildProcessSpawner.layer, nodeFileSystemLayer, nodePathLayer),
+  ),
 )
 
 const toolsStatus = Effect.fn('project tools status')(function* () {
@@ -50,6 +55,15 @@ export default DshxPlugin.make({
       inspect: input => FolderInspector.use(inspector => inspector.inspect(input.path)),
       initProject: input => ProjectCreator.use(creator => creator.initialize(input)),
       publishProject: input => ProjectCreator.use(creator => creator.publish(input)),
+      icon: input =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem
+          const path = yield* Path.Path
+          const now = yield* Clock.currentTimeMillis
+          const icons = yield* makeProjectIconCache({ fs, path })
+          const title = input.title ?? path.basename(input.path)
+          return yield* icons.read({ workspaceRoot: input.path, title, now })
+        }),
       readProjectConfig: input =>
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem

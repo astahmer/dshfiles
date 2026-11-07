@@ -8,7 +8,7 @@ import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsNavEntry, settingsPage } from '../steps.js'
-import { selectModelForNewThread } from '../threads.js'
+import { createScratchDirectory, selectModelForNewThread } from '../threads.js'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
@@ -28,6 +28,7 @@ interface HeldDestinationLookup {
 }
 
 const repositories = new WeakMap<Page, ThreadRepository>()
+const plainFolders = new WeakMap<Page, string>()
 const divergentCheckouts = new WeakMap<Page, { readonly checkoutCommitId: string; readonly featureCommitId: string }>()
 const existingSharedThreads = new WeakMap<Page, string>()
 const configuredBaseThreads = new WeakMap<Page, { readonly name: string; readonly commitId: string }>()
@@ -1050,6 +1051,61 @@ Then('the blank new thread returns to the owning project checkout', async ({ pag
     await expect(workspaceToggle(page)).toBeVisible()
     await expectOwnWorkspace(page, false)
     expect(workspaceNames(repository, [provisionedThreadName(page)])).toEqual(['default', provisionedThreadName(page)])
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a disposable jj repository with an asset icon is chosen as the New thread project', async ({ page }: { page: Page }) => {
+  const repository = await createRepository(page)
+  await mkdir(join(repository.repositoryPath, 'assets'), { recursive: true })
+  await writeFile(
+    join(repository.repositoryPath, 'assets', 'icon.svg'),
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="#3b82f6"/></svg>',
+  )
+  await chooseProjectPath(page, repository.repositoryPath)
+  await expect(projectButton(page)).toHaveText('repo')
+})
+
+Then('the project row shows the icon the repository ships', async ({ page }: { page: Page }) => {
+  // Project rows only exist while the thread list groups by project.
+  await page.getByRole('button', { name: /^Group: /u }).click()
+  await page.getByRole('menuitemradio', { name: /^Project$/u }).or(page.getByRole('option', { name: /^Project$/u })).first().click()
+  await recordAssertion(page, 'jj-integration-project-icon-comes-from-the-repository', async () => {
+    await expect(page.locator('[data-project-icon-source="assets/icon.svg"]')).toBeVisible({ timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a plain folder is chosen as the New thread project', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-jj-not-a-repository-')
+  const folder = join(root, 'plain-project')
+  await mkdir(folder, { recursive: true })
+  await writeFile(join(folder, 'README.md'), 'plain folder\n')
+  plainFolders.set(page, folder)
+  await chooseProjectPath(page, folder)
+  await expect(projectButton(page)).toHaveText('plain-project')
+})
+
+Then('the destination bar offers Initialize repository instead of a workspace toggle', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-not-a-repository-offers-initialize', async () => {
+    const destination = page.getByLabel('New thread destination', { exact: true })
+    await expect(destination.getByText('Not a Jujutsu repository', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(destination.getByRole('button', { name: 'Initialize repository', exact: true })).toBeVisible()
+  })
+})
+
+When('Initialize repository is clicked in the destination bar', async ({ page }: { page: Page }) => {
+  await page.getByLabel('New thread destination', { exact: true }).getByRole('button', { name: 'Initialize repository', exact: true }).click()
+})
+
+Then('the opened project becomes a Jujutsu repository', async ({ page }: { page: Page }) => {
+  const folder = plainFolders.get(page)
+  if (folder === undefined) throw new Error('The plain-folder fixture was not created for this scenario.')
+  await recordAssertion(page, 'jj-integration-enable-jujutsu-initializes-in-place', async () => {
+    await expect.poll(() => existsSync(join(folder, '.jj')), { timeout: 60_000 }).toBe(true)
+    const destination = page.getByLabel('New thread destination', { exact: true })
+    await expect(destination.getByText('Not a Jujutsu repository', { exact: true })).toHaveCount(0, { timeout: 30_000 })
+    await expect(workspaceToggle(page)).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

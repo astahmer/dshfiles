@@ -17,9 +17,11 @@ interface ThreadGroupHeaderProps {
   readonly t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
   /** A group-wide verb (Needs you offers Resume all); it sits beside the toggle, not inside it. */
   readonly action?: ReactNode
+  /** The project's own mark, before its name; absent for groups that are not a project. */
+  readonly icon?: ReactNode
 }
 
-export const ThreadGroupHeader = ({ label, count, collapsed, projectId, className, onToggle, startProjectSession, t, action }: ThreadGroupHeaderProps) => {
+export const ThreadGroupHeader = ({ label, count, collapsed, projectId, className, onToggle, startProjectSession, t, action, icon }: ThreadGroupHeaderProps) => {
   const createLabel = t('threadSidebarNewChatInProject', { project: label })
   return (
     <div className={cn(className, 'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-2.5')}>
@@ -30,6 +32,7 @@ export const ThreadGroupHeader = ({ label, count, collapsed, projectId, classNam
         aria-expanded={!collapsed}
         onClick={onToggle}
       >
+        {icon}
         <span className="dshx:min-w-0 dshx:truncate">{label}</span>
         <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums">({count})</span>
         <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />

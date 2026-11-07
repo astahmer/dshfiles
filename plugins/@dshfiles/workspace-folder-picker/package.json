@@ -39,6 +39,10 @@
     "./project-config": {
       "types": "./src/project-config.ts",
       "default": "./dist/project-config.js"
+    },
+    "./project-icon-view": {
+      "types": "./src/project-icon-view.tsx",
+      "default": "./dist/project-icon-view.js"
     }
   },
   "scripts": {

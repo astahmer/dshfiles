@@ -17,6 +17,7 @@ import { threadDragMachine, type ThreadDragCommands } from './thread-drag-machin
 import { ThreadRouteModel } from './thread-route.js'
 import { useNearViewport } from './use-near-viewport.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
+import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view'
 import { ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
 import { RemoteThreadItem, RemoteThreadsSection, type RemoteThreadRowLabels } from './remote-threads-section.js'
@@ -1742,6 +1743,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       })),
     [defaultProjectTitle, workspaceState.items],
   )
+  /** Project folder per workspace id: the project row's icon is resolved from it on the Host. */
+  const workspacePathById = useMemo(() => new Map<string, string>(workspaceState.items.map(workspace => [workspace.workspaceId, workspace.path])), [workspaceState.items])
   /** Titles by workspace id, so a row does not rescan every workspace on each render. */
   const workspaceTitleById = useMemo(() => new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title])), [displayWorkspaces])
   const workspaceNameById = useMemo(
@@ -5404,6 +5407,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     >
                       {showHeader ? (
                         <ThreadGroupHeader
+                          icon={
+                            group.key.startsWith('project:')
+                              ? (() => {
+                                  const projectPath = workspacePathById.get(group.key.slice('project:'.length))
+                                  return projectPath === undefined ? undefined : <ProjectIcon path={projectPath} title={groupLabel} />
+                                })()
+                              : undefined
+                          }
                           label={groupLabel}
                           count={group.threads.length}
                           collapsed={groupCollapsed}

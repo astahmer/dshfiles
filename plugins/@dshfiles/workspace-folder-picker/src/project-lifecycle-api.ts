@@ -197,6 +197,18 @@ export const projectLifecycleApi = defineApi({
             : `${output.path} · workspace ${output.config.defaultThreadWorkspace ?? 'inherit'} · ${String(output.config.checks?.length ?? 0)} check(s)`,
       },
     }),
+    icon: WorkspaceFolderPickerSchema.method({
+      input: Schema.Struct({ path: parentPathSchema, title: Schema.optional(Schema.String.check(Schema.isMaxLength(200))) }),
+      output: Schema.Struct({
+        kind: Schema.Literals(['image', 'monogram']),
+        value: Schema.String.check(Schema.isMaxLength(120_000)),
+        mediaType: Schema.NullOr(Schema.Literals(['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp', 'image/x-icon'])),
+        source: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+      }),
+      description:
+        'The icon of the project at a folder: the iconPath declared in dsh.project.json, then a short list of conventional paths, then a monogram from the folder name. Cached on the Host. Read-only.',
+      tool: { name: 'project_icon', readOnly: true, render: output => (output.kind === 'monogram' ? `Monogram ${output.value}` : `${output.source} (${output.mediaType ?? 'image'})`) },
+    }),
     publishProject: WorkspaceFolderPickerSchema.method({
       input: Schema.Struct({
         path: parentPathSchema,
