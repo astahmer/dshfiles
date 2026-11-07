@@ -1207,7 +1207,11 @@ const handlers = Api.handlers(multiHostApi, {
       if (refused !== undefined) return refused
       const value = yield* withRuntime(
         owner.runtimeId,
-        gateway => gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })(input.method, input.input),
+        gateway =>
+          gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })(
+            input.method,
+            RemoteJjScope.asking({ method: input.method, sessionId: input.sessionId, action: input.input }),
+          ),
         { mutation },
       )
       return { ok: true as const, value }

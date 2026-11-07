@@ -24,7 +24,15 @@ import type {
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import * as SessionPayload from './payload.ts'
 
-export { isSessionPromptRefused, SessionPromptRefused, SessionSourceRegistryError, SessionSources, type EffectSessionSource } from './effect.ts'
+export {
+  isSessionPromptRefused,
+  isSessionForkUnavailable,
+  SessionForkUnavailable,
+  SessionPromptRefused,
+  SessionSourceRegistryError,
+  SessionSources,
+  type EffectSessionSource,
+} from './effect.ts'
 export { fromEffect } from './session-source-promise.ts'
 export * as SessionPayload from './payload.ts'
 export { SessionPayloadError } from './payload.ts'

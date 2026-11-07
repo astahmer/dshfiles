@@ -153,6 +153,22 @@ Feature: Multi-host loopback SSH lifecycle
     When the thread is integrated from this client
     Then the work is on the remote main bookmark
 
+  @scenario:multi-host.remote-land-queue
+  Scenario: Landing a busy remote thread is queued and undone here
+    Given a loopback SSH DSH pair with JJ on the remote is booted
+    When the scratch remote is added from the host UI
+    And a thread on the remote has described work in its own JJ workspace
+    And a turn is running on that thread
+    Then landing is queued and undone from this client
+
+  @scenario:multi-host.remote-fork
+  Scenario: A remote thread forks on its host
+    Given a loopback SSH DSH pair with JJ on the remote is booted
+    When the scratch remote is added from the host UI
+    And a thread on the remote has described work in its own JJ workspace
+    And the remote thread is forked
+    Then the fork is a thread of the same host
+
   @scenario:multi-host.remote-land-page
   Scenario: A remote thread is landed and removed from the Land page
     Given a loopback SSH DSH pair with JJ on the remote is booted

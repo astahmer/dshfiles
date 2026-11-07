@@ -1,7 +1,13 @@
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createSessionSourceRegistry, SessionPromptRefused, SessionSourcePayload, type MirroredSessionSource } from '@dshfiles/session-source-port'
+import {
+  createSessionSourceRegistry,
+  SessionPromptRefused,
+  SessionForkUnavailable,
+  SessionSourcePayload,
+  type MirroredSessionSource,
+} from '@dshfiles/session-source-port'
 import { MirroredSessions } from '../../src/mirrored-sessions.ts'
 import type { SessionFollowFrame, SessionForkRequest, SessionRenameRequest, SessionSummary } from '../../src/native/types.ts'
 
@@ -208,6 +214,24 @@ describe('mirrored sessions', () => {
         throw new Error('local fallback must not run')
       }),
     ).resolves.toMatchObject({ values: { modelSelection: { next: { model: 'reasoner' } } } })
+  })
+
+  it("keeps the owner's own code when it refuses a fork", async () => {
+    const { mirrored, source } = await fixture()
+    mirrored.registry.register(
+      source({
+        rows: [summary('session-remote', 100)],
+        fork: async () => {
+          throw new SessionForkUnavailable({ sessionId: 'session-remote', reason: 'No completed turn yet.' })
+        },
+      }),
+    )
+    await mirrored.merge([], {}, new AbortController().signal)
+    await expect(
+      mirrored.fork({ sessionId: SessionId('session-remote') }, async () => {
+        throw new Error('local fallback must not run')
+      }),
+    ).rejects.toMatchObject({ code: 'session/fork-unavailable', message: 'No completed turn yet.' })
   })
 
   it('forks and renames on the owner, and keeps a local Session on this Host', async () => {

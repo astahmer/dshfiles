@@ -54,3 +54,23 @@ describe('a repository call on a mirrored thread', () => {
     expect(RemoteJjScope.repositoryRefusal({ folder, repoIds: new Set(), call: { repoId } })).toMatchObject({ ok: false })
   })
 })
+
+describe('a land on a mirrored thread', () => {
+  test('names the thread, so its owner counts that running Session', () => {
+    expect(RemoteJjScope.asking({ method: 'land', sessionId: 'session-a', action: { path: '/remote/a' } })).toEqual({
+      path: '/remote/a',
+      sessionId: 'session-a',
+    })
+    expect(RemoteJjScope.asking({ method: 'queueLand', sessionId: 'session-a', action: { path: '/remote/a' } })).toEqual({
+      path: '/remote/a',
+      sessionId: 'session-a',
+    })
+  })
+
+  test('leaves every other action as it was', () => {
+    expect(RemoteJjScope.asking({ method: 'discard', sessionId: 'session-a', action: { path: '/remote/a', force: false } })).toEqual({
+      path: '/remote/a',
+      force: false,
+    })
+  })
+})
