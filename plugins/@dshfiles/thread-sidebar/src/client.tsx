@@ -3732,7 +3732,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // The machine is created once, so its commands read the handlers of the latest render through one holder.
   const dragCommands = useRef<ThreadDragCommands>({ moveToSection: () => undefined, commitSectionOrder: () => undefined })
   dragCommands.current = {
-    moveToSection: input => void moveThreadsToSection(SessionId(input.sessionId), input.section),
+    moveToSection: input => {
+      if (input.kind === 'remote') moveRemoteThreadToSection(SessionId(input.sessionId), input.section)
+      else void moveThreadsToSection(SessionId(input.sessionId), input.section)
+    },
     commitSectionOrder: input => commitSectionOrder(input.from, input.to),
   }
   const [drag, sendDrag, dragActor] = useMachine(threadDragMachine, {
@@ -3775,20 +3778,30 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       return isSidebarSection(section) ? { element, section } : null
     }
     const draggingRow = (): boolean => dragActor.getSnapshot().matches('rows')
+    /** The section a landing row may enter: a remote row only reaches the sections whose drop plan is preference-only. */
+    const dropSectionFor = (section: SidebarSection): SidebarSection | null => {
+      const row = dragActor.getSnapshot().context.row
+      if (row === null || row.kind === 'local') return section
+      return SidebarOrganization.remoteSectionDropPlan(section) === null ? null : section
+    }
     const onDragStart = (event: DragEvent): void => {
       const target = event.target
       if (!(target instanceof Element)) return
-      const row = target.closest<HTMLElement>('article[data-thread-id][data-thread-section-row]')
+      const remoteRow = target.closest<HTMLElement>('article[data-remote-thread-id][data-remote-thread-section-row]')
+      const row = remoteRow ?? target.closest<HTMLElement>('article[data-thread-id][data-thread-section-row]')
       if (row === null || threadSurfaceOf(row) !== surface) return
       const section = row.closest<HTMLElement>('[data-thread-section]')?.dataset.threadSection
-      const threadId = row.dataset.threadId
-      if (!isSidebarSection(section) || threadId === undefined) return
-      sendDrag({ type: 'row.start', row: { sessionId: SessionId(threadId), section } })
+      const sessionId = remoteRow === null ? row.dataset.threadId : remoteRow.dataset.remoteThreadSessionId
+      if (!isSidebarSection(section) || sessionId === undefined) return
+      // A remote row gets no mention drag: its id resolves on the runtime that owns the Session, not in this composer.
+      if (remoteRow !== null && event.dataTransfer !== null) event.dataTransfer.effectAllowed = 'move'
+      sendDrag({ type: 'row.start', row: { kind: remoteRow === null ? 'local' : 'remote', sessionId: SessionId(sessionId), section } })
     }
     const onDragOver = (event: DragEvent): void => {
       if (!draggingRow()) return
       const target = sectionAt(event.clientX, event.clientY)
-      const next = target !== null && threadSurfaceOf(target.element) === surface ? target.section : null
+      const landing = target !== null && threadSurfaceOf(target.element) === surface ? target.section : null
+      const next = landing === null ? null : dropSectionFor(landing)
       if (next === null) {
         sendDrag({ type: 'row.over', section: null })
         return
@@ -3801,7 +3814,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const onDrop = (event: DragEvent): void => {
       if (!draggingRow()) return
       const target = sectionAt(event.clientX, event.clientY)
-      const droppedOn = target !== null && threadSurfaceOf(target.element) === surface ? target.section : null
+      const landing = target !== null && threadSurfaceOf(target.element) === surface ? target.section : null
+      const droppedOn = landing === null ? null : dropSectionFor(landing)
       if (droppedOn === null) {
         sendDrag({ type: 'row.end' })
         return
@@ -4505,6 +4519,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         section={section}
         dropSections={SidebarOrganization.remoteDropSections}
         labels={remoteThreadRowLabels}
+        dragging={activeRowDrag?.kind === 'remote' && activeRowDrag.sessionId === sessionId}
         onOpen={() => (props.openRemoteSession === undefined ? props.openRemoteThreads?.() : props.openRemoteSession(thread.sessionId))}
         onToggleSettled={() => toggleRemoteSettled(sessionId)}
         onToggleParked={() => toggleParked(sessionId)}

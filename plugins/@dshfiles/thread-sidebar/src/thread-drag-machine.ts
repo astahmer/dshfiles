@@ -6,7 +6,9 @@ import { SidebarOrganization, type SidebarSection } from './organization.js'
  * stream, and the click that ends either gesture belongs to the drag. One machine owns both gestures, so one cannot
  * start while the other is active and a suppressed click belongs to exactly one of them.
  */
+/** A row being dragged between sections; `remote` marks a row drawn from another runtime's inventory. */
 export interface ThreadDragRow {
+  readonly kind: 'local' | 'remote'
   readonly sessionId: string
   readonly section: SidebarSection
 }
@@ -23,7 +25,7 @@ export interface ThreadDragSection {
 export type ThreadDragSuppressed = 'row' | 'section'
 
 export interface ThreadDragCommands {
-  readonly moveToSection: (input: { readonly sessionId: string; readonly section: SidebarSection }) => void
+  readonly moveToSection: (input: { readonly kind: ThreadDragRow['kind']; readonly sessionId: string; readonly section: SidebarSection }) => void
   readonly commitSectionOrder: (input: { readonly from: number; readonly to: number }) => void
 }
 
@@ -68,7 +70,7 @@ export const threadDragMachine = setup({
     setRowDropSection: assign(({ event }) => (event.type === 'row.over' ? { dropSection: event.section } : {})),
     dropRow: ({ context, event }) => {
       if (event.type !== 'row.drop' || context.row === null || event.section === context.row.section) return
-      context.commands.moveToSection({ sessionId: context.row.sessionId, section: event.section })
+      context.commands.moveToSection({ kind: context.row.kind, sessionId: context.row.sessionId, section: event.section })
     },
     startSectionPress: assign(({ event }) =>
       event.type === 'section.press' ? { section: { pointerId: event.pointerId, from: event.from, startY: event.startY, centers: null, to: event.from } } : {},

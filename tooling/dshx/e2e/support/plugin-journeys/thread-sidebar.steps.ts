@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, type Response, type TestInfo } from '@playwright/test'
-import { openGlobalPanel, reusableViewName, viewNamePattern } from '../plugin-view-names.js'
+import { openGlobalPanel, viewNamePattern } from '../plugin-view-names.js'
 import { DEFAULT_PREFERENCES } from '../../../../../plugins/@dshfiles/thread-sidebar/src/organization.js'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -734,6 +734,21 @@ Then("the remote row offers the sidebar's own verbs and no Host verb", async ({ 
     await expect(sectionOfSidebar(page, 'active').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(0)
     await expandSection(page, 'settled')
     await expect(sectionOfSidebar(page, 'settled').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(1)
+  })
+})
+
+Then('dragging the remote row onto the Active header keeps it there across a reload', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-remote-row-drags-into-a-section', async () => {
+    await expandSection(page, 'settled')
+    await dragRowToSectionHeader(page, remoteRow(page), sectionOfSidebar(page, 'active').locator('[data-thread-section-header]'))
+    await expect(sectionOfSidebar(page, 'active').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(1)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toHaveCount(0)
+  })
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await recordAssertion(page, 'thread-sidebar-remote-row-drag-survives-reload', async () => {
+    await expect(sectionOfSidebar(page, 'active').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(1)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

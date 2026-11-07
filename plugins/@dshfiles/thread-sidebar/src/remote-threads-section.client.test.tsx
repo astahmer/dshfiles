@@ -25,6 +25,7 @@ const mount = (
     running?: boolean
     selected?: boolean
     section?: SidebarSection
+    dragging?: boolean
   } = {},
 ) => {
   const onOpen = vi.fn()
@@ -51,6 +52,7 @@ const mount = (
         section={options.section}
         dropSections={dropSections}
         labels={labels}
+        dragging={options.dragging}
         onOpen={onOpen}
         onToggleSettled={onToggleSettled}
         onToggleParked={onToggleParked}
@@ -104,6 +106,22 @@ describe('RemoteThreadItem', () => {
     const { onOpen } = mount()
     fireEvent.click(screen.getByRole('button', { name: /Fix the parser/u }))
     expect(onOpen).toHaveBeenCalledTimes(1)
+  })
+
+  it('is a draggable section row only when the row sits in a status section', () => {
+    const { container: sectioned } = mount({ section: 'active' })
+    const article = sectioned.querySelector('article[data-remote-thread-id]')
+    expect(article?.hasAttribute('data-remote-thread-section-row')).toBe(true)
+    expect(article?.getAttribute('data-remote-thread-session-id')).toBe('session-remote')
+    expect(screen.getByRole('button', { name: /Fix the parser/u }).hasAttribute('draggable')).toBe(true)
+    cleanup()
+    const { container: plain } = mount()
+    expect(plain.querySelector('article[data-remote-thread-id]')?.hasAttribute('data-remote-thread-section-row')).toBe(false)
+  })
+
+  it('marks the row it is dragging, like a local row', () => {
+    const { container } = mount({ dragging: true })
+    expect(container.querySelector('.dshx\\:opacity-50')).not.toBeNull()
   })
 
   it('offers the same preference verbs in its context menu and no Host verb', () => {

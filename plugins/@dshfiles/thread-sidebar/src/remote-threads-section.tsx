@@ -92,6 +92,7 @@ export const RemoteThreadItem = (props: {
   readonly section: SidebarSection | undefined
   readonly dropSections: readonly SidebarSection[]
   readonly labels: RemoteThreadRowLabels
+  readonly dragging?: boolean | undefined
   readonly onOpen: () => void
   readonly onToggleSettled: () => void
   readonly onToggleParked: () => void
@@ -103,8 +104,10 @@ export const RemoteThreadItem = (props: {
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <article
-          className="dshx:group/row dshx:relative dshx:min-w-0"
+          className={cn('dshx:group/row dshx:relative dshx:min-w-0', props.dragging === true && 'dshx:opacity-50')}
           data-remote-thread-id={`${props.runtimeId}:${props.sessionId}`}
+          data-remote-thread-session-id={props.sessionId}
+          data-remote-thread-section-row={props.section === undefined ? undefined : ''}
           data-selected={props.selected}
         >
           <div className={cn('dshx:relative dshx:rounded-md dshx:hover:bg-accent/60', props.selected && 'dshx:bg-accent')}>
@@ -112,6 +115,7 @@ export const RemoteThreadItem = (props: {
               <TooltipTrigger asChild>
                 <button
                   type="button"
+                  draggable
                   data-remote-thread-id={`${props.runtimeId}:${props.sessionId}`}
                   aria-current={props.selected ? 'page' : undefined}
                   className={cn(
