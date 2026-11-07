@@ -894,7 +894,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "InlineReferences",
       "importFrom": "@dshfiles/chat/inline-references",
       "owner": "@dshfiles/chat",
-      "source": "plugins/@dshfiles/chat/src/inline-references.tsx:94",
+      "source": "plugins/@dshfiles/chat/src/inline-references.tsx:95",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/chat.inline-reference",
@@ -916,7 +916,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "key": "module:@dshfiles/chat/inline-reference-markdown",
       "kind": "module",
       "title": "@dshfiles/chat/inline-reference-markdown",
-      "summary": "The native Markdown renderer with the inline-reference registry applied (see `./inline-references.tsx`). A separate module so a provider that only defines references never loads the native renderer.",
+      "summary": "The native Markdown renderer with the inline-reference registry (see `./inline-references.tsx`) and the code-fence registry (see `./code-fences.tsx`) applied. A separate module so a provider that only defines references or fences never loads the native renderer.",
       "publicSymbol": "InlineReferenceMarkdown",
       "importFrom": "@dshfiles/chat/inline-reference-markdown",
       "owner": "@dshfiles/chat",
@@ -929,6 +929,48 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/chat/src/inline-reference-markdown.tsx",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "CodeFences",
+      "importFrom": "@dshfiles/chat/code-fences",
+      "owner": "@dshfiles/chat",
+      "source": "plugins/@dshfiles/chat/src/code-fences.tsx:37",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/chat.code-fence",
+      "kind": "registry",
+      "title": "CodeFences",
+      "summary": "Add one with `plugin.add(CodeFences, { id, languages: ['mermaid'], Component })`.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(CodeFences, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/chat renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/chat.code-fence"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/chat/fenced-markdown",
+      "kind": "module",
+      "title": "@dshfiles/chat/fenced-markdown",
+      "summary": "The native Markdown renderer with only the code-fence registry applied (see `./code-fences.tsx`): for Markdown that is not an assistant answer (reasoning, compaction summaries, question text) and should not grow inline-reference links, yet should show a ```` ```mermaid ```` fence the way the answer does.",
+      "publicSymbol": "FencedMarkdown",
+      "importFrom": "@dshfiles/chat/fenced-markdown",
+      "owner": "@dshfiles/chat",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/chat/src/fenced-markdown.tsx",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -1207,6 +1249,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/jj-integration/src/merged-pull-requests.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/jj-integration/no-folder",
+      "kind": "module",
+      "title": "@dshfiles/jj-integration/no-folder",
+      "summary": "The scratch workspace every \"No folder\" thread starts in. Shared with the thread sidebar, which offers to promote one into a project, so both halves agree on the folder marker and on the title a scratch workspace still carries.",
+      "publicSymbol": "NoFolderWorkspace",
+      "importFrom": "@dshfiles/jj-integration/no-folder",
+      "owner": "@dshfiles/jj-integration",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/jj-integration/src/no-folder.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2356,7 +2418,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "projectLifecycleApi",
       "importFrom": "@dshfiles/workspace-folder-picker/project-lifecycle-api",
       "owner": "@dshfiles/workspace-folder-picker",
-      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle-api.ts:120",
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle-api.ts:130",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/workspace-folder-picker:workspace-folder-picker.project-lifecycle",
@@ -2369,8 +2431,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/workspace-folder-picker owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: tools, startClone, cloneJobs, cancelClone, retryClone, createProject, inspect, initProject, readProjectConfig, icon, publishProject, removeProject",
-        "Agent tools: project_tools_status (read-only), project_clone, project_clone_jobs (read-only), project_clone_cancel, project_clone_retry, project_create, project_inspect (read-only), project_init, project_config_read (read-only), project_icon (read-only), project_publish"
+        "Methods: tools, startClone, cloneJobs, cancelClone, retryClone, createProject, inspect, initProject, readProjectConfig, projects, projectIdentities, icon, publishProject, removeProject",
+        "Agent tools: project_tools_status (read-only), project_clone, project_clone_jobs (read-only), project_clone_cancel, project_clone_retry, project_create, project_inspect (read-only), project_init, project_config_read (read-only), project_projects (read-only), project_identities (read-only), project_icon (read-only), project_publish"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -2584,10 +2646,11 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Catalog metadata only; features:check validates the surface/destination pair.",
       "occupancy": "static",
       "occupants": [
-        "@dshfiles/multi-host › logical-project-grouping"
+        "@dshfiles/multi-host › logical-project-grouping",
+        "@dshfiles/thread-sidebar › thread-subscriptions"
       ],
       "details": [
-        "Used by 1 catalog feature(s)",
+        "Used by 2 catalog feature(s)",
         "Destinations in use: threads"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2643,7 +2706,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 25 catalog feature(s)",
+        "Used by 26 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2671,7 +2734,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agents › agent-mentions"
       ],
       "details": [
-        "Used by 58 catalog feature(s)",
+        "Used by 59 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2727,7 +2790,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 52 catalog feature(s)",
+        "Used by 53 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2839,7 +2902,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › auxiliary-and-wait-spans"
       ],
       "details": [
-        "Used by 99 catalog feature(s)",
+        "Used by 100 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

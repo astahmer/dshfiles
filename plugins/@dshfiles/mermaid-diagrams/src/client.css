@@ -1,0 +1,154 @@
+/*
+ * The diagram card mirrors the native code card (CodeCard.module.css in dsh-client-ui-primitives), and pele reads its
+ * colors and fonts from these variables, so a theme switch recolors a diagram without re-rendering it.
+ */
+.dshfiles-mermaid {
+  --pele-bg: var(--dsw-alias-markdown-code-block);
+  --pele-fg: var(--dsw-alias-label-primary);
+  --pele-muted: var(--dsw-alias-label-secondary);
+  --pele-line: var(--dsw-alias-label-secondary);
+  --pele-surface: var(--dsw-alias-bg-base);
+  --pele-surface-alt: var(--dsw-alias-interactive-bg-hover);
+  --pele-border: color-mix(in srgb, var(--dsw-alias-label-primary) 28%, transparent);
+  --pele-accent: var(--dsw-alias-brand-primary);
+  --pele-critical: var(--dsw-alias-state-error-primary);
+  --pele-font: var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif);
+  --pele-font-mono: var(--ds-font-family-code, ui-monospace, monospace);
+  position: relative;
+  margin: 16px 0;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-markdown-code-block);
+  border-radius: var(--dsw-radius-lg, 8px);
+}
+
+.dshfiles-mermaid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px 4px 22px;
+  color: var(--dsw-alias-label-secondary);
+  font: 11px/18px var(--dsw-font-family);
+}
+
+.dshfiles-mermaid-language {
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--ds-font-family-code);
+}
+
+.dshfiles-mermaid-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dshfiles-mermaid-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm, 4px);
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.dshfiles-mermaid-action:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dshfiles-mermaid-action:focus-visible {
+  outline: 1px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
+}
+
+.dshfiles-mermaid-action svg {
+  width: 14px;
+  height: 14px;
+}
+
+.dshfiles-mermaid-body {
+  padding: 4px 22px 18px;
+  overflow-x: auto;
+}
+
+/* The source view reuses the native card's body; its own background and margins would double the card's. */
+.dshfiles-mermaid-body .md-code-block {
+  margin: 0;
+  background: transparent;
+}
+
+.dshfiles-mermaid-canvas {
+  display: flex;
+  justify-content: center;
+  min-height: 48px;
+}
+
+.dshfiles-mermaid-canvas[data-state='loading'] {
+  min-height: 0;
+}
+
+/* The source at the code card's size, invisible, so the card keeps its height while pele loads. */
+.dshfiles-mermaid-placeholder {
+  visibility: hidden;
+  margin: 0;
+  font: var(--dsw-font-markdown-code-block);
+  white-space: pre-wrap;
+  text-align: left;
+}
+
+/* A rendered diagram fades in instead of popping over the source. */
+.dshfiles-mermaid-canvas > svg {
+  animation: dshfiles-mermaid-fade-in 240ms ease-out;
+}
+
+@keyframes dshfiles-mermaid-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dshfiles-mermaid-canvas > svg {
+    animation: none;
+  }
+}
+
+.dshfiles-mermaid-zoom {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm, 4px);
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.dshfiles-mermaid-zoom:focus-visible {
+  outline: 1px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
+}
+
+.dshfiles-mermaid-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: var(--dsw-alias-state-error-primary);
+  font: 12px/18px var(--dsw-font-family);
+}
+
+.dshfiles-mermaid-error button {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm, 4px);
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
