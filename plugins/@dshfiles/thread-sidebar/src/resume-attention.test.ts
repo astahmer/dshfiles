@@ -28,6 +28,8 @@ const continuation: QuotaContinuation = {
   accountId: 'codex_work',
   failedAt: 1,
   resetAt: null,
+  retryAt: null,
+  retryAttempt: 0,
   autoRetry: false,
   snoozedUntil: null,
   state: 'waiting',
