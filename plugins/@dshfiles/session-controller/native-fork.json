@@ -17,6 +17,9 @@
       "local": "locale"
     }
   ],
+  "added": [
+    "src/native/cold-reads.ts"
+  ],
   "delta": [
     "src/native/history.ts",
     "src/native/commands.ts",

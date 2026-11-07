@@ -97,7 +97,7 @@
           "kind": "unit-test",
           "id": "queue-reorder.composer-message-editing-unit-image-reference",
           "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
-          "testName": "Edit turns queued image tokens into attachment references without changing the text"
+          "testName": "Edit rebuilds the reference chips a queued message carried, without changing its text"
         },
         {
           "kind": "unit-test",
