@@ -9,6 +9,7 @@ import { Cleanup } from './cleanup.js'
 import { Executables } from './executables-promise.js'
 import { ActivityLog, SettledThreads, WorkspaceRegistry } from './host-edges-promise.js'
 import { JjSettings } from './jj-settings.js'
+import { MaintenanceFailures } from './maintenance-failures.js'
 import { RepositoryViews } from './repository-views.js'
 import { SettleCleanupModel } from './settle-cleanup.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
@@ -42,6 +43,7 @@ export const MaintenanceLive = Layer.effectDiscard(
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const fileSystem = yield* FileSystem.FileSystem
     const path = yield* Path.Path
+    const failures = yield* MaintenanceFailures.make
 
     const located = views.locatedWorkspaces.pipe(Effect.orElseSucceed(() => []))
 
@@ -76,13 +78,8 @@ export const MaintenanceLive = Layer.effectDiscard(
           `jj-integration: automatic cleanup ran in ${String(outcome.runs.length)} repository(ies), skipped ${String(outcome.inactive)} inactive one(s)`,
         )
       if (outcome.status !== 'failed') return Effect.void
-      return log.emit({
-        type: 'workspace.cleanup-failed',
-        summary: 'Automatic thread-workspace cleanup failed',
-        detail: outcome.message,
-        path: null,
-        level: 'attention',
-      })
+      // The cleanup job itself reports the failure to the activity timeline, on the repository that owns it.
+      return Effect.logDebug(`jj-integration: automatic cleanup ${outcome.jobId} failed: ${outcome.message}`)
     }
 
     const reportAutoFetch = Effect.fnUntraced(function* (outcome: FetchOutcome) {
@@ -130,51 +127,80 @@ export const MaintenanceLive = Layer.effectDiscard(
      * An archived thread kept for its unlanded work keeps its folder but not its dependencies: the project's cleanup
      * script (written once by memory, per project) deletes its node_modules, which setup reinstalls if it is reopened.
      */
-    const cleanKeptThread = Effect.fn('maintenance clean kept thread')(
-      function* (workspacePath: string) {
-        if (!(yield* fileSystem.exists(path.join(workspacePath, 'node_modules')).pipe(Effect.orElseSucceed(() => false)))) return
-        const scripts = yield* apis
-          .client(workspaceScriptsApi)
-          .scripts({ cwd: workspacePath })
-          .pipe(
-            Effect.catch(error =>
-              error.kind === 'unavailable'
-                ? Effect.succeed(null)
-                : Effect.as(Effect.logWarning(`jj-integration: no cleanup script for ${workspacePath}: ${error.message}`), null),
-            ),
-          )
-        if (scripts === null) return
-        const executable = yield* executables.resolve(scripts.cleanup)
-        const exitCode = yield* spawner
-          .spawn(
-            ChildProcess.make(executable, [workspacePath], {
-              cwd: process.cwd(),
-              stdin: 'ignore',
-              stdout: 'ignore',
-              stderr: 'ignore',
-              forceKillAfter: Duration.seconds(1.5),
-            }),
-          )
-          .pipe(
-            Effect.flatMap(handle => handle.exitCode),
-            Effect.scoped,
-            Effect.timeoutOption(CLEANUP_SCRIPT_TIMEOUT),
-          )
-        if (Option.isNone(exitCode) || exitCode.value !== 0)
-          yield* Effect.logWarning(
-            `jj-integration: cleanup of archived thread ${workspacePath} failed: ${Option.isNone(exitCode) ? 'timed out' : `cleanup exited with code ${String(exitCode.value)}`}`,
-          )
-      },
-      effect => Effect.catch(effect, error => Effect.logWarning(`jj-integration: cleanup of an archived thread failed: ${error.message}`)),
-    )
+    const runKeptThreadCleanup = Effect.fnUntraced(function* (workspacePath: string) {
+      if (!(yield* fileSystem.exists(path.join(workspacePath, 'node_modules')).pipe(Effect.orElseSucceed(() => false)))) return { status: 'clean' } as const
+      const scripts = yield* apis
+        .client(workspaceScriptsApi)
+        .scripts({ cwd: workspacePath })
+        .pipe(
+          Effect.catch(error =>
+            error.kind === 'unavailable'
+              ? Effect.succeed(null)
+              : Effect.as(Effect.logWarning(`jj-integration: no cleanup script for ${workspacePath}: ${error.message}`), null),
+          ),
+        )
+      if (scripts === null) return { status: 'no-script' } as const
+      const executable = yield* executables.resolve(scripts.cleanup)
+      const command = `${executable} ${workspacePath}`
+      const exitCode = yield* spawner
+        .spawn(
+          ChildProcess.make(executable, [workspacePath], {
+            cwd: process.cwd(),
+            stdin: 'ignore',
+            stdout: 'ignore',
+            stderr: 'ignore',
+            forceKillAfter: Duration.seconds(1.5),
+          }),
+        )
+        .pipe(
+          Effect.flatMap(handle => handle.exitCode),
+          Effect.scoped,
+          Effect.timeoutOption(CLEANUP_SCRIPT_TIMEOUT),
+        )
+      if (Option.isSome(exitCode) && exitCode.value === 0) return { status: 'clean' } as const
+      const reason = Option.isNone(exitCode)
+        ? `The cleanup script timed out after ${String(Duration.toMinutes(CLEANUP_SCRIPT_TIMEOUT))} minutes.`
+        : `The cleanup script exited with code ${String(exitCode.value)}.`
+      return { status: 'failed', reason, command } as const
+    })
+
+    /**
+     * The script's outcome, reported on the thread's project when it fails: a failure stays in the activity timeline with
+     * the command that retries it, once per reason, since every sweep tries again.
+     */
+    const cleanKeptThread = Effect.fn('maintenance clean kept thread')(function* (thread: {
+      readonly repoRoot: string
+      readonly name: string
+      readonly path: string
+    }) {
+      const outcome = yield* runKeptThreadCleanup(thread.path).pipe(
+        Effect.catch(error => Effect.succeed({ status: 'failed', reason: error.message, command: undefined } as const)),
+      )
+      if (outcome.status !== 'failed') return yield* failures.cleared('kept-thread', thread.path)
+      yield* Effect.logWarning(`jj-integration: cleanup of archived thread ${thread.path} failed: ${outcome.reason}`)
+      yield* failures.failed({ kind: 'kept-thread', ...thread, reason: outcome.reason, command: outcome.command })
+    })
+
+    /** Removes one finished thread workspace; a removal that fails is reported on its project, never forced. */
+    const removeFinishedThread = Effect.fn('maintenance remove finished thread')(function* (thread: {
+      readonly repoRoot: string
+      readonly name: string
+      readonly path: string
+    }) {
+      const removed = yield* lifecycle.discard({ path: thread.path, force: false }).pipe(Effect.result)
+      if (removed._tag === 'Success') return yield* failures.cleared('finished-thread', thread.path)
+      yield* Effect.logWarning(`jj-integration: could not remove finished thread ${thread.name}: ${removed.failure.message}`)
+      yield* failures.failed({ kind: 'finished-thread', ...thread, reason: removed.failure.message })
+    })
 
     const sweepFinishedThreads = Effect.gen(function* () {
       const current = yield* settings.get
       for (const repository of yield* views.list) {
         for (const thread of repository.threads) {
           if (!thread.finished) continue
+          const owned = { repoRoot: repository.repoRoot, name: thread.name, path: thread.path }
           if (!current.removeFinishedThreads || thread.unlanded.length > 0) {
-            yield* cleanKeptThread(thread.path)
+            yield* cleanKeptThread(owned)
             continue
           }
           const ready = WorkspaceCleanupModel.isFinishedWorkspaceReadyToRemove({
@@ -185,9 +211,7 @@ export const MaintenanceLive = Layer.effectDiscard(
             graceMs: current.removeFinishedThreadsAfterMinutes * 60_000,
           })
           if (!ready) continue
-          yield* lifecycle
-            .discard({ path: thread.path, force: false })
-            .pipe(Effect.catch(error => Effect.logWarning(`jj-integration: could not remove finished thread ${thread.name}: ${error.message}`)))
+          yield* removeFinishedThread(owned)
         }
       }
     }).pipe(Effect.withSpan('maintenance sweep finished threads'))

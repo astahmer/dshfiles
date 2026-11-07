@@ -1129,7 +1129,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "jjIntegrationApi",
       "importFrom": "@dshfiles/jj-integration/api",
       "owner": "@dshfiles/jj-integration",
-      "source": "plugins/@dshfiles/jj-integration/src/api.ts:176",
+      "source": "plugins/@dshfiles/jj-integration/src/api.ts:190",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/jj-integration:jj-threads",
@@ -2384,7 +2384,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-communication › agent-directory"
       ],
       "details": [
-        "Used by 75 catalog feature(s)",
+        "Used by 77 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2412,7 +2412,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/background-jobs › thread-jobs-facet"
       ],
       "details": [
-        "Used by 28 catalog feature(s)",
+        "Used by 29 catalog feature(s)",
         "Destinations in use: thread-panel"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2549,7 +2549,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agents › agent-mentions"
       ],
       "details": [
-        "Used by 55 catalog feature(s)",
+        "Used by 56 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

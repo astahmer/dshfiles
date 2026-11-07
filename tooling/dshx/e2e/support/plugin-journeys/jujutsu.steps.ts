@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test'
 import { openGlobalPanel } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, rm, utimes } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
@@ -528,12 +528,76 @@ Then('graph focus and hide can be undone without losing shared history', async (
   await finishJourneyAssertions(page)
 })
 
+/** A folder inside a thread workspace the Host cannot delete, so its removal fails after jj forgot the workspace. */
+const lockedCleanupFolders = new WeakMap<Page, string>()
+const lockedCleanupWorkspace = 'thread-e2e002'
+
 After(async ({ page }: { page: Page }) => {
+  const locked = lockedCleanupFolders.get(page)
+  lockedCleanupFolders.delete(page)
+  if (locked !== undefined) await chmod(locked, 0o755).catch(() => undefined)
   const fixture = fixtures.get(page)
   if (fixture === undefined) return
   fixtures.delete(page)
   cleanupGraphFixtures.delete(page)
   await rm(fixture.temporaryRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+})
+
+When('a disposable Jujutsu repository with an empty thread workspace that cannot be deleted is selected', async ({ page }: { page: Page }) => {
+  const fixture = await createFixture(page)
+  jjAt(fixture.repositoryPath, fixture.temporaryRoot, ['bookmark', 'set', 'main', '--revision', fixture.commitId])
+  const workspacePath = join(fixture.temporaryRoot, 'repo-threads', lockedCleanupWorkspace)
+  await mkdir(join(fixture.temporaryRoot, 'repo-threads'), { recursive: true })
+  jjAt(fixture.repositoryPath, fixture.temporaryRoot, [
+    'workspace',
+    'add',
+    '--no-colocate',
+    '--name',
+    lockedCleanupWorkspace,
+    '--revision',
+    'main',
+    workspacePath,
+  ])
+  // Inside .jj, which jj never snapshots, so the workspace still reads as empty work while its folder cannot go.
+  const locked = join(workspacePath, '.jj', 'e2e-locked')
+  await mkdir(locked)
+  await writeFile(join(locked, 'held.txt'), 'held\n')
+  await chmod(locked, 0o555)
+  lockedCleanupFolders.set(page, locked)
+  await registerWorkspaceFolder(page, fixture.repositoryPath)
+  await selectRepository(page, fixture)
+})
+
+When('the undeletable thread workspace is selected for cleanup', async ({ page }: { page: Page }) => {
+  const dialog = page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })
+  await dialog.getByRole('radio', { name: 'All', exact: true }).click()
+  await dialog.getByRole('button', { name: /^Empty/ }).click()
+  const option = cleanupOption(dialog, lockedCleanupWorkspace)
+  await option.click()
+  await expect(option).toHaveAttribute('aria-selected', 'true')
+  await dialog.getByRole('button', { name: 'Clean up 1', exact: true }).click()
+  await expect(dialog).toBeHidden()
+})
+
+Then('the project panel keeps the cleanup failure with its reason and a safe recovery', async ({ page }: { page: Page }) => {
+  const failure = page.getByRole('alert').filter({ hasText: lockedCleanupWorkspace })
+  await recordAssertion(page, 'jujutsu-cleanup-failure-stays-on-its-project-panel', async () =>
+    expect(failure).toContainText(`Could not remove ${lockedCleanupWorkspace}`, { timeout: 30_000 }),
+  )
+  // The reason the file system gave, then the recovery.
+  await expect(failure).toContainText(/PermissionDenied|EACCES|permission denied/iu)
+  await expect(failure).toContainText(`${lockedCleanupWorkspace} stayed in place`)
+  await expect(failure).toContainText('never forces unlanded work')
+  await failure.getByRole('button', { name: 'Review cleanup…', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })).toBeVisible({ timeout: 10_000 })
+  await page.keyboard.press('Escape')
+  // A reload keeps the failure on the project until it is handled.
+  await page.reload()
+  await openGlobalPanel(page, 'Revision graph')
+  await expect(page.getByRole('alert').filter({ hasText: lockedCleanupWorkspace })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Dismiss the cleanup failure', exact: true }).click()
+  await expect(page.getByRole('alert').filter({ hasText: lockedCleanupWorkspace })).toHaveCount(0)
+  await finishJourneyAssertions(page)
 })
 
 /** A cleanup target row of the kit BulkSelectList, found by its exact target name. */
