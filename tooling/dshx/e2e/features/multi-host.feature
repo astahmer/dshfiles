@@ -116,6 +116,8 @@ Feature: Multi-host loopback SSH lifecycle
     When the scratch remote is added from the host UI
     And a thread on the remote has described work in its own JJ workspace
     Then this client reads that workspace from its owner and refuses any other path
+    When a revision of that thread is described through the owner
+    Then the revision panel shows that thread from its owner
     When the thread is integrated from this client
     Then the work is on the remote main bookmark
 

@@ -18,6 +18,8 @@ import {
   fileUploadValueSchema,
   jjRepositoriesEffectSchema,
   multiHostApi,
+  sessionRepositoryReads,
+  sessionRepositoryWrites,
   type ModelSelection,
   type RemoteInteraction,
   type RemoteQuestionAnswer,
@@ -1193,6 +1195,29 @@ const handlers = Api.handlers(multiHostApi, {
         gateway => gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })(input.method, input.input),
         { mutation },
       )
+      return { ok: true as const, value }
+    }).pipe(Effect.catch(error => Effect.succeed(pluginCallFailure({ error, mutation }))))
+  }),
+  sessionRepositoryCall: Effect.fn('multi-host session repository call')(function* (input) {
+    const mutation = sessionRepositoryWrites.some(method => method === input.method)
+    return yield* Effect.gen(function* () {
+      const owner = yield* sessionOwner(input.sessionId)
+      if (!owner.ok) return owner
+      if (!mutation && !sessionRepositoryReads[input.api].some(method => method === input.method)) {
+        return { ok: false as const, code: 'session/method-not-allowed', message: 'This repository call is not available for a remote thread.' }
+      }
+      const sessions = yield* RemoteSessions
+      const folder = yield* sessions.threadFolder(input.sessionId)
+      const repoIds = yield* sessions.threadRepositoryIds(input.sessionId)
+      const refused = RemoteJjScope.repositoryRefusal({ folder, repoIds, call: input.input })
+      if (refused !== undefined) return refused
+      const value = yield* withRuntime(
+        owner.runtimeId,
+        gateway => gateway.pluginApi({ packageId: '@dshfiles/jujutsu', apiId: input.api, version: 1 })(input.method, input.input),
+        { mutation },
+      )
+      // Only an id the owner issued for this thread's folder may be used afterwards.
+      yield* sessions.rememberRepository({ sessionId: input.sessionId, reply: value })
       return { ok: true as const, value }
     }).pipe(Effect.catch(error => Effect.succeed(pluginCallFailure({ error, mutation }))))
   }),

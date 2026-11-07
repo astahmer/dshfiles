@@ -299,6 +299,14 @@ once and sends the thread control's four calls to it through `sessionJjCall`; a 
 Session keeps this Host's API unchanged. The owner's refusal code survives, so a queued
 integration is recognized the same way on both sides.
 
+The side panel and the composer's changes bar go further through `sessionRepositoryCall`:
+`OwnerRouting.api` gives them a client of the same shape whose calls reach the owner, so
+no component changed beyond which client it asks for. The owner mints a new repository id
+per registration, so the Host cannot compare with one id: it remembers the ids returned
+for this thread's folder and accepts only those. An id from before a Host restart is
+refused, and reopening the panel registers a new one. A workspace added from the panel may
+only sit beside the thread's folder.
+
 The Host authorizes the Session as usual, then `RemoteJjScope` requires the action's path
 to be that thread's own folder: owning a Session is not a grant over the machine, so an
 agent or a stale client cannot name another workspace. `discard` keeps its required
@@ -306,5 +314,5 @@ agent or a stale client cannot name another workspace. `discard` keeps its requi
 
 ## Remaining boundaries
 
-- The JJ panel's revision graph, diffs, composer chips and the Land page read this machine's repositories. They would need the same owner routing as the thread control; the native thread still offers Host UI for them.
+- The Land page reads this machine's repositories; the native thread still offers Host UI for it.
 - Terminal access is not mirrored; Host UI is the fallback.
