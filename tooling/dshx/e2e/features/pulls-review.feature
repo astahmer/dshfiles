@@ -57,6 +57,44 @@ Feature: pulls.review thread review scopes
     When the work described "Add the feature" is landed from the Land card
     Then main moves onto the work described "Add the feature" and the Land card has nothing left
 
+  @scenario:pulls-review.combined-revisions
+  @scenario:jujutsu.review-selection
+  Scenario: Select revisions with a gap in the graph and review them together in the Changes facet
+    Given the isolated plugin composition of "@dshfiles/pulls-review, @dshfiles/diff-viewed, @dshfiles/jj-integration, @dshfiles/jujutsu, @dshfiles/project-checks, @dshfiles/workspace-folder-picker, @dshfiles/multi-host, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And a message is sent in the thread workspace
+    And the thread workspace holds revisions adding "one.txt", "two.txt" and "three.txt"
+    And the revision graph is opened in the thread panel
+    And the revision adding "one.txt" is selected for review with a modifier click
+    And the revision adding "three.txt" is selected for review from its menu
+    Then the graph reads "2 revisions selected"
+    When the selection is reviewed together
+    Then the Changes facet shows the combined review of 2 revisions with a gap
+    And the combined review is on revision 1 of 2 showing "one.txt"
+    When the next revision is shown in the combined review
+    Then the combined review is on revision 2 of 2 showing "three.txt"
+    When "one.txt" is opened from the combined review
+    Then the combined review is on revision 1 of 2 showing "one.txt"
+    When "one.txt" of the first revision is marked viewed in the combined review
+    Then the combined review reads "1/2 viewed"
+    When line 1 of "one.txt" is commented "Why this file?"
+    Then the composer holds the line comment chip "one.txt:1"
+    And the Changes journey is complete
+
+  @scenario:pulls-review.combined-revisions-page
+  Scenario: Review a graph selection on the Review page when no thread owns the repository
+    Given the isolated plugin composition of "@dshfiles/pulls-review, @dshfiles/diff-viewed, @dshfiles/jj-integration, @dshfiles/jujutsu, @dshfiles/workspace-folder-picker" is booted
+    When a disposable Jujutsu repository is selected
+    And the revision described "Branch source fixture" is selected for review
+    And the selection is extended to the revision described "Branch child fixture"
+    Then the graph reads "2 revisions selected"
+    When the selection is reviewed together
+    Then the Review page shows the combined review of 2 revisions
+    When the Review page goes back to the workspace review
+    Then the combined review is gone from the Review page
+    And the Changes journey is complete
+
   @scenario:pulls-review.turn-card-opens-changes
   Scenario: A turn's Edited files card opens the Changes facet on that turn
     Given the isolated plugin composition of "@dshfiles/pulls-review, @dshfiles/diff-viewed, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted

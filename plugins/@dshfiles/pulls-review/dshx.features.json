@@ -336,6 +336,86 @@
       ]
     },
     {
+      "id": "combined-revisions",
+      "title": "Review several selected revisions together",
+      "summary": "Revisions selected in the graph open as one combined review: every revision listed oldest first with its own files, one revision's diff on screen with Previous and Next, a viewed mark per file of each revision, and line comments that name their revision. Each revision stays its own change because jj cannot diff across a gap, so a selection with gaps says so. In a thread that owns the repository it is the Revisions scope of the Changes facet; otherwise it opens on the Review page. The pulls_review_revisions agent tool reads the same review.",
+      "surfaces": ["client", "api"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: Changes \u203a Revisions",
+      "configuration": [],
+      "states": ["loading", "stack", "gaps", "partly-unresolved", "none-resolved", "truncated", "viewed", "failed", "page"],
+      "failureModes": [
+        "A selection with gaps says that revisions between them are not part of the review.",
+        "A revision that is gone or divergent is named and left out, and the rest is still reviewed; a divergent row is selected from the graph by its commit.",
+        "A review too large for one read flags which revisions are partial and says to select fewer.",
+        "A git-only repository is refused with the reason instead of an empty review."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jujutsu",
+          "boundary": "The jj CLI in the selected repository.",
+          "deterministicFake": "Host tests and the e2e journey build a disposable jj repository with stacked, gapped and divergent revisions."
+        }
+      ],
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"Open right sidebar\"",
+        "click text \"Jujutsu\"",
+        "expect region \"Revisions\"",
+        "rightclick text \"Seeded work to rebase\"",
+        "click menuitem \"Select for review\"",
+        "rightclick text \"Sample project\"",
+        "click menuitem \"Select for review\"",
+        "click button \"Review together\"",
+        "expect text \"2 revisions\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "pulls-review.combined-revisions",
+          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "pulls-review.combined-revisions-page",
+          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.combined-revisions-unit-gap",
+          "file": "plugins/@dshfiles/pulls-review/tests/revisions-review.spec.ts",
+          "testName": "reviews a selection with a gap, oldest first, each revision keeping its own files"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.combined-revisions-unit-unresolved",
+          "file": "plugins/@dshfiles/pulls-review/tests/revisions-review.spec.ts",
+          "testName": "reviews the rest and names a revision that is gone or divergent"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.combined-revisions-unit-tool",
+          "file": "plugins/@dshfiles/pulls-review/tests/revisions-review.spec.ts",
+          "testName": "gives the agent the same review as text"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "jj"
+        }
+      ]
+    },
+    {
       "id": "turn-card-opens-changes",
       "title": "A turn's Edited files card opens Changes on that turn",
       "summary": "Claims the native per-turn review address (dsh-resource://changes-review/\u2026) at the extension band, so the Edited N files card and its review button open the one Changes facet scoped to that turn instead of a second review tab; the viewed marks are the same per-turn marks the native review tab writes.",
