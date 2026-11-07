@@ -83,6 +83,14 @@ New items land in `inbox`, in the project the header filters by when there is on
 of the previous capture (`reuseCaptureProject`, on by default; off starts each capture with no project).
 Picking a project the header does not show keeps that chip until you clear it.
 
+### Composer tools
+
+The capture box, an item's description and its replies render dshx `ComposerTools`, so a tool another plugin adds to
+`ComposerTool` appears here too, with no dependency on that plugin: `@dshfiles/annotations` puts its element picker in
+all three. Tools get a scope instead of a Session, `backlog:item:<id>` for every box of one item and
+`backlog:capture:<key>` for the capture box. While a tool works outside a description box the box stays open rather than
+saving on blur, and takes focus back when the tool is done.
+
 ## Feed, board and freshness
 
 The feed lists pinned items first, then newest activity by default. Use the sort menu on Feed, Inbox or Items to
