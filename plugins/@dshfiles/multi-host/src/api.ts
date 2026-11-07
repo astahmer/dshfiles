@@ -227,7 +227,7 @@ const remoteThreadSchema = Schema.Struct({
 /** jj-integration methods a manager may call on a remote runtime; the folder and bookmark pickers need these. */
 const remotePluginMethodSchema = Schema.Literals(['projects', 'classifyWorkspaces', 'destination', 'provision', 'noFolder'])
 /** The JJ thread actions a mirrored thread reaches on its owner; each one names that thread's own folder. */
-const sessionJjMethodSchema = Schema.Literals(['threadAt', 'land', 'queueLand', 'cancelQueuedLand', 'discard'])
+const sessionJjMethodSchema = Schema.Literals(['threadAt', 'integrationProgress', 'land', 'queueLand', 'cancelQueuedLand', 'discard'])
 /** The repository reads and actions a mirrored thread reaches on its owner, by the API that serves them there. */
 export const sessionRepositoryReads = {
   jujutsu: [
@@ -919,8 +919,25 @@ const effectMultiHostApi = defineApi({
       input: Schema.Struct({ sessionId: sessionIdSchema, method: sessionJjMethodSchema, input: jsonValueSchema }),
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }), failedSchema]),
       description:
-        "Run one JJ thread action in a remote thread's own folder, on the runtime that owns the thread: threadAt reads it; land, queueLand, cancelQueuedLand and discard change it (discard needs an explicit force, and force: true abandons unlanded work). Call only when the user asked for that action.",
+        "Run one JJ thread action in a remote thread's own folder, on the runtime that owns the thread: threadAt and integrationProgress read it; land, queueLand, cancelQueuedLand and discard change it (discard needs an explicit force, and force: true abandons unlanded work). Call only when the user asked for that action.",
       tool: { name: 'multi_host_session_jj', render: compactJson },
+    }),
+    remoteRepositories: method({
+      input: Schema.Struct({}),
+      output: Schema.Struct({
+        hosts: Schema.Array(
+          Schema.Struct({
+            runtimeId: Schema.String,
+            hostName: Schema.String,
+            refreshing: Schema.Boolean,
+            repositories: jjRepositoriesEffectSchema.fields.repositories,
+          }),
+        ),
+        unreachable: Schema.Array(Schema.String),
+      }),
+      description:
+        'The thread workspaces of every visible remote host, limited to threads recorded on this DSH, plus the hosts that did not answer. Read-only.',
+      tool: { name: 'multi_host_land_repositories', readOnly: true, render: compactJson },
     }),
     sessionRepositoryCall: method({
       input: Schema.Struct({

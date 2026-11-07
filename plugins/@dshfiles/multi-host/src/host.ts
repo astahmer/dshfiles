@@ -1182,7 +1182,7 @@ const handlers = Api.handlers(multiHostApi, {
     }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
   }),
   sessionJjCall: Effect.fn('multi-host session jj call')(function* (input) {
-    const mutation = input.method !== 'threadAt'
+    const mutation = input.method !== 'threadAt' && input.method !== 'integrationProgress'
     return yield* Effect.gen(function* () {
       const owner = yield* sessionOwner(input.sessionId)
       if (!owner.ok) return owner
@@ -1197,6 +1197,70 @@ const handlers = Api.handlers(multiHostApi, {
       )
       return { ok: true as const, value }
     }).pipe(Effect.catch(error => Effect.succeed(pluginCallFailure({ error, mutation }))))
+  }),
+  remoteRepositories: Effect.fn('multi-host remote repositories')(function* () {
+    const directory = yield* HostDirectory
+    const threads = yield* RemoteThreads
+    const hosts = yield* directory.listHosts.pipe(Effect.orElseSucceed(() => []))
+    const runtimes = yield* directory.listRuntimes().pipe(Effect.orElseSucceed(() => []))
+    const recorded = yield* threads.list
+    const sessions = yield* RemoteSessions
+    const results = yield* Effect.forEach(
+      yield* Effect.forEach(
+        runtimes.flatMap(runtime => {
+          const host = hosts.find(item => item.id === runtime.hostId)
+          const threadsHere = recorded.filter(thread => thread.runtimeId === runtime.id)
+          return host === undefined || host.hidden || threadsHere.length === 0 ? [] : [{ runtime, hostName: host.name, threadsHere }]
+        }),
+        ({ hostName, runtime, threadsHere }) =>
+          Effect.map(
+            // The owner's list says where a thread really runs; the recorded folder is what was asked for at start.
+            Effect.forEach(threadsHere, thread =>
+              sessions.threadFolder(thread.sessionId).pipe(
+                Effect.orElseSucceed(() => thread.cwd),
+                Effect.map(folder => ({ sessionId: thread.sessionId, folder: folder ?? thread.cwd })),
+              ),
+            ),
+            folders => ({ runtime, hostName, folders }),
+          ),
+      ),
+      ({ folders, hostName, runtime }) =>
+        withRuntime(
+          runtime.id,
+          gateway => {
+            const threadsApi = gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })
+            // `repositories` answers from the owner's last scan, and a scan coalesces, so asking here keeps this page current.
+            return threadsApi('refreshRepositories', {}).pipe(
+              Effect.ignore,
+              Effect.andThen(threadsApi('repositories', {})),
+              Effect.flatMap(decodeJjRepositories),
+            )
+          },
+          { mutation: false },
+        ).pipe(
+          Effect.map(({ refreshing, repositories }) => ({
+            runtimeId: runtime.id,
+            hostName,
+            refreshing: refreshing === true,
+            // Only threads this DSH recorded, by folder since an owner may not list a Session against its workspace:
+            // anything else on that machine has no Session to authorize an action.
+            repositories: repositories.flatMap(repository => {
+              const owned = repository.threads.flatMap(thread => {
+                const threadSessions = folders.filter(item => item.folder === thread.path).map(item => item.sessionId)
+                return threadSessions.length === 0 ? [] : [{ ...thread, sessionIds: threadSessions }]
+              })
+              return owned.length === 0 ? [] : [{ ...repository, threads: owned }]
+            }),
+          })),
+          Effect.map(host => ({ host })),
+          Effect.orElseSucceed(() => ({ unreachable: hostName })),
+        ),
+      { concurrency: 4 },
+    )
+    return {
+      hosts: results.flatMap(result => ('host' in result ? [result.host] : [])),
+      unreachable: results.flatMap(result => ('unreachable' in result ? [result.unreachable] : [])),
+    }
   }),
   sessionRepositoryCall: Effect.fn('multi-host session repository call')(function* (input) {
     const mutation = sessionRepositoryWrites.some(method => method === input.method)

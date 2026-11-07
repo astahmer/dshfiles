@@ -121,6 +121,15 @@ Feature: Multi-host loopback SSH lifecycle
     When the thread is integrated from this client
     Then the work is on the remote main bookmark
 
+  @scenario:multi-host.remote-land-page
+  Scenario: A remote thread is landed and removed from the Land page
+    Given a loopback SSH DSH pair with JJ on the remote is booted
+    When the scratch remote is added from the host UI
+    And a thread on the remote has described work in its own JJ workspace
+    And the thread is landed from the Land page
+    Then the work reached the remote main bookmark
+    And the workspace is removed from the Land page
+
   @scenario:multi-host.host-resources
   Scenario: The Hosts page shows live SSH resource pressure
     Given a loopback SSH DSH pair is booted

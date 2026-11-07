@@ -312,7 +312,13 @@ to be that thread's own folder: owning a Session is not a grant over the machine
 agent or a stale client cannot name another workspace. `discard` keeps its required
 `force`, and the runtime still applies every eligibility check of its own.
 
+The Land page merges `remoteRepositories` into its own list. That read asks each runtime
+to rescan first, because `repositories` answers from the last scan, and it matches
+workspaces to recorded threads by folder, because an owner may list no Session against a
+workspace. Only those threads appear: anything else on that machine has no Session to
+authorize an action. Each row's land and remove go through one of its Sessions, so they
+pass the same owner and folder checks as the thread control.
+
 ## Remaining boundaries
 
-- The Land page reads this machine's repositories; the native thread still offers Host UI for it.
 - Terminal access is not mirrored; Host UI is the fallback.

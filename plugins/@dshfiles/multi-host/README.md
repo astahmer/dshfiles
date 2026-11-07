@@ -270,6 +270,10 @@ title}` for threads started here, so the sidebar and view can list them.
   the owner issued for it, and nothing else on the machine; another path is
   refused here before it leaves. The host needs `@dshfiles/jujutsu` installed for
   the panel. Global panels with no thread still read this machine.
+- The Land page lists the thread workspaces of every visible host, under
+  `<repository> · <host>`, for threads recorded on this DSH. **Land** and
+  **Remove workspace** run on the host that owns the thread. A host that does not
+  answer is named at the top of the page.
 - LSP is not advertised by remote runtimes (unchanged from earlier
   validation).
 
