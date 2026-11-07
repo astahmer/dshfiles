@@ -17,9 +17,11 @@ export class ProviderCredentials extends Context.Service<
     readonly resolve: (input: {
       readonly provider: string
       readonly connection: Pick<ProviderConnection, 'credential'>
-      readonly environmentVariables: readonly string[]
-      readonly fallback?: Effect.Effect<Option.Option<Redacted.Redacted>> | undefined
-    }) => Effect.Effect<ResolvedCredential, BacklogProviderFailed>
+                readonly environmentVariables: readonly string[]
+          readonly fallback?: Effect.Effect<Option.Option<Redacted.Redacted>> | undefined
+          /** How to sign the fallback tool in, named in the failure so the message is actionable. */
+          readonly fallbackHint?: string | undefined
+        }) => Effect.Effect<ResolvedCredential, BacklogProviderFailed>
   }
 >()('@dshfiles/backlog/ProviderCredentials') {
   static readonly layer = Layer.effect(
@@ -31,6 +33,7 @@ export class ProviderCredentials extends Context.Service<
         readonly connection: Pick<ProviderConnection, 'credential'>
         readonly environmentVariables: readonly string[]
         readonly fallback?: Effect.Effect<Option.Option<Redacted.Redacted>> | undefined
+        readonly fallbackHint?: string | undefined
       }) {
         const reference = input.connection.credential.trim()
         const environment = input.environmentVariables.map(name => ({ name, value: process.env[name] ?? '' })).find(variable => variable.value !== '')
@@ -59,10 +62,13 @@ export class ProviderCredentials extends Context.Service<
           if (Option.isSome(fallback)) return { key: fallback.value, source: 'cli' } satisfies ResolvedCredential
         }
         const variables = input.environmentVariables.join(' or ')
+        const unset = variables === '' ? '' : `${variables} is not set on the Host`
+        const cli = input.fallbackHint === undefined ? '' : `and ${input.fallbackHint} did not answer`
+        const detail = [unset, cli].filter(part => part !== '').join(' ')
         return yield* new BacklogProviderFailed({
           provider: input.provider,
           code: 'credential-missing',
-          detail: variables === '' ? 'no key is bound' : `no key is bound and ${variables} is not set on the Host`,
+          detail: detail === '' ? 'no key is bound' : `no key is bound: ${detail}`,
         })
       })
       return ProviderCredentials.of({ resolve })
