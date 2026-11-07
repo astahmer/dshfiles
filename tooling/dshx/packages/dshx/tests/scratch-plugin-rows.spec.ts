@@ -43,12 +43,12 @@ describe('LocalBundleModel.listLocalBootBundles', () => {
 
 describe('ScratchActivation.expectations', () => {
   it('expects an active row only for bundles that own one, keeping preset children under test', () => {
-    expect(ScratchActivation.expectations({ bundles: ['@fixture/thread-sidebar', '@dshfiles/tool-ask-user'], expectedEntries: ['@fixture/thread-sidebar'] })).toEqual(
-      {
-        expectedEntries: ['@fixture/thread-sidebar'],
-        composedByAnotherRow: ['@dshfiles/tool-ask-user'],
-      },
-    )
+    expect(
+      ScratchActivation.expectations({ bundles: ['@fixture/thread-sidebar', '@dshfiles/tool-ask-user'], expectedEntries: ['@fixture/thread-sidebar'] }),
+    ).toEqual({
+      expectedEntries: ['@fixture/thread-sidebar'],
+      composedByAnotherRow: ['@dshfiles/tool-ask-user'],
+    })
   })
 
   it('assumes every bundle owns a row on a state file written before the field existed', () => {
