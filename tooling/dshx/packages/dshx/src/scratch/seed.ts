@@ -258,8 +258,11 @@ const seedRebaseReadyThread = async (state: ScratchState, page: Page, timeoutMs:
     await page.getByRole('option', { name: projectName }).first().waitFor({ state: 'visible', timeout: timeoutMs })
     await page.keyboard.press('Enter')
   }
-  const workspaceToggle = page.getByRole('checkbox', { name: 'workspace', exact: true })
-  if ((await workspaceToggle.getAttribute('aria-checked', { timeout: timeoutMs })) !== 'true') await workspaceToggle.click({ timeout: timeoutMs })
+  const workspacePicker = page.getByRole('button', { name: /^Workspace: / })
+  if (!/^Workspace: Own workspace/u.test((await workspacePicker.getAttribute('aria-label', { timeout: timeoutMs })) ?? '')) {
+    await workspacePicker.click({ timeout: timeoutMs })
+    await page.getByRole('option', { name: /^Own workspace/ }).click({ timeout: timeoutMs })
+  }
   const threadLabel = new RegExp(`^${projectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} · (thread-[\\w-]+)$`)
   const deadline = Date.now() + timeoutMs
   let threadName: string | undefined
