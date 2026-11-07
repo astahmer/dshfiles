@@ -1112,9 +1112,18 @@ const handlers = Api.handlers(multiHostApi, {
     }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
   }),
   sessionInteractions: Effect.fn('multi-host session interactions')(function* (input) {
-    const interactions = yield* RemoteInteractions
-    const rows = yield* interactions.list
-    return { ok: true as const, interactions: rows.filter(row => input.sessionId === undefined || row.sessionId === input.sessionId) }
+    return yield* Effect.gen(function* () {
+      const interactions = yield* RemoteInteractions
+      // A browser reading this is what makes threads it has not opened worth following; a hidden host stays quiet.
+      const directory = yield* HostDirectory
+      const threads = yield* RemoteThreads
+      const hidden = new Set((yield* directory.listHosts).filter(host => host.hidden).map(host => host.id))
+      const runtimes = yield* directory.listRuntimes()
+      const recorded = new Set((yield* threads.list).map(thread => thread.runtimeId))
+      yield* interactions.watch(runtimes.filter(runtime => recorded.has(runtime.id) && !hidden.has(runtime.hostId)).map(runtime => runtime.id))
+      const rows = yield* interactions.list
+      return { ok: true as const, interactions: rows.filter(row => input.sessionId === undefined || row.sessionId === input.sessionId) }
+    }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
   }),
   sessionQuestionAnswer: Effect.fn('multi-host session question answer')(function* (input) {
     if (input.interactionId !== undefined) {

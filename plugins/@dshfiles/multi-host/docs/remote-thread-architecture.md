@@ -265,6 +265,13 @@ even while someone takes their time at the host; the question stays answerable. 
 `hasLiveClient` is true while the bridge is open, which only changes how the owner reports
 a `dsh inspect` query with no page attached.
 
+`sessionInteractions` is what keeps these streams open for threads that are not open
+here: a browser's feed reads it at least every 15 seconds, and each read marks every
+visible runtime with recorded threads as watched for the next 45 seconds. Held requests
+publish through the same pending-interaction channel as local ones, so the thread list's
+**Needs you** group needs no multi-host code. Nothing is watched with no browser reading,
+and a stream that keeps failing retries at a doubling delay up to a minute.
+
 A question that outlived its wait is `continued`, and it comes from the `userQuestions`
 projection. Live projection values travel on `session/control`, which serves one Host's
 own Sessions, so the bridge also follows the runtime's control stream and hands each

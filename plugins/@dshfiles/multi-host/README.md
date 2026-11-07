@@ -291,11 +291,13 @@ title}` for threads started here, so the sidebar and view can list them.
   list, not the sidebar.
 - The remote transcript is polled (1.5 s while a turn runs, 8 s idle), not
   streamed; the conversation is still written and read on the host.
-- Questions and approvals reach this client only while the thread is open here:
-  following it is what opens the owner's event stream. Elsewhere the row shows
-  nothing until you open it; the request stays on the owner meanwhile. A child
-  Session's question is not offered, because the owner refuses to ask from one.
-  An approval from a child Session opens under that child Session, not its
+- While a browser is open on this DSH, it follows every visible host with threads
+  recorded here, so a thread you have not opened still shows under **Needs you**
+  with its question or approval. Threads started on a host and never recorded
+  here are not followed. When no browser is reading, the connections close after
+  about a minute, and an unreachable host is retried at most once a minute. A
+  child Session's question is not offered, because the owner refuses to ask from
+  one. An approval from a child Session opens under that child Session, not its
   parent.
 - A remote thread's own JJ workspace works from here: the thread's workspace
   control and its integrate offer read its status from the runtime that owns it,

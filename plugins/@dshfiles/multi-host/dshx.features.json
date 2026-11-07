@@ -824,6 +824,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "multi-host.remote-unopened-waiting",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "multi-host.remote-approval",
           "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
         },

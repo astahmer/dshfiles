@@ -52,6 +52,16 @@ Feature: Multi-host loopback SSH lifecycle
     When the remote question is answered "Production" here
     Then the remote agent receives the answer "Production"
 
+  @scenario:multi-host.remote-unopened-waiting
+  Scenario: A remote thread that is not open here reports what it waits on
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the native composer sends a prompt to the remote Session
+    And another remote thread that is not open here asks a question
+    Then the unopened thread reports it is waiting and its question opens with it
+
   @scenario:multi-host.remote-question-reconnect
   Scenario: A waiting remote question survives a dropped tunnel
     Given a loopback SSH DSH pair is booted
