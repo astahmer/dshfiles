@@ -229,7 +229,8 @@ const start = async (
       return found === undefined ? undefined : workspaceView(found)
     },
     resolveByPath: async (path: string) => {
-      const found = workspaces.find(workspace => workspace.path === path)
+      const canonical = realpathSync(path)
+      const found = workspaces.find(workspace => workspace.path === canonical)
       return found === undefined ? undefined : workspaceView(found)
     },
     create: async (path: string, title?: string) => {
@@ -295,6 +296,10 @@ const start = async (
     prompt: async (input: { readonly sessionId: string; readonly content: readonly { readonly text: string }[] }) => {
       prompts.push({ sessionId: String(input.sessionId), text: input.content.map(part => part.text).join('') })
     },
+  })
+  host.ctx.provide('sessionQuery', {
+    listSessions: async () => [...sessions.keys()].map(sessionId => ({ header: { id: sessionId, cwd: undefined } })),
+    observeSession: async () => ({ events: [], inheritedEventCount: 0, [Symbol.dispose]: () => undefined }),
   })
   host.ctx.provide('settings', {
     configure: () => () => undefined,
