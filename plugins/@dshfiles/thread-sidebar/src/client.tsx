@@ -5,6 +5,7 @@ import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { NoFolderWorkspace } from '@dshfiles/jj-integration/no-folder'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { DetachedThreadsModel, type DetachedGroupAction } from './detached-threads.js'
 import { DraftThreadsModel } from './draft-threads.js'
@@ -274,6 +275,8 @@ type InjectedActions = {
     sessionId: SessionSummary['id'],
     projectId: string,
   ) => Promise<{ readonly continuedSessionId: SessionSummary['id']; readonly settled: boolean }>
+  /** Register one scratch thread's folder as a project; resolves to the title it actually got. */
+  projectRegister: (input: { readonly path: string; readonly title: string }) => Promise<{ readonly title: string }>
 }
 
 /** The slot runtime's global selector hooks, the one part of the props a `main` panel mount supplies itself. */
@@ -498,6 +501,8 @@ interface RowActions {
   readonly markUnread: (sessionId: SessionSummary['id']) => void
   readonly followUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
   readonly continueIn: (sessionId: SessionSummary['id'], projectId: string) => void
+  /** Turn a scratch thread's own folder into a project, so the thread stops being a No folder thread. */
+  readonly turnIntoProject: (session: SessionSummary) => void
   readonly resume: (sessionId: SessionSummary['id']) => void
   readonly dismissRecovery: (sessionId: SessionSummary['id']) => void
   readonly beginRename: (sessionId: SessionSummary['id']) => void
@@ -808,7 +813,7 @@ const ChildThreadList = (props: {
 
 type ThreadContextMenuProps = Pick<
   ThreadRowProps,
-  'session' | 'unread' | 'autoSettleOverride' | 'mute' | 'archived' | 'pinned' | 'parked' | 'settled' | 'section' | 'workspaceId' | 'actions' | 'notifyTarget'
+  'session' | 'unread' | 'autoSettleOverride' | 'mute' | 'archived' | 'pinned' | 'parked' | 'settled' | 'section' | 'workspaceId' | 'workspaceTitle' | 'actions' | 'notifyTarget'
 > & { readonly children: JSX.Element }
 
 /** One menu for the whole batch: every verb applies to each selected thread the verb can still change. */
@@ -905,6 +910,9 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
           </ContextMenuSubContent>
         </ContextMenuSub>
       )}
+      {NoFolderWorkspace.isScratchWorkspace({ path: session.cwd ?? '', title: props.workspaceTitle ?? '' }) ? (
+        <ContextMenuItem onSelect={() => props.actions.turnIntoProject(session)}>{t('threadSidebarTurnIntoProject')}</ContextMenuItem>
+      ) : null}
       <ContextMenuItem onSelect={() => props.actions.beginRename(session.id)}>{t('threadSidebarRenameThread')}</ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuSub>
@@ -1217,6 +1225,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       settled={settled}
       section={props.section}
       workspaceId={props.workspaceId}
+      workspaceTitle={props.workspaceTitle}
       actions={props.actions}
       notifyTarget={props.notifyTarget}
     >
@@ -1730,6 +1739,22 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       openThreadRef.current(continued.continuedSessionId)
     } catch {
       setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarContinueInFailure') })
+    }
+  }
+  /**
+   * A scratch thread's own folder becomes a project: the Session already lives there, so registering it gives the row a
+   * project title of its own instead of the shared No folder label. The Host chooses a title no other project holds.
+   */
+  const turnThreadIntoProject = async (session: SessionSummary): Promise<void> => {
+    const cwd = session.cwd
+    if (cwd === undefined) return
+    try {
+      const project = await props.projectRegister({ path: cwd, title: session.title?.trim() || session.displayTitle })
+      setNotice({ tone: 'success', message: props.tSidebar('threadSidebarTurnedIntoProject', { title: project.title }) })
+      void queryClient.invalidateQueries({ queryKey: ['workspace-folder-picker'] })
+      void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'projects'] })
+    } catch {
+      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarTurnIntoProjectFailure') })
     }
   }
   useEffect(() => {
@@ -4170,6 +4195,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     markAttentionUnread: attention.markUnread,
     startFollowUp: props.startFollowUp,
     continueThreadIn,
+    turnThreadIntoProject,
     notifyThread,
     toggleSubscription: (target: ThreadNotifyTarget) =>
       subscriptions.setSubscription({
@@ -4211,6 +4237,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     markAttentionUnread: attention.markUnread,
     startFollowUp: props.startFollowUp,
     continueThreadIn,
+    turnThreadIntoProject,
     notifyThread,
     toggleSubscription: (target: ThreadNotifyTarget) =>
       subscriptions.setSubscription({
@@ -4352,6 +4379,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       },
       followUp: (sessionId, workspaceId) => latestRowActions.current.startFollowUp(sessionId, workspaceId),
       continueIn: (sessionId, projectId) => void latestRowActions.current.continueThreadIn(sessionId, projectId),
+      turnIntoProject: session => void latestRowActions.current.turnThreadIntoProject(session),
       resume: sessionId => void latestRowActions.current.resumeRecoverySession(sessionId),
       dismissRecovery: sessionId => void latestRowActions.current.dismissRecoverySession(sessionId),
       beginRename: sessionId => latestRowActions.current.beginRename(sessionId),
@@ -5241,23 +5269,27 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             resumeAllBusy={resumeAllBusy}
             rows={hoistedUsageLimitRows}
             translate={props.tSidebar}
-            withThreadMenu={(session, row) => (
-              <ThreadContextMenu
-                key={session.id}
-                session={session}
-                unread={unreadSessionIds.has(session.id)}
-                autoSettleOverride={SidebarOrganization.autoSettleOverrideForSession(preferences, session.id)}
-                mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
-                archived={archivedSessionIds.has(session.id)}
-                pinned={pinnedSessionIds.has(session.id)}
-                parked={parkedSessionIds.has(session.id)}
-                settled={settledSessionIds.has(session.id)}
-                workspaceId={realWorkspaceBySession.get(session.id) ?? SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)}
-                actions={rowActions}
-              >
-                {row}
-              </ThreadContextMenu>
-            )}
+            withThreadMenu={(session, row) => {
+              const workspaceId = realWorkspaceBySession.get(session.id) ?? SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
+              return (
+                <ThreadContextMenu
+                  key={session.id}
+                  session={session}
+                  unread={unreadSessionIds.has(session.id)}
+                  autoSettleOverride={SidebarOrganization.autoSettleOverrideForSession(preferences, session.id)}
+                  mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
+                  archived={archivedSessionIds.has(session.id)}
+                  pinned={pinnedSessionIds.has(session.id)}
+                  parked={parkedSessionIds.has(session.id)}
+                  settled={settledSessionIds.has(session.id)}
+                  workspaceId={workspaceId}
+                  workspaceTitle={workspaceId === undefined ? undefined : workspaceTitleById.get(workspaceId)}
+                  actions={rowActions}
+                >
+                  {row}
+                </ThreadContextMenu>
+              )
+            }}
           />
           {groupedAttentionRows.approvalNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarApprovalNeeded')}>

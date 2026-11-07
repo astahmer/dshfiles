@@ -1078,6 +1078,8 @@ export default defineClient({
         if (project !== undefined) ctx.uiWorkspace.startSession(project.workspaceId)
       },
       continueInProject,
+      projectRegister: (input: { readonly path: string; readonly title: string }) =>
+        createApiClient(ctx, threadActionsApi).projectRegister({ path: input.path, title: input.title }),
       open: openThread,
       openLinkedSession: (sessionId: SessionSummary['id']) => {
         const activePanelId = ctx.layout.panelInfo.getSnapshot().activePanelId

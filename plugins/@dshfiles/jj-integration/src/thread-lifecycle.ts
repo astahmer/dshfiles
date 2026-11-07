@@ -9,6 +9,7 @@ import { ActivityLog, WorkspaceRegistry } from './host-edges-promise.js'
 import { IsolatedSessions } from './integration-requests.js'
 import { JjSettings } from './jj-settings.js'
 import { Landing, LandingMessages } from './landing.js'
+import { NoFolderWorkspace } from './no-folder.js'
 import { registeredProjects } from './registered-projects.js'
 import { RepositoryViews } from './repository-views.js'
 import { isolatesNewThreadsByDefault } from './settings.js'
@@ -193,13 +194,38 @@ const make = Effect.gen(function* () {
     return { projects: [...registered.projects], workspaces: [...registered.workspaces] }
   }).pipe(Effect.withSpan('thread lifecycle projects'))
 
+  /** One fresh scratch folder name: the date, then six random hex digits, like a dated scratch directory. */
+  const scratchFolderName = (): string => {
+    const today = new Date()
+    const pad = (value: number) => String(value).padStart(2, '0')
+    const date = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+    return `${date}-${randomUUID().replaceAll('-', '').slice(0, 6)}`
+  }
+
   const noFolder = Effect.gen(function* () {
-    const directory = path.join(homedir(), '.dsh', 'no-folder')
-    yield* fileSystem
-      .makeDirectory(directory, { recursive: true })
-      .pipe(Effect.mapError(cause => new WorkspaceFilesFailed({ detail: `Could not create ${directory}.`, cause })))
+    const root = path.join(homedir(), NoFolderWorkspace.pathMarker)
+    const create = (directory: string) =>
+      fileSystem.makeDirectory(directory, { recursive: true }).pipe(Effect.mapError(cause => new WorkspaceFilesFailed({ detail: `Could not create ${directory}.`, cause })))
+    yield* create(root)
+    // One folder per scratch thread, so turning one into a project groups only that thread. A scratch folder no Session
+    // was accounted to is reused instead of growing the list on every New thread click.
+    const workspaces = yield* registry.list
+    const present = yield* Effect.forEach(
+      workspaces,
+      workspace => exists(workspace.path).pipe(Effect.map(present => ({ path: workspace.path, present }))),
+      { concurrency: 'unbounded' },
+    )
+    let directory = NoFolderWorkspace.reusablePath({
+      root,
+      workspaces,
+      presentPaths: new Set(present.filter(entry => entry.present).map(entry => entry.path)),
+    })
+    if (directory === undefined) {
+      directory = path.join(root, scratchFolderName())
+      yield* create(directory)
+    }
     const existing = yield* registry.resolveByPath(directory)
-    return { workspaceId: (existing ?? (yield* registry.create({ path: directory, title: 'No folder' }))).id }
+    return { workspaceId: (existing ?? (yield* registry.create({ path: directory, title: NoFolderWorkspace.workspaceTitle }))).id }
   }).pipe(Effect.withSpan('thread lifecycle no folder'))
 
   const threadAt = Effect.fn('thread lifecycle thread at')(function* (input: { readonly path: string; readonly sessionId?: string | undefined }) {

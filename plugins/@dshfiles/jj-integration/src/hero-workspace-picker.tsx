@@ -18,11 +18,11 @@ import { jjIntegrationApi } from './api.js'
 import { mainViewSessionId } from './main-view-session.js'
 import { DestinationBar, HostChipSlot, type DestinationBarServices, type WorkspaceToggleActor } from './destination-bar.js'
 import type { JjIntegrationTranslate } from './locales.js'
+import { NoFolderWorkspace } from './no-folder.js'
 import { prepareRemoteFolder, RemoteDestinationChips } from './remote-destination.js'
 import { recentProjectPaths } from './recent-projects.js'
 
 const NO_FOLDER_ID = 'dshfiles:no-folder'
-const NO_FOLDER_PATH_SUFFIX = '/.dsh/no-folder'
 const RECENT_PROJECT_COUNT = 5
 const pinnedWorkspaceIds = [NO_FOLDER_ID]
 
@@ -155,7 +155,7 @@ export const HeroWorkspacePicker = (
 
   // The Host lists projects by last use; its own "No folder" registration is the entry offered first here. Thread
   // workspaces are not projects: the run row's Workspace segment offers them as "Share a thread's workspace".
-  const hostProjects = (projects.data?.projects ?? []).filter(project => !project.path.endsWith(NO_FOLDER_PATH_SUFFIX))
+  const hostProjects = (projects.data?.projects ?? []).filter(project => !NoFolderWorkspace.isScratchWorkspace(project))
   const registered: RegisteredProject[] = [
     { workspaceId: NO_FOLDER_ID, title: props.t('noFolder'), canonicalPath: '~/.dsh/no-folder', removable: false },
     ...hostProjects.map(project => ({ workspaceId: project.workspaceId, title: project.title, canonicalPath: project.path })),
