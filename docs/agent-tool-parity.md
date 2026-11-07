@@ -279,6 +279,12 @@ agent tools`): read-only `multi_host_identity`, `multi_host_status`,
 picker without removing it) and `multi_host_reorder_hosts` (every host id once,
 in the destination picker's order). Every write names the user request it needs.
 
+Remote thread parity adds `multi_host_answer_question`, `multi_host_session_jj`,
+`multi_host_session_repository` (reads, plus `confirm` and `openRepository`, which
+need the user to have asked) and the read-only `multi_host_land_repositories`.
+`sessionApprovalDecide` and `sessionQuestionDecline` have no tool on purpose: an
+agent must not decide for the person the question or approval is waiting on.
+
 Remote administration has its own tools, each bound to one dshx method and one
 SSH-bounded verb: `multi_host_exec` (one command, exit code and both streams,
 120 s at most), `multi_host_doctor` (read-only facts plus the diagnostics worth

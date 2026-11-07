@@ -30,7 +30,7 @@ Rejected as the plan, kept as sources of small fixes:
   it.
 - **A, embedding the host's client as the product**: full parity for free, but the
   local plugins cannot act on the thread. `Host UI` and an optional embedded view stay
-  as the escape hatch for approvals and terminals.
+  as the way to reach a terminal.
 
 ## Architecture
 
@@ -117,5 +117,6 @@ response was lost as `gateway-unreachable` (safe-to-retry) instead of
 
 ## Resume here
 
-Route the JJ panel's graph and diffs through the owner when that is worth doing, then
-decide whether terminals belong here at all.
+Nothing is left in this plan: the JJ panel, the Land page and terminals are settled.
+Terminals stay on the host, because a shell here would be new interactive access to
+that machine. Run `complete-plan` once this work lands.
