@@ -111,16 +111,20 @@ describe('AgentsRegistry', () => {
   })
 
   it.layer(storageHost)(it => {
-    it.effect('refuses past the agent limit without dropping existing rows', () =>
-      Effect.scoped(
-        Effect.gen(function* () {
-          yield* TestClock.setTime(4_000)
-          const registry = yield* openRegistry
-          for (let index = 0; index < 99; index += 1) yield* registry.save(draftOf(`agent-${String(index)}`))
-          expect((yield* registry.save(draftOf('one-more'))).kind).toBe('limit')
-          expect((yield* registry.resolve('agent-98'))?.handle).toBe('agent-98')
-        }),
-      ),
+    it.effect(
+      'refuses past the agent limit without dropping existing rows',
+      () =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            yield* TestClock.setTime(4_000)
+            const registry = yield* openRegistry
+            for (let index = 0; index < 99; index += 1) yield* registry.save(draftOf(`agent-${String(index)}`))
+            expect((yield* registry.save(draftOf('one-more'))).kind).toBe('limit')
+            expect((yield* registry.resolve('agent-98'))?.handle).toBe('agent-98')
+          }),
+        ),
+      // Every save is a durable write, up to the limit of them, which runs past five seconds on a loaded machine.
+      30_000,
     )
   })
 
