@@ -1,5 +1,6 @@
 import { memo, useMemo, type ComponentProps, type MouseEvent } from 'react'
 import { MarkdownText, type MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives'
+import { FencedMarkdown } from '@dshfiles/chat/fenced-markdown'
 import { fileMediaUrl } from '@deepseek-ai/dsh-util-workspace-path'
 import { useRegistry } from '@dshfiles/dshx/client'
 import { QuestionHtmlPreview } from '../html-preview.ts'
@@ -53,7 +54,7 @@ export const QuestionMarkdown = memo(function QuestionMarkdown(props: QuestionMa
       {segments.map((segment, index) => {
         const key = `${segment.kind}-${String(index)}`
         if (segment.kind === 'markdown') {
-          return <MarkdownText key={key} text={segment.text} labels={props.labels} pathImages={pathImages} />
+          return <FencedMarkdown key={key} text={segment.text} labels={props.labels} pathImages={pathImages} />
         }
         const caption = segment.title ?? props.previewTitle
         if (renderer === undefined) {
@@ -98,7 +99,7 @@ export const OptionDescription = memo(function OptionDescription(props: OptionDe
         if (!isLinkClick(event)) props.onSelect?.()
       }}
     >
-      {rich ? <MarkdownText text={props.text} labels={props.labels} pathImages={pathImages} variant="compact" /> : props.text}
+      {rich ? <FencedMarkdown text={props.text} labels={props.labels} pathImages={pathImages} variant="compact" /> : props.text}
     </div>
   )
 })

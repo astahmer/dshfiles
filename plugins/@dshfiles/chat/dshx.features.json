@@ -263,6 +263,65 @@
           "reason": "Client-only: matching and rendering references in a message reads browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "code-fences",
+      "title": "Render fenced code blocks from other plugins",
+      "summary": "Other plugins add a component for fence languages to the code-fence registry (@dshfiles/chat/code-fences); while Chat renders Markdown (assistant answers through InlineReferenceMarkdown; reasoning, compaction summaries and other plugins' Markdown through FencedMarkdown, @dshfiles/chat/fenced-markdown) it swaps each native code card whose language a renderer claims for that component, handing it the source, whether the fence may still grow (a fence followed by another block is complete even while the message streams), the native card as `fallback` and the highlighted code without its header as `source`. Fences nested in lists and quotes count, a streaming message's frozen blocks keep their rendered fences, and without renderers the native tree is unchanged.",
+      "surfaces": [
+        "client"
+      ],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "client: code-fence registry",
+      "configuration": [],
+      "states": [
+        "no-renderers",
+        "growing",
+        "rendered",
+        "renderer-failed"
+      ],
+      "failureModes": [
+        "A renderer that throws shows the native code card and is logged once; new source for the same fence tries the renderer again."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.code-fence-claimed",
+          "file": "plugins/@dshfiles/chat/tests/code-fences.test.tsx",
+          "testName": "hands a claimed fence to its renderer, nested ones included, and leaves other fences native"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.code-fence-streaming",
+          "file": "plugins/@dshfiles/chat/tests/code-fences.test.tsx",
+          "testName": "keeps a frozen streaming block rendered once while the tail grows"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.code-fence-complete-while-streaming",
+          "file": "plugins/@dshfiles/chat/tests/code-fences.test.tsx",
+          "testName": "renders a fence as soon as another block follows it, while the last block of a streaming message stays native"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.code-fence-failure",
+          "file": "plugins/@dshfiles/chat/tests/code-fences.test.tsx",
+          "testName": "shows the native card when a renderer throws, and tries again for new source"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "chat.code-fences-browser",
+          "reason": "A registry with no UI of its own; the provider's journey walks it in the browser (mermaid-diagrams.chat-diagram)."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: swapping a fence's element while a message renders reads browser state and starts no Host work of its own."
+        }
+      ]
     }
   ]
 }

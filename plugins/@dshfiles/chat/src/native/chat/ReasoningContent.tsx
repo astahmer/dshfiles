@@ -1,6 +1,6 @@
 /** Official reasoning content and its default Body Slot adapter. */
 import { memo, useMemo } from 'react'
-import { MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import { FencedMarkdown } from '../../fenced-markdown.tsx'
 import type { FactoryComponentPropsOf, PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { markdownLabels } from '../markdown-labels.ts'
 
@@ -13,7 +13,7 @@ type ReasoningBodyProps = PropsRuntime<'conversation.chat.reasoning.body'> & Pro
  */
 export const ReasoningContent = memo(function ReasoningContent({ text, running, labels, t }: FactoryComponentPropsOf<'conversation.chat.reasoning.content'>) {
   const resolvedLabels = useMemo(() => labels ?? markdownLabels(t), [labels, t])
-  return <MarkdownText text={text} streaming={running} labels={resolvedLabels} variant="compact" />
+  return <FencedMarkdown text={text} streaming={running} labels={resolvedLabels} variant="compact" />
 })
 
 /**
