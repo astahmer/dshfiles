@@ -19,7 +19,7 @@ import { useNearViewport } from './use-near-viewport.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
-import { RemoteThreadItem, RemoteThreadsSection } from './remote-threads-section.js'
+import { RemoteThreadItem, RemoteThreadsSection, type RemoteThreadRowLabels } from './remote-threads-section.js'
 import { RemoteThreadInventoryModel, useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
@@ -4393,18 +4393,40 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       />
     )
   }
-  const renderRemoteThreadRow = (thread: RemoteSidebarThread): JSX.Element => (
-    <RemoteThreadItem
-      key={`${thread.runtimeId}:${thread.sessionId}`}
-      runtimeId={thread.runtimeId}
-      sessionId={thread.sessionId}
-      label={thread.title}
-      cwd={thread.cwd}
-      hostName={thread.hostName}
-      connected={thread.connected}
-      onOpen={() => (props.openRemoteSession === undefined ? props.openRemoteThreads?.() : props.openRemoteSession(thread.sessionId))}
-    />
+  const remoteThreadRowLabels = useMemo(
+    (): RemoteThreadRowLabels => ({
+      settle: props.tSidebar('threadSidebarSettle'),
+      unsettle: props.tSidebar('threadSidebarUnsettle'),
+      park: props.tSidebar('threadSidebarPark'),
+      unpark: props.tSidebar('threadSidebarUnpark'),
+    }),
+    [props.tSidebar],
   )
+  const renderRemoteThreadRow = (thread: RemoteSidebarThread): JSX.Element => {
+    const sessionId = SessionId(thread.sessionId)
+    return (
+      <RemoteThreadItem
+        key={`${thread.runtimeId}:${thread.sessionId}`}
+        runtimeId={thread.runtimeId}
+        sessionId={thread.sessionId}
+        label={thread.title}
+        cwd={thread.cwd}
+        hostName={thread.hostName}
+        workspaceTitle={thread.workspaceTitle}
+        connected={thread.connected}
+        running={thread.running}
+        settled={settledSessionIds.has(sessionId)}
+        parked={parkedSessionIds.has(sessionId)}
+        selected={selectedSession?.id === sessionId}
+        compact={rowStyle.density === 'compact'}
+        age={formatAge(thread.updatedAt)}
+        labels={remoteThreadRowLabels}
+        onOpen={() => (props.openRemoteSession === undefined ? props.openRemoteThreads?.() : props.openRemoteSession(thread.sessionId))}
+        onToggleSettled={() => toggleSettled(sessionId)}
+        onToggleParked={() => toggleParked(sessionId)}
+      />
+    )
+  }
 
   useEffect(() => {
     if (!isPrimarySurface || sessionState.phase !== 'ready') return
@@ -5102,8 +5124,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         key="remote"
                         threads={filteredRemoteThreads}
                         headerClassName={stickyHeaderClass}
+                        renderRow={renderRemoteThreadRow}
                         onOpen={props.openRemoteThreads}
-                        onOpenSession={props.openRemoteSession}
                         hint={props.tSidebar('threadSidebarSectionReorderHint')}
                         keepEmpty
                         onHeaderRef={element => {
@@ -5371,9 +5393,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           {threadView.groupBy !== 'status' && separatesRemoteThreads && props.openRemoteThreads !== undefined ? (
             <RemoteThreadsSection
               threads={filteredRemoteThreads}
+              renderRow={renderRemoteThreadRow}
               headerClassName={stickyHeaderClass}
               onOpen={props.openRemoteThreads}
-              onOpenSession={props.openRemoteSession}
             />
           ) : null}
           {isBoard || draftSessions.length === 0 ? null : (
