@@ -947,7 +947,7 @@
     {
       "id": "global-dock",
       "title": "Keep one docking surface in the right column and a bottom panel",
-      "summary": "Only main Pane options offers Open right pane while closed; the original sidebar shortcut drives that same full-height pane. Right/bottom panes have their own far-right Close pane icons; no centre Close right pane action exists. Hidden panes retain views and drafts. Empty right/bottom panes use the New tab chooser. Named layouts restore every region; native resource lifetimes stay with their declarer.",
+      "summary": "Only main Pane options offers Open right pane while closed; the original sidebar shortcut drives that same full-height pane. With exactly one panel open it closes that panel and the pane follows its last-tab rule; with several panels it hides the pane and keeps them. Right/bottom panes have their own far-right Close pane icons; no centre Close right pane action exists. Hidden panes retain views and drafts. Empty right/bottom panes use the New tab chooser. Named layouts restore every region; native resource lifetimes stay with their declarer.",
       "reach": [
         "click button \"Collapse sidebar\"",
         "click button \"Pane options\"",
@@ -1060,6 +1060,18 @@
           "id": "workbench.global-dock-unit-layout-rename",
           "file": "plugins/@dshfiles/workbench/src/saved-layouts.test.ts",
           "testName": "renames in place, keeping the arrangement, and ignores an absent source"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-toggle-sole-panel",
+          "file": "plugins/@dshfiles/workbench/src/right-pane-toggle.test.tsx",
+          "testName": "closes the only open panel through its owning close path"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-toggle-several-panels",
+          "file": "plugins/@dshfiles/workbench/src/right-pane-toggle.test.tsx",
+          "testName": "hides the pane and keeps every panel when several are open"
         }
       ],
       "telemetry": [
