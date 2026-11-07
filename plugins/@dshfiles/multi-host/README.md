@@ -88,8 +88,11 @@ With a host chosen:
   Existing command, prompt, queue, plan, permission, todo, and jj/workspace
   surfaces remain subject to the capabilities available from the remote Host.
   If the runtime is unreachable, the native composer stays visible and keeps the
-  draft; its send is refused until the owner is reachable. Interactive browser
-  verification of the model picker and attachment picker is still pending.
+  draft; its send is refused until the owner is reachable. A message that names
+  this machine is refused before it leaves: an `@` mention under this machine's
+  home or `~` (a path inside the thread's folder is fine, and so is a path in
+  plain prose), and an attachment uploaded for another thread. The composer keeps
+  the draft and says how to recover.
   The ownership boundary and unsupported surfaces are described in
   [docs/remote-thread-architecture.md](docs/remote-thread-architecture.md).
 - The started thread opens in the main area as a **normal thread of this client**:
@@ -234,9 +237,9 @@ title}` for threads started here, so the sidebar and view can list them.
 - A remote thread is a Session of another runtime, mirrored into this Host:
   `session/list`, `follow`, `page`, `prompt`, `cancel` and `updateQueue` forward
   to the runtime that owns it, so the native chat and composer work. Model
-  catalogs, attachments, `@` references, approvals and terminals still resolve
-  on this machine or stay in the host's own DSH; the remaining slices are listed
-  in [docs/remote-thread-architecture.md](docs/remote-thread-architecture.md).
+  catalogs, attachments and `@` references resolve on that runtime too; the
+  remaining slices are listed in
+  [docs/remote-thread-architecture.md](docs/remote-thread-architecture.md).
 - The agent preset chip of the New thread row does not apply to remote
   threads; the model is picked in the remote composer.
 - No password or keyboard-interactive SSH (BatchMode only). Provisioning runs

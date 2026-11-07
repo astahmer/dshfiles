@@ -125,8 +125,9 @@ Full notes, with the files and URLs read for each product, are in
 5. **A dropped connection restricts submission; it never replaces the composer.** The
    native composer remains in place and retains its draft when remote calls fail.
 6. **Strict machine-local paths.** A local attachment is uploaded through the
-   owning-runtime API; it is not passed as a local filesystem path. Cross-machine
-   absolute-path refusal messaging remains unverified.
+   owning-runtime API; it is not passed as a local filesystem path. A message that
+   names this machine is refused before it reaches the owner (see
+   [Cross-machine references](#cross-machine-references)).
 
 ## What DSH already gives us
 
@@ -210,17 +211,34 @@ from that runtime with Session ownership checked before forwarding. Drafts stay 
 client; questions/approvals and terminal interactions still require the host UI.
 
 Validation: `DSHX_E2E_ONLY=@dshfiles/multi-host node --run check:e2e` covers remote
-Session creation, file-reference results, and a file upload over loopback SSH. Focused
-unit tests cover Session ownership authorization and mirrored model selection. Direct
-browser interaction with model selection and the file picker, plus cross-machine
-absolute-path refusal messaging, remain unverified.
+Session creation, file-reference results, a file upload over loopback SSH, and the
+browser's model picker and file picker on a remote thread (`multi-host.auto-destination`).
+Focused unit tests cover Session ownership authorization, mirrored model selection and
+the cross-machine refusals below.
+
+## Cross-machine references
+
+A path in a message is text: nothing reads it until the remote agent or its `@` resolver
+looks it up there, so a path from this machine fails or silently names another file.
+`remote-prompt-guard.ts` applies the rule the owner chose on 2026-11-07 to every message
+the Session source forwards (`prompt`, a queued edit) and to `threadReply`/`threadStart`:
+
+| Message on a remote thread                                         | Result  |
+| ------------------------------------------------------------------ | ------- |
+| `@~/x`, or `@/abs/path` under this Host's home                     | refused |
+| `@relative/path`, or `@/abs/path` inside the thread's folder       | sent    |
+| `@/abs/path` anywhere else, such as `@/etc/hosts`                  | sent    |
+| a path in plain prose, such as a stack trace                       | sent    |
+| an upload this Host staged for another thread or runtime           | refused |
+| an upload this Host has no record of                               | sent; the owner decides |
+
+Two machines can share a home path, so the thread's folder wins over the home. The
+upload ledger is in memory: after a local restart a receipt is unknown rather than
+foreign, and it goes to the owner, whose `session/attachment-invalid` becomes the same
+recovery message. The refusal is `SessionPromptRefused`, which the Session controller shows
+as written (`session-source-port`), and the composer keeps the draft.
 
 ## Remaining boundaries
 
 - `sessionJjRepositories(sessionId)` is read-only status, not a local JJ panel. Per-thread path-scoped JJ reads, workspace mutations and landing are not mirrored; the native thread still offers Host UI.
 - In-client question/approval answers and terminal access are not mirrored. The remote waterfall payload/answer RPC is only delivered to the owner Host's client. The local transcript's open tool-call name is not sufficient authorization to fabricate an answer or approve a call; Host UI is the safe fallback.
-- The loopback SSH E2E tests Host API transport for remote file references and uploads,
-  but does not drive the browser's model picker or attachment picker.
-- The implementation routes selected local files through the owning runtime's upload
-  service. A specific cross-machine absolute-path refusal message has not been
-  implemented or tested.

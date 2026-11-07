@@ -1,11 +1,12 @@
 import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from '@effect/vitest'
-import { Effect, Layer, Stream } from 'effect'
+import { Cause, Effect, Exit, Layer, Stream } from 'effect'
 import { Connectors } from '../src/connectors/connectors.js'
 import type { Gateway } from '../src/connectors/gateway.js'
+import { RemoteRequestFailed } from '../src/errors.js'
 import { HostDirectory } from '../src/host-directory.js'
 import { RemoteSessions } from '../src/remote-sessions.js'
 import { RemoteThreads } from '../src/remote-threads.js'
@@ -33,6 +34,7 @@ interface Fixture {
   readonly routed: { readonly method: string; readonly mutation: boolean }[]
   readonly layer: Layer.Layer<Connectors>
   readonly setStreamed: (frames: readonly unknown[]) => void
+  readonly setPromptFailure: (failure: RemoteRequestFailed) => void
   readonly released: () => number
 }
 
@@ -41,6 +43,7 @@ const fixture = (): Fixture => {
   const routed: { method: string; mutation: boolean }[] = []
   let streamed: readonly unknown[] = [{ type: 'snapshot', cursor: 0, records: [], hasMore: false, projections: { asOfSeq: 0, values: {} } }]
   let releases = 0
+  let promptFailure: RemoteRequestFailed | undefined
   const gateway = (): Gateway => ({
     origin: 'http://127.0.0.1:1',
     launchUrl: 'http://127.0.0.1:1/?token=test-token-12345678',
@@ -60,6 +63,7 @@ const fixture = (): Fixture => {
         })
       if (request.method === 'selectModel') return Effect.succeed({ selected: { provider: 'deepseek', model: 'chat', reasoningEffort: 'high' } })
       if (request.method === 'create') return Effect.succeed({ sessionId: 'session-created' })
+      if (request.method === 'prompt' && promptFailure !== undefined) return Effect.fail(promptFailure)
       return Effect.succeed({ accepted: true })
     },
     api: method =>
@@ -81,6 +85,9 @@ const fixture = (): Fixture => {
     routed,
     setStreamed: frames => {
       streamed = frames
+    },
+    setPromptFailure: failure => {
+      promptFailure = failure
     },
     released: () => releases,
     layer: Layer.succeed(
@@ -198,6 +205,96 @@ describe('RemoteSessions', () => {
       }
       yield* sessions.source.prompt?.(request) ?? Effect.void
       expect(test.calls.at(-1)).toEqual({ method: 'prompt', args: { request } })
+    }).pipe(Effect.provide(services(test)))
+  })
+
+  const prompted = (test: Fixture) => test.calls.some(call => call.method === 'prompt')
+
+  it.effect('refuses a mention under this machine home before it reaches the runtime', () => {
+    const test = fixture()
+    return Effect.gen(function* () {
+      const sessions = yield* RemoteSessions
+      yield* sessions.source.list({})
+      const exit = yield* Effect.exit(
+        sessions.source.prompt?.({
+          requestId: 'request-1',
+          sessionId: 'session-remote',
+          mode: 'queue',
+          content: [{ type: 'text', text: `read @${homedir()}/notes.md` }],
+        } as never) ?? Effect.void,
+      )
+      expect(Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined).toMatchObject({ _tag: 'SessionPromptRefused' })
+      expect(prompted(test)).toBe(false)
+    }).pipe(Effect.provide(services(test)))
+  })
+
+  it.effect('sends a mention inside the thread folder and prose naming a home path', () => {
+    const test = fixture()
+    return Effect.gen(function* () {
+      const sessions = yield* RemoteSessions
+      yield* sessions.source.list({})
+      yield* sessions.source.prompt?.({
+        requestId: 'request-1',
+        sessionId: 'session-remote',
+        mode: 'queue',
+        content: [{ type: 'text', text: `@/remote/repo/x.ts and ${homedir()}/notes.md` }],
+      } as never) ?? Effect.void
+      expect(prompted(test)).toBe(true)
+    }).pipe(Effect.provide(services(test)))
+  })
+
+  it.effect('refuses an upload staged for another thread before it reaches the runtime', () => {
+    const test = fixture()
+    return Effect.gen(function* () {
+      const sessions = yield* RemoteSessions
+      yield* sessions.source.list({})
+      yield* sessions.recordUpload({ receiptId: 'receipt-1', runtimeId, sessionId: 'session-other' })
+      const exit = yield* Effect.exit(
+        sessions.source.prompt?.({
+          requestId: 'request-1',
+          sessionId: 'session-remote',
+          mode: 'queue',
+          content: [{ type: 'file', receiptId: 'receipt-1' }],
+        } as never) ?? Effect.void,
+      )
+      expect(Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined).toMatchObject({ _tag: 'SessionPromptRefused' })
+      expect(prompted(test)).toBe(false)
+    }).pipe(Effect.provide(services(test)))
+  })
+
+  it.effect('says how to recover when the owning runtime does not hold an attachment', () => {
+    const test = fixture()
+    test.setPromptFailure(new RemoteRequestFailed({ code: 'session/attachment-invalid', detail: 'File was not uploaded for this session.' }))
+    return Effect.gen(function* () {
+      const sessions = yield* RemoteSessions
+      yield* sessions.source.list({})
+      const exit = yield* Effect.exit(
+        sessions.source.prompt?.({
+          requestId: 'request-1',
+          sessionId: 'session-remote',
+          mode: 'queue',
+          content: [{ type: 'file', receiptId: 'receipt-unknown' }],
+        } as never) ?? Effect.void,
+      )
+      expect(Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined).toMatchObject({ _tag: 'SessionPromptRefused' })
+      expect(prompted(test)).toBe(true)
+    }).pipe(Effect.provide(services(test)))
+  })
+
+  it.effect('applies the same rule to a queued message edit', () => {
+    const test = fixture()
+    return Effect.gen(function* () {
+      const sessions = yield* RemoteSessions
+      yield* sessions.source.list({})
+      const exit = yield* Effect.exit(
+        sessions.source.updateQueue?.({
+          sessionId: 'session-remote',
+          itemId: 'item-1',
+          action: { kind: 'edit', content: [{ type: 'text', text: '@~/notes.md' }] },
+        } as never) ?? Effect.void,
+      )
+      expect(Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined).toMatchObject({ _tag: 'SessionPromptRefused' })
+      expect(test.calls.some(call => call.method === 'updateQueue')).toBe(false)
     }).pipe(Effect.provide(services(test)))
   })
 

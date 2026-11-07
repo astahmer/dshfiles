@@ -59,7 +59,7 @@ running }`, marked so the UI can badge them.
 | 2   | `session/follow` + `session/page` re-served from the remote journal stream                  | native chat renders the live transcript: user text, assistant blocks, tool cards, windowed history                                                                                                                                                                                | done    |
 | 3   | `session/prompt` (text), `cancel`, `updateQueue` forwarded                                  | the native composer sends, steers, queues and stops a remote turn; the plain-textarea view is deleted                                                                                                                                                                             | done    |
 | 4   | Per-session model catalog + reasoning effort | remote selection is reported (projections + follow frames), `selectModel` forwards on the no-replay path, the chip offers the runtime catalog (`model-effort-picker` → `runtimeModels`); unit-tested in multi-host and session-controller; the browser chip on a remote thread opens that catalog and selects GPT-6 Luna (`multi-host.auto-destination`) | done |
-| 5   | Image and file uploads, file references (`@`) resolved on the host | SSH E2E covers upload and `@` through Host APIs, and the composer's own file picker on a remote thread stores the bytes under the owning host's home only (`multi-host.auto-destination`); cross-machine path refusal messaging is not built | partial |
+| 5   | Image and file uploads, file references (`@`) resolved on the host | SSH E2E covers upload and `@` through Host APIs, and the composer's own file picker on a remote thread stores the bytes under the owning host's home only (`multi-host.auto-destination`); a message naming this machine is refused before it reaches the owner | done |
 | 6   | JJ/workspace proxy; native question/approval path or Host UI fallback | owner-resolved read-only repository/workspace status proxy ships; **Open on remote host** opens the exact mirrored thread (fleet-dx 6: `runtimeOpenView` takes a Session id and returns a token-free `threadUrl`); native waterfall, approvals, path-scoped JJ/workspace mutations and terminals remain in Host UI with exact gaps documented | partial |
 
 ## Risks and stop conditions
@@ -91,12 +91,9 @@ under the remote host's home and nowhere under the manager's. Upload and file-re
 route through the owning runtime; ownership is verified before file lookup or upload, and
 empty remote Sessions are persisted and recovered into the native Session list.
 
-M5 remainder: **cross-machine path refusal**. Prompt content carries only text and upload
-receipts (`PromptContentPart` is `text` | `image` | `file` with a `receiptId`), so no
-structured local path ever crosses to a remote Host; uploads are bound to the runtime they
-were sent to. What is left is messaging, not a guard: a local absolute path typed as text, or
-a receipt minted on another runtime, reaches the remote as-is and the remote's own error is
-shown. Building a refusal needs a decision on what counts as a "local path" in free text.
+M5 closed on 2026-11-07: the owner chose the "local path in free text" rule (`@` mentions under this
+Host's home or `~`; prose is left alone). See
+[Cross-machine references](../../plugins/@dshfiles/multi-host/docs/remote-thread-architecture.md#cross-machine-references).
 
 Milestone 6 partial: `sessionJjRepositories(sessionId)` resolves the mirrored Session's
 owner and reads validated repository/workspace status there without passing a path or
@@ -122,5 +119,4 @@ response was lost as `gateway-unreachable` (safe-to-retry) instead of
 
 ## Resume here
 
-Build the cross-machine path refusal (M5) once the "local path in free text" rule is
-decided, then the remaining M6 native question/approval path.
+Build the remaining M6 native question/approval path.
