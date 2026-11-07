@@ -543,7 +543,7 @@
     {
       "id": "quota-dashboard",
       "title": "Read provider quota and usage status",
-      "summary": "Keep enabled non-hidden accounts visible in canonical order, including accounts whose quota is unavailable. Show Sign in again or Quota unavailable with the provider reason instead of inventing a percentage. Real quota meters retain tags, reset tooltips, active-wire highlighting and last-good transient-error policy; only explicit user hiding collapses an account. Claude cards add an Extra usage meter (spent vs monthly cap, percent, currency, reset when reported, or Extra usage off), also in the quota agent tool and recorded history. A compact settings button beside Add opens the AI Accounts page and closes any open usage popover.",
+      "summary": "Keep enabled non-hidden accounts visible in canonical order, including accounts whose quota is unavailable. Show Sign in again or Quota unavailable with the provider reason instead of inventing a percentage. Real quota meters retain tags, reset tooltips, active-wire highlighting and last-good transient-error policy; only explicit user hiding collapses an account. Refresh bypasses the Host's 30-second sweep cache. Every card says when its own content was read: a reading kept through a failed read keeps its original time and names why, with Retry, and a shared Claude reading says when the next one can reach the provider. A failed read of the whole sweep shows a retryable notice beside the last reading on every quota surface. Claude cards add an Extra usage meter (spent vs monthly cap, percent, currency, reset when reported, or Extra usage off), also in the quota agent tool and recorded history. A compact settings button beside Add opens the AI Accounts page and closes any open usage popover.",
       "reach": ["expect group \"AI accounts usage\"", "click button \"AI accounts usage\"", "expect region \"AI account usage\""],
       "surfaces": ["client", "host", "settings"],
       "surface": "destinationSection",
@@ -613,7 +613,8 @@
       "failureModes": [
         "A quota provider failure is displayed without persisting a fake success.",
         "Missing or stale accounts do not crash the quota strip.",
-        "A transient failed poll retains the last good quota. Rejected or unavailable quota without a usable measurement keeps the account visible with a status, never a fabricated percentage.",
+        "A transient failed poll retains the last good quota under its own read time with the failure reason and Retry. Rejected or unavailable quota without a usable measurement keeps the account visible with a status, never a fabricated percentage.",
+        "While Claude's usage endpoint is held back by the two-minute shared reading or a 429 back-off, a refresh reuses the last reading, shows its real age and the next possible read, and offers no Retry that could not reach the provider.",
         "The accounts page reports saved credentials separately from provider quota authorization; a local credential alone does not prove remote validity.",
         "Signed-out cards offer Reauthenticate for that existing account, closing the popover before shared setup opens. Merely opening or cancelling it never starts provider login or replaces credentials."
       ],
@@ -634,6 +635,29 @@
           "kind": "gherkin",
           "id": "ai-accounts.unavailable-accounts",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.usage-refresh",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.usage-refresh-manual",
+          "file": "plugins/@dshfiles/ai-accounts/src/use-accounts-usage.test.tsx",
+          "testName": "keeps the last reading through a failed refresh, says why, and clears once a retry succeeds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.usage-refresh-foreground",
+          "file": "plugins/@dshfiles/ai-accounts/src/use-accounts-usage.test.tsx",
+          "testName": "keeps polling while hidden and reads again the moment the page returns"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.usage-refresh-held-reading",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-footer.test.tsx",
+          "testName": "says when the next reading can happen instead of offering a retry that cannot reach the provider"
         },
         {
           "kind": "gherkin",
