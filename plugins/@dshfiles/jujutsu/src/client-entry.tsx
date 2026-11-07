@@ -34,7 +34,7 @@ import { SchemaHelpers } from './schema-helpers.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { SurfaceVisibility } from './surface-visibility.js'
 import { JujutsuPanelSession } from './use-jujutsu-api.js'
-import { OwnerRouting } from './owner-routed-api.js'
+import { OwnerRouting, type OwnerPort } from './owner-routed-api.js'
 import './client.css'
 
 const PANEL_ID = 'dshfiles-jujutsu'
@@ -67,7 +67,18 @@ export default defineClient({
     const multiHost = createApiClient(ctx, multiHostApi, '@dshfiles/multi-host')
     ChatReferenceLinks.setTitles(
       new ChatReferenceTitleStore({
-        load: input => jujutsu.referenceTitles({ paths: input.paths, references: input.references }),
+        load: input =>
+          // SAFETY: the two shapes differ only in that the port leaves `method` to the Host, which validates it.
+          OwnerRouting.api({
+            local: jujutsu,
+            api: 'jujutsu',
+            methods: jujutsuApi.methods,
+            owner: multiHost as never as OwnerPort,
+            sessionId: SessionId(input.sessionId),
+          }).referenceTitles({
+            paths: input.paths,
+            references: input.references,
+          }),
         projectPathForSession: sessionId => sessionProjectPath(sessionId, ctx.sessions.list.getSnapshot().byId, ctx.workspaces.list.getSnapshot().items),
       }),
     )

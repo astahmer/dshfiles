@@ -109,6 +109,15 @@ Feature: Multi-host loopback SSH lifecycle
     And a terminal is opened on the remote thread
     Then the terminal is offered on its host
 
+  @scenario:multi-host.remote-child-approval
+  Scenario: A remote child agent cannot widen its access through this client
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And a child agent on the remote asks for an approval
+    Then the owner refuses the child agent without asking anyone
+
   @scenario:multi-host.remote-approval-rejected
   Scenario: A remote tool call is rejected in the controlling chat
     Given a loopback SSH DSH pair is booted
