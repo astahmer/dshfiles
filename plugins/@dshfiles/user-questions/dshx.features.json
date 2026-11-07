@@ -40,7 +40,7 @@
     {
       "id": "markdown-question",
       "title": "Markdown questions with sandboxed HTML previews",
-      "summary": "ask_user_question text and option descriptions render as markdown in the question form. The first paragraph is the heading (inline links, code and emphasis render in an ARIA heading; plain text keeps the native h2); the rest renders through the native MarkdownText (GFM tables, links, images, fenced code, math). A ```html preview fence renders through the QuestionHtmlPreview registry, which @dshfiles/html-render provides with its sandboxed card; a markdown option description renders under its option button so its links stay links. @dshfiles/tool-ask-user tells the model about it.",
+      "summary": "ask_user_question text and option descriptions render as markdown in the question form. The first paragraph is the heading (inline links, code and emphasis render in an ARIA heading; plain text keeps the native h2); the rest renders through the native MarkdownText (GFM tables, links, images, fenced code, math), through Chat's FencedMarkdown, so a fence a code-fence renderer claims (a ```mermaid diagram with @dshfiles/mermaid-diagrams) renders as it does in the transcript. A ```html preview fence renders through the QuestionHtmlPreview registry, which @dshfiles/html-render provides with its sandboxed card; a markdown option description renders under its option button so its links stay links. @dshfiles/tool-ask-user tells the model about it.",
       "surfaces": ["client"],
       "configuration": [],
       "states": ["plain", "markdown", "html-preview", "preview-unavailable"],

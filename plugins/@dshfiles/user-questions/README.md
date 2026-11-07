@@ -20,7 +20,10 @@ is added to the tool schema. [`@dshfiles/tool-ask-user`](../tool-ask-user) tells
   visually hidden heading from its `header`, else from its prose.
 - **Body**: everything after the heading, through the native `MarkdownText` the chat transcript uses (GFM tables,
   links, fenced code with highlighting, KaTeX math). Images follow the transcript's policy: an absolute local path
-  resolves through the file API, an https image loads directly, anything else renders as its alt text.
+  resolves through the file API, an https image loads directly, anything else renders as its alt text. The body and
+  markdown option descriptions render through Chat's `FencedMarkdown` (`@dshfiles/chat/fenced-markdown`), so a fence a
+  code-fence renderer claims renders as it does in the transcript: a ` ```mermaid ` fence is a diagram when
+  [`@dshfiles/mermaid-diagrams`](../mermaid-diagrams) is loaded.
 - **HTML preview**: a fence whose info string is `html preview`, optionally followed by a title
   (` ```html preview Revenue by month `), goes to the `QuestionHtmlPreview` registry this package declares as the
   dshx module `@dshfiles/user-questions/html-preview`. [`@dshfiles/html-render`](../html-render) provides it with its
