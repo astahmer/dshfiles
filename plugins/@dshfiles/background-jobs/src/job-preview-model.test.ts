@@ -9,11 +9,14 @@ const row = (overrides: Partial<JobView>): JobView =>
 describe('JobPreviewModel.jobIdOfResult', () => {
   it('reads each native hand-over wording', () => {
     expect(JobPreviewModel.jobIdOfResult({ toolName: 'bash', text: 'started background job bash-f75a9420a5824696' })).toBe('bash-f75a9420a5824696')
-    expect(JobPreviewModel.jobIdOfResult({ toolName: 'workflow', text: 'workflow "audit" started in the background as job workflow-ab12' })).toBe('workflow-ab12')
+    expect(JobPreviewModel.jobIdOfResult({ toolName: 'workflow', text: 'workflow "audit" started in the background as job workflow-ab12' })).toBe(
+      'workflow-ab12',
+    )
   })
 
   it('takes the promotion marker after output that quotes another job', () => {
-    const text = 'started background job bash-0000\n[still running after 30000ms; moved to background job bash-1a2b]\nThe command keeps running in the background.'
+    const text =
+      'started background job bash-0000\n[still running after 30000ms; moved to background job bash-1a2b]\nThe command keeps running in the background.'
     expect(JobPreviewModel.jobIdOfResult({ toolName: 'bash', text })).toBe('bash-1a2b')
   })
 

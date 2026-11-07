@@ -41,9 +41,9 @@ Feature: Background jobs board
     Then the thread's Jobs facet lists only that thread's running job
 
   @scenario:background-jobs.transcript-job-preview
-  Scenario: The transcript previews a background job where it started
+  Scenario: A running job stays previewed above the composer after its turn ends
     Given the isolated plugin composition of "@dshfiles/background-jobs, @dshfiles/tool-meta, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
     When a Command Code account backed by a local fake provider is added
     And a thread starts a background job that keeps writing output
-    Then the transcript previews the running job and streams its output
+    Then the composer dock previews the running job and streams its output
     And stopping the job from the preview takes a confirmation

@@ -129,4 +129,6 @@ A call that starts a job (`bash` or `pwsh` with `run_in_background`, either one 
 
 It reads the client `jobs` service (`watchRows`, `observe`), which is the stream the native header control shares. `observe` runs only while the card is open, and each card subscribes on its own with a selector that ignores output offsets, so an output chunk re-renders that card and never the transcript. Stop is the Jobs board's two-step confirmation over `background_jobs_kill`. A job the registry no longer holds shows no preview.
 
+A turn that ends folds its tool cards, and with them the card of a job still running, so the thread's running jobs also list above the composer (`conversation.input.dock`) with the same expandable card. The dock clears as jobs settle; the card under the tool stays as the history. A running job can show in both places while its turn is open.
+
 Job status is the registry's lifecycle, worded as on the board. A subagent is not a job: its row in `@dshfiles/thread-sidebar` has its own states.

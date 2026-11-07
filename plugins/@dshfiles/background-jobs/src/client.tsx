@@ -11,7 +11,7 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { ToolCallSections, type ToolCallSectionProps } from '@dshfiles/tool-meta/tool-call-sections'
 import type { JobsClient } from './job-preview-model.js'
-import { JobPreviewSection } from './job-preview.js'
+import { JobPreviewDock, JobPreviewSection, type JobPreviewBindings } from './job-preview.js'
 import { Processes } from './processes-page.js'
 import { ThreadJobsFacet } from './thread-jobs-facet.js'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
@@ -76,20 +76,30 @@ export default defineClient({
       // SAFETY: in the browser `ctx.jobs` is the job-controller's client service; the Host registry's declaration of the
       // same Context key is the one this program sees (job-preview-model.ts says why).
       const jobs = ctx.jobs as unknown as JobsClient
+      const preview: JobPreviewBindings = {
+        jobs,
+        t: translate,
+        useThreadLabel: () => EntityLabels.useSessionLabel(ctx.sessions),
+        // SAFETY: a job's owner is a Host-issued Session id.
+        openThread: sessionId => ctx.uiWorkspace.openSession(sessionId as SessionId),
+        openProcesses: () => openProcesses(),
+      }
       const JobPreview = (props: ToolCallSectionProps): JSX.Element => (
         <PluginQueryProvider>
-          <JobPreviewSection
-            {...props}
-            jobs={jobs}
-            t={translate}
-            useThreadLabel={() => EntityLabels.useSessionLabel(ctx.sessions)}
-            // SAFETY: a job's owner is a Host-issued Session id.
-            openThread={sessionId => ctx.uiWorkspace.openSession(sessionId as SessionId)}
-            openProcesses={() => openProcesses()}
-          />
+          <JobPreviewSection {...props} {...preview} />
         </PluginQueryProvider>
       )
       plugin.add(ToolCallSections, { id: '@dshfiles/background-jobs/job-preview', Section: plugin.bind(JobPreview) })
+      ctx.slots.inject('conversation.input.dock', () =>
+        ctx.slots.register(
+          { name: 'conversation.input.dock', id: 'dshfiles-background-jobs-live', order: 3, inject: sessionId => ({ sessionId }) },
+          decorate((props: { readonly sessionId: string }) => (
+            <PluginQueryProvider>
+              <JobPreviewDock {...preview} sessionId={props.sessionId} />
+            </PluginQueryProvider>
+          )),
+        ),
+      )
       const rows = [
         { id: 'processes', label: 'Observe › Processes', aliases: ['Processes', 'Jobs', 'Background jobs'], tab: PROCESSES_JOBS_TAB },
         { id: 'processes-dev-servers', label: 'Observe › Processes › Dev servers', aliases: ['Dev servers', 'Preview servers', 'Ports'], tab: 'dev-servers' },

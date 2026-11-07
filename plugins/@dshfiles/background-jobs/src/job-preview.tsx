@@ -23,6 +23,9 @@ export interface JobPreviewBindings {
   readonly openProcesses: () => void
 }
 
+/** The service's state is a class instance, so `subscribe` must stay a method call. */
+const useJobsSubscribe = (jobs: JobsClient) => useCallback((listener: () => void) => jobs.state.subscribe(listener), [jobs])
+
 const textOfResult = (owner: ToolCallSectionProps['owner']): string | undefined => {
   if (owner.phase !== 'result' || owner.block.isError) return undefined
   return owner.block.content.flatMap(content => (content.type === 'text' ? [content.text] : [])).join('\n')
@@ -43,7 +46,7 @@ const useJobView = (input: { readonly jobs: JobsClient; readonly sessionId: stri
     if (!JobPreviewModel.sameView(last.current, next)) last.current = next
     return last.current
   }, [jobs, sessionId, jobId])
-  return useSyncExternalStore(jobs.state.subscribe, read)
+  return useSyncExternalStore(useJobsSubscribe(jobs), read)
 }
 
 const Elapsed = (props: { readonly startedAt: number; readonly finishedAt: number | undefined; readonly live: boolean }): JSX.Element => {
@@ -68,7 +71,7 @@ const JobOutput = (props: {
   // SAFETY: ids come from the Host roster row this card renders.
   useEffect(() => jobs.observe(owner as SessionId | undefined, jobId as JobId), [jobs, owner, jobId])
   const read = useCallback(() => jobs.state.getSnapshot().observed[jobId], [jobs, jobId])
-  const observed = useSyncExternalStore(jobs.state.subscribe, read)
+  const observed = useSyncExternalStore(useJobsSubscribe(jobs), read)
   const pane = useRef<HTMLPreElement>(null)
   const pinned = useRef(true)
   const text = observed?.text ?? ''
@@ -125,10 +128,16 @@ const StopControl = (props: { readonly jobId: string; readonly status: JobPrevie
   )
 }
 
-const JobPreviewCard = (props: JobPreviewBindings & { readonly sessionId: string; readonly jobId: string; readonly owner: ToolCallSectionProps['owner'] }) => {
-  const { jobs, t, sessionId, jobId } = props
+const JobPreviewCard = (
+  props: JobPreviewBindings & {
+    readonly sessionId: string
+    readonly jobId: string
+    readonly seat: 'tool-card' | 'dock'
+    readonly disclosure: { readonly expanded: boolean; readonly toggle: () => void }
+  },
+) => {
+  const { jobs, t, sessionId, jobId, disclosure } = props
   const view = useJobView({ jobs, sessionId, jobId })
-  const disclosure = props.owner.useDisclosure()
   const threadLabel = props.useThreadLabel()
   // A job the registry no longer holds (an earlier DSH process, or retention) has nothing live to show.
   if (view === undefined) return null
@@ -137,8 +146,12 @@ const JobPreviewCard = (props: JobPreviewBindings & { readonly sessionId: string
   return (
     <section
       aria-label={`${t('previewKind')}: ${view.label}`}
-      className="dshx-root dshx:@container dshx:my-1 dshx:ml-1 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:text-xs"
+      className={cn(
+        'dshx-root dshx:@container dshx:my-1 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:text-xs',
+        props.seat === 'dock' ? 'dshx:bg-background' : 'dshx:ml-1',
+      )}
       data-dshfiles-live-preview="job"
+      data-dshfiles-live-preview-seat={props.seat}
       data-job-id={view.id}
       data-state={view.status}
     >
@@ -153,7 +166,9 @@ const JobPreviewCard = (props: JobPreviewBindings & { readonly sessionId: string
         <SquareTerminalIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
         <span className="dshx:shrink-0 dshx:text-muted-foreground dshx:@max-pane-narrow:sr-only">{t('previewKind')}</span>
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono!">{view.label}</span>
-        {view.progress === undefined ? null : <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{view.progress}</span>}
+        {view.progress === undefined ? null : (
+          <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{view.progress}</span>
+        )}
         <span role="status" className="dshx:shrink-0">
           <Badge variant={statusVariant(view.status)}>{t(STATUS_KEY[view.status])}</Badge>
         </span>
@@ -187,5 +202,50 @@ const JobPreviewCard = (props: JobPreviewBindings & { readonly sessionId: string
 export const JobPreviewSection = (props: ToolCallSectionProps & JobPreviewBindings): JSX.Element | null => {
   const text = textOfResult(props.owner)
   const jobId = text === undefined ? undefined : JobPreviewModel.jobIdOfResult({ toolName: props.owner.toolName, text })
-  return jobId === undefined ? null : <JobPreviewCard {...props} jobId={jobId} />
+  return jobId === undefined ? null : <ToolCardPreview {...props} jobId={jobId} />
+}
+
+const ToolCardPreview = (props: ToolCallSectionProps & JobPreviewBindings & { readonly jobId: string }): JSX.Element => {
+  const disclosure = props.owner.useDisclosure()
+  return <JobPreviewCard {...props} seat="tool-card" disclosure={disclosure} />
+}
+
+const DockPreview = (props: JobPreviewBindings & { readonly sessionId: string; readonly jobId: string }): JSX.Element => {
+  const [expanded, setExpanded] = useState(false)
+  return <JobPreviewCard {...props} seat="dock" disclosure={{ expanded, toggle: () => setExpanded(open => !open) }} />
+}
+
+const ID_SEPARATOR = '\n'
+
+/**
+ * The thread's running jobs above the composer. A turn that ends folds its tool cards, and with them the card of a job
+ * that is still running; this keeps that job in reach and clears as work ends. The id list is read as one string, so
+ * output frames do not re-render the dock.
+ */
+export const JobPreviewDock = (props: JobPreviewBindings & { readonly sessionId: string }): JSX.Element | null => {
+  const { jobs, sessionId } = props
+  // SAFETY: the Session id comes from the dock slot.
+  useEffect(() => jobs.watchRows(sessionId as SessionId), [jobs, sessionId])
+  const read = useCallback(
+    () =>
+      (jobs.state.getSnapshot().rows[sessionId] ?? [])
+        .filter(row => JobPreviewModel.isLive(row.status))
+        .map(row => row.id)
+        .join(ID_SEPARATOR),
+    [jobs, sessionId],
+  )
+  const ids = useSyncExternalStore(useJobsSubscribe(jobs), read)
+  if (ids === '') return null
+  return (
+    <div
+      aria-label={props.t('previewDock')}
+      role="region"
+      className="dshx-root dshx:mx-auto dshx:flex dshx:max-h-72 dshx:w-[calc(100%-var(--dsh-composer-side-clearance,0px)*2)] dshx:max-w-(--dsh-composer-card-max-width) dshx:flex-col dshx:overflow-y-auto"
+      data-dshfiles-live-preview-dock="jobs"
+    >
+      {ids.split(ID_SEPARATOR).map(jobId => (
+        <DockPreview key={jobId} {...props} jobId={jobId} />
+      ))}
+    </div>
+  )
 }

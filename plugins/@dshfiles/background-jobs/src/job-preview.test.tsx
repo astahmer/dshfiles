@@ -6,7 +6,7 @@ import type { ToolCallSectionProps } from '@dshfiles/tool-meta/tool-call-section
 import { Profiler, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JobsClient } from './job-preview-model.js'
-import { JobPreviewSection } from './job-preview.js'
+import { JobPreviewDock, JobPreviewSection } from './job-preview.js'
 
 const kill = vi.hoisted(() => vi.fn(async ({ jobId }: { readonly jobId: string }) => ({ jobId, outcome: 'requested' as const })))
 vi.mock('@dshfiles/dshx/client', async original => ({
@@ -26,29 +26,40 @@ type JobsSnapshot = ReturnType<JobsClient['state']['getSnapshot']>
 
 // SAFETY: fixture rows carry only what the card reads; no registry validates the brands.
 const row = (overrides: Partial<JobView> = {}): JobView =>
-  ({ id: JOB_ID, kind: 'bash', label: 'pnpm build', status: 'running', owner: SESSION, startedAt: STARTED_AT, output: { total: 0, earliest: 0 }, ...overrides }) as JobView
+  ({
+    id: JOB_ID,
+    kind: 'bash',
+    label: 'pnpm build',
+    status: 'running',
+    owner: SESSION,
+    startedAt: STARTED_AT,
+    output: { total: 0, earliest: 0 },
+    ...overrides,
+  }) as JobView
+
+/** A class like the real ClientJobsModel, so a detached `subscribe` fails here too. */
+class FakeJobsState {
+  private readonly listeners = new Set<() => void>()
+  constructor(private snapshot: JobsSnapshot) {}
+  getSnapshot(): JobsSnapshot {
+    return this.snapshot
+  }
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+  publish(next: Partial<JobsSnapshot>): void {
+    this.snapshot = { ...this.snapshot, ...next }
+    for (const listener of this.listeners) listener()
+  }
+}
 
 const fakeJobs = (rows: readonly JobView[] = [row()]) => {
-  let snapshot: JobsSnapshot = { rows: { [SESSION]: rows }, observed: {} }
-  const listeners = new Set<() => void>()
+  const state = new FakeJobsState({ rows: { [SESSION]: rows }, observed: {} })
   const observe = vi.fn(() => vi.fn())
   const watchRows = vi.fn(() => vi.fn())
-  const jobs: JobsClient = {
-    state: {
-      getSnapshot: () => snapshot,
-      subscribe: listener => {
-        listeners.add(listener)
-        return () => listeners.delete(listener)
-      },
-    },
-    watchRows,
-    observe,
-  }
-  const publish = (next: Partial<JobsSnapshot>): void => {
-    snapshot = { ...snapshot, ...next }
-    for (const listener of listeners) listener()
-  }
-  return { jobs, publish, observe, watchRows }
+  const jobs: JobsClient = { state, watchRows, observe }
+  return { jobs, publish: (next: Partial<JobsSnapshot>) => state.publish(next), observe, watchRows }
 }
 
 // SAFETY: the card reads only these fields of the native owner.
@@ -168,5 +179,52 @@ describe('JobPreviewSection', () => {
     renderCard({ expanded: true })
     expect(screen.getByText('previewThisThread')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /previewThread/ })).toBeNull()
+  })
+})
+
+describe('JobPreviewDock', () => {
+  const renderDock = (jobs = fakeJobs()) => {
+    render(
+      <PluginQueryProvider>
+        <JobPreviewDock {...bindings} jobs={jobs.jobs} sessionId={SESSION} />
+      </PluginQueryProvider>,
+    )
+    return jobs
+  }
+  const dockCards = () => document.querySelectorAll('[data-dshfiles-live-preview-seat="dock"]')
+
+  it('lists running jobs only, and clears as they settle', () => {
+    const fake = renderDock(fakeJobs([row(), row({ id: 'bash-2c3d' as JobView['id'], status: 'completed', finishedAt: STARTED_AT + 1 })]))
+    expect(dockCards()).toHaveLength(1)
+    act(() => fake.publish({ rows: { [SESSION]: [row({ status: 'completed', finishedAt: STARTED_AT + 1 })] } }))
+    expect(dockCards()).toHaveLength(0)
+    expect(document.querySelector('[data-dshfiles-live-preview-dock]')).toBeNull()
+  })
+
+  it('renders nothing for a thread with no running job', () => {
+    renderDock(fakeJobs([]))
+    expect(document.querySelector('[data-dshfiles-live-preview-dock]')).toBeNull()
+  })
+
+  it('expands a row by itself, streaming only that job', () => {
+    const fake = renderDock()
+    expect(fake.observe).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /previewToggle/ }))
+    expect(fake.observe).toHaveBeenCalledWith(SESSION, JOB_ID)
+  })
+
+  it('does not re-render the dock for output frames', () => {
+    const fake = fakeJobs()
+    let commits = 0
+    render(
+      <Profiler id="dock" onRender={() => (commits += 1)}>
+        <PluginQueryProvider>
+          <JobPreviewDock {...bindings} jobs={fake.jobs} sessionId={SESSION} />
+        </PluginQueryProvider>
+      </Profiler>,
+    )
+    const before = commits
+    for (const total of [10, 20, 30]) act(() => fake.publish({ rows: { [SESSION]: [row({ output: { total, earliest: 0 } })] } }))
+    expect(commits).toBe(before)
   })
 })
