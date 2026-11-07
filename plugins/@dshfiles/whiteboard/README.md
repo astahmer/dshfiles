@@ -112,7 +112,7 @@ stateDiagram-v2
   s_boardSync_failed --> s_boardSync_saving : LEAVE
 ```
 
-Findings and options compared: [plans/xstate-viz/README.md](../../../plans/xstate-viz/README.md).
+Findings and options compared: [xstate visualization](docs/xstate-visualization.md).
 
 ## Verify
 

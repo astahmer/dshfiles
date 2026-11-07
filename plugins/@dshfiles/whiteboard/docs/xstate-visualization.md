@@ -1,17 +1,11 @@
-# xstate visualization (b:5)
+# xstate visualization
 
 Owned plugins use xstate v5 for tangled client flows (35 `createMachine` calls under `plugins/@dshfiles/*/src` on
-2026-11-04: ai-accounts, command-palette, editor, jj-integration, jujutsu, thread-sidebar, …). The question: how do
-we see those machines, statically (what states and transitions exist) and live (which state an actor is in now)?
+2026-11-04: ai-accounts, command-palette, editor, jj-integration, jujutsu, thread-sidebar, …). A static machine →
+Mermaid generator ships in this plugin. Live inspection is deliberately not built: it is a debugging technique you
+wire up for one session, never a feature.
 
-**Resume here:** the static path shipped in `@dshfiles/whiteboard` (below). Live inspection is a recommendation, not
-built; pick it up only when a debugging session needs it.
-
-| Step                                             | State                                                               |
-| ------------------------------------------------ | ------------------------------------------------------------------- |
-| Static machine → Mermaid, CLI, whiteboard export | done (`whiteboard/src/xstate-diagram.ts`, `machine-diagram` script) |
-| Live inspection behind a dev switch              | not started; on demand                                              |
-| Local live view (actor snapshot registry)        | not started; only if repeated debugging asks for it                 |
+## Options compared
 
 | Option                                                    | Static diagram   | Live state | Runs offline | Data leaves the machine              | Cost here                                                             | Verdict                            |
 | --------------------------------------------------------- | ---------------- | ---------- | ------------ | ------------------------------------ | --------------------------------------------------------------------- | ---------------------------------- |
@@ -23,7 +17,7 @@ built; pick it up only when a debugging session needs it.
 | elkjs 0.12 (EPL-2.0 / GPL-3.0)                            | layout only      | no         | yes          | none                                 | 8 MB package, licence review, we would write the drawing ourselves    | no                                 |
 | **Machine → Mermaid (built)**                             | yes              | no         | yes          | none                                 | ~200 lines, no dependency, reads `machine.root`                       | **shipped**                        |
 
-## What shipped
+## What ships
 
 - `@dshfiles/whiteboard/xstate-diagram` — `machineToMermaid(machine, 'flowchart' | 'state')`. It walks the live v5
   state-node tree (`states`, `initial`, `transitions`, `always`, `invoke`) structurally, without importing xstate:
@@ -38,9 +32,9 @@ built; pick it up only when a debugging session needs it.
   pasted as an image, which is why `flowchart` is the default.
 - `stateDiagram-v2` output renders on GitHub, so a plugin README can embed its machine (the whiteboard README does).
 
-## Recommendation for live inspection
+## Live inspection, when a flow misbehaves
 
-When a flow misbehaves at runtime, wire `@statelyai/inspect` behind an explicit dev switch rather than shipping it:
+Wire `@statelyai/inspect` behind an explicit dev switch rather than shipping it:
 `createActor(machine, { inspect: createBrowserInspector({ autoStart: false }).inspect })` only when
 `localStorage['dshfiles:xstate-inspect'] === '1'`, with the dependency in the plugin under investigation and removed
 afterwards. Do not make it default: it opens a stately.ai window and sends every event and context snapshot there

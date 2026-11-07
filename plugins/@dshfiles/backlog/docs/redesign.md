@@ -1,4 +1,7 @@
-# Backlog redesign (step 7)
+# Backlog redesign
+
+The shipped design of the Backlog page: views, inspector, composer, and the decisions behind them. Open work lives in
+[the Backlog plan](../../../../plans/backlog/README.md).
 
 Brief: the user's handoff of 2026-10-19 (Gr8r Studio quality, Linear issue handling, Discord capture,
 agent-native). References: `~/Downloads/backlog-ui-reference-screenshots`, the "Agent inbox" board video.
@@ -60,4 +63,3 @@ local storage; Enter sends instantly (optimistic), failure restores the draft wi
 | Lists not virtualized              | Items virtualized, Feed paged, Board columns capped, revision-gated polling, Host-side project counts; measured on 2,017 items                                                               |
 | Jev and model triage untested live | Jev checked live with the `jev-api-key-optmem` secret; its work question now counts bug reports as work. The model path is still unchecked: the free models refuse calls outside OpenCode    |
 
-Open: see "Remaining" in [README.md](README.md).
