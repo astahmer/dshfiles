@@ -30,6 +30,7 @@ import { multiHostApi, type HostSummary, type ResourcePoolEntry, type RuntimeSum
 import { remoteDirectoryPicker } from './remote-folders.js'
 import { HostDialog, hostState, type HostDraft } from './hosts-dialog.js'
 import { moveHostId, shiftHostId } from './host-order.js'
+import { CheckoutSyncDialog } from './checkout-sync-dialog.js'
 import { CloneProjectDialog } from './clone-project-dialog.js'
 import { ConnectionDiagnostics } from './connection-diagnostics.js'
 import { ConnectionTestSteps } from './connection-test-steps.js'
@@ -134,6 +135,7 @@ const HostRow = (props: {
   readonly onEdit: () => void
   readonly onAddProject: () => void
   readonly onCloneProject: () => void
+  readonly onSyncCheckout: () => void
   readonly onRemove: () => void
 }) => {
   const { api, host, runtime } = props
@@ -394,6 +396,10 @@ const HostRow = (props: {
                 <PlusIcon className="dshx:size-3.5" />
                 Clone project
               </Button>
+              <Button size="sm" variant="outline" onClick={props.onSyncCheckout}>
+                <RefreshCwIcon className="dshx:size-3.5" />
+                Sync checkout
+              </Button>
             </>
           ) : null}
           <IconAction
@@ -437,6 +443,7 @@ export const HostsPage = () => {
   const [form, setForm] = useState<HostDraft | null>(null)
   const [projectRuntimeId, setProjectRuntimeId] = useState<string | null>(null)
   const [cloneRuntimeId, setCloneRuntimeId] = useState<string | null>(null)
+  const [syncHostId, setSyncHostId] = useState<string | null>(null)
   const [fleetOpen, setFleetOpen] = useState(false)
   const [updateRequest, setUpdateRequest] = useState(0)
   const projectRuntime = directory.data?.runtimes.find(runtime => runtime.id === projectRuntimeId)
@@ -618,6 +625,7 @@ export const HostsPage = () => {
                 onHide={hidden => hide.mutate({ id: host.id, hidden })}
                 onAddProject={() => setProjectRuntimeId(runtimeFor(host)?.id ?? null)}
                 onCloneProject={() => setCloneRuntimeId(runtimeFor(host)?.id ?? null)}
+                onSyncCheckout={() => setSyncHostId(host.id)}
                 onEdit={() =>
                   setForm({
                     hostId: host.id,
@@ -657,6 +665,7 @@ export const HostsPage = () => {
             heading={`Add project · ${projectHost.name}`}
           />
         ) : null}
+        <CheckoutSyncDialog api={api} host={hosts.find(host => host.id === syncHostId)} onClose={() => setSyncHostId(null)} />
         <HostDialog api={api} draft={form} onOpenChange={open => (open ? undefined : setForm(null))} />
         <FleetUpdateDialog
           api={api}

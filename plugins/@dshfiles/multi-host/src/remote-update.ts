@@ -1,5 +1,6 @@
 import { Effect, Option, Schema } from 'effect'
 import type { RemoteFacts } from './remote-doctor.js'
+import { RemoteCheckout, type CheckoutRecovery } from './remote-checkout.js'
 import { RemoteExec } from './remote-exec.js'
 import { shellQuote } from './ssh.js'
 
@@ -10,12 +11,18 @@ const syncEnvelopeSchema = Schema.Union([
   Schema.Struct({
     ok: Schema.Literal(true),
     data: Schema.Struct({
+      status: Schema.optional(Schema.String),
       to: Schema.NullOr(Schema.String),
       unlanded: Schema.Array(Schema.Unknown),
       conflicts: Schema.Array(Schema.Unknown),
       rebuilt: Schema.Struct({ plugins: Schema.Array(Schema.String) }),
       restart: Schema.Struct({ needed: Schema.Boolean }),
     }),
+  }),
+  // A refused, conflicted or failed build run reports its result, not an error.
+  Schema.Struct({
+    ok: Schema.Literal(false),
+    data: Schema.Struct({ status: Schema.String, to: Schema.NullOr(Schema.String), hint: Schema.NullOr(Schema.String) }),
   }),
   Schema.Struct({ ok: Schema.Literal(false), error: Schema.Struct({ message: Schema.String, hint: Schema.optional(Schema.String) }) }),
 ])
@@ -28,6 +35,10 @@ export interface HostUpdateResult {
   readonly rebuilt: readonly string[]
   readonly restartNeeded: boolean
   readonly detail: string
+  /** Revisions origin has that this checkout lacks, and revisions here origin lacks. */
+  readonly incoming: number
+  readonly outgoing: number
+  readonly recovery: readonly CheckoutRecovery[]
 }
 
 /** Why a machine cannot run the update; undefined when it can. */
@@ -39,22 +50,39 @@ const blockedReason = (input: { readonly facts: RemoteFacts; readonly nodePath: 
   return undefined
 }
 
-/** Fetch the host's repository, then let its own `dshx checkout sync` rebase, install and rebuild what changed. */
+/** The host's own `dshx checkout sync`, which rebases, installs and rebuilds what changed; the fetch comes first. */
 const commandsOf = (input: { readonly facts: RemoteFacts; readonly nodePath: string; readonly bookmark: string; readonly apply: boolean }) => {
   const path = shellQuote(input.facts.checkout.path)
-  const jj = shellQuote(input.facts.jj.path ?? 'jj')
   const directories = [input.nodePath, input.facts.pnpm.path].flatMap(file => (file === undefined ? [] : [file.slice(0, file.lastIndexOf('/'))]))
   const environment = `env PATH=${[...directories.map(shellQuote), '"$PATH"'].join(':')}`
   const sync = `cd ${path} && ${environment} ${shellQuote(input.nodePath)} ${dshxCli} checkout sync --bookmark ${shellQuote(input.bookmark)} --json${input.apply ? '' : ' --dry-run'}`
-  return { fetch: `${jj} -R ${path} git fetch`, sync }
+  return { sync }
 }
 
 /** Turn the sync envelope into the update result; output that is not the envelope is reported, never guessed. */
 const readSyncOutput = (input: { readonly stdout: string; readonly apply: boolean; readonly checkoutPath: string }): HostUpdateResult => {
-  const base = { applied: input.apply, checkoutPath: input.checkoutPath, revision: undefined, rebuilt: [], restartNeeded: false }
+  const base = {
+    applied: input.apply,
+    checkoutPath: input.checkoutPath,
+    revision: undefined,
+    rebuilt: [],
+    restartNeeded: false,
+    incoming: 0,
+    outgoing: 0,
+    recovery: [],
+  }
   const decoded = Schema.decodeUnknownOption(Schema.fromJsonString(syncEnvelopeSchema))(input.stdout.trim())
   if (Option.isNone(decoded)) return { ...base, ok: false, detail: 'the host checkout sync printed no result; update dshx on the host and retry' }
   const envelope = decoded.value
+  if (!envelope.ok && 'data' in envelope) {
+    return {
+      ...base,
+      ok: false,
+      applied: false,
+      revision: envelope.data.to ?? undefined,
+      detail: envelope.data.hint ?? `the host checkout sync ended ${envelope.data.status}; run it on the host to see why`,
+    }
+  }
   if (!envelope.ok) return { ...base, ok: false, detail: `${envelope.error.message}${envelope.error.hint === undefined ? '' : ` ${envelope.error.hint}`}` }
   const { data } = envelope
   const rebuilt = data.rebuilt.plugins
@@ -66,7 +94,9 @@ const readSyncOutput = (input: { readonly stdout: string; readonly apply: boolea
     rebuilt.length === 0
       ? input.apply
         ? 'up to date'
-        : 'already up to date'
+        : data.status === 'would-sync'
+          ? 'would rebase; nothing to rebuild'
+          : 'already up to date'
       : `${input.apply ? 'rebuilt' : 'would rebuild'} ${rebuilt.length} plugin${rebuilt.length === 1 ? '' : 's'}`
   return { ...base, ok: true, revision, rebuilt, restartNeeded: data.restart.needed, detail }
 }
@@ -79,45 +109,49 @@ const runHostUpdate = Effect.fn('remote host update')(function* (input: {
   readonly apply: boolean
 }) {
   const checkoutPath = input.facts.checkout.path
+  const failure = {
+    ok: false,
+    applied: false,
+    checkoutPath,
+    revision: undefined,
+    rebuilt: [],
+    restartNeeded: false,
+    incoming: 0,
+    outgoing: 0,
+    recovery: [],
+  } satisfies Omit<HostUpdateResult, 'detail'>
   const blocked = blockedReason({ facts: input.facts, nodePath: input.nodePath })
   if (blocked !== undefined || input.nodePath === undefined) {
-    return {
-      ok: false,
-      applied: false,
-      checkoutPath,
-      revision: undefined,
-      rebuilt: [],
-      restartNeeded: false,
-      detail: blocked ?? 'no Node',
-    } satisfies HostUpdateResult
+    return { ...failure, detail: blocked ?? 'no Node' } satisfies HostUpdateResult
   }
   const commands = commandsOf({ facts: input.facts, nodePath: input.nodePath, bookmark: input.bookmark, apply: input.apply })
-  const fetched = yield* RemoteExec.run({ sshTarget: input.sshTarget, command: commands.fetch, timeoutMs: 180_000 })
-  if (!fetched.ok) {
-    const reason = fetched.stderr.trim().split('\n').at(-1) ?? ''
-    return {
-      ok: false,
-      applied: false,
-      checkoutPath,
-      revision: undefined,
-      rebuilt: [],
-      restartNeeded: false,
-      detail: `jj git fetch failed on the host: ${reason}`,
-    } satisfies HostUpdateResult
+  const { exec, inspection } = yield* RemoteCheckout.fetchAndInspect({ sshTarget: input.sshTarget, path: checkoutPath, bookmark: input.bookmark })
+  if (!exec.ok) return { ...failure, detail: `the host could not be read: ${exec.stderr.trim().split('\n').at(-1) ?? ''}` } satisfies HostUpdateResult
+  // dshx refuses unlanded work and undoes conflicts itself; what it cannot read past is a bookmark with two targets.
+  const standing = RemoteCheckout.standingStatus(inspection)
+  if (inspection.stop !== undefined || standing === 'bookmark-conflict') {
+    const report = RemoteCheckout.report({
+      path: checkoutPath,
+      bookmark: input.bookmark,
+      status: standing ?? 'failed',
+      inspection,
+      reason: inspection.stop?.detail ?? '',
+    })
+    return { ...failure, detail: report.detail, recovery: report.recovery } satisfies HostUpdateResult
   }
+  const counts = { incoming: inspection.incoming.total, outgoing: inspection.outgoing.total + inspection.unpushedBookmark.total }
   const synced = yield* RemoteExec.run({ sshTarget: input.sshTarget, command: commands.sync, timeoutMs: 1_200_000 })
   if (synced.timedOut) {
     return {
-      ok: false,
+      ...failure,
+      ...counts,
       applied: input.apply,
-      checkoutPath,
-      revision: undefined,
-      rebuilt: [],
-      restartNeeded: false,
       detail: 'the host checkout sync timed out after 20 min; retry or read its output on the host',
     } satisfies HostUpdateResult
   }
-  return readSyncOutput({ stdout: synced.stdout, apply: input.apply, checkoutPath })
+  const result = readSyncOutput({ stdout: synced.stdout, apply: input.apply, checkoutPath })
+  const recovery = result.ok || result.detail.length === 0 ? result.recovery : [{ label: result.detail }]
+  return { ...result, ...counts, recovery } satisfies HostUpdateResult
 })
 
 export class RemoteUpdate {

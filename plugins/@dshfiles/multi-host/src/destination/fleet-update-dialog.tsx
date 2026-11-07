@@ -12,11 +12,22 @@ type UpdateResult = Awaited<ReturnType<MultiHostClient['hostUpdate']>>
 /** One host's row: whether it succeeded, what it says, and whether an update would change something. */
 type RowOutcome = { readonly ok: boolean; readonly text: string; readonly pending: boolean }
 
+/** What is on the move for this checkout. A host that has not loaded this version reports neither count. */
+const movementOf = (result: { readonly incoming?: number | undefined; readonly outgoing?: number | undefined }): string => {
+  const incoming = result.incoming ?? 0
+  const outgoing = result.outgoing ?? 0
+  return incoming + outgoing === 0 ? '' : `${incoming} incoming · ${outgoing} not pushed · `
+}
+
 const outcomeOf = (result: UpdateResult): RowOutcome => {
   if (!('detail' in result)) return { ok: false, text: result.message, pending: false }
-  if (!result.ok) return { ok: false, text: result.detail, pending: false }
-  if (!result.applied) return { ok: true, text: result.detail, pending: result.rebuilt.length > 0 }
-  return { ok: true, text: result.restartNeeded ? `${result.detail} · restart DSH on this host to load it` : result.detail, pending: false }
+  if (!result.ok) {
+    const recovery = (result.recovery ?? []).filter(step => step.label !== result.detail).map(step => step.command ?? step.label)
+    return { ok: false, text: [result.detail, ...recovery].join(' '), pending: false }
+  }
+  const counts = movementOf(result)
+  if (!result.applied) return { ok: true, text: `${counts}${result.detail}`, pending: result.rebuilt.length > 0 || (result.incoming ?? 0) > 0 }
+  return { ok: true, text: `${counts}${result.restartNeeded ? `${result.detail} · restart DSH on this host to load it` : result.detail}`, pending: false }
 }
 
 type RowState = 'busy' | 'failed' | 'pending' | 'done'

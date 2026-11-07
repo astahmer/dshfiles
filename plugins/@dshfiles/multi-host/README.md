@@ -14,6 +14,10 @@ Update every host's dshfiles checkout from the same page:
 
 ![Update hosts lists each host's sync result, with Retry on a failed host](docs/screenshots/fleet-update.png)
 
+Compare any jj checkout on a host with origin, then sync it without pushing:
+
+![Sync checkout reports incoming and unpushed work, the bookmark, the workspaces and what to do on that host](docs/screenshots/checkout-sync.png)
+
 Edit host sets how much Auto loads a host and whether new threads there fetch
 first:
 
@@ -165,13 +169,14 @@ method with a `multi_host_*` tool:
   `multi_host_runtime_logs` — whether the headless runtime is up, start it with
   an official Node build and a free loopback port, stop it (refusing a pid that
   is not that machine's DSH web), read its bounded log tail.
-- `multi_host_checkout_sync` — fetch and rebase one checkout onto
-  `<bookmark>@origin`, keeping that machine's edits; `apply: false` only reports
-  the commands.
+- `multi_host_checkout_sync` — the Hosts page's **Sync checkout**: compare any
+  jj checkout with `<bookmark>@origin`, then rebase it. See
+  [Keeping checkouts in sync](#keeping-checkouts-in-sync).
 - `multi_host_update` — the Hosts page's **Update hosts** for one host: fetch,
   then the host's own `dshx checkout sync` rebases, installs and rebuilds what
   changed and says whether DSH there needs a restart. `apply: false` is a dry
-  run. It never restarts the host, and only commits on `main@origin` reach it.
+  run reporting incoming and unpushed revisions. It never restarts the host, and
+  only commits on `main@origin` reach it.
 
 Agents can also hand work to another machine: `multi_host_delegate` runs a task
 as a thread on a named host, or on the least-loaded visible SSH host when no
@@ -182,6 +187,38 @@ follow; cancelling the call stops the remote turn.
 Provisioning never installs a package manager or edits the machine's own setup:
 a missing fnm or a stale nixfiles is reported, not patched. It also never
 rewrites another machine's checkout without `apply`.
+
+## Keeping checkouts in sync
+
+Hosts share work through origin and nothing else. **Sync checkout** on a host row
+(or `multi_host_checkout_sync`) fetches, simulates the rebase off disk and
+reports, for one jj checkout and one bookmark:
+
+- **Incoming**: revisions on `<bookmark>@origin` this checkout lacks.
+- **Not pushed**: revisions under the working copy or on the local bookmark that
+  origin lacks. Undescribed or `wip` revisions are local edits and ride a sync.
+  Described ones origin already holds drop out.
+- **Bookmark**: where it points here and on origin, and both sides of a conflict.
+- **Workspaces**: which workspace this checkout is, the others sharing the
+  repository and the threads this machine started in them.
+
+Confirming rebases the checkout onto the commit the report showed. A sync
+**never pushes and never moves a bookmark**: publishing stays a person's act on
+the machine that holds the work, so the report names the push command instead.
+
+| Report              | Why it refuses                                 | Way forward                                      |
+| ------------------- | ---------------------------------------------- | ------------------------------------------------ |
+| `unpushed-work`     | Described work origin lacks.                   | Rebase and push it, or mark it `wip`.            |
+| `conflicted`        | The rebase would conflict; files are listed.   | Rebase by hand, or set the work aside.           |
+| `bookmark-conflict` | Here and origin moved the bookmark apart.      | Keep the local commits, or follow origin.        |
+| `workspace-busy`    | Another workspace is built on these revisions. | Finish or move that work.                        |
+| `stale`             | Another workspace rewrote this working copy.   | `jj workspace update-stale`, saving edits first. |
+| `moved`             | The checkout changed after the report.         | Check again.                                     |
+
+Each refusal leaves the checkout as it was and carries the exact commands for
+that host. The simulation, the check and the undo run as one remote script, so a
+dropped connection cannot strand a rebase. A preview fetches, which moves remote
+bookmarks and can surface a bookmark conflict, but changes no file.
 
 ## How it works
 
