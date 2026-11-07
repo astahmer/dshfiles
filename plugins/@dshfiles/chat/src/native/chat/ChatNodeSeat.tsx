@@ -159,6 +159,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       data-chat-node-key={routedNode.key}
       data-chat-group-part={groupPart}
       data-chat-flow-kind={routedNode.kind}
+      data-chat-message-seq={routedNode.kind === 'assistant-step' ? routedNode.data.finalNode?.seq : undefined}
       data-chat-turn={turn}
       data-chat-step={stepOf(routedNode)}
       data-turn-process-member={processMember || undefined}
