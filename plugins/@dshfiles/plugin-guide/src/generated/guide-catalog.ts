@@ -1345,7 +1345,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/multi-host/api",
       "summary": "Public module of @dshfiles/multi-host.",
-      "publicSymbol": "JsonValue, LocalProjectFileCandidate, jsonValueSchema, resourceSnapshotSchema, fileUploadValueSchema, remotePeerReadCalls",
+      "publicSymbol": "JsonValue, LocalProjectFileCandidate, jsonValueSchema, resourceSnapshotSchema, fileUploadValueSchema, sessionRepositoryReads",
       "importFrom": "@dshfiles/multi-host/api",
       "owner": "@dshfiles/multi-host",
       "scope": "client or host",
@@ -1356,9 +1356,29 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: jjRevisionEffectSchema, jjThreadEffectSchema, jjRepositoryEffectSchema, jjRepositoriesEffectSchema, jjRevisionSchema, jjThreadSchema, jjRepositorySchema, jjRepositoriesSchema, JjRevisionView, JjThreadView, JjRepositoryView, nativeRpcSchema, nativeRpcResultSchema, ProjectOriginsInput, cloneProjectInputEffectSchema, EffectMultiHostApi, multiHostApi, HostSummary"
+        "Also exports: sessionRepositoryWrites, remotePeerReadCalls, jjRevisionEffectSchema, jjThreadEffectSchema, jjRepositoryEffectSchema, jjRepositoriesEffectSchema, jjRevisionSchema, jjThreadSchema, jjRepositorySchema, jjRepositoriesSchema, JjRevisionView, JjThreadView, JjRepositoryView, nativeRpcSchema, nativeRpcResultSchema, ProjectOriginsInput, cloneProjectInputEffectSchema, remoteQuestionWireSchema"
       ],
       "source": "plugins/@dshfiles/multi-host/src/api.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/multi-host/interaction-feed",
+      "kind": "module",
+      "title": "@dshfiles/multi-host/interaction-feed",
+      "summary": "A connected event stream announces every change; this only covers a missed frame.",
+      "publicSymbol": "watchRemoteInteractions",
+      "importFrom": "@dshfiles/multi-host/interaction-feed",
+      "owner": "@dshfiles/multi-host",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/multi-host/src/interaction-feed.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2575,7 +2595,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › inline-title-edit"
       ],
       "details": [
-        "Used by 30 catalog feature(s)",
+        "Used by 32 catalog feature(s)",
         "Destinations in use: inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2631,7 +2651,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agents › agent-mentions"
       ],
       "details": [
-        "Used by 58 catalog feature(s)",
+        "Used by 59 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
