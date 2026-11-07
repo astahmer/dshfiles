@@ -186,7 +186,7 @@ export const attentionApi = defineApi({
       }),
       output: attentionListSchema,
       description:
-        'List inbox items that need the user: one view at a time plus the count of every view and the muted sources. Needs you = blocking and failed items not done, snoozed, resolved or muted. Read-only.',
+        'List inbox items that need the user: one view at a time plus the count of every view and the muted sources. An item published about a subagent Session lists as its parent thread, the one the user acts on. Needs you = blocking and failed items not done, snoozed, resolved or muted. Read-only.',
       tool: { name: 'attention_list', readOnly: true, render: compactJson },
     }),
     publish: method({

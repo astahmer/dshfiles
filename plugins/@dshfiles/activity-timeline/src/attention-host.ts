@@ -1,10 +1,13 @@
-import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
+import { Api, DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
 import { Clock, Effect, Layer, Option, Schema, Stream } from 'effect'
 import { workspaceActivity } from './adapters.js'
 import { ActivityTimeline } from './activity-timeline.js'
 import { attentionActOutcomeSchema, attentionApi, type AttentionActOutcome, type AttentionActRequest } from './attention-api.js'
 import { serialAttentionAct } from './attention-act-promise.js'
 import { AttentionInbox } from './attention-store.js'
+import { ThreadLineageModel, type ThreadLineageHeader } from './thread-lineage.js'
 
 /** Announce at most four changes a second; badges read the counts the event carries. */
 const CHANGE_EVENT_INTERVAL = '250 millis'
@@ -21,6 +24,19 @@ export class AttentionProviderOnly extends Schema.TaggedError<AttentionProviderO
 }
 
 const decodeOutcome = Schema.decodeUnknownOption(attentionActOutcomeSchema)
+
+/** Header-only lineage: the rollup needs a stored Session's origin and parent, never its event log. */
+const threadHeaderOf = (options: { readonly persistence: SessionPersistence; readonly sessionId: string }): Effect.Effect<ThreadLineageHeader | undefined> =>
+  Effect.gen(function* () {
+    const snapshot = yield* Effect.option(
+      Effect.tryPromise({ try: signal => options.persistence.stat(SessionId(options.sessionId), { signal }), catch: cause => cause }),
+    )
+    const header = Option.isNone(snapshot) ? undefined : snapshot.value?.header
+    if (header === undefined) return undefined
+    const lineage: ThreadLineageHeader = {}
+    const withOrigin: ThreadLineageHeader = header.origin === 'subagent' ? { ...lineage, origin: 'subagent' } : lineage
+    return header.parentSession === undefined ? withOrigin : { ...withOrigin, parentSessionId: header.parentSession }
+  })
 
 /** Publish, resolve and reconcile come from another plugin's Host half, never from a browser or an agent. */
 const providerOnly = (call: Api.ApiCall, method: string) => (call.caller.kind === 'plugin' ? Effect.void : Effect.fail(new AttentionProviderOnly({ method })))
@@ -53,7 +69,17 @@ const act = Effect.fn('attention act')(function* (input: { readonly id: string; 
 })
 
 export const attentionHandlers = Api.handlers(attentionApi, {
-  list: input => AttentionInbox.use(inbox => inbox.list({ view: input.view ?? 'needs-you', limit: input.limit ?? DEFAULT_LIST_LIMIT })),
+  list: input =>
+    Effect.gen(function* () {
+      const list = yield* AttentionInbox.use(inbox => inbox.list({ view: input.view ?? 'needs-you', limit: input.limit ?? DEFAULT_LIST_LIMIT }))
+      const persistence = yield* Effect.option(hostService('sessionPersistence'))
+      if (Option.isNone(persistence)) return list
+      const items = yield* ThreadLineageModel.withParentSubjects({
+        items: list.items,
+        rootOf: sessionId => ThreadLineageModel.rootOf({ sessionId, headerOf: id => threadHeaderOf({ persistence: persistence.value, sessionId: id }) }),
+      })
+      return { ...list, items: [...items] }
+    }),
   publish: (input, call) =>
     Effect.gen(function* () {
       yield* providerOnly(call, 'publish')
