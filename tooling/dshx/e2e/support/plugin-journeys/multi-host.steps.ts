@@ -239,6 +239,10 @@ const readProcessDetails = (processId: number) => {
   })
 }
 
+/** A scratch Host runs under its parent-death guard, and `host.pid` is the guard's, so its children sit one level below. */
+const isChildOfGuardedHost = (parentProcessId: number, guardProcessId: number): boolean =>
+  parentProcessId === guardProcessId || readProcessDetails(parentProcessId).parentProcessId === guardProcessId
+
 const isProcessRunning = (processId: number): boolean => {
   try {
     process.kill(processId, 0)
@@ -670,6 +674,26 @@ Then('the remote agent receives the answer {string}', async ({ page }: { readonl
   await finishJourneyAssertions(page)
 })
 
+When('the connection to the remote drops while the question waits', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const records = await readTunnelProcessRecords(pair.tunnelProcessLogPath)
+  const tunnel = records.at(-1)
+  if (tunnel === undefined || tunnel.marker !== 'persistent-forward') throw new Error('The persistent SSH forward was not recorded.')
+  const details = readProcessDetails(tunnel.processId)
+  const manager = pair.manager.host.pid
+  if (manager === undefined || details.commandName !== 'ssh' || !isChildOfGuardedHost(details.parentProcessId, manager)) {
+    throw new Error('Refusing to signal a process the manager DSH does not own.')
+  }
+  process.kill(tunnel.processId, 'SIGKILL')
+  await expect.poll(async () => (await readTunnelProcessRecords(pair.tunnelProcessLogPath)).length, { timeout: 30_000 }).toBeGreaterThan(records.length)
+})
+
+Then('the remote question is back in the controlling chat after reconnecting', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-question-reconnected', async () => {
+    await expect(remoteQuestionCard(page).getByRole('radio', { name: 'Production', exact: true })).toBeVisible({ timeout: 45_000 })
+  })
+})
+
 When('the remote question is dismissed here', async ({ page }: { readonly page: Page }) => {
   await remoteQuestionCard(page).getByRole('button', { name: 'Dismiss all questions', exact: true }).click()
 })
@@ -1090,7 +1114,7 @@ When('the SSH tunnel drops and reconnects', async ({ page }: { readonly page: Pa
   if (
     tunnelProcessRecord.marker !== 'persistent-forward' ||
     tunnelProcessDetails.commandName !== 'ssh' ||
-    tunnelProcessDetails.parentProcessId !== managerProcessId ||
+    !isChildOfGuardedHost(tunnelProcessDetails.parentProcessId, managerProcessId) ||
     !ownsProcessGroup(tunnelProcessDetails.processGroupId, { processId: tunnelProcessId, managerProcessId }) ||
     !isProcessRunning(tunnelProcessId)
   ) {
@@ -1114,7 +1138,7 @@ When('the SSH tunnel drops and reconnects', async ({ page }: { readonly page: Pa
   if (
     recoveredTunnelProcessRecord.marker !== 'persistent-forward' ||
     recoveredTunnelProcessDetails.commandName !== 'ssh' ||
-    recoveredTunnelProcessDetails.parentProcessId !== managerProcessId ||
+    !isChildOfGuardedHost(recoveredTunnelProcessDetails.parentProcessId, managerProcessId) ||
     !ownsProcessGroup(recoveredTunnelProcessDetails.processGroupId, { processId: recoveredTunnelProcessRecord.processId, managerProcessId }) ||
     !isProcessRunning(recoveredTunnelProcessRecord.processId)
   ) {
