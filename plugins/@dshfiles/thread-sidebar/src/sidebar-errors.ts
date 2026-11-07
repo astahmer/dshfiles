@@ -11,6 +11,17 @@ export class AttentionStorageFailed extends Schema.TaggedError<AttentionStorageF
   }
 }
 
+/** The durable thread subscriptions could not be read or written in the Host storage domain. */
+export class SubscriptionStorageFailed extends Schema.TaggedError<SubscriptionStorageFailed>()(
+  'SubscriptionStorageFailed',
+  { operation: Schema.Literals(['open', 'subscribe', 'unsubscribe', 'prune']), cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'subscription-storage-failed' },
+) {
+  override get message(): string {
+    return `Thread subscriptions could not ${this.operation === 'open' ? 'open their storage' : `save the ${this.operation} change`}. Retry, or restart DSH if it keeps failing.`
+  }
+}
+
 /** One of the plugin's small state files under `<DSH home>/runtime` could not be read or replaced. */
 export class RuntimeStateFailed extends Schema.TaggedError<RuntimeStateFailed>()(
   'RuntimeStateFailed',

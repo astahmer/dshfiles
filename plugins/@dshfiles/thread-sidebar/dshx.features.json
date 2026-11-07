@@ -3483,6 +3483,78 @@
           "reason": "Client-only: it reads an already-open event window and calls the native session cancel, which owns its own spans."
         }
       ]
+    },
+    {
+      "id": "thread-subscriptions",
+      "title": "Opt-in completion notices between threads",
+      "summary": "A thread can subscribe to another thread's turn completions. While subscribed, that thread's turn end queues ONE compact notice into the subscriber (status: finished, failed, blocked, stopped, truncated or waiting-on-question, plus a 320-character answer preview, never the transcript) and wakes it when it is idle. Nothing is delivered without a subscription, so a thread started with thread_create/thread_fork stays silent by default. The state is durable Host storage, visible and reversible from a thread's context menu (Notify “…” when this thread finishes) and the N-notified row badge, and it ends when either thread is archived.",
+      "surface": "rowDecorator",
+      "destination": "threads",
+      "currentSurface": "threads: row context menu → Notify “…” when this thread finishes",
+      "surfaces": ["client", "host", "tool", "storage"],
+      "configuration": [],
+      "states": ["idle", "subscribed", "notice-delivered", "archived-cleanup"],
+      "failureModes": [
+        "Without a subscription nothing is delivered: a created thread ends silently, which is the default.",
+        "A thread cannot watch itself, and a pair cannot watch itself in both directions, because two threads that wake each other on every completion would keep each other running; the refusal names the edge to drop first.",
+        "An archived subscriber or target ends the edge: the archive path this plugin performs drops it at once, and a notice pass drops an endpoint archived from elsewhere before delivering.",
+        "A subscriber the Host no longer resolves loses its edge instead of retrying forever, and an undelivered notice is logged with its reason.",
+        "A settled subscriber accepts the queued notice but runs no model step until it is unsettled, like any other wake."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/session-controller",
+          "boundary": "sessions-api module: sessions.message delivers the notice with wake: true and sessions.messages reads the answer preview; sessionsApi is the fork's own Host API.",
+          "deterministicFake": "The notifier takes its reads and delivery from an injectable SubscriptionNotices service; src/subscription-notices.test.ts drives it with fake states, messages and outcomes."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-durable-edge",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscriptions-store.test.ts",
+          "testName": "an edge is durable, listed by its target, and removed by unsubscribing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-refusals",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscriptions-store.test.ts",
+          "testName": "a thread never watches itself, and a pair never wakes itself in both directions"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-notice-delivery",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscription-notices.test.ts",
+          "testName": "a subscribed target delivers one compact notice per subscriber"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-archive-cleanup",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscriptions-store.test.ts",
+          "testName": "pruning drops every edge of an archived thread on either end"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-gone-subscriber",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscription-notices.test.ts",
+          "testName": "a subscriber the Host no longer resolves loses its edge instead of retrying forever"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.subscription-browser-menu",
+          "reason": "The affordance is one checkbox in the thread row context menu plus a meta badge on a row that has subscribers; no Gherkin journey drives a row context menu yet, and no two-thread completion is produced by the scratch fake provider in one walk. The state transitions are covered by the store and notifier unit tests listed here."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
     }
   ],
   "kind": "bundle"

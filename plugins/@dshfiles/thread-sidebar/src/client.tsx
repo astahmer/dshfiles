@@ -28,6 +28,7 @@ import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/wor
 import { useInboxThreadSignals } from './inbox-signals.js'
 import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusGroup } from './thread-status.js'
 import { useApi, useApiQuery, usePlugin, useRegistry } from '@dshfiles/dshx/client'
+import { useThreadSubscriptions } from './subscriptions-client.js'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { ThreadRowActions, type ThreadRowActionTarget } from './thread-row-actions.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -56,6 +57,7 @@ import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuLabel,
@@ -501,6 +503,8 @@ interface RowActions {
   readonly rename: (sessionId: SessionSummary['id'], title: string) => void
   readonly cancelRename: () => void
   readonly setAutoSettleOverride: (sessionId: SessionSummary['id'], override: AutoSettleOverride) => void
+  /** Opt-in completion notices: the open thread is told when the target thread finishes. */
+  readonly toggleNotify: (input: ThreadNotifyTarget) => void
   /** The row's one inline verb (plan §4.3): an inbox item's provider verb, a sidebar Resume, or open the thread. */
   readonly actOnStatus: (sessionId: SessionSummary['id'], status: ThreadStatus) => void
   readonly translate: ThreadSidebarTranslate
@@ -518,6 +522,14 @@ interface RowStyle {
   readonly statusDot: boolean
   readonly attentionColors: AttentionColors
   readonly maxChildren: number
+}
+
+/** The open thread as a row offers to subscribe it to that row's completions. */
+export interface ThreadNotifyTarget {
+  readonly subscriberSessionId: string
+  readonly subscriberTitle: string
+  readonly targetSessionId: string
+  readonly subscribed: boolean
 }
 
 interface ThreadRowProps {
@@ -569,6 +581,10 @@ interface ThreadRowProps {
   readonly childStatuses?: ReadonlyMap<SessionSummary['id'], ThreadStatus> | undefined
   /** The `@handle` of the agent that started the thread, else the agent preset it runs, shown as a muted chip. */
   readonly agent?: string | undefined
+  /** Set when another thread is open: this row offers to notify that thread when this one finishes. */
+  readonly notifyTarget?: ThreadNotifyTarget | undefined
+  /** How many threads are notified when this one finishes; 0 or undefined hides the badge. */
+  readonly subscriberCount?: number | undefined
 }
 
 const workStatusLabelKeys = {
@@ -791,7 +807,7 @@ const ChildThreadList = (props: {
 
 type ThreadContextMenuProps = Pick<
   ThreadRowProps,
-  'session' | 'unread' | 'autoSettleOverride' | 'mute' | 'archived' | 'pinned' | 'parked' | 'settled' | 'section' | 'workspaceId' | 'actions'
+  'session' | 'unread' | 'autoSettleOverride' | 'mute' | 'archived' | 'pinned' | 'parked' | 'settled' | 'section' | 'workspaceId' | 'actions' | 'notifyTarget'
 > & { readonly children: JSX.Element }
 
 /** One menu for the whole batch: every verb applies to each selected thread the verb can still change. */
@@ -862,7 +878,7 @@ const RegisteredThreadRowActions = (props: { readonly target: ThreadRowActionTar
 }
 
 const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
-  const { session, unread, archived, pinned, parked, settled } = props
+  const { session, unread, archived, pinned, parked, settled, notifyTarget } = props
   const t = props.actions.translate
   const openAside = useAsideOpen()
   const registry = workbenchPanels()
@@ -922,6 +938,11 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
       </ContextMenuSub>
       <RegisteredThreadRowActions target={{ sessionId: session.id, workspaceId: props.workspaceId, archived, running: session.running }} />
       <ContextMenuSeparator />
+      {notifyTarget === undefined ? null : (
+        <ContextMenuCheckboxItem checked={notifyTarget.subscribed} onSelect={() => props.actions.toggleNotify(notifyTarget)}>
+          {t('threadSidebarNotifyOnFinish', { title: notifyTarget.subscriberTitle })}
+        </ContextMenuCheckboxItem>
+      )}
       <ContextMenuItem disabled={unread} onSelect={() => props.actions.markUnread(session.id)}>
         {t('threadSidebarMarkUnread')}
       </ContextMenuItem>
@@ -1059,7 +1080,13 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       ? undefined
       : (workStatus.detail ?? t(workStatusLabelKeys[workStatus.status]))
   const metaLine = showProject || showMachine || showPath || childCount > 0 || showAgent || statusDetail !== undefined
-  const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.rebasedAt !== undefined || props.integrationQueuedAt !== undefined
+  const headLine =
+    rowStyle.title ||
+    rowStyle.time ||
+    rowStyle.statusDot ||
+    props.rebasedAt !== undefined ||
+    props.integrationQueuedAt !== undefined ||
+    (props.subscriberCount ?? 0) > 0
   const openAside = useAsideOpen()
   /**
    * One hover action's button, or null when the row's own state rules it out: the recovery pair only on a thread that
@@ -1190,6 +1217,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       section={props.section}
       workspaceId={props.workspaceId}
       actions={props.actions}
+      notifyTarget={props.notifyTarget}
     >
       <article
         ref={rowRef}
@@ -1280,6 +1308,16 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   {props.rebasedAt === undefined ? null : (
                     <Badge variant="success" title={new Date(props.rebasedAt).toLocaleString()} data-testid="thread-sidebar-rebased-tag">
                       {t('threadSidebarRebased')}
+                    </Badge>
+                  )}
+                  {props.subscriberCount === undefined || props.subscriberCount === 0 ? null : (
+                    <Badge
+                      variant="secondary"
+                      title={t('threadSidebarNotifySubscribersHint', { count: props.subscriberCount })}
+                      aria-label={t('threadSidebarNotifySubscribersHint', { count: props.subscriberCount })}
+                      data-testid="thread-sidebar-subscribers-tag"
+                    >
+                      {t('threadSidebarNotifySubscribers', { count: props.subscriberCount })}
                     </Badge>
                   )}
                   {rowStyle.time && inlineVerb === undefined ? (
@@ -1744,7 +1782,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [defaultProjectTitle, workspaceState.items],
   )
   /** Project folder per workspace id: the project row's icon is resolved from it on the Host. */
-  const workspacePathById = useMemo(() => new Map<string, string>(workspaceState.items.map(workspace => [workspace.workspaceId, workspace.path])), [workspaceState.items])
+  const workspacePathById = useMemo(
+    () => new Map<string, string>(workspaceState.items.map(workspace => [workspace.workspaceId, workspace.path])),
+    [workspaceState.items],
+  )
   /** Titles by workspace id, so a row does not rescan every workspace on each render. */
   const workspaceTitleById = useMemo(() => new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title])), [displayWorkspaces])
   const workspaceNameById = useMemo(
@@ -1872,6 +1913,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const currentSessionId = useSyncExternalStore(currentSessionSource.subscribe, currentSessionSource.getSnapshot, currentSessionSource.getSnapshot)
   const selectedSession = useMemo(() => HostSnapshotsModel.currentSessionOf(sessions, currentSessionId), [sessions, currentSessionId])
   const selectedSessionId = selectedSession?.id
+  const subscriptions = useThreadSubscriptions()
   /**
    * Abandoned New threads. DSH mints the Session (and, when isolation is the default, a whole thread workspace) before
    * the first prompt, so an abandoned attempt leaves an untitled idle thread whose folder name becomes its row title.
@@ -4105,6 +4147,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     startFollowUp: props.startFollowUp,
     continueThreadIn,
     notifyThread,
+    toggleSubscription: (target: ThreadNotifyTarget) =>
+      subscriptions.setSubscription({
+        subscriberSessionId: target.subscriberSessionId,
+        targetSessionId: target.targetSessionId,
+        subscribed: !target.subscribed,
+      }),
     props,
     sessionsById: sessionState.byId,
     preferences,
@@ -4140,6 +4188,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     startFollowUp: props.startFollowUp,
     continueThreadIn,
     notifyThread,
+    toggleSubscription: (target: ThreadNotifyTarget) =>
+      subscriptions.setSubscription({
+        subscriberSessionId: target.subscriberSessionId,
+        targetSessionId: target.targetSessionId,
+        subscribed: !target.subscribed,
+      }),
     props,
     sessionsById: sessionState.byId,
     preferences,
@@ -4288,6 +4342,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         })
       },
       actOnStatus: (sessionId, status) => latestRowActions.current.actOnStatus(sessionId, status),
+      toggleNotify: target => latestRowActions.current.toggleSubscription(target),
       translate: (...args) => latestRowActions.current.props.tSidebar(...args),
     }
   }, [])
@@ -4478,6 +4533,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         workStatus={stateGrouping ? (threadStatusById.get(session.id) ?? childStatusById.get(session.id)) : undefined}
         childStatuses={stateGrouping ? childStatusById : undefined}
         agent={stateGrouping ? (agentHandleOf(session.id) ?? agentPresetOf(session)) : undefined}
+        notifyTarget={
+          !subscriptions.available || selectedSession === undefined || selectedSession.id === session.id
+            ? undefined
+            : {
+                subscriberSessionId: selectedSession.id,
+                subscriberTitle: selectedSession.displayTitle,
+                targetSessionId: session.id,
+                subscribed: subscriptions.isSubscribed({ subscriberSessionId: selectedSession.id, targetSessionId: session.id }),
+              }
+        }
+        subscriberCount={subscriptions.available ? subscriptions.notifiersOf(session.id).length : undefined}
       />
     )
   }

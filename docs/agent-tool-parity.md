@@ -41,7 +41,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 
 | Owner                                                                                                       | Capabilities audited | Agent tools today                                                                                                                                                                                                                                                                                                                                                    | Missing tools | Host gaps                                |
 | ----------------------------------------------------------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ---------------------------------------- |
-| thread-sidebar                                                                                              | 44                   | 23 (new)                                                                                                                                                                                                                                                                                                                                                             | 12            | 5                                        |
+| thread-sidebar                                                                                              | 44                   | 26 (23 thread/project actions, plus `thread_subscribe`, `thread_unsubscribe`, `thread_subscriptions`)                                                                                                                                                                                                                                                                | 12            | 5                                        |
 | main-tabs                                                                                                   | 8                    | 0                                                                                                                                                                                                                                                                                                                                                                    | 2             | 2                                        |
 | command-palette                                                                                             | 11                   | 0                                                                                                                                                                                                                                                                                                                                                                    | 5             | 3                                        |
 | mentions                                                                                                    | 8                    | 1 (`skill`)                                                                                                                                                                                                                                                                                                                                                          | 1             | 0                                        |
@@ -707,7 +707,9 @@ Pick the channel by relationship, not by habit:
   thread, not your child, so `send_message` refuses it. Use `thread_prompt`
   (`mode: 'queue'` for its next turn, `mode: 'steer'` into a live one) — the
   plugin tool whose description names it as the follow-up verb — or
-  `dshx_comm_send` for a passive note.
+  `dshx_comm_send` for a passive note. To end your turn and still be told when
+  it finishes, `thread_subscribe { sessionId }` first; nothing wakes you
+  otherwise, and `thread_unsubscribe` stops it.
 - **Any other live thread**: `dshx_comm_agents` once to find its Session id,
   then `dshx_comm_send`. Delivery is passive: the recipient sees an unread count
   at its next prompt and reads it with `dshx_comm_inbox`; nothing starts or
@@ -733,7 +735,7 @@ whose methods carry `tool:` bindings:
 `thread_unsettle`, `thread_pin`, `thread_unpin`, `thread_rename`, `thread_fork`,
 `thread_create`, `thread_stop`, `thread_select_model`, `project_list`,
 `project_register`, `project_rename`, `project_delete`, `project_reorder`,
-`thread_move`.
+`thread_move`, `thread_subscribe`, `thread_unsubscribe`, `thread_subscriptions`.
 
 Semantics worth knowing:
 
@@ -747,6 +749,20 @@ Semantics worth knowing:
   refused with the active families (turn, job, subagent, schedule) named; only
   `stopActivity: true`, which the description ties to an explicit user request,
   stops that work first — the sidebar's own stop-and-archive confirmation.
+- `thread_subscribe` is the only thing that wakes a thread on another thread's
+  completion (b:eqtb). The subscription defaults the subscriber to the calling
+  thread, is durable Host state in the `thread_subscriptions` domain, and makes
+  the target's `turn/end` queue ONE compact notice into the subscriber — status
+  (`finished`, `failed`, `blocked`, `stopped`, `truncated`, or
+  `waiting-on-question`) plus a 320-character answer preview, never the
+  transcript — through session-controller's `sessions.message` with
+  `wake: true`. Without an edge nothing is delivered, so a thread started with
+  `thread_create`/`thread_fork` stays silent. A thread cannot watch itself, a
+  pair cannot watch itself in both directions (they would wake each other), and
+  an archived subscriber or target ends the edge. `thread_subscriptions` is the
+  read tool, defaulted to the calling thread's edges; the same state is the
+  **Notify “…” when this thread finishes** checkbox in a row's context menu and
+  the `N notified` badge on a row that has subscribers.
 - Every write tool's description ends with "call only when the user asked".
 - These are Host-side tools: the running DSH keeps the old Host until the user
   restarts, so they appear only after a restart.
