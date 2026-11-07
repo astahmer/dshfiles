@@ -4,6 +4,7 @@ import { PendingRestartSources } from '@dshfiles/thread-sidebar/restart-sources'
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
+import { createPendingReread } from './reread.js'
 
 /**
  * The browser half of the gate: the stock `/plugins/events` subscriber, plus the
@@ -11,9 +12,8 @@ import { z } from 'zod'
  *
  * `graph` and `rebuilt` frames do exactly what `@deepseek-ai/dsh-client-hmr` does
  * with them; `deferred` frames only move the notice. The page uses a same-origin
- * EventSource (this repository's Web profile); a carrier-only shell that exposes
- * `__DSH_TRANSPORT__` without same-origin EventSource would need the fetch path
- * the stock client also carries.
+ * EventSource (this repository's Web profile) and reopens a short-lived one when
+ * it comes back, so a slept tab or a reset stream cannot hide a restart.
  */
 
 const EVENTS_ROUTE = 'plugins/events'
@@ -22,6 +22,8 @@ const RECOVERY_KEY = 'dshfiles.hmr-gate.slot-recovery-at'
 const RECOVERY_INTERVAL_MS = 30_000
 // Lets the rest of a rebuild burst arrive before the reload picks up the bundles.
 const RECOVERY_DELAY_MS = 1_500
+// A probe stream the Host never answers must not stay open past one connect round trip.
+const REREAD_TIMEOUT_MS = 10_000
 
 const deferredPackageSchema = z.object({ id: z.string().min(1), reason: z.string().min(1) })
 
@@ -104,28 +106,30 @@ export default defineClient({
         'hmr-gate: pending restart source',
       )
     }
-    const receive = (data: string): void => {
+    /** Handles one frame; returns true when it moved the deferred notice. */
+    const receive = (data: string): boolean => {
       let decoded: JsonValue
       try {
         decoded = decodeJson(jsonValueSchema, data)
       } catch {
-        return
+        return false
       }
       const frame = frameSchema.safeParse(decoded)
-      if (!frame.success) return
+      if (!frame.success) return false
       if (frame.data.type === 'graph') {
         void ctx.modules.entries.sync(frame.data.graph).catch((error: unknown) => {
           ctx.logger.warn(error)
         })
-        return
+        return false
       }
       if (frame.data.type === 'rebuilt') {
         void ctx.modules.entries.reload(frame.data.id, frame.data.rev).catch((error: unknown) => {
           ctx.logger.warn(error)
         })
-        return
+        return false
       }
       publish(frame.data.packages)
+      return true
     }
 
     // A recomposition can leave a slot with no adapter or registration for one render; the stock renderer then throws
@@ -163,6 +167,35 @@ export default defineClient({
         source.close()
       }
     }, 'hmr-gate: event source')
+
+    // A sleeping tab and a reset stream both lose `deferred` frames, and the notice keeps its last list until the next
+    // one arrives. Borrow one short-lived stream when the page comes back: its connect frames carry the Host's current
+    // list, and the live stream keeps running meanwhile.
+    ctx.effect(() => {
+      const pending = createPendingReread({
+        open: () => {
+          const source = new EventSource(EVENTS_ROUTE)
+          return {
+            onMessage: listener => source.addEventListener('message', event => listener(event.data)),
+            onError: listener => source.addEventListener('error', () => listener()),
+            close: () => source.close(),
+          }
+        },
+        receive,
+        timeoutMs: REREAD_TIMEOUT_MS,
+      })
+      const onVisibilityChange = (): void => {
+        if (document.visibilityState === 'visible') pending.reread()
+      }
+      pending.reread()
+      window.addEventListener('focus', pending.reread)
+      document.addEventListener('visibilitychange', onVisibilityChange)
+      return () => {
+        window.removeEventListener('focus', pending.reread)
+        document.removeEventListener('visibilitychange', onVisibilityChange)
+        pending.dispose()
+      }
+    }, 'hmr-gate: re-read the pending list')
 
     ctx.slots.inject('plugins.item', () =>
       ctx.slots.register(

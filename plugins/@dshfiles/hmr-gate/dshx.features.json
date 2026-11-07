@@ -17,7 +17,8 @@
         "A rebuilt client bundle whose Host half did not change applies immediately, as before.",
         "A rebuilt client bundle whose Host half changed is announced as deferred; the browser keeps the last-good code and the row names the package until a Host restart.",
         "A Host that reloads the package in-process releases the deferral and announces the rebuild.",
-        "A bundle directory removed by a clean build, or one that cannot be watched, is polled until a watch reopens; a 10 s re-read covers dropped watch events."
+        "A bundle directory removed by a clean build, or one that cannot be watched, is polled until a watch reopens; a 10 s re-read covers dropped watch events.",
+        "The page opens one short-lived event stream on setup and on focus or visibilitychange, so a slept tab or a dropped stream cannot hide a pending restart."
       ],
       "externalDependencies": [],
       "verification": [
@@ -50,6 +51,18 @@
           "id": "hmr-gate.plugins-row-unit-watch-survives-clean-build",
           "file": "plugins/@dshfiles/hmr-gate/src/host/bundle-watcher.test.ts",
           "testName": "falls back to polling a removed bundle directory and resumes when a clean build recreates it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.plugins-row-unit-rereads-on-focus",
+          "file": "plugins/@dshfiles/hmr-gate/src/reread.test.ts",
+          "testName": "closes the borrowed stream once a frame delivers the list"
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.plugins-row-unit-reread-timeout",
+          "file": "plugins/@dshfiles/hmr-gate/src/reread.test.ts",
+          "testName": "closes a stream the Host never answers"
         },
         {
           "kind": "not-applicable",
