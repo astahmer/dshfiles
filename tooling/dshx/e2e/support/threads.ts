@@ -60,7 +60,7 @@ export const selectModelForNewThread = async (page: Page, model: string): Promis
 
 /** Start a New thread in a project or register an absolute folder path, then choose its model. */
 export const startThreadWithModel = async (page: Page, input: { readonly project: string; readonly model: string }): Promise<void> => {
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await page.getByRole('button', { name: /^New (session|thread)$/ }).first().click()
   await expect(page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })).toBeVisible()
   const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
   const expectedProject = input.project.startsWith('/') ? basename(input.project) : input.project

@@ -2,7 +2,7 @@ import { useMemo, useState, type ComponentProps } from 'react'
 import * as Result from 'effect/Result'
 import * as Schema from 'effect/Schema'
 import { DisclosureRow, IconAgentPresetOutlineRegular, IconInspectOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
@@ -48,8 +48,10 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   const childId = props.phase === 'result' && !props.block.isError ? SubagentFeedModel.childIdOfResult(result) : undefined
   // The result only says the child started; the child's own state is what the row reports from here on.
   const output = childId === undefined ? result : undefined
-  const running = props.useSessionStatus(statuses => (childId === undefined ? false : statuses.get(childId as SessionId)?.running === true))
-  const listedTurn = props.useSessions(list => (childId === undefined ? undefined : list.byId[childId as SessionId]?.projectionValues?.subagentTiming?.lastTurnCompleted))
+  const running = props.useSessionStatus(statuses => (childId === undefined ? false : statuses.get(SessionId(childId))?.running === true))
+  const listedTurn = props.useSessions(list =>
+    childId === undefined ? undefined : list.byId[SessionId(childId)]?.projectionValues?.subagentTiming?.lastTurnCompleted,
+  )
   const [feedTurn, setFeedTurn] = useState<boolean | undefined>(undefined)
   const state = SubagentFeedModel.stateOf({
     phase: props.phase,

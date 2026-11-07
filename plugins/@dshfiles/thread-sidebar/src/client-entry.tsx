@@ -42,6 +42,7 @@ import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import { HeaderThreadActions } from './header-actions.js'
 import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentCatalogInjected } from './subagent-provenance/SubagentHeaderLineage.js'
 import type { SubagentPreviewBindings } from './subagent-provenance/subagent-live-preview.js'
+import { SubagentPreviewDock } from './subagent-provenance/subagent-preview-dock.js'
 import { SubagentProvenanceToolRow, type SubagentToolViewProps } from './subagent-provenance/subagent-tool-row.js'
 import { NS as SUBAGENT_LOCALE_NAMESPACE } from './subagent-provenance/locales.js'
 import { subagentChatAddress } from './subagent-provenance/resource.js'
@@ -877,6 +878,19 @@ export default defineClient({
       },
       canOpenAside: childId => ctx.sessions.subagentAddress(SessionId(childId)) !== undefined,
     }
+    ctx.slots.inject('conversation.input.dock', () =>
+      ctx.slots.register(
+        { name: 'conversation.input.dock', id: 'thread-sidebar-subagents-live', order: 4, inject: sessionId => ({ sessionId }) },
+        decorate((props: PropsRuntime<'conversation.input.dock'> & { readonly sessionId: SessionSummary['id'] }) => (
+          <SubagentPreviewDock
+            useSessions={props.useSessions}
+            useSessionStatus={props.useSessionStatus}
+            sessionId={props.sessionId}
+            preview={subagentPreview}
+          />
+        )),
+      ),
+    )
     const SubagentRow = decorate((props: SubagentToolViewProps) => <SubagentProvenanceToolRow {...props} preview={subagentPreview} />)
     for (const key of ['subagent', 'subagent_fork'])
       ctx.slots.inject('tool.call.toolview', () =>

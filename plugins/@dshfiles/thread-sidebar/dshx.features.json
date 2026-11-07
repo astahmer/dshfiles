@@ -8,27 +8,11 @@
       "destination": "none",
       "currentSurface": "palette: Send to several models…",
       "summary": "Create two to six independent threads for selected models, selecting each model before sending the same prompt and reporting per-model success or failure.",
-      "reach": [
-        "click button \"Open command palette\"",
-        "click text \"Send to several models…\"",
-        "expect dialog \"Send to several models\""
-      ],
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "reach": ["click button \"Open command palette\"", "click text \"Send to several models…\"", "expect dialog \"Send to several models\""],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "model-selection",
-        "creating",
-        "partial-success",
-        "complete"
-      ],
-      "failureModes": [
-        "A failed model thread does not cancel another model's creation.",
-        "The model is selected before the first prompt is queued."
-      ],
+      "states": ["model-selection", "creating", "partial-success", "complete"],
+      "failureModes": ["A failed model thread does not cancel another model's creation.", "The model is selected before the first prompt is queued."],
       "externalDependencies": [],
       "verification": [
         {
@@ -76,20 +60,12 @@
         "click button \"More sidebar destinations\"",
         "expect button \"More sidebar destinations\""
       ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "main-tabs: New tab › Thread Sidebar views",
       "configuration": [],
-      "states": [
-        "sidebar-present",
-        "panel-open",
-        "navigation-current",
-        "declarer-unloaded"
-      ],
+      "states": ["sidebar-present", "panel-open", "navigation-current", "declarer-unloaded"],
       "failureModes": [
         "The declarer root unload disposes its panel registrations.",
         "Contextual message, turn, menu and chrome seats are retained inside their original parent assemblies, not shown as misleading blank panels."
@@ -181,13 +157,7 @@
         "expect region \"Active column\"",
         "expect button \"Group: Status\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "storage", "integration"],
       "surface": "destinationSection",
       "destination": "threads",
       "currentSurface": "left-nav: Thread Sidebar: Board",
@@ -196,151 +166,91 @@
           "key": "threadRowDensity",
           "defaultValue": "compact",
           "constraints": "One of compact or comfortable.",
-          "choices": [
-            "compact",
-            "comfortable"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["compact", "comfortable"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowProject",
           "defaultValue": "true",
           "constraints": "Boolean; show project labels.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowProjectColor",
           "defaultValue": "true",
           "constraints": "Boolean; color project labels.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowTitle",
           "defaultValue": "true",
           "constraints": "Boolean; show thread titles.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowMachine",
           "defaultValue": "true",
           "constraints": "Boolean; show machine labels.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowPath",
           "defaultValue": "false",
           "constraints": "Boolean; show workspace paths.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowTime",
           "defaultValue": "true",
           "constraints": "Boolean; show thread activity time.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowStatusDot",
           "defaultValue": "true",
           "constraints": "Boolean; show thread status indicator.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "attentionColors",
           "defaultValue": "{\"approvalNeeded\":\"warning\",\"inputNeeded\":\"info\",\"turnFinished\":\"success\"}",
           "constraints": "Each status independently chooses one of muted, primary, info, success, warning, or danger semantic colors.",
-          "coveredBy": [
-            "thread-sidebar.attention-colors"
-          ]
+          "coveredBy": ["thread-sidebar.attention-colors"]
         },
         {
           "key": "parkedSessionIds",
           "defaultValue": "[]",
           "constraints": "Parked session IDs in sidebar preferences; settling a session drops its parked mark in the same write. Not updated through Host session attention.",
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "settledSessionIds",
           "defaultValue": "[]",
           "constraints": "Settled session IDs in Host-synced sidebar preferences; a settled session stays listed and openable but runs no model step until it is unsettled.",
-          "coveredBy": [
-            "thread-sidebar.settle"
-          ]
+          "coveredBy": ["thread-sidebar.settle"]
         },
         {
           "key": "applyActionsToChildThreads",
           "defaultValue": "true",
           "constraints": "Boolean; apply manual actions to every descendant when acting on a parent thread.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "collapsedSections",
           "defaultValue": "[archived,settled]",
           "constraints": "Section ID list; archived and settled are collapsed by default.",
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "coveredBy": ["thread-sidebar.classification"]
         }
       ],
-      "states": [
-        "active",
-        "pinned",
-        "parked",
-        "settled",
-        "inactive",
-        "archived"
-      ],
+      "states": ["active", "pinned", "parked", "settled", "inactive", "archived"],
       "failureModes": [
         "Parking updates sidebar preferences without depending on Host session-attention mutations.",
         "Settling an ancestor with a still-running descendant is refused, so a child turn is never rejected mid-step.",
@@ -444,10 +354,7 @@
         "press Escape",
         "expect button \"Group: Status\""
       ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "surface": "destinationSection",
       "destination": "threads",
       "currentSurface": "thread-list: All threads › Group: Status",
@@ -456,28 +363,11 @@
           "key": "threadViews.views[all-threads].groupBy",
           "defaultValue": "state",
           "constraints": "One of state (Status), project, date, status (Arrange manually) or none; a saved choice is kept.",
-          "choices": [
-            "state",
-            "project",
-            "date",
-            "status",
-            "none"
-          ],
-          "coveredBy": [
-            "thread-sidebar.status-grouping-defaults"
-          ]
+          "choices": ["state", "project", "date", "status", "none"],
+          "coveredBy": ["thread-sidebar.status-grouping-defaults"]
         }
       ],
-      "states": [
-        "pinned",
-        "needs-you",
-        "failed",
-        "working",
-        "ready",
-        "idle",
-        "done",
-        "subagent-rolled-up"
-      ],
+      "states": ["pinned", "needs-you", "failed", "working", "ready", "idle", "done", "subagent-rolled-up"],
       "failureModes": [
         "Without the inbox plugin the groups still follow the sidebar's own attention labels; only provider verbs (Retry, Land) on inbox items are missing.",
         "A verb the provider refuses shows its message as a sidebar notice, with what to do instead.",
@@ -544,23 +434,14 @@
       "id": "working-status-item",
       "title": "See how many threads are working in the status strip",
       "summary": "The status strip shows \"N working\" for top-level threads with a running turn, colourless, and hides it while nothing runs. On a phone it is one line in the Status chip's list.",
-      "reach": [
-        "expect region \"Threads\""
-      ],
-      "surfaces": [
-        "client"
-      ],
+      "reach": ["expect region \"Threads\""],
+      "surfaces": ["client"],
       "surface": "statusItem",
       "destination": "none",
       "currentSurface": "status-strip: N working",
       "configuration": [],
-      "states": [
-        "hidden-idle",
-        "working"
-      ],
-      "failureModes": [
-        "Without frame-layout as the layout owner the item is registered but nothing renders it."
-      ],
+      "states": ["hidden-idle", "working"],
+      "failureModes": ["Without frame-layout as the layout owner the item is registered but nothing renders it."],
       "externalDependencies": [],
       "verification": [
         {
@@ -601,21 +482,12 @@
         "click text \"Draft: Unsent project prompt\" at 16,8",
         "expect text \"Unsent project prompt\""
       ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "surface": "rowAction",
       "destination": "threads",
       "currentSurface": "thread-list: project header › New chat",
       "configuration": [],
-      "states": [
-        "expanded-project",
-        "collapsed-project",
-        "blank-chat",
-        "project-draft",
-        "fresh-after-send"
-      ],
+      "states": ["expanded-project", "collapsed-project", "blank-chat", "project-draft", "fresh-after-send"],
       "failureModes": [
         "Creation uses the chosen project's ID, not its display label or the currently open thread's project.",
         "Date, status, Unassigned, remote and unavailable project groups have no creation button.",
@@ -670,12 +542,7 @@
         "click text \"Archive me later\"",
         "expect banner \"This thread is archived.\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "integration"],
       "surface": "rowAction",
       "destination": "threads",
       "currentSurface": "thread-list: Archive › Undo",
@@ -684,30 +551,17 @@
           "key": "archiveUndoEnabled",
           "defaultValue": "true",
           "constraints": "Boolean; show or hide manual archive undo notices.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.archive-undo-preferences"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.archive-undo-preferences"]
         },
         {
           "key": "archiveUndoDurationSeconds",
           "defaultValue": "5",
           "constraints": "Integer from 1 through 30 seconds.",
-          "coveredBy": [
-            "thread-sidebar.archive-undo-preferences"
-          ]
+          "coveredBy": ["thread-sidebar.archive-undo-preferences"]
         }
       ],
-      "states": [
-        "archived",
-        "undo-available",
-        "restoring-to-open",
-        "restored",
-        "restore-failed"
-      ],
+      "states": ["archived", "undo-available", "restoring-to-open", "restored", "restore-failed"],
       "failureModes": [
         "Undo is offered only for thread IDs successfully archived by the initiating action.",
         "A partial restore reports failure without hiding the remaining archive state.",
@@ -766,10 +620,7 @@
         "expect checkbox \"Archived\"",
         "expect checkbox \"Show count on tab\""
       ],
-      "surfaces": [
-        "client",
-        "storage"
-      ],
+      "surfaces": ["client", "storage"],
       "surface": "destinationSection",
       "destination": "threads",
       "currentSurface": "thread-list: Thread list settings › Manage views",
@@ -778,84 +629,53 @@
           "key": "groupBy",
           "defaultValue": "status",
           "constraints": "Browser-local view preference: project, date, status, or none.",
-          "choices": [
-            "project",
-            "date",
-            "status",
-            "none"
-          ],
-          "coveredBy": [
-            "thread-sidebar.view-controls"
-          ]
+          "choices": ["project", "date", "status", "none"],
+          "coveredBy": ["thread-sidebar.view-controls"]
         },
         {
           "key": "statusFilters",
           "defaultValue": "[]",
           "constraints": "Browser-local view preference: an empty list for every status, or any combination of working, not-running, attention, unread, approval-needed, input-needed, turn-finished, needs-resume, interrupted, inactive, muted, settled, and archived. A saved not-working filter from an earlier version decodes to not-running while retaining other selectors. Working matches a thread whose own turn runs and a parent whose subagent runs. Storage-state selectors match only non-running threads unless Working is also selected.",
-          "coveredBy": [
-            "thread-sidebar.view-controls"
-          ]
+          "coveredBy": ["thread-sidebar.view-controls"]
         },
         {
           "key": "sourceFilter",
           "defaultValue": "all",
           "constraints": "Browser-local view preference: all, main threads, or subagent threads.",
-          "choices": [
-            "all",
-            "main",
-            "subagents"
-          ],
-          "coveredBy": [
-            "thread-sidebar.view-controls"
-          ]
+          "choices": ["all", "main", "subagents"],
+          "coveredBy": ["thread-sidebar.view-controls"]
         },
         {
           "key": "views",
           "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"date\",\"statusFilters\":[\"not-running\",\"attention\"],\"sourceFilter\":\"main\",\"enabled\":true}]",
           "constraints": "Host-synced saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, source filters, and optional showCount (default true). The browser copy an older version wrote is handed to the Host on the next load.",
-          "coveredBy": [
-            "thread-sidebar.custom-views"
-          ]
+          "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
           "key": "activeViewId",
           "defaultValue": "done",
           "constraints": "Browser-local ID of the enabled preset currently selected.",
-          "coveredBy": [
-            "thread-sidebar.custom-views"
-          ]
+          "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
           "key": "showGroupControl",
           "defaultValue": "true",
           "constraints": "Boolean; show the quick group control in the sidebar header.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.custom-views"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
           "key": "showFilterControl",
           "defaultValue": "true",
           "constraints": "Boolean; show the quick filter control in the sidebar header.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.custom-views"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
           "key": "viewPresets",
           "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"date\",\"statusFilters\":[\"not-running\",\"attention\"],\"sourceFilter\":\"main\",\"enabled\":true}]",
           "constraints": "Host-synced saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, source filters, and optional showCount (default true). The browser copy an older version wrote is handed to the Host on the next load.",
-          "coveredBy": [
-            "thread-sidebar.custom-views"
-          ]
+          "coveredBy": ["thread-sidebar.custom-views"]
         }
       ],
       "states": [
@@ -1123,12 +943,7 @@
         "click button \"Thread list settings\"",
         "expect checkbox \"Settle inactive threads\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Thread sidebar › idle policy",
@@ -1137,79 +952,56 @@
           "key": "autoSettleEnabled",
           "defaultValue": "false",
           "constraints": "Boolean; automatic settling is opt-in.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.idle-archive"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.idle-archive"]
         },
         {
           "key": "idleMinutes",
           "defaultValue": "120",
           "constraints": "Integer from 15 to 10080 minutes.",
-          "coveredBy": [
-            "thread-sidebar.idle-archive"
-          ]
+          "coveredBy": ["thread-sidebar.idle-archive"]
         },
         {
           "key": "subagentSettleHours",
           "defaultValue": "24",
           "constraints": "Integer from 0 to 720 hours; the Host settles a subagent thread idle that long and stops the jobs it owns. 0 turns it off.",
-          "coveredBy": [
-            "thread-sidebar.idle-archive-policy-unit-subagent-model",
-            "thread-sidebar.idle-archive-policy-unit-subagent-jobs"
-          ]
+          "coveredBy": ["thread-sidebar.idle-archive-policy-unit-subagent-model", "thread-sidebar.idle-archive-policy-unit-subagent-jobs"]
         },
         {
           "key": "scanIntervalMinutes",
           "defaultValue": "10",
           "constraints": "Integer from 1 to 120 minutes.",
-          "coveredBy": [
-            "thread-sidebar.idle-archive"
-          ]
+          "coveredBy": ["thread-sidebar.idle-archive"]
         },
         {
           "key": "excludedWorkspaceIds",
           "defaultValue": "[]",
           "constraints": "Workspace ID exclusion list.",
-          "coveredBy": [
-            "thread-sidebar.idle-archive"
-          ]
+          "coveredBy": ["thread-sidebar.idle-archive"]
         },
         {
           "key": "excludedSessionIds",
           "defaultValue": "[]",
           "constraints": "Session ID exclusion list; safety exclusions cannot be bypassed by thread overrides.",
-          "coveredBy": [
-            "thread-sidebar.idle-archive",
-            "thread-sidebar.auto-archive-overrides"
-          ]
+          "coveredBy": ["thread-sidebar.idle-archive", "thread-sidebar.auto-archive-overrides"]
         },
         {
           "key": "autoSettleSessionIds",
           "defaultValue": "[]",
           "constraints": "Session ID allow-list; enables per-thread auto-settle even when global policy is off.",
-          "coveredBy": [
-            "thread-sidebar.auto-archive-overrides"
-          ]
+          "coveredBy": ["thread-sidebar.auto-archive-overrides"]
         },
         {
           "key": "autoSettleDisabledSessionIds",
           "defaultValue": "[]",
           "constraints": "Session ID deny-list; disables auto-settle for one thread without changing global exclusions.",
-          "coveredBy": [
-            "thread-sidebar.auto-archive-overrides"
-          ]
+          "coveredBy": ["thread-sidebar.auto-archive-overrides"]
         },
         {
           "key": "workspaceFilter",
           "defaultValue": "null",
           "constraints": "Optional workspace ID used to scope the visible thread list.",
-          "coveredBy": [
-            "thread-sidebar.idle-archive"
-          ]
+          "coveredBy": ["thread-sidebar.idle-archive"]
         }
       ],
       "states": [
@@ -1341,19 +1133,12 @@
         "click button \"Thread list settings\"",
         "expect region \"Thread list settings\""
       ],
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
       "currentSurface": "thread-list: Thread list settings › Remote group",
       "configuration": [],
-      "states": [
-        "integrated-by-default",
-        "separate-remote",
-        "reordered",
-        "empty-sections-folded"
-      ],
+      "states": ["integrated-by-default", "separate-remote", "reordered", "empty-sections-folded"],
       "failureModes": [
         "Remote grouping is shown by default instead of following the current view.",
         "Empty sections can shift the drag position even though they are not rendered.",
@@ -1420,10 +1205,7 @@
         "click button \"Thread list settings\"",
         "expect group \"Archive settled threads\""
       ],
-      "surfaces": [
-        "client",
-        "settings"
-      ],
+      "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Thread sidebar › settled archive delay",
@@ -1432,25 +1214,11 @@
           "key": "settledArchiveDelay",
           "defaultValue": "disabled",
           "constraints": "Never, immediately, after 1 hour, after 1 day or after 1 week; counted from the recorded settle instant.",
-          "choices": [
-            "disabled",
-            "immediately",
-            "after-1-hour",
-            "after-1-day",
-            "after-1-week"
-          ],
-          "coveredBy": [
-            "thread-sidebar.settled-auto-archive"
-          ]
+          "choices": ["disabled", "immediately", "after-1-hour", "after-1-day", "after-1-week"],
+          "coveredBy": ["thread-sidebar.settled-auto-archive"]
         }
       ],
-      "states": [
-        "disabled",
-        "waiting",
-        "due",
-        "archived",
-        "skipped"
-      ],
+      "states": ["disabled", "waiting", "due", "archived", "skipped"],
       "failureModes": [
         "An archived, pinned, running, waiting or newly changed thread is never automatically archived.",
         "A settled id with no recorded settle instant is never automatically archived.",
@@ -1505,11 +1273,7 @@
         "click menuitem \"Until tomorrow morning\"",
         "expect img \"Muted\""
       ],
-      "surfaces": [
-        "client",
-        "settings",
-        "storage"
-      ],
+      "surfaces": ["client", "settings", "storage"],
       "surface": "rowAction",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Mute",
@@ -1518,17 +1282,10 @@
           "key": "mutedThreads",
           "defaultValue": "{}",
           "constraints": "Hidden; session id → { until: epoch ms or null for until unmuted, activityAt: the activity time the row keeps while muted }. Expired entries are dropped when they wake.",
-          "coveredBy": [
-            "thread-sidebar.thread-mute"
-          ]
+          "coveredBy": ["thread-sidebar.thread-mute"]
         }
       ],
-      "states": [
-        "unmuted",
-        "snoozed",
-        "muted",
-        "woken"
-      ],
+      "states": ["unmuted", "snoozed", "muted", "woken"],
       "failureModes": [
         "Muting silences this sidebar only: the Host still records attention, and the thread's composer still shows a pending request.",
         "Mutes made before they were Host-synced lived in this browser; they are copied into settings once and cleared locally.",
@@ -1591,19 +1348,12 @@
         "click menuitem \"Mark unread\"",
         "expect img \"Unread\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "storage"
-      ],
+      "surfaces": ["client", "host", "storage"],
       "surface": "rowAction",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Mark unread",
       "configuration": [],
-      "states": [
-        "read",
-        "manual-unread"
-      ],
+      "states": ["read", "manual-unread"],
       "failureModes": [
         "The Host stores the mark for the whole user, so every open tab, plugin and CLI reads the same unread state.",
         "Opening a thread drops its whole attention record without touching another thread’s record.",
@@ -1645,20 +1395,12 @@
         "click button \"Send message\"",
         "expect text \"Turn finished\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "storage", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",
       "currentSurface": "thread-list: finished-turn unread marks",
       "configuration": [],
-      "states": [
-        "finished-unacknowledged",
-        "acknowledged"
-      ],
+      "states": ["finished-unacknowledged", "acknowledged"],
       "failureModes": [
         "Only turn ends that ask the user for something (completed, error, aborted, blocked, max-tokens) are stored; forked and interrupted turns never are.",
         "Acknowledging compares the record version the browser rendered, so a finish stored after that read stays unacknowledged.",
@@ -1717,12 +1459,7 @@
         "expect button \"In-app notification position\"",
         "expect button \"In-app notification timeout\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "storage"
-      ],
+      "surfaces": ["client", "host", "settings", "storage"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Notifications › Thread notifications",
@@ -1731,53 +1468,24 @@
           "key": "notificationCategories",
           "defaultValue": "all categories off; per-category sound disabled",
           "constraints": "Host-synced category settings; each of the five categories selects off, in-app, system, or both, plus an optional sound preset and volume.",
-          "coveredBy": [
-            "thread-sidebar.notifications-settings"
-          ]
+          "coveredBy": ["thread-sidebar.notifications-settings"]
         },
         {
           "key": "notificationPlacement",
           "defaultValue": "bottom-center",
           "constraints": "One of six in-app notification positions: top or bottom, aligned left, center, or right within the sidebar.",
-          "choices": [
-            "top-left",
-            "top-center",
-            "top-right",
-            "bottom-left",
-            "bottom-center",
-            "bottom-right"
-          ],
-          "coveredBy": [
-            "thread-sidebar.notifications-settings"
-          ]
+          "choices": ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"],
+          "coveredBy": ["thread-sidebar.notifications-settings"]
         },
         {
           "key": "notificationDurationSeconds",
           "defaultValue": "5",
           "constraints": "Integer from 0 to 60; 0 means notifications stay until dismissed.",
-          "choices": [
-            "0",
-            "3",
-            "5",
-            "10",
-            "15",
-            "30",
-            "60"
-          ],
-          "coveredBy": [
-            "thread-sidebar.notifications-settings"
-          ]
+          "choices": ["0", "3", "5", "10", "15", "30", "60"],
+          "coveredBy": ["thread-sidebar.notifications-settings"]
         }
       ],
-      "states": [
-        "off",
-        "in-app",
-        "system",
-        "both",
-        "silent",
-        "permission-needed",
-        "permission-granted"
-      ],
+      "states": ["off", "in-app", "system", "both", "silent", "permission-needed", "permission-granted"],
       "failureModes": [
         "System permission is requested only by the explicit Allow system notifications action; notification delivery never prompts on its own.",
         "Global silent mode suppresses in-app alerts, system notifications and notification sounds until resumed; events during silence are not replayed.",
@@ -1859,17 +1567,8 @@
       "id": "navigation-layout",
       "title": "Customize sidebar navigation and sections",
       "summary": "The Threads panel toolbar owns a Sidebar settings gear, not fixed app chrome. It opens the original Root-owned Customize sidebar editor inside that panel through an owned React portal seat, so gear and editor follow moves and remain usable with a hidden tab row or collapsed left column. Switch compact/expanded header and density, reorder and hide header/footer entries, and expose overflow through the selected menu or scrolling behavior using the same preferences authority. Standalone/global recovery remains available. The separate list-only sliders control is named Thread list settings; no duplicate preference model or native DOM reparenting is involved.",
-      "reach": [
-        "click button \"Sidebar settings\"",
-        "expect heading \"Customize sidebar\"",
-        "click button \"Move up: Settle\"",
-        "expect checkbox \"Settle\""
-      ],
-      "surfaces": [
-        "client",
-        "settings",
-        "storage"
-      ],
+      "reach": ["click button \"Sidebar settings\"", "expect heading \"Customize sidebar\"", "click button \"Move up: Settle\"", "expect checkbox \"Settle\""],
+      "surfaces": ["client", "settings", "storage"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "thread-list: Sidebar settings › Customize sidebar",
@@ -1878,103 +1577,63 @@
           "key": "headerMode",
           "defaultValue": "compact",
           "constraints": "One of compact or expanded.",
-          "choices": [
-            "compact",
-            "expanded"
-          ],
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "choices": ["compact", "expanded"],
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "hideBrandLogo",
           "defaultValue": "false",
           "constraints": "Boolean; hide the brand logo.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "navigationDensity",
           "defaultValue": "compact",
           "constraints": "One of compact or comfortable.",
-          "choices": [
-            "compact",
-            "comfortable"
-          ],
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "choices": ["compact", "comfortable"],
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "navigationOverflow",
           "defaultValue": "scroll-menu",
           "constraints": "One of scroll, menu, or scroll-menu.",
-          "choices": [
-            "scroll",
-            "menu",
-            "scroll-menu"
-          ],
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "choices": ["scroll", "menu", "scroll-menu"],
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "headerRegionHeight",
           "defaultValue": "null",
           "constraints": "Optional persisted pixel height.",
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "headerOrder",
           "defaultValue": "[]",
           "constraints": "Ordered header item ID list.",
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "hiddenHeaderIds",
           "defaultValue": "[]",
           "constraints": "Hidden header item ID list.",
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "footerOrder",
           "defaultValue": "[]",
           "constraints": "Ordered footer item ID list.",
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "hiddenFooterIds",
           "defaultValue": "[]",
           "constraints": "Hidden footer item ID list; default includes More.",
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         }
       ],
-      "states": [
-        "compact",
-        "expanded",
-        "scroll-overflow",
-        "menu-overflow",
-        "custom-order"
-      ],
-      "failureModes": [
-        "Unknown item IDs do not create phantom navigation entries.",
-        "Persisted layout values fall back to safe defaults when invalid."
-      ],
+      "states": ["compact", "expanded", "scroll-overflow", "menu-overflow", "custom-order"],
+      "failureModes": ["Unknown item IDs do not create phantom navigation entries.", "Persisted layout values fall back to safe defaults when invalid."],
       "externalDependencies": [],
       "verification": [
         {
@@ -2053,21 +1712,12 @@
         "click button \"More sidebar destinations\"",
         "expect option \"Settings\""
       ],
-      "surfaces": [
-        "client",
-        "settings"
-      ],
+      "surfaces": ["client", "settings"],
       "surface": "command",
       "destination": "none",
       "currentSurface": "sidebar-footer: More menu",
       "configuration": [],
-      "states": [
-        "wide",
-        "narrow",
-        "collapsed",
-        "hidden-entry",
-        "entry-yielded-to-another-seat"
-      ],
+      "states": ["wide", "narrow", "collapsed", "hidden-entry", "entry-yielded-to-another-seat"],
       "failureModes": [
         "A footer seat that renders nothing never overflows and never opens an empty More menu.",
         "A hidden footer action stays reachable from More.",
@@ -2122,20 +1772,12 @@
       "id": "client-reload-banner",
       "title": "Offer a page reload when the running client bundles are behind",
       "summary": "The sidebar foot reports the client bundle revisions the page runs against the Host's served graph; a page that missed a rebuild, reconnected to another release or lacks a newly added entry gets a Restart the page to apply updates banner at the sidebar foot, naming the plugins a reload would load, with the button that does it.",
-      "surfaces": [
-        "client",
-        "host"
-      ],
+      "surfaces": ["client", "host"],
       "surface": "statusItem",
       "destination": "none",
       "currentSurface": "sidebar-footer: client reload banner",
       "configuration": [],
-      "states": [
-        "current",
-        "stale-rebuild",
-        "other-release",
-        "added-entry"
-      ],
+      "states": ["current", "stale-rebuild", "other-release", "added-entry"],
       "failureModes": [
         "A page that already hot-reloaded a rebuild reports the served revision and stays out of the banner.",
         "A Host without the client module registry reports nothing instead of failing the query.",
@@ -2175,13 +1817,7 @@
         "fill combobox \"*\" \"Palette search target\"",
         "expect option \"Palette search target*\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "storage", "integration"],
       "surface": "command",
       "destination": "none",
       "currentSurface": "thread-list: Search threads",
@@ -2190,58 +1826,40 @@
           "key": "paletteRecentLimit",
           "defaultValue": "20",
           "constraints": "Integer from 5 to 100 recent entries.",
-          "coveredBy": [
-            "thread-sidebar.palette-search"
-          ]
+          "coveredBy": ["thread-sidebar.palette-search"]
         },
         {
           "key": "paletteChord",
           "defaultValue": "primary+KeyK",
           "constraints": "Persisted keyboard chord string.",
-          "coveredBy": [
-            "thread-sidebar.palette-search"
-          ]
+          "coveredBy": ["thread-sidebar.palette-search"]
         },
         {
           "key": "fileSearchChord",
           "defaultValue": "primary+KeyP",
           "constraints": "Persisted keyboard chord string.",
-          "coveredBy": [
-            "thread-sidebar.palette-search"
-          ]
+          "coveredBy": ["thread-sidebar.palette-search"]
         },
         {
           "key": "threadSearchChord",
           "defaultValue": "null",
           "constraints": "Optional persisted keyboard chord string.",
-          "coveredBy": [
-            "thread-sidebar.palette-search"
-          ]
+          "coveredBy": ["thread-sidebar.palette-search"]
         },
         {
           "key": "backChord",
           "defaultValue": "primary+BracketLeft",
           "constraints": "Persisted keyboard chord string.",
-          "coveredBy": [
-            "thread-sidebar.palette-search"
-          ]
+          "coveredBy": ["thread-sidebar.palette-search"]
         },
         {
           "key": "forwardChord",
           "defaultValue": "primary+BracketRight",
           "constraints": "Persisted keyboard chord string.",
-          "coveredBy": [
-            "thread-sidebar.palette-search"
-          ]
+          "coveredBy": ["thread-sidebar.palette-search"]
         }
       ],
-      "states": [
-        "closed",
-        "searching-threads",
-        "searching-files",
-        "history-back",
-        "history-forward"
-      ],
+      "states": ["closed", "searching-threads", "searching-files", "history-back", "history-forward"],
       "failureModes": [
         "Conflicting key chords are reported rather than silently stealing another shortcut.",
         "Unsupported URL routes are not treated as navigable thread state."
@@ -2294,17 +1912,8 @@
       "id": "thread-children-and-links",
       "title": "Browse child sessions and share thread URLs",
       "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a “parent thread unavailable” header instead of a top-level row, archive or restore that whole branch from the header, and copy credential-free thread URLs.",
-      "reach": [
-        "click button \"Thread list settings\"",
-        "click button \"Finished subagents: Fold into “N finished”\"",
-        "expect menuitemradio \"Hide them\""
-      ],
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "integration"
-      ],
+      "reach": ["click button \"Thread list settings\"", "click button \"Finished subagents: Fold into “N finished”\"", "expect menuitemradio \"Hide them\""],
+      "surfaces": ["client", "host", "settings", "integration"],
       "surface": "destinationSection",
       "destination": "threads",
       "currentSurface": "thread-list: child threads",
@@ -2313,19 +1922,13 @@
           "key": "maxChildren",
           "defaultValue": "3",
           "constraints": "Integer from 1 to 50 children per level.",
-          "coveredBy": [
-            "thread-sidebar.children-links"
-          ]
+          "coveredBy": ["thread-sidebar.children-links"]
         },
         {
           "key": "finishedSubagents",
           "defaultValue": "collapse",
           "constraints": "show lists finished subagents, collapse folds them into one \"N finished\" line, hide omits them; the open child always stays listed.",
-          "choices": [
-            "show",
-            "collapse",
-            "hide"
-          ],
+          "choices": ["show", "collapse", "hide"],
           "coveredBy": [
             "thread-sidebar.thread-children-and-links-unit-finished-collapse",
             "thread-sidebar.thread-children-and-links-unit-finished-hide-show",
@@ -2333,14 +1936,7 @@
           ]
         }
       ],
-      "states": [
-        "collapsed",
-        "expanded",
-        "nested",
-        "copied",
-        "finished-folded",
-        "parent-unavailable"
-      ],
+      "states": ["collapsed", "expanded", "nested", "copied", "finished-folded", "parent-unavailable"],
       "failureModes": [
         "Child chains preserve inherited workspace identity.",
         "A branch whose nearest listed ancestor is missing from the corpus groups under one “parent thread unavailable” header and never renders as a top-level thread row.",
@@ -2481,25 +2077,12 @@
         "expect menuitem \"Archive\"",
         "expect menuitem \"Settle\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "storage", "integration"],
       "surface": "rowAction",
       "destination": "threads",
       "currentSurface": "thread-header: Pin / More menu",
       "configuration": [],
-      "states": [
-        "active",
-        "pinned",
-        "parked",
-        "settled",
-        "snoozed",
-        "archived",
-        "crowded"
-      ],
+      "states": ["active", "pinned", "parked", "settled", "snoozed", "archived", "crowded"],
       "failureModes": [
         "Blank sessions have no header actions.",
         "Running sessions cannot be parked, settled or archived, and ancestors with running descendants cannot be settled.",
@@ -2573,11 +2156,7 @@
         "click button \"Restart pending*\"",
         "expect text \"Restart DSH yourself to load them.\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "surface": "statusItem",
       "destination": "none",
       "currentSurface": "status-strip: Restart pending",
@@ -2701,26 +2280,12 @@
       "id": "interrupted-turn-threads",
       "title": "See threads a crash interrupted",
       "summary": "Every turn the Host opens is recorded in a small durable in-flight file and cleared when the turn ends, so the next Host process knows exactly which turns a crash, kill or shutdown timeout left open; it promotes them into the durable recovery store at boot, marked interrupted, and the sidebar lists them under Interrupted with Resume, Resume all and dismiss actions until the thread runs again.",
-      "surfaces": [
-        "client",
-        "host",
-        "api",
-        "tool",
-        "storage"
-      ],
+      "surfaces": ["client", "host", "api", "tool", "storage"],
       "surface": "attentionProvider",
       "destination": "inbox",
       "currentSurface": "thread-list: interrupted threads",
       "configuration": [],
-      "states": [
-        "turn-open",
-        "turn-closed",
-        "interrupted",
-        "managed-restart",
-        "promoted",
-        "resumed",
-        "dismissed"
-      ],
+      "states": ["turn-open", "turn-closed", "interrupted", "managed-restart", "promoted", "resumed", "dismissed"],
       "failureModes": [
         "A turn that ended before the process stopped is never reported: turn/end clears its in-flight marker.",
         "The in-flight file is cleared while its entries are promoted, so one exit is reported once even if recording the recovery rows fails.",
@@ -2798,24 +2363,12 @@
         "click menuitem \"Follow-up in a new thread\"",
         "expect text \"Follow-up after @session:*\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Mention",
       "configuration": [],
-      "states": [
-        "idle",
-        "dragging",
-        "captured",
-        "resolving",
-        "inserted",
-        "unavailable",
-        "failed"
-      ],
+      "states": ["idle", "dragging", "captured", "resolving", "inserted", "unavailable", "failed"],
       "failureModes": [
         "Unresolvable targets and canceled requests never change the draft.",
         "Error diagnostics expose only bounded, non-sensitive fields.",
@@ -2900,21 +2453,12 @@
         "press Backspace",
         "expect option \"e2e-skill-mentions*\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: @ skills",
       "configuration": [],
-      "states": [
-        "loading",
-        "suggested",
-        "selected",
-        "unavailable"
-      ],
+      "states": ["loading", "suggested", "selected", "unavailable"],
       "failureModes": [
         "Subagent Sessions do not receive human-invocable skill suggestions.",
         "A selected skill uses the existing slash invocation rather than a new skill execution path."
@@ -2950,26 +2494,13 @@
       "id": "usage-limit-group",
       "title": "Group provider-blocked threads under Usage limit",
       "summary": "Threads whose last turn the provider refused for quota or a rate limit appear together with their reset countdown, a resume action, snooze choices and the auto-retry switch, reading the durable recoveries @dshfiles/ai-accounts owns.",
-      "reach": [
-        "seed quota-blocked-thread",
-        "expect region \"Usage limit\"",
-        "expect button \"Resume this thread\""
-      ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "reach": ["seed quota-blocked-thread", "expect region \"Usage limit\"", "expect button \"Resume this thread\""],
+      "surfaces": ["client", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",
       "currentSurface": "thread-list: Usage limit group",
       "configuration": [],
-      "states": [
-        "hidden",
-        "waiting",
-        "ready",
-        "snoozed",
-        "unknown-reset"
-      ],
+      "states": ["hidden", "waiting", "ready", "snoozed", "unknown-reset"],
       "failureModes": [
         "Without the AI Accounts Host the group stays hidden and polling stops instead of retrying a missing owner.",
         "A recovery already queued, a thread running again, and a muted or archived thread stay out of the group."
@@ -3031,9 +2562,7 @@
         "hover text \"Hover actions target\" at 8,8",
         "expect button \"Settle\""
       ],
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Open in side panel",
@@ -3042,37 +2571,17 @@
           "key": "hiddenRowActions",
           "defaultValue": "none",
           "constraints": "Which hover buttons a row hides: none, or any combination of resume, resumeDismiss, aside, pin, park, mute, archive and restore. A missing id keeps its button.",
-          "choices": [
-            "none",
-            "resume",
-            "resumeDismiss",
-            "aside",
-            "pin",
-            "park",
-            "mute",
-            "archive",
-            "restore"
-          ],
-          "coveredBy": [
-            "thread-sidebar.open-in-side-panel"
-          ]
+          "choices": ["none", "resume", "resumeDismiss", "aside", "pin", "park", "mute", "archive", "restore"],
+          "coveredBy": ["thread-sidebar.open-in-side-panel"]
         },
         {
           "key": "rowActionOrder",
           "defaultValue": "[resume, resumeDismiss, aside, pin, park, mute, archive, settle, restore]",
           "constraints": "Left-to-right order the hover buttons draw in: every row action once, dragged or moved in Customize sidebar. An id the saved order misses keeps its shipped place after them; settle ships in archive's slot.",
-          "coveredBy": [
-            "thread-sidebar.open-in-side-panel"
-          ]
+          "coveredBy": ["thread-sidebar.open-in-side-panel"]
         }
       ],
-      "states": [
-        "closed",
-        "open",
-        "focused",
-        "hover-action-hidden",
-        "hover-action-reordered"
-      ],
+      "states": ["closed", "open", "focused", "hover-action-hidden", "hover-action-reordered"],
       "failureModes": [
         "An aside tab closed while the thread is still running keeps running: nothing is archived.",
         "An archived row offers no aside, because a stopped thread has nothing to show.",
@@ -3140,21 +2649,12 @@
       "id": "thread-referenced-by",
       "title": "See which threads reference one thread",
       "summary": "Both thread menus open a Referenced by submenu listing the threads that point back at one thread: its forked and subagent children from the Host session headers, plus the threads whose messages pulled it in as referenced context, found by one bounded session-content lookup for the thread id. Mention rows need the Host's session-content index (the web profile's session-query-sqlite Loader row); without it the submenu lists forked and subagent threads only and says so. Rows open the referencing thread, and a lookup that cannot answer never holds the menu open.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Referenced by",
       "configuration": [],
-      "states": [
-        "loading",
-        "empty",
-        "listed",
-        "degraded"
-      ],
+      "states": ["loading", "empty", "listed", "degraded"],
       "failureModes": [
         "A content search still reconciling the corpus times out after two seconds and lists lineage only.",
         "An agent tool call without a sessionId and without an acting Agent asks for the target instead of guessing."
@@ -3196,18 +2696,12 @@
       "id": "thread-inventory-reads",
       "title": "Read the thread inventory only while it is on screen",
       "summary": "The sidebar reads the JJ repository inventory when its thread region is visible and stops while the sidebar is collapsed, so a hidden sidebar buys no jj scan; the schedule is sixty seconds, in step with the sixty-second repository view the Host keeps.",
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "thread-list: inventory reads",
       "configuration": [],
-      "states": [
-        "inventory-visible",
-        "inventory-suspended"
-      ],
+      "states": ["inventory-visible", "inventory-suspended"],
       "failureModes": [
         "A Host whose integration API owner is missing leaves the inventory query unanswered, and the schedule stops instead of repeating a request that cannot succeed.",
         "Collapsing the sidebar while a read is in flight lets that read finish and ignores its result; no new read is scheduled."
@@ -3237,10 +2731,7 @@
       "id": "thread-keyboard-navigation",
       "title": "Navigate and multi-select threads from the keyboard",
       "summary": "ArrowUp/Down from a view preset enters its first/last visible row; row arrows switch to the focused thread immediately by default, or move row focus only when configured. Left and Right walk the section and child-thread tree, Shift+ArrowUp/Down selects a range from the last selected row, and the primary modifier toggles individual rows. A selection bar pins, settles, or archives every selected thread and clears with Escape.",
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "surface": "destinationSection",
       "destination": "threads",
       "currentSurface": "thread-list: keyboard navigation",
@@ -3249,20 +2740,11 @@
           "key": "arrowKeysSwitchThread",
           "defaultValue": "true",
           "constraints": "Boolean; Up/Down switches threads immediately, or moves row focus only until Enter or a click.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.keyboard-selection-unit-switch"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.keyboard-selection-unit-switch"]
         }
       ],
-      "states": [
-        "focused",
-        "range-selected",
-        "toggled"
-      ],
+      "states": ["focused", "range-selected", "toggled"],
       "failureModes": [
         "After activating a view preset, ArrowDown enters its first visible thread and ArrowUp enters its last; within rows, Up/Down switches threads immediately by default, so Shift+ArrowUp/Down is the gesture that moves focus without opening one.",
         "A range selects only rendered rows, so a collapsed section or hidden child row is never selected behind the user's back.",
@@ -3330,20 +2812,12 @@
         "press Enter",
         "expect text \"Sidebar rename\""
       ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "surface": "rowAction",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Edit title",
       "configuration": [],
-      "states": [
-        "title-idle",
-        "title-editing",
-        "title-committed",
-        "title-cancelled"
-      ],
+      "states": ["title-idle", "title-editing", "title-committed", "title-cancelled"],
       "failureModes": [
         "A rename the Host refuses keeps the row title and shows the sidebar failure notice.",
         "An unchanged or blank draft closes the editor without a Host call."
@@ -3373,29 +2847,13 @@
       "id": "continue-in-project",
       "title": "Continue a thread in another project",
       "summary": "A thread started in the wrong folder, or whose work moved to another repository, continues in a registered project: the row menu and the thread header menu open a Continue in project submenu listing the projects, and the agent tool thread_continue_in does the same. The conversation is forked into a new thread whose own working directory is that project's workspace (its isolated jj workspace when jj-integration isolates new threads), the new thread is told where it came from, the original thread is settled so it stays readable but runs no further step, and the new thread opens. An agent continuing its own thread keeps its running turn in the copy and stops after the call.",
-      "reach": [
-        "seed tool-call-thread",
-        "rightclick text \"sample\"",
-        "click menuitem \"Continue in project\"",
-        "expect menuitem \"sample\""
-      ],
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "reach": ["seed tool-call-thread", "rightclick text \"sample\"", "click menuitem \"Continue in project\"", "expect menuitem \"sample\""],
+      "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Continue in project",
       "configuration": [],
-      "states": [
-        "idle",
-        "listing-projects",
-        "continuing",
-        "continued",
-        "continued-unsettled",
-        "failed"
-      ],
+      "states": ["idle", "listing-projects", "continuing", "continued", "continued-unsettled", "failed"],
       "failureModes": [
         "Another thread that is still running is refused before anything is created; only the calling thread may continue mid-turn.",
         "An unknown project is refused before a thread is created, and the original is not settled.",
@@ -3445,19 +2903,12 @@
       "id": "queued-message-tools",
       "title": "Remove, steer or edit a queued message as an Agent",
       "summary": "thread_queue_remove, thread_queue_steer and thread_queue_edit act on one queued message through the Session controller updateQueue verb the queue dock uses; an edit replaces the text in place, keeping the message id and position, and the Host refuses messages with images or files.",
-      "surfaces": [
-        "host"
-      ],
+      "surfaces": ["host"],
       "surface": "agentToolOnly",
       "destination": "none",
       "currentSurface": "agent tool: thread_queue_remove / thread_queue_steer / thread_queue_edit",
       "configuration": [],
-      "states": [
-        "queued",
-        "removed",
-        "steering",
-        "edited"
-      ],
+      "states": ["queued", "removed", "steering", "edited"],
       "failureModes": [
         "A message that already left the queue is refused with session/queue-item-not-found and nothing changes.",
         "An edit of a message with images or files is refused with QUEUE_EDIT_NON_TEXT; the message stays queued unchanged.",
@@ -3498,18 +2949,12 @@
       "id": "prompt-links",
       "title": "Open a prefilled new thread from a prompt link",
       "summary": "Opening the GUI with ?prompt=<text>, optionally &project=<id or path> and &model=<provider>/<model>, creates a new thread in that project, selects the model, fills its composer without sending, and removes the three parameters from the address.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "command",
       "destination": "none",
       "currentSurface": "url: ?prompt= link",
       "configuration": [],
-      "states": [
-        "no-link",
-        "opening",
-        "draft-ready"
-      ],
+      "states": ["no-link", "opening", "draft-ready"],
       "failureModes": [
         "An unknown project opens the draft in the current or first project and logs a warning.",
         "A refused or unreadable model keeps the default model; the draft still opens.",
@@ -3577,19 +3022,9 @@
       "surface": "attentionProvider",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › Turn finished",
-      "surfaces": [
-        "host",
-        "integration"
-      ],
+      "surfaces": ["host", "integration"],
       "configuration": [],
-      "states": [
-        "ready",
-        "failed",
-        "manually-unread",
-        "acknowledged",
-        "inbox-absent",
-        "done-in-inbox"
-      ],
+      "states": ["ready", "failed", "manually-unread", "acknowledged", "inbox-absent", "done-in-inbox"],
       "failureModes": [
         "Each finished turn is its own occurrence, so a later turn shows again after an earlier one was marked done.",
         "Without the inbox loaded, thread attention works exactly as before."
@@ -3639,17 +3074,12 @@
         "click tab \"Threads\"",
         "expect button \"Board\""
       ],
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
       "currentSurface": "shell: Navigation list (21 entries) and collapsed icon rail",
       "configuration": [],
-      "states": [
-        "expanded",
-        "collapsed"
-      ],
+      "states": ["expanded", "collapsed"],
       "failureModes": [
         "A page another plugin registers without a section entry is still listed, under Settings › Other pages.",
         "Without the Inbox plugin the Inbox destination shows an empty state and no badge."
@@ -3685,20 +3115,12 @@
       "id": "phone-stack-navigation",
       "title": "Navigate the phone as a stack",
       "summary": "Below 640px the fixed layout is a stack (plans/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers Thread panels, which opens the thread panel as a bottom sheet. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
       "currentSurface": "shell: phone tab bar only; the stage kept the desktop tab strip and no Back",
       "configuration": [],
-      "states": [
-        "list",
-        "stage-thread",
-        "stage-page",
-        "stage-draft",
-        "keyboard-open"
-      ],
+      "states": ["list", "stage-thread", "stage-page", "stage-draft", "keyboard-open"],
       "failureModes": [
         "Without the Workbench's toggle command the bar offers no Thread panels button instead of a dead control.",
         "An older Host that rejects the new 'back' navigation surface only loses that count; navigation never waits on it."
@@ -3740,20 +3162,13 @@
       "id": "touch-row-menu",
       "title": "Open a thread's actions by touch",
       "summary": "On a coarse pointer each thread row shows a ⋯ button that opens the row's own actions menu (the right-click menu, which holds every hover action: pin, mute, move, settle, open in side panel…), anchored under the button. Touch has no hover and iOS WebKit fires no contextmenu on a long press, so the hover strip is hidden there and the inline status verb (Answer, Land, Retry) moves left of the ⋯ button. A fine pointer keeps the hover strip and no extra button.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "threads",
       "currentSurface": "thread-list: hover action strip and right-click menu only",
       "configuration": [],
-      "states": [
-        "coarse-pointer",
-        "fine-pointer"
-      ],
-      "failureModes": [
-        "An offscreen row renders its menu button only once near the viewport, like its hover actions."
-      ],
+      "states": ["coarse-pointer", "fine-pointer"],
+      "failureModes": ["An offscreen row renders its menu button only once near the viewport, like its hover actions."],
       "externalDependencies": [],
       "verification": [
         {
@@ -3773,15 +3188,8 @@
       "id": "layout-mode",
       "title": "Choose a fixed or free-docking left column",
       "summary": "Settings › Layout (and the palette's Layout commands) switch the left column between the fixed rail-and-list layout, the default, and free docking, which mounts the movable Workbench panes again. The Workbench's saved left layout and named layouts are not touched while fixed is on, so switching back to free docking restores them; Move tab to stops offering the left region while it is absent.",
-      "reach": [
-        "click tab \"Settings\"",
-        "click radio \"Free docking\"",
-        "expect tab \"Thread Sidebar: Threads\""
-      ],
-      "surfaces": [
-        "client",
-        "settings"
-      ],
+      "reach": ["click tab \"Settings\"", "click radio \"Free docking\"", "expect tab \"Thread Sidebar: Threads\""],
+      "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Thread sidebar › Layout",
@@ -3790,22 +3198,12 @@
           "key": "layoutMode",
           "defaultValue": "fixed",
           "constraints": "One of fixed or docking; docking restores the Workbench left panes and their saved layout.",
-          "choices": [
-            "fixed",
-            "docking"
-          ],
-          "coveredBy": [
-            "thread-sidebar.layout-mode-default"
-          ]
+          "choices": ["fixed", "docking"],
+          "coveredBy": ["thread-sidebar.layout-mode-default"]
         }
       ],
-      "states": [
-        "fixed",
-        "docking"
-      ],
-      "failureModes": [
-        "Without the Workbench the docking choice falls back to the standalone navigation list and thread list."
-      ],
+      "states": ["fixed", "docking"],
+      "failureModes": ["Without the Workbench the docking choice falls back to the standalone navigation list and thread list."],
       "externalDependencies": [],
       "verification": [
         {
@@ -3838,21 +3236,13 @@
         "click button \"Open Observe › Usage\"",
         "expect tab \"Observe\""
       ],
-      "surfaces": [
-        "client",
-        "command"
-      ],
+      "surfaces": ["client", "command"],
       "surface": "command",
       "destination": "none",
       "currentSurface": "palette: Where did a page go?",
       "configuration": [],
-      "states": [
-        "closed",
-        "open"
-      ],
-      "failureModes": [
-        "A page that is not installed in this profile reads Not installed instead of offering Open."
-      ],
+      "states": ["closed", "open"],
+      "failureModes": ["A page that is not installed in this profile reads Not installed instead of offering Open."],
       "externalDependencies": [],
       "verification": [
         {
@@ -3884,20 +3274,12 @@
       "id": "navigation-counter",
       "title": "Count destination and section opens",
       "summary": "Every rail, phone tab bar, list, palette and moved-to open adds one to a private counter on this Host: destination and section ids with counts and the last time, never a thread or its content. The shell_navigation_counts agent tool reads it to inform later rail decisions; shell_navigation_reset clears it only with confirm: true.",
-      "surfaces": [
-        "client",
-        "host",
-        "tool",
-        "storage"
-      ],
+      "surfaces": ["client", "host", "tool", "storage"],
       "surface": "agentToolOnly",
       "destination": "none",
       "currentSurface": "agent tool: shell_navigation_counts / shell_navigation_reset",
       "configuration": [],
-      "states": [
-        "empty",
-        "counting"
-      ],
+      "states": ["empty", "counting"],
       "failureModes": [
         "An unreadable counter file starts over instead of failing navigation; a Host without the method leaves navigation working and counts nothing."
       ],
@@ -3936,18 +3318,12 @@
       "id": "phone-tab-bar",
       "title": "Navigate from a bottom tab bar on a phone",
       "summary": "Below 640px the rail becomes a bottom tab bar (Threads, Inbox, New, More). Threads and Inbox open their list full screen; opening a thread or page closes it, so the stage is pushed; a second tap on the open tab goes back. More lists the other destinations and the moved-to help. The frame then gives the stage the full width and leaves room for the bar instead of keeping the 56px rail.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
       "currentSurface": "shell: collapsed icon rail at phone width",
       "configuration": [],
-      "states": [
-        "stage",
-        "list",
-        "more"
-      ],
+      "states": ["stage", "list", "more"],
       "failureModes": [
         "A left-column occupant without phone navigation keeps the rail: the frame only reflows when the document carries data-shell-phone-nav."
       ],
@@ -3976,26 +3352,13 @@
       "id": "waiting-threads-page",
       "title": "See the threads waiting on you in one page",
       "summary": "Inbox › Waiting threads lists one row per thread with an open inbox item about it: blocking and failed first, finished turns next, each with Open, its provider verb when it has one, and Done. The Inbox page next to it lists items across every source.",
-      "reach": [
-        "click tab \"Inbox\"",
-        "click button \"Waiting threads\"",
-        "expect heading \"Waiting threads\""
-      ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "reach": ["click tab \"Inbox\"", "click button \"Waiting threads\"", "expect heading \"Waiting threads\""],
+      "surfaces": ["client", "integration"],
       "surface": "destinationSection",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › Waiting threads",
       "configuration": [],
-      "states": [
-        "needs-you",
-        "ready",
-        "empty",
-        "busy",
-        "provider-absent"
-      ],
+      "states": ["needs-you", "ready", "empty", "busy", "provider-absent"],
       "failureModes": [
         "A thread with several open items appears once, at its most urgent item, so a busy thread never fills the page.",
         "Without @dshfiles/activity-timeline the page lists nothing and the rail section is still reachable.",
@@ -4037,32 +3400,22 @@
     },
     {
       "id": "subagent-live-preview",
-      "title": "Live subagent preview in the transcript",
+      "title": "Live subagent preview in the transcript and above the composer",
       "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation.",
       "reach": [
         "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[once call subagent {\\\"description\\\":\\\"Answer\\\",\\\"prompt\\\":\\\"Say hello\\\"}]]\"",
+        "fill textbox \"commands, @ files or sessions*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
         "press Enter",
-        "expect text \"Create subagent*\""
+        "expect region \"Working subagents\"",
+        "click button \"Show or hide the progress of *\"",
+        "expect text \"In bash*\""
       ],
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: subagent tool row",
+      "currentSurface": "transcript: subagent tool row; composer dock while the child works",
       "configuration": [],
-      "states": [
-        "starting",
-        "failed-to-start",
-        "working",
-        "finished",
-        "interrupted",
-        "idle",
-        "stop-armed",
-        "stopping",
-        "progress-unavailable"
-      ],
+      "states": ["starting", "failed-to-start", "working", "finished", "interrupted", "idle", "stop-armed", "stopping", "progress-unavailable"],
       "failureModes": [
         "A child that cannot be opened keeps its row and thread link, and says live progress is unavailable.",
         "A failed stop leaves the child working and points to its thread, where Stop is also available."
@@ -4097,6 +3450,12 @@
           "id": "thread-sidebar.subagent-stop-confirmation",
           "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-tool-row.client.test.tsx",
           "testName": "stops a working child only after confirmation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-dock-working",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
+          "testName": "lists working children only, and clears as they go idle"
         }
       ],
       "telemetry": [
