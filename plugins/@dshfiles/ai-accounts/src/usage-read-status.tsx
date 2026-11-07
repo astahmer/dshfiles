@@ -1,32 +1,42 @@
-import { Alert, AlertDescription, AlertTitle } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { RefreshCwIcon, TriangleAlertIcon } from '@dshfiles/plugin-ui/icons'
 import type { UsageCard } from './api.js'
 import { useQuotaClock } from './quota-clock.js'
 import { UsageOverviewModel } from './usage-overview-model.js'
 
-/** Reading usage failed as a whole: why, what is on screen instead, and the retry. */
+/** A failed read as one compact line: what failed, why, and the retry. */
 export const UsageRefreshNotice = (props: {
   readonly failure: string | null
-  readonly hasReading: boolean
   readonly refreshing: boolean
   readonly onRetry: () => void
 }): JSX.Element | null => {
   if (props.failure === null) return null
   return (
-    <Alert variant="warning">
-      <AlertTitle>Usage could not be refreshed</AlertTitle>
-      <AlertDescription className="dshx:text-xs">
-        <p>
-          {props.failure}
-          {props.hasReading ? ' The figures shown are from the last successful read.' : ''}
-        </p>
-        <Button disabled={props.refreshing} onClick={props.onRetry} size="xs" type="button" variant="outline">
-          <RefreshCwIcon aria-hidden className={props.refreshing ? 'dshx:animate-spin' : undefined} />
-          Retry
-        </Button>
-      </AlertDescription>
-    </Alert>
+    <div
+      className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-warning/40 dshx:bg-warning/10 dshx:px-2 dshx:py-1 dshx:text-xs"
+      role="alert"
+    >
+      <TriangleAlertIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-warning" />
+      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+        <span className="dshx:font-medium">Refresh failed</span>
+        <span aria-hidden className="dshx:text-muted-foreground">
+          {' '}
+          · {props.failure}
+        </span>
+      </span>
+      <span className="dshx:sr-only">{props.failure}</span>
+      <Button
+        className="dshx:h-5 dshx:shrink-0 dshx:px-1.5 dshx:text-[11px]"
+        disabled={props.refreshing}
+        onClick={props.onRetry}
+        size="xs"
+        type="button"
+        variant="outline"
+      >
+        <RefreshCwIcon aria-hidden className={props.refreshing ? 'dshx:animate-spin' : undefined} />
+        Retry
+      </Button>
+    </div>
   )
 }
 

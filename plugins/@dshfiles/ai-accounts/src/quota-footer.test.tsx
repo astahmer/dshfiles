@@ -325,9 +325,8 @@ describe('usage popover refresh', () => {
     await click(refreshButton())
     const notice = overview().querySelector<HTMLElement>('[role="alert"]')
     if (notice === null) throw new Error('Missing refresh failure notice')
-    expect(notice.textContent).toContain('Usage could not be refreshed')
+    expect(notice.textContent).toContain('Refresh failed')
     expect(notice.textContent).toContain('Account usage read timed out after 30000 ms.')
-    expect(notice.textContent).toContain('last successful read')
     expect(overviewCard('Work').textContent).toContain('42% left')
 
     host.refreshUsage.mockResolvedValueOnce(snapshot([healthy('work', 'Work', 30)]))

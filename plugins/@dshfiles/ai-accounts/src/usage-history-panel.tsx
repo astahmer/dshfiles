@@ -311,7 +311,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void; readonly
           </Collapsible>
 
           <HistoryCard description={`${selected.displayName || selected.instanceId}${selected.kind ? ` · ${selected.kind}` : ''}`} heading="Current limits">
-            <UsageRefreshNotice failure={failure} hasReading={usage !== null} onRetry={() => void refreshUsage()} refreshing={refreshing} />
+            <UsageRefreshNotice failure={failure} onRetry={() => void refreshUsage()} refreshing={refreshing} />
             <CurrentQuota accountId={selectedId} onRetry={() => void refreshUsage()} refreshing={refreshing} usage={usage} />
           </HistoryCard>
 

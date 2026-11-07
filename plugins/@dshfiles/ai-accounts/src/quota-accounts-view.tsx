@@ -68,7 +68,7 @@ export const QuotaAccountsView = (props: {
           Manage accounts
         </Button>
       </div>
-      <UsageRefreshNotice failure={failure} hasReading={usage !== null} onRetry={() => void refresh()} refreshing={refreshing} />
+      <UsageRefreshNotice failure={failure} onRetry={() => void refresh()} refreshing={refreshing} />
       <PageSection heading="Current limits" description="Provider-reported subscription allowance, separate from recorded requests and list-price estimates.">
         <CurrentQuota accountId={selectedId} onRetry={() => void refresh()} refreshing={refreshing} usage={usage} />
       </PageSection>
