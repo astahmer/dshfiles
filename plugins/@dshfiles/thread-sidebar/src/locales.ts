@@ -357,7 +357,8 @@ const en = {
   threadSidebarContinueInFailure: 'Could not continue this thread in that project.',
   threadSidebarTurnIntoProject: 'Turn into project',
   threadSidebarTurnedIntoProject: 'Turned into project “{{title}}”.',
-  threadSidebarTurnIntoProjectFailure: 'The Host could not register this thread’s folder as a project. Retry, or add the folder as a project from the New thread picker.',
+  threadSidebarTurnIntoProjectFailure:
+    'The Host could not register this thread’s folder as a project. Retry, or add the folder as a project from the New thread picker.',
   threadSidebarDropToMention: 'Drop to mention thread',
   threadSidebarSkillSource: 'Skills',
   threadSidebarSkillUserOnly: 'User-only skill',

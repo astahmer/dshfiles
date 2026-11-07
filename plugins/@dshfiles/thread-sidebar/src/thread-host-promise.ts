@@ -163,7 +163,10 @@ export class ThreadActions extends Context.Service<ThreadActions, ThreadActionSe
             }
             const unique = uniqueProjectTitle({
               desired,
-              taken: ctx.workspaceRegistry.list().filter(candidate => candidate.id !== workspace.workspaceId).map(candidate => candidate.title),
+              taken: ctx.workspaceRegistry
+                .list()
+                .filter(candidate => candidate.id !== workspace.workspaceId)
+                .map(candidate => candidate.title),
             })
             if (unique === workspace.title) return { projectId: workspace.workspaceId, title: workspace.title, path: workspace.path, created: created.created }
             const renamed = await ctx.workspaceController.rename({ workspaceId: workspace.workspaceId, title: unique })

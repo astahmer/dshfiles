@@ -7,6 +7,21 @@ import { SubscriptionStorageFailed, ThreadHostCallFailed } from './sidebar-error
 import { ThreadSubscriptions, ThreadSubscriptionsModel } from './subscriptions-store.js'
 import type { ThreadSubscription, ThreadSubscriptionsSnapshot } from './subscriptions-api.js'
 
+/** The snapshot filter: both ends are optional, so a caller can list one side or every edge. */
+type ThreadSubscriptionFilter = {
+  subscriberSessionId?: string
+  targetSessionId?: string
+}
+
+/** A row under construction: the optional titles are set only when the Host knows one. */
+type ThreadSubscriptionDraft = {
+  subscriberSessionId: string
+  targetSessionId: string
+  createdAt: number
+  subscriberTitle?: string
+  targetTitle?: string
+}
+
 const callerSessionId = (caller: ApiCaller): string | undefined => (caller.kind === 'agent' ? caller.sessionId : undefined)
 
 const notFound = (): PluginApiError => new PluginApiError('No thread with that id exists.', { code: 'thread-not-found' })
@@ -89,13 +104,14 @@ export class ThreadSubscriptionActions extends Context.Service<ThreadSubscriptio
             subscriptions: rows.map(row => {
               const subscriberTitle = titles.get(row.subscriberSessionId)
               const targetTitle = titles.get(row.targetSessionId)
-              return {
+              const view: ThreadSubscriptionDraft = {
                 subscriberSessionId: row.subscriberSessionId,
                 targetSessionId: row.targetSessionId,
                 createdAt: row.createdAt,
-                ...(subscriberTitle === undefined ? {} : { subscriberTitle }),
-                ...(targetTitle === undefined ? {} : { targetTitle }),
-              } satisfies ThreadSubscription
+              }
+              if (subscriberTitle !== undefined) view.subscriberTitle = subscriberTitle
+              if (targetTitle !== undefined) view.targetTitle = targetTitle
+              return view satisfies ThreadSubscription
             }),
           }
         })
@@ -118,10 +134,10 @@ export class ThreadSubscriptionActions extends Context.Service<ThreadSubscriptio
       return ThreadSubscriptionActions.of({
         state: (input, caller) => {
           const subscriberSessionId = resolvedSubscriber(input.subscriberSessionId, caller)
-          return snapshot({
-            ...(subscriberSessionId === undefined ? {} : { subscriberSessionId }),
-            ...(input.targetSessionId === undefined ? {} : { targetSessionId: input.targetSessionId }),
-          })
+          const filter: ThreadSubscriptionFilter = {}
+          if (subscriberSessionId !== undefined) filter.subscriberSessionId = subscriberSessionId
+          if (input.targetSessionId !== undefined) filter.targetSessionId = input.targetSessionId
+          return snapshot(filter)
         },
         subscribe: Effect.fn('thread subscriptions subscribe action')(function* (input, caller) {
           const subscriberSessionId = resolvedSubscriber(input.subscriberSessionId, caller)

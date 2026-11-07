@@ -813,7 +813,19 @@ const ChildThreadList = (props: {
 
 type ThreadContextMenuProps = Pick<
   ThreadRowProps,
-  'session' | 'unread' | 'autoSettleOverride' | 'mute' | 'archived' | 'pinned' | 'parked' | 'settled' | 'section' | 'workspaceId' | 'workspaceTitle' | 'actions' | 'notifyTarget'
+  | 'session'
+  | 'unread'
+  | 'autoSettleOverride'
+  | 'mute'
+  | 'archived'
+  | 'pinned'
+  | 'parked'
+  | 'settled'
+  | 'section'
+  | 'workspaceId'
+  | 'workspaceTitle'
+  | 'actions'
+  | 'notifyTarget'
 > & { readonly children: JSX.Element }
 
 /** One menu for the whole batch: every verb applies to each selected thread the verb can still change. */
@@ -1320,16 +1332,18 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       {t('threadSidebarRebased')}
                     </Badge>
                   )}
-                  {props.subscriberCount === undefined || props.subscriberCount === 0 ? null : (
-                    <Badge
-                      variant="secondary"
-                      title={t('threadSidebarNotifySubscribersHint', { count: props.subscriberCount })}
-                      aria-label={t('threadSidebarNotifySubscribersHint', { count: props.subscriberCount })}
-                      data-testid="thread-sidebar-subscribers-tag"
-                    >
-                      {t('threadSidebarNotifySubscribers', { count: props.subscriberCount })}
-                    </Badge>
-                  )}
+                  {props.subscriberCount === undefined || props.subscriberCount === 0
+                    ? null
+                    : withTooltip(
+                        t('threadSidebarNotifySubscribersHint', { count: props.subscriberCount }),
+                        <Badge
+                          variant="secondary"
+                          aria-label={t('threadSidebarNotifySubscribersHint', { count: props.subscriberCount })}
+                          data-testid="thread-sidebar-subscribers-tag"
+                        >
+                          {t('threadSidebarNotifySubscribers', { count: props.subscriberCount })}
+                        </Badge>,
+                      )}
                   {rowStyle.time && inlineVerb === undefined ? (
                     <span
                       className={cn(
@@ -4002,6 +4016,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     displayWorkspaces,
     now,
     pinnedSessionIds,
+    projectKeys,
     tSidebar,
     threadStatusById,
     threadView.groupBy,
@@ -5270,7 +5285,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             rows={hoistedUsageLimitRows}
             translate={props.tSidebar}
             withThreadMenu={(session, row) => {
-              const workspaceId = realWorkspaceBySession.get(session.id) ?? SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
+              const workspaceId =
+                realWorkspaceBySession.get(session.id) ?? SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
               return (
                 <ThreadContextMenu
                   key={session.id}
@@ -5530,10 +5546,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       {showHeader ? (
                         <ThreadGroupHeader
                           icon={
-group.projectId === undefined ? undefined : (() => {
-                              const projectPath = workspacePathById.get(group.projectId)
-                              return projectPath === undefined ? undefined : <ProjectIcon path={projectPath} label={groupLabel} />
-                            })()
+                            group.projectId === undefined
+                              ? undefined
+                              : (() => {
+                                  const projectPath = workspacePathById.get(group.projectId)
+                                  return projectPath === undefined ? undefined : <ProjectIcon path={projectPath} label={groupLabel} />
+                                })()
                           }
                           checkoutCount={group.checkoutCount}
                           label={groupLabel}

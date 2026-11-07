@@ -111,7 +111,7 @@ describe('ThreadGroupHeader', () => {
   })
 
   it('names how many local checkouts a repository row stands for', () => {
-    const header = mount({ label: 'repo', projectId: 'project-1', checkoutCount: 2 })
+    mount({ label: 'repo', projectId: 'project-1', checkoutCount: 2 })
     expect(screen.getByText('2 checkouts')).toBeTruthy()
     cleanup()
     mount({ label: 'repo', projectId: 'project-1', checkoutCount: 1 })

@@ -205,16 +205,16 @@ const make = Effect.gen(function* () {
   const noFolder = Effect.gen(function* () {
     const root = path.join(homedir(), NoFolderWorkspace.pathMarker)
     const create = (directory: string) =>
-      fileSystem.makeDirectory(directory, { recursive: true }).pipe(Effect.mapError(cause => new WorkspaceFilesFailed({ detail: `Could not create ${directory}.`, cause })))
+      fileSystem
+        .makeDirectory(directory, { recursive: true })
+        .pipe(Effect.mapError(cause => new WorkspaceFilesFailed({ detail: `Could not create ${directory}.`, cause })))
     yield* create(root)
     // One folder per scratch thread, so turning one into a project groups only that thread. A scratch folder no Session
     // was accounted to is reused instead of growing the list on every New thread click.
     const workspaces = yield* registry.list
-    const present = yield* Effect.forEach(
-      workspaces,
-      workspace => exists(workspace.path).pipe(Effect.map(present => ({ path: workspace.path, present }))),
-      { concurrency: 'unbounded' },
-    )
+    const present = yield* Effect.forEach(workspaces, workspace => exists(workspace.path).pipe(Effect.map(present => ({ path: workspace.path, present }))), {
+      concurrency: 'unbounded',
+    })
     let directory = NoFolderWorkspace.reusablePath({
       root,
       workspaces,

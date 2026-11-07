@@ -23,7 +23,19 @@ interface ThreadGroupHeaderProps {
   readonly checkoutCount?: number
 }
 
-export const ThreadGroupHeader = ({ label, count, collapsed, projectId, className, onToggle, startProjectSession, t, action, icon, checkoutCount }: ThreadGroupHeaderProps) => {
+export const ThreadGroupHeader = ({
+  label,
+  count,
+  collapsed,
+  projectId,
+  className,
+  onToggle,
+  startProjectSession,
+  t,
+  action,
+  icon,
+  checkoutCount,
+}: ThreadGroupHeaderProps) => {
   const createLabel = t('threadSidebarNewChatInProject', { project: label })
   return (
     <div className={cn(className, 'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-2.5')}>

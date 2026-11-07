@@ -17,6 +17,14 @@ const turnEndSchema = Schema.Struct({
 
 const decodeTurnEnd = Schema.decodeUnknownOption(turnEndSchema)
 
+/** A committed Session event as the Host publishes it: only `type` and the end reason are read here. */
+export interface SessionEventReport {
+  readonly type: string
+  readonly seq?: number
+  readonly time?: number
+  readonly data?: unknown
+}
+
 export type SubscriptionFinish = 'completed' | 'aborted' | 'blocked' | 'error' | 'max-tokens'
 
 export type SubscriptionStatus = 'finished' | 'failed' | 'blocked' | 'stopped' | 'truncated' | 'waiting-on-question'
@@ -39,7 +47,7 @@ const clip = (text: string, limit = PREVIEW_CHARS): string => {
 
 export class SubscriptionNoticeModel {
   /** The finish one Session event reports, or null when that event is not a completion worth a notice. */
-  static readonly finishOf = (event: unknown): SubscriptionFinish | null => {
+  static readonly finishOf = (event: SessionEventReport): SubscriptionFinish | null => {
     const parsed = decodeTurnEnd(event)
     if (Option.isNone(parsed)) return null
     const reason = parsed.value.data.reason

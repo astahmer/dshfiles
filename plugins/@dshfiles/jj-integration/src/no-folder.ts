@@ -33,11 +33,7 @@ const reusablePath = (input: {
   readonly presentPaths: ReadonlySet<string>
 }): string | undefined =>
   input.workspaces.find(
-    workspace =>
-      workspace.path !== input.root &&
-      isPath(workspace.path) &&
-      workspace.sessionIds.length === 0 &&
-      input.presentPaths.has(workspace.path),
+    workspace => workspace.path !== input.root && isPath(workspace.path) && workspace.sessionIds.length === 0 && input.presentPaths.has(workspace.path),
   )?.path
 
 /** The no-folder scratch layout: its folder marker, the title a scratch workspace keeps, and which folder a new one reuses. */

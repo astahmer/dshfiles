@@ -62,11 +62,11 @@ const definitions: readonly SettingDefinition[] = [
   },
 ]
 
-const tierLabels: Record<ProjectSettingTier, string> = {
+const tierLabels = {
   file: 'dsh.project.json',
   profile: 'Profile setting',
   'built-in': 'Built-in',
-}
+} satisfies Record<ProjectSettingTier, string>
 
 /** One row per declared key, naming the tier that actually wins so the section never implies a project override store. */
 export const projectSettingRows = (config: ProjectConfig | null): readonly ProjectSettingRow[] =>

@@ -60,7 +60,7 @@ export const subscriptionNoticeHostLayer = Layer.effect(
       deliver: input =>
         Effect.tryPromise({
           try: () => sessions.message({ sessionId: input.sessionId, text: input.text, target: 'next-turn', wake: true }),
-          catch: cause => cause,
+          catch: cause => new ThreadHostCallFailed({ cause }),
         }).pipe(
           Effect.as<DeliveryOutcome>({ delivered: true }),
           Effect.catch(error => Effect.succeed(catchDelivery(error))),

@@ -9,7 +9,7 @@ import {
   type SubscriptionTargetState,
 } from './subscription-notices.js'
 
-const turnEnd = (kind: string, reason?: string): unknown => ({
+const turnEnd = (kind: string, reason?: string) => ({
   type: 'turn/end',
   seq: 12,
   time: 1_000,
