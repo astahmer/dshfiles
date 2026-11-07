@@ -129,10 +129,10 @@ describe('JobPreviewSection', () => {
 
   it('does not re-render the transcript above it per output chunk, and the collapsed card ignores roster offsets', () => {
     const fake = fakeJobs()
-    let parent = 0
+    const parentRender = vi.fn()
     let section = 0
     const Transcript = () => {
-      parent += 1
+      parentRender()
       return (
         <Profiler id="section" onRender={() => (section += 1)}>
           <PluginQueryProvider>
@@ -142,12 +142,12 @@ describe('JobPreviewSection', () => {
       )
     }
     render(<Transcript />)
-    const before = { parent, section }
+    const rendered = () => ({ parent: parentRender.mock.calls.length, section })
+    const before = rendered()
     for (const total of [10, 20, 30]) act(() => fake.publish({ rows: { [SESSION]: [row({ output: { total, earliest: 0 } })] } }))
-    expect({ parent, section }).toEqual(before)
+    expect(rendered()).toEqual(before)
     act(() => fake.publish({ rows: { [SESSION]: [row({ status: 'completed', finishedAt: STARTED_AT + 5_000 })] } }))
-    expect(parent).toBe(before.parent)
-    expect(section).toBe(before.section + 1)
+    expect(rendered()).toEqual({ parent: before.parent, section: before.section + 1 })
     expect(card()?.getAttribute('data-state')).toBe('completed')
   })
 
@@ -169,6 +169,7 @@ describe('JobPreviewSection', () => {
   })
 
   it('links a job owned by another thread to that thread', () => {
+    // SAFETY: the card treats the owner as an opaque id.
     renderCard({ expanded: true }, fakeJobs([row({ owner: 'session-2' as NonNullable<JobView['owner']> })]))
     fireEvent.click(screen.getByRole('button', { name: /previewThread/ }))
     expect(bindings.openThread).toHaveBeenCalledWith('session-2')
@@ -194,6 +195,7 @@ describe('JobPreviewDock', () => {
   const dockCards = () => document.querySelectorAll('[data-dshfiles-live-preview-seat="dock"]')
 
   it('lists running jobs only, and clears as they settle', () => {
+    // SAFETY: the dock treats the job id as an opaque key.
     const fake = renderDock(fakeJobs([row(), row({ id: 'bash-2c3d' as JobView['id'], status: 'completed', finishedAt: STARTED_AT + 1 })]))
     expect(dockCards()).toHaveLength(1)
     act(() => fake.publish({ rows: { [SESSION]: [row({ status: 'completed', finishedAt: STARTED_AT + 1 })] } }))
@@ -223,8 +225,8 @@ describe('JobPreviewDock', () => {
         </PluginQueryProvider>
       </Profiler>,
     )
-    const before = commits
+    commits = 0
     for (const total of [10, 20, 30]) act(() => fake.publish({ rows: { [SESSION]: [row({ output: { total, earliest: 0 } })] } }))
-    expect(commits).toBe(before)
+    expect(commits).toBe(0)
   })
 })

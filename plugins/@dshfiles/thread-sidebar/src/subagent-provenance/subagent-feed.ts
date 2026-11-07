@@ -21,12 +21,27 @@ const TEXT_TAIL = 2_000
 const FLUSH_MS = 150
 
 const tail = (text: string): string => (text.length > TEXT_TAIL ? text.slice(-TEXT_TAIL) : text)
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+/** The wire fields the fold reads; each stays unknown until it is checked. */
+interface WirePayload {
+  readonly chunk?: unknown
+  readonly content?: unknown
+  readonly message?: unknown
+  readonly name?: unknown
+  readonly reason?: unknown
+  readonly text?: unknown
+  readonly type?: unknown
+}
 
-const messageText = (message: unknown): string | undefined => {
-  if (!isRecord(message) || !Array.isArray(message.content)) return undefined
+const isRecord = (value: unknown): value is WirePayload => typeof value === 'object' && value !== null
+
+const isMessage = (value: unknown): value is { readonly content: readonly unknown[] } => isRecord(value) && Array.isArray(value.content)
+const isTextPart = (value: unknown): value is { readonly type: 'text'; readonly text: string } =>
+  isRecord(value) && value.type === 'text' && typeof value.text === 'string'
+
+const messageText = (message: { readonly content: readonly unknown[] }): string | undefined => {
   const text = message.content
-    .flatMap((part: unknown) => (isRecord(part) && part.type === 'text' && typeof part.text === 'string' ? [part.text] : []))
+    .filter(isTextPart)
+    .map(part => part.text)
     .join('\n')
   return text === '' ? undefined : text
 }
@@ -49,7 +64,7 @@ const foldEntry = (feed: SubagentFeed, entry: SessionEventLikeEntry): SubagentFe
       return { ...feed, text: tail(feed.text + chunk.text) }
     }
     case 'assistant/message': {
-      const text = messageText(data.message)
+      const text = isMessage(data.message) ? messageText(data.message) : undefined
       return text === undefined ? feed : { ...feed, text: tail(text) }
     }
     case 'turn/start':

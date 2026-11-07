@@ -10,6 +10,7 @@ type Props = Parameters<typeof SubagentPreviewDock>[0]
 const PARENT = 'session-parent'
 
 const preview = (): SubagentPreviewBindings => ({
+  // SAFETY: the preview only prints keys, so the identity translator covers every key it asks for.
   t: (key => key) as SubagentPreviewBindings['t'],
   retainChild: vi.fn(() => ({ ready: new Promise<never>(() => undefined), release: vi.fn() })),
   openChild: vi.fn(),
@@ -36,8 +37,10 @@ const dockProps = (input: { readonly running: readonly string[]; readonly bindin
   return {
     sessionId: PARENT,
     preview: input.bindings ?? preview(),
-    useSessions: ((selector: (value: unknown) => unknown) => selector(list)) as unknown as Props['useSessions'],
-    useSessionStatus: ((selector: (value: unknown) => unknown) => selector(statuses)) as unknown as Props['useSessionStatus'],
+    // SAFETY: the dock reads only these fields of the session list.
+    useSessions: selector => selector(list as never),
+    // SAFETY: the dock reads only `running` of each status.
+    useSessionStatus: selector => selector(statuses as never),
   }
 }
 

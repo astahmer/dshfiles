@@ -12,7 +12,7 @@ export type ToolMetaComponent = ComponentType<{ readonly owner: ToolCallOwnerPro
 /** What the frame renders around each call: the timing line, and what other plugins add under the card. */
 export interface ToolCallFrameParts {
   readonly Meta: ToolMetaComponent
-  readonly Sections?: ComponentType<{ readonly owner: ToolCallOwnerProps; readonly sessionId: string }>
+  readonly Sections?: ComponentType<{ readonly owner: ToolCallOwnerProps; readonly sessionId: string }> | undefined
 }
 
 /** Every wrapper this module made, so a re-registration is wrapped once and dispose can tell ours apart. */
@@ -94,7 +94,7 @@ export const installToolCallTreeWrapper = (input: ToolCallFrameParts & { readonl
     entry.component = wrapToolCallTree({
       tree: entry.component as ComponentType<ToolTreeProps>,
       Meta: input.Meta,
-      ...(input.Sections === undefined ? {} : { Sections: input.Sections }),
+      Sections: input.Sections,
     })
   }
   wrap()

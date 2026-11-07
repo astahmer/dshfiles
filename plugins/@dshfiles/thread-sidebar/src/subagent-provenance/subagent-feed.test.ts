@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSubagentFeedStore, SubagentFeedModel } from './subagent-feed.js'
 
 // SAFETY: fixture events carry only what the fold reads.
-const entry = (type: string, data: unknown): SessionEventLikeEntry =>
+const entry = <Data>(type: string, data: Data): SessionEventLikeEntry =>
   ({ type: 'event', event: { type, data, seq: 1, time: 1 } }) as unknown as SessionEventLikeEntry
 const chunk = (text: string) => entry('assistant/live-chunk', { chunk: { type: 'text-delta', index: 0, text } })
 

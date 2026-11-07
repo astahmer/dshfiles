@@ -32,6 +32,7 @@ const translate: Props['t'] = key => {
 }
 
 const previewBindings = (overrides: Partial<SubagentPreviewBindings> = {}): SubagentPreviewBindings => ({
+  // SAFETY: the preview only prints keys, so the identity translator covers every key it asks for.
   t: (key => key) as SubagentPreviewBindings['t'],
   retainChild: vi.fn(() => ({ ready: new Promise<never>(() => undefined), release: vi.fn() })),
   openChild: vi.fn(),
@@ -79,9 +80,10 @@ const props = ({
   useWorkspaces: unused,
   usePanelInfo: unused,
   useResource: unused,
-  useSessions: ((selector: (list: { byId: Record<string, never> }) => unknown) => selector({ byId: {} })) as unknown as Props['useSessions'],
-  useSessionStatus: ((selector: (statuses: ReadonlyMap<string, never>) => unknown) =>
-    selector(new Map<string, never>())) as unknown as Props['useSessionStatus'],
+  // SAFETY: the row reads only `byId` of the session list.
+  useSessions: selector => selector({ byId: {} } as never),
+  // SAFETY: an empty status map holds nothing to misread.
+  useSessionStatus: selector => selector(new Map<string, never>() as never),
   useSessionRetainInfo: unused,
   useChat: unused,
   useConversation: unused,
@@ -120,16 +122,17 @@ const settled = (input: {
     content: [{ type: 'text', text: input.isError === true ? 'no route' : `started subagent ${CHILD}` }],
     isError: input.isError === true,
   } as unknown as Extract<Props, { phase: 'result' }>['block']
+  const statuses = new Map([[CHILD, { running: input.running === true }]])
+  const list = { byId: { [CHILD]: { projectionValues: { subagentTiming: { lastTurnCompleted: input.lastTurnCompleted } } } } }
+  // SAFETY: `base` is the start-phase fixture; this swaps it to the result phase with the block built above.
   return {
     ...base,
     phase: 'result',
     block,
-    useSessionStatus: ((selector: (statuses: ReadonlyMap<string, { running: boolean }>) => unknown) =>
-      selector(new Map([[CHILD, { running: input.running === true }]]))) as unknown as Props['useSessionStatus'],
-    useSessions: ((selector: (list: unknown) => unknown) =>
-      selector({
-        byId: { [CHILD]: { projectionValues: { subagentTiming: { lastTurnCompleted: input.lastTurnCompleted } } } },
-      })) as unknown as Props['useSessions'],
+    // SAFETY: the row reads only `running` of each status.
+    useSessionStatus: selector => selector(statuses as never),
+    // SAFETY: the row reads only `projectionValues` of a listed session.
+    useSessions: selector => selector(list as never),
     preview: input.preview ?? previewBindings(),
   } as Props
 }
