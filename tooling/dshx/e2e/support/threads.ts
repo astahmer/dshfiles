@@ -34,14 +34,23 @@ export const registerWorkspaceFolder = async (page: Page, path: string, open: (p
   }).toPass({ timeout: 20_000 })
   await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
   await expect(picker).toBeHidden()
-  // Picking a folder now opens the folder-inspection step. Journeys that only need a project take the plain-folder
-  // choice; a folder that already is a repository keeps its own option.
+  // Picking a folder opens the folder-inspection step, which says what the folder is before anything is registered.
+  // A journey that only needs the project takes the plain choice; a repository keeps its own "Add project", and a Git
+  // checkout with Jujutsu available additionally offers to enable it, which is not this helper's decision to make.
   const setup = page.getByRole('dialog', { name: `Add ${basename(path)}`, exact: true })
-  const asked = await setup.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)
-  if (asked) {
-    await setup.getByRole('button', { name: 'Add without a repository', exact: true }).click()
+  const asked = await setup
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false)
+  if (!asked) return
+  for (const name of ['Add project', 'Add without a repository', 'Enable Jujutsu and add']) {
+    const button = setup.getByRole('button', { name, exact: true })
+    if ((await button.count()) === 0) continue
+    await button.click()
     await expect(setup).toBeHidden()
+    return
   }
+  throw new Error(`The setup step offered no way to register ${path}.`)
 }
 
 /** Send a message from whichever composer is on screen and wait until that turn settles. */
@@ -68,7 +77,10 @@ export const selectModelForNewThread = async (page: Page, model: string): Promis
 
 /** Start a New thread in a project or register an absolute folder path, then choose its model. */
 export const startThreadWithModel = async (page: Page, input: { readonly project: string; readonly model: string }): Promise<void> => {
-  await page.getByRole('button', { name: /^New (session|thread)$/ }).first().click()
+  await page
+    .getByRole('button', { name: /^New (session|thread)$/ })
+    .first()
+    .click()
   await expect(page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })).toBeVisible()
   const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
   const expectedProject = input.project.startsWith('/') ? basename(input.project) : input.project

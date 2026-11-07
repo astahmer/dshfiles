@@ -5,10 +5,8 @@ Feature: Verification evidence projection
   @scenario:activity-timeline.verification-receipts
   @scenario:project-checks.activity-projection
   Scenario: Manual outcomes stay factual through navigation and a Host restart
-    Given the isolated plugin composition of "@dshfiles/activity-timeline, @dshfiles/project-checks, @dshfiles/workspace-folder-picker" is booted
-    When a trusted root holds a jj project and a sibling folder sits outside it
-    And the profile trusts the Activity Timeline manual evidence actions
-    And a thread is started in the "project" folder
+    Given the isolated plugin composition of "@dshfiles/activity-timeline, @dshfiles/project-checks, @dshfiles/workspace-folder-picker" is booted with the Activity Timeline manual evidence actions
+    When a thread is started in the "project" folder
     And "Manual pass" is run from the panel
     And "Manual failure" is run from the panel
     And "Manual timeout" is run from the panel
