@@ -10,7 +10,7 @@ import { Connectors } from '../src/connectors/connectors.js'
 import type { Gateway, RemoteEventOutcome } from '../src/connectors/gateway.js'
 import { RemoteRequestFailed } from '../src/errors.js'
 import { HostDirectory } from '../src/host-directory.js'
-import { interactionGone, RemoteInteractions } from '../src/remote-interactions.js'
+import { interactionGone, nextReconnectMillis, RemoteInteractions } from '../src/remote-interactions.js'
 import { RuntimePool } from '../src/runtime-pool.js'
 import { dataLayer } from './fixtures/data-runtime.js'
 
@@ -263,6 +263,27 @@ describe('RemoteInteractions', () => {
       }),
     ),
   )
+
+  it.live('opens a stream for a runtime a browser asks about, without any thread being followed', () =>
+    settled(runtime =>
+      Effect.gen(function* () {
+        const interactions = yield* RemoteInteractions
+        yield* interactions.watch([runtimeId])
+        yield* eventually(Ref.get(runtime.streams), count => count === 1)
+        yield* runtime.send(approval('event-1'))
+        yield* eventually(interactions.list, rows => rows.length === 1)
+        yield* interactions.watch([runtimeId])
+        expect(yield* Ref.get(runtime.streams)).toBe(1)
+      }),
+    ),
+  )
+
+  it('backs off while a runtime keeps failing and starts over after a healthy connection', () => {
+    expect(nextReconnectMillis({ previousMillis: 3_000, connectedMillis: 50 })).toBe(6_000)
+    expect(nextReconnectMillis({ previousMillis: 48_000, connectedMillis: 50 })).toBe(60_000)
+    expect(nextReconnectMillis({ previousMillis: 60_000, connectedMillis: 50 })).toBe(60_000)
+    expect(nextReconnectMillis({ previousMillis: 60_000, connectedMillis: 30_000 })).toBe(3_000)
+  })
 
   it.live('hands on the projection values its follow stream does not carry, and leaves the baseline to that snapshot', () =>
     settled(runtime =>

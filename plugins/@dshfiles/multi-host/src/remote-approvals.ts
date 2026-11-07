@@ -23,7 +23,8 @@ type Decide = (input: {
 
 /** One request the owning runtime holds open, as the composer seat presents it. The owner decides whether it is valid. */
 export class PendingRemoteApproval {
-  readonly kind = 'remote-approval' as const
+  /** Thread lists read this kind: a remote approval waits on the same person a local one does. */
+  readonly kind = 'approval' as const
   readonly key: string
   readonly sessionId: SessionId
   readonly toolName: string

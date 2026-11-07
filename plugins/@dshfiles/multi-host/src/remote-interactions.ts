@@ -8,6 +8,11 @@ import { SchemaFields } from './schema.js'
 /** A reconnect within this window keeps the bridge, so a mirrored Session's stream can drop without losing its claims. */
 const idleTimeToLive = Duration.seconds(30)
 const reconnectDelay = Duration.seconds(3)
+const maxReconnectMillis = 60_000
+/** A stream that stayed up this long was healthy, so its next drop starts the backoff again. */
+const healthyMillis = 30_000
+/** A browser's feed reads at least every 15 seconds; twice that without a read means nobody is looking. */
+const watchWindow = Duration.seconds(45)
 const maxInteractions = 200
 
 /** The frames of the owner's event stream this Host acts on; every other frame decodes to nothing. */
@@ -59,6 +64,13 @@ export const interactionGone = {
   message: 'This request is no longer waiting: it was answered elsewhere, timed out, or the host disconnected. Check the thread before answering again.',
 } as const
 
+/**
+ * How long to wait before reopening a runtime's stream: short after a healthy connection, doubling while it keeps
+ * failing, so an offline host is not dialled every few seconds for as long as a browser is open.
+ */
+export const nextReconnectMillis = (input: { readonly previousMillis: number; readonly connectedMillis: number }): number =>
+  input.connectedMillis >= healthyMillis ? Duration.toMillis(reconnectDelay) : Math.min(input.previousMillis * 2, maxReconnectMillis)
+
 /** One finished projection value at the owning runtime's own event sequence. */
 export interface RemoteProjectionUpdate {
   readonly sessionId: string
@@ -97,7 +109,8 @@ const timedCall = (frame: { readonly request: unknown }): string | undefined =>
  * Questions and approvals of the runtimes whose Sessions this Host mirrors.
  *
  * The owning runtime forwards these waterfalls only to an owner Client it can reach, so this Host becomes one: while a
- * mirrored Session is followed, it opens the runtime's own `$events` stream and holds each request, and an answer goes
+ * mirrored Session is followed, or a browser here reads what remote threads wait on, it opens the runtime's own
+ * `$events` stream and holds each request, and an answer goes
  * back as `$events/result` over that connection. The owner still decides: it accepts a result only for a request it
  * delivered to this client, and the first answer from any Client settles it. Nothing here fabricates a request, and
  * nothing answers `next`, so a request no one here answers stays on the owner for its own UI.
@@ -107,6 +120,8 @@ export class RemoteInteractions extends Context.Service<
   {
     /** Keep the runtime's event stream open for the Scope. */
     readonly hold: (runtimeId: string) => Effect.Effect<void, never, Scope.Scope>
+    /** Keep these runtimes' streams open while someone keeps asking, so a thread that is not open still reports what it waits on. */
+    readonly watch: (runtimeIds: readonly string[]) => Effect.Effect<void>
     /** Every held request, oldest first; a timed question carries what its wait has left right now. */
     readonly list: Effect.Effect<readonly RemoteInteraction[]>
     /** One held request of one Session, when the owner still waits on it. */
@@ -254,8 +269,23 @@ export class RemoteInteractions extends Context.Service<
           ),
         ).pipe(Effect.ensuring(disconnect(runtimeId)), Effect.ignore)
 
+      const followForever = (runtimeId: string) =>
+        Effect.gen(function* () {
+          const delay = yield* Ref.make(Duration.toMillis(reconnectDelay) / 2)
+          return yield* Effect.forever(
+            Effect.gen(function* () {
+              const openedAt = yield* Clock.currentTimeMillis
+              yield* connectOnce(runtimeId)
+              const connectedMillis = (yield* Clock.currentTimeMillis) - openedAt
+              const next = nextReconnectMillis({ previousMillis: yield* Ref.get(delay), connectedMillis })
+              yield* Ref.set(delay, next)
+              yield* Effect.sleep(Duration.millis(next))
+            }),
+          )
+        })
+
       const bridges = yield* RcMap.make({
-        lookup: (runtimeId: string) => Effect.asVoid(Effect.forkScoped(Effect.repeat(connectOnce(runtimeId), Schedule.spaced(reconnectDelay)))),
+        lookup: (runtimeId: string) => Effect.asVoid(Effect.forkScoped(followForever(runtimeId))),
         idleTimeToLive,
       })
 
@@ -283,8 +313,46 @@ export class RemoteInteractions extends Context.Service<
         return { ok: true as const }
       })
 
+      const layerScope = yield* Effect.scope
+      const watched = yield* Ref.make<ReadonlyMap<string, number>>(new Map())
+
+      /** Hold one runtime's stream until nobody has asked about it for a whole window. */
+      const keepWatching = (runtimeId: string) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            yield* RcMap.get(bridges, runtimeId)
+            yield* Effect.repeat(Effect.sleep(watchWindow), {
+              while: () =>
+                Effect.gen(function* () {
+                  const seenAt = (yield* Ref.get(watched)).get(runtimeId) ?? 0
+                  return (yield* Clock.currentTimeMillis) - seenAt < Duration.toMillis(watchWindow)
+                }),
+            })
+          }),
+        ).pipe(
+          Effect.ensuring(
+            Ref.update(watched, current => {
+              const next = new Map(current)
+              next.delete(runtimeId)
+              return next
+            }),
+          ),
+        )
+
+      const watch = (runtimeIds: readonly string[]) =>
+        Effect.gen(function* () {
+          const now = yield* Clock.currentTimeMillis
+          const fresh = yield* Ref.modify(watched, current => {
+            const next = new Map(current)
+            for (const runtimeId of runtimeIds) next.set(runtimeId, now)
+            return [runtimeIds.filter(runtimeId => !current.has(runtimeId)), next] as const
+          })
+          yield* Effect.forEach(fresh, runtimeId => Effect.forkIn(keepWatching(runtimeId), layerScope), { discard: true })
+        })
+
       return RemoteInteractions.of({
         hold: runtimeId => RcMap.get(bridges, runtimeId),
+        watch,
         list,
         find,
         settle,

@@ -694,6 +694,37 @@ Then('the remote question is back in the controlling chat after reconnecting', a
   })
 })
 
+const UNOPENED_QUESTION = 'Which region should the unopened thread use?'
+const UNOPENED_TITLE = 'Unopened question fixture'
+
+When('another remote thread that is not open here asks a question', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+  const call = await hostApi(pairFor(page).manager)
+  const directive = `[[title ${UNOPENED_TITLE}]] [[once call ask_user_question ${JSON.stringify({
+    questions: [{ id: 'region', header: 'Region', question: UNOPENED_QUESTION, options: [{ label: 'Paris' }, { label: 'Tokyo' }] }],
+  })}]]`
+  const started = Schema.decodeUnknownSync(withUnknownProperties({ ok: Schema.Boolean, message: Schema.optional(Schema.String) }))(
+    await call('threadStart', { runtimeId: observation.runtimeId, cwd: observation.folderPath, text: directive, model: { provider: 'commandcode_work', model: 'gpt-6-luna' } }),
+  )
+  expect(started.ok, started.message).toBe(true)
+})
+
+Then('the unopened thread reports it is waiting and its question opens with it', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-unopened-thread-waiting', async () => {
+    await page.getByRole('tab', { name: 'Threads', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Needs you (1)', exact: true })).toBeVisible({ timeout: 45_000 })
+    await page.getByRole('button', { name: new RegExp(UNOPENED_TITLE, 'u') }).first().click()
+    const card = page.locator('[data-question-key]').filter({ hasText: UNOPENED_QUESTION })
+    await expect(card).toBeVisible({ timeout: 30_000 })
+    await card.getByRole('radio', { name: 'Tokyo', exact: true }).click()
+    await card.getByRole('button', { name: 'Submit', exact: true }).click()
+    const fake = fakeCommandCodeFor(page)
+    await expect.poll(() => fake.requests.flatMap(request => request.messages).some(message => message.text.includes('Tokyo') && message.text.includes('region')), { timeout: 30_000 }).toBe(true)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the remote question is dismissed here', async ({ page }: { readonly page: Page }) => {
   await remoteQuestionCard(page).getByRole('button', { name: 'Dismiss all questions', exact: true }).click()
 })
