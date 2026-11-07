@@ -7,7 +7,16 @@ import { AppServicesModel, Command, Dialogs, type DialogsService } from '../src/
 import { PluginHooksModel } from '../src/client/hooks.js'
 import { PluginContextModel, type NativeSlots, type PluginContext } from '../src/client/plugin-context.js'
 import { PluginRuntimeModel } from '../src/client/plugin-runtime.js'
-import { ComposerPill, Panel, PluginDetailBadge, PluginDetailSection, SettingsSection } from '../src/client/registries.js'
+import {
+  ComposerPill,
+  ComposerTool,
+  ComposerTools,
+  Panel,
+  PluginDetailBadge,
+  PluginDetailSection,
+  SettingsSection,
+  type ComposerToolProps,
+} from '../src/client/registries.js'
 import { StoreModel } from '../src/client/store.js'
 import { SettingsSearchEntriesModel } from '../src/settings/section-entries.js'
 import { defineClientPlugin } from '../src/sdk/client.js'
@@ -273,6 +282,34 @@ describe('registries', () => {
     )
     label = undefined
     expect(renderToStaticMarkup(createElement(Frame, { sessionId: 's1' }))).toBe('')
+  })
+
+  it('gives a ComposerTool the same props in the conversation row and in any surface that renders ComposerTools', () => {
+    const { plugin, host } = createPlugin('@test/tool')
+    const seen: ComposerToolProps[] = []
+    const Tool = (props: ComposerToolProps): null => {
+      seen.push(props)
+      return null
+    }
+    plugin.add(ComposerTool, { id: 'late', order: 50, component: () => createElement('i', null, 'late') })
+    plugin.add(ComposerTool, { id: 'early', order: 10, component: Tool })
+    expect(host.registered.map(entry => [entry.name, entry.options.id, entry.options.order])).toEqual([
+      ['conversation.input.left', 'late', 50],
+      ['conversation.input.left', 'early', 10],
+    ])
+
+    const span = { draftRev: 1 }
+    const insertText = vi.fn(() => true)
+    const Row = host.registered[1]?.component as ComponentType<{ readonly sessionId: string; readonly inputActions: unknown }>
+    renderToStaticMarkup(createElement(Row, { sessionId: 's1', inputActions: { captureInsertion: () => span, insertText } }))
+    expect(seen[0]).toMatchObject({ surface: 'conversation', scope: 's1', scopeLabel: 'thread' })
+    expect(seen[0]?.insertText('note')).toBe(true)
+    expect(insertText).toHaveBeenCalledWith('note', span)
+    expect(seen[0]?.hold()).toBeTypeOf('function')
+
+    const surface = { surface: 'test.reply', scope: 'test:1', scopeLabel: 'item', insertText: () => true, hold: () => () => {} }
+    expect(renderToStaticMarkup(createElement(ComposerTools, surface))).toBe('<i>late</i>')
+    expect(seen.at(-1)).toMatchObject({ surface: 'test.reply', scope: 'test:1' })
   })
 
   it('reports an invalid native item instead of throwing from add', () => {

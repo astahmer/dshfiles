@@ -60,6 +60,7 @@ export default defineClientPlugin({
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `Panel`               | main view + sidebar navigation row                                                                                                      |
 | `ComposerAction`      | composer tool row (`placement: 'left' \| 'right'`)                                                                                      |
+| `ComposerTool`        | a tool in **every** composer: the conversation tool row, plus any surface rendering `<ComposerTools>`                                   |
 | `ComposerPill`        | a pill above each session's composer (`conversation.input.dock`) with an optional row menu                                              |
 | `HeaderAction`        | session header actions                                                                                                                  |
 | `SessionRowAccessory` | leading content of each sidebar thread row                                                                                              |
@@ -80,6 +81,18 @@ api.add(ComposerPill, {
     return pending ? { label: 'Waiting for upload', menu: [{ id: 'cancel', title: 'Cancel', run: pending.cancel }] } : undefined
   },
 })
+```
+
+`ComposerTool` is the surface-neutral form of `ComposerAction`: the tool receives `ComposerToolProps`
+(`{ surface, scope, scopeLabel, insertText, hold }`) and never the native slot props, so it runs in any composer. A
+composer that is not the conversation offers tools by rendering `<ComposerTools {...props} />`; a surface that does not
+render it is unchanged. `scope` keys the tool's state: the Session id in a conversation, an owner-prefixed key elsewhere
+(`backlog:item:12`). `hold()` keeps a draft open that would otherwise close when focus leaves it, for as long as the tool
+works outside it; focus returns to the draft after the last release. Bind the component, because another plugin's tree
+renders it:
+
+```ts
+api.add(ComposerTool, { id: 'acme-snippets', order: 40, component: api.bind(SnippetsTool) })
 ```
 
 ### Registries owned plugins render

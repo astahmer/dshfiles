@@ -207,7 +207,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `export { Command, Composer, Dialogs, SessionScreen, Toasts } from ${JSON.stringify(CLIENT_APP_SERVICES_PATH)}`,
           `export { LinkHandler, MarkdownLinks } from ${JSON.stringify(CLIENT_LINKS_PATH)}`,
           `export { Browser, Changes, Files } from ${JSON.stringify(CLIENT_APP_CONTRACTS_PATH)}`,
-          `export { ComposerAction, ComposerPill, FileViewer, HeaderAction, MenuItem, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from ${JSON.stringify(CLIENT_REGISTRIES_PATH)}`,
+          `export { ComposerAction, ComposerPill, ComposerTool, ComposerTools, FileViewer, HeaderAction, MenuItem, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from ${JSON.stringify(CLIENT_REGISTRIES_PATH)}`,
           `export { CommandChords } from ${JSON.stringify(CLIENT_COMMAND_CHORDS_PATH)}`,
           `import { StoreModel } from ${JSON.stringify(CLIENT_STORE_PATH)}`,
           'export const defineStore = StoreModel.define',

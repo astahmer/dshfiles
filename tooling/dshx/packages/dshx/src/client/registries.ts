@@ -1,5 +1,6 @@
 import { createElement, useState, type ComponentType, type ReactNode } from 'react'
 import { BrowserBroker } from './broker.js'
+import { PluginHooksModel } from './hooks.js'
 import { IsolationModel } from './isolation.js'
 import { SettingsSearchEntriesModel, type SettingsSearchEntry } from '../settings/section-entries.js'
 import { PluginContextModel, type NativeSlots } from './plugin-context.js'
@@ -19,6 +20,33 @@ export interface ComposerActionItem {
   readonly placement?: 'left' | 'right'
   readonly order?: number
   readonly component: ComponentType<never>
+}
+
+/**
+ * What a composer lends a tool for one draft. The tool never learns whose composer it is in, so it works in every
+ * surface that renders `ComposerTools`: the conversation composer, Backlog's text boxes, the next one.
+ */
+export interface ComposerToolProps {
+  /** Which composer: `conversation`, or an owner-named surface such as `backlog.reply`. */
+  readonly surface: string
+  /** Stable key of what the draft belongs to: the Session id in a conversation, an owner-prefixed key elsewhere. */
+  readonly scope: string
+  /** The word for that subject in copy: `thread`, `item`, `draft`. */
+  readonly scopeLabel: string
+  /** Insert text at the draft's caret; false when the draft refused it. */
+  insertText(text: string): boolean
+  /** Keep the draft open while the tool works outside it (a popover, a page-wide pick). Call the result to let go; focus returns to the draft after the last hold. */
+  hold(): () => void
+}
+
+/**
+ * A tool every composer offers. Added once, it joins the conversation composer's tool row and any surface rendering
+ * `ComposerTools`. Bind `component` with `plugin.bind`: another plugin's tree renders it.
+ */
+export interface ComposerToolItem {
+  readonly id: string
+  readonly order?: number
+  readonly component: ComponentType<ComposerToolProps>
 }
 
 /** A title-adjacent action in a session's header. */
@@ -127,6 +155,7 @@ export interface PluginDetailItem {
 
 export const Panel = BrowserBroker.defineRegistry<PanelItem>('dshx.panel')
 export const ComposerAction = BrowserBroker.defineRegistry<ComposerActionItem>('dshx.composer-action')
+export const ComposerTool = BrowserBroker.defineRegistry<ComposerToolItem>('dshx.composer-tool')
 export const ComposerPill = BrowserBroker.defineRegistry<ComposerPillItem>('dshx.composer-pill')
 export const MenuItem = BrowserBroker.defineRegistry<MenuRowItem>('dshx.menu-item')
 export const FileViewer = BrowserBroker.defineRegistry<FileViewerItem>('dshx.file-viewer')
@@ -182,6 +211,54 @@ PluginContextModel.registerNativeMount(ComposerAction, ({ item, owner, slots, de
     contribution({ component: item.component, owner, id: `composer-action:${item.id}`, decorate }),
   )
 })
+
+/** The caret mark `captureInsertion` mints and `insertText` takes back; a tool only passes it along. */
+interface ConversationInsertion {
+  readonly draftRev: number
+}
+
+/** The props of a `conversation.input.left` entry a tool reads; only the conversation composer has them. */
+interface ConversationToolProps {
+  readonly sessionId: string
+  readonly inputActions: {
+    captureInsertion(): ConversationInsertion
+    insertText(text: string, span: ConversationInsertion): boolean
+  }
+}
+
+const noHold = (): (() => void) => () => {}
+
+/** The conversation draft never closes behind a tool, so its hold has nothing to do. */
+const conversationTool = (item: ComposerToolItem): ComponentType<ConversationToolProps> => {
+  const Tool = (props: ConversationToolProps): ReactNode =>
+    createElement(item.component, {
+      surface: 'conversation',
+      scope: props.sessionId,
+      scopeLabel: 'thread',
+      insertText: text => props.inputActions.insertText(text, props.inputActions.captureInsertion()),
+      hold: noHold,
+    })
+  Tool.displayName = `ConversationTool(${item.id})`
+  return Tool
+}
+
+PluginContextModel.registerNativeMount(ComposerTool, ({ item, owner, slots, decorate }) => {
+  assertItemId('ComposerTool', item.id)
+  return registerSlot(
+    slots,
+    'conversation.input.left',
+    { id: item.id, order: item.order ?? 100 },
+    contribution({ component: conversationTool(item), owner, id: `composer-tool:${item.id}`, decorate }),
+  )
+})
+
+/** Render every contributed tool for one draft. A surface opts in by rendering this; nothing else changes it. */
+export const ComposerTools = (props: ComposerToolProps): ReactNode => {
+  const tools = [...PluginHooksModel.useRegistry(ComposerTool)].sort((left, right) => (left.order ?? 100) - (right.order ?? 100))
+  return tools.map(tool =>
+    createElement(IsolationModel.isolate(tool.component, { owner: tool.id, id: `composer-tool:${tool.id}` }), { ...props, key: tool.id }),
+  )
+}
 
 interface PillPrimitives {
   readonly Pill: ComponentType<{
