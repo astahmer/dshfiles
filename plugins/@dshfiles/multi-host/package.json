@@ -20,6 +20,10 @@
       "types": "./src/api.ts",
       "default": "./dist/api.js"
     },
+    "./interaction-feed": {
+      "types": "./src/interaction-feed.ts",
+      "default": "./dist/interaction-feed.js"
+    },
     "./destination": {
       "types": "./src/destination/index.ts",
       "default": "./src/destination/index.ts"

@@ -2,7 +2,7 @@ import type { FileUploadValue } from '@deepseek-ai/dsh-client-file-upload/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
-import { defineApi, method as defineMethod, zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import { defineApi, event, method as defineMethod, zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
 import { nativeRpcRequestSchema } from '@dshfiles/dshx/platform/native-rpc'
 import type { NativeRpcRequest as DshxNativeRpcRequest } from '@dshfiles/dshx/platform/native-rpc'
@@ -603,6 +603,62 @@ const checkoutSyncResultSchema = Schema.Struct({
 const checkoutBookmarkSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(128), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/u))
 const checkoutCommitSchema = Schema.String.check(Schema.isPattern(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u))
 
+const remoteQuestionOptionSchema = Schema.Struct({ label: Schema.String, description: Schema.optional(Schema.String) }).pipe(SchemaFields.passthrough)
+const remoteQuestionItemSchema = Schema.Struct({
+  id: Schema.String,
+  question: Schema.String,
+  detail: Schema.optional(Schema.String),
+  header: Schema.optional(Schema.String),
+  options: Schema.optional(Schema.Array(remoteQuestionOptionSchema)),
+  multiSelect: Schema.optional(Schema.Boolean),
+  intent: Schema.optional(Schema.Struct({ kind: Schema.String, approve: Schema.String, callId: Schema.optional(Schema.String) }).pipe(SchemaFields.passthrough)),
+}).pipe(SchemaFields.passthrough)
+
+/** The `user-questions/request` waterfall as the owning runtime forwards it. */
+export const remoteQuestionWireSchema = Schema.Struct({
+  questions: Schema.Array(remoteQuestionItemSchema),
+  wait: Schema.optional(Schema.Struct({ callId: Schema.optional(Schema.String), timed: Schema.optional(Schema.Boolean) }).pipe(SchemaFields.passthrough)),
+}).pipe(SchemaFields.passthrough)
+
+const remoteApprovalFields = {
+  toolName: Schema.String,
+  callId: Schema.optional(Schema.String),
+  reason: Schema.optional(Schema.String),
+  displayReason: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+}
+
+/** The `approval/request` waterfall as the owning runtime forwards it. */
+export const remoteApprovalWireSchema = Schema.Struct(remoteApprovalFields).pipe(SchemaFields.passthrough)
+
+/** One request the owning runtime holds open for a human, as this Host's clients see it. */
+const remoteInteractionSchema = Schema.Struct({
+  id: Schema.String,
+  runtimeId: Schema.String,
+  sessionId: Schema.String,
+  request: Schema.Union([
+    Schema.Struct({
+      kind: Schema.Literal('question'),
+      questions: Schema.Array(remoteQuestionItemSchema),
+      callId: Schema.optional(Schema.String),
+      /** How long the owner's foreground wait still has; absent for a blocking question or a runtime that refused the claim. */
+      remainingMs: Schema.optional(Schema.Number),
+    }),
+    Schema.Struct({ kind: Schema.Literal('approval'), ...remoteApprovalFields }),
+  ]),
+})
+
+const remoteQuestionAnswerSchema = Schema.Struct({
+  answers: Schema.Array(
+    Schema.Struct({
+      id: Schema.String.check(Schema.isMaxLength(256)),
+      selected: Schema.Array(Schema.String.check(Schema.isMaxLength(4096))).check(Schema.isMaxLength(64)),
+      custom: Schema.optional(Schema.String.check(Schema.isMaxLength(100_000))),
+    }),
+  ).check(Schema.isMaxLength(64)),
+})
+
+const interactionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))
+
 const effectMultiHostApi = defineApi({
   id: 'multi-host',
   version: 1,
@@ -850,6 +906,32 @@ const effectMultiHostApi = defineApi({
       input: Schema.Struct({ sessionId: brandedSessionIdSchema }),
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), runtimeId: Schema.NullOr(idSchema) }), failedSchema]),
       description: 'Return the known runtime for a Session already claimed by a source, or null when no runtime is known.',
+    }),
+    sessionInteractions: method({
+      input: Schema.Struct({ sessionId: Schema.optional(sessionIdSchema) }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), interactions: Schema.Array(remoteInteractionSchema) }), failedSchema]),
+      description:
+        'Questions and approvals remote threads are waiting on right now, read from the runtimes this Host is following. A thread that is not open here may hold more on its own host. Read-only.',
+      tool: { name: 'multi_host_session_interactions', readOnly: true, render: compactJson },
+    }),
+    sessionQuestionAnswer: method({
+      input: Schema.Struct({
+        sessionId: sessionIdSchema,
+        /** A question the agent is still waiting on, by the id `sessionInteractions` lists. */
+        interactionId: Schema.optional(interactionIdSchema),
+        /** A question that outlived its wait, by the tool call of its projection row. */
+        callId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))),
+        answer: remoteQuestionAnswerSchema,
+      }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), accepted: Schema.Boolean }), failedSchema]),
+      description:
+        'Answer one question on a remote thread with one answer per question, on the runtime that owns the thread. Call only when the user asked you to give that answer; never choose one yourself.',
+      tool: { name: 'multi_host_answer_question', render: compactJson },
+    }),
+    sessionQuestionDecline: method({
+      input: Schema.Struct({ sessionId: sessionIdSchema, interactionId: interactionIdSchema, reason: Schema.Literals(['cancelled', 'timed-out']) }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true) }), failedSchema]),
+      description: 'End one waiting question on a remote thread without answering it. Not an agent tool: the card calls it when the person cancels or the countdown ends.',
     }),
     sessionJjRepositories: method({
       input: Schema.Struct({ sessionId: sessionIdSchema }),
@@ -1150,6 +1232,12 @@ const effectMultiHostApi = defineApi({
       tool: { name: 'multi_host_remove_runtime', render: compactJson },
     }),
   },
+  events: {
+    interactionsChanged: event({
+      schema: Schema.Struct({}),
+      description: 'What remote threads are waiting on changed. Read sessionInteractions again.',
+    }),
+  },
 })
 
 export type EffectMultiHostApi = typeof effectMultiHostApi
@@ -1162,6 +1250,8 @@ export type DirectoryListing = Schema.Schema.Type<typeof directoryListingSchema>
 export type TranscriptEntry = Schema.Schema.Type<typeof transcriptEntrySchema>
 export type TranscriptWaiting = Schema.Schema.Type<typeof transcriptWaitingSchema>
 export type ModelSelection = Schema.Schema.Type<typeof modelSelectionSchema>
+export type RemoteInteraction = Schema.Schema.Type<typeof remoteInteractionSchema>
+export type RemoteQuestionAnswer = Schema.Schema.Type<typeof remoteQuestionAnswerSchema>
 export type RuntimeSummary = Schema.Schema.Type<typeof runtimeSummarySchema>
 export type WorkspaceSummary = Schema.Schema.Type<typeof workspaceSchema>
 export type SessionSummary = Schema.Schema.Type<typeof sessionSchema>

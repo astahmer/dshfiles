@@ -42,7 +42,8 @@ const nativeResponseSchema = passthrough({
   type: Schema.Literal('server-response'),
   rpcId: Schema.String,
   result: Schema.Union([
-    passthrough({ ok: Schema.Literal(true), value: Schema.Unknown }),
+    // A method with no return value answers `{ ok: true }`: the wire drops the undefined value.
+    passthrough({ ok: Schema.Literal(true), value: Schema.optionalKey(Schema.Unknown) }),
     passthrough({
       ok: Schema.Literal(false),
       error: passthrough({ code: Schema.optional(Schema.String.check(Schema.isMaxLength(128))), message: Schema.String.check(Schema.isMaxLength(8192)) }),
@@ -63,6 +64,8 @@ const isSnapshot = Schema.is(snapshotTypeSchema)
 
 const endpointPattern = /^[A-Za-z][A-Za-z0-9-]*\/[A-Za-z][A-Za-z0-9-]*$/
 const segmentPattern = /^[A-Za-z][A-Za-z0-9-]*$/
+/** The Gateway's own forwarded-event stream and the unary result it pairs with; neither is a Service method. */
+const remoteEventStream = '$events'
 
 const sanitizeRemoteMessage = (message: string): string =>
   message
@@ -95,6 +98,11 @@ export interface StreamRequest {
   readonly args: unknown
 }
 
+/** What this client decided about one forwarded waterfall. `next` is left out: a held request stays with its owner. */
+export type RemoteEventOutcome =
+  | { readonly kind: 'result'; readonly value: JsonValue }
+  | { readonly kind: 'rejected'; readonly error: { readonly name: string; readonly message: string; readonly code: string } }
+
 /** One authenticated connection to a DSH runtime; it lives as long as the Scope it was opened in. */
 export interface Gateway {
   readonly origin: string
@@ -110,6 +118,14 @@ export interface Gateway {
   readonly follow: (request: StreamRequest & { readonly timeout: Duration.Input }) => Effect.Effect<readonly unknown[], GatewayStreamError>
   /** Every item of one long-lived stream until it ends; interrupting the consumer cancels it on the runtime. */
   readonly stream: (request: StreamRequest) => Stream.Stream<unknown, GatewayStreamError>
+  /** This connection as an answering owner client of the runtime: its `ready`, waterfall, cancel and emit frames. */
+  readonly events: Stream.Stream<unknown, GatewayStreamError>
+  /** Settle one waterfall that `events` delivered to the client named by its `ready` frame. */
+  readonly answerEvent: (input: {
+    readonly clientId: string
+    readonly eventId: string
+    readonly outcome: RemoteEventOutcome
+  }) => Effect.Effect<void, GatewayRequestError>
 }
 
 const textOf = (data: WebSocket.RawData): string => {
@@ -122,7 +138,7 @@ const textOf = (data: WebSocket.RawData): string => {
 const frames = (input: { readonly origin: string; readonly cookie: string; readonly request: StreamRequest }) =>
   Stream.callback<unknown, GatewayStreamError>(queue =>
     Effect.gen(function* () {
-      if (!endpointPattern.test(input.request.endpoint)) return yield* new InvalidEndpoint()
+      if (input.request.endpoint !== remoteEventStream && !endpointPattern.test(input.request.endpoint)) return yield* new InvalidEndpoint()
       const url = new URL('/api/remote.mux', input.origin)
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
       const streamId = randomUUID()
@@ -225,15 +241,14 @@ export const connectGateway = Effect.fn('multi-host gateway connect')(function* 
   const origin = transport.origin
 
   /** One span per native runtime request: endpoint and outcome code only, never the arguments or the reply. */
-  const run = (request: NativeRequest): Effect.Effect<unknown, GatewayRequestError> =>
+  const rpc = (request: { readonly namespace: string; readonly method: string; readonly args: unknown }): Effect.Effect<unknown, GatewayRequestError> =>
     Effect.gen(function* () {
-      if (!segmentPattern.test(request.namespace) || !segmentPattern.test(request.method)) return yield* new InvalidEndpoint()
       const rpcId = randomUUID()
       const body = JSON.stringify({ type: 'client-request', rpcId, method: `${request.namespace}/${request.method}`, payload: { args: request.args } })
       if (Buffer.byteLength(body, 'utf8') > maxNativeRequestBytes) return yield* new RequestTooLarge()
       const response = yield* client
         .execute(
-          HttpClientRequest.post(`${origin}/api/${encodeURIComponent(request.namespace)}/${encodeURIComponent(request.method)}`).pipe(
+          HttpClientRequest.post(`${origin}/api/${request.namespace}/${request.method}`).pipe(
             HttpClientRequest.setHeader('cookie', cookie),
             HttpClientRequest.bodyText(body, 'application/json'),
           ),
@@ -249,7 +264,7 @@ export const connectGateway = Effect.fn('multi-host gateway connect')(function* 
       const envelope = decodeNativeResponse(text)
       if (Option.isNone(envelope) || envelope.value.rpcId !== rpcId) return yield* new InvalidResponse()
       const result = envelope.value.result
-      if (result.ok) return result.value
+      if (result.ok) return 'value' in result ? result.value : undefined
       return yield* new RemoteRequestFailed({ code: result.error.code ?? 'remote-error', detail: sanitizeRemoteMessage(result.error.message) })
     }).pipe(
       Effect.tap(() => Effect.annotateCurrentSpan('multi_host.outcome', 'ok')),
@@ -264,6 +279,12 @@ export const connectGateway = Effect.fn('multi-host gateway connect')(function* 
         },
       }),
     )
+
+  const run = (request: NativeRequest): Effect.Effect<unknown, GatewayRequestError> =>
+    !segmentPattern.test(request.namespace) || !segmentPattern.test(request.method) ? Effect.fail(new InvalidEndpoint()) : rpc(request)
+
+  const answerEvent = (input: { readonly clientId: string; readonly eventId: string; readonly outcome: RemoteEventOutcome }) =>
+    Effect.asVoid(rpc({ namespace: '$events', method: 'result', args: { clientId: input.clientId, eventId: input.eventId, outcome: input.outcome } }))
 
   const pluginApi = (target: PluginApiTarget) => {
     const call = createDshxApiCaller({ origin, cookie, ...target })
@@ -299,5 +320,7 @@ export const connectGateway = Effect.fn('multi-host gateway connect')(function* 
     pluginApi,
     follow,
     stream: request => frames({ origin, cookie, request }).pipe(Stream.catchTag('StreamClosed', () => Stream.empty)),
+    events: frames({ origin, cookie, request: { endpoint: remoteEventStream, args: {} } }).pipe(Stream.catchTag('StreamClosed', () => Stream.empty)),
+    answerEvent,
   } satisfies Gateway
 })

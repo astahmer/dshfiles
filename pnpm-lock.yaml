@@ -8234,6 +8234,9 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
+      '@dshfiles/multi-host':
+        specifier: workspace:*
+        version: link:../multi-host
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.20

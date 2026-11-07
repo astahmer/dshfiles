@@ -54,6 +54,7 @@ describe('multi-host tool exposure', () => {
   test('every remote/host action a human can take is a named tool', () => {
     const tools = Object.values(multiHostApi.methods).flatMap(method => (method.tool === undefined ? [] : [method.tool]))
     expect(tools.map(tool => tool.name).sort()).toEqual([
+      'multi_host_answer_question',
       'multi_host_browse',
       'multi_host_checkout_sync',
       'multi_host_clone_project',
@@ -82,6 +83,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_runtime_logs',
       'multi_host_runtime_status',
       'multi_host_save_ssh_host',
+      'multi_host_session_interactions',
       'multi_host_session_jj_repositories',
       'multi_host_set_host_hidden',
       'multi_host_set_host_settings',
@@ -330,6 +332,10 @@ describe('multi-host tool exposure', () => {
     if ('issues' in missingApi) throw new Error('The missing remote API result was rejected.')
     expect(missingApi.value).toMatchObject({ ok: false })
   })
+  test('no tool declines a question for the person it was asked of', () => {
+    expect(multiHostApi.methods.sessionQuestionDecline.tool).toBeUndefined()
+  })
+
   test('inspection stays read-only and every write needs the user to have asked', () => {
     const readOnly = Object.values(multiHostApi.methods)
       .filter(method => method.tool?.readOnly === true)
@@ -348,6 +354,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_resource_snapshot',
       'multi_host_runtime_logs',
       'multi_host_runtime_status',
+      'multi_host_session_interactions',
       'multi_host_session_jj_repositories',
       'multi_host_ssh_hosts',
       'multi_host_status',

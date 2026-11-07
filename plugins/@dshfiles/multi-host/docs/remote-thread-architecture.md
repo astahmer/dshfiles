@@ -155,7 +155,7 @@ the owning runtime before forwarding.
 | ------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | **A. Embed the host's own client** in the remote panel                                | 100%, forever                 | No: the host's own plugins act                              | none               | small: iframe on the stable loopback origin + `?thread=` consumer + embed chrome hide; probed working (token→cookie→UI) |
 | **B. Port capabilities into the local remote composer**                               | partial, per feature          | Yes, for the ported ones                                    | a second composer  | each feature needs a remote endpoint; never converges                                                                   |
-| **C. Give the data plane an environment dimension** (this is what bb/t3code/Codex do) | 100% (native composer + chat) | Yes, once path services are proxied                         | none               | large: session source for remote Sessions, then models/uploads/mentions; approvals stay host-side until waterfall proxy |
+| **C. Give the data plane an environment dimension** (this is what bb/t3code/Codex do) | 100% (native composer + chat) | Yes, once path services are proxied                         | none               | large: session source for remote Sessions, then models/uploads/mentions, then the owner's event stream                |
 
 C splits into two implementations, and one of them is much cheaper here:
 
@@ -238,7 +238,41 @@ foreign, and it goes to the owner, whose `session/attachment-invalid` becomes th
 recovery message. The refusal is `SessionPromptRefused`, which the Session controller shows
 as written (`session-source-port`), and the composer keeps the draft.
 
+## Questions
+
+The owning runtime forwards `user-questions/request` as a waterfall to any owner client
+of its gateway, so this Host becomes one (`remote-interactions.ts`). A runtime's launch
+cookie authenticates as its owner browser peer, which may answer forwarded events: while
+a mirrored Session is followed, the Host opens that runtime's `$events` stream on the
+`/api/remote.mux` socket and holds each request, and an answer goes back as
+`$events/result` over the same peer.
+
+The owner stays the authority. It accepts a result only for a request it delivered to
+that client, and this Host also checks that the request belongs to the Session and that
+the Session controller agrees which runtime owns it. Nothing is fabricated from a
+transcript, and nothing answers `next`: delegation would tell the owner no client wants
+the request, while holding it leaves it for the owner's own UI. A dropped stream forgets
+what it held and the owner delivers it again on the next one.
+
+A timed question claims the owner's wait through `userQuestions/attachWait`, as the
+native client does, and only then reaches a card: a card that mounts without a deadline
+takes focus, and focus freezes a countdown that has not started. A runtime that refuses
+the claim keeps its own timer, and its `cancel` frame ends the card.
+
+Being an owner client has two effects on the owner worth knowing. A client that holds a
+timed question counts down as a second browser would, so its timeout continues the agent
+even while someone takes their time at the host; the question stays answerable. And
+`hasLiveClient` is true while the bridge is open, which only changes how the owner reports
+a `dsh inspect` query with no page attached.
+
+A question that outlived its wait is `continued`, and it comes from the `userQuestions`
+projection. Live projection values travel on `session/control`, which serves one Host's
+own Sessions, so the bridge also follows the runtime's control stream and hands each
+value to the Session controller through `SessionSourceRegistry.publishProjection`. This
+is also what keeps a mirrored thread's other live values, such as its inbox, current
+after the opening snapshot.
+
 ## Remaining boundaries
 
 - `sessionJjRepositories(sessionId)` is read-only status, not a local JJ panel. Per-thread path-scoped JJ reads, workspace mutations and landing are not mirrored; the native thread still offers Host UI.
-- In-client question/approval answers and terminal access are not mirrored. The remote waterfall payload/answer RPC is only delivered to the owner Host's client. The local transcript's open tool-call name is not sufficient authorization to fabricate an answer or approve a call; Host UI is the safe fallback.
+- Approvals and terminal access are not mirrored; Host UI is the fallback.

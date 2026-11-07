@@ -39,6 +39,43 @@ Feature: Multi-host loopback SSH lifecycle
     Then the new thread is owned by the automatically selected remote runtime
     And the picked file is stored by the owning remote host only
 
+  @scenario:multi-host.local-path-refused
+  @scenario:multi-host.remote-question
+  Scenario: A remote agent's question is answered in the controlling chat
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    Then a message naming this machine is refused and keeps its draft
+    When the remote agent asks a question
+    Then the remote question opens in the controlling chat
+    When the remote question is answered "Production" here
+    Then the remote agent receives the answer "Production"
+
+  @scenario:multi-host.remote-question-dismissed
+  Scenario: A remote agent's question is dismissed in the controlling chat
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the remote agent asks a question
+    Then the remote question opens in the controlling chat
+    When the remote question is dismissed here
+    Then the remote agent learns the question was dismissed
+
+  @scenario:multi-host.remote-question-timed
+  Scenario: A remote agent's timed question counts down here and accepts a late answer
+    Given a loopback SSH DSH pair with timed questions is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the remote agent asks a timed question lasting 12 seconds
+    Then the remote question opens in the controlling chat
+    And the remote question counts down with what its owner reports
+    And the remote question stays answerable after its wait ends
+    When the remote question is answered "Production" here
+    Then the remote agent receives the answer "Production"
+
   @scenario:multi-host.host-resources
   Scenario: The Hosts page shows live SSH resource pressure
     Given a loopback SSH DSH pair is booted
