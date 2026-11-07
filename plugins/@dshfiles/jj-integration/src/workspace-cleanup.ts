@@ -2,11 +2,11 @@ import type { ThreadSessionActivity } from './thread-rebase-eligibility.js'
 
 /**
  * `empty` never landed anything; `integrated` landed at least once and has nothing left above the bookmark, or every
- * revision it holds is already on another bookmark; `secondary` is another checkout of the repository; `untracked` is a
- * threads-directory entry no jj workspace owns. A merged-pull-request kind needs the pull-request links, which live in a
- * plugin that already depends on this one; see the cleanup receipt in the plan.
+ * revision it holds is already on another bookmark; `merged` is the same with a merged pull request recorded for one of
+ * its threads; `secondary` is another checkout of the repository; `untracked` is a threads-directory entry no jj
+ * workspace owns.
  */
-export type CleanupKind = 'empty' | 'integrated' | 'secondary' | 'untracked'
+export type CleanupKind = 'empty' | 'integrated' | 'merged' | 'secondary' | 'untracked'
 type WorkspaceKind = Exclude<CleanupKind, 'untracked'>
 
 export type CleanupSkipReason =
@@ -27,6 +27,8 @@ export interface CleanupThread {
   readonly rebasedAt: number | undefined
   readonly sessionIds: readonly string[]
   readonly integrationQueued: boolean
+  /** Merged pull requests recorded for this workspace's threads, as `owner/repo#123`: why a landed workspace is merged. */
+  readonly mergedPullRequests?: readonly string[]
   readonly secondary?: boolean
   readonly missing?: boolean
   readonly workingCopyState?: 'clean' | 'dirty' | 'unknown' | 'missing'
@@ -68,7 +70,14 @@ const decide = (input: {
     if (activity?.running === true || activity?.pendingUserQuestion === true) return skip('busy')
     if (activity?.running === undefined || activity.pendingUserQuestion === undefined) return skip('activity-unknown')
   }
-  const kind: WorkspaceKind = thread.secondary === true ? 'secondary' : thread.rebasedAt === undefined && !onAnotherBookmark ? 'empty' : 'integrated'
+  const kind: WorkspaceKind =
+    thread.secondary === true
+      ? 'secondary'
+      : thread.rebasedAt === undefined && !onAnotherBookmark
+        ? 'empty'
+        : (thread.mergedPullRequests?.length ?? 0) > 0
+          ? 'merged'
+          : 'integrated'
   if (!input.kinds.includes(kind)) return skip('kind-excluded')
   if (input.now - usedAt < input.olderThanMs) return skip('too-recent')
   return { action: 'remove', kind, lastUsedAt: usedAt }
@@ -94,10 +103,11 @@ const isStaleUntracked = (input: {
 
 /**
  * An automatic run has no preview to name a bookmark in, so like `secondary` this stays a manual choice: it never reads
- * them and those workspaces are kept as `has-work`.
+ * them and those workspaces are kept as `has-work`. `merged` needs the same bookmark read plus the merged pull requests,
+ * so it is manual only too.
  */
 const readsBookmarkedWork = (input: { readonly trigger: 'manual' | 'automatic'; readonly kinds: readonly CleanupKind[] }): boolean =>
-  input.trigger === 'manual' && input.kinds.includes('integrated')
+  input.trigger === 'manual' && (input.kinds.includes('integrated') || input.kinds.includes('merged'))
 
 /** Why a kept workspace was kept, in the words the cleanup result and the agent tool report. */
 const skipReasonMessage = (reason: CleanupSkipReason): string => {

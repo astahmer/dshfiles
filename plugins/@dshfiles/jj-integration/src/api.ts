@@ -80,7 +80,7 @@ export const threadWorkspaceName = threadWorkspaceNameEffect
 const cleanupRequestSchema = Schema.Struct({
   path: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
   olderThanHours: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(24 * 90)),
-  kinds: Schema.Array(cleanupKindSchema).check(Schema.isMinLength(1), Schema.isMaxLength(4)),
+  kinds: Schema.Array(cleanupKindSchema).check(Schema.isMinLength(1), Schema.isMaxLength(5)),
   targets: Schema.optional(Schema.Array(cleanupTargetSchema).check(Schema.isMaxLength(500))),
 })
 
@@ -97,7 +97,7 @@ const cleanupWorkspaceSchema = Schema.Struct({
   repoRoot: Schema.String,
   name: Schema.String,
   path: Schema.String,
-  kind: Schema.Literals(['empty', 'integrated', 'secondary']),
+  kind: Schema.Literals(['empty', 'integrated', 'merged', 'secondary']),
   lastUsedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   missing: Schema.Boolean,
   /** Other bookmarks that each hold all of this workspace's work: why a workspace with revisions is removable. */

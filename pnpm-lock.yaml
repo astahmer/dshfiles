@@ -5290,6 +5290,9 @@ importers:
       '@dshfiles/jj-cli':
         specifier: workspace:*
         version: link:../jj-cli
+      '@dshfiles/jj-integration':
+        specifier: workspace:*
+        version: link:../jj-integration
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -7324,6 +7327,9 @@ importers:
       '@dshfiles/workbench':
         specifier: workspace:*
         version: link:../workbench
+      '@dshfiles/workspace-folder-picker':
+        specifier: workspace:*
+        version: link:../workspace-folder-picker
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.1.0(effect@4.1.0)(redis@6.3.1)
