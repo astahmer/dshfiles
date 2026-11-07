@@ -12,6 +12,7 @@ import { bootComposedPluginProfile } from '../boot.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion, visitIsolatedPluginProfile, settingsNavEntry } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, selectModelForNewThread, sendMessage } from '../threads.js'
 import { ThreadSidebarJourney } from '../thread-list-grouping.js'
+import { primaryModifierFor } from './platform-modifier.js'
 
 const MAIN_LAYOUT_KEY = 'dshfiles.workbench.layout.v1'
 const DOCK_LAYOUT_KEY = 'dshfiles.workbench.dock-layout.v1'
@@ -255,6 +256,108 @@ Then('the bottom panel shows the Jujutsu panel and the dock no longer does', asy
     await expect(bottomRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toBeVisible()
     await expect(dockRegion(page).getByRole('region', { name: viewNamePattern('Jujutsu') })).toHaveCount(0)
   })
+})
+
+/** The chord the bottom-panel command answers to: platform primary plus J. */
+const TERMINAL_KEY_ATTRIBUTE = 'data-journey-terminal-keys'
+
+const pressBottomPanelChord = async (page: Page): Promise<void> => {
+  await page.keyboard.press(`${await primaryModifierFor(page)}+KeyJ`)
+}
+
+const focusNothing = (page: Page): Promise<void> =>
+  page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  })
+
+Then('the bottom panel is closed', async ({ page }: { page: Page }) => {
+  await expect(bottomRegion(page)).toHaveCount(0)
+})
+
+When('the platform primary+J chord is pressed outside every text field', async ({ page }: { page: Page }) => {
+  await focusNothing(page)
+  await pressBottomPanelChord(page)
+})
+
+Then('the keyboard shortcut opens the bottom panel', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'workbench-bottom-panel-opens-from-the-keyboard', async () => {
+    await expect(bottomRegion(page)).toBeVisible()
+    await expect(chooserIn(bottomRegion(page))).toBeVisible()
+  })
+})
+
+When('a terminal owns the keyboard and the platform primary+J chord is pressed', async ({ page }: { page: Page }) => {
+  await page.evaluate(attribute => {
+    // Only the DOM shape xterm presents matters here: its hidden textarea inside the
+    // `.xterm` root is what the Host adapter calls a terminal region.
+    const terminal = document.createElement('div')
+    terminal.className = 'xterm'
+    terminal.dataset.journeyTerminal = ''
+    terminal.style.cssText = 'position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:0;'
+    const input = document.createElement('textarea')
+    input.className = 'xterm-helper-textarea'
+    terminal.append(input)
+    document.body.append(terminal)
+    document.body.setAttribute(attribute, '0')
+    // A chord the capture listener claims stops at the window, so reaching this
+    // target is the proof that the terminal kept its key.
+    input.addEventListener('keydown', event => {
+      document.body.setAttribute(attribute, '1')
+      event.preventDefault()
+    })
+    input.focus()
+  }, TERMINAL_KEY_ATTRIBUTE)
+  await pressBottomPanelChord(page)
+})
+
+Then('the keyboard shortcut leaves the bottom panel open and reaches the terminal', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'workbench-bottom-panel-chord-keeps-the-terminal-key', async () => {
+    await expect(bottomRegion(page)).toBeVisible()
+    await expect(page.locator('body')).toHaveAttribute(TERMINAL_KEY_ATTRIBUTE, '1')
+  })
+})
+
+When('the terminal fragment is removed and the platform primary+J chord is pressed', async ({ page }: { page: Page }) => {
+  await page.evaluate(attribute => {
+    document.querySelector('[data-journey-terminal]')?.remove()
+    document.body.removeAttribute(attribute)
+  }, TERMINAL_KEY_ATTRIBUTE)
+  await focusNothing(page)
+  await pressBottomPanelChord(page)
+})
+
+Then('the keyboard shortcut closes the bottom panel', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'workbench-bottom-panel-closes-from-the-keyboard', async () => {
+    await expect(bottomRegion(page)).toHaveCount(0)
+  })
+})
+
+const BOTTOM_PANEL_COMMAND_TITLE = 'Toggle the bottom panel'
+
+When('the bottom-panel shortcut is rebound to primary+Shift+J in Keyboard shortcuts', async ({ page }: { page: Page }) => {
+  const primary = await primaryModifierFor(page)
+  await page.keyboard.press(`${primary}+Slash`)
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: `Edit shortcut for ${BOTTOM_PANEL_COMMAND_TITLE}` }).click()
+  await expect(dialog.getByText('Press a shortcut')).toBeVisible()
+  await page.keyboard.press(`${primary}+Shift+KeyJ`)
+  await expect(dialog.getByText('1 customized')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+})
+
+Then('the rebound chord toggles the bottom panel and the default chord no longer does', async ({ page }: { page: Page }) => {
+  const primary = await primaryModifierFor(page)
+  await focusNothing(page)
+  // The user binding replaces the command's own keys in the capture listener.
+  await page.keyboard.press(`${primary}+Shift+KeyJ`)
+  await recordAssertion(page, 'workbench-bottom-panel-opens-from-the-user-binding', () => expect(bottomRegion(page)).toBeVisible())
+  await page.keyboard.press(`${primary}+KeyJ`)
+  await recordAssertion(page, 'workbench-bottom-panel-drops-its-default-chord', () => expect(bottomRegion(page)).toBeVisible())
+  await page.keyboard.press(`${primary}+Shift+KeyJ`)
+  await recordAssertion(page, 'workbench-bottom-panel-closes-from-the-user-binding', () => expect(bottomRegion(page)).toHaveCount(0))
+  await finishJourneyAssertions(page)
 })
 
 When('the Jujutsu tab is dragged from the dock into the bottom panel', async ({ page }: { page: Page }) => {

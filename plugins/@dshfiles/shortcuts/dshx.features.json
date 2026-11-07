@@ -67,13 +67,13 @@
     {
       "id": "panel-selection-chords",
       "title": "Select native panels with keyboard shortcuts",
-      "summary": "Use primary+N and primary+comma to select the declared panel target while respecting editable fields, IME composition, repeat, and prior event claims.",
+      "summary": "Use primary+N and primary+comma to select the declared panel target while respecting editable fields, IME composition, repeat, terminal ownership, and prior event claims. A chord the shell reads inside xterm opts out of the terminal.",
       "surfaces": ["client", "integration"],
       "surface": "command",
       "destination": "none",
       "currentSurface": "keyboard: Mod+N / Mod+,",
       "configuration": [],
-      "states": ["panel-selected", "editable-target", "unclaimed", "disposed"],
+      "states": ["panel-selected", "editable-target", "terminal-target", "unclaimed", "disposed"],
       "failureModes": ["Extra Alt or Shift modifiers do not trigger a shortcut.", "Disposal unregisters the capture handler."],
       "externalDependencies": [],
       "verification": [
@@ -93,6 +93,24 @@
           "id": "shortcuts.panel-selection-chords-unit-dispose-handler",
           "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
           "testName": "stops listening once disposed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.panel-selection-chords-unit-terminal-region",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "resolves the terminal before the text field it holds, then editable, then page"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.panel-selection-chords-unit-terminal-opt-out",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "leaves the key to the shell when the chord opts out of the terminal"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.panel-selection-chords-unit-terminal-opt-in",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "keeps claiming the chord in the terminal when it does not opt out"
         }
       ],
       "telemetry": [

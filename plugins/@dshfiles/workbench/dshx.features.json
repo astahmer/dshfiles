@@ -947,7 +947,7 @@
     {
       "id": "global-dock",
       "title": "Keep one docking surface in the right column and a bottom panel",
-      "summary": "Only main Pane options offers Open right pane while closed; the original sidebar shortcut drives that same full-height pane. Right/bottom panes have their own far-right Close pane icons; no centre Close right pane action exists. Hidden panes retain views and drafts. Empty right/bottom panes use the New tab chooser. Named layouts restore every region; native resource lifetimes stay with their declarer.",
+      "summary": "Only main Pane options offers Open right pane while closed; the original sidebar shortcut drives that same full-height pane. Right/bottom panes have their own far-right Close pane icons; no centre Close right pane action exists. Hidden panes retain views and drafts. Empty right/bottom panes use the New tab chooser. The bottom row also toggles from platform primary+J, delivered by the capture-phase shortcut plugin because the browser owns that chord, and rebindable through its Settings › Shortcuts row. Named layouts restore every region; native resource lifetimes stay with their declarer.",
       "reach": [
         "click button \"Collapse sidebar\"",
         "click button \"Pane options\"",
@@ -972,10 +972,10 @@
           "defaultValue": "hidden",
           "constraints": "One of hidden or shown; applies live to the bottom row below left and centre, never underneath the full-height right pane.",
           "choices": ["hidden", "shown"],
-          "coveredBy": ["workbench.bottom-panel"]
+          "coveredBy": ["workbench.bottom-panel", "workbench.bottom-panel-shortcut"]
         }
       ],
-      "states": ["closed", "dock", "bottom-open", "panel-moved", "layout-saved", "layout-applied", "reloaded"],
+      "states": ["closed", "dock", "bottom-open", "keyboard-toggled", "panel-moved", "layout-saved", "layout-applied", "reloaded"],
       "failureModes": [
         "The owned frame must supply the main, right and bottom seats before this plugin activates.",
         "A rejected saved dock layout falls back to an empty tabbed pane; reusable views remain available from its picker.",
@@ -1007,6 +1007,11 @@
         {
           "kind": "gherkin",
           "id": "workbench.bottom-panel",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.bottom-panel-shortcut",
           "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
         {
@@ -1060,6 +1065,18 @@
           "id": "workbench.global-dock-unit-layout-rename",
           "file": "plugins/@dshfiles/workbench/src/saved-layouts.test.ts",
           "testName": "renames in place, keeping the arrangement, and ignores an absent source"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.bottom-panel-shortcut-unit-host-row",
+          "file": "plugins/@dshfiles/workbench/src/bottom-panel-shortcut.test.ts",
+          "testName": "maps its id to the Host shortcut row Settings › Shortcuts edits"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.bottom-panel-shortcut-unit-terminal-opt-out",
+          "file": "plugins/@dshfiles/workbench/src/bottom-panel-shortcut.test.ts",
+          "testName": "keeps the terminal key for the shell it feeds"
         }
       ],
       "telemetry": [

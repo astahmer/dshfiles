@@ -107,6 +107,7 @@ const commandShortcuts = (commands: readonly CommandItem[], keys: ReadonlyMap<st
           modifier: 'primary' as const,
           alsoShift: parsed.alsoShift,
           allowInEditable: command.scope !== 'page',
+          ...(command.allowInTerminal !== undefined && { allowInTerminal: command.allowInTerminal }),
           label: command.title,
           run: () => {
             if (command.enabled === false) return false

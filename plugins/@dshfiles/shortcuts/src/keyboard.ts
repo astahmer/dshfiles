@@ -18,7 +18,13 @@
  *   `Cmd+P` inside a textarea should insert those characters, not open a panel.
  * - A chord already handled by someone else is left alone. DSH's own registry runs
  *   first for anything it owns, and this only claims what nothing else took.
+ * - A chord the terminal reads keeps reaching the shell. `Cmd+J` may toggle the
+ *   bottom panel everywhere else, but `Ctrl+J` is a line feed once xterm owns the
+ *   keyboard, so a command can opt out of the terminal.
  */
+
+/** Which input owner the key event belongs to, named as the Host adapter names them. */
+export type ShortcutRegion = 'page' | 'editable' | 'terminal'
 
 /** `primary` is Meta on macOS and Control everywhere else, matching the Host. */
 export type Modifier = 'primary' | 'control' | 'alt' | 'shift' | 'meta'
@@ -39,6 +45,14 @@ export interface Shortcut {
    * a modified chord cannot type anything, so it is safe to claim anywhere.
    */
   readonly allowInEditable?: boolean
+  /**
+   * Whether the chord still applies while a terminal owns the keyboard.
+   *
+   * Defaults to `true`: a modified chord cannot type anything, and app chords are
+   * expected to work from every surface. A chord the shell itself reads — `Ctrl+J`
+   * is a line feed — sets this to `false` so the key reaches xterm instead.
+   */
+  readonly allowInTerminal?: boolean
   /** Human label for menus and help. */
   readonly label: string
   /** Returning false declines the key: the event goes on to its target as if nothing matched. */
@@ -47,6 +61,9 @@ export interface Shortcut {
 
 const EDITABLE_SELECTOR =
   'input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'
+
+/** xterm's root element, the same owner the Host adapter calls a `terminal` region. */
+const TERMINAL_SELECTOR = '.xterm'
 
 /** Resolve the Host's logical `primary` to the physical modifier for this platform. */
 const isPrimaryHeld = (event: KeyboardEvent, mac: boolean): boolean => (mac ? event.metaKey : event.ctrlKey)
@@ -114,6 +131,13 @@ export class ShortcutKeyboardModel {
     return target.closest(EDITABLE_SELECTOR) !== null
   }
 
+  /** Which input owner the event lands in, in the order the Host resolves it: terminal, then editable, then page. */
+  static readonly regionOf = (target: EventTarget | null): ShortcutRegion => {
+    if (!(target instanceof Element)) return 'page'
+    if (target.closest(TERMINAL_SELECTOR) !== null) return 'terminal'
+    return ShortcutKeyboardModel.isEditableTarget(target) ? 'editable' : 'page'
+  }
+
   /**
    * Whether this event is exactly this chord.
    *
@@ -143,13 +167,18 @@ export const installShortcuts = (target: Window, shortcuts: readonly Shortcut[])
     // Someone already handled it, a composition is in flight, or the key is being
     // auto-repeated: none of these are a fresh command.
     if (event.defaultPrevented || event.isComposing || event.repeat) return
-    // A modified chord cannot insert text, so it is claimed even from a text
-    // field. Without this the guard below would swallow every chord aimed at the
-    // composer, which is where focus actually is.
-    const inEditable = ShortcutKeyboardModel.isEditableTarget(event.composedPath().find(node => node instanceof Element) ?? null)
+    // The region decides which guards apply: xterm's hidden textarea is a text
+    // field, so it is named a terminal first and the editable rule never sees it.
+    const region = ShortcutKeyboardModel.regionOf(event.composedPath().find(node => node instanceof Element) ?? null)
     for (const shortcut of shortcuts) {
       if (!ShortcutKeyboardModel.matchesShortcut(event, shortcut, mac)) continue
-      if (inEditable && shortcut.allowInEditable !== true) continue
+      // A modified chord cannot insert text, so it is claimed even from a text
+      // field. Without this the guard below would swallow every chord aimed at the
+      // composer, which is where focus actually is.
+      if (region === 'editable' && shortcut.allowInEditable !== true) continue
+      // The terminal forwards an unclaimed key to its shell, so only a chord that
+      // opts into the terminal is claimed there.
+      if (region === 'terminal' && shortcut.allowInTerminal !== true) continue
       if (shortcut.run(event) === false) continue
 
       // Both calls are needed: preventDefault stops the browser's own binding,
