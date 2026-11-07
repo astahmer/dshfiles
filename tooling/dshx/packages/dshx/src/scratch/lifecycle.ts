@@ -23,6 +23,25 @@ export interface DoctorCheck {
 
 const HOST_ERROR_LINE = /did not activate|\berror\b|\bfailed\b|EADDRINUSE|unhandled/i
 
+export interface BundleActivationExpectations {
+  /** Bundles the Host's plugin list must name as active entries. */
+  readonly expectedEntries: readonly string[]
+  /** Bundles under test a seed row composes from inside another row, so the list can never name them. */
+  readonly composedByAnotherRow: readonly string[]
+}
+
+/**
+ * Which bundles under test expect an active Loader entry, and which the seed composes from inside another row. A
+ * bundle with an empty `cordis.patch.yml` is an agent-preset child (`@dshfiles/tool-ask-user`), so the Host's plugin
+ * list can never name it and demanding an entry for it fails every scratch.
+ */
+export class ScratchActivation {
+  static readonly expectations = (state: Pick<ScratchState, 'bundles' | 'expectedEntries'>): BundleActivationExpectations => {
+    const expectedEntries = state.expectedEntries ?? state.bundles
+    return { expectedEntries, composedByAnotherRow: state.bundles.filter(bundle => !expectedEntries.includes(bundle)) }
+  }
+}
+
 /**
  * Read-only: never restarts, navigates or writes anything. Any command that touches an instance answers its pending
  * warning first, so the doctor is handed what it answered to report instead of printing an already-cancelled warning.
@@ -101,13 +120,19 @@ export const scratchDoctor = async (options: { readonly state: ScratchState; rea
   if (plugins !== undefined) {
     const broken = plugins.filter(plugin => plugin.enabled && (plugin.phase === 'failed' || plugin.phase === 'pending'))
     const loadedModules = plugins.filter(plugin => plugin.phase === 'active').map(plugin => plugin.moduleName)
-    const missing = state.bundles.filter(bundle => !loadedModules.some(moduleName => moduleName === bundle || moduleName.startsWith(`${bundle}/`)))
+    const { expectedEntries, composedByAnotherRow } = ScratchActivation.expectations(state)
+    const missing = expectedEntries.filter(bundle => !loadedModules.some(moduleName => moduleName === bundle || moduleName.startsWith(`${bundle}/`)))
     const ok = broken.length === 0 && missing.length === 0
     checks.push({
       id: 'plugins',
       ok,
       detail: ok
-        ? `${loadedModules.length} active entries; all ${state.bundles.length} bundles under test loaded`
+        ? [
+            `${String(loadedModules.length)} active entries; all ${String(expectedEntries.length)} bundle rows under test loaded`,
+            composedByAnotherRow.length === 0 ? '' : `${composedByAnotherRow.join(', ')} composed by an agent-preset row`,
+          ]
+            .filter(Boolean)
+            .join('; ')
         : [
             broken.length > 0 ? `not active: ${broken.map(plugin => `${plugin.id} (${plugin.phase})`).join(', ')}` : '',
             missing.length > 0 ? `no active entry: ${missing.join(', ')}` : '',

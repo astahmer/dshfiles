@@ -36,7 +36,16 @@ export interface LocalBootBundle extends BootProfileBundle {
   readonly clientExternalPackages: readonly string[]
   /** Declares @dshfiles/plugin-ui, so its client renders plugin-ui classes that only the shared sheet defines. */
   readonly usesPluginUi: boolean
+  /**
+   * Its `cordis.patch.yml` contributes at least one top-level Loader row of its own. A bundle that declares none
+   * (`[]`) is installed for a row another package composes: an agent-preset child such as `@dshfiles/tool-ask-user`
+   * never appears in the Host's plugin list, so only the bundles with rows are expected as active entries.
+   */
+  readonly composesLoaderRows: boolean
 }
+
+/** A top-level patch entry (`- id:`, `- insert:`) owns rows; `[]`, comments or an indented-only file owns none. */
+const declaresLoaderRows = (patch: string): boolean => patch.split(/\r?\n/u).some(line => /^- /.test(line))
 
 /** Owned Cordis bundles under plugins/@dshfiles, sorted by package id. */
 const listLocalBootBundles = async (options: { readonly pluginsRoot?: string } = {}): Promise<LocalBootBundle[]> => {
@@ -57,12 +66,14 @@ const listLocalBootBundles = async (options: { readonly pluginsRoot?: string } =
     const manifest = Schema.decodeUnknownSync(PackageManifest)(rawManifest)
     if (manifest.dsh === undefined) continue
     const dsh = Schema.decodeUnknownSync(DshManifest)(manifest.dsh)
+    const patch = await readFile(join(projectRoot, 'cordis.patch.yml'), 'utf8').catch(() => undefined)
     bundles.push({
       projectRoot,
       packageId: manifest.name,
       hasClient: dsh.client !== undefined,
       clientExternalPackages: dsh.client?.external ?? [],
       usesPluginUi: Object.keys({ ...manifest.dependencies, ...manifest.devDependencies, ...manifest.peerDependencies }).includes('@dshfiles/plugin-ui'),
+      composesLoaderRows: patch !== undefined && declaresLoaderRows(patch),
     })
   }
   return bundles.sort((first, second) => first.packageId.localeCompare(second.packageId))
