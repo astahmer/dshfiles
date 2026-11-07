@@ -867,6 +867,41 @@ When('the thread is integrated from this client', async ({ page }: { readonly pa
   await page.getByRole('button', { name: 'Land this thread on main', exact: true }).click()
 })
 
+When('the thread is landed from the Land page', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  const row = page.locator('article, li').filter({ hasText: basename(journey.threadPath) }).first()
+  await expect(async () => {
+    await page.reload()
+    await page.getByRole('tab', { name: 'Land', exact: true }).click()
+    await page.getByRole('button', { name: /^Workspaces/u }).first().click()
+    await expect(row).toBeVisible({ timeout: 6_000 })
+  }).toPass({ timeout: 60_000 })
+  await row.getByRole('button', { name: 'Land', exact: true }).click()
+})
+
+Then('the work reached the remote main bookmark', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await recordAssertion(page, 'multi-host-remote-land-page', async () => {
+    await expect.poll(() => runScratchJj(journey.repository, 'log', '--no-graph', '-r', 'main', '-T', 'description'), { timeout: 30_000 }).toContain(journey.description)
+  })
+})
+
+Then('the workspace is removed from the Land page', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await recordAssertion(page, 'multi-host-remote-land-discard', async () => {
+    // A landed workspace leaves the default "Needs you" filter.
+    await page.getByRole('button', { name: 'All', exact: true }).first().click()
+    await page.getByRole('button', { name: `More actions for ${basename(journey.threadPath)}`, exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Remove workspace…', exact: true }).click()
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Remove workspace and folder', exact: true }).click()
+    await expect.poll(() => existsSync(journey.threadPath), { timeout: 30_000 }).toBe(false)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the work is on the remote main bookmark', async ({ page }: { readonly page: Page }) => {
   const journey = remoteJjJourneys.get(page)
   if (journey === undefined) throw new Error('The remote JJ journey has no thread.')

@@ -886,6 +886,11 @@
           "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "multi-host.remote-land-page",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "multi-host.jj-path-scope",
           "file": "plugins/@dshfiles/multi-host/src/remote-jj-scope.test.ts",
