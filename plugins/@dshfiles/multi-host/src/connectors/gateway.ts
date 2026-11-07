@@ -214,7 +214,9 @@ const pluginApiError = (cause: unknown): PluginApiError => {
   const code = cause instanceof Error && 'code' in cause && typeof cause.code === 'string' ? cause.code : 'api-unreachable'
   if (code === 'api-unreachable') return new ApiUnreachable({ cause })
   if (code === 'authentication-expired') return new AuthenticationExpired()
-  return new RemoteApiFailed({ code: code.slice(0, 128), cause })
+  // The owner wrote this for the person asking; a generic failure would hide why it refused.
+  const detail = cause instanceof Error && cause.message !== '' ? sanitizeRemoteMessage(cause.message) : undefined
+  return new RemoteApiFailed({ code: code.slice(0, 128), cause, ...(detail !== undefined && { detail }) })
 }
 
 /**

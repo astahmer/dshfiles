@@ -1,6 +1,5 @@
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { useApi } from '@dshfiles/dshx/client'
 import { MergeConflictGraph, type MergeRevision } from '@dshfiles/plugin-ui/components/motion/merge-conflict-graph'
 import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
@@ -15,7 +14,8 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import { Schema } from 'effect'
-import { jjIntegrationApi, type ThreadRevisionView, type ThreadView } from './api.js'
+import type { ThreadRevisionView, ThreadView } from './api.js'
+import { useSessionThreadApi } from './use-session-thread-api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
@@ -76,7 +76,7 @@ const folderName = (path: string): string =>
  * point to its workspace actions, which is what made the old header look like it had lost the button.
  */
 export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.Element => {
-  const api = useApi(jjIntegrationApi)
+  const api = useSessionThreadApi(props.sessionId)
   const queryClient = useQueryClient()
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const rebasesPending = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0

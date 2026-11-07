@@ -284,7 +284,20 @@ waterfall's result, and the owner writes the `approval/decided` audit event.
 [row 41](../../../../plans/dsh-host-gaps.md) keeps it out of reach of any Agent. It is an
 exception to the rule that a user capability carries a tool, stated here so nobody adds one.
 
+## JJ actions
+
+A mirrored thread's folder means nothing on this machine, so `threadAt` here could only
+answer "not a thread". `sessionThreadApi` in jj-integration resolves the Session's owner
+once and sends the thread control's four calls to it through `sessionJjCall`; a local
+Session keeps this Host's API unchanged. The owner's refusal code survives, so a queued
+integration is recognized the same way on both sides.
+
+The Host authorizes the Session as usual, then `RemoteJjScope` requires the action's path
+to be that thread's own folder: owning a Session is not a grant over the machine, so an
+agent or a stale client cannot name another workspace. `discard` keeps its required
+`force`, and the runtime still applies every eligibility check of its own.
+
 ## Remaining boundaries
 
-- `sessionJjRepositories(sessionId)` is read-only status, not a local JJ panel. Per-thread path-scoped JJ reads, workspace mutations and landing are not mirrored; the native thread still offers Host UI.
+- The JJ panel's revision graph, diffs, composer chips and the Land page read this machine's repositories. They would need the same owner routing as the thread control; the native thread still offers Host UI for them.
 - Terminal access is not mirrored; Host UI is the fallback.

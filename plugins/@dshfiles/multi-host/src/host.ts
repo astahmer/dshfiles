@@ -14,7 +14,14 @@ import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
 import { Api, DshxPlugin, HostContext, hostServiceChanges } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
-import { fileUploadValueSchema, jjRepositoriesEffectSchema, multiHostApi, type ModelSelection, type RemoteInteraction, type RemoteQuestionAnswer } from './api.js'
+import {
+  fileUploadValueSchema,
+  jjRepositoriesEffectSchema,
+  multiHostApi,
+  type ModelSelection,
+  type RemoteInteraction,
+  type RemoteQuestionAnswer,
+} from './api.js'
 import type { ConnectionTestStep } from './api.js'
 import { Connectors } from './connectors/connectors.js'
 import { Loopback } from './connectors/loopback.js'
@@ -51,6 +58,7 @@ import { RemoteDoctor, type RemoteFacts } from './remote-doctor.js'
 import { RemoteExec } from './remote-exec.js'
 import { RemoteIdentity } from './remote-identity.js'
 import { interactionGone, RemoteInteractions } from './remote-interactions.js'
+import { RemoteJjScope } from './remote-jj-scope.js'
 import { RemotePromptGuard } from './remote-prompt-guard.js'
 import { RemoteProvision } from './remote-provision.js'
 import { RemoteReferenceContext } from './remote-reference-context.js'
@@ -417,6 +425,12 @@ const fetchBeforeThread = Effect.fn('multi-host fetch before thread')(function* 
     Effect.catch(error => Effect.succeed({ ok: false, detail: `jj git fetch could not run on the host: ${failed(error).message}` })),
   )
 })
+
+/** A remote plugin call that failed; a mutation whose reply was lost may have applied, so it is not reported as refused. */
+const pluginCallFailure = (input: { readonly error: unknown; readonly mutation: boolean }) =>
+  input.mutation && isTaggedFailure(input.error) && NativeRpc.mayHaveReachedRuntime(input.error)
+    ? { ok: false as const, code: 'unknown-mutation-outcome', message: 'The connection dropped after the request was sent; check the host before retrying.' }
+    : { ok: false as const, ...failed(input.error) }
 
 /** The runtime that owns a mirrored Session, as the Session controller authorizes it; a local Session has none. */
 const sessionOwner = Effect.fn('multi-host session owner')(function* (sessionId: string) {
@@ -977,17 +991,7 @@ const handlers = Api.handlers(multiHostApi, {
       { mutation },
     ).pipe(
       Effect.map(value => ({ ok: true as const, value })),
-      Effect.catch(error => {
-        const failure = failed(error)
-        if (mutation && isTaggedFailure(error) && NativeRpc.mayHaveReachedRuntime(error)) {
-          return Effect.succeed({
-            ok: false as const,
-            code: 'unknown-mutation-outcome',
-            message: 'The connection dropped after the request was sent; check the host before retrying.',
-          })
-        }
-        return Effect.succeed({ ok: false as const, ...failure })
-      }),
+      Effect.catch(error => Effect.succeed(pluginCallFailure({ error, mutation }))),
     )
   }),
   runtimePeerRead: Effect.fn('multi-host runtime peer read')(function* (input) {
@@ -1125,7 +1129,10 @@ const handlers = Api.handlers(multiHostApi, {
       const accepted = yield* withRuntime(
         owner.runtimeId,
         gateway =>
-          Effect.flatMap(gateway.run({ namespace: 'userQuestions', method: 'answer', args: { agentId: input.sessionId, callId, answer: answerValue(input.answer) } }), decodeAccepted),
+          Effect.flatMap(
+            gateway.run({ namespace: 'userQuestions', method: 'answer', args: { agentId: input.sessionId, callId, answer: answerValue(input.answer) } }),
+            decodeAccepted,
+          ),
         { mutation: true },
       )
       return { ok: true as const, accepted }
@@ -1154,11 +1161,31 @@ const handlers = Api.handlers(multiHostApi, {
       const repositories = yield* withRuntime(
         owner.runtimeId,
         gateway =>
-          Effect.flatMap(gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })('repositories', {}), decodeJjRepositories),
+          Effect.flatMap(
+            gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })('repositories', {}),
+            decodeJjRepositories,
+          ),
         { mutation: false },
       )
       return { ok: true as const, repositories }
     }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
+  }),
+  sessionJjCall: Effect.fn('multi-host session jj call')(function* (input) {
+    const mutation = input.method !== 'threadAt'
+    return yield* Effect.gen(function* () {
+      const owner = yield* sessionOwner(input.sessionId)
+      if (!owner.ok) return owner
+      const sessions = yield* RemoteSessions
+      const folder = yield* sessions.threadFolder(input.sessionId)
+      const refused = RemoteJjScope.refusal({ sessionId: input.sessionId, folder, action: input.input })
+      if (refused !== undefined) return refused
+      const value = yield* withRuntime(
+        owner.runtimeId,
+        gateway => gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })(input.method, input.input),
+        { mutation },
+      )
+      return { ok: true as const, value }
+    }).pipe(Effect.catch(error => Effect.succeed(pluginCallFailure({ error, mutation }))))
   }),
   runtimeFileReferences: Effect.fn('multi-host runtime file references')(function* (input) {
     return yield* Effect.gen(function* () {
