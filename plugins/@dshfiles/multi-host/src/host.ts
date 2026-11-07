@@ -40,6 +40,7 @@ import {
   NoOfficialNode,
   OriginPortExhausted,
   RemoteHomeUnknown,
+  RemoteApiFailed,
   RemoteRequestFailed,
   SessionCursorUnavailable,
   SessionUnavailable,
@@ -428,11 +429,22 @@ const fetchBeforeThread = Effect.fn('multi-host fetch before thread')(function* 
   )
 })
 
+/** What a runtime answers for a plugin it does not run. */
+const pluginNotServed = 'api-not-served'
+
 /** A remote plugin call that failed; a mutation whose reply was lost may have applied, so it is not reported as refused. */
-const pluginCallFailure = (input: { readonly error: unknown; readonly mutation: boolean }) =>
-  input.mutation && isTaggedFailure(input.error) && NativeRpc.mayHaveReachedRuntime(input.error)
+const pluginCallFailure = (input: { readonly error: unknown; readonly mutation: boolean }) => {
+  if (input.error instanceof RemoteApiFailed && input.error.code === pluginNotServed) {
+    return {
+      ok: false as const,
+      code: pluginNotServed,
+      message: 'This host does not have the plugin for that. Update DSH there, or open the thread on its host.',
+    }
+  }
+  return input.mutation && isTaggedFailure(input.error) && NativeRpc.mayHaveReachedRuntime(input.error)
     ? { ok: false as const, code: 'unknown-mutation-outcome', message: 'The connection dropped after the request was sent; check the host before retrying.' }
     : { ok: false as const, ...failed(input.error) }
+}
 
 /** The runtime that owns a mirrored Session, as the Session controller authorizes it; a local Session has none. */
 const sessionOwner = Effect.fn('multi-host session owner')(function* (sessionId: string) {
@@ -1256,6 +1268,12 @@ const handlers = Api.handlers(multiHostApi, {
             }),
           })),
           Effect.map(host => ({ host })),
+          // A host without the plugin answered: it simply has no thread workspaces to show.
+          Effect.catchTag('RemoteApiFailed', error =>
+            error.code === pluginNotServed
+              ? Effect.succeed({ host: { runtimeId: runtime.id, hostName, refreshing: false, repositories: [] } })
+              : Effect.fail(error),
+          ),
           Effect.orElseSucceed(() => ({ unreachable: hostName })),
         ),
       { concurrency: 4 },
