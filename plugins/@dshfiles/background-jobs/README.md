@@ -86,6 +86,11 @@ The Host reads which Sessions run from its agent registry (`ctx.agents`); when t
 marked. The mark clears when the owner runs a turn again. Board rows carry it as `outlivedSince`, so
 `background_jobs_board` shows it to agents and `background_jobs_kill` stops it.
 
+Agents see a compact rendering of the board — one line per job with its id, status, category, elapsed time and a
+short label, plus counts — because the full payload (up to 200 job rows, up to 200 per-Session rows and spill paths)
+averaged ~17k characters per tool result and is only needed by the browser. A job's detail stays available through
+`background_jobs_output`.
+
 Once a minute the Host stops every job that outlived its turn for `stopOutlivedAfterMinutes` (setting namespace
 `dshfiles-background-jobs`, 120 by default; `0` keeps them running until stopped by hand). It kills through the
 same owner fence with the reason `stopped: outlived its turn for N min with no reader`, and leaves a

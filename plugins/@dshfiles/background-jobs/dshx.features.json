@@ -52,6 +52,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "background-jobs.board.model-render",
+          "file": "plugins/@dshfiles/background-jobs/src/board-render.test.ts",
+          "testName": "leaves the browser-only payload out of the model text"
+        },
+        {
+          "kind": "unit-test",
           "id": "background-jobs.classify.commands",
           "file": "plugins/@dshfiles/background-jobs/src/classify.test.ts",
           "testName": "reads the package manager script that did the work, not the wrapper around it"
