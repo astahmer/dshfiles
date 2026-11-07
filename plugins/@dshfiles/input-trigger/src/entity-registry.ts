@@ -1,5 +1,5 @@
 /**
- * The one mention and entity registry (plan `plans/ade-ux` §5 `entityProvider`, §6 "7 `@` sources, 3 preview overlays").
+ * The one mention and entity registry (plan `docs/ade-ux` §5 `entityProvider`, §6 "7 `@` sources, 3 preview overlays").
  *
  * Every plugin that knows a kind of thing a user can mention or reference (an agent, a backlog item, a memory note, an
  * MCP server, a skill, a thread or file) adds one `EntityKinds` item. Input-trigger, which owns the `@` engine every

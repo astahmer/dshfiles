@@ -128,9 +128,9 @@ D="node tooling/dshx/packages/dshx/dist/cli/bin.js dev"
 $D up --name ade-phone --skip-build --fake-secret-cli --idle-timeout 240 --timeout 400000
 $D open user-questions/answered-question-stays-closed --name ade-phone        # seed: fake-provider threads
 S=$TMPDIR/dshx-dev/ade-phone/state.json
-ADE_WS=$PWD node plans/ade-ux/phase6/capture/audit.mjs $S out plans/ade-ux/phase6/capture/audit-plan.json
-ADE_WS=$PWD node plans/ade-ux/phase6/capture/audit.mjs $S out plans/ade-ux/phase6/capture/journey-plan.json --strict
-ADE_WS=$PWD node plans/ade-ux/phase6/capture/audit.mjs $S out plans/ade-ux/phase6/capture/desktop-plan.json --desktop
+ADE_WS=$PWD node docs/ade-ux/phase6/capture/audit.mjs $S out docs/ade-ux/phase6/capture/audit-plan.json
+ADE_WS=$PWD node docs/ade-ux/phase6/capture/audit.mjs $S out docs/ade-ux/phase6/capture/journey-plan.json --strict
+ADE_WS=$PWD node docs/ade-ux/phase6/capture/audit.mjs $S out docs/ade-ux/phase6/capture/desktop-plan.json --desktop
 $D down --name ade-phone
 # compression: magick <f> -resize 75% -colors 128 PNG8:<f>   (desktop: 50%)
 ```

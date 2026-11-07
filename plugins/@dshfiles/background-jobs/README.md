@@ -3,7 +3,7 @@
 ![Observe › Processes with its Jobs, Dev servers and RAM tabs](docs/screenshots/processes-page.png)
 ![Cross-Session background jobs board](docs/screenshots/jobs-board.png)
 
-**Observe › Processes** is one page for what runs on this host for your threads (plans/ade-ux §6):
+**Observe › Processes** is one page for what runs on this host for your threads (docs/ade-ux §6):
 **Jobs** (this board), then the tabs other plugins add through the
 `@dshfiles/background-jobs/process-views` registry — **Dev servers** from `@dshfiles/preview` and
 **RAM** from `@dshfiles/worktree-memory`. Providers depend on background-jobs, never the reverse.

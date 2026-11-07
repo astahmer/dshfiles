@@ -425,7 +425,7 @@
         {
           "kind": "not-applicable",
           "id": "thread-sidebar.status-grouping-browser",
-          "reason": "Walked by this feature's reach and captured at desktop and 390x844 WebKit in a scratch DSH (plans/ade-ux/phase3b); the section journeys in thread-sidebar.feature run with Arrange manually."
+          "reason": "Walked by this feature's reach and captured at desktop and 390x844 WebKit in a scratch DSH (docs/ade-ux/phase3b); the section journeys in thread-sidebar.feature run with Arrange manually."
         }
       ],
       "telemetry": [
@@ -452,7 +452,7 @@
         {
           "kind": "not-applicable",
           "id": "thread-sidebar.working-status-item-browser",
-          "reason": "Captured in a scratch DSH at desktop and 390x844 WebKit (plans/ade-ux/phase3b); a fake-provider run is needed to hold a turn open for a Gherkin scenario."
+          "reason": "Captured in a scratch DSH at desktop and 390x844 WebKit (docs/ade-ux/phase3b); a fake-provider run is needed to hold a turn open for a Gherkin scenario."
         }
       ],
       "telemetry": [
@@ -3102,7 +3102,7 @@
         {
           "kind": "not-applicable",
           "id": "thread-sidebar.destination-rail-browser",
-          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (plans/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
+          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (docs/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
         },
         {
           "kind": "unit-test",
@@ -3127,7 +3127,7 @@
     {
       "id": "phone-stack-navigation",
       "title": "Navigate the phone as a stack",
-      "summary": "Below 640px the fixed layout is a stack (plans/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers Thread panels, which opens the thread panel as a bottom sheet. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
+      "summary": "Below 640px the fixed layout is a stack (docs/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers Thread panels, which opens the thread panel as a bottom sheet. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -3161,7 +3161,7 @@
         {
           "kind": "not-applicable",
           "id": "thread-sidebar.phone-stack-browser",
-          "reason": "The Gherkin harness runs Chromium at 1440x900 only; the WebKit 390x844 browser journey is the scripted phone journey plans/ade-ux/phase6/capture/journey-plan.json (open a thread from Threads, Back, Inbox Open then Back to Inbox, Back through More)."
+          "reason": "The Gherkin harness runs Chromium at 1440x900 only; the WebKit 390x844 browser journey is the scripted phone journey docs/ade-ux/phase6/capture/journey-plan.json (open a thread from Threads, Back, Inbox Open then Back to Inbox, Back through More)."
         }
       ],
       "telemetry": [
@@ -3187,7 +3187,7 @@
         {
           "kind": "not-applicable",
           "id": "thread-sidebar.touch-row-menu-browser",
-          "reason": "Pointer media queries need a touch browser: the WebKit iPhone audit plans/ade-ux/phase6/capture/audit-plan.json screen 01b-row-menu opens the menu from the button; Chromium Gherkin runs a fine pointer."
+          "reason": "Pointer media queries need a touch browser: the WebKit iPhone audit docs/ade-ux/phase6/capture/audit-plan.json screen 01b-row-menu opens the menu from the button; Chromium Gherkin runs a fine pointer."
         }
       ],
       "telemetry": [
@@ -3222,7 +3222,7 @@
         {
           "kind": "not-applicable",
           "id": "thread-sidebar.layout-mode-browser",
-          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (plans/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
+          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (docs/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
         },
         {
           "kind": "unit-test",
@@ -3261,7 +3261,7 @@
         {
           "kind": "not-applicable",
           "id": "thread-sidebar.moved-to-map-browser",
-          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (plans/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
+          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (docs/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
         },
         {
           "kind": "unit-test",
@@ -3301,7 +3301,7 @@
         {
           "kind": "not-applicable",
           "id": "thread-sidebar.navigation-counter-browser",
-          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (plans/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
+          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (docs/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
         },
         {
           "kind": "unit-test",
@@ -3345,7 +3345,7 @@
         {
           "kind": "not-applicable",
           "id": "thread-sidebar.phone-tab-bar-browser",
-          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (plans/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
+          "reason": "The browser journey is the catalog reach plus the Phase 3a scratch-DSH desktop and WebKit phone screenshots (docs/ade-ux); a Gherkin scenario comes with the Phase 3b shell e2e steps."
         },
         {
           "kind": "unit-test",

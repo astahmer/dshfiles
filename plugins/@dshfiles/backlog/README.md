@@ -40,7 +40,7 @@ One capture feed for notes, tasks, bugs, ideas and questions, shared by the user
 replaces a "TODO" chat channel: adding something costs one line, the feed stays ordered by activity so
 idle things sink, and the tracker parts (status, actors, links, search, board) come for free.
 
-Plan and open steps: [plans/backlog](../../../plans/backlog/README.md).
+Plan and open steps: [plans/backlog](../../../plans/backlog/README.md). Shipped design: [docs/redesign.md](docs/redesign.md).
 
 Open the reusable **Backlog** view from navigation or the Workbench chooser. Items, Board, Projects, Shipped, Ready and Inbox remain the page’s own view controls.
 

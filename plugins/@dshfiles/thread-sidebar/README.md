@@ -51,7 +51,7 @@ The reusable board page is **Thread Sidebar: Board** (Threads › Board in the r
 
 **Multi-model fan-out.** `thread_fan_out` creates two to six independent threads for one prompt. Each thread is created blank, assigned its requested provider/model (and optional reasoning effort), titled `<prompt prefix> · <model>`, then receives the prompt. Creations run at concurrency two; each result reports its thread ID or failure without cancelling sibling work. With jj-integration isolation enabled, every thread is created in its own workspace.
 
-**Status grouping (default).** **All threads** groups rows by the ADE status vocabulary (plan `plans/ade-ux` §4.3,
+**Status grouping (default).** **All threads** groups rows by the ADE status vocabulary (plan `docs/ade-ux` §4.3,
 §4.7; `src/thread-status.ts`): **Pinned** on top, then **Needs you**, **Working**, **Ready**, **Idle** and **Done**.
 Done starts folded, and a thread nobody touched for 72 hours folds into it on its own unless it is pinned. Within a
 group the newest return to you comes first: the time the thread entered its group (the inbox item's opening, the
@@ -82,7 +82,7 @@ so the row's unread dot clears too. Done on an older turn's item leaves a newer 
 above the sidebar footer into the strip's Quota item; free docking still seats it there.
 
 **Fixed layout and destinations (default).** The left column is a labelled rail of eight destinations (plan
-`plans/ade-ux` §4.2): Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings. Threads shows this thread
+`docs/ade-ux` §4.2): Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings. Threads shows this thread
 list with **Search threads**, the Sidebar settings gear and its sections (Board); every other destination lists its
 sections, and choosing one opens that page in the stage. A destination with a single page (the Inbox) opens it at once.
 The former Navigation pages are sections now, labelled without their plugin name; the table lives in the

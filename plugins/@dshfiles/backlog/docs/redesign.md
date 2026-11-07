@@ -62,4 +62,3 @@ local storage; Enter sends instantly (optimistic), failure restores the draft wi
 | Activity not shared                | Item log stays the source of truth (timeline is bounded and observation-only); backlog events published to the timeline (setting `publishActivity`); live thread state from the session list |
 | Lists not virtualized              | Items virtualized, Feed paged, Board columns capped, revision-gated polling, Host-side project counts; measured on 2,017 items                                                               |
 | Jev and model triage untested live | Jev checked live with the `jev-api-key-optmem` secret; its work question now counts bug reports as work. The model path is still unchecked: the free models refuse calls outside OpenCode    |
-

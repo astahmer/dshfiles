@@ -106,7 +106,7 @@ export interface SidebarPreferences {
   idleSectionOverrides: Record<string, IdleSectionOverride>
   workspaceFilter: string | null
   /**
-   * Fixed (default): the rail of destinations and one list (plans/ade-ux §4.1). Free docking: the older left column of
+   * Fixed (default): the rail of destinations and one list (docs/ade-ux §4.1). Free docking: the older left column of
    * movable Workbench panes, whose saved layout is kept untouched while fixed is on.
    */
   layoutMode: 'fixed' | 'docking'

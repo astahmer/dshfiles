@@ -119,7 +119,7 @@ export function ConversationContent(props: ConversationContentProps) {
     ? undefined
     : workspaceDisplayTitle(storedChipTitle, t('workspace.defaultName'))
 
-  // The run row's leading segments (plans/ade-ux §4.5): project · host · workspace (the hero.workspace occupant, which
+  // The run row's leading segments (docs/ade-ux §4.5): project · host · workspace (the hero.workspace occupant, which
   // leads with its host chip) · agent mode · plugin options. The bar appends File access and Model + account. Each
   // owner keeps its own state; this row only places their slots, so a missing owner just drops its segment.
   const heroWorkspaceRow = (

@@ -32,7 +32,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [HextaUI blocks](hextaui-blocks.md)                                  | Port MIT components; rebuild Pro blocks as references: shared CodeBlock/StackTrace, edit cards, bash stack traces, then P2 polish.                                                                |
 | [Inline chat UI](inline-chat-ui.md)                                  | Shared tool-card kit, edit cards, tool-group summary, plan progress, live activity strip, turn summary; ported from AI Elements / prompt-kit, affectUI as reference.                              |
 | [Typed chat drafts](typed-chat-drafts/README.md)                     | Activation only: the user picks a restart, then the New chat / typed-draft GUI check.                                                                                                             |
-| [One Agent Development Environment](ade-ux/README.md)                | Phases 0–6 landed (kit, inbox, rail, thread loop, Usage/Processes, phone); open: one follow-up checklist, then a plan per Phase 7 bet.                                                            |
+| [ADE: remaining work](ade-ux/README.md)                                                                | Phases 0–6 shipped; the design and evidence live in [docs/ade-ux](../docs/ade-ux/README.md). Open: nine follow-ups (a Host restart, browser push, native question forms in the Inbox, Done/Restore recreating the workspace, git-worktree scopes, a physical iPhone pass). |
 | [Thread sharing](thread-share/README.md)                             | v1 shipped as `@dshfiles/thread-share` (opt-in, not seeded); open: v2 collaborative threads (design and risks only), opentunnel revisit.                                                          |
 | [Component adoption](component-adoption/README.md)                   | Use the gallery components that no plugin imports yet: TraceWaterfall in traces, MergeChecks in the Land card, TestRunResults, FallbackChain, ActivityFeed, RoutineList; delete or keep the rest. |
 | [Browser preview panel](browser-preview-panel.md)                    | Pane, new-tab fallback and Agent browser mirror shipped; open: live check after restart, auto-reveal, remote-GUI Open, mirror perf, hand-off.                                                     |
@@ -47,7 +47,6 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [Reference feature additions](reference-feature-additions.md)        | Evidence-gated feature and adoption backlog from reference products.                                                                                                                                                    |
 | [Competitor releases 2026-11](competitor-releases-2026-11/README.md) | Ranked gaps from competitor releases of 2026-10-07 → 11-04: tool/instruction diet, idle compaction, resume-cost warning, thread artifacts, child approvals in the parent, find in thread.                               |
 | [Self-improvement](self-improve/README.md)                           | Open improvements mined from DSH Session history (jj hardening, fetch provider, checkout-sync fan-out, store folds, context diet); the ledger dedups and reopens them. A standing backlog, not a task plan.             |
-| [~/dev cleanup](dev-cleanup-audit.md)                                | 23 workspaces and repositories awaiting a keep/archive/remove decision.                                                                                                                                                 |
 | [Data fetching](data-fetching/README.md)                             | A fresh-load HAR spent 99 % of request time queued in the browser (HTTP/1.1, six sockets): batched dshx transport, page-wide resource store usable from React and later Foldkit, event-tag invalidation, P0 poll fixes. |
 | [Performance optimization](performance-optimization/README.md)       | Remaining client, Host and tooling work packages from the repository-wide audit, then full representative before/after acceptance.                                                                                      |
 | [Lint cleanup](lint-cleanup/README.md)                               | Remove the ratcheted lint baseline with real fixes and lower each cap as a rule empties.                                                                                                                                |
@@ -71,13 +70,19 @@ Leftovers of finished plans. The plan files were deleted; each line links to the
 
 ## Proposed, not started
 
-Written plans for ideas that were scoped but not started:
-
-- [Agent Calendar](agent-calendar.md): a turn-time Calendar tab inside Usage.
-- [External usage history](external-usage-history.md): opt-in cross-harness token usage in Usage.
-
 Ideas that were investigated but never built. Their plan files were deleted; this line is what survives. Reopen one by
 writing a new plan.
+
+- **Agent Calendar** (2026-11-05). A retrospective turn-time Calendar tab inside Usage, built from `turn/start` and
+  `turn/end` markers: wall-clock agent time per project and Session, never claiming billable time or mixing duration
+  with token usage. Direction: a Host projection table, Day/3-day/Week views and CSV, reusing Usage so no second
+  analytics owner appears.
+- **External usage history** (2026-11-05). Opt-in, cross-harness token usage inside Usage. TokiToki already reports
+  other harnesses locally, so DSH integration must justify its privacy cost with native charts; Codex rollout and
+  OpenCode stores are best-effort sources, Claude OTel is forward-only and Cursor has no documented local schema.
+- **~/dev cleanup** (2026-10-13). A read-only audit of `~/dev` left 23 workspaces and repositories needing the owner's
+  keep/archive/remove call, including a 28-workspace store whose 34 commits exist only locally. Re-run the audit before
+  acting; nothing there is removed without the owner's decision.
 
 - **Slot assembly crash safety** (2026-10-19). A recomposition that briefly leaves the sole `root` slot owner
   (`frame-layout`) with zero registrations makes the stock renderer throw `SlotAssemblyError` past every error boundary

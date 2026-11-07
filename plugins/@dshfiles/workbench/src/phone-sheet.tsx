@@ -13,7 +13,7 @@ const subscribe = (listener: () => void): (() => void) => {
 }
 const read = (): boolean => typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches
 
-/** Whether the frame is phone-width, where supporting panes become sheets (plans/ade-ux §8 phase 6). */
+/** Whether the frame is phone-width, where supporting panes become sheets (docs/ade-ux §8 phase 6). */
 export const usePhoneWidth = (): boolean => useSyncExternalStore(subscribe, read, () => false)
 
 /**

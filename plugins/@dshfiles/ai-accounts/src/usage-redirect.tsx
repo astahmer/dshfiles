@@ -4,7 +4,7 @@ import { UsageNavigation, type UsageQuotaTarget } from './quota-views.js'
 
 /**
  * The account page's Usage tab while `@dshfiles/usage` runs: an alias of Observe › Usage › Quota › Accounts for this
- * account (plans/ade-ux §6). `open()` returns false when usage is absent, so the tab keeps its own content then.
+ * account (docs/ade-ux §6). `open()` returns false when usage is absent, so the tab keeps its own content then.
  */
 export const useUsageRedirect = (target: Omit<UsageQuotaTarget, 'view'> | undefined): { readonly active: boolean; readonly open: () => boolean } => {
   const navigation = useContract(UsageNavigation)

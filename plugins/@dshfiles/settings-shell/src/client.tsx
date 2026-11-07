@@ -183,7 +183,7 @@ export default defineClient({
       return journaled
     }
     /**
-     * Settings has one place: a page in the stage (plan `plans/ade-ux` §4.6). The gear, the rail, the palette, Mod+,
+     * Settings has one place: a page in the stage (plan `docs/ade-ux` §4.6). The gear, the rail, the palette, Mod+,
      * and other plugins' open requests all land there; the former dialog, expanded dialog and side-panel presentations
      * are gone, and a request that still names one opens the page.
      */

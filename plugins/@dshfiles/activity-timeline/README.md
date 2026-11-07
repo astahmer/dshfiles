@@ -14,7 +14,7 @@ Open the reusable **Activity Timeline: Activity** view from navigation or the Wo
 
 <img alt="Inbox at 390×844 in WebKit" src="docs/screenshots/inbox-panel-phone.png" width="195">
 
-The plugin also owns the attention inbox of [the ADE plan](../../../plans/ade-ux/README.md#48-the-attention-model)
+The plugin also owns the attention inbox of [the ADE plan](../../../docs/ade-ux/README.md#48-the-attention-model)
 (Phase 2a). The **Inbox** entry in the left navigation (a temporary home until the Phase 3 rail) carries the only
 badge, the Needs you count. The page has **Needs you** (blocking and failed items) and **Other** (ready items) tabs,
 plus **Snoozed**, **Done** and **Muted** when they hold items. Each row shows a severity glyph, the reason, the source,

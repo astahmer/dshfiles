@@ -4,7 +4,7 @@ Research input for the ADE macro redesign. Date: 2026-11-04. Scope: what a user 
 
 **Evidence base.** READMEs and client entries of the shell plugins (frame-layout, workspace-nav, thread-sidebar,
 sidebar-right, main-tabs, workbench, home, settings-shell, user-questions, agent-questions, turn-summary),
-`docs/workbench-slot-inventory.md`, `docs/native-forks.md`, `profiles/web/package.json` (154 `@dshfiles/*` rows), and
+`plugins/@dshfiles/workbench/docs/slot-inventory.md`, `docs/native-forks.md`, `profiles/web/package.json` (154 `@dshfiles/*` rows), and
 32 plugin screenshots read image by image (listed in §6). No scratch DSH was booted: the screenshot set already covers
 desktop 1440/1280 and 360 px phone widths, and the live instance was not touched. Paths below are repository-relative;
 screenshots are `plugins/@dshfiles/<plugin>/docs/screenshots/<file>`, abbreviated `<plugin>/<file>`.

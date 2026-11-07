@@ -3,7 +3,7 @@
 How three products give work on another machine (or in the cloud) the _same_ chat
 composer as local work, read to decide how `@dshfiles/multi-host` should replace its
 plain-textarea remote composer. The decision and the DSH plan are in
-[remote-thread-architecture.md](../../../plugins/@dshfiles/multi-host/docs/remote-thread-architecture.md).
+[remote-thread-architecture.md](../../remote-thread-architecture.md).
 
 | Note                   | Product                     | Version / revision                                            | Read as                                            |
 | ---------------------- | --------------------------- | ------------------------------------------------------------- | -------------------------------------------------- |

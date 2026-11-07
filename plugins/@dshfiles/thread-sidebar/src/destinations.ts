@@ -1,5 +1,5 @@
 /**
- * The shell's destinations (plan `plans/ade-ux` §4.2): the fixed rail entries and the sections each one lists. The
+ * The shell's destinations (plan `docs/ade-ux` §4.2): the fixed rail entries and the sections each one lists. The
  * thread sidebar owns the left column (it declares `shell.left` and the `sidebar.panellist` seat), so it owns this
  * registry. Published as the `@dshfiles/thread-sidebar/destinations` dshx module; importing it loads none of the sidebar.
  *

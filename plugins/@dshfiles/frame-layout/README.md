@@ -95,7 +95,7 @@ The frame owns the whole geometry and exposes one seat per region to plugins:
 
 ### The status strip
 
-Local delta (plan `plans/ade-ux` §4.1 R5): a third grid row, 24 px, across every column. Plugins add at most one
+Local delta (plan `docs/ade-ux` §4.1 R5): a third grid row, 24 px, across every column. Plugins add at most one
 text-first item each through the `@dshfiles/frame-layout/status-strip` dshx module:
 
 ```ts

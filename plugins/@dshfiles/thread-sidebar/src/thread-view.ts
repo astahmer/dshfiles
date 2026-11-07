@@ -2,7 +2,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import type { ThreadAttentionLabel } from './attention-presentation.js'
 
 /**
- * `state` is the ADE status grouping (Pinned, Needs you, Working, Ready, Idle, Done; plan `plans/ade-ux` §4.3) and the
+ * `state` is the ADE status grouping (Pinned, Needs you, Working, Ready, Idle, Done; plan `docs/ade-ux` §4.3) and the
  * default. `status` is the older drag-to-arrange sections (Pinned, Active, Parked, Inactive, Settled, Archived), kept as
  * "Arrange manually" because status sorting makes rows move.
  */

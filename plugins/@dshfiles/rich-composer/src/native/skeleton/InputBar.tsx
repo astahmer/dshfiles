@@ -426,7 +426,7 @@ export const InputBar = memo(function InputBar({
         ? t('placeholder.steerQueue')
         : planActive ? t('placeholder.plan') : t('placeholder.default'))
 
-  // Hero: one run row above the card holds every pre-send choice (§4.5 of plans/ade-ux). File access and the model
+  // Hero: one run row above the card holds every pre-send choice (§4.5 of docs/ade-ux). File access and the model
   // seat move up from the toolbar there; once the thread has started they return to the toolbar, where they stay
   // changeable, and the row collapses to the summary chip on the meter line.
   const heroRunRow = variant === 'hero' && runRow !== undefined

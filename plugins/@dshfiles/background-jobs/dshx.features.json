@@ -243,7 +243,7 @@
     {
       "id": "processes-page",
       "title": "Observe › Processes: jobs, dev servers and RAM on one page",
-      "summary": "One Processes page (plans/ade-ux §6 \"Processes in 3 boards\") owned by background-jobs: Jobs, then the tabs other plugins add through the `@dshfiles/background-jobs/process-views` registry (Dev servers from preview, RAM from worktree-memory). Its navigation glyph carries their marks (RAM pressure and detached memory). `ProcessesNavigation` lets the former RAM page and saved tabs land on their tab; palette rows find it by the old names (Background Jobs: Jobs, Worktree Memory: RAM).",
+      "summary": "One Processes page (docs/ade-ux §6 \"Processes in 3 boards\") owned by background-jobs: Jobs, then the tabs other plugins add through the `@dshfiles/background-jobs/process-views` registry (Dev servers from preview, RAM from worktree-memory). Its navigation glyph carries their marks (RAM pressure and detached memory). `ProcessesNavigation` lets the former RAM page and saved tabs land on their tab; palette rows find it by the old names (Background Jobs: Jobs, Worktree Memory: RAM).",
       "reach": ["click tab \"Observe\"", "click button \"Processes\"", "expect heading \"Processes\""],
       "surfaces": ["client"],
       "surface": "destinationSection",

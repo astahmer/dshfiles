@@ -43,7 +43,7 @@ export const jevQuestions = {
  * Memory's optional Jev use: digest signals, the recall gate and on-demand note review. Each answered call is counted
  * in memory's own usage and cost tables; a failed one bumps `jev.failures` and the caller treats it as "unknown".
  */
-/** Settings-shell's namespace, which holds the one Jev key every Jev reader shares (plans/ade-ux §4.6). */
+/** Settings-shell's namespace, which holds the one Jev key every Jev reader shares (docs/ade-ux §4.6). */
 export const SharedJevSettingsTag = Settings.Tag<SettingsShellSettings>(settingsShellSettings.namespace)
 
 export class MemoryJev extends Context.Service<

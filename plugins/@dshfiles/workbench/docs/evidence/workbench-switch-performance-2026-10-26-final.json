@@ -71,9 +71,7 @@
           "budgetExceeded": false,
           "slowRpc": [],
           "attribution": {
-            "observedSignals": [
-              "browser-main-thread-longtasks"
-            ],
+            "observedSignals": ["browser-main-thread-longtasks"],
             "unexplainedByLongTasksMs": 57.3000000002794,
             "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
           }
@@ -134,9 +132,7 @@
           "budgetExceeded": false,
           "slowRpc": [],
           "attribution": {
-            "observedSignals": [
-              "browser-main-thread-longtasks"
-            ],
+            "observedSignals": ["browser-main-thread-longtasks"],
             "unexplainedByLongTasksMs": 61.799999999813735,
             "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
           }
@@ -188,9 +184,7 @@
           "budgetExceeded": false,
           "slowRpc": [],
           "attribution": {
-            "observedSignals": [
-              "browser-main-thread-longtasks"
-            ],
+            "observedSignals": ["browser-main-thread-longtasks"],
             "unexplainedByLongTasksMs": 62.60000000009313,
             "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
           }
@@ -242,9 +236,7 @@
           "budgetExceeded": false,
           "slowRpc": [],
           "attribution": {
-            "observedSignals": [
-              "browser-main-thread-longtasks"
-            ],
+            "observedSignals": ["browser-main-thread-longtasks"],
             "unexplainedByLongTasksMs": 65.60000000009313,
             "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
           }
@@ -305,9 +297,7 @@
           "budgetExceeded": false,
           "slowRpc": [],
           "attribution": {
-            "observedSignals": [
-              "browser-main-thread-longtasks"
-            ],
+            "observedSignals": ["browser-main-thread-longtasks"],
             "unexplainedByLongTasksMs": 57.8000000002794,
             "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
           }
@@ -368,9 +358,7 @@
           "budgetExceeded": false,
           "slowRpc": [],
           "attribution": {
-            "observedSignals": [
-              "browser-main-thread-longtasks"
-            ],
+            "observedSignals": ["browser-main-thread-longtasks"],
             "unexplainedByLongTasksMs": 64.39999999990687,
             "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
           }

@@ -12,12 +12,12 @@ Method:
   `Command` registry. Vendored native forks (`src/native/**`) were excluded, so the native-fork plugins' own
   re-declared slots are not counted as "contributions".
 - `profiles/web/package.json` `dsh.profile.bundles` decides "mounted".
-- Docs: `docs/workbench-slot-inventory.md`, `docs/native-forks.md`, `docs/native-plugin-overrides.md`,
+- Docs: `plugins/@dshfiles/workbench/docs/slot-inventory.md`, `docs/native-forks.md`, `docs/native-plugin-overrides.md`,
   `profiles/web/cordis.patch.yml`.
 
 Caveats: the `reach` paths are the e2e catalog journeys, so they name the accessible button labels a user clicks
 (e.g. `"Backlog: Items"`) but sometimes start from a fixture state. Agent-tool counts are regex approximations.
-`docs/workbench-slot-inventory.md` is an M0 snapshot of 2026-10-26 and is partly historical (it still calls
+`plugins/@dshfiles/workbench/docs/slot-inventory.md` is an M0 snapshot of 2026-10-26 and is partly historical (it still calls
 `pulls-review` and `traces` "repository-only", but both are now in the seed, `profiles/web/package.json`).
 
 ---
@@ -42,7 +42,7 @@ DeepSeek LLM rows, feedback rows, `session-telemetry-otel`, `session-log-deepsee
 lines 10-237.
 
 Native surfaces still present beside the owned ones: the **Plugins** manager and **Schedules** main entries
-(`docs/workbench-slot-inventory.md:113`), native right-sidebar resources (Files, document preview, diff, terminal),
+(`plugins/@dshfiles/workbench/docs/slot-inventory.md:113`), native right-sidebar resources (Files, document preview, diff, terminal),
 native settings sections not overridden, and the native chat/composer slots the forks keep.
 
 ---
@@ -321,7 +321,7 @@ chat/rich-composer forks, attachment-gallery, html-render.
 | Surface | Count | Contributors |
 | --- | --- | --- |
 | Left sidebar nav entries (`sidebar.panellist`) | **21** owned (22 in source; resource-packs unmounted) + native Plugins, Schedules | activity-timeline, agent-communication, agent-toolkit, agents, ai-accounts ×3, background-jobs, backlog, jj-integration, jujutsu ×2, mcp-servers, memory, multi-host, pulls-review, secret-catalog, thread-sidebar Board, traces, usage, worktree-memory |
-| Main panels (`main` entries) | **24** owned (+ conversation, plugins, schedules native) + workbench panels (editor, jujutsu dock, backlog) | see `docs/workbench-slot-inventory.md:114` plus `pulls-review/src/client.tsx:45`, `traces/src/client.tsx:105` |
+| Main panels (`main` entries) | **24** owned (+ conversation, plugins, schedules native) + workbench panels (editor, jujutsu dock, backlog) | see `plugins/@dshfiles/workbench/docs/slot-inventory.md:114` plus `pulls-review/src/client.tsx:45`, `traces/src/client.tsx:105` |
 | Right sidebar pane tabs (`sidebar.right.pane.tab`) | **8** (+5 tab menu items) + native Files/doc preview/diff/terminal | btw, editor ×2, jj-integration, jujutsu, settings-shell, thread-sidebar, workbench |
 | Overlays/dialogs (`shell.overlay`) | **16** from 14 plugins | agents, ai-accounts, annotations, backlog, btw, command-palette, jj-integration, jujutsu, main-tabs, memory, secret-catalog, settings-shell, traces, workbench ×3 |
 | Settings sections (`settings.section`) | **7** + 3 general items + 1 models footer; **27** plugins with `defineSettings` pages | listed in §3.8 |

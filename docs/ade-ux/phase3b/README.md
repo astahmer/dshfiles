@@ -48,7 +48,7 @@ $D open thread-sidebar/status-grouped-thread-list --name ade-3b-list
 $D open ai-accounts/active-chat-account --name ade-3b-list      # fake-provider account + a failed turn
 $D open thread-sidebar/usage-limit-group --name ade-3b-list     # quota-exhausted thread
 $D open thread-sidebar/manual-unread --name ade-3b-list         # two more failed turns (its rename-dependent steps drift: the fake provider titles threads)
-ADE_WS=$PWD node plans/ade-ux/phase3b/capture/phone.mjs <state.json> <out.png> light 1440x900 'click tab "Threads"' 'wait 2500'
+ADE_WS=$PWD node docs/ade-ux/phase3b/capture/phone.mjs <state.json> <out.png> light 1440x900 'click tab "Threads"' 'wait 2500'
 # compression: magick <f> [-resize 75% for phone] -colors 128 PNG8:<f>
 $D down --name ade-3b-list
 ```

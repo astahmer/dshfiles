@@ -101,7 +101,7 @@ export const openSettingsDialog = async (page: Page, options?: { readonly timeou
 }
 
 /**
- * Settings as the composition draws it: `@dshfiles/settings-shell`'s one page in the stage (plans/ade-ux §4.6), or the
+ * Settings as the composition draws it: `@dshfiles/settings-shell`'s one page in the stage (docs/ade-ux §4.6), or the
  * native Settings dialog in an isolated composition that does not load the shell.
  */
 export const settingsPage = (page: Page): Locator =>

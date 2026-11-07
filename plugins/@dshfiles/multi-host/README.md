@@ -324,7 +324,7 @@ known_hosts permissions, shell-safe paths, and launch-URL redaction without
 starting DSH. A separate test validates the strict SSH options against an
 ephemeral high-port loopback-only sshd, always stopping its owned process group;
 it does not contact a remote host or prove DSH lifecycle behavior. Runtime evidence is in
-[docs/validation.md](docs/validation.md); why runtimes are federated rather
+[docs/validation.md](docs/validation.md), [remote-thread-composer research](docs/research/remote-thread-composer/README.md); why runtimes are federated rather
 than proxied, and the rules that follow, are in [docs/design.md](docs/design.md).
 Durable supervision of a remote host is still open:
 [plans/multi-host](../../../plans/multi-host/README.md).

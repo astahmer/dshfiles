@@ -17,7 +17,7 @@ The native Loader row is disabled by this bundle's Cordis patch. Source registra
 ![One shared reference card: an agent mention previewed in place](docs/screenshots/entity-registry.png)
 
 `@dshfiles/input-trigger/entity-registry` is the one place a plugin makes something mentionable (plan
-[`ade-ux` §5 `entityProvider`](../../../plans/ade-ux/README.md)). A provider adds one `EntityKinds` item:
+[`ade-ux` §5 `entityProvider`](../../../docs/ade-ux/README.md)). A provider adds one `EntityKinds` item:
 
 ```ts
 plugin.add(EntityKinds, {

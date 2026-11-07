@@ -43,7 +43,7 @@ contributes an editor panel, and [`@dshfiles/jujutsu`](../jujutsu/README.md) a r
 ## Use
 
 - **View names**: reusable plugin views use **Plugin: View** everywhere they are offered, for example **AI Accounts: Preview**, **Editor: Files**, **Backlog: Items**, **Thread Sidebar: Threads** and **Settings Shell: Settings**. The chooser searches full names. Saved layout IDs and view state stay unchanged; restored captions update in place. Conversation names, scoped subjects and file/resource instance titles are not renamed.
-- **Left pane only in free docking**: the thread sidebar's default fixed layout (a rail of destinations, plans/ade-ux §4.1) does not mount the left region. Its saved layout and named layouts stay untouched and return when Settings › Layout is set to free docking; meanwhile **Move tab to** does not offer the left region.
+- **Left pane only in free docking**: the thread sidebar's default fixed layout (a rail of destinations, docs/ade-ux §4.1) does not mount the left region. Its saved layout and named layouts stay untouched and return when Settings › Layout is set to free docking; meanwhile **Move tab to** does not offer the left region.
 - **One view system**: plugins export reusable components through `@dshfiles/workbench/registry`. Views open in left, centre, right or bottom panes and their Dockview split groups. The owned Threads list and Navigation use this same contract. The sidebar keeps only its brand/history/palette row and native account/footer chrome fixed. Sidebar customization belongs to the Threads panel's settings gear and follows that view.
 - **Stable window scene**: switching between already-open conversations from different projects changes only the selected conversation, not the tab set or layout. Unrelated New tab choosers, order, pins and drafts remain. Reload uses the current region layouts instead of an older scope cache; a chooser you explicitly close stays closed.
 - **New thread welcome**: an empty conversation keeps the native centered **Into the Unknown** heading, workspace/model controls and its original composer inside its own tab. Drafting alone keeps the welcome; the first real turn switches that same editor into normal chat. Loading/unknown history is not mistaken for an empty thread. The welcome also fits narrow and split panes.
@@ -100,6 +100,11 @@ The same controls remain reachable at 360, 480, 768 and 1024 pixels, including w
 ![Icon-only main controls at 360 pixels](docs/screenshots/responsive-main-360.png)
 
 ![Main panels split beside each other](docs/screenshots/responsive-main-split.png)
+
+## Docs
+
+- [Slot and panel inventory](docs/slot-inventory.md): the M0 baseline key/shape table and persistence obligations.
+- [Switch measurements](docs/evidence/workbench-switch-performance-2026-10-26.json) and [its repeat](docs/evidence/workbench-switch-performance-2026-10-26-final.json): the redacted before/after numbers behind [performance](../../../docs/performance.md).
 
 ## Panels
 

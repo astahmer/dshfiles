@@ -40,7 +40,7 @@ const useSourcePackages = (sources: readonly PendingRestartSource[]): readonly s
 }
 
 /**
- * The status strip's one restart item (plans/ade-ux §4.1 R5): every update only a Host restart applies, from the Host
+ * The status strip's one restart item (docs/ade-ux §4.1 R5): every update only a Host restart applies, from the Host
  * files thread-sidebar watches and from other plugins' sources, with the restart verbs. It hides while nothing waits.
  * The verbs run in the sidebar shell, which keeps the confirmation dialog and its guards.
  */

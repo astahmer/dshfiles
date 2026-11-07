@@ -1810,7 +1810,7 @@ const assertFullHeightRightPane = async (page: Page, bottomShown: boolean): Prom
       const right = await page.locator('[data-workbench-region="right"]').boundingBox()
       const outer = await page.locator('[data-rightbar-col]').locator('..').boundingBox()
       const bottom = bottomShown ? await page.locator('[data-shell-bottom]').boundingBox() : null
-      // The frame's status strip spans its last row under every column (plans/ade-ux §4.1); the columns end above it.
+      // The frame's status strip spans its last row under every column (docs/ade-ux §4.1); the columns end above it.
       const strips = page.locator('[data-status-strip]')
       const strip = (await strips.count()) === 0 ? null : await strips.first().boundingBox()
       const frame = outer === null ? null : { ...outer, height: outer.height - (strip?.height ?? 0) }

@@ -2,7 +2,7 @@ import { defineContract } from '@dshfiles/dshx/client'
 import type { ComponentType } from 'react'
 
 /**
- * Observe › Usage › Quota (plans/ade-ux §6 "Cost/usage in 4–6 places"). `@dshfiles/usage` owns the one Usage page; the
+ * Observe › Usage › Quota (docs/ade-ux §6 "Cost/usage in 4–6 places"). `@dshfiles/usage` owns the one Usage page; the
  * quota views stay ai-accounts' code because they read its quota store.
  *
  * Why ai-accounts declares these tokens instead of usage declaring a registry: usage already imports ai-accounts (price

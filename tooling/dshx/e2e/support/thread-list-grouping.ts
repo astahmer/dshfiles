@@ -6,7 +6,7 @@ const threadsRegion = (page: Page): Locator => page.getByRole('region', { name: 
 const sidebarNavigation = (page: Page): Locator => page.getByRole('navigation', { name: 'Sidebar navigation', exact: true })
 
 /**
- * All threads ships grouped by status (Needs you, Working, Ready, Idle, Done; plans/ade-ux §4.3). A journey that asserts
+ * All threads ships grouped by status (Needs you, Working, Ready, Idle, Done; docs/ade-ux §4.3). A journey that asserts
  * the older Active, Parked, Pinned, Settled or Archived section headers picks those drag-to-arrange sections first,
  * through the Group menu, as a user would. Idempotent: a list already arranged manually is left alone.
  */
@@ -46,7 +46,7 @@ const groupByStatus = async (page: Page, scope: Locator = threadsRegion(page)): 
 const newThreadButton = (page: Page): Locator => page.getByRole('button', { name: 'New thread', exact: true }).filter({ visible: true }).first()
 
 /**
- * The fixed rail layout is the default (plans/ade-ux §4.1). A journey about the older Dockview sidebar — its header
+ * The fixed rail layout is the default (docs/ade-ux §4.1). A journey about the older Dockview sidebar — its header
  * destinations, header and footer More menus, overflow modes, Workbench Threads panel — switches to Settings › Layout ›
  * Free docking first, as a user would. Idempotent: a page already docking is left alone.
  */

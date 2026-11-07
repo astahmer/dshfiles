@@ -7,8 +7,6 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [Plugin boundaries](plugin-boundaries.md)                    | One-way dependencies between plugins: contracts and registries instead of cycles, enforced by `dshx check repo`.                                        |
 | [Fork maintenance](fork-maintenance.md)                      | Upstream sync, selective plugin PRs, ownership policy, sanitized publication history, and the separate deployment boundary.                             |
 | [Personal configuration](personal-configuration.md)          | Machine-local launcher choices, private paths and deployment settings.                                                                                  |
-| [25 October upstream sync](upstream-sync-20261025.md)        | Isolated candidate, deliberate conflict resolutions, verification evidence and deployment caveats.                                                      |
-| [26 October upstream sync](upstream-sync-20261026.md)        | Historical receipt: six accepted upstream PRs, rollback reference, conflict resolutions and verification.                                               |
 | [Recovering a broken DSH](recovery.md)                       | Start the last known good DSH, find what broke, refresh the snapshot, and upgrade DSH through the gate.                                                 |
 | [`profile-installs.md`](profile-installs.md)                 | Local profile installs, pnpm behavior, peer dependencies, and composition.                                                                              |
 | [`e2e-testing.md`](e2e-testing.md)                           | Test layers, boot smoke, Gherkin journeys, feature catalogs, and run evidence.                                                                          |
@@ -34,6 +32,10 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [Observability](observability.md)                            | Which source answers which question; OpenTelemetry spans for turns, model calls, tools and plugin code, one trace.                                      |
 | [Session reminders](session-reminders.md)                    | Same-thread reminders through the official Schedule service: tools, limits, and the scratch journey that proves delivery.                               |
 | [Reference repositories](reference-repos.md)                 | Upstream and peer projects checked out locally for comparison, and why each is kept.                                                                    |
+| [ADE design](ade-ux/README.md)                              | The unified shell as built: language, inbox, rail, thread loop, Observe pages, phone rules, the migration map and the per-phase evidence. |
+| [Replacing native plugins](native-plugin-overrides.md)      | Use DSH core as the baseline and own the divergence in an owned plugin instead of forking core. |
+| [Verifying a plugin change](verifying-plugins.md)           | The full check after touching a plugin: Host bundle import, HMR versus restart, probe and scratch profiles, browser console. |
+| [Host stall profile](host-stall-profile-2026-10-19.md)      | Dated live-Host event-loop profile: the settings read behind every Session event, its fix and its regression test. |
 | [Harness landscape](research/harness-landscape/README.md)    | Dated comparison of DSH against ten coding harnesses, one report per product.                                                                           |
 
 For the complete package guide index, see the [repository README](../README.md#owned-dsh-bundles). For dshx, see the [toolchain documentation index](../tooling/dshx/docs/index.md).

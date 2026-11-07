@@ -17,7 +17,7 @@ owning plugin's README — this file is only the decision register.
 
 ## Workbench compatibility boundary
 
-The [slot inventory](../docs/workbench-slot-inventory.md) records exact declarers and owner props. Generic arbitrary
+The [slot inventory](../plugins/@dshfiles/workbench/docs/slot-inventory.md) records exact declarers and owner props. Generic arbitrary
 foreign-child rendering remains unavailable without declarer cooperation (WB-SLOT-01): metadata enumeration does not
 grant render authority or fabricate valid message/turn/file/approval owner data (WB-PROPS-01). Keep those contributions
 inside their existing parent assembly; direct panels require an opt-in registration or an owned declarer replacement.

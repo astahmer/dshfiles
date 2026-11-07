@@ -320,7 +320,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const stageTitle = props.useSessions(state =>
     stageThread === undefined ? undefined : Object.values(state.byId).find(session => session.id === stageThread)?.displayTitle,
   )
-  // Fixed (default): the rail and one list; the Workbench left panes render only in free docking (plans/ade-ux §4.1).
+  // Fixed (default): the rail and one list; the Workbench left panes render only in free docking (docs/ade-ux §4.1).
   const docking = preferences.layoutMode === 'docking'
   const contentOverridden = props.contentOverridden && docking
   const contributedSections = useRegistry(DestinationSections)
@@ -1624,7 +1624,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 </PopoverContent>
               </Popover>
             )}
-            {/* The fixed layout's status strip carries the account preview (plans/ade-ux §4.1 R5); free docking keeps the
+            {/* The fixed layout's status strip carries the account preview (docs/ade-ux §4.1 R5); free docking keeps the
                 footer preview seat, which Workbench also offers as a movable view. */}
             {docking ? <SidebarPreviewFallback renderSlot={props.renderSlot} contentOverridden={contentOverridden} /> : null}
           </div>

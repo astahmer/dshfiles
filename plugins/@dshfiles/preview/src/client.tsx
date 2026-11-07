@@ -29,7 +29,7 @@ export default defineClient({
   name: '@dshfiles/preview',
   inject: ['slots', 'sidebarRight', 'sidebarRightTabs'],
   setup(ctx, decorate, metadata) {
-    // Dev servers are a tab of Observe › Processes and part of the thread panel's Jobs facet (plans/ade-ux §6); the
+    // Dev servers are a tab of Observe › Processes and part of the thread panel's Jobs facet (docs/ade-ux §6); the
     // header chip stays the quick view on the thread itself.
     const plugin = metadata?.plugin
     if (plugin !== undefined) {

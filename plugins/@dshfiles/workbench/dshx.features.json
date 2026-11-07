@@ -733,7 +733,7 @@
         {
           "kind": "not-applicable",
           "id": "workbench.phone-sheet-browser",
-          "reason": "The Gherkin harness is Chromium 1440x900 only; the WebKit 390x844 scripted phone journey plans/ade-ux/phase6/capture/journey-plan.json opens the Changes facet in the sheet and closes it."
+          "reason": "The Gherkin harness is Chromium 1440x900 only; the WebKit 390x844 scripted phone journey docs/ade-ux/phase6/capture/journey-plan.json opens the Changes facet in the sheet and closes it."
         }
       ],
       "telemetry": [

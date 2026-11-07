@@ -4,7 +4,7 @@ import { DESTINATION_IDS } from './destination-ids.js'
 import { SchemaHelpers } from './schema-helpers.js'
 
 /**
- * A private navigation counter (plan `plans/ade-ux` §4.2): how often each rail destination and each of its sections
+ * A private navigation counter (plan `docs/ade-ux` §4.2): how often each rail destination and each of its sections
  * is opened, so later rail decisions rest on use rather than guesses. It records ids and counts only — never a thread,
  * a title or any other content — and stays on this Host.
  */
