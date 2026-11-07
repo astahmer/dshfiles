@@ -7,11 +7,12 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { pathToFileURL } from 'node:url'
+import { Schema } from 'effect'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { runProfilePluginCli } from '../src/cli/add-plugin.js'
 import { runRegistryCli } from '../src/cli/registry.js'
 import { runCli } from '../src/cli/run.js'
-import type { JsonObject } from '../src/json.js'
+import { decodeJson, type JsonObject } from '../src/json.js'
 import type { DshCommandRunner } from '../src/profile/types.js'
 import { RegistryClient } from '../src/registry/client.js'
 
@@ -32,6 +33,9 @@ const capture = () => {
 
 const sri = (bytes: Buffer): string => `sha512-${createHash('sha512').update(bytes).digest('base64')}`
 
+/** Each test reads the shape it just wrote, so only the JSON syntax is decoded here. */
+const readJson = (text: string) => decodeJson(Schema.Any, text)
+
 describe('dshx registry', () => {
   let root: string
   let home: string
@@ -45,7 +49,7 @@ describe('dshx registry', () => {
     if (args[0] === '--version') return { exitCode: 0, stdout: dshVersion, stderr: '', executable: 'global' }
     calls.push([...args])
     const [, , , verb, spec] = args
-    const manifest = JSON.parse(readFileSync(join(profileRoot, 'package.json'), 'utf8'))
+    const manifest = readJson(readFileSync(join(profileRoot, 'package.json'), 'utf8'))
     if (verb === 'add' && spec !== undefined) {
       const [name, version] = spec.startsWith('file:')
         ? nameFromTarball(spec.slice('file:'.length))
@@ -67,7 +71,7 @@ describe('dshx registry', () => {
   }
 
   const nameFromTarball = (path: string): readonly [string, string] => {
-    const manifest = JSON.parse(execFileSync('tar', ['-xzOf', path, 'package/package.json'], { encoding: 'utf8' }))
+    const manifest = readJson(execFileSync('tar', ['-xzOf', path, 'package/package.json'], { encoding: 'utf8' }))
     return [manifest.name, manifest.version]
   }
 
@@ -83,8 +87,8 @@ describe('dshx registry', () => {
     return { status, output: run.output(), errors: run.errors() }
   }
 
-  const profileManifest = () => JSON.parse(readFileSync(join(profileRoot, 'package.json'), 'utf8'))
-  const profileRecords = () => JSON.parse(readFileSync(join(profileRoot, '.dshx-registry/installed.json'), 'utf8'))
+  const profileManifest = () => readJson(readFileSync(join(profileRoot, 'package.json'), 'utf8'))
+  const profileRecords = () => readJson(readFileSync(join(profileRoot, '.dshx-registry/installed.json'), 'utf8'))
 
   /** A real npm-pack-shaped tarball, so hashing and manifest checks run against real bytes. */
   const packTarball = (name: string, version: string, extra: JsonObject = {}): Buffer => {
@@ -431,7 +435,7 @@ describe('dshx registry', () => {
       expect(added.output).toContain('Register it in src/index.ts.')
       expect(added.output).toContain('zod@4.4.3')
       expect(projectFile('src/tools/hello.ts')).toBe('one\n')
-      expect(JSON.parse(projectFile('package.json')).dependencies).toEqual({ kept: '1.0.0', zod: '4.4.3' })
+      expect(readJson(projectFile('package.json')).dependencies).toEqual({ kept: '1.0.0', zod: '4.4.3' })
       expect((await source('add', item)).output).toContain('up to date')
 
       publishSource('1.1.0', { 'src/tools/hello.ts': 'two\n' })
@@ -565,14 +569,14 @@ describe('dshx registry', () => {
       const result = await build()
       expect(result.errors).toBe('')
       expect(result.status).toBe(0)
-      const item = JSON.parse(readFileSync(join(author, 'out/r/acme-mini.json'), 'utf8'))
+      const item = readJson(readFileSync(join(author, 'out/r/acme-mini.json'), 'utf8'))
       expect(item).toMatchObject({
         package: '@acme/mini',
         engines: { dsh: '>=0.2.0-rc.1 <0.3.0-0' },
         source: { type: 'tarball', url: '../tarballs/acme-mini-1.0.0.tgz' },
       })
       expect(item.source.integrity).toBe(sri(readFileSync(join(author, 'out/tarballs/acme-mini-1.0.0.tgz'))))
-      const index = JSON.parse(readFileSync(join(author, 'out/registry.json'), 'utf8'))
+      const index = readJson(readFileSync(join(author, 'out/registry.json'), 'utf8'))
       expect(index.items.map((entry: { url: string }) => entry.url)).toEqual(['r/acme-mini.json', 'r/hello.json'])
       expect((await profilePlugin('add', join(author, 'out/r/acme-mini.json'))).status).toBe(0)
       expect((await registryCli('search', '--registry', pathToFileURL(join(author, 'out/registry.json')).href)).output).toContain('hello')
