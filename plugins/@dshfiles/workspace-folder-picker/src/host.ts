@@ -9,7 +9,7 @@ import { FolderInspector } from './folder-inspection.js'
 import { DirectoryBrowser, executableLookupLayer, ProjectRemover, projectRegistryLayer } from './host-edge-promise.js'
 import { CloneJobs, ExecutableLookup, ProjectCommands, ProjectCreator, ProjectHome } from './project-lifecycle.js'
 import { Clock } from 'effect'
-import { makeProjectIconCache } from './project-icon.js'
+import { ProjectIcon } from './project-icon.js'
 import { loadProjectConfig } from './project-config.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
 import { registeredProjects } from './registered-projects.js'
@@ -82,7 +82,7 @@ export default DshxPlugin.make({
           const fs = yield* FileSystem.FileSystem
           const path = yield* Path.Path
           const now = yield* Clock.currentTimeMillis
-          const icons = yield* makeProjectIconCache({ fs, path })
+          const icons = yield* ProjectIcon.cache({ fs, path })
           const title = input.title ?? path.basename(input.path)
           return yield* icons.read({ workspaceRoot: input.path, title, now })
         }),

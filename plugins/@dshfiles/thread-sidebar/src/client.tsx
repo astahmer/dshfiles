@@ -5530,9 +5530,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       {showHeader ? (
                         <ThreadGroupHeader
                           icon={
-                            group.projectId === undefined ? undefined : (() => {
+group.projectId === undefined ? undefined : (() => {
                               const projectPath = workspacePathById.get(group.projectId)
-                              return projectPath === undefined ? undefined : <ProjectIcon path={projectPath} title={groupLabel} />
+                              return projectPath === undefined ? undefined : <ProjectIcon path={projectPath} label={groupLabel} />
                             })()
                           }
                           checkoutCount={group.checkoutCount}

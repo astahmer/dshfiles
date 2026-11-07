@@ -40,6 +40,11 @@ export interface ResolvedProjectIcon {
   readonly source: string
 }
 
+/** One cache per Host: a project's icon is derived from files that change only when someone commits a new one. */
+export interface ProjectIconCache {
+  readonly read: (input: { readonly workspaceRoot: string; readonly title: string; readonly now: number }) => Effect.Effect<ResolvedProjectIcon>
+}
+
 const mediaTypeOf = (file: string): ProjectIconMediaType | null => {
   if (file.endsWith('.svg')) return 'image/svg+xml'
   if (file.endsWith('.png')) return 'image/png'
@@ -50,7 +55,7 @@ const mediaTypeOf = (file: string): ProjectIconMediaType | null => {
 }
 
 /** Two initials at most, from the first two words of the project name; one word keeps its first two letters. */
-export const monogramOf = (title: string): string => {
+const monogramOf = (title: string): string => {
   const words = title
     .trim()
     .split(/[\s._-]+/u)
@@ -62,60 +67,64 @@ export const monogramOf = (title: string): string => {
 
 const monogramIcon = (title: string): ResolvedProjectIcon => ({ kind: 'monogram', value: monogramOf(title), mediaType: null, source: 'monogram' })
 
-/** The declared icon first, then the candidates; the first readable image under the size cap wins. */
-export const resolveProjectIcon = (input: {
-  readonly fs: FileSystem.FileSystem
-  readonly path: Path.Path
-  readonly workspaceRoot: string
-  readonly title: string
-}) =>
-  Effect.gen(function* () {
-    const declared = yield* loadProjectConfig(input.fs, input.workspaceRoot).pipe(Effect.orElseSucceed(() => ({ file: PROJECT_CONFIG_FILE, config: null, invalid: null })))
-    const declaredPath = declared.config?.iconPath
-    const candidates = declaredPath === undefined ? PROJECT_ICON_CANDIDATES : [declaredPath, ...PROJECT_ICON_CANDIDATES.filter(candidate => candidate !== declaredPath)]
-    for (const relativePath of candidates) {
-      const mediaType = mediaTypeOf(relativePath)
-      if (mediaType === null) continue
-      const absolute = input.path.join(input.workspaceRoot, relativePath)
-      const bytes = yield* input.fs.readFile(absolute).pipe(
-        Effect.map(Option.some),
-        Effect.orElseSucceed(() => Option.none<Uint8Array>()),
+/** A project's icon helpers, grouped so the module exports one domain surface rather than a bag of functions. */
+export class ProjectIcon {
+  static monogram(title: string): string {
+    return monogramOf(title)
+  }
+
+  /** The declared icon first, then the candidates; the first readable image under the size cap wins. */
+  static resolve(input: {
+    readonly fs: FileSystem.FileSystem
+    readonly path: Path.Path
+    readonly workspaceRoot: string
+    readonly title: string
+  }): Effect.Effect<ResolvedProjectIcon> {
+    return Effect.gen(function* () {
+      const declared = yield* loadProjectConfig(input.fs, input.workspaceRoot).pipe(
+        Effect.orElseSucceed(() => ({ file: PROJECT_CONFIG_FILE, config: null, invalid: null })),
       )
-      if (Option.isNone(bytes)) continue
-      if (bytes.value.byteLength === 0 || bytes.value.byteLength > MAX_PROJECT_ICON_BYTES) continue
-      return {
-        kind: 'image',
-        value: `data:${mediaType};base64,${Buffer.from(bytes.value).toString('base64')}`,
-        mediaType,
-        source: relativePath,
-      } satisfies ResolvedProjectIcon
-    }
-    return monogramIcon(input.title)
-  })
-
-/** One cache per Host: a project's icon is derived from files that change only when someone commits a new one. */
-export interface ProjectIconCache {
-  readonly read: (input: { readonly workspaceRoot: string; readonly title: string; readonly now: number }) => Effect.Effect<ResolvedProjectIcon>
-}
-
-export const makeProjectIconCache = (input: {
-  readonly fs: FileSystem.FileSystem
-  readonly path: Path.Path
-}): Effect.Effect<ProjectIconCache> =>
-  Effect.sync(() => {
-    const entries = new Map<string, { readonly at: number; readonly icon: ResolvedProjectIcon }>()
-    return {
-      read: ({ workspaceRoot, title, now }) => {
-        const cached = entries.get(workspaceRoot)
-        const ttl = cached?.icon.kind === 'image' ? PROJECT_ICON_TTL_MS : PROJECT_ICON_MISS_TTL_MS
-        if (cached !== undefined && now - cached.at < ttl) return Effect.succeed(cached.icon)
-        return resolveProjectIcon({ fs: input.fs, path: input.path, workspaceRoot, title }).pipe(
-          Effect.tap(icon =>
-            Effect.sync(() => {
-              entries.set(workspaceRoot, { at: now, icon })
-            }),
-          ),
+      const declaredPath = declared.config?.iconPath
+      const candidates =
+        declaredPath === undefined ? PROJECT_ICON_CANDIDATES : [declaredPath, ...PROJECT_ICON_CANDIDATES.filter(candidate => candidate !== declaredPath)]
+      for (const relativePath of candidates) {
+        const mediaType = mediaTypeOf(relativePath)
+        if (mediaType === null) continue
+        const absolute = input.path.join(input.workspaceRoot, relativePath)
+        const bytes = yield* input.fs.readFile(absolute).pipe(
+          Effect.map(Option.some),
+          Effect.orElseSucceed(() => Option.none<Uint8Array>()),
         )
-      },
-    }
-  })
+        if (Option.isNone(bytes)) continue
+        if (bytes.value.byteLength === 0 || bytes.value.byteLength > MAX_PROJECT_ICON_BYTES) continue
+        return {
+          kind: 'image',
+          value: `data:${mediaType};base64,${Buffer.from(bytes.value).toString('base64')}`,
+          mediaType,
+          source: relativePath,
+        } satisfies ResolvedProjectIcon
+      }
+      return monogramIcon(input.title)
+    })
+  }
+
+  static cache(input: { readonly fs: FileSystem.FileSystem; readonly path: Path.Path }): Effect.Effect<ProjectIconCache> {
+    return Effect.sync(() => {
+      const entries = new Map<string, { readonly at: number; readonly icon: ResolvedProjectIcon }>()
+      return {
+        read: ({ workspaceRoot, title, now }) => {
+          const cached = entries.get(workspaceRoot)
+          const ttl = cached?.icon.kind === 'image' ? PROJECT_ICON_TTL_MS : PROJECT_ICON_MISS_TTL_MS
+          if (cached !== undefined && now - cached.at < ttl) return Effect.succeed(cached.icon)
+          return ProjectIcon.resolve({ fs: input.fs, path: input.path, workspaceRoot, title }).pipe(
+            Effect.tap(icon =>
+              Effect.sync(() => {
+                entries.set(workspaceRoot, { at: now, icon })
+              }),
+            ),
+          )
+        },
+      }
+    })
+  }
+}

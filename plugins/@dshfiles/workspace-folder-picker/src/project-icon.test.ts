@@ -4,7 +4,7 @@ import { Effect, FileSystem, Path } from 'effect'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { makeProjectIconCache, monogramOf, resolveProjectIcon } from './project-icon.js'
+import { ProjectIcon } from './project-icon.js'
 
 const platform = NodeServices.layer
 
@@ -25,13 +25,17 @@ const resolveIn = (root: string, title = 'my project') =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    return yield* resolveProjectIcon({ fs, path, workspaceRoot: root, title })
+    return yield* ProjectIcon.resolve({ fs, path, workspaceRoot: root, title })
   })
 
 describe('project icons', () => {
   it.effect('prefers the iconPath declared in dsh.project.json', () =>
     Effect.gen(function* () {
-      const root = yield* scratchProject({ 'dsh.project.json': '{"iconPath":"brand/mark.svg"}', 'brand/mark.svg': '<svg/>', 'assets/icon.svg': '<svg id="other"/>' })
+      const root = yield* scratchProject({
+        'dsh.project.json': '{"iconPath":"brand/mark.svg"}',
+        'brand/mark.svg': '<svg/>',
+        'assets/icon.svg': '<svg id="other"/>',
+      })
       const icon = yield* resolveIn(root)
       expect(icon).toMatchObject({ kind: 'image', source: 'brand/mark.svg', mediaType: 'image/svg+xml' })
       expect(icon.value.startsWith('data:image/svg+xml;base64,')).toBe(true)
@@ -62,7 +66,7 @@ describe('project icons', () => {
   it.effect('caches a hit and rechecks a miss sooner', () =>
     Effect.gen(function* () {
       const root = yield* scratchProject({})
-      const icons = yield* makeProjectIconCache({ fs: yield* FileSystem.FileSystem, path: yield* Path.Path })
+      const icons = yield* ProjectIcon.cache({ fs: yield* FileSystem.FileSystem, path: yield* Path.Path })
       const first = yield* icons.read({ workspaceRoot: root, title: 'project', now: 0 })
       const cached = yield* icons.read({ workspaceRoot: root, title: 'project', now: 30_000 })
       const rechecked = yield* icons.read({ workspaceRoot: root, title: 'project', now: 90_000 })
@@ -76,7 +80,7 @@ describe('monogram', () => {
   it.effect('derives one or two initials from the project name', () =>
     Effect.sync(() => {
       const titles = ['my project', 'solo', 'a-b_c.d', '  ', 'École Normale']
-      expect(titles.map(title => monogramOf(title))).toEqual(['MP', 'SO', 'AB', '?', 'ÉN'])
+      expect(titles.map(title => ProjectIcon.monogram(title))).toEqual(['MP', 'SO', 'AB', '?', 'ÉN'])
     }),
   )
 })
