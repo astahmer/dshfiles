@@ -83,8 +83,9 @@ above the sidebar footer into the strip's Quota item; free docking still seats i
 
 **Fixed layout and destinations (default).** The left column is a labelled rail of eight destinations (plan
 `docs/ade-ux` §4.2): Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings. Threads shows this thread
-list with **Search threads**, the Sidebar settings gear and its sections (Board); every other destination lists its
-sections, and choosing one opens that page in the stage. A destination with a single page (the Inbox) opens it at once.
+list with **Search threads**, the Sidebar settings gear and an icon for each of its sections beside them (Board);
+every other destination lists its sections, and choosing one opens that page in the stage. A destination with a
+single page (the Inbox) opens it at once.
 The former Navigation pages are sections now, labelled without their plugin name; the table lives in the
 `@dshfiles/thread-sidebar/destinations` dshx module (`KNOWN_SECTIONS`), plugins add later pages through its
 `DestinationSections` registry, and a page nobody mapped is listed under **Settings › Other pages**. The Inbox entry
