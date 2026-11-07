@@ -22,7 +22,7 @@ import { ProjectChecksActivityModel } from './receipt-activity.js'
 import { ReceiptStore } from './receipt-store.js'
 import { ReceiptViewModel } from './receipt-view.js'
 import { storedReceiptSchema, type StoredReceipt } from './store.js'
-import { preparationActionsFor } from './workspace-setup-selection.js'
+import { WorkspaceSetupSelection } from './workspace-setup-selection.js'
 
 const PACKAGE_NAME = '@dshfiles/project-checks'
 
@@ -251,7 +251,7 @@ const handlers = Api.handlers(projectChecksApi, {
   }),
   setupActions: Effect.fn('project-checks setup actions')(function* (input) {
     const config = yield* ChecksHost.use(host => host.config)
-    return preparationActionsFor({ actions: config.actions, workspace: { workspacePath: input.workspacePath, repoRoot: input.repoRoot } }).map(
+    return WorkspaceSetupSelection.preparationActions({ actions: config.actions, workspace: { workspacePath: input.workspacePath, repoRoot: input.repoRoot } }).map(
       action => ({
         id: action.id,
         label: action.label,

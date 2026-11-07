@@ -10,18 +10,49 @@ import { jjIntegrationApi } from './api.js'
 
 export const workspaceSetupQueryKey = (sessionId: string, path: string) => ['jj-integration', 'workspace-setup', sessionId, path] as const
 
+/** The live phase's glyph: a spinner while the dock is open, otherwise the finished state. */
+const setupStatusIcon = (status: SetupTaskView['status'], open: boolean): JSX.Element => {
+  if (open) return <Spinner className="dshx:size-3" />
+  switch (status) {
+    case 'succeeded':
+      return <CircleCheckIcon className="dshx:size-3 dshx:text-emerald-500" aria-hidden />
+    case 'cancelled':
+      return <XIcon className="dshx:size-3 dshx:text-muted-foreground" aria-hidden />
+    case 'queued':
+      return <PlayIcon className="dshx:size-3 dshx:text-muted-foreground" aria-hidden />
+    case 'failed':
+    case 'timed-out':
+    case 'blocked':
+    case 'unknown':
+    case 'running':
+    case 'cancel-requested':
+      return <CircleXIcon className="dshx:size-3 dshx:text-destructive" aria-hidden />
+  }
+}
+
 /** The one-line state of one setup action: what the composer shows while the workspace is prepared. */
+/** One phrase per live phase; the cancelled and cancel-requested phases share their wording on purpose. */
+const setupStatusLine = (status: SetupTaskView['status'], t: JjIntegrationTranslate): string => {
+  switch (status) {
+    case 'queued':
+      return t('setupQueued')
+    case 'running':
+    case 'cancel-requested':
+      return t('setupRunning')
+    case 'succeeded':
+      return t('setupSucceeded')
+    case 'cancelled':
+      return t('setupCancelled')
+    case 'failed':
+    case 'timed-out':
+    case 'blocked':
+    case 'unknown':
+      return t('setupFailed')
+  }
+}
+
 export const setupTaskLine = (input: { readonly task: SetupTaskView; readonly t: JjIntegrationTranslate }): string => {
-  const state =
-    input.task.status === 'queued'
-      ? input.t('setupQueued')
-      : input.task.status === 'running' || input.task.status === 'cancel-requested'
-        ? input.t('setupRunning')
-        : input.task.status === 'succeeded'
-          ? input.t('setupSucceeded')
-          : input.task.status === 'cancelled'
-            ? input.t('setupCancelled')
-            : input.t('setupFailed')
+  const state = setupStatusLine(input.task.status, input.t)
   return `${input.t('setupTitle')} · ${input.task.label} · ${state}`
 }
 
@@ -66,17 +97,7 @@ export const WorkspaceSetupDock = (props: { readonly sessionId: string; readonly
         const open = setupState.open && (task.status === 'running' || task.status === 'queued' || task.status === 'cancel-requested')
         return (
           <div key={task.id} className="dshx:flex dshx:items-center dshx:gap-1.5">
-            {open ? (
-              <Spinner className="dshx:size-3" />
-            ) : task.status === 'succeeded' ? (
-              <CircleCheckIcon className="dshx:size-3 dshx:text-emerald-500" aria-hidden />
-            ) : task.status === 'cancelled' ? (
-              <XIcon className="dshx:size-3 dshx:text-muted-foreground" aria-hidden />
-            ) : task.status === 'queued' ? (
-              <PlayIcon className="dshx:size-3 dshx:text-muted-foreground" aria-hidden />
-            ) : (
-              <CircleXIcon className="dshx:size-3 dshx:text-destructive" aria-hidden />
-            )}
+            {setupStatusIcon(task.status, open)}
             <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate" title={task.label}>
               {setupTaskLine({ task, t: props.t })}
             </span>
