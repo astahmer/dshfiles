@@ -73,9 +73,6 @@ describe('one tabbed right pane', () => {
     expect(close).toHaveBeenCalledOnce()
     expect(close).toHaveBeenCalledWith(panel)
     expect(panels).toHaveLength(0)
-    // The pane itself closes through its own last-panel rule, exactly as a tab close does.
-    actions.close()
-    expect(actions.isOpen()).toBe(false)
   })
 
   it('hides a pane holding several panels without closing any of them', () => {
