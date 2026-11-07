@@ -6,6 +6,7 @@ import { expect, type Page, type Route } from '@playwright/test'
 import * as Schema from 'effect/Schema'
 import { ApiChannelModel } from '../../../packages/dshx/src/api/channel.js'
 import { Then, When } from '../bdd.js'
+import { confirmFolderSetupStep } from '../threads.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 const folderPickerDialog = (page: Page) => page.getByRole('dialog', { name: 'Add workspace' })
@@ -220,6 +221,7 @@ Then('native folder selection supports cancellation, recovery and registration',
       await expect(browse).toBeEnabled()
     })
     await pickNative(3)
+    await confirmFolderSetupStep(page, selectedPath)
     await recordAssertion(page, 'native-selection-registers-workspace', async () => {
       await expect(dialog).toBeHidden()
       await expect(page.getByRole('treeitem').filter({ hasText: 'native-selected-workspace' })).toBeVisible()
@@ -249,6 +251,8 @@ Then('a typed absolute folder path can be registered without browsing', async ({
       expect(dialog.getByRole('button', { name: 'Select this folder', exact: true })).toHaveCount(0),
     )
     await dialog.getByRole('button', { name: 'Use this folder', exact: true }).click()
+    // The chosen folder now opens the setup step before it is registered.
+    await confirmFolderSetupStep(page, workspacePath)
     await recordAssertion(page, 'direct-path-is-registered-as-workspace', () =>
       expect(page.getByRole('treeitem').filter({ hasText: workspaceName })).toBeVisible(),
     )

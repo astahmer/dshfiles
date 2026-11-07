@@ -34,9 +34,15 @@ export const registerWorkspaceFolder = async (page: Page, path: string, open: (p
   }).toPass({ timeout: 20_000 })
   await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
   await expect(picker).toBeHidden()
-  // Picking a folder opens the folder-inspection step, which says what the folder is before anything is registered.
-  // A journey that only needs the project takes the plain choice; a repository keeps its own "Add project", and a Git
-  // checkout with Jujutsu available additionally offers to enable it, which is not this helper's decision to make.
+  await confirmFolderSetupStep(page, path)
+}
+
+/**
+ * The step between choosing a folder and adding it now says what the folder is. A journey that only needs the project
+ * takes the plain choice; a repository keeps its own "Add project", and a Git checkout with Jujutsu available
+ * additionally offers to enable it, which is not this helper's decision to make.
+ */
+export const confirmFolderSetupStep = async (page: Page, path: string): Promise<void> => {
   const setup = page.getByRole('dialog', { name: `Add ${basename(path)}`, exact: true })
   const asked = await setup
     .waitFor({ state: 'visible', timeout: 10_000 })
