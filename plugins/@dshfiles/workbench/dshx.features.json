@@ -503,7 +503,7 @@
     {
       "id": "main-tab-parity",
       "title": "Keep preview pin unread and close semantics in Dockview tabs",
-      "summary": "Dockview tabs consume main-tabs' existing semantics provider and profile close-button setting: preview, keep, pin, unread, local close and explicit thread-open continue working after the old strip disappears.",
+      "summary": "Dockview tabs consume main-tabs' existing semantics provider and profile close-button setting: preview, keep, pin, unread, local close and explicit thread-open continue working after the old strip disappears. Selecting a tab also scrolls it fully into view once its title and the strip header actions have laid out, without moving a strip the user scrolled by hand.",
       "reach": [
         "seed tool-call-thread",
         "expect button \"New tab\"",
@@ -561,6 +561,18 @@
           "id": "workbench.container-selection-owner",
           "file": "plugins/@dshfiles/workbench/src/tab-panels.test.tsx",
           "testName": "adopts the canonical container selection during a stale panel-flag notification"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.active-tab-visible",
+          "file": "plugins/@dshfiles/workbench/src/tab-reveal.test.ts",
+          "testName": "re-reveals the selected tab when its strip resizes, and stops after disposal"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.active-tab-user-scroll",
+          "file": "plugins/@dshfiles/workbench/src/tab-reveal.test.ts",
+          "testName": "leaves a strip alone once the user scrolls it away from the selection"
         }
       ],
       "telemetry": [
