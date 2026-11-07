@@ -319,6 +319,12 @@ workspace. Only those threads appear: anything else on that machine has no Sessi
 authorize an action. Each row's land and remove go through one of its Sessions, so they
 pass the same owner and folder checks as the thread control.
 
+## Fork and rename
+
+A mirrored Session's log lives on its owner, so `session/fork` and `session/rename` go there
+too. A fork stays on that host and is recorded here as one of its threads, so it opens in
+this client like any other.
+
 ## Remaining boundaries
 
 - Terminal access is not mirrored; Host UI is the fallback.

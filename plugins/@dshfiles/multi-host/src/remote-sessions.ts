@@ -11,6 +11,9 @@ import type {
   SessionProjectionsValue,
   SessionPromptRequest,
   SessionPromptValue,
+  SessionForkRequest,
+  SessionRenameRequest,
+  SessionRenameValue,
   SessionSelectModelRequest,
   SessionSelectModelValue,
   SessionSummary,
@@ -337,6 +340,15 @@ export class RemoteSessions extends Context.Service<
                 )
                 .pipe(Effect.orElseSucceed(() => undefined)),
         )
+      /** A fork of a mirrored thread stays on its host, so this Host records it as that host's thread. */
+      const fork = Effect.fn('multi-host remote session fork')(function* (request: SessionForkRequest) {
+        const runtime = yield* requireRuntime(request.sessionId)
+        const created = yield* forward({ sessionId: request.sessionId, method: 'fork', request, mutation: true, decode: SessionPayload.forked })
+        const cwd = yield* cwdFor(request.sessionId, runtime)
+        if (cwd !== undefined)
+          yield* threads.record({ runtimeId: runtime.id, sessionId: created.sessionId, cwd, title: '', createdAt: new Date().toISOString() })
+        return created
+      })
 
       const source: EffectSessionSource = {
         id: 'multi-host',
@@ -362,6 +374,9 @@ export class RemoteSessions extends Context.Service<
         updateQueue,
         projections: (request: SessionProjectionsRequest): Effect.Effect<SessionProjectionsValue, unknown> =>
           forward({ sessionId: request.sessionId, method: 'projections', request, mutation: false, decode: SessionPayload.projections }),
+        fork,
+        rename: (request: SessionRenameRequest): Effect.Effect<SessionRenameValue, unknown> =>
+          forward({ sessionId: request.sessionId, method: 'rename', request, mutation: true, decode: SessionPayload.renamed }),
         selectModel: (request: SessionSelectModelRequest): Effect.Effect<SessionSelectModelValue, unknown> =>
           forward({ sessionId: request.sessionId, method: 'selectModel', request, mutation: true, decode: SessionPayload.selectedModel }),
       }

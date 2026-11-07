@@ -69,6 +69,8 @@ const fixture = (): Fixture => {
         })
       if (request.method === 'selectModel') return Effect.succeed({ selected: { provider: 'deepseek', model: 'chat', reasoningEffort: 'high' } })
       if (request.method === 'create') return Effect.succeed({ sessionId: 'session-created' })
+      if (request.method === 'fork') return Effect.succeed({ sessionId: 'session-forked' })
+      if (request.method === 'rename') return Effect.succeed({ title: 'Renamed', seq: 9 })
       if (request.method === 'prompt' && promptFailure !== undefined) return Effect.fail(promptFailure)
       return Effect.succeed({ accepted: true })
     },
@@ -247,6 +249,20 @@ describe('RemoteSessions', () => {
       expect({ opened, closed }).toEqual({ opened: 1, closed: 1 })
       expect(yield* interactions.list).toEqual([])
     }).pipe(Effect.provide(services(test)))
+  })
+
+  it.effect("forks on the owning runtime and records the new thread as that runtime's", () => {
+    const test = fixture()
+    return Effect.gen(function* () {
+      const sessions = yield* RemoteSessions
+      const threads = yield* RemoteThreads
+      const fork = sessions.source.fork
+      if (fork === undefined) throw new Error('The source forks Sessions.')
+      const created = yield* fork({ sessionId: 'session-remote' as SessionId })
+      expect(created.sessionId).toBe('session-forked')
+      expect(test.calls.map(call => call.method)).toContain('fork')
+      expect((yield* threads.list).find(thread => thread.sessionId === 'session-forked')).toMatchObject({ runtimeId, cwd: '/remote/repo' })
+    }).pipe(Effect.provide(services(test, [{ sessionId: 'session-remote', runtimeId }])))
   })
 
   it.effect('forwards a prompt to the owning runtime unchanged', () => {
