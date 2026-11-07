@@ -8,6 +8,7 @@ import { DEFAULT_CLOSE_BUTTON_POSITION, workbenchTabs } from './tabs.js'
 import type { WorkbenchPanelRegistry } from './registry.js'
 import { SurfaceAction } from './surface-action.js'
 import { NewViewTabs } from './new-view.js'
+import { closeWorkbenchPanel, type WorkbenchPanelIdentity } from './panel-close.js'
 import { TabRows } from './tab-row-visibility.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
@@ -32,12 +33,12 @@ export const WorkbenchNewTabButton = (props: { readonly label: string }): JSX.El
 /** Bulk close for panels without a semantic tab, read from the group when the menu opens. */
 const GroupCloseItems = (props: {
   readonly panel: IDockviewPanelHeaderProps['api']
-  readonly closePanel: (id: string, params: unknown) => void
+  readonly closePanel: (panel: WorkbenchPanelIdentity) => void
 }): JSX.Element => {
   const panels = [...props.panel.group.panels]
   const position = panels.findIndex(panel => panel.id === props.panel.id)
   const closeExcept = (keep: (index: number) => boolean): void => {
-    for (const [index, panel] of panels.entries()) if (!keep(index)) props.closePanel(panel.id, panel.params)
+    for (const [index, panel] of panels.entries()) if (!keep(index)) props.closePanel({ id: panel.id, params: panel.params })
   }
   return (
     <>
@@ -66,15 +67,10 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
     const title = definition?.newView ? 'New tab' : tab?.target.kind === 'thread' ? tab.title : (definition?.title ?? tab?.title ?? props.api.title)
     const [renaming, setRenaming] = useState(false)
     const [notice, setNotice] = useState('')
-    const closePanel = (id: string, params: unknown): void => {
-      registry.get(NewViewTabs.sourceId(params, id))?.beforeClose?.()
-      // The semantic/native owner may already retire this occurrence. Retire
-      // only the exact surviving presentation, without a second user-close
-      // gesture and its automatic neighbor navigation.
-      const panel = props.containerApi.getPanel(id)
-      if (panel !== undefined) props.containerApi.removePanel(panel)
+    const closePanel = (panel: WorkbenchPanelIdentity): void => {
+      closeWorkbenchPanel({ api: props.containerApi, registry, panel })
     }
-    const close = (): void => closePanel(props.api.id, props.params)
+    const close = (): void => closePanel({ id: props.api.id, params: props.params })
     const closeButton = !tab?.pinned ? (
       <button
         type="button"
