@@ -450,12 +450,14 @@ the file first.
 Never `sleep` and never loop a discovery tool to pass time; both hold the turn
 with nothing running.
 
-| Waiting for          | Do this                                                                                                      |
-| -------------------- | ------------------------------------------------------------------------------------------------------------ |
-| A background command | `background_jobs_wait` (Host-side, no polling); a bounded `job_output` wait only when the job is nearly done |
-| Another agent        | `send_message` it, or end the turn — its reply resumes you                                                   |
-| The user             | async `ask_user_question`, or a `schedule_*` reminder; a pending question or the next message resumes you    |
-| Thread questions     | `list_thread_questions` once, with `sessionId` when known; never in a poll loop                              |
+| Waiting for                                               | Do this                                                                                                                                                                     |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A background command                                      | `background_jobs_wait` (Host-side, no polling); a bounded `job_output` wait only when the job is nearly done                                                               |
+| Your parent, or a child you started                       | native `send_message`; a child's final result resumes you                                                                                                                  |
+| A thread you started with `thread_create` / `thread_fork` | `thread_prompt` (queue, or steer a live turn) is the channel; it is a root thread, not your child, so `send_message` refuses it with `subagent "…" belongs to another parent session` |
+| Any other top-level thread                                | `thread_prompt` to start or queue its turn, or `dshx_comm_send` for a passive note it reads at its next prompt                                                             |
+| The user                                                  | async `ask_user_question`, or a `schedule_*` reminder; a pending question or the next message resumes you                                                                   |
+| Thread questions                                          | `list_thread_questions` once, with `sessionId` when known; never in a poll loop                                                                                             |
 
 **Cap every blocking wait.** Steering is boundary input: a user's steer is only
 read at the start of the next step, so it cannot interrupt a tool call already

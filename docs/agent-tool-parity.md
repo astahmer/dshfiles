@@ -694,7 +694,7 @@ packages enforce them:
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Depth                  | A root is depth 0; its children are depth 1. With `maxDepth: 1` (the default) a child cannot call `subagent` or `subagent_fork`: the call fails with `subagent depth 2 exceeds maxDepth 1`. The runtime context states the current and maximum depth each turn.             | `subagents` service `maxDepth`; per tool row `maxDepth` or `provider-managed` |
 | Active children        | At most `maxActiveSubagents` (default 8) running children per parent. The next start fails with `ACTIVATION_LIMIT_REACHED`; wait for a child to finish, or do the work yourself.                                                                                            | `subagents` service `maxActiveSubagents`                                      |
-| `send_message` target  | Only your direct, continuable child, or your direct parent when you are a resident child. Your own id, a sibling, a grandchild or an unrelated thread is refused; `interrupt_agent` alone reaches deeper descendants.                                                       | Native `dsh-tool-subagent-control`                                            |
+| `send_message` target  | Only your direct, continuable child, or your direct parent when you are a resident child. Your own id, a sibling, a grandchild, a thread you started with `thread_create` / `thread_fork`, or an unrelated thread is refused with `subagent "<id>" belongs to another parent session`; that text names no alternative (host-gap row 100), and `interrupt_agent` alone reaches deeper descendants. | Native `dsh-tool-subagent-control`                                            |
 | Parent questions       | `ask_parent_question` goes to the direct parent only, and only that parent may answer it (`answer_parent_question`): another Session gets "Only the direct parent can answer this question." A parent that needs a human asks with `ask_user_question` first, then answers. | `@dshfiles/agent-questions`                                                   |
 | Agent delegation rules | A configured Agent's `delegation.messaging` (`any`, `listed`, `none`) limits whom `dshx_comm_send` and topic posts may reach; `delegation.subagents: false` refuses its `subagent` calls.                                                                                   | `@dshfiles/agents` contract, enforced in `@dshfiles/agent-communication`      |
 
@@ -703,11 +703,17 @@ Pick the channel by relationship, not by habit:
 - **Your parent or your child**: native `send_message`, and the child's final
   result. The child is woken or steered by it; the parent is notified when a
   child finishes, so it never needs to poll `list_agents`.
+- **A thread you started with `thread_create` or `thread_fork`**: it is a root
+  thread, not your child, so `send_message` refuses it. Use `thread_prompt`
+  (`mode: 'queue'` for its next turn, `mode: 'steer'` into a live one) — the
+  plugin tool whose description names it as the follow-up verb — or
+  `dshx_comm_send` for a passive note.
 - **Any other live thread**: `dshx_comm_agents` once to find its Session id,
   then `dshx_comm_send`. Delivery is passive: the recipient sees an unread count
   at its next prompt and reads it with `dshx_comm_inbox`; nothing starts or
   resumes its turn. Do not expect an answer within your turn; end it, or ask the
-  user to relay.
+  user to relay. `thread_prompt` fits the same case when the thread should run
+  rather than merely be told.
 - **A decision you cannot make**: `ask_parent_question` as a child,
   `ask_user_question` as a root.
 
