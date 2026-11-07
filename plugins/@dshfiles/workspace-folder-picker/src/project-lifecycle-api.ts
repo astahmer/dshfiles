@@ -1,5 +1,6 @@
 import { defineApi, type ApiClient } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
+import { projectConfigSchema } from './project-config.js'
 import { WorkspaceFolderPickerSchema } from './schema.js'
 
 const MAX_PATH_LENGTH = 4_096
@@ -82,6 +83,13 @@ export const folderInspectionSchema = Schema.Struct({
 export type FolderInspection = typeof folderInspectionSchema.Type
 
 const initializedProjectSchema = Schema.Struct({ path: Schema.String, workspaceId: Schema.String, title: Schema.String })
+
+const projectConfigOutput = Schema.Struct({
+  path: Schema.String,
+  file: Schema.String,
+  config: Schema.NullOr(projectConfigSchema),
+  invalid: Schema.NullOr(Schema.String.check(Schema.isMaxLength(400))),
+})
 
 const publishedProjectSchema = Schema.Struct({
   path: Schema.String,
@@ -174,6 +182,20 @@ export const projectLifecycleApi = defineApi({
       description:
         'Turn an existing folder into a project in place: jj git init (colocated), a README.md when it has none, a first described commit and a main bookmark, then register it as a project. Existing files are kept and become the first revision. Refuses a folder that is already a repository or sits inside one. Call only when the user asked to initialize that folder.',
       tool: { name: 'project_init', render: project => `Initialized ${project.path}` },
+    }),
+    readProjectConfig: WorkspaceFolderPickerSchema.method({
+      input: Schema.Struct({ path: parentPathSchema }),
+      output: projectConfigOutput,
+      description:
+        'Read the dsh.project.json a repository declares at its root: icon path, default thread workspace, bookmark, trusted check ids and suggested scripts. A missing or invalid file is reported, never thrown; scripts in the file only run after the user imports them into the profile-trusted project checks. Read-only.',
+      tool: {
+        name: 'project_config_read',
+        readOnly: true,
+        render: output =>
+          output.config === null
+            ? `${output.path} · ${output.invalid ?? 'no dsh.project.json'}`
+            : `${output.path} · workspace ${output.config.defaultThreadWorkspace ?? 'inherit'} · ${String(output.config.checks?.length ?? 0)} check(s)`,
+      },
     }),
     publishProject: WorkspaceFolderPickerSchema.method({
       input: Schema.Struct({

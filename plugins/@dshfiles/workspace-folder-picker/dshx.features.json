@@ -5,7 +5,7 @@
     {
       "id": "workspace-folder-add-flow",
       "title": "Add workspaces from the folder browser",
-      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the workspace_folder_browser_capabilities agent tool reports that, with the Host's path style, without opening it. Choosing a folder first reports what it is: no repository, a Git checkout with its origin and default branch, or a Jujutsu repository. A Git checkout offers Enable Jujutsu and add, which runs the same guarded colocated init the graph uses; a folder without a repository offers Initialize repository, which starts Jujutsu in place and keeps the files already in it. The project_inspect and project_init agent tools drive the same read and write.",
+      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the workspace_folder_browser_capabilities agent tool reports that, with the Host's path style, without opening it. Choosing a folder first reports what it is: no repository, a Git checkout with its origin and default branch, or a Jujutsu repository. A Git checkout offers Enable Jujutsu and add, which runs the same guarded colocated init the graph uses; a folder without a repository offers Initialize repository, which starts Jujutsu in place and keeps the files already in it. The project_inspect and project_init agent tools drive the same read and write. A repository can also check in dsh.project.json, read by project_config_read: icon path, default thread workspace, bookmark, trusted check ids and suggested scripts, where a missing or invalid file is reported instead of thrown.",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose workspace\"",
@@ -40,7 +40,8 @@
         "A folder already inside a checkout is reported with that checkout's root, and adding it registers the folder you chose.",
         "Enable Jujutsu is offered only while the Jujutsu bundle is loaded and jj is installed; otherwise the panel offers the plain add and says why.",
         "A folder with broken .jj metadata is reported as broken and is never repaired or replaced.",
-        "Initialize repository refuses a folder that is already a repository or sits inside one, naming the checkout to add instead."
+        "Initialize repository refuses a folder that is already a repository or sits inside one, naming the checkout to add instead.",
+        "Only non-executable settings from dsh.project.json are honoured: a script runs only after the user imports it into the profile-trusted project checks."
       ],
       "externalDependencies": [],
       "verification": [
@@ -93,6 +94,24 @@
           "kind": "gherkin",
           "id": "workspace-folder-picker.folder-setup",
           "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.project-config-missing",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-config.test.ts",
+          "testName": "treats a missing file as absent and never fails"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.project-config-valid",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-config.test.ts",
+          "testName": "reads the declared settings"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.project-config-invalid",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-config.test.ts",
+          "testName": "reports an invalid file instead of throwing or applying half of it"
         }
       ],
       "telemetry": [

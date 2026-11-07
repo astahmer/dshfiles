@@ -267,16 +267,16 @@ exists) and one E2E journey against a scratch `gh` shim.
 
 Goal: a repository can declare how it wants to be worked in, safely.
 
-- [ ] Define the schema in a dshx module (`@dshfiles/workspace-folder-picker/project-config`,
+- [x] Define the schema in a dshx module (`@dshfiles/workspace-folder-picker/project-config`,
       published `exports` subpath, per the repository contract): `iconPath`,
       `defaultThreadWorkspace: 'isolated' | 'shared'`, `bookmark`, and `checks` — ids of
       **trusted** `project-checks` actions to offer in this repo, never commands to run.
       A command may only live in the file as an *importable* suggestion
       (`scripts: [{ name, command, hint }]`) that the user imports into the trusted profile
       with one click; the Host refuses to run anything from the file directly.
-- [ ] Resolve it at the workspace root, validate with the published schema, and treat a
+- [x] Resolve it at the workspace root, validate with the published schema, and treat a
       missing or invalid file as absent (log once, never fail a thread).
-- [ ] Wire `defaultThreadWorkspace` into `jj-integration`'s isolation decision for that
+- [x] Wire `defaultThreadWorkspace` into `jj-integration`'s isolation decision for that
       repository (it already has `isolateByDefault` / `autoIntegrationScope` and a
       `RepositoryAutoIntegration` exclusion list; the file becomes another resolver in front
       of the profile setting).
@@ -390,6 +390,7 @@ Filled as tasks land; empty means unverified.
 | P2 | clone surface outside the dialog | — (open: needs a global slot owner) |
 | P3 | project_publish | 2 tests: jj bookmark push to a bare remote, and the three refusals |
 | P3 | publish UI entry | — (open) |
-| P4 | dsh.project.json | — |
+| P4 | dsh.project.json | `project-config.test.ts` 3 tests; `project_config_read` bound; jj-integration `threads.integration.test.ts` 72 tests green |
+| P4 | project settings section + import button | — (open) |
 | P5 | setup on workspace create | — |
 | P6 | icons, grouping, promotion, cleanup reasons | — |

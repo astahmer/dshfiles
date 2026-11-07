@@ -2,11 +2,12 @@ import type {} from '@deepseek-ai/dsh-host-directory-picker'
 import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
-import { Effect, Layer, Option } from 'effect'
+import { Effect, FileSystem, Layer, Option } from 'effect'
 import { workspaceFolderBrowserApi } from './directory-browser-api.js'
 import { FolderInspector } from './folder-inspection.js'
 import { DirectoryBrowser, executableLookupLayer, ProjectRemover, projectRegistryLayer } from './host-edge-promise.js'
 import { CloneJobs, ExecutableLookup, ProjectCommands, ProjectCreator, ProjectHome } from './project-lifecycle.js'
+import { loadProjectConfig } from './project-config.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
 
 const projectLayer = Layer.mergeAll(CloneJobs.layer, ProjectCreator.layer, FolderInspector.layer).pipe(
@@ -49,6 +50,11 @@ export default DshxPlugin.make({
       inspect: input => FolderInspector.use(inspector => inspector.inspect(input.path)),
       initProject: input => ProjectCreator.use(creator => creator.initialize(input)),
       publishProject: input => ProjectCreator.use(creator => creator.publish(input)),
+      readProjectConfig: input =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem
+          return { path: input.path, ...(yield* loadProjectConfig(fs, input.path)) }
+        }),
       removeProject: input => ProjectRemover.use(remover => remover.remove(input.workspaceId)),
     }),
   ],

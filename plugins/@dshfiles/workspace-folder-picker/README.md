@@ -107,6 +107,30 @@ repository, one whose `origin` already exists, and one without commits are
 refused before anything is created, each naming the next command. A failed push
 keeps the repository and returns the command that finishes it.
 
+## Project config file (`dsh.project.json`)
+
+A repository can check in `dsh.project.json` at its root. Only non-executable
+settings are honoured:
+
+```json
+{
+  "iconPath": "assets/logo.svg",
+  "defaultThreadWorkspace": "isolated",
+  "bookmark": "main",
+  "checks": ["test", "typecheck"],
+  "scripts": [{ "name": "Setup", "command": "pnpm install", "hint": "Run after cloning" }]
+}
+```
+
+`project_config_read` reports what was declared; a missing, unreadable or
+invalid file is reported (never thrown), so a broken file cannot stop a thread
+from starting. `defaultThreadWorkspace` decides where new threads start for
+that repository and outranks the profile's isolate-by-default only in that
+direction: an explicit `isolate: true` at a call site still wins. `checks`
+lists ids of profile-trusted `project-checks` actions to offer. `scripts` are
+suggestions only — nothing from the file runs until the user imports it into
+the trusted actions, so cloning a repository can never execute its commands.
+
 ## Runtime support
 
 The plugin builds against the published

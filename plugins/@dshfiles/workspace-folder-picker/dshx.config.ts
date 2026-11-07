@@ -7,6 +7,7 @@ export default defineConfig({
     'directory-browser-api': 'src/directory-browser-api.ts',
     'project-lifecycle-api': 'src/project-lifecycle-api.ts',
     picker: 'src/picker/index.ts',
+    'project-config': 'src/project-config.ts',
     'repository-setup-contract': 'src/repository-setup-contract.ts',
   },
   host: { entry: 'src/host.ts' },

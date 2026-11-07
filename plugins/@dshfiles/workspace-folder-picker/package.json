@@ -35,7 +35,11 @@
       "default": "./dist/repository-setup-contract.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./project-config": {
+      "types": "./src/project-config.ts",
+      "default": "./dist/project-config.js"
+    }
   },
   "scripts": {
     "check": "dshx check && pnpm lint && pnpm fmt:check",

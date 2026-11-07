@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import { Context, Effect, FileSystem, Layer, Option, Path } from 'effect'
+import { loadProjectConfig } from '@dshfiles/workspace-folder-picker/project-config'
 import type { DestinationView } from './api.js'
 import { AgentOnly, NoPath, NotARepository, NotAThread, WorkspaceFilesFailed, WorkspaceNotFound } from './errors.js'
 import { ActivityLog, WorkspaceRegistry } from './host-edges-promise.js'
@@ -42,6 +43,17 @@ const make = Effect.gen(function* () {
 
   const exists = (target: string) => fileSystem.exists(target).pipe(Effect.orElseSucceed(() => false))
   const isolateByDefault = Effect.map(settings.get, isolatesNewThreadsByDefault)
+  /**
+   * Where this repository starts new threads: `dsh.project.json` can declare it, and the profile setting decides when
+   * it does not. Only `isolate: true` at a call site outranks both.
+   */
+  const isolationFor = (repoRoot: string) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadProjectConfig(fileSystem, repoRoot)
+      const declared = loaded.config?.defaultThreadWorkspace
+      if (declared === undefined) return yield* isolateByDefault
+      return declared === 'isolated'
+    })
   const titleFor = (input: { readonly project: { readonly title: string } | undefined; readonly repoRoot: string; readonly name: string }) =>
     `${input.project?.title ?? path.basename(input.repoRoot)} · ${input.name}`
 
@@ -69,7 +81,7 @@ const make = Effect.gen(function* () {
     if (Option.isNone(location)) return { workspaceId: source.id, isolated: false, destination: noDestination(yield* isolateByDefault) }
     const repoRoot = location.value.repoRoot
     const project = yield* registry.resolveByPath(repoRoot)
-    if (!(input.isolate ?? (yield* isolateByDefault)))
+    if (!(input.isolate ?? (yield* isolationFor(repoRoot))))
       return {
         workspaceId: project?.id ?? source.id,
         isolated: false,
