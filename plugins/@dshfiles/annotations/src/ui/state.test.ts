@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AnnotationTarget } from '../schema.js'
 import { annotationsUi } from './state.js'
 
@@ -28,5 +28,24 @@ describe('annotationsUi', () => {
   it('adopts a pick that finished in the picker browser', () => {
     annotationsUi.pickedFrom({ scope: 'session-1', owner: 'capture', picked: { target, point, mode: 'element' } })
     expect(annotationsUi.snapshot()).toMatchObject({ scope: 'session-1', owner: 'capture', pickMode: false, picked: { point } })
+  })
+
+  it('inserts through the writer its composer registered last', () => {
+    const first = vi.fn(() => true)
+    const second = vi.fn(() => true)
+    annotationsUi.registerDraftWriter({ owner: 'reply', insertText: first })
+    annotationsUi.registerDraftWriter({ owner: 'reply', insertText: second })
+
+    expect(annotationsUi.insertIntoDraft({ owner: 'reply', text: 'block' })).toBe(true)
+    expect(first).not.toHaveBeenCalled()
+    expect(second).toHaveBeenCalledWith('block')
+  })
+
+  it('forgets the writer when its action leaves', () => {
+    annotationsUi.registerDraftWriter({ owner: 'reply', insertText: () => true })
+
+    annotationsUi.release('reply')
+
+    expect(annotationsUi.insertIntoDraft({ owner: 'reply', text: 'block' })).toBe(false)
   })
 })

@@ -2,13 +2,14 @@ import { useEffect, useState, type JSX } from 'react'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { useApi } from '@dshfiles/dshx/client'
-import { useMutation, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useApi, useResource } from '@dshfiles/dshx/client'
+import { useMutation } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { annotationsApi } from '../api.js'
-import { ElementDescriptor } from '../descriptor.js'
-import { describeRegion } from '../region.js'
-import type { AnnotationIntent, AnnotationSeverity, AnnotationTarget } from '../schema.js'
+import { formatAnnotationBlock } from '../draft.js'
+import { annotationsListInput, annotationsListResource } from '../list-poll.js'
+import type { AnnotationIntent, AnnotationSeverity } from '../schema.js'
+import { PickClickGuard, PickSession, type DragBox } from './pick-session.js'
 import { annotationsUi, useAnnotationsUi, type PickedTarget, type PickMode } from './state.js'
 
 const INTENTS: readonly AnnotationIntent[] = ['fix', 'change', 'question', 'approve']
@@ -32,30 +33,21 @@ const labelOf = (element: Element): string => {
   return text.length === 0 ? tag : `${tag} "${text.slice(0, 40)}"`
 }
 
-const targetAt = ({ x, y }: { readonly x: number; readonly y: number }, eventTarget?: EventTarget | null): Element | null => {
-  const fromEvent = eventTarget instanceof Element ? eventTarget : null
-  const hit = fromEvent ?? document.elementFromPoint(x, y)
-  if (hit === null) return null
-  if (hit.closest('[data-annotations-ui]') !== null) return null
-  return ElementDescriptor.pickableElement(hit)
-}
-
-const describeAt = ({ element, surface, url }: { readonly element: Element; readonly surface: 'dsh'; readonly url: string }): AnnotationTarget | null =>
-  ElementDescriptor.describeTarget({ element, surface, url })
-
 const CommentForm = ({ picked }: { readonly picked: PickedTarget }): JSX.Element => {
   const api = useApi(annotationsApi)
-  const queryClient = useQueryClient()
   const ui = useAnnotationsUi()
   const [note, setNote] = useState('')
   const [intent, setIntent] = useState<AnnotationIntent | null>('fix')
   const [severity, setSeverity] = useState<AnnotationSeverity | null>('important')
   const [error, setError] = useState<string | null>(null)
   const { scope, owner } = ui
+  // The action's list read: the same input and options reach the same page-wide resource, so refreshing here also
+  // refreshes the badge and the panel the user opens next.
+  const list = useResource(annotationsApi, 'list', annotationsListInput({ scope: scope ?? '' }), { ...annotationsListResource, enabled: false })
   const create = useMutation({
     mutationFn: async (pickAgain: boolean) => {
       if (scope === null) throw new Error('Open a thread first, or a Backlog item.')
-      await runHostRequest({
+      const created = await runHostRequest({
         request: signal =>
           api.create(
             {
@@ -73,10 +65,15 @@ const CommentForm = ({ picked }: { readonly picked: PickedTarget }): JSX.Element
             { signal },
           ),
       })
-      return pickAgain
+      return { created, pickAgain }
     },
-    onSuccess: async pickAgain => {
-      await queryClient.invalidateQueries({ queryKey: ['annotations', scope] })
+    onSuccess: ({ created, pickAgain }) => {
+      list.refetch()
+      const block = formatAnnotationBlock({ annotations: created.annotations })
+      if (block.length > 0 && owner !== null && !annotationsUi.insertIntoDraft({ owner, text: block })) {
+        setError('Saved, but the draft did not take it. Close this and add it from the panel.')
+        return
+      }
       if (pickAgain && scope !== null && owner !== null) annotationsUi.beginPick({ scope, owner, mode: picked.mode })
       else annotationsUi.clearPicked()
     },
@@ -147,7 +144,9 @@ const modeHint = (mode: PickMode): string => (mode === 'region' ? 'Drag an area 
 export const PickerOverlay = (): JSX.Element | null => {
   const ui = useAnnotationsUi()
   const [hover, setHover] = useState<{ box: Box; label: string } | null>(null)
-  const [drag, setDrag] = useState<{ start: { x: number; y: number }; current: { x: number; y: number } } | null>(null)
+  const [drag, setDrag] = useState<DragBox | null>(null)
+
+  useEffect(() => PickClickGuard.install(), [])
 
   useEffect(() => {
     if (!ui.pickMode) {
@@ -155,56 +154,17 @@ export const PickerOverlay = (): JSX.Element | null => {
       setDrag(null)
       return
     }
-    const onMove = (event: PointerEvent): void => {
-      if (ui.mode === 'region') {
-        setDrag(current => (current === null ? current : { ...current, current: { x: event.clientX, y: event.clientY } }))
-        return
-      }
-      const element = targetAt({ x: event.clientX, y: event.clientY })
-      setHover(element === null ? null : { box: boxOf(element), label: labelOf(element) })
-    }
-    const onPointerDown = (event: PointerEvent): void => {
-      const element = targetAt({ x: event.clientX, y: event.clientY }, event.target)
-      if (element === null) return
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      if (ui.mode === 'region') {
-        setDrag({ start: { x: event.clientX, y: event.clientY }, current: { x: event.clientX, y: event.clientY } })
-        return
-      }
-      const target = describeAt({ element, surface: 'dsh', url: window.location.href })
-      if (target !== null) annotationsUi.picked({ target, point: { x: event.clientX, y: event.clientY }, mode: 'element' })
-    }
-    const onPointerUp = (event: PointerEvent): void => {
-      if (ui.mode !== 'region' || drag === null) return
-      const element = targetAt({ x: event.clientX, y: event.clientY }) ?? targetAt(drag.start)
-      if (element === null) return
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      const rect = { x: drag.start.x, y: drag.start.y, width: drag.current.x - drag.start.x, height: drag.current.y - drag.start.y }
-      if (Math.abs(rect.width) < 4 || Math.abs(rect.height) < 4) return
-      const target = describeRegion({ element, surface: 'dsh', url: window.location.href, rect })
-      if (target !== null) annotationsUi.picked({ target, point: { x: event.clientX, y: event.clientY }, mode: 'region' })
-    }
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      annotationsUi.cancelPick()
-    }
-    document.addEventListener('pointermove', onMove, true)
-    document.addEventListener('pointerdown', onPointerDown, true)
-    document.addEventListener('pointerup', onPointerUp, true)
-    document.addEventListener('keydown', onKey, true)
-    document.body.style.cursor = ui.mode === 'region' ? 'cell' : 'crosshair'
-    return () => {
-      document.removeEventListener('pointermove', onMove, true)
-      document.removeEventListener('pointerdown', onPointerDown, true)
-      document.removeEventListener('pointerup', onPointerUp, true)
-      document.removeEventListener('keydown', onKey, true)
-      document.body.style.cursor = ''
-    }
-  }, [ui.pickMode, ui.mode, drag])
+    return PickSession.install({
+      mode: ui.mode,
+      url: () => window.location.href,
+      handlers: {
+        onHover: element => setHover(element === null ? null : { box: boxOf(element), label: labelOf(element) }),
+        onDrag: setDrag,
+        onPicked: result => annotationsUi.picked({ target: result.target, point: result.point, mode: result.mode }),
+        onCancel: () => annotationsUi.cancelPick(),
+      },
+    })
+  }, [ui.pickMode, ui.mode])
 
   const dragBox =
     drag === null

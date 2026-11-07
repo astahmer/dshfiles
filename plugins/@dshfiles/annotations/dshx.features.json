@@ -28,6 +28,7 @@
         "expect textbox \"What is wrong or what should change?\"",
         "fill textbox \"What is wrong or what should change?\" \"the tab strip overlaps the sidebar\"",
         "click button \"Add\"",
+        "expect text \"Annotated UI feedback (1)\"",
         "click button \"Annotate an element\"",
         "expect text \"plugins/@dshfiles/annotations/src*\""
       ],
@@ -66,6 +67,12 @@
           "id": "annotations.draft-block",
           "file": "plugins/@dshfiles/annotations/tests/draft.spec.ts",
           "testName": "prints selector, page, source and note"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.pick-click-guard",
+          "file": "plugins/@dshfiles/annotations/src/ui/pick-session.test.ts",
+          "testName": "cancels the click a picked element would otherwise receive"
         }
       ],
       "telemetry": [

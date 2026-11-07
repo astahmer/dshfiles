@@ -11,15 +11,13 @@ import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query
 import { annotationsApi } from '../api.js'
 import { INGEST_PATH } from '../limits.js'
 import { formatAnnotationBlock } from '../draft.js'
-import { annotationsListPollMs, annotationsListResource } from '../list-poll.js'
+import { annotationsListInput, annotationsListPollMs, annotationsListResource } from '../list-poll.js'
 import type { Annotation } from '../schema.js'
 import { staleAnnotations } from '../stale.js'
 import { annotationsUi, useAnnotationsUi } from './state.js'
 import { pairingMachine } from './pairing-machine.js'
 import { PreviewDialog } from './preview-dialog.js'
 import { noRowAction, rowActionReducer } from './row-action.js'
-
-const OPEN_STATUSES = ['pending', 'acknowledged', 'stale'] as const
 
 const selectorLabel = (annotation: Annotation): string => annotation.target.selector.split(' > ').slice(-1)[0] ?? annotation.target.tag
 
@@ -61,18 +59,19 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
   const [rowAction, dispatchRowAction] = useReducer(rowActionReducer, noRowAction)
   const checked = useRef(new Set<string>())
 
+  useEffect(() => {
+    annotationsUi.registerDraftWriter({ owner, insertText: props.insertText })
+  }, [owner, props.insertText])
   useEffect(() => () => annotationsUi.release(owner), [owner, scope])
 
   // A layout effect: the popover moves focus out of the draft in its own effect, and a draft saving on blur must already be held.
   const working = open || previewOpen || (ui.owner === owner && (ui.pickMode || ui.picked !== null))
   useLayoutEffect(() => (working ? hold() : undefined), [hold, working])
 
-  const list = useResource(
-    annotationsApi,
-    'list',
-    { sessionId: scope, statuses: [...OPEN_STATUSES], limit: 50 },
-    { ...annotationsListResource, subscriberPollInterval: annotationsListPollMs(open) },
-  )
+  const list = useResource(annotationsApi, 'list', annotationsListInput({ scope }), {
+    ...annotationsListResource,
+    subscriberPollInterval: annotationsListPollMs(open),
+  })
   const rows = useMemo(() => list.data?.annotations ?? [], [list.data])
   const count = rows.length
 
