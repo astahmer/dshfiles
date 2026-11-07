@@ -629,7 +629,7 @@ When('a checkout on the host has unpushed work and origin moved', async ({ page 
   const origin = join(root, 'origin.git')
   const publisher = join(root, 'publisher')
   const checkout = join(root, 'host checkout')
-  scratchRun(root, 'git', 'init', '--quiet', '--bare', origin)
+  scratchRun(root, 'git', 'init', '--quiet', '--bare', '--initial-branch=main', origin)
   scratchRun(root, 'jj', 'git', 'init', '--colocate', publisher)
   scratchRun(publisher, 'jj', 'git', 'remote', 'add', 'origin', origin)
   await writeFile(join(publisher, 'base.txt'), 'base\n')

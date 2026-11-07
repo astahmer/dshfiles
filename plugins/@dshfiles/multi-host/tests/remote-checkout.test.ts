@@ -98,7 +98,7 @@ beforeEach(async () => {
   origin = join(scenario, 'origin.git')
   publisher = join(scenario, 'publisher')
   host = join(scenario, 'host checkout')
-  await execFile('git', ['init', '--quiet', '--bare', origin])
+  await execFile('git', ['init', '--quiet', '--bare', '--initial-branch=main', origin])
   await execFile('jj', ['git', 'init', '--colocate', publisher])
   await jj(publisher, 'git', 'remote', 'add', 'origin', origin)
   await write(publisher, 'shared.txt', 'one\ntwo\nthree\n')
