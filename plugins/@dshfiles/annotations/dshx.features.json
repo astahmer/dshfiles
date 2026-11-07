@@ -86,6 +86,48 @@
       ]
     },
     {
+      "id": "backlog-composers",
+      "title": "Annotate from Backlog composers",
+      "summary": "The element picker joins the Backlog capture box, item descriptions and replies through the ComposerTool contract, with annotations scoped to the item or capture box, so a note can be picked, reviewed and sent from a discussion.",
+      "surfaces": ["client", "host", "api"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "Backlog composer: Annotate an element",
+      "configuration": [],
+      "states": ["idle", "picking", "commenting", "saved", "stale", "resolved", "dismissed"],
+      "failureModes": [
+        "The Backlog plugin is absent, so the tool only appears in the conversation composer.",
+        "The Host store is unavailable, so saving reports an error and the draft is untouched.",
+        "The draft closed before the tool finished, so insertion reports false and nothing is written."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "expect textbox \"Capture\"",
+        "click button \"Annotate an element\"",
+        "expect text \"None yet in this draft\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "annotations.backlog-reply",
+          "featureFile": "tooling/dshx/e2e/features/annotations.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "annotations.backlog-description",
+          "featureFile": "tooling/dshx/e2e/features/annotations.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
       "id": "source-resolution",
       "title": "Resolve an element to its source",
       "summary": "Map a captured CSS class or exact visible text to a file and line inside an owned plugin bundle through its client source map.",

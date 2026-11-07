@@ -18,11 +18,11 @@ interface PreviewDocument {
 export const PreviewDialog = ({
   open,
   onOpenChange,
-  sessionId,
+  scope,
 }: {
   readonly open: boolean
   readonly onOpenChange: (open: boolean) => void
-  readonly sessionId: string
+  readonly scope: string
 }): JSX.Element => {
   const api = useApi(annotationsApi)
   const queryClient = useQueryClient()
@@ -53,7 +53,7 @@ export const PreviewDialog = ({
         request: signal =>
           api.create(
             {
-              sessionId,
+              sessionId: scope,
               items: [
                 {
                   kind: 'element',
@@ -68,7 +68,7 @@ export const PreviewDialog = ({
     onSuccess: async () => {
       setPicked(null)
       setNote('')
-      await queryClient.invalidateQueries({ queryKey: ['annotations', sessionId] })
+      await queryClient.invalidateQueries({ queryKey: ['annotations', scope] })
     },
     onError: (cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not save the annotation.'),
   })

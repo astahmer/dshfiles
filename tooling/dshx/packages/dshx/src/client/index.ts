@@ -142,6 +142,8 @@ export type {
 export {
   ComposerAction,
   ComposerPill,
+  ComposerTool,
+  ComposerTools,
   FileViewer,
   HeaderAction,
   MenuItem,
@@ -157,6 +159,8 @@ export type {
   ComposerPillItem,
   ComposerPillRow,
   ComposerPillState,
+  ComposerToolItem,
+  ComposerToolProps,
   FileViewerItem,
   FileViewerProps,
   HeaderActionItem,

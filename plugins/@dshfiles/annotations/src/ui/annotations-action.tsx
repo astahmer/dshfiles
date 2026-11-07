@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { CrosshairIcon, SquareDashedIcon } from '@dshfiles/plugin-ui/icons'
-import { useApi, usePlugin, useResource, type ComposerActionProps } from '@dshfiles/dshx/client'
+import { useApi, usePlugin, useResource, type ComposerToolProps } from '@dshfiles/dshx/client'
 import { retryOnceUnlessTimedOut, runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -14,7 +14,7 @@ import { formatAnnotationBlock } from '../draft.js'
 import { annotationsListPollMs, annotationsListResource } from '../list-poll.js'
 import type { Annotation } from '../schema.js'
 import { staleAnnotations } from '../stale.js'
-import { annotationsUi } from './state.js'
+import { annotationsUi, useAnnotationsUi } from './state.js'
 import { pairingMachine } from './pairing-machine.js'
 import { PreviewDialog } from './preview-dialog.js'
 import { noRowAction, rowActionReducer } from './row-action.js'
@@ -48,26 +48,29 @@ const pickFailureMessage = ({
   return 'Could not reach that tab.'
 }
 
-export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
+export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
   const api = useApi(annotationsApi)
   const plugin = usePlugin()
   const queryClient = useQueryClient()
-  const sessionId = props.sessionId
+  const { scope, scopeLabel, hold } = props
+  const owner = useId()
+  const ui = useAnnotationsUi()
   const [open, setOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pairing, sendPairing] = useMachine(pairingMachine)
   const [rowAction, dispatchRowAction] = useReducer(rowActionReducer, noRowAction)
   const checked = useRef(new Set<string>())
 
-  useEffect(() => {
-    annotationsUi.setSession(sessionId)
-    return () => annotationsUi.setSession(null)
-  }, [sessionId])
+  useEffect(() => () => annotationsUi.release(owner), [owner, scope])
+
+  // A layout effect: the popover moves focus out of the draft in its own effect, and a draft saving on blur must already be held.
+  const working = open || previewOpen || (ui.owner === owner && (ui.pickMode || ui.picked !== null))
+  useLayoutEffect(() => (working ? hold() : undefined), [hold, working])
 
   const list = useResource(
     annotationsApi,
     'list',
-    { sessionId, statuses: [...OPEN_STATUSES], limit: 50 },
+    { sessionId: scope, statuses: [...OPEN_STATUSES], limit: 50 },
     { ...annotationsListResource, subscriberPollInterval: annotationsListPollMs(open) },
   )
   const rows = useMemo(() => list.data?.annotations ?? [], [list.data])
@@ -81,7 +84,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
     retry: retryOnceUnlessTimedOut,
   })
   const attach = useMutation({
-    mutationFn: async (ids: readonly string[]) => runHostRequest({ request: signal => api.attach({ sessionId, ids: [...ids] }, { signal }) }),
+    mutationFn: async (ids: readonly string[]) => runHostRequest({ request: signal => api.attach({ sessionId: scope, ids: [...ids] }, { signal }) }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['annotations', 'intake'] })
       await refresh()
@@ -132,7 +135,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
   }
   const acceptPick = (picked: Awaited<ReturnType<typeof pickInChrome>>): void => {
     if (picked === null) return
-    annotationsUi.picked({ target: picked.target, point: picked.point, mode: 'element' })
+    annotationsUi.pickedFrom({ scope, owner, picked: { target: picked.target, point: picked.point, mode: 'element' } })
   }
   const pickActiveTab = useMutation({
     mutationFn: () => pickInChrome({ noPage: 'No annotatable tab yet; open a page in that window.' }),
@@ -155,13 +158,13 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
 
   const stale = useMutation({
     mutationFn: async (check: { readonly id: string; readonly revision: number; readonly reason: 'element-missing' | 'text-changed' | 'route-changed' }) =>
-      runHostRequest({ request: signal => api.stale({ sessionId, id: check.id, reason: check.reason }, { signal }) }),
+      runHostRequest({ request: signal => api.stale({ sessionId: scope, id: check.id, reason: check.reason }, { signal }) }),
     onSuccess: refresh,
   })
 
   const resolve = useMutation({
     mutationFn: async (annotation: Annotation) =>
-      runHostRequest({ request: signal => api.resolve({ sessionId, id: annotation.id, revision: annotation.revision }, { signal }) }),
+      runHostRequest({ request: signal => api.resolve({ sessionId: scope, id: annotation.id, revision: annotation.revision }, { signal }) }),
     onSuccess: async () => {
       await refresh()
     },
@@ -169,7 +172,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
 
   const dismiss = useMutation({
     mutationFn: async ({ id, text }: { readonly id: string; readonly text: string }) =>
-      runHostRequest({ request: signal => api.dismiss({ sessionId, id, reason: text }, { signal }) }),
+      runHostRequest({ request: signal => api.dismiss({ sessionId: scope, id, reason: text }, { signal }) }),
     onSuccess: async () => {
       dispatchRowAction({ type: 'settled' })
       await refresh()
@@ -178,7 +181,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
 
   const sendReply = useMutation({
     mutationFn: async ({ id, body }: { readonly id: string; readonly body: string }) =>
-      runHostRequest({ request: signal => api.reply({ sessionId, id, body, role: 'human' }, { signal }) }),
+      runHostRequest({ request: signal => api.reply({ sessionId: scope, id, body, role: 'human' }, { signal }) }),
     onSuccess: async () => {
       dispatchRowAction({ type: 'settled' })
       await refresh()
@@ -206,14 +209,13 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
 
   const pick = ({ mode }: { readonly mode: 'element' | 'region' }): void => {
     setOpen(false)
-    annotationsUi.beginPick({ sessionId, mode })
+    annotationsUi.beginPick({ scope, owner, mode })
   }
 
   const insert = (): void => {
     const block = formatAnnotationBlock({ annotations: rows })
     if (block.length === 0) return
-    const span = props.inputActions.captureInsertion()
-    if (!props.inputActions.insertText(block, span)) return
+    if (!props.insertText(block)) return
     setOpen(false)
   }
 
@@ -226,6 +228,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
             variant="ghost"
             size="sm"
             aria-label="Annotate an element"
+            onMouseDown={event => event.preventDefault()}
             className="dshx-root dshx:relative dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent"
           >
             <CrosshairIcon className="dshx:size-4" />
@@ -240,7 +243,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
           <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-2">
             <div>
               <h2 className="dshx:text-sm dshx:font-semibold">Annotations</h2>
-              <p className="dshx:text-xs dshx:text-muted-foreground">{count === 0 ? 'None yet in this thread' : `${count} open`}</p>
+              <p className="dshx:text-xs dshx:text-muted-foreground">{count === 0 ? `None yet in this ${scopeLabel}` : `${count} open`}</p>
             </div>
             <div className="dshx:flex dshx:items-center dshx:gap-1">
               <Button type="button" size="sm" variant="secondary" onClick={() => pick({ mode: 'element' })}>
@@ -268,7 +271,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
                     disabled={attach.isPending}
                     onClick={() => attach.mutate([item.id])}
                   >
-                    Add to this thread
+                    Add to this {scopeLabel}
                   </Button>
                 </div>
               ))}
@@ -530,7 +533,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
           </div>
         </PopoverContent>
       </Popover>
-      <PreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} sessionId={sessionId} />
+      <PreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} scope={scope} />
     </>
   )
 }

@@ -1,3 +1,4 @@
+import { ComposerTools } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
@@ -6,6 +7,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react'
 
 import { AttachFilesButton, AttachmentTray, threadMentionText, useComposerFiles, useFileDrop } from './composer-attachments.js'
+import { useComposerToolHold, type BacklogComposerTools } from './composer-tools.js'
 import { BacklogImageEditor } from './image-reference-editor.js'
 import type { BacklogImageEditorHandle } from './image-reference-editor.js'
 import { InlineCompletion } from './inline-completion.js'
@@ -29,6 +31,8 @@ export const BacklogTextBox = (props: {
   readonly tags?: readonly string[]
   readonly attachments: ComposerFiles
   readonly variant: 'body' | 'reply'
+  /** What the composer tools offered here belong to. */
+  readonly tools: BacklogComposerTools
   readonly autoFocus?: boolean
   readonly submitLabel?: string
   readonly submitDisabled?: boolean
@@ -57,26 +61,40 @@ export const BacklogTextBox = (props: {
     files: props.attachments.files,
   })
   const rows = dismissed ? [] : completion.suggestions
+  const toolHold = useComposerToolHold(() => input.current?.focus())
   const addFiles = async (files: readonly File[]): Promise<void> => {
     const result = await props.attachments.add(files)
     if (result.added.length === 0) return
     input.current?.insertImageReferences(result.added, result.firstImageNumber)
   }
+  const insertAtCaret = (inserted: string): void => {
+    const text = input.current?.getMarkdownText() ?? props.value
+    const range = input.current?.getSelectionRange() ?? { start: text.length, end: text.length }
+    const next = `${text.slice(0, range.start)}${inserted}${text.slice(range.end)}`
+    input.current?.replaceRange(range.start, range.end, inserted)
+    props.onChange(next)
+    const position = range.start + inserted.length
+    setCaret(position)
+    requestAnimationFrame(() => input.current?.setCaret(position))
+  }
   const drop = useFileDrop({
     onFiles: files => void addFiles(files),
     onThreadMention: sessionId => {
       const thread = props.threads.find(candidate => candidate.id === sessionId)
-      const mention = threadMentionText({ sessionId, title: thread?.title ?? sessionId })
-      const text = input.current?.getMarkdownText() ?? props.value
-      const range = input.current?.getSelectionRange() ?? { start: text.length, end: text.length }
-      const next = `${text.slice(0, range.start)}${mention}${text.slice(range.end)}`
-      input.current?.replaceRange(range.start, range.end, mention)
-      props.onChange(next)
-      const position = range.start + mention.length
-      setCaret(position)
-      requestAnimationFrame(() => input.current?.setCaret(position))
+      insertAtCaret(threadMentionText({ sessionId, title: thread?.title ?? sessionId }))
     },
   })
+  const tools = (
+    <ComposerTools
+      {...props.tools}
+      insertText={text => {
+        if (input.current === null) return false
+        insertAtCaret(text)
+        return true
+      }}
+      hold={toolHold.hold}
+    />
+  )
   const reply = props.variant === 'reply'
   const inputClass = cn(
     'dshx:w-full dshx:overflow-y-auto dshx:whitespace-pre-wrap dshx:break-words dshx:bg-transparent dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',
@@ -147,6 +165,8 @@ export const BacklogTextBox = (props: {
   }
 
   const blur = (event: FocusEvent<HTMLDivElement>): void => {
+    // A tool at work owns the focus for now, and the draft has to outlive it to receive the result.
+    if (toolHold.held()) return
     const next = event.relatedTarget
     if (next instanceof Node && event.currentTarget.contains(next)) return
     if (next instanceof HTMLElement && next.draggable) {
@@ -238,6 +258,7 @@ export const BacklogTextBox = (props: {
         <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
           <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
             <AttachFilesButton onFiles={files => void addFiles(files)} />
+            {tools}
             <span>
               <Kbd>↵</Kbd> send
             </span>
@@ -249,6 +270,7 @@ export const BacklogTextBox = (props: {
       ) : (
         <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
           <AttachFilesButton onFiles={files => void addFiles(files)} label="Attach an image or file to this item" />
+          {tools}
           <span>
             Markdown · <code>@</code> items, threads and agents · <Kbd>⌘</Kbd>
             <Kbd>↵</Kbd> to save

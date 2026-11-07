@@ -17,6 +17,32 @@ Feature: Element annotations in the composer
     When the annotations are added to the draft
     Then the composer draft holds the annotation block
 
+  @scenario:annotations.backlog-reply
+  Scenario: Annotate from a Backlog discussion and send it as a reply
+    Given the annotations profile is booted beside the Backlog
+    When the Backlog panel is opened
+    And "Annotate the reply box" is captured
+    And backlog item b:1 is opened
+    And an element is annotated from the reply box with "the reply box is cramped"
+    Then the reply box lists the annotation with "the reply box is cramped"
+    And the capture box lists no annotation of that item
+    When the annotations are added to the reply draft
+    Then the reply draft holds the annotation block with "the reply box is cramped"
+    When the reply is sent
+    Then the item conversation shows the annotation block with "the reply box is cramped"
+
+  @scenario:annotations.backlog-description
+  Scenario: Annotate from a Backlog description without closing it
+    Given the annotations profile is booted beside the Backlog
+    When the Backlog panel is opened
+    And "Annotate the description" is captured
+    And backlog item b:1 is opened
+    And an element is annotated from the description box with "the description is cramped"
+    Then the description box is still open
+    When the annotations are added to the description draft
+    And focus leaves the description box
+    Then the saved description shows the annotation block with "the description is cramped"
+
   @scenario:annotations.preview-element
   Scenario: Annotate an element inside an HTML preview
     Given the isolated plugin profile "@dshfiles/annotations" is booted

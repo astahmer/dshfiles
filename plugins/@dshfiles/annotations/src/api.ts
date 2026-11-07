@@ -55,7 +55,7 @@ export const annotationsApi = defineApi({
       input: listInputSchema,
       output: shownOutputSchema,
       description:
-        "List element annotations the user wrote about this Session's DSH UI, with per-status counts. Read-only; it never resolves or acknowledges anything.",
+        "List element annotations the user wrote about this Session's DSH UI, with per-status counts. `sessionId` also takes the key of a composer without a Session, such as `backlog:item:12` for a Backlog item. Read-only; it never resolves or acknowledges anything.",
       tool: { name: 'annotations_list', readOnly: true, render: compactJson },
     }),
     create: method({

@@ -1537,7 +1537,7 @@
     },
     {
       "name": "annotations_list",
-      "description": "List element annotations the user wrote about this Session's DSH UI, with per-status counts. Read-only; it never resolves or acknowledges anything.",
+      "description": "List element annotations the user wrote about this Session's DSH UI, with per-status counts. `sessionId` also takes the key of a composer without a Session, such as `backlog:item:12` for a Backlog item. Read-only; it never resolves or acknowledges anything.",
       "parameters": {
         "type": "object",
         "properties": {
