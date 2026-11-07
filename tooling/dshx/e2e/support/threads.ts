@@ -34,6 +34,14 @@ export const registerWorkspaceFolder = async (page: Page, path: string, open: (p
   }).toPass({ timeout: 20_000 })
   await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
   await expect(picker).toBeHidden()
+  // Picking a folder now opens the folder-inspection step. Journeys that only need a project take the plain-folder
+  // choice; a folder that already is a repository keeps its own option.
+  const setup = page.getByRole('dialog', { name: `Add ${basename(path)}`, exact: true })
+  const asked = await setup.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)
+  if (asked) {
+    await setup.getByRole('button', { name: 'Add without a repository', exact: true }).click()
+    await expect(setup).toBeHidden()
+  }
 }
 
 /** Send a message from whichever composer is on screen and wait until that turn settles. */
