@@ -171,10 +171,7 @@ export const createQueueEditMachine = <DraftId extends string, Attachment>() =>
           context.ports.drafts.release(hydrated)
           notice = 'The composer refused the attachments; Cancel still puts the original back.'
         } else {
-          composer.restoreImageReferences({
-            text,
-            imageIds: QueueEditModel.imageIdsForBlocks({ blocks: context.row?.blocks ?? [], attachmentIds: hydrated }),
-          })
+          composer.restoreReferences()
         }
         composer.focus()
         return { notice }
@@ -278,10 +275,7 @@ export const createQueueEditMachine = <DraftId extends string, Attachment>() =>
           input.ports.drafts.release(hydrated)
           return
         }
-        input.ports.composer.restoreImageReferences({
-          text: QueueEditModel.textOf(input.blocks),
-          imageIds: QueueEditModel.imageIdsForBlocks({ blocks: input.blocks, attachmentIds: hydrated }),
-        })
+        input.ports.composer.restoreReferences()
       }),
       place: fromPromise<void, { readonly ports: QueueEditPorts<DraftId, Attachment>; readonly itemId: string; readonly before: readonly string[] }>(
         ({ input }) => moveIntoPlace({ ports: input.ports, itemId: input.itemId, before: input.before }),

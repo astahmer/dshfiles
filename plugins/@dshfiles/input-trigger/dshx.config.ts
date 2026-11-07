@@ -15,6 +15,7 @@ export default defineConfig({
   modules: {
     'caret-token': 'src/caret-token.ts',
     'entity-registry': 'src/entity-registry.ts',
+    'entity-reference': 'src/entity-reference.tsx',
     'image-attachment-contract': 'src/image-attachment-contract.ts',
   },
   build: { sourcemap: true, declarations: true, minify: true },

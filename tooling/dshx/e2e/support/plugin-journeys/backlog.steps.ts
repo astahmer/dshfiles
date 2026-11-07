@@ -1186,8 +1186,9 @@ When('a message with the serialized backlog mention is sent', async ({ page }: {
 
 Then('the sent mention renders as a backlog chip {string} titled {string}', async ({ page }: { page: Page }, reference: string, title: string) => {
   await recordAssertion(page, 'backlog-sent-mention-chip', async () => {
-    const chip = page.getByRole('button', { name: `Backlog item ${await withBacklogRefs(page, reference)} · ${title}`, exact: true })
+    const chip = page.getByRole('button', { name: `Preview backlog item ${await withBacklogRefs(page, reference)}`, exact: true })
     await expect(chip).toBeVisible()
+    await expect(chip).toContainText(title)
     // The serialized title and tool hint must not stay in the bubble.
     await expect(page.getByText('backlog_get has its details')).toHaveCount(0)
     await chip.click()
@@ -1198,7 +1199,7 @@ Then('the sent mention renders as a backlog chip {string} titled {string}', asyn
 
 Then('the inline backlog preview shows {string}', async ({ page }: { page: Page }, text: string) => {
   await recordAssertion(page, 'backlog-reference-inline-preview', async () => {
-    const reference = page.getByRole('button', { name: await withBacklogRefs(page, 'Backlog item b:1'), exact: true })
+    const reference = page.getByRole('button', { name: await withBacklogRefs(page, 'Preview backlog item b:1'), exact: true })
     await expect(reference).toBeVisible()
     const preview = page.locator('[data-dshfiles-backlog-preview]')
     // A scroll closes the card by design, and the conversation can still settle right after the turn lands, so ask

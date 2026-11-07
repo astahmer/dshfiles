@@ -1,5 +1,6 @@
-import type { InputTriggerCandidate, InputTriggerSource } from '@dshfiles/input-trigger/client'
+import type { InputTriggerCandidate, InputTriggerSource, RestoredReference } from '@dshfiles/input-trigger/client'
 import { AGENT_MENTION_SCOPES, type Agent } from './agent.js'
+import { AgentReference } from './agent-reference.js'
 
 /** Every other source's scope, so its rows never leak into an agent lookup and vice versa. */
 const OTHER_SCOPES = ['thread', 't', 'file', 'f', 'skill', 'mcp', 'backlog', 'b']
@@ -30,10 +31,9 @@ const candidateOf = (agent: Agent, section: string): InputTriggerCandidate => ({
   value: agent.handle,
 })
 
-/**
- * `@` mentions of agents. A picked row inserts `@handle ` as plain text, so the composer, the sent message and a
- * backlog comment all carry the same readable mention.
- */
+const wireMention = (handle: string): string => `@{${handle}}`
+
+/** `@` mentions of agents. A picked row inserts the agent chip, which submits and reads back as `@{handle}`. */
 const createSource = (options: { readonly list: () => Promise<readonly Agent[]>; readonly section: string }): InputTriggerSource => ({
   trigger: '@',
   name: 'agents',
@@ -50,7 +50,35 @@ const createSource = (options: { readonly list: () => Promise<readonly Agent[]>;
   },
   onPick({ candidate }) {
     if (candidate.value === undefined) return undefined
-    return { text: `@${candidate.value} ` }
+    const handle = candidate.value
+    return {
+      insert: {
+        source: 'agents',
+        ref: handle,
+        label: `@${handle}`,
+        clipboardText: wireMention(handle),
+      },
+    }
+  },
+  codec: {
+    clipboardText: ref => wireMention(ref),
+    serialize: ref => Promise.resolve(wireMention(ref)),
+  },
+  restore(_session, text) {
+    return [...text.matchAll(/@\{([^}\s]{1,64})\}/gu)].flatMap(token => {
+      const handle = token[1]
+      if (handle === undefined || !AgentReference.isHandle(handle)) return []
+      const start = token.index ?? 0
+      const reference: RestoredReference = {
+        source: 'agents',
+        ref: handle,
+        label: `@${handle}`,
+        clipboardText: token[0],
+        start,
+        end: start + token[0].length,
+      }
+      return [reference]
+    })
   },
 })
 

@@ -58,11 +58,18 @@ const draftAttachmentApiShape = Schema.Struct({
 })
 
 const sessionInputShape = Schema.Struct({ input: Schema.Struct({ for: anyFunctionSchema }) })
+/** The composer's chip-restore verb; absent on a client bundle older than the composer that added it. */
+const restoreReferencesShape = Schema.Struct({ restoreReferences: anyFunctionSchema })
 
 // Only the shape is checked; callers keep the original object, whose methods rely on their own `this`.
 const hasDraftAttachmentApi = (value: unknown): value is DraftAttachmentApi => Option.isSome(Schema.decodeUnknownOption(draftAttachmentApiShape)(value))
 
 const hasSessionInput = (value: unknown): value is ConversationWithInput => Option.isSome(Schema.decodeUnknownOption(sessionInputShape)(value))
+
+const restoreComposerReferences = (composer: SessionInput): void => {
+  const parsed = Schema.decodeUnknownOption(restoreReferencesShape)(composer)
+  if (Option.isSome(parsed)) parsed.value.restoreReferences()
+}
 
 const isAttachmentId = (value: string): value is AttachmentIdType => value.length > 0
 const isReceiptId = (value: string): value is ReceiptId => value.length > 0
@@ -217,25 +224,8 @@ const createEditor = (input: {
       subscribe: listener => input.composer.state.subscribe(listener),
       setDraft: text => input.composer.setDraft(text),
       addAttachments: ids => input.composer.addAttachments(ids),
-      restoreImageReferences: ({ text, imageIds }) => {
-        // Without the trigger service the composer has no reference codec, so a chip would fail the send.
-        if (!input.canRestoreReferences) return
-        const tokens = QueueEditModel.imageReferenceTokens({ text, imageIds })
-        for (const token of [...tokens].reverse()) {
-          const state = input.composer.state.getSnapshot()
-          if (!state.draft.startsWith(text)) return
-          const inserted = input.composer.insertReference(
-            {
-              source: 'image-attachment',
-              ref: token.id,
-              label: token.label,
-              appearance: 'file',
-              clipboardText: `[${token.label}]`,
-            },
-            { start: token.offset, end: token.offset + token.length, draftRev: state.draftRev },
-          )
-          if (!inserted) return
-        }
+      restoreReferences: () => {
+        restoreComposerReferences(input.composer)
       },
       removeAttachment: id => {
         input.composer.removeAttachment(id)

@@ -39,4 +39,19 @@ describe('imageAttachmentSource', () => {
     expect(open).toHaveBeenNthCalledWith(1, 'session-a', 'draft-image-a')
     expect(open).toHaveBeenNthCalledWith(2, 'session-a', 'stale-image')
   })
+
+  it('restores each written token to the image it names, and leaves an unmatched number alone', () => {
+    const source = imageAttachmentSource({
+      imagesFor: () => [
+        { id: 'draft-image-a', label: 'Image 1' },
+        { id: 'draft-image-b', label: 'Image 2' },
+      ],
+      open: () => true,
+    })
+    const session = { sessionId: SessionId('session-a') }
+    expect(source.restore?.(session, 'look at [Image 2] and [Image 3], then [Image 1]')).toEqual([
+      { source: 'image-attachment', ref: 'draft-image-b', label: 'Image 2', appearance: 'file', clipboardText: '[Image 2]', start: 8, end: 17 },
+      { source: 'image-attachment', ref: 'draft-image-a', label: 'Image 1', appearance: 'file', clipboardText: '[Image 1]', start: 38, end: 47 },
+    ])
+  })
 })

@@ -45,9 +45,18 @@ test('a quoted query is a file path, not an agent lookup', async () => {
   assert.deepEqual(await source.candidates({ sessionId: 'session-1' } as never, { ...request('agent:ds'), quoted: true }), [])
 })
 
-test('picking inserts the plain mention text', () => {
+test('picking inserts the agent chip, which submits as the braced mention', () => {
   const source = AgentMentions.createSource({ section: 'Agents', list: async () => [] })
-  assert.deepEqual(source.onPick?.({ candidate: { name: '@reviewer', section: 'Agents', value: 'reviewer' } } as never), { text: '@reviewer ' })
+  assert.deepEqual(source.onPick?.({ candidate: { name: '@reviewer', section: 'Agents', value: 'reviewer' } } as never), {
+    insert: { source: 'agents', ref: 'reviewer', label: '@reviewer', clipboardText: '@{reviewer}' },
+  })
+})
+
+test('restores a braced mention as its chip and leaves a legacy plain mention alone', () => {
+  const source = AgentMentions.createSource({ section: 'Agents', list: async () => [] })
+  assert.deepEqual(source.restore?.({ sessionId: 'session-1' } as never, 'ask @{reviewer}, then @reviewer later'), [
+    { source: 'agents', ref: 'reviewer', label: '@reviewer', clipboardText: '@{reviewer}', start: 4, end: 15 },
+  ])
 })
 
 test('rows describe the route and the description', async () => {

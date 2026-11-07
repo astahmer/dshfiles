@@ -20,6 +20,7 @@ import type {
   InputTriggerCrumb,
   InputTriggerSource,
   PickAction,
+  RestoredReference,
   SubmitEnvelope,
   TriggerChar,
   TriggerGuard,
@@ -94,6 +95,42 @@ export class InputTriggerController {
     const projection = this.project()
     for (const src of deps.roster.all()) this.watchLexicon(src, projection)
     this.refreshLexicon()
+  }
+
+  /**
+   * Rebuild the chips a plain-text message's serialized references left behind, from every source that declares a
+   * restore grammar. Overlapping spans keep the earlier one; a chip whose text no longer matches is dropped.
+   * @param text - the draft text a queued message came back as.
+   * @returns ordered, non-overlapping reference spans.
+   */
+  restoreReferences(text: string): readonly RestoredReference[] {
+    if (this.disposed || text === '') return []
+    const projection = this.project()
+    const candidates: RestoredReference[] = []
+    for (const source of this.deps.roster.all()) {
+      if (source.restore === undefined) continue
+      let spans: readonly RestoredReference[]
+      try {
+        spans = source.restore(projection, text)
+      } catch {
+        continue
+      }
+      for (const span of spans) {
+        if (!Number.isInteger(span.start) || !Number.isInteger(span.end)) continue
+        if (span.start < 0 || span.end > text.length || span.start >= span.end) continue
+        if (text.slice(span.start, span.end) !== span.clipboardText) continue
+        candidates.push(span)
+      }
+    }
+    candidates.sort((left, right) => left.start - right.start)
+    const accepted: RestoredReference[] = []
+    let end = 0
+    for (const candidate of candidates) {
+      if (candidate.start < end) continue
+      accepted.push(candidate)
+      end = candidate.end
+    }
+    return accepted
   }
 
   /**

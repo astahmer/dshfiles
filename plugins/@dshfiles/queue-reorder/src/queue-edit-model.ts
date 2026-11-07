@@ -177,8 +177,8 @@ export interface QueueEditPorts<DraftId extends string, Attachment> {
   readonly composer: Observable<ComposerSnapshot<DraftId>> & {
     setDraft(text: string): void
     addAttachments(ids: readonly DraftId[]): boolean
-    /** Replace queued [Image N] tokens with live attachment reference chips. */
-    restoreImageReferences(input: { readonly text: string; readonly imageIds: readonly DraftId[] }): void
+    /** Rebuild the reference chips the queued text's serialized references still name. */
+    restoreReferences(): void
     removeAttachment(id: DraftId): void
     submit(): void
     focus(): void

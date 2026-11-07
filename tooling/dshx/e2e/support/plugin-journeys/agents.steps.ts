@@ -220,7 +220,7 @@ const agentPreview = (page: Page) => page.locator('[data-dshfiles-agent-preview]
 When('the mention {string} is clicked in the open item', async ({ page }: { page: Page }, mention: string) => {
   const handle = mention.replace(/^@\{([^}]+)\}$/u, '@$1')
   await peek(page)
-    .getByRole('link', { name: `Preview agent ${handle}`, exact: true })
+    .getByRole('button', { name: `Preview agent ${handle}`, exact: true })
     .first()
     .click()
 })

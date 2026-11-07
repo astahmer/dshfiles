@@ -120,7 +120,7 @@
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "left-nav: Backlog › Backlog settings",
+      "currentSurface": "left-nav: Backlog \u203a Backlog settings",
       "configuration": [
         {
           "key": "dshfiles-backlog.jevEnabled",
@@ -137,7 +137,7 @@
         {
           "key": "dshfiles-backlog.jevSecret",
           "defaultValue": "",
-          "constraints": "Hidden since the one shared key (dshfiles-settings-shell.jevSecret, Settings › Tools & MCP › Jev): kept as the fallback while the shared key is empty, and adopted into it once when that is empty. Secret Catalog reference only; value resolves on the Host.",
+          "constraints": "Hidden since the one shared key (dshfiles-settings-shell.jevSecret, Settings \u203a Tools & MCP \u203a Jev): kept as the fallback while the shared key is empty, and adopted into it once when that is empty. Secret Catalog reference only; value resolves on the Host.",
           "coveredBy": ["backlog.jev-settings-panel"]
         }
       ],
@@ -187,7 +187,7 @@
       "surfaces": ["client", "host"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › Feed",
+      "currentSurface": "left-nav: Backlog \u203a Feed",
       "configuration": [],
       "states": ["fresh", "stale", "dormant", "archived"],
       "failureModes": ["Dormant and archived items stay in search and backlinks; only the default feed hides them."],
@@ -266,7 +266,7 @@
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › rows",
+      "currentSurface": "left-nav: Backlog \u203a rows",
       "configuration": [],
       "states": ["reading", "editing", "saved", "cancelled"],
       "failureModes": [
@@ -318,7 +318,7 @@
       "surfaces": ["client", "host", "tool"],
       "surface": "detail",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › Board / item detail",
+      "currentSurface": "left-nav: Backlog \u203a Board / item detail",
       "configuration": [],
       "states": ["inbox", "todo", "doing", "done", "dropped"],
       "failureModes": ["An unknown item id answers not-found without writing."],
@@ -377,7 +377,7 @@
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › Board › Configure board columns",
+      "currentSurface": "left-nav: Backlog \u203a Board \u203a Configure board columns",
       "configuration": [],
       "states": ["default-order", "custom-order", "hidden-column"],
       "failureModes": ["At least one board column remains visible; hiding columns does not change item status or remove items."],
@@ -419,16 +419,16 @@
         "expect text \"2 selected\"",
         "expect button \"Start thread\"",
         "rightclick row \"Item b:#2\"",
-        "click menuitem \"Start thread (2)…\"",
+        "click menuitem \"Start thread (2)\u2026\"",
         "expect dialog \"Start thread\"",
-        "expect text \"· 2 items*\"",
+        "expect text \"\u00b7 2 items*\"",
         "click button \"Cancel\"",
         "expect text \"First selection item\""
       ],
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › rows",
+      "currentSurface": "left-nav: Backlog \u203a rows",
       "configuration": [],
       "states": ["unselected", "range-selected", "additive-selection", "batch-updated"],
       "failureModes": [
@@ -529,17 +529,17 @@
         "click checkbox \"Select b:#1\"",
         "click checkbox \"Select b:#2\"",
         "rightclick row \"Item b:#2\"",
-        "expect menuitem \"Start thread (2)…\"",
+        "expect menuitem \"Start thread (2)\u2026\"",
         "expect menuitem \"Copy item IDs (2)\"",
         "expect menuitem \"Copy item links (2)\"",
         "expect menuitem \"Status (2)\"",
         "expect menuitem \"Pin items (2)\"",
-        "expect menuitem \"Delete permanently (2)…\""
+        "expect menuitem \"Delete permanently (2)\u2026\""
       ],
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › row menu",
+      "currentSurface": "left-nav: Backlog \u203a row menu",
       "configuration": [],
       "states": ["single", "selection"],
       "failureModes": [
@@ -574,7 +574,7 @@
       "surfaces": ["client", "host", "settings", "tool"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › capture",
+      "currentSurface": "left-nav: Backlog \u203a capture",
       "configuration": [],
       "states": ["off", "proposed", "applied", "dismissed"],
       "verification": [
@@ -704,7 +704,7 @@
       "surfaces": ["client", "host", "tool"],
       "surface": "command",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › Backfill triage",
+      "currentSurface": "left-nav: Backlog \u203a Backfill triage",
       "configuration": [],
       "states": ["untriaged", "applied", "suggested", "unchanged", "remaining", "not-configured"],
       "reach": [
@@ -942,7 +942,7 @@
     {
       "id": "backlog-mentions",
       "title": "Mention backlog items with @",
-      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; …)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text.",
+      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; \u2026)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text.",
       "surfaces": ["client", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -1004,9 +1004,9 @@
         "click menuitemradio \"dshx_fake_commandcode/gpt-6-luna\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Working on b:#1\"",
         "press Enter",
-        "expect button \"Backlog item b:#1\"",
-        "click button \"Backlog item b:#1\"",
-        "expect text \"Backlog · b:#1\"",
+        "expect button \"Preview backlog item b:#1\"",
+        "click button \"Preview backlog item b:#1\"",
+        "expect text \"Backlog \u00b7 b:#1\"",
         "expect text \"Ship the backlog reference preview\"",
         "expect img \"red.png\"",
         "click button \"Open red.png\"",
@@ -1018,7 +1018,7 @@
         "press Escape",
         "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Following b:#1\"",
         "press Enter",
-        "expect button \"Backlog item b:#1\""
+        "expect button \"Preview backlog item b:#1\""
       ],
       "surfaces": ["client"],
       "surface": "entityProvider",
@@ -1082,7 +1082,7 @@
       "surfaces": ["client", "host", "settings", "tool"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › search",
+      "currentSurface": "left-nav: Backlog \u203a search",
       "configuration": [],
       "states": ["browsing", "searching", "saved"],
       "failureModes": ["A settings write that the Host refuses drops the optimistic saved view."],
@@ -1186,7 +1186,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",
-      "currentSurface": "left-nav: Backlog › Inbox filter (links to the Inbox)",
+      "currentSurface": "left-nav: Backlog \u203a Inbox filter (links to the Inbox)",
       "configuration": [],
       "states": ["unread", "acknowledged", "resolved", "snoozed"],
       "failureModes": [
@@ -1338,7 +1338,7 @@
       "surfaces": ["client", "host", "storage"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › capture box",
+      "currentSurface": "left-nav: Backlog \u203a capture box",
       "configuration": [],
       "states": ["empty", "gallery", "images", "properties", "saved", "sending", "typing"],
       "failureModes": [
@@ -1414,7 +1414,7 @@
       "surfaces": ["client", "host", "storage"],
       "surface": "detail",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › item detail",
+      "currentSurface": "left-nav: Backlog \u203a item detail",
       "states": ["reading", "editing", "mentioning", "attached", "saved", "routing"],
       "configuration": [
         {
@@ -1536,7 +1536,7 @@
       "surfaces": ["client", "host", "settings"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › project filter",
+      "currentSurface": "left-nav: Backlog \u203a project filter",
       "configuration": [],
       "states": ["all-projects", "one-project", "multiple-projects", "no-project", "remembered"],
       "failureModes": [
@@ -1594,7 +1594,7 @@
       "surfaces": ["client", "host", "tool"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › header › Agent items",
+      "currentSurface": "left-nav: Backlog \u203a header \u203a Agent items",
       "configuration": [],
       "states": ["hiding", "showing"],
       "failureModes": [
@@ -1710,12 +1710,12 @@
         "expect text \"Start a thread from b:1\"",
         "click button \"Feed\"",
         "rightclick article \"Item b:#1\"",
-        "expect menuitem \"Start thread…\"",
+        "expect menuitem \"Start thread\u2026\"",
         "expect menuitem \"Status\"",
         "expect menuitem \"Project\"",
         "expect menuitem \"Copy item ID\"",
         "expect menuitem \"Copy item link\"",
-        "click menuitem \"Start thread…\"",
+        "click menuitem \"Start thread\u2026\"",
         "expect dialog \"Start thread\"",
         "click button \"Cancel\"",
         "click button \"Board\"",
@@ -1736,7 +1736,7 @@
       "surfaces": ["client", "settings", "tool"],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › Start thread",
+      "currentSurface": "left-nav: Backlog \u203a Start thread",
       "configuration": [],
       "states": ["item-without-project", "item-project-registered", "item-project-unregistered", "send-at-once", "stays-in-backlog", "opened-on-request"],
       "failureModes": [
@@ -1852,7 +1852,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: turn tail › Set up missing secrets",
+      "currentSurface": "transcript: turn tail \u203a Set up missing secrets",
       "configuration": [],
       "states": ["disabled", "missing-key", "offered", "editing-masked", "cancelled", "bound", "binding-failed", "catalog-unavailable"],
       "failureModes": [
@@ -1911,7 +1911,7 @@
       "surfaces": ["client", "host", "storage", "tool"],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › row menu › tweet context",
+      "currentSurface": "left-nav: Backlog \u203a row menu \u203a tweet context",
       "configuration": [],
       "states": ["unmatched", "retrieving", "imported", "retryable-failure"],
       "failureModes": [
@@ -1996,7 +1996,7 @@
       "surfaces": ["host", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",
-      "currentSurface": "left-nav: Inbox › backlog.attention",
+      "currentSurface": "left-nav: Inbox \u203a backlog.attention",
       "configuration": [],
       "states": ["needs-input", "blocked", "waiting", "cleared", "closed", "snoozed", "inbox-absent"],
       "failureModes": [
@@ -2053,16 +2053,16 @@
         "fill textbox \"Capture\" \"Mirror this item in files\"",
         "press Enter",
         "rightclick article \"Item b:#1\"",
-        "expect menuitem \"Create in Markdown files · /tmp/dshx-backlog-reach\""
+        "expect menuitem \"Create in Markdown files \u00b7 /tmp/dshx-backlog-reach\""
       ],
       "surfaces": ["client", "host", "storage", "tool", "integration"],
       "surface": "rowAction",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog: Items › row menu › Link to … / Create in … / row selection › Create in… per binding / item detail › sync chips",
+      "currentSurface": "left-nav: Backlog: Items \u203a row menu \u203a Link to \u2026 / Create in \u2026 / row selection \u203a Create in\u2026 per binding / item detail \u203a sync chips",
       "configuration": [],
       "states": ["not-linked", "synced", "pending", "conflict", "flagged", "error", "removed-remotely", "tombstoned", "unlinked", "imported"],
       "failureModes": [
-        "No enabled binding for the item's project answers with the Backlog settings › Remote sync binding to add, before any network call.",
+        "No enabled binding for the item's project answers with the Backlog settings \u203a Remote sync binding to add, before any network call.",
         "A key that does not resolve names the secret reference or environment variable to set; a refused key, rate limit or unreachable source is recorded on the item's external ref with its recovery, local edits are kept and the next Sync now retries.",
         "A parent the store refuses (a cycle, too deep) is recorded as the ref's sync error; the other pulled fields still apply.",
         "A lossy mapping never reads as a change: statuses compare by equivalence and each side is compared with its own last synced value; a field the provider cannot carry, or the binding leaves out, never flows.",
@@ -2160,7 +2160,7 @@
           "kind": "host-test",
           "id": "backlog.remote-sync-tombstone",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
-          "testName": "keeps a deleted item’s link as a tombstone, so a pull never imports its issue again; an explicit import still can"
+          "testName": "keeps a deleted item\u2019s link as a tombstone, so a pull never imports its issue again; an explicit import still can"
         },
         {
           "kind": "host-test",
@@ -2226,7 +2226,7 @@
           "kind": "unit-test",
           "id": "backlog.remote-sync-policy-first",
           "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
-          "testName": "the first sync adopts the remote side and merges both sides’ tags"
+          "testName": "the first sync adopts the remote side and merges both sides\u2019 tags"
         },
         {
           "kind": "unit-test",
@@ -2289,7 +2289,7 @@
     {
       "id": "remote-sync-settings",
       "title": "Configure remote sync connections and bindings, and import remote items",
-      "summary": "Backlog settings › Remote sync lists connections (one account of one provider each: a name, a secret:ALIAS key reference with the provider's Host-variable fallback, an optional API base URL) with Test, reorder, edit and remove, and under each its bindings: a container picked from what the connection discovers (or derived from the project), a project scope, a direction, a per-field flow with remote status names, a conflict policy, an interval, Push agent comments and Import new remote items, with Sync now, Import all open, an on/off switch, edit and remove. Removing a connection or binding asks first and drops its item links. Import reads the provider from the pasted id or URL. Rows saved in the earlier syncBackends setting move into connections and bindings on the first start, keeping every item link. Agents list with backlog_sync_connections, change with backlog_sync_connection_save/move/remove and backlog_sync_binding_save/remove, discover with backlog_sync_discover, test with backlog_sync_test_connection and backlog_sync_test_all, and import with backlog_import_remote and backlog_sync_import_all when the user asked; removals and import-all take confirm: true.",
+      "summary": "Backlog settings \u203a Remote sync lists connections (one account of one provider each: a name, a secret:ALIAS key reference with the provider's Host-variable fallback, an optional API base URL) with Test, reorder, edit and remove, and under each its bindings: a container picked from what the connection discovers (or derived from the project), a project scope, a direction, a per-field flow with remote status names, a conflict policy, an interval, Push agent comments and Import new remote items, with Sync now, Import all open, an on/off switch, edit and remove. Removing a connection or binding asks first and drops its item links. Import reads the provider from the pasted id or URL. Rows saved in the earlier syncBackends setting move into connections and bindings on the first start, keeping every item link. Agents list with backlog_sync_connections, change with backlog_sync_connection_save/move/remove and backlog_sync_binding_save/remove, discover with backlog_sync_discover, test with backlog_sync_test_connection and backlog_sync_test_all, and import with backlog_import_remote and backlog_sync_import_all when the user asked; removals and import-all take confirm: true.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2310,7 +2310,7 @@
       "surfaces": ["client", "host", "settings", "storage", "tool", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "left-nav: Backlog: Items › Backlog settings › Remote sync",
+      "currentSurface": "left-nav: Backlog: Items \u203a Backlog settings \u203a Remote sync",
       "configuration": [
         {
           "key": "dshfiles-backlog.syncBackends",
@@ -2478,7 +2478,7 @@
       "surfaces": ["client", "integration"],
       "surface": "detail",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › item detail › Relationships",
+      "currentSurface": "left-nav: Backlog \u203a item detail \u203a Relationships",
       "configuration": [],
       "states": ["masked", "revealing", "revealed", "missing", "ambiguous", "catalog-absent"],
       "failureModes": [
@@ -2597,7 +2597,7 @@
       "surfaces": ["client", "host", "storage", "tool"],
       "surface": "detail",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › item detail › activity › Show changes › Revert",
+      "currentSurface": "left-nav: Backlog \u203a item detail \u203a activity \u203a Show changes \u203a Revert",
       "configuration": [],
       "states": ["reverted", "stale"],
       "failureModes": [
@@ -2632,7 +2632,7 @@
     {
       "id": "item-timeline-lanes",
       "title": "Conversation and work log in the item timeline",
-      "summary": "An item's activity reads in two lanes. The Conversation holds everything the user did and said, attention requests, reverts, comments carried over from Linear or GitHub, smart-reply answers and the agent comment that answers the user (the one right after their comment, or the first from a thread they started or linked). Agent progress comments, moves, links, triage, system and sync events fold into a Work log line such as \"2 agents · 14 updates · last 2h\" that opens in place; Show changes and Revert work in both lanes. Every event and comment records its origin once (user, agent:<sessionId>, system, remote:<backend>); older events derive it on read, and backlog_get serves it.",
+      "summary": "An item's activity reads in two lanes. The Conversation holds everything the user did and said, attention requests, reverts, comments carried over from Linear or GitHub, smart-reply answers and the agent comment that answers the user (the one right after their comment, or the first from a thread they started or linked). Agent progress comments, moves, links, triage, system and sync events fold into a Work log line such as \"2 agents \u00b7 14 updates \u00b7 last 2h\" that opens in place; Show changes and Revert work in both lanes. Every event and comment records its origin once (user, agent:<sessionId>, system, remote:<backend>); older events derive it on read, and backlog_get serves it.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2644,7 +2644,7 @@
       "surfaces": ["client", "host", "storage", "tool"],
       "surface": "detail",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › item detail › Activity › Conversation / Work log",
+      "currentSurface": "left-nav: Backlog \u203a item detail \u203a Activity \u203a Conversation / Work log",
       "configuration": [],
       "states": ["conversation", "work-log-folded", "work-log-open"],
       "failureModes": [
@@ -2734,18 +2734,18 @@
     {
       "id": "export-backlog",
       "title": "Export the backlog to JSONL or an SQLite copy",
-      "summary": "Backlog settings › Export… writes a new file on the Host: JSON Lines with one folded item per line (optionally the op log after it) or a consistent SQLite copy. A relative, existing or folderless path is refused, so nothing is overwritten. Agents call backlog_export.",
+      "summary": "Backlog settings \u203a Export\u2026 writes a new file on the Host: JSON Lines with one folded item per line (optionally the op log after it) or a consistent SQLite copy. A relative, existing or folderless path is refused, so nothing is overwritten. Agents call backlog_export.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
         "click button \"Backlog settings\"",
-        "click button \"Export…\"",
+        "click button \"Export\u2026\"",
         "expect textbox \"Export file\""
       ],
       "surfaces": ["client", "host", "storage", "tool", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "left-nav: Backlog › Backlog settings › Export",
+      "currentSurface": "left-nav: Backlog \u203a Backlog settings \u203a Export",
       "configuration": [],
       "states": ["jsonl", "jsonl-with-ops", "sqlite"],
       "failureModes": [
@@ -2792,7 +2792,7 @@
     {
       "id": "shipped-digest",
       "title": "See what shipped per hour, day, week, month or year",
-      "summary": "The Shipped view lists items that reached done per period (Hour, Day, Week, Month, Year), newest first, as a timeline with each period's count and its change against the period before, grouped by project, each item with its kind, linked revisions and pull requests. Only items done now count, once, at their last move to done; dropped items never count; items an agent captured count with an Agent badge. Empty periods fold into one quiet line, and the header project filter applies. Agents call backlog_shipped (also with a custom from–to range).",
+      "summary": "The Shipped view lists items that reached done per period (Hour, Day, Week, Month, Year), newest first, as a timeline with each period's count and its change against the period before, grouped by project, each item with its kind, linked revisions and pull requests. Only items done now count, once, at their last move to done; dropped items never count; items an agent captured count with an Agent badge. Empty periods fold into one quiet line, and the header project filter applies. Agents call backlog_shipped (also with a custom from\u2013to range).",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2816,7 +2816,7 @@
       "surfaces": ["client", "host", "tool"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › Shipped",
+      "currentSurface": "left-nav: Backlog \u203a Shipped",
       "configuration": [],
       "states": ["empty-period", "shipped", "agent-item", "quiet-periods", "host-predates-shipped"],
       "failureModes": [
@@ -2851,7 +2851,7 @@
     {
       "id": "shipped-summary",
       "title": "Summarize a shipped period with the triage model",
-      "summary": "Each period in the Shipped view with done items has Summarize: the triage model (Backlog settings › Triage) writes a short overview, cached in the backlog database per period, bucket and project filter, so reopening the view never calls the model again. A summary whose items changed since shows Out of date; Regenerate calls the model again. Without a triage model the view says where to pick one. Agents call backlog_summarize_shipped only when the user asked.",
+      "summary": "Each period in the Shipped view with done items has Summarize: the triage model (Backlog settings \u203a Triage) writes a short overview, cached in the backlog database per period, bucket and project filter, so reopening the view never calls the model again. A summary whose items changed since shows Out of date; Regenerate calls the model again. Without a triage model the view says where to pick one. Agents call backlog_summarize_shipped only when the user asked.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2875,7 +2875,7 @@
       "surfaces": ["client", "host", "storage", "tool"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › Shipped › Summarize",
+      "currentSurface": "left-nav: Backlog \u203a Shipped \u203a Summarize",
       "configuration": [
         {
           "key": "dshfiles-backlog.triageProvider",
@@ -2892,7 +2892,7 @@
       ],
       "states": ["not-summarized", "summarized", "cached", "stale", "regenerated"],
       "failureModes": [
-        "No triage model is set: the error names Backlog settings › Triage and offers a button to open them.",
+        "No triage model is set: the error names Backlog settings \u203a Triage and offers a button to open them.",
         "The model does not answer: the error names the provider and model and asks to check AI Accounts or pick another model.",
         "A period with nothing shipped is refused instead of calling the model."
       ],
@@ -2954,7 +2954,7 @@
       "surfaces": ["client", "host", "storage", "tool"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › Items › priority column",
+      "currentSurface": "left-nav: Backlog \u203a Items \u203a priority column",
       "configuration": [],
       "states": ["none", "urgent", "high", "medium", "low"],
       "failureModes": [
@@ -3002,7 +3002,7 @@
       "surfaces": ["client", "host", "storage", "tool"],
       "surface": "detail",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › item detail › Sub-issues",
+      "currentSurface": "left-nav: Backlog \u203a item detail \u203a Sub-issues",
       "configuration": [],
       "states": ["no-children", "in-progress", "complete", "nested"],
       "failureModes": [
@@ -3057,7 +3057,7 @@
       "surfaces": ["client", "host", "tool"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › Ready",
+      "currentSurface": "left-nav: Backlog \u203a Ready",
       "configuration": [],
       "states": ["empty", "ready", "blocked-by-deps", "claimed"],
       "failureModes": ["A Host older than the ready queue marks nothing ready: the empty view says to restart the DSH Host process."],
@@ -3089,7 +3089,7 @@
     {
       "id": "agent-claims",
       "title": "Agents claim items with a lease; you release them",
-      "summary": "backlog_claim hands an item to the calling agent thread in one write: it becomes the delegate (the owner stays whoever captured it), moves to In progress, links the thread and starts a lease. Another agent's claim is refused with the holder named. Every write by the holder renews the lease; it ends after the idle time in Backlog settings (30 minutes by default), when the holder's thread is archived, settled or gone, when the item is done or dropped, or with backlog_release; a lapsed or abandoned claim returns the item to Todo. The inspector shows Owner · Delegate and the claim with a Release action; rows and cards show a lock chip. `is:claimed`, `is:delegated` and `delegate:agent` search them. Starting a thread from an item also makes that thread its delegate.",
+      "summary": "backlog_claim hands an item to the calling agent thread in one write: it becomes the delegate (the owner stays whoever captured it), moves to In progress, links the thread and starts a lease. Another agent's claim is refused with the holder named. Every write by the holder renews the lease; it ends after the idle time in Backlog settings (30 minutes by default), when the holder's thread is archived, settled or gone, when the item is done or dropped, or with backlog_release; a lapsed or abandoned claim returns the item to Todo. The inspector shows Owner \u00b7 Delegate and the claim with a Release action; rows and cards show a lock chip. `is:claimed`, `is:delegated` and `delegate:agent` search them. Starting a thread from an item also makes that thread its delegate.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -3101,7 +3101,7 @@
       "surfaces": ["client", "host", "storage", "tool"],
       "surface": "detail",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › item detail › Owner · Delegate › Release",
+      "currentSurface": "left-nav: Backlog \u203a item detail \u203a Owner \u00b7 Delegate \u203a Release",
       "configuration": [
         {
           "key": "dshfiles-backlog.leaseIdleMinutes",
@@ -3168,7 +3168,7 @@
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › Items, Board and item detail › agent chip",
+      "currentSurface": "left-nav: Backlog \u203a Items, Board and item detail \u203a agent chip",
       "configuration": [],
       "states": ["working", "awaiting-input", "error", "done", "stale"],
       "failureModes": [
@@ -3208,7 +3208,7 @@
       "surface": "destinationSection",
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › item detail",
+      "currentSurface": "left-nav: Backlog \u203a item detail",
       "summary": "An item carries an acceptance checklist that rolls up as 3/5 on the item and its row, a plan an agent writes and may ask the user to approve (the item asks for input until approved; only the user approves), and a final summary written when it closes, which the Shipped view and its AI digest show. They are fields in the op log, revertible, edited in the item detail and through backlog_update (criteria, criteriaChecks, plan, planApproval, summary), and searchable with has:criteria, has:plan, has:summary and is:plan-pending.",
       "states": ["no-sections", "criteria-partial", "criteria-complete", "plan-pending", "plan-approved", "summary-written", "host-predates-sections"],
       "failureModes": [
@@ -3265,7 +3265,7 @@
       "surface": "destinationSection",
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › capture box",
+      "currentSurface": "left-nav: Backlog \u203a capture box",
       "summary": "Named templates in Backlog settings (Bug report, Feature spec and Research question ship by default) carry a title prefix, kind, priority, tags, a body to fill in and acceptance criteria. A capture picks one with the Template chip, by writing /template <name> in its text, or with backlog_capture template; the Host fills only what the capture left out. An unknown name is refused with the names that exist.",
       "states": ["no-template", "template-picked", "template-command", "unknown-template", "host-predates-templates"],
       "failureModes": [
@@ -3320,7 +3320,7 @@
       "surface": "destinationSection",
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › item detail, Items, Inbox",
+      "currentSurface": "left-nav: Backlog \u203a item detail, Items, Inbox",
       "summary": "A date-only due date set from the item detail, the item menu, backlog_capture or backlog_update. Rows and cards show a chip that warns when it is close and turns red once an open item is past it; the list sorts by due date and groups into Overdue, Today, Next 7 days, Later and No due date. Overdue is derived on read from the Host calendar, never stored: an open overdue item lands in the Inbox with its own reason and Overdue tab. Search: has:due, is:overdue, due:<7d, due:>30d.",
       "states": ["no-due-date", "due-later", "due-soon", "overdue", "closed-after-due"],
       "failureModes": ["A date that does not exist (2026-02-30) is refused with an example of a valid one."],
@@ -3366,7 +3366,7 @@
       "surface": "destinationSection",
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › item detail › Repeat",
+      "currentSurface": "left-nav: Backlog \u203a item detail \u203a Repeat",
       "summary": "An item with recurrence daily, weekly, monthly or cron:<expr> creates its next occurrence on the Host when it reaches done: same title, body, kind, priority, tags, project and parent, criteria unchecked, due one step after the previous due date and past today. The rule moves to the new item, so reopening and closing the old one never makes a second occurrence. Set from the Repeat picker, Make recurring on the item menu, backlog_capture or backlog_update.",
       "states": ["not-repeating", "repeating", "next-occurrence-created", "cron-never-matches"],
       "failureModes": [
@@ -3415,8 +3415,8 @@
       "surface": "destinationSection",
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › item menu › Merge into…, triage duplicate suggestion",
-      "summary": "Merge into… on the item menu (for one item or a selection) and on a triage duplicate suggestion, and backlog_merge (an agent must pass confirm: true), move each duplicate's comments (quoted, keeping who wrote them), links, tags, files and sub-issues into the survivor, rewrite links other items held to it, move its remote links where the survivor has none on that binding, and drop it with a duplicates link. An alias redirect makes b:<duplicate> keep opening the survivor; its number still opens the duplicate. Every step is an event on the items it touched.",
+      "currentSurface": "left-nav: Backlog \u203a item menu \u203a Merge into\u2026, triage duplicate suggestion",
+      "summary": "Merge into\u2026 on the item menu (for one item or a selection) and on a triage duplicate suggestion, and backlog_merge (an agent must pass confirm: true), move each duplicate's comments (quoted, keeping who wrote them), links, tags, files and sub-issues into the survivor, rewrite links other items held to it, move its remote links where the survivor has none on that binding, and drop it with a duplicates link. An alias redirect makes b:<duplicate> keep opening the survivor; its number still opens the duplicate. Every step is an event on the items it touched.",
       "states": ["merged", "already-merged", "self-merge-refused", "agent-unconfirmed"],
       "failureModes": [
         "Merging an item into itself, or a duplicate merged before, is refused with what to do instead.",
@@ -3433,7 +3433,7 @@
         "press Enter",
         "click button \"Items\"",
         "rightclick text \"Chips vanish on paste\"",
-        "click menuitem \"Merge into…\"",
+        "click menuitem \"Merge into\u2026\"",
         "expect dialog \"Merge b:#2 into another item\""
       ],
       "telemetry": [
@@ -3466,7 +3466,7 @@
       "surface": "destinationSection",
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › item detail › Waits on, Pull requests",
+      "currentSurface": "left-nav: Backlog \u203a item detail \u203a Waits on, Pull requests",
       "summary": "Gates hold an item out of the ready queue until a pull request merges, a jj revision lands on main, a project check passes in a thread linked to the item, or a date arrives (is:gated, has:gate, a chip on rows and cards). A Host gate watch resolves them on the revision poll cadence from the pull-requests contract, one jj read per repository and project-check receipts; a date gate follows the calendar. GitHub pull and GitLab merge-request URLs are PR links: Link PR in the detail or backlog_link_pr links one as fixes and asks pull-requests to watch it through the item's newest thread; the detail and backlog_pull_requests show open, merged or closed and checks, and a fixing PR that merges closes its item unless its status was set by hand. Without the pull-requests plugin they stay plain URLs.",
       "states": ["no-gates", "gated", "gate-met", "date-gate-open", "pr-unwatched", "pr-open", "pr-merged", "pull-requests-absent"],
       "failureModes": [
@@ -3542,7 +3542,7 @@
       "surface": "destinationSection",
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › item menu › Schedule nightly triage; Projects › overview",
+      "currentSurface": "left-nav: Backlog \u203a item menu \u203a Schedule nightly triage; Projects \u203a overview",
       "summary": "backlog_schedule_rule and Schedule nightly triage (item menu, project overview) create a project automation through the project-automations contract whose prompt calls backlog tools: triage runs backlog_triage_backfill and reports what still waits on the user; recreate captures a fresh copy of an item. No backlog scheduler: automations run them, and automation_list / automation_delete manage them.",
       "states": ["scheduled", "automations-absent", "project-unregistered"],
       "failureModes": [
@@ -3595,7 +3595,7 @@
       "surface": "destinationSection",
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
-      "currentSurface": "left-nav: Backlog › Projects › project overview › Agent guidance",
+      "currentSurface": "left-nav: Backlog \u203a Projects \u203a project overview \u203a Agent guidance",
       "summary": "Each project can hold markdown guidance for agents, edited in the project overview or with backlog_set_project_guidance. A thread started from items opens its first message with their projects' guidance; backlog_get returns it with the item and backlog_ready with the queue. A thread workspace folds to its project, so guidance for the checkout applies there.",
       "states": ["no-guidance", "guidance-set", "guidance-cleared"],
       "failureModes": ["A Host older than guidance answers without it: the overview editor saves nothing and the notice says to restart the DSH Host process."],
@@ -3636,17 +3636,17 @@
     {
       "id": "peer-hosts",
       "title": "Share one backlog across Hosts",
-      "summary": "Every Host serves its op log read-only to peers (peerInfo, peerOpsSince after a cursor, peerFiles) and pulls each multi-host runtime turned on in Backlog settings › Hosts every peerPullSeconds, or now with Sync now or backlog_peer_sync. A Host serves every op it holds, so A ↔ B ↔ C converges; ingest skips ops it has and folds only the touched items in one total order; an offline Host is skipped and caught up from its cursor. Another Host's item gets a private local number; a ref two Hosts minted stays on the older item and the newer gets a derived ref with a note; another Host's legacy item shows under a derived ref that resolves on both; merge redirects travel as ops; a recurring item finished on two Hosts spawns one next occurrence. Attachment bytes come from a peer when an item is opened, or ahead after each pass, kept only when they match their SHA-256. Gate checks and main polling run only on the chosen automation Host. The section lists each runtime with a switch, last pull, ops to pull, its error and Sync now, and the automation Host picker; the work log names the Host that wrote an event. Agents read backlog_peer_status and, when the user asked, call backlog_peer_sync and backlog_peers_configure.",
+      "summary": "Every Host serves its op log read-only to peers (peerInfo, peerOpsSince after a cursor, peerFiles) and pulls each multi-host runtime turned on in Backlog settings \u203a Hosts every peerPullSeconds, or now with Sync now or backlog_peer_sync. A Host serves every op it holds, so A \u2194 B \u2194 C converges; ingest skips ops it has and folds only the touched items in one total order; an offline Host is skipped and caught up from its cursor. Another Host's item gets a private local number; a ref two Hosts minted stays on the older item and the newer gets a derived ref with a note; another Host's legacy item shows under a derived ref that resolves on both; merge redirects travel as ops; a recurring item finished on two Hosts spawns one next occurrence. Attachment bytes come from a peer when an item is opened, or ahead after each pass, kept only when they match their SHA-256. Gate checks and main polling run only on the chosen automation Host. The section lists each runtime with a switch, last pull, ops to pull, its error and Sync now, and the automation Host picker; the work log names the Host that wrote an event. Agents read backlog_peer_status and, when the user asked, call backlog_peer_sync and backlog_peers_configure.",
       "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Backlog settings\"", "expect region \"Hosts\""],
       "surfaces": ["client", "host", "settings", "storage", "tool", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "left-nav: Backlog › Backlog settings › Hosts",
+      "currentSurface": "left-nav: Backlog \u203a Backlog settings \u203a Hosts",
       "configuration": [
         {
           "key": "dshfiles-backlog.peers",
           "defaultValue": "[]",
-          "constraints": "Hidden; { runtimeId, enabled } per multi-host runtime, edited in Backlog settings › Hosts or with backlog_peers_configure. Off by default: nothing is pulled until a runtime is turned on.",
+          "constraints": "Hidden; { runtimeId, enabled } per multi-host runtime, edited in Backlog settings \u203a Hosts or with backlog_peers_configure. Off by default: nothing is pulled until a runtime is turned on.",
           "coveredBy": ["backlog.peer-replication-toggle"]
         },
         {
@@ -3678,7 +3678,7 @@
       "failureModes": [
         "Without @dshfiles/multi-host the section says the backlog stays on this Host and nothing pulls.",
         "An offline or unreachable Host is skipped with its error and caught up from its saved cursor on a later pull.",
-        "A Host on another peer protocol or a newer op schema is refused before anything is stored, with what to update (Hosts panel › Update hosts, or multi_host_update) and a restart.",
+        "A Host on another peer protocol or a newer op schema is refused before anything is stored, with what to update (Hosts panel \u203a Update hosts, or multi_host_update) and a restart.",
         "A Host without the backlog plugin answers api-not-served; the row asks to enable it there or turn the peer off.",
         "An op that does not decode with this Host's op schema stops the pull and stores nothing of that page.",
         "Attachment bytes that do not hash to their SHA-256 are refused and asked from the next peer.",
@@ -3702,7 +3702,7 @@
           "kind": "host-test",
           "id": "backlog.peer-replication-pull",
           "file": "plugins/@dshfiles/backlog/src/peer-replication.test.ts",
-          "testName": "pulls the other Host’s items with their files, resumes where it stopped, and records one bounded span per pull"
+          "testName": "pulls the other Host\u2019s items with their files, resumes where it stopped, and records one bounded span per pull"
         },
         {
           "kind": "host-test",
@@ -3756,7 +3756,7 @@
           "kind": "host-test",
           "id": "backlog.peer-ingest-legacy",
           "file": "plugins/@dshfiles/backlog/src/peer-ingest.test.ts",
-          "testName": "shows another host’s legacy item under a derived ref that resolves on both hosts, never as a local b:<n>"
+          "testName": "shows another host\u2019s legacy item under a derived ref that resolves on both hosts, never as a local b:<n>"
         },
         {
           "kind": "host-test",
@@ -3782,7 +3782,7 @@
           "kind": "custom",
           "span": "backlog peer pull",
           "file": "plugins/@dshfiles/backlog/src/peer-replication.test.ts",
-          "testName": "pulls the other Host’s items with their files, resumes where it stopped, and records one bounded span per pull"
+          "testName": "pulls the other Host\u2019s items with their files, resumes where it stopped, and records one bounded span per pull"
         }
       ]
     }

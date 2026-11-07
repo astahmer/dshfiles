@@ -14,7 +14,7 @@ The native Loader row is disabled by this bundle's Cordis patch. Source registra
 
 ## One mention and reference-preview registry
 
-![One shared reference card: an agent mention previewed in place](docs/screenshots/entity-registry.png)
+![One shared reference card: hovering a backlog reference opens its item card](docs/screenshots/entity-registry.png)
 
 `@dshfiles/input-trigger/entity-registry` is the one place a plugin makes something mentionable (plan
 [`ade-ux` §5 `entityProvider`](../../../docs/ade-ux/README.md)). A provider adds one `EntityKinds` item:
@@ -32,10 +32,17 @@ plugin.add(EntityKinds, {
 - **`@` groups:** input-trigger registers every `mentionSource` with its own `inputTriggers` service, so `@` sources
   go through the registry. `EntityRegistryModel.foreignScope(kinds, kind, query)` tells a source that another kind owns
   the typed scope (mentions' file/thread source uses it instead of a hard-coded list).
-- **References:** a link installer calls `EntityPreview.request({ kind, id, range? }, element)`. One `shell.overlay`
-  card (`[data-dshfiles-entity-preview="<kind>"]`) positions itself under the reference, follows it while the page
+- **References:** `@dshfiles/input-trigger/entity-reference` exports `ReferencePreviewAnchor`, the one hover/focus
+  behavior every kind wraps its chip in: a 160 ms dwell or focus calls
+  `EntityPreview.request({ kind, id, range? }, element)`, leaving or blurring calls `EntityPreview.dismiss()`, and the
+  shared card waits out its grace before closing so the pointer can move into it. One `shell.overlay` card
+  (`[data-dshfiles-entity-preview="<kind>"]`) positions itself under the reference, follows it while the page
   scrolls, closes when it scrolls away, and draws the kind's `Preview`. `Decorations` is an optional headless
   component the overlay keeps mounted (agents uses it to decorate `@handle` mentions from its live agent list).
+- **Draft restore:** a trigger source may declare `restore(session, text)`: the serialized references its own text still
+  names, as spans whose `clipboardText` equals the matched text. The composer's `restoreReferences()` asks the
+  per-session controller for every source's spans, drops overlaps, and re-imports the draft with those chips — so a
+  queued message comes back as the chips it was sent with.
 - Providers today: mentions (files and threads), thread-sidebar (skills), mcp-servers (`@mcp:`), backlog (`b:`),
   agents (`@handle`), memory (`memory: n:… / t:…`). A provider that is not loaded simply contributes nothing.
 

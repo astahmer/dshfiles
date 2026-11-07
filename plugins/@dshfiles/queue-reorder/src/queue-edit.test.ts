@@ -39,7 +39,7 @@ interface FakeWorld {
   started: RawRow[]
   pending: string[]
   composer: { draft: string; attachmentIds: string[]; idle: boolean }
-  references: { id: string; label: string; offset: number; length: number }[]
+  references: { label: string; clipboardText: string }[]
   drafts: Map<string, File>
   released: string[]
   stored: Map<string, File>
@@ -108,12 +108,11 @@ const createWorld = (options: { readonly running?: boolean } = {}) => {
         composerSubject.notify()
         return true
       },
-      restoreImageReferences: ({ text, imageIds }: { readonly text: string; readonly imageIds: readonly string[] }) => {
-        world.references = QueueEditModel.imageReferenceTokens({ text, imageIds }).map(token => ({
-          id: token.id,
-          label: token.label,
-          offset: token.offset,
-          length: token.length,
+      // The real composer asks its trigger sources; this world only proves the editor calls the verb on the right text.
+      restoreReferences: () => {
+        world.references = [...world.composer.draft.matchAll(/\[Image (\d+)\]/gu)].map(token => ({
+          label: `Image ${token[1]}`,
+          clipboardText: token[0],
         }))
         composerSubject.notify()
       },
@@ -291,24 +290,21 @@ test('Edit moves the text and attachments into the composer and keeps the user d
   assert.equal(QueueEditModel.restoredIndex({ rows: rowsOf(world), before: record?.before ?? [] }), 1)
 })
 
-test('Edit turns queued image tokens into attachment references without changing the text', async () => {
+test('Edit rebuilds the reference chips a queued message carried, without changing its text', async () => {
   const { world, enqueueRow, editor } = createWorld()
-  const target = enqueueRow([text('look [Image 1]'), image('shot.png')])
+  enqueueRow([text('look at [Image 1]'), image('shot.png')])
   const queueEditor = editor()
   const row = rowsOf(world)[0]
   assert.ok(row)
 
   await queueEditor.begin(row)
 
-  assert.equal(world.composer.draft, 'look [Image 1]')
-  assert.deepEqual(world.references, [{ id: world.composer.attachmentIds[0], label: 'Image 1', offset: 5, length: 9 }])
-
-  queueEditor.submit()
-  await settle()
-
-  assert.ok(!world.rows.some(candidate => candidate.id === target.id))
-  assert.deepEqual(textsOf(world), ['look [Image 1] [shot.png]'])
-  assert.ok(world.rows[0]?.content.some(block => block.type === 'image'))
+  assert.equal(world.composer.draft, 'look at [Image 1]')
+  assert.deepEqual(world.references, [{ label: 'Image 1', clipboardText: '[Image 1]' }])
+  assert.deepEqual(
+    world.composer.attachmentIds.map(id => world.drafts.get(id)?.name),
+    ['shot.png'],
+  )
 })
 
 test('Submit queues the edited message, with its attachments, back at the same position', async () => {
@@ -454,10 +450,7 @@ test('After a reload the saved record still offers Cancel, which restores the or
     world.composer.attachmentIds.map(id => world.drafts.get(id)?.name),
     ['shot.png'],
   )
-  assert.deepEqual(
-    world.references.map(reference => reference.label),
-    ['Image 1'],
-  )
+  assert.deepEqual(world.references, [{ label: 'Image 1', clipboardText: '[Image 1]' }])
 
   await reloaded.cancel()
   await reloaded.cancel()

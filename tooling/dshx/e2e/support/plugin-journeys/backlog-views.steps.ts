@@ -436,7 +436,7 @@ Then('the {string} previews b:{int} titled {string}', async ({ page }: { page: P
     const label = await backlogLabel(page, ordinal)
     const link = peek(page)
       .getByLabel(place, { exact: true })
-      .getByRole('link', { name: `Preview backlog item ${label}`, exact: true })
+      .getByRole('button', { name: `Preview backlog item ${label}`, exact: true })
     const preview = page.locator('[data-dshfiles-backlog-preview]')
     // The card may already be open from another link, so the link must become the card's anchor: that proves this
     // link opened it. A scroll closes the card by design, so ask again rather than read a card the page took away.
