@@ -3,7 +3,14 @@ import { Cause, Effect, Exit } from 'effect'
 import type { ThreadWorkspaces, LandCandidate, LandCandidateVerification, LandPhase, VerifiedLandOptions } from './thread-workspaces.js'
 import type { ThreadLocation } from './thread-workspace-model.js'
 
-export type ThreadErrorCode = 'not-a-repository' | 'not-a-thread' | 'jj-failed' | 'git-failed' | 'unsafe-path' | 'workspace-files-failed'
+export type ThreadErrorCode =
+  | 'not-a-repository'
+  | 'not-a-thread'
+  | 'jj-failed'
+  | 'git-failed'
+  | 'unsafe-path'
+  | 'workspace-files-failed'
+  | 'destination-rejected'
 
 /** A `ThreadWorkspaces` failure as the Promise half of the Host still reads it: a `PluginApiError` with its wire code. */
 export class ThreadError extends PluginApiError {
@@ -19,6 +26,7 @@ const codeByTag = {
   GitFailed: 'git-failed',
   UnsafePath: 'unsafe-path',
   WorkspaceFilesFailed: 'workspace-files-failed',
+  DestinationRejected: 'destination-rejected',
 } satisfies Readonly<Record<string, ThreadErrorCode>>
 
 const isTaggedWithCode = (tag: string): tag is keyof typeof codeByTag => tag in codeByTag

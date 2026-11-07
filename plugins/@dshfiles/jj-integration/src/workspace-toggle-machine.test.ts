@@ -200,6 +200,21 @@ describe('workspaceToggleMachine', () => {
     expect(toggle.switched).toEqual(['ws-host-named'])
   })
 
+  it('does not repeat a provision the Host refused, even when its text mentions the name flag', async () => {
+    const payloads: unknown[] = []
+    const refusal = 'jj workspace add /repo-threads/thread-abc123 --name thread-abc123 -r forked: invalid revision'
+    const toggle = startToggle({
+      provision: async input => {
+        payloads.push(input)
+        throw new Error(refusal)
+      },
+    })
+    toggle.actor.send({ type: 'toggle', request: isolateRequest() })
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    expect(payloads).toHaveLength(1)
+    expect(toggle.actor.getSnapshot().context).toMatchObject({ pending: null, error: refusal })
+  })
+
   it('reports a failed provision without blocking the composer', async () => {
     const toggle = startToggle({ provision: async () => Promise.reject(new Error('jj workspace add failed')) })
     toggle.actor.send({ type: 'toggle', request: isolateRequest() })
@@ -982,6 +997,7 @@ describe('deliverFirstSend', () => {
       readonly keeps?: boolean
       readonly destinationFails?: boolean
       readonly failIsolationAttempts?: number
+      readonly isolationError?: Error
     } = {},
   ) => {
     const sourceComposer = composerWithDraft('first prompt')
@@ -1003,6 +1019,7 @@ describe('deliverFirstSend', () => {
         },
         isolate: async () => {
           isolationAttempts.push('attempt')
+          if (options.isolationError !== undefined) throw options.isolationError
           if (isolationAttempts.length <= (options.failIsolationAttempts ?? 0)) throw new Error('Workspace provisioning failed.')
           isolated.push('ws-thread-abc123')
           return { workspaceId: 'ws-thread-abc123' }
@@ -1042,6 +1059,18 @@ describe('deliverFirstSend', () => {
     await expect(retried.delivery).resolves.toBe('sent')
     toggle.actor.send({ type: 'claim', sessionId: 'source' })
     expect(WorkspaceToggle.deferredMoveFor(toggle.actor.getSnapshot(), 'source')).toBeNull()
+  })
+
+  it('shows why the Host refused the destination, not an offer to send again', async () => {
+    const refusal = Object.assign(new Error('"forked" points at more than one revision, so no workspace was created.'), { remoteCode: 'destination-rejected' })
+    const refused = deliveryFixture({ isolationError: refusal })
+    await expect(refused.delivery).resolves.toBe('failed')
+    expect(refused.sourceComposer.notices).toEqual([refusal.message])
+    expect(refused.sourceComposer.input.state.getSnapshot().draft).toBe('first prompt')
+
+    const failed = deliveryFixture({ isolationError: new Error('jj timed out') })
+    await expect(failed.delivery).resolves.toBe('failed')
+    expect(failed.sourceComposer.notices).toEqual(['Workspace setup failed.'])
   })
 
   it('sends into the thread workspace and leaves the view on the New thread opened meanwhile', async () => {

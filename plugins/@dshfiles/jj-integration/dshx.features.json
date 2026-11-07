@@ -61,7 +61,9 @@
       "states": ["shared-checkout", "isolated", "finished", "missing"],
       "failureModes": [
         "A folder outside a jj or git repository offers no bookmark or isolation.",
-        "A thread workspace with revisions to rebase is never removed by the sweep."
+        "A thread workspace with revisions to rebase is never removed by the sweep.",
+        "A destination that names no revision or several (unknown name, ambiguous prefix, conflicted bookmark) is refused before jj creates anything, with the bar's recovery text, and retrying creates nothing.",
+        "A failed `jj workspace add` removes what it registered, and a spare that cannot be claimed is replaced, so neither leaves a second workspace."
       ],
       "externalDependencies": [
         {
@@ -74,6 +76,11 @@
         {
           "kind": "gherkin",
           "id": "jj-integration.destination-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.ambiguous-destination-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
         {

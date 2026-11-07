@@ -213,13 +213,19 @@ const provisionInputFor = (input: { readonly workspaceId: string; readonly base:
   return provisionInput
 }
 
+/**
+ * Only a Host that rejects the field itself: a failed provision also mentions `--name`, and repeating that one under
+ * a Host-chosen name is how a refused destination used to make a second workspace.
+ */
+const rejectsNameField = (error: unknown): boolean => /(?:unrecognized|unknown|unexpected) key/iu.test(errorText(error)) && /\bname\b/u.test(errorText(error))
+
 // A Host from before the client-chosen name rejects the unknown field; retry without it and show what it created.
 const provisionTolerant = async (client: WorkspaceToggleClient, input: ProvisionInput, signal: AbortSignal): Promise<ProvisionedDestination> => {
   try {
     return await client.provision(input, signal)
   } catch (error) {
     const { name, ...inputWithoutName } = input
-    if (name === undefined || signal.aborted || !/name|unrecognized|invalid/iu.test(errorText(error))) throw error
+    if (name === undefined || signal.aborted || !rejectsNameField(error)) throw error
     return client.provision(inputWithoutName, signal)
   }
 }

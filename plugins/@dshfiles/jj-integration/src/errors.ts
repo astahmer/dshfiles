@@ -44,6 +44,17 @@ export class GitFailed extends Schema.TaggedError<GitFailed>()(
   }
 }
 
+/** The revision a thread would start from is not one revision of this repository; nothing was created. */
+export class DestinationRejected extends Schema.TaggedError<DestinationRejected>()(
+  'DestinationRejected',
+  { detail: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'destination-rejected' },
+) {
+  override get message(): string {
+    return this.detail
+  }
+}
+
 /** A workspace name would escape the threads directory, or now belongs to another jj workspace. */
 export class UnsafePath extends Schema.TaggedError<UnsafePath>()(
   'UnsafePath',
@@ -150,4 +161,4 @@ export class HostCallFailed extends Schema.TaggedError<HostCallFailed>()(
   }
 }
 
-export type ThreadWorkspaceError = NotARepository | NotAThread | JjFailed | GitFailed | UnsafePath | WorkspaceFilesFailed
+export type ThreadWorkspaceError = NotARepository | NotAThread | JjFailed | GitFailed | UnsafePath | WorkspaceFilesFailed | DestinationRejected

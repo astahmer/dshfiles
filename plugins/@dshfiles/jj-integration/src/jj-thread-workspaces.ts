@@ -3,7 +3,7 @@ import { KeyedMutex } from '@dshfiles/dshx/effect/keyed-mutex'
 import { commandAttributes } from '@dshfiles/dshx/tracing'
 import { Context, Effect, FiberMap, FileSystem, Layer, Option, Path, type PlatformError, Ref, Schema } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
-import { JjFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed, type ThreadWorkspaceError } from './errors.js'
+import { DestinationRejected, JjFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed, type ThreadWorkspaceError } from './errors.js'
 import { Executables } from './executables-promise.js'
 import { JjSettings } from './jj-settings.js'
 import { RepoLocks } from './repo-locks.js'
@@ -250,6 +250,18 @@ const conflictFiles = (stdout: string): readonly string[] =>
     const file = line.trim().split(/\s{2,}/)[0]
     return file !== undefined && file.length > 0 ? [file] : []
   })
+
+const destinationRecovery = 'Pick another bookmark in the destination bar, or set the bookmark in Settings › Workspaces, then retry.'
+const unknownDestination = (target: string) =>
+  new DestinationRejected({ detail: `"${target}" is not a bookmark or revision in this repository, so no workspace was created. ${destinationRecovery}` })
+const ambiguousDestination = (target: string) =>
+  new DestinationRejected({
+    detail: `"${target}" points at more than one revision, so no workspace was created. ${destinationRecovery} To keep it, move a bookmark onto one revision with \`jj bookmark set <name> -r <revision>\`.`,
+  })
+
+/** jj's own words for a name or prefix with several targets, and for text that names nothing. */
+const AMBIGUOUS_REVISION = /is ambiguous|is conflicted|is divergent/iu
+const UNKNOWN_REVISION = /doesn't exist|failed to parse/iu
 
 const jjRunFailed =
   (args: readonly string[]) =>
@@ -727,6 +739,45 @@ const make = Effect.gen(function* () {
     )
 
   /**
+   * The one commit a thread would start from. jj 0.46 registers a workspace and creates its folder before it resolves
+   * `-r`, so a bad destination must be refused here: `workspace add` would exit 1 and leave both behind. The commit id
+   * is what jj then gets, so what was checked is what is used. Reads through `run`, not `jj`, to tell a destination
+   * that names nothing or several revisions from jj itself failing.
+   */
+  const resolveDestination = Effect.fnUntraced(function* (repoRoot: string, target: string) {
+    if (target.startsWith('-')) return yield* unknownDestination(target)
+    const output = yield* run(['--ignore-working-copy', 'log', '--no-graph', '-n', '2', '-r', target, '-T', 'commit_id ++ "\\n"'], repoRoot)
+    if (output.exitCode !== 0) {
+      if (AMBIGUOUS_REVISION.test(output.stderr)) return yield* ambiguousDestination(target)
+      if (UNKNOWN_REVISION.test(output.stderr)) return yield* unknownDestination(target)
+      return yield* jjFailed(`Could not resolve "${target}" in ${repoRoot}: ${output.stderr.trim().slice(0, 400)}`)
+    }
+    const [commitId, ...others] = lines(output.stdout)
+    if (commitId === undefined) return yield* unknownDestination(target)
+    if (others.length > 0) return yield* ambiguousDestination(target)
+    if (!isCommitId(commitId)) return yield* jjFailed('JJ returned an invalid commit ID; refusing revision selection.')
+    return commitId
+  })
+
+  /** Only for a workspace this call made or an unclaimed spare: it deletes the folder and nothing can be unlanded there. */
+  const removeUnclaimedWorkspace = (repoRoot: string, name: string, workspacePath: string) =>
+    Effect.gen(function* () {
+      yield* jj(['--ignore-working-copy', 'workspace', 'forget', name], repoRoot).pipe(Effect.ignore)
+      yield* fileSystem.remove(workspacePath, { recursive: true, force: true }).pipe(Effect.ignore)
+      yield* gitWorktrees(repoRoot, ['prune'])
+    })
+
+  /**
+   * `name` must be free. A failure after jj registered the workspace is undone: the leftover would hold the name, so
+   * the next attempt would take a fresh one and make a second workspace.
+   */
+  const addWorkspace = (repoRoot: string, name: string, workspacePath: string, commitId: string) =>
+    // Plain `workspace add`: with --ignore-working-copy jj registers the workspace but never checks its files out.
+    jj(['workspace', 'add', workspacePath, '--name', name, '-r', knownCommitRevset(commitId)], repoRoot).pipe(
+      Effect.onError(() => removeUnclaimedWorkspace(repoRoot, name, workspacePath)),
+    )
+
+  /**
    * One checked-out, unclaimed workspace per repository and base, made ahead of the first send that isolates a thread:
    * `jj workspace add` checks the whole tree out (1.6–2.8 s on a 2 700-file repo with 70 workspaces), while moving a
    * spare onto the base as it is now takes 0.15–0.35 s. The record survives a Host restart; a spare deleted from disk
@@ -734,17 +785,21 @@ const make = Effect.gen(function* () {
    */
   const warmSpare = Effect.fnUntraced(function* (repoRoot: string, target: string) {
     if ((yield* usableSpare(repoRoot, (yield* readSpares(repoRoot))[target])) !== undefined) return
-    const name = `thread-${yield* ThreadMetadata.randomHex(3)}`
+    const commitId = yield* resolveDestination(repoRoot, target)
+    const name = yield* freeThreadName(repoRoot, undefined)
     const directory = yield* threadsDirectory(repoRoot)
     yield* Ref.update(sparesBeingAdded, current => new Set([...current, name]))
     yield* Effect.gen(function* () {
       yield* fileSystem.makeDirectory(directory, { recursive: true })
-      yield* jj(['workspace', 'add', path.join(directory, name), '--name', name, '-r', target], repoRoot)
+      yield* addWorkspace(repoRoot, name, path.join(directory, name), commitId)
       yield* updateSpares(repoRoot, spares => ({ ...spares, [target]: name }))
     }).pipe(Effect.ensuring(Ref.update(sparesBeingAdded, current => new Set([...current].filter(entry => entry !== name)))))
   })
 
-  /** Make the spare for `base` in the background; outside the repo lock, since adding a workspace moves no bookmark. */
+  /**
+   * Make the spare for `base` in the background; outside the repo lock, since adding a workspace moves no bookmark. A
+   * failure stays silent because nobody asked for this spare: the send that needs the workspace reports it from `provision`.
+   */
   const prewarm = Effect.fn('thread workspaces prewarm')(function* (repoRoot: string, base?: string) {
     const target = base ?? (yield* bookmark)
     yield* FiberMap.run(warming, `${repoRoot}\0${target}`, warmSpare(repoRoot, target).pipe(Effect.ignore), { onlyIfMissing: true })
@@ -765,35 +820,61 @@ const make = Effect.gen(function* () {
       return (yield* isFreeThreadName(repoRoot, name)) ? name : yield* freeThreadName(repoRoot, undefined)
     })
 
+  /**
+   * Hand the spare over on `commitId`. The record goes first, so a Host dying midway can never give one checkout to two
+   * threads; a spare that then cannot be moved is removed, because it holds nothing and would fail the same way next time.
+   */
+  const claimSpare = Effect.fnUntraced(function* (
+    repoRoot: string,
+    spare: string,
+    claim: { readonly target: string; readonly commitId: string; readonly requestedName: string | undefined },
+  ) {
+    const directory = yield* threadsDirectory(repoRoot)
+    yield* updateSpares(repoRoot, ({ [claim.target]: _claimed, ...rest }) => rest)
+    // The thread keeps the name the client already shows: the spare's folder moves within the same directory, so
+    // its relative pointer to the store still holds, and jj renames the workspace to match.
+    const name = claim.requestedName !== undefined && (yield* isFreeThreadName(repoRoot, claim.requestedName)) ? claim.requestedName : spare
+    const sparePath = path.join(directory, spare)
+    const workspacePath = path.join(directory, name)
+    return yield* Effect.gen(function* () {
+      if (name !== spare) {
+        yield* fileSystem.rename(sparePath, workspacePath)
+        yield* gitWorktrees(repoRoot, ['repair', workspacePath])
+        yield* jj(['workspace', 'rename', name], workspacePath)
+      }
+      yield* jj(['new', knownCommitRevset(claim.commitId)], workspacePath)
+      return { name, path: workspacePath }
+    }).pipe(
+      Effect.onError(() =>
+        Effect.andThen(
+          removeUnclaimedWorkspace(repoRoot, spare, sparePath),
+          name === spare ? Effect.void : removeUnclaimedWorkspace(repoRoot, name, workspacePath),
+        ),
+      ),
+    )
+  })
+
   const provision = Effect.fn('thread workspaces provision')(function* (repoRoot: string, base?: string, requestedName?: string) {
     return yield* locks.withRepo(repoRoot)(
       Effect.gen(function* () {
         const target = base ?? (yield* bookmark)
-        const directory = yield* threadsDirectory(repoRoot)
+        const commitId = yield* resolveDestination(repoRoot, target)
         const spare = yield* usableSpare(repoRoot, (yield* readSpares(repoRoot))[target])
-        if (spare !== undefined) {
-          yield* updateSpares(repoRoot, ({ [target]: _claimed, ...rest }) => rest)
-          // The thread keeps the name the client already shows: the spare's folder moves within the same directory, so
-          // its relative pointer to the store still holds, and jj renames the workspace to match.
-          const name = requestedName !== undefined && (yield* isFreeThreadName(repoRoot, requestedName)) ? requestedName : spare
-          const workspacePath = path.join(directory, name)
-          if (name !== spare) {
-            yield* fileSystem.rename(path.join(directory, spare), workspacePath)
-            yield* gitWorktrees(repoRoot, ['repair', workspacePath])
-            yield* jj(['workspace', 'rename', name], workspacePath)
-          }
-          yield* jj(['new', target], workspacePath)
-          if (!isCommitId(target)) yield* prewarm(repoRoot, target)
-          return { name, path: workspacePath }
-        }
-        const name = yield* freeThreadName(repoRoot, requestedName)
-        const workspacePath = path.join(directory, name)
-        yield* fileSystem.makeDirectory(directory, { recursive: true })
-        // Plain `workspace add`: with --ignore-working-copy jj registers the workspace but never checks its files out.
-        yield* jj(['workspace', 'add', workspacePath, '--name', name, '-r', target], repoRoot)
+        const claimed =
+          spare === undefined ? undefined : yield* claimSpare(repoRoot, spare, { target, commitId, requestedName }).pipe(Effect.orElseSucceed(() => undefined))
+        const thread =
+          claimed ??
+          (yield* Effect.gen(function* () {
+            const directory = yield* threadsDirectory(repoRoot)
+            const name = yield* freeThreadName(repoRoot, requestedName)
+            const workspacePath = path.join(directory, name)
+            yield* fileSystem.makeDirectory(directory, { recursive: true })
+            yield* addWorkspace(repoRoot, name, workspacePath, commitId)
+            return { name, path: workspacePath }
+          }))
         // A spare waits for the next thread from a bookmark; a thread branched from one exact revision gets none.
         if (!isCommitId(target)) yield* prewarm(repoRoot, target)
-        return { name, path: workspacePath }
+        return thread
       }).pipe(
         Effect.mapError(error =>
           error._tag === 'PlatformError' ? new WorkspaceFilesFailed({ detail: `Could not create a thread workspace in ${repoRoot}.`, cause: error }) : error,
@@ -844,7 +925,8 @@ const make = Effect.gen(function* () {
           .pipe(Effect.mapError(filesFailed(`Could not create ${path.dirname(workspacePath)}.`)))
         yield* gitWorktrees(repoRoot, ['prune'])
         if (workingCopy === undefined) {
-          yield* jj(['workspace', 'add', workspacePath, '--name', name, '-r', yield* bookmark], repoRoot)
+          const commitId = yield* resolveDestination(repoRoot, yield* bookmark)
+          yield* jj(['workspace', 'add', workspacePath, '--name', name, '-r', knownCommitRevset(commitId)], repoRoot)
           return
         }
         if (!isCommitId(workingCopy.commitId) || workingCopy.parentIds.length === 0)

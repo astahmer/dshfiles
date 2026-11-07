@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import { openGlobalPanel } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -125,6 +125,9 @@ const workspaceNames = (repository: ThreadRepository, keep: readonly string[] = 
     .filter(name => !spares.has(name))
     .sort()
 }
+
+const threadFolders = async (repository: ThreadRepository): Promise<readonly string[]> =>
+  (await readdir(repository.threadsPath)).filter(name => name.startsWith('thread-'))
 
 const provisionedThreadName = (page: Page): string => {
   const threadName = provisionedThreads.get(page)
@@ -294,6 +297,49 @@ When('a disposable jj repository is chosen as the New thread project', async ({ 
   const repository = await createRepository(page)
   await chooseProjectPath(page, repository.repositoryPath)
   await expect(projectButton(page)).toHaveText('repo')
+})
+
+When(
+  'a disposable jj repository with a conflicted {string} bookmark is chosen as the New thread project',
+  async ({ page }: { page: Page }, bookmark: string) => {
+    const repository = await createRepository(page)
+    const inRepository = (args: readonly string[]) => jjAt(repository.repositoryPath, repository.temporaryRoot, args)
+    inRepository(['bookmark', 'create', bookmark, '--revision', 'main'])
+    const operation = inRepository(['--ignore-working-copy', 'op', 'log', '--limit', '1', '--no-graph', '--template', 'self.id()']).trim()
+    inRepository(['bookmark', 'set', bookmark, '--revision', 'release'])
+    inRepository(['--at-op', operation, 'bookmark', 'set', bookmark, '--revision', '@'])
+    await chooseProjectPath(page, repository.repositoryPath)
+    await expect(projectButton(page)).toHaveText('repo')
+  },
+)
+
+When('the {string} bookmark is picked in the destination bar and refused', async ({ page }: { page: Page }, bookmark: string) => {
+  const refusal = page.getByText(`"${bookmark}" points at more than one revision, so no workspace was created.`, { exact: false })
+  await workspaceToggle(page).click()
+  await page.getByPlaceholder('Search workspaces and bookmarks').fill(bookmark)
+  await page.getByRole('option', { name: bookmark, exact: true }).click()
+  await expect(refusal).toBeVisible()
+})
+
+Then('the refusal names how to recover and left no thread workspace', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jj-integration-refused-destination-leaves-nothing', async () => {
+    await expect(page.getByText(/Pick another bookmark in the destination bar/u)).toBeVisible()
+    await expect(projectButton(page)).toHaveText('repo')
+    expect(rawWorkspaceNames(repository)).toEqual([])
+    expect(existsSync(repository.threadsPath) ? await threadFolders(repository) : []).toEqual([])
+  })
+})
+
+Then('exactly one thread workspace exists on {string}', async ({ page }: { page: Page }, bookmark: string) => {
+  const repository = repositoryFor(page)
+  const threadName = await currentThreadName(page)
+  await recordAssertion(page, 'jj-integration-one-workspace-after-refusal', async () => {
+    await expect.poll(() => workspaceNames(repository, [threadName])).toEqual(['default', threadName].sort())
+    await expect.poll(async () => (await threadFolders(repository)).filter(name => !prewarmedSpareNames(repository).includes(name))).toEqual([threadName])
+    expect(commitIdOf(repository, `${threadName}@-`)).toBe(commitIdOf(repository, bookmark))
+  })
+  await finishJourneyAssertions(page)
 })
 
 const gitAt = (cwd: string, home: string, args: readonly string[]): string => {

@@ -90,6 +90,7 @@ describe.skipIf(!jjAvailable)('jj-integration wire error codes', () => {
     await record('discardMany: mixed', 'discardMany', { paths: [repo, plain], force: false, confirm: true })
     await record('land: missing bookmark', 'land', { path: idleThread, bookmark: 'no-such-bookmark' })
     await record('land: invalid input', 'land', { path: 42 })
+    await record('provision: no such destination', 'provision', { workspaceId: await harness.register(repo), isolate: true, base: 'no-such-revision' })
     await record('cleanupWorkspaces: folder outside jj', 'cleanupWorkspaces', { path: plain, olderThanHours: 1, kinds: ['empty'], apply: false })
 
     expect(table).toMatchInlineSnapshot(`
@@ -151,6 +152,10 @@ describe.skipIf(!jjAvailable)('jj-integration wire error codes', () => {
         "landThread: browser without path": {
           "code": "no-path",
           "message": "Pass the thread workspace path; this caller has no working directory.",
+        },
+        "provision: no such destination": {
+          "code": "destination-rejected",
+          "message": ""no-such-revision" is not a bookmark or revision in this repository, so no workspace was created. Pick another bookmark in the destination bar, or set the bookmark in Settings › Workspaces, then retry.",
         },
         "queueLand: folder outside jj": {
           "code": "not-a-thread",
