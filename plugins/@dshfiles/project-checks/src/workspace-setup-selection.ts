@@ -36,10 +36,7 @@ export class WorkspaceSetupSelection {
    * qualifies when its root contains both the checkout and the workspace: a root that covers the checkout alone
    * cannot reach a thread workspace created beside it, and this never widens the root to reach one.
    */
-  static actionsFor(input: {
-    readonly actions: readonly SetupAction[]
-    readonly workspace: SetupWorkspace
-  }): readonly SetupAction[] {
+  static actionsFor(input: { readonly actions: readonly SetupAction[]; readonly workspace: SetupWorkspace }): readonly SetupAction[] {
     return WorkspaceSetupSelection.local(input, action => action.runOnWorkspaceCreate)
   }
 
@@ -49,10 +46,7 @@ export class WorkspaceSetupSelection {
   }
 
   /** Every action either trigger may run, which is what the workspace-setup read reports. */
-  static preparationActions(input: {
-    readonly actions: readonly SetupAction[]
-    readonly workspace: SetupWorkspace
-  }): readonly SetupAction[] {
+  static preparationActions(input: { readonly actions: readonly SetupAction[]; readonly workspace: SetupWorkspace }): readonly SetupAction[] {
     return WorkspaceSetupSelection.local(input, action => action.runOnWorkspaceCreate || action.onSettle)
   }
 

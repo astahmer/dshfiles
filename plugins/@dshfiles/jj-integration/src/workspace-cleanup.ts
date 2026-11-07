@@ -103,7 +103,7 @@ const readsBookmarkedWork = (input: { readonly trigger: 'manual' | 'automatic'; 
 const skipReasonMessage = (reason: CleanupSkipReason): string => {
   if (reason === 'has-work') return 'Kept because: it still holds revisions that are not on the bookmark.'
   if (reason === 'busy') return 'Kept because: a thread working in it is running or waiting for an answer.'
-  if (reason === 'activity-unknown') return 'Kept because: its thread\'s activity could not be read, so it may be in use.'
+  if (reason === 'activity-unknown') return "Kept because: its thread's activity could not be read, so it may be in use."
   if (reason === 'queued') return 'Kept because: an integration is queued for it.'
   if (reason === 'too-recent') return 'Kept because: it was used more recently than the configured age.'
   if (reason === 'kind-excluded') return 'Kept because: its kind is not one this run removes.'

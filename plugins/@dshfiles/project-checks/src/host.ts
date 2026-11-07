@@ -251,15 +251,16 @@ const handlers = Api.handlers(projectChecksApi, {
   }),
   setupActions: Effect.fn('project-checks setup actions')(function* (input) {
     const config = yield* ChecksHost.use(host => host.config)
-    return WorkspaceSetupSelection.preparationActions({ actions: config.actions, workspace: { workspacePath: input.workspacePath, repoRoot: input.repoRoot } }).map(
-      action => ({
-        id: action.id,
-        label: action.label,
-        runOnWorkspaceCreate: action.runOnWorkspaceCreate,
-        awaitBeforeFirstTurn: action.awaitBeforeFirstTurn,
-        onSettle: action.onSettle,
-      }),
-    )
+    return WorkspaceSetupSelection.preparationActions({
+      actions: config.actions,
+      workspace: { workspacePath: input.workspacePath, repoRoot: input.repoRoot },
+    }).map(action => ({
+      id: action.id,
+      label: action.label,
+      runOnWorkspaceCreate: action.runOnWorkspaceCreate,
+      awaitBeforeFirstTurn: action.awaitBeforeFirstTurn,
+      onSettle: action.onSettle,
+    }))
   }),
   dispatch: Effect.fn('project-checks dispatch')(function* (input, call) {
     const sessionId = yield* targetSessionId(input.sessionId, call.caller)
