@@ -162,9 +162,18 @@ Two panels in navigation, the main view and the Workbench chooser: **Revision gr
   or another loaded revision without opening that revision's details. The compact
   comparison strip reports ahead/behind direction and exact per-side ancestry
   counts; path actions are disabled when there is no useful path or no work
-  since the target. It compares ancestry, not file contents or patch equivalence.
+  since the target. It compares ancestry, not file contents or patch equivalence;
+  select revisions and choose **Review together** to read their files.
   Rewritten comparison subjects follow a unique current change ID; ambiguous
   divergent copies are never selected automatically.
+- **Several revisions.** Cmd/Ctrl-click toggles a revision for review, Shift-click
+  extends the selection across visible rows, and the revision menu offers
+  **Select for review** for touch and keyboard. A plain click still opens the
+  row. **Review together** hands the selection to the dshx `Changes` contract, so
+  the plugin that owns review opens it (pulls-review's
+  [combined review](../pulls-review/README.md#changes-facet)) and this plugin
+  depends on nothing new; without that plugin the gestures stay off. A filter or
+  rewrite that hides a selected row drops it.
 - **Highlight path** dims unrelated text while preserving graph membership and
   passing rails. **Show only path** loads bounded connecting DAG, including all
   relevant merge paths and best common ancestors. **Work since target** shows

@@ -29,6 +29,11 @@ export class SessionActivity extends Context.Service<
     readonly display: Effect.Effect<SessionActivityMap | undefined>
     /** Activity read the moment a guard decides: every Session when `sessionIds` is omitted, else only those. */
     readonly guard: (sessionIds?: readonly string[]) => Effect.Effect<SessionActivityMap | undefined>
+    /**
+     * One workspace as it is now, for a status that says whether it can land: the display value may predate the end of
+     * a turn by its whole TTL. A read over the display budget answers with the display value rather than hold a poll.
+     */
+    readonly workspaceDisplay: (sessionIds: readonly string[]) => Effect.Effect<SessionActivityMap | undefined>
     readonly reset: Effect.Effect<void>
   }
 >()('@dshfiles/jj-integration/SessionActivity') {
@@ -147,7 +152,12 @@ export class SessionActivity extends Context.Service<
         return Option.getOrUndefined(Option.flatMap(yield* Fiber.join(unfinished).pipe(Effect.timeoutOption(Duration.millis(remaining))), Option.fromNullishOr))
       })
 
-      return SessionActivity.of({ display, guard, reset: Ref.set(cached, Option.none()) })
+      const workspaceDisplay = Effect.fn('session activity workspace display')(function* (sessionIds: readonly string[]) {
+        const fresh = yield* guard(sessionIds).pipe(Effect.timeoutOption(DISPLAY_BUDGET))
+        return Option.isSome(fresh) && fresh.value !== undefined ? fresh.value : yield* display
+      })
+
+      return SessionActivity.of({ display, guard, workspaceDisplay, reset: Ref.set(cached, Option.none()) })
     }),
   )
 }

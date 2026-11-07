@@ -13,6 +13,7 @@ import { ReviewGit } from './git.js'
 import { ReviewJj } from './jj.js'
 import { reviewReportText } from './report.js'
 import { ReviewWorkspace } from './review.js'
+import { RevisionReviewModel } from './revision-review.js'
 import { PullsReviewSummary } from './summarize.js'
 import { SummaryRoutes } from './summary-routes-promise.js'
 
@@ -51,6 +52,9 @@ export default DshxPlugin.make({
     Api.bind(pullsReviewApi, {
       review: input => ReviewWorkspace.use(workspace => workspace.review(input)),
       report: input => ReviewWorkspace.use(workspace => workspace.review(input)).pipe(Effect.map(result => ({ text: reviewReportText(result) }))),
+      reviewRevisions: input => ReviewWorkspace.use(workspace => workspace.reviewRevisions(input)),
+      reportRevisions: input =>
+        ReviewWorkspace.use(workspace => workspace.reviewRevisions(input)).pipe(Effect.map(result => ({ text: RevisionReviewModel.reportText(result) }))),
       summarize: input =>
         PullsReviewSummary.use(summary =>
           summary.summarize({

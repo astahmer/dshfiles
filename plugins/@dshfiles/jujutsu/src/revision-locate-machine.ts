@@ -1,6 +1,7 @@
 import { assign, setup } from '@dshfiles/plugin-ui/machine'
 import type { Revision } from './api.js'
 import { ChatReferenceModel } from './chat-reference.js'
+import { containsPath } from './side-panel-repository.js'
 
 /** What a chat reference or a panel request asks the graph to show. */
 export interface LocateReference {
@@ -11,7 +12,11 @@ export interface LocateReference {
 
 interface LocateContext {
   readonly reference: LocateReference | null
+  /** The repository the reference was requested for; it only resolves against that repository's revisions. */
+  readonly referencePath: string | null
   readonly revisions: readonly Revision[]
+  /** The repository `revisions` came from. */
+  readonly root: string | null
   /** The repository state has loaded; resolving against a partial list would filter for a revision that is coming. */
   readonly loaded: boolean
   /** The last reference turned into a text filter, so one unresolved reference filters the graph once. */
@@ -22,8 +27,10 @@ interface LocateContext {
 }
 
 type LocateEvent =
-  | { readonly type: 'reference'; readonly reference: LocateReference }
-  | { readonly type: 'revisions'; readonly revisions: readonly Revision[]; readonly loaded: boolean }
+  | { readonly type: 'reference'; readonly reference: LocateReference; readonly path: string }
+  | { readonly type: 'revisions'; readonly revisions: readonly Revision[]; readonly loaded: boolean; readonly root: string | null }
+  /** Another repository came on screen: what was located goes, a reference still waiting for its repository stays. */
+  | { readonly type: 'repository.changed' }
   /** A shown revision the user asked to reveal: `visible` is whether the graph already lists it. */
   | { readonly type: 'locate'; readonly revision: Revision; readonly visible: boolean }
   /** The banner's reveal ran, so the graph lists the revision from its next render on. */
@@ -35,13 +42,19 @@ type LocateEvent =
 
 const EMPTY_CONTEXT: LocateContext = {
   reference: null,
+  referencePath: null,
   revisions: [],
+  root: null,
   loaded: false,
   searchKey: null,
   target: null,
   behavior: 'focus',
   highlighted: null,
 }
+
+/** The revisions on hand are the requested repository's, loaded: a panel moving to another one still lists the old one's. */
+const ready = (context: LocateContext): boolean =>
+  context.loaded && context.root !== null && context.referencePath !== null && containsPath(context.root, context.referencePath)
 
 const matchOf = (context: LocateContext): Revision | undefined =>
   context.reference === null ? undefined : ChatReferenceModel.resolve({ reference: context.reference, revisions: context.revisions })
@@ -56,9 +69,10 @@ export const revisionLocateMachine = setup({
     events: {} as LocateEvent,
   },
   guards: {
-    resolvesReference: ({ context }) => context.loaded && matchOf(context) !== undefined,
+    resolvesReference: ({ context }) => ready(context) && matchOf(context) !== undefined,
     needsTextFilter: ({ context }) =>
-      context.loaded && context.reference !== null && matchOf(context) === undefined && context.searchKey !== searchKeyOf(context.reference),
+      ready(context) && context.reference !== null && matchOf(context) === undefined && context.searchKey !== searchKeyOf(context.reference),
+    referenceWaiting: ({ context }) => context.reference !== null,
   },
 }).createMachine({
   id: 'revisionLocate',
@@ -67,11 +81,15 @@ export const revisionLocateMachine = setup({
   on: {
     reference: {
       target: '.resolving',
-      actions: assign(({ event }) => ({ reference: event.reference, target: null, highlighted: null })),
+      actions: assign(({ event }) => ({ reference: event.reference, referencePath: event.path, target: null, highlighted: null })),
     },
     revisions: {
-      actions: assign(({ event }) => ({ revisions: event.revisions, loaded: event.loaded })),
+      actions: assign(({ event }) => ({ revisions: event.revisions, loaded: event.loaded, root: event.root })),
     },
+    'repository.changed': [
+      { guard: 'referenceWaiting', target: '.resolving', actions: assign({ target: null, highlighted: null, searchKey: null }) },
+      { target: '.idle', actions: assign({ target: null, highlighted: null, searchKey: null }) },
+    ],
     locate: [
       {
         target: '.locating',
@@ -87,8 +105,8 @@ export const revisionLocateMachine = setup({
       target: '.locating',
       actions: assign(({ event }) => ({ target: event.revision, behavior: 'focus' as const, highlighted: null })),
     },
-    cancel: { target: '.idle', actions: assign({ target: null, reference: null }) },
-    reset: { target: '.idle', actions: assign({ reference: null, target: null, highlighted: null, searchKey: null }) },
+    cancel: { target: '.idle', actions: assign({ target: null, reference: null, referencePath: null }) },
+    reset: { target: '.idle', actions: assign({ reference: null, referencePath: null, target: null, highlighted: null, searchKey: null }) },
   },
   states: {
     idle: {},
@@ -97,7 +115,12 @@ export const revisionLocateMachine = setup({
         {
           guard: 'resolvesReference',
           target: 'applying',
-          actions: assign(({ context }) => ({ reference: null, target: matchOf(context) ?? null, behavior: context.reference?.behavior ?? 'focus' })),
+          actions: assign(({ context }) => ({
+            reference: null,
+            referencePath: null,
+            target: matchOf(context) ?? null,
+            behavior: context.reference?.behavior ?? 'focus',
+          })),
         },
         {
           guard: 'needsTextFilter',

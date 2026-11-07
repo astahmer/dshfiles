@@ -274,12 +274,14 @@ export class RepositoryViews extends Context.Service<
           const threadName = input.location.threadName
           if (threadName === undefined) return undefined
           const workspace = yield* registry.resolveByPath(input.location.workspaceRoot)
+          const activitySessionIds =
+            workspace === undefined ? [] : [...new Set([...workspace.sessionIds, ...(yield* isolated.sessionIdsAt(input.location.workspaceRoot))])]
           const shouldReadActivity = input.includeActivity !== false && workspace !== undefined && workspace.sessionIds.length > 0
           const viewerSessionId = input.viewerSessionId
           const [status, currentActivity, forkCutAt] = yield* Effect.all(
             [
               threads.status(input.location.repoRoot, threadName),
-              shouldReadActivity ? activity.display : Effect.succeed(undefined),
+              shouldReadActivity ? activity.workspaceDisplay(activitySessionIds) : Effect.succeed(undefined),
               viewerSessionId === undefined ? Effect.succeed(undefined) : sessions.forkCutAt(viewerSessionId),
             ],
             { concurrency: 'unbounded' },

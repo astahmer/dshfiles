@@ -67,6 +67,8 @@ export const startThreadWithModel = async (page: Page, input: { readonly project
   if ((await projectButton.textContent())?.trim() !== expectedProject) {
     await projectButton.click()
     const projectPicker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
+    // Which control opens is only known once one has: counting straight after the click can catch neither.
+    await expect(projectPicker.or(page.getByRole('menuitem', { name: input.project, exact: true }))).toBeVisible()
     if ((await projectPicker.count()) > 0) {
       await expect(projectPicker).toBeVisible()
       if (input.project.startsWith('/')) {

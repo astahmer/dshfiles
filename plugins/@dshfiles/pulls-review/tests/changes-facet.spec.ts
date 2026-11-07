@@ -14,6 +14,16 @@ describe('ChangesScopeModel', () => {
     expect(ChangesScopeModel.label('target', 'main')).toBe('vs main')
   })
 
+  it('keeps a graph selection out of the scopes every thread offers', () => {
+    expect(ChangesScopeModel.scopes).not.toContain('revisions')
+    expect(ChangesScopeModel.base('revisions', 'main')).toBeUndefined()
+    expect(ChangesScopeModel.label('revisions', 'main')).toBe('Revisions')
+    const request = ChangesScopeModel.decodeRequest({ scope: 'revisions', workspacePath: '/repo', revisions: ['abc', 'def'] })
+    expect(ChangesScopeModel.selectionOf(request)).toEqual({ workspacePath: '/repo', revisions: ['abc', 'def'] })
+    expect(ChangesScopeModel.selectionOf(ChangesScopeModel.decodeRequest({ scope: 'revisions' }))).toBeUndefined()
+    expect(ChangesScopeModel.selectionOf(ChangesScopeModel.decodeRequest({ scope: 'thread' }))).toBeUndefined()
+  })
+
   it('reads the turn card address the native review tab would open', () => {
     expect(ChangesScopeModel.parseTurnAddress('dsh-resource://changes-review/session/session-a%2Fb/42/3')).toEqual({
       sessionId: 'session-a/b',

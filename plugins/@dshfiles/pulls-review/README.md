@@ -36,11 +36,25 @@ read it, and can it land?" without leaving the thread:
 
 ![A line comment waits in the composer as a chip](docs/screenshots/diff-line-comments.png)
 
+**Several revisions together.** Selecting revisions in the Jujutsu graph and choosing **Review
+together** opens them as one review, the **Revisions** scope of this facet. Each revision stays its
+own change: `jj diff` refuses a selection with gaps, and a net diff would lose which revision made
+which line. So every revision is listed oldest first with its own files, **Previous** and **Next**
+step through their diffs, a viewed mark belongs to one file of one revision (a file two revisions
+touched is read twice; rewriting a revision starts it unread), and a line comment says which
+revision it is on. A selection with gaps says so, and a revision that is gone or divergent is named
+and left out. The graph reads a revision by its change id, so a review left open follows a rewrite.
+When no thread on screen owns the repository, the same review opens on the Review page. Agents read
+it with the `pulls_review_revisions` tool.
+
+![Review several selected revisions together](docs/screenshots/combined-revisions.png)
+
 Ways in: the turn card (this plugin claims the native `dsh-resource://changes-review/…` address,
 so the card opens Changes on that turn instead of a second review tab), the right pane's tab
 chooser, the jujutsu composer bar ("Review workspace changes"), **Open in thread** on a Land row or
 on the Review page, and the dshx `Changes` contract (`review({ workspacePath, sessionId })` opens the
-thread and its facet; without `sessionId` it opens the Review page).
+thread and its facet; without `sessionId` it opens the Review page; `reviewRevisions` does the same
+for a graph selection).
 
 Why here and not in sidebar-right: this plugin already owns scoped review (Host diff reads and
 pulls.review scopes) and the `Changes` contract, and it already depends on jj-integration's API, so

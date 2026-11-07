@@ -28,7 +28,7 @@ import { JujutsuPanel } from './client.js'
 import { ComposerChangesBar, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
 import { DEFAULT_PANEL_SCOPE, DOCK_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
 import { SchemaHelpers } from './schema-helpers.js'
-import { sidePanelRepository } from './side-panel-repository.js'
+import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { SurfaceVisibility } from './surface-visibility.js'
 import './client.css'
 
@@ -67,6 +67,29 @@ export default defineClient({
       const workspace = await ctx.workspaces.create({ path: canonicalPath })
       return { workspaceId: workspace.workspaceId, title: workspace.title, canonicalPath: workspace.path }
     }
+    // A global panel in the main view unsets the on-screen Session, yet the graph opened from a thread is still about it.
+    let lastThread: SessionId | undefined
+    ctx.effect(
+      () =>
+        ctx.sidebarRight.mounted.subscribe(() => {
+          lastThread = ctx.sidebarRight.mounted.getSnapshot() ?? lastThread
+        }),
+      'dshfiles-jujutsu: remember the last thread on screen',
+    )
+    /** The thread the graph belongs to, when it shows that thread's own repository: its Changes facet then holds the review. */
+    const sessionInRepository = (root: string): SessionId | undefined => {
+      const sessionId = ctx.sidebarRight.mounted.getSnapshot() ?? lastThread
+      if (sessionId === undefined) return undefined
+      const projectPath = sessionProjectPath(sessionId, ctx.sessions.list.getSnapshot().byId, ctx.workspaces.list.getSnapshot().items)
+      return projectPath !== undefined && containsPath(root, projectPath) ? sessionId : undefined
+    }
+    const reviewRevisions = (input: { readonly workspacePath: string; readonly revisions: readonly string[] }): boolean => {
+      const changes = metadata?.plugin?.use(Changes).get()
+      if (changes?.status !== 'active') return false
+      const sessionId = sessionInRepository(input.workspacePath)
+      const opened = sessionId === undefined ? changes.value.reviewRevisions?.(input) : changes.value.reviewRevisions?.({ ...input, sessionId })
+      return opened ?? false
+    }
     const panel = (options: SurfacePanelOptions): JSX.Element => (
       <PluginQueryProvider>
         <ProjectsBoundPanel
@@ -80,6 +103,7 @@ export default defineClient({
           {...(options.view === undefined ? {} : { view: options.view })}
           directoryPicker={directoryPicker}
           registerWorkspace={registerWorkspace}
+          reviewRevisions={metadata?.plugin?.use(Changes).get()?.status === 'active' ? reviewRevisions : undefined}
           // A Session whose folder is not a registered workspace lands in "Ungrouped" with its composer locked, so
           // the new JJ workspace is registered and opened the way the native folder picker opens one.
           launchSession={async cwd => {

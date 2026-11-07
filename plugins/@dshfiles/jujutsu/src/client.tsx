@@ -46,6 +46,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import {
   ArrowDownIcon,
   CalendarIcon,
+  CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   CopyPlusIcon,
@@ -61,6 +62,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
 import { defaultRangeExtractor, useVirtualizer } from '@dshfiles/plugin-ui/virtual'
+import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -68,7 +70,7 @@ import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, keepPreviousData, useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/workspace-folder-picker/picker'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import * as Schema from 'effect/Schema'
 import { REVISION_PAGE_SIZE, type GraphLandmark, type Mutation, type ReadFailure, type Revision } from './api.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
@@ -105,6 +107,7 @@ import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { filterGraphRevisions, mergeGraphRevisions } from './graph-navigation.js'
 import { GraphRowAnchorModel, type GraphRowAnchor } from './graph-row-anchor.js'
 import { GraphViewStatus, LandmarkControls, RelationshipInspector } from './graph-navigation-controls.js'
+import { ReviewSelectionModel } from './review-selection.js'
 import { useGraphNavigation } from './use-graph-navigation.js'
 import { WorkspaceLabels } from './workspace-labels.js'
 
@@ -136,6 +139,8 @@ interface JujutsuPanelProps {
   readonly visible?: boolean
   /** A panel dedicated to one view; without it the panel switches between both with tabs (the narrow side panel). */
   readonly view?: View
+  /** Open revisions in the review surface, when the plugin that owns it is loaded; false when it could not. */
+  readonly reviewRevisions?: ((input: { readonly workspacePath: string; readonly revisions: readonly string[] }) => boolean) | undefined
 }
 
 const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
@@ -287,8 +292,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   )
   const [locateSnapshot, sendLocate] = useMachine(revisionLocateMachine)
   useEffect(() => {
-    const reference = initialRequest?.reference
-    if (reference !== undefined) sendLocate({ type: 'reference', reference })
+    if (initialRequest?.reference !== undefined) sendLocate({ type: 'reference', reference: initialRequest.reference, path: initialRequest.path })
   }, [initialRequest, sendLocate])
   const [repoHistory, setRepoHistory] = useState(() => storedRepoHistory.get().slice(0, REPO_HISTORY_LIMIT))
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -304,6 +308,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [collapsedDays, setCollapsedDays] = usePanelScopeState<ReadonlySet<string>>(scope, 'collapsedDays', () => new Set())
   const [selection, setSelection] = usePanelScopeState<RevisionSelection | null>(scope, 'selection', () => null)
   const [comparisonSelection, setComparisonSelection] = usePanelScopeState<RevisionSelection | null>(scope, 'comparisonSelection', () => null)
+  // Separate from `selection`: a plain click keeps opening one row's details while rows are collected for a review.
+  const [reviewSelection, setReviewSelection] = usePanelScopeState<ListSelection<string>>(scope, 'reviewSelection', () => ListSelectionModel.empty())
+  const [reviewOpenFailed, setReviewOpenFailed] = useState(false)
   useEffect(() => {
     const selectedPath = path.trim()
     if (selectedPath.length > 0) PanelScopes.remember(scope, { path: selectedPath })
@@ -522,8 +529,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const allRevisions = useMemo(() => mergeGraphRevisions(navigation.extraRevisions, graphRowsInput), [navigation.extraRevisions, graphRowsInput])
   const revisionsLoaded = state !== undefined
   useEffect(() => {
-    sendLocate({ type: 'revisions', revisions: allRevisions, loaded: revisionsLoaded })
-  }, [allRevisions, revisionsLoaded, sendLocate])
+    sendLocate({ type: 'revisions', revisions: allRevisions, loaded: revisionsLoaded, root: state?.root ?? null })
+  }, [allRevisions, revisionsLoaded, sendLocate, state?.root])
   const editTimeCommitIds = useMemo(
     () =>
       preferences.revisionDate === 'created' && fromDate === '' && toDate === ''
@@ -547,7 +554,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   })
   const selectedRevision = navigation.selectedRevision
   useEffect(() => {
-    sendLocate({ type: 'reset' })
+    sendLocate({ type: 'repository.changed' })
     setComparisonSelection(null)
   }, [repoId, sendLocate, setComparisonSelection])
 
@@ -575,7 +582,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   useEffect(() => {
     if (!sidePanel) return
     return sidePanelRepository.onRequest(requested => {
-      if (requested.reference !== undefined) sendLocate({ type: 'reference', reference: requested.reference })
+      if (requested.reference !== undefined) sendLocate({ type: 'reference', reference: requested.reference, path: requested.path })
       if (shownRootRef.current !== null && containsPath(shownRootRef.current, requested.path)) return
       sendRegistration({ type: 'register', path: requested.path })
     })
@@ -685,6 +692,15 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     graphMetrics,
     graphRows.reduce((maximum, row) => Math.max(maximum, row.laneCount), 1),
   )
+  const graphLoaded = state !== undefined
+  // A filter, a search, a rewrite or another repository takes rows away; a review never includes a row no longer shown.
+  useEffect(() => {
+    if (!graphLoaded) return
+    setReviewSelection(current => {
+      const next = ListSelectionModel.prune({ state: current, visibleIds: visibleRevisions.map(revision => revision.commitId) })
+      return next.ids.length === current.ids.length && next.anchorId === current.anchorId ? current : next
+    })
+  }, [graphLoaded, setReviewSelection, visibleRevisions])
   const groups = useMemo(() => groupRows(visibleRevisions, preferences.dateHeadings), [visibleRevisions, preferences.dateHeadings])
   const movingBranch = useMemo(
     () => (dragSource === null || state === undefined ? null : descendantCommitIds(state.revisions, dragSource)),
@@ -1109,12 +1125,33 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     setSelection(current => (current?.commitId === revision.commitId ? null : { commitId: revision.commitId, changeId: revision.changeId }))
   }
 
-  const activateRevisionRow = (revision: Revision): void => {
+  const toggleReviewSelection = (revision: Revision): void => {
+    setReviewOpenFailed(false)
+    setReviewSelection(current => ListSelectionModel.toggle({ state: current, id: revision.commitId }))
+  }
+
+  const activateRevisionRow = (revision: Revision, event: MouseEvent): void => {
     if (moveSource !== null) {
       chooseMoveDestination(revision)
       return
     }
+    if (props.reviewRevisions !== undefined && (event.metaKey || event.ctrlKey)) {
+      toggleReviewSelection(revision)
+      return
+    }
+    if (props.reviewRevisions !== undefined && event.shiftKey) {
+      setReviewOpenFailed(false)
+      const orderedIds = visibleRevisions.map(row => row.commitId)
+      setReviewSelection(current => ListSelectionModel.extend({ state: current, orderedIds, id: revision.commitId }))
+      return
+    }
     toggleRevision(revision)
+  }
+
+  const openReviewSelection = (): void => {
+    if (state === undefined) return
+    const revisions = ReviewSelectionModel.reviewIds({ selected: reviewSelection.ids, revisions: visibleRevisions })
+    setReviewOpenFailed(!(props.reviewRevisions?.({ workspacePath: state.root, revisions }) ?? false))
   }
 
   const compareRevision = (revision: Revision, target?: GraphLandmark['kind'] | 'revision'): void => {
@@ -1170,6 +1207,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => openFullDiff(revision, null)}>Show full diff</ContextMenuItem>
+        {props.reviewRevisions !== undefined && (
+          <ContextMenuItem onSelect={() => toggleReviewSelection(revision)}>
+            {reviewSelection.ids.includes(revision.commitId) ? 'Remove from review' : 'Select for review'}
+          </ContextMenuItem>
+        )}
         {!revision.immutable && (
           <ContextMenuItem
             onSelect={() => {
@@ -1627,6 +1669,29 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         {navigation.comparisonOpen && navigation.comparisonRevision !== undefined && (
           <RelationshipInspector navigation={navigation} onLocate={locateRevision} revisions={allRevisions} selected={navigation.comparisonRevision} />
         )}
+        {reviewSelection.ids.length > 0 && (
+          <div
+            className="dshx:flex dshx:flex-none dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs"
+            data-testid="revision-review-selection"
+            role="status"
+          >
+            <span className="dshx:tabular-nums">
+              {reviewSelection.ids.length === 1 ? '1 revision selected' : `${String(reviewSelection.ids.length)} revisions selected`}
+            </span>
+            {reviewSelection.ids.length === 1 && <span className="dshx:text-muted-foreground">Select another to review them together.</span>}
+            <Button disabled={reviewSelection.ids.length < 2} onClick={openReviewSelection} size="xs" type="button">
+              Review together
+            </Button>
+            <Button onClick={() => setReviewSelection(ListSelectionModel.empty())} size="xs" type="button" variant="ghost">
+              Clear
+            </Button>
+            {reviewOpenFailed && (
+              <span className="dshx:basis-full dshx:text-destructive" role="alert">
+                The review could not open. Select at most 30 revisions, and add @dshfiles/pulls-review to the profile if it is missing.
+              </span>
+            )}
+          </div>
+        )}
         <div
           aria-label="Revisions"
           className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain"
@@ -1748,7 +1813,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       onDragLeave={() => sendAction({ type: 'drag.leave', targetId: item.revision.commitId })}
                       onDragStart={origin => sendAction({ type: 'drag.start', origin })}
                       onDrop={event => dropOn(event, item.revision)}
-                      onToggle={() => activateRevisionRow(item.revision)}
+                      onToggle={event => activateRevisionRow(item.revision, event)}
+                      reviewable={props.reviewRevisions !== undefined}
+                      reviewSelected={reviewSelection.ids.includes(item.revision.commitId)}
                       onDescribe={() => {
                         setSelection({ commitId: item.revision.commitId, changeId: item.revision.changeId })
                         setEditingDescription(item.revision.commitId)
@@ -2125,6 +2192,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             onSelect={selected => {
               setPickerOpen(false)
               setPath(selected.canonicalPath)
+              // The user chose another repository, so a reference still waiting for the last one no longer applies.
+              sendLocate({ type: 'cancel' })
               sendRegistration({ type: 'register', path: selected.canonicalPath })
             }}
             projects={props.projects}
@@ -2391,7 +2460,9 @@ interface RevisionRowProps {
   readonly menu: ReactNode
   readonly bookmarkMenu: (name: string, local: boolean) => ReactNode
   readonly workspaceMenu: (name: string, commitId: string) => ReactNode
-  readonly onToggle: () => void
+  readonly onToggle: (event: MouseEvent) => void
+  readonly reviewable: boolean
+  readonly reviewSelected: boolean
   readonly onDescribe: () => void
   readonly onDragStart: (origin: DragOrigin) => void
   readonly onDragEnter: (event: DragEvent) => void
@@ -2546,8 +2617,10 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
         revision.empty && 'dshx:bg-muted/50',
         props.dimmed && 'dshx:opacity-40',
         props.highlighted && 'dshx:bg-primary/10',
+        props.reviewSelected && 'dshx:bg-info/10',
       )}
       data-commit-id={revision.commitId}
+      data-review-selected={props.reviewSelected || undefined}
       data-connection-dimmed={props.connectionDimmed || undefined}
       data-highlighted={props.highlighted || undefined}
       onDragEnter={props.onDragEnter}
@@ -2587,6 +2660,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                 )}
                 onClick={props.onToggle}
               />
+              {props.reviewSelected && <CheckIcon aria-hidden className="dshx:size-3 dshx:flex-none dshx:text-info" />}
               {labels}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -2597,6 +2671,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                     onClick={props.onToggle}
                     type="button"
                   >
+                    {props.reviewSelected && <span className="dshx:sr-only">Selected for review:</span>}
                     {revision.conflict && <span className="dshx:sr-only">Conflict:</span>}
                     {revision.empty && <span className="dshx:flex-none dshx:text-muted-foreground dshx:italic">(empty)</span>}
                     {described ? (
@@ -2616,6 +2691,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
                   {draggable ? 'Drag onto another revision to rebase · right-click for actions' : 'Right-click for actions'}
+                  {props.reviewable ? ' · Cmd/Ctrl-click or Shift-click to select for review' : ''}
                 </TooltipContent>
               </Tooltip>
               {!described && !revision.immutable && (

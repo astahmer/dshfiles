@@ -278,6 +278,42 @@
       ]
     },
     {
+      "id": "review-selection",
+      "title": "Select revisions in the graph to review them together",
+      "summary": "Cmd/Ctrl-click toggles a revision, Shift-click extends the visible range and the revision menu offers Select for review for touch and keyboard; a plain click keeps opening the row's details. Review together hands the selection to the Changes contract, so the plugin that owns review opens it, and the graph stays usable without that plugin.",
+      "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "land",
+      "currentSurface": "left-nav: Revision graph \u203a selection strip",
+      "configuration": [],
+      "states": ["empty", "one-selected", "several-selected", "open-failed"],
+      "failureModes": [
+        "Without a review provider the selection gestures stay off and a modifier click opens the row as usual.",
+        "A selection the review cannot open says to select at most 30 revisions and names the plugin to add.",
+        "A filter, search or rewrite that hides a selected row drops it from the selection."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jujutsu.review-selection",
+          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.review-selection-unit-order",
+          "file": "plugins/@dshfiles/jujutsu/src/review-selection.test.ts",
+          "testName": "keeps graph order, not selection order, and skips a row that left the graph"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only selection state; opening the review goes through the Changes contract."
+        }
+      ]
+    },
+    {
       "id": "composer-context",
       "title": "See project and Jujutsu workspace context in the composer",
       "summary": "The change bar labels the net file diff as changes since branching from the selected base, reports revisions present only on @ or only on that base, and lets the base be a local or remote bookmark.",
