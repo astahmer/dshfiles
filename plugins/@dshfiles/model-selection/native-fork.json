@@ -25,15 +25,6 @@
       "local": "locale"
     }
   ],
-  "added": [
-    "src/native/inject.ts",
-    "src/native/model-menu.ts"
-  ],
-  "delta": [
-    "src/native/catalog.ts",
-    "src/native/directory.ts",
-    "src/native/service.ts",
-    "src/native/index.ts",
-    "src/native/ModelSelect.tsx"
-  ]
+  "added": ["src/native/inject.ts", "src/native/model-menu.ts"],
+  "delta": ["src/native/catalog.ts", "src/native/directory.ts", "src/native/service.ts", "src/native/index.ts", "src/native/ModelSelect.tsx"]
 }

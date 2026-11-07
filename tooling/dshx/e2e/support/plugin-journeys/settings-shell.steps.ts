@@ -336,3 +336,32 @@ Then("the shared Jev key is listed once and the plugins' earlier key fields are 
   })
   await finishJourneyAssertions(page)
 })
+
+When('the Models page is opened in Settings', async ({ page }: { page: Page }) => {
+  await openSettings(page)
+  await settingsNavEntry(page, 'Models').click()
+})
+
+Then('the Models section renders the owned fork instead of a placeholder', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-models-page-renders-the-fork', async () => {
+    // The stock Models section always renders its heading and its provider controls; a fork that failed to register
+    // would leave the page empty.
+    await expect(settingsView(page).getByRole('heading', { name: 'Models', exact: true }).first()).toBeVisible()
+    expect(await settingsView(page).locator('button, [role="switch"], input').count()).toBeGreaterThan(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the Web search plugin page is opened in Settings', async ({ page }: { page: Page }) => {
+  await openGlobalPanel(page, 'Plugins')
+  await page.getByRole('button', { name: 'View Web search', exact: true }).click()
+})
+
+Then('the Web search page renders the owned fork instead of a placeholder', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-web-search-page-renders-the-fork', async () => {
+    await expect(page.getByRole('heading', { name: 'Web search', exact: true }).first()).toBeVisible()
+    await expect(page.getByText('Set up the DeepSeek search provider.')).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'API key' })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})

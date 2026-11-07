@@ -32,6 +32,11 @@
       ],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "settings-web-search.web-search-settings",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "settings-web-search.registration",
           "file": "plugins/@dshfiles/settings-web-search/tests/registration.test.ts",

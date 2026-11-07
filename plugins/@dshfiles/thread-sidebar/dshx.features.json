@@ -2266,7 +2266,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.pending-host-restart-unit-idle-restart-watched",
           "file": "plugins/@dshfiles/thread-sidebar/src/restart-machine.test.ts",
-          "testName": "watches a restart started elsewhere (Restart when idle) like its own"
+          "testName": "follows a pending restart this page did not request"
         }
       ],
       "telemetry": [

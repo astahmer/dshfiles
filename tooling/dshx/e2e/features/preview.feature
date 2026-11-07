@@ -4,7 +4,7 @@ Feature: Thread dev servers and the agent preview browser
   header lists the port it listens on, the agent opens and snapshots the page
   in the Host preview browser, and Stop ends the server.
 
-  @scenario:preview.dev-server-chip
+  @scenario:preview.dev-server-chip @scenario:preview.agent-browser
   Scenario: A server started by a thread is listed, previewed by the agent and stopped
     Given the isolated plugin composition of "@dshfiles/preview, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
     When a Command Code account backed by a local fake provider is added

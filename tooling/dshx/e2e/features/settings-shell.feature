@@ -112,3 +112,14 @@ Feature: Settings shell
     When Settings is opened from the sidebar
     And Settings are searched for "Jev"
     Then the shared Jev key is listed once and the plugins' earlier key fields are not
+  @scenario:settings-models.models-settings
+  Scenario: The Models settings section comes from the owned fork
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/settings-models" is booted
+    When the Models page is opened in Settings
+    Then the Models section renders the owned fork instead of a placeholder
+
+  @scenario:settings-web-search.web-search-settings
+  Scenario: The Web search plugin page comes from the owned fork
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/settings-web-search" is booted
+    When the Web search plugin page is opened in Settings
+    Then the Web search page renders the owned fork instead of a placeholder
