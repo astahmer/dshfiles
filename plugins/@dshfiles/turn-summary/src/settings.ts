@@ -15,7 +15,9 @@ export const turnSummarySettings = defineSettings({
     openLists: Schema.boolean().default(true).description('Let the edited-file and command counts open their lists; each file opens in the editor.'),
     walkthrough: Schema.boolean()
       .default(true)
-      .description('After a turn that edited files, show a walkthrough card: the changed files by folder and a link to the Changes view.'),
+      .description(
+        'After a turn that edited files, show a walkthrough card: the changed files by folder and a link to the Changes view. The footer then leaves the edited files to the card.',
+      ),
   }),
   applies: 'live',
 })

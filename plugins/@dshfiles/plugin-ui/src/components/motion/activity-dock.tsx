@@ -278,6 +278,8 @@ export interface DockFileChange {
   readonly path: string
   readonly added: number
   readonly removed: number
+  /** Makes the file name a button, for example to open the file. */
+  readonly onOpen?: () => void
 }
 
 export interface DockChangeGroup {
@@ -328,7 +330,17 @@ export function DockChanges({ groups, className }: { readonly groups: readonly D
                 >
                   {extension(file.path)}
                 </span>
-                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-foreground">{file.path}</span>
+                {file.onOpen ? (
+                  <button
+                    type="button"
+                    onClick={file.onOpen}
+                    className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:rounded-sm dshx:text-left dshx:font-mono dshx:text-xs dshx:text-foreground dshx:outline-none dshx:hover:underline dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                  >
+                    {file.path}
+                  </button>
+                ) : (
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-foreground">{file.path}</span>
+                )}
                 <span className="dshx:shrink-0 dshx:font-mono dshx:text-xs dshx:tabular-nums">
                   {file.added > 0 ? <span className="dshx:text-success">+{file.added}</span> : null}
                   {file.added > 0 && file.removed > 0 ? ' ' : null}

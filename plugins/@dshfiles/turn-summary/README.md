@@ -8,16 +8,16 @@ A footer under each finished turn that says what the agent did with tools:
 
 > Edited 3 files +42 −7 › · ran 6 commands › · tests 40/42 · read 4 files · 2 searches · **1 failed ›** · 1m 12s
 
-- **Edited files** count distinct files that were actually written (a rejected edit is not counted), with lines added and removed. The count opens the files with per-file `+N −M`; each opens in the editor.
+- **Edited files** count distinct files that were actually written (a rejected edit is not counted), with lines added and removed. The count opens the files with per-file `+N −M`; each opens in the editor. While the walkthrough card shows, the footer leaves the edited files to it.
 - **Commands** open every command (its description, or the first line of the command) with how it ended.
 - **Tests** are passed / total from the last Vitest, Jest or pytest summary a command printed in the turn; red when any failed.
 - The red **failure count** opens the failed commands and how each ended: `exit 1`, `signal SIGKILL`, `no exit code`, or `error` when the tool rejected the call.
 - **Duration** is the turn's wall time, from `turn/start` to `turn/end`.
 
 After a turn that edited files, a **walkthrough card** (plugin-ui `ActivityDock` with `DockChanges`) lists the changed
-files by folder, each folder with a one-line summary (`Edited 2 files · +40 −3`), and **Review in Changes** opens that
-turn's changed-files review in the right pane: pulls-review's Changes facet when it is loaded, else the native review
-tab. Its icon folds it to one button.
+files by folder (each opens in the editor), each folder with a one-line summary (`Edited 2 files · +40 −3`) when there
+are several, and **Review in Changes** opens that turn's changed-files review in the right pane: pulls-review's Changes
+facet when it is loaded, else the native review tab. Its icon folds it to one button.
 
 Built with dshx (no port). Run `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.
 

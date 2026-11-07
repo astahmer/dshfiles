@@ -7,6 +7,7 @@ import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel }
 
 const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
 const WRITE_FILE = `[[call write ${JSON.stringify({ file_path: 'notes/walkthrough.md', content: 'one two' })}]]`
+const PASSING_COMMAND = `[[call bash ${JSON.stringify({ command: 'printf ok', description: 'Run the passing summary fixture' })}]]`
 const FAILING_COMMAND = `[[call bash ${JSON.stringify({ command: 'printf "turn-summary-e2e"; exit 7', description: 'Run the failing summary fixture' })}]]`
 
 const runInFreshWorkspace = async (page: Page, message: string): Promise<void> => {
@@ -27,6 +28,32 @@ When('the fake model runs a failing bash command in a fresh workspace', async ({
 
 When('the fake model writes a file in a fresh workspace', async ({ page }: { page: Page }) => {
   await runInFreshWorkspace(page, WRITE_FILE)
+})
+
+When('the fake model writes a file and runs a command in a fresh workspace', async ({ page }: { page: Page }) => {
+  await runInFreshWorkspace(page, `${WRITE_FILE} ${PASSING_COMMAND}`)
+})
+
+Then('the footer names the command and the walkthrough card alone names the edited file', async ({ page }: { page: Page }) => {
+  // The summary holds the footer and the card under it.
+  const summary = page.locator('[data-dshfiles-turn-summary]')
+  const card = page.locator('[data-dshfiles-turn-walkthrough]')
+  await recordAssertion(page, 'turn-summary-names-edit-once', async () => {
+    await expect(card).toBeVisible({ timeout: 60_000 })
+    await expect(summary).toContainText(/ran 1 command/i)
+    await expect(card).toContainText('Changed 1 file')
+    // Before, the footer and the card's only folder each repeated "Edited 1 file".
+    await expect(summary).not.toContainText(/edited/i)
+    await expect(card.getByRole('button', { name: 'Review in Changes' })).toBeVisible({ timeout: 60_000 })
+  })
+})
+
+Then('the walkthrough card opens the edited file', async ({ page }: { page: Page }) => {
+  await page.locator('[data-dshfiles-turn-walkthrough]').getByRole('button', { name: 'walkthrough.md', exact: true }).click()
+  await recordAssertion(page, 'turn-summary-walkthrough-opens-edited-file', async () => {
+    await expect(page.getByRole('tab', { name: /walkthrough\.md/ })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the finished turn shows a walkthrough card naming the written file', async ({ page }: { page: Page }) => {

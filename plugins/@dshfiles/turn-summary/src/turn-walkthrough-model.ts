@@ -1,9 +1,14 @@
 import type { EditedFile } from './turn-activity.js'
 
+/** An edited file with its name below the group's folder. */
+export interface WalkthroughFile extends EditedFile {
+  readonly name: string
+}
+
 /** The files of one folder a turn edited, with their line totals and the one-line summary the card shows. */
 export interface WalkthroughGroup {
   readonly directory: string
-  readonly files: readonly EditedFile[]
+  readonly files: readonly WalkthroughFile[]
   readonly added: number
   readonly removed: number
   readonly summary: string
@@ -23,16 +28,16 @@ const plural = (count: number, word: string): string => `${String(count)} ${word
 
 /**
  * Groups a turn's edited files by folder, below the folder they all share, in first-edit order: "src · 2 files +40 −3".
- * Each file keeps only its name, since its group already names the folder.
+ * Each file is named by its file name alone, since its group already names the folder; its path stays whole.
  */
 const groups = (files: readonly EditedFile[]): readonly WalkthroughGroup[] => {
   const shared = sharedPrefix(files.map(file => directoryOf(file.path)))
-  const byDirectory = new Map<string, EditedFile[]>()
+  const byDirectory = new Map<string, WalkthroughFile[]>()
   for (const file of files) {
     const segments = file.path.split('/')
     const directory = segments.slice(shared, -1).join('/')
-    const relative = { ...file, path: segments.at(-1) ?? file.path }
-    byDirectory.set(directory, [...(byDirectory.get(directory) ?? []), relative])
+    const named = { ...file, name: segments.at(-1) ?? file.path }
+    byDirectory.set(directory, [...(byDirectory.get(directory) ?? []), named])
   }
   const root = files[0] === undefined ? '' : directoryOf(files[0].path).slice(0, shared).join('/')
   return [...byDirectory].map(([directory, grouped]) => {
