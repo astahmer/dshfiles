@@ -17,6 +17,7 @@
     "test:feature-coverage": "node --test scripts/feature-coverage.test.mjs",
     "test:browser-tasks": "node --test scripts/browser-tasks.test.mjs",
     "test:reap": "node --test scripts/reap-scratch-processes.test.mjs",
+    "test:registry-roundtrip": "pnpm run build && node scripts/registry-roundtrip.mjs",
     "test:ssh-smoke-safety": "node --test scripts/smoke-multi-host-ssh.test.mjs scripts/smoke-multi-host-ssh-sshd.test.mjs",
     "browser-tasks:check": "node scripts/browser-tasks.mjs",
     "features:check": "node --experimental-strip-types scripts/feature-coverage.mjs --check",
