@@ -70,12 +70,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 584,
-  "apiToolBindings": 401,
-  "apiToolNameCount": 401,
-  "apiToolSchemas": 400,
+  "apiMethods": 589,
+  "apiToolBindings": 406,
+  "apiToolNameCount": 406,
+  "apiToolSchemas": 405,
   "definedTools": 24,
-  "tools": 424,
+  "tools": 429,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -8100,6 +8100,25 @@
       }
     },
     {
+      "name": "project_identities",
+      "description": "The repository identity behind each project folder: the Git/Jujutsu origin when there is one, else the repository root, else the folder itself, so two checkouts of one repository can group as one project. Cached on the Host. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "paths"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "project_init",
       "description": "Turn an existing folder into a project in place: jj git init (colocated), a README.md when it has none, a first described commit and a main bookmark, then register it as a project. Existing files are kept and become the first revision. Refuses a folder that is already a repository or sits inside one. Call only when the user asked to initialize that folder.",
       "parameters": {
@@ -8134,6 +8153,15 @@
     {
       "name": "project_list",
       "description": "List registered projects (DSH Workspaces): id, title, path and thread count. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "project_projects",
+      "description": "List registered projects (DSH Workspaces) on this machine with their workspace id, title and path, leaving out jj thread workspaces. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {},
@@ -10196,6 +10224,22 @@
       }
     },
     {
+      "name": "thread_subscribe",
+      "description": "Subscribe a thread to another thread's turn completions: when the target finishes, fails, or stops to ask a question, one compact notice (status plus a short answer preview, never the transcript) is queued into the subscriber and wakes it when it is idle. Defaults the subscriber to the calling thread. Refused for a thread watching itself or a pair that would wake each other. Call it when the user asked you to wait on another thread's result, or right before you end a turn that waits on one — the subscription is that opt-in, and without it nothing wakes you.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "thread_subscriptions",
+      "description": "List thread subscriptions: which thread is notified when which other thread finishes a turn. Filter by subscriber or target; omit both for every edge. Nothing is delivered without a subscription. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
       "name": "thread_unarchive",
       "description": "Restore an archived thread to its recorded place in the sidebar. Call only when the user asked for this.",
       "parameters": {
@@ -10241,6 +10285,14 @@
           "sessionId"
         ],
         "additionalProperties": false
+      }
+    },
+    {
+      "name": "thread_unsubscribe",
+      "description": "Stop the notices for one pair: no further completion of the target reaches the subscriber. Defaults the subscriber to the calling thread. Call only when the user asked for this.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
       }
     },
     {

@@ -3,7 +3,8 @@ import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { HostContext } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer } from 'effect'
 import { SidebarHost } from './sidebar-host-promise.js'
-import { SubscriptionStorageFailed, ThreadHostCallFailed } from './sidebar-errors.js'
+import { SubscriptionStorageFailed } from './sidebar-errors.js'
+import { hostCall } from './subscription-host-promise.js'
 import { ThreadSubscriptions, ThreadSubscriptionsModel } from './subscriptions-store.js'
 import type { ThreadSubscription, ThreadSubscriptionsSnapshot } from './subscriptions-api.js'
 
@@ -70,14 +71,12 @@ export class ThreadSubscriptionActions extends Context.Service<ThreadSubscriptio
       const store = yield* ThreadSubscriptions
 
       const titlesOf = (sessionIds: ReadonlyArray<string>) =>
-        Effect.tryPromise({
-          try: signal =>
-            ctx.sessionQuery.readTitleSnapshots(
-              sessionIds.map(id => SessionId(id)),
-              signal,
-            ),
-          catch: cause => new ThreadHostCallFailed({ cause }),
-        }).pipe(
+        hostCall(signal =>
+          ctx.sessionQuery.readTitleSnapshots(
+            sessionIds.map(id => SessionId(id)),
+            signal,
+          ),
+        ).pipe(
           Effect.map(results => {
             const titles = new Map<string, string>()
             for (const result of results) {

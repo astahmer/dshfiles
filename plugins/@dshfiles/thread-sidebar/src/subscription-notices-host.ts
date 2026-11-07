@@ -6,6 +6,7 @@ import { Clock, Effect, Layer, Stream } from 'effect'
 import { SessionEvents } from './session-events.js'
 import { SidebarHost } from './sidebar-host-promise.js'
 import { ThreadHostCallFailed } from './sidebar-errors.js'
+import { hostCall } from './subscription-host-promise.js'
 import { SubscriptionNoticeModel, SubscriptionNotices, notifySubscribers, type DeliveryOutcome, type SubscriptionNoticeDeps } from './subscription-notices.js'
 import { threadSubscriptionsApi } from './subscriptions-api.js'
 import { ThreadSubscriptions } from './subscriptions-store.js'
@@ -33,14 +34,12 @@ export const subscriptionNoticeHostLayer = Layer.effect(
           const archived = new Set(yield* sidebar.archivedSessionIds)
           const listed = yield* sidebar.sessions
           const pending = new Map(listed.map(session => [session.sessionId, session.pendingQuestions] as const))
-          const titles = yield* Effect.tryPromise({
-            try: signal =>
-              ctx.sessionQuery.readTitleSnapshots(
-                sessionIds.map(id => SessionId(id)),
-                signal,
-              ),
-            catch: cause => new ThreadHostCallFailed({ cause }),
-          })
+          const titles = yield* hostCall(signal =>
+            ctx.sessionQuery.readTitleSnapshots(
+              sessionIds.map(id => SessionId(id)),
+              signal,
+            ),
+          )
           const bySession = new Map<string, string>()
           for (const result of titles) {
             if (result.status !== 'fulfilled' || result.value.title === undefined) continue
@@ -58,18 +57,14 @@ export const subscriptionNoticeHostLayer = Layer.effect(
         ),
       // `wake: true` is the whole opt-in: only a subscription reaches this call, so nothing else starts a thread's turn.
       deliver: input =>
-        Effect.tryPromise({
-          try: () => sessions.message({ sessionId: input.sessionId, text: input.text, target: 'next-turn', wake: true }),
-          catch: cause => new ThreadHostCallFailed({ cause }),
-        }).pipe(
+        hostCall(() => sessions.message({ sessionId: input.sessionId, text: input.text, target: 'next-turn', wake: true })).pipe(
           Effect.as<DeliveryOutcome>({ delivered: true }),
           Effect.catch(error => Effect.succeed(catchDelivery(error))),
         ),
       messagesOf: sessionId =>
-        Effect.tryPromise({
-          try: signal => sessions.messages({ sessionId, limit: 8 }, { signal }),
-          catch: cause => new ThreadHostCallFailed({ cause }),
-        }).pipe(Effect.map(page => page.entries.map(entry => ({ role: entry.role, text: entry.text })))),
+        hostCall(signal => sessions.messages({ sessionId, limit: 8 }, { signal })).pipe(
+          Effect.map(page => page.entries.map(entry => ({ role: entry.role, text: entry.text }))),
+        ),
     }
     return SubscriptionNotices.of(deps)
   }),
