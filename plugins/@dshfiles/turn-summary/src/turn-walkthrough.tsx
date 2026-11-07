@@ -24,8 +24,12 @@ export const TurnWalkthroughToggle = (props: { readonly open: boolean; readonly 
   </button>
 )
 
-/** The opened walkthrough: the changed files by folder and the way into that turn's Changes view. */
-export const TurnWalkthroughList = (props: { readonly summary: TurnActivitySummary; readonly openChanges: (() => void) | undefined }): JSX.Element => (
+/** The opened walkthrough: the changed files by folder, each opening in the editor, and the way into that turn's Changes view. */
+export const TurnWalkthroughList = (props: {
+  readonly summary: TurnActivitySummary
+  readonly openFile: (path: string) => void
+  readonly openChanges: (() => void) | undefined
+}): JSX.Element => (
   <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:items-start dshx:gap-2 dshx:pl-5" data-dshfiles-turn-walkthrough="">
     <DockChanges
       className="dshx:w-full dshx:gap-3"
@@ -34,7 +38,7 @@ export const TurnWalkthroughList = (props: { readonly summary: TurnActivitySumma
         label: group.directory,
         icon: <FolderIcon />,
         hint: group.summary,
-        files: group.files,
+        files: group.files.map(file => ({ ...file, onOpen: () => props.openFile(file.fullPath) })),
       }))}
     />
     {props.openChanges === undefined ? null : (

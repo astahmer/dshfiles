@@ -1,9 +1,14 @@
 import type { EditedFile } from './turn-activity.js'
 
+/** One file of a folder a turn edited: the name the card shows, and the path that opens it. */
+export interface WalkthroughFile extends EditedFile {
+  readonly fullPath: string
+}
+
 /** The files of one folder a turn edited, with their line totals and the one-line summary the card shows. */
 export interface WalkthroughGroup {
   readonly directory: string
-  readonly files: readonly EditedFile[]
+  readonly files: readonly WalkthroughFile[]
   readonly added: number
   readonly removed: number
   readonly summary: string
@@ -27,11 +32,11 @@ const plural = (count: number, word: string): string => `${String(count)} ${word
  */
 const groups = (files: readonly EditedFile[]): readonly WalkthroughGroup[] => {
   const shared = sharedPrefix(files.map(file => directoryOf(file.path)))
-  const byDirectory = new Map<string, EditedFile[]>()
+  const byDirectory = new Map<string, WalkthroughFile[]>()
   for (const file of files) {
     const segments = file.path.split('/')
     const directory = segments.slice(shared, -1).join('/')
-    const relative = { ...file, path: segments.at(-1) ?? file.path }
+    const relative: WalkthroughFile = { ...file, path: segments.at(-1) ?? file.path, fullPath: file.path }
     byDirectory.set(directory, [...(byDirectory.get(directory) ?? []), relative])
   }
   const root = files[0] === undefined ? '' : directoryOf(files[0].path).slice(0, shared).join('/')
