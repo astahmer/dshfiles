@@ -446,6 +446,8 @@ const remoteNodeSchema = Schema.Struct({
   nix: Schema.Boolean,
 })
 
+const checkoutRecoverySchema = Schema.Struct({ label: Schema.String, command: Schema.optional(Schema.String) })
+
 const hostUpdateResultSchema = Schema.Struct({
   ok: Schema.Boolean,
   applied: Schema.Boolean,
@@ -454,6 +456,10 @@ const hostUpdateResultSchema = Schema.Struct({
   rebuilt: Schema.Array(Schema.String),
   restartNeeded: Schema.Boolean,
   detail: Schema.String,
+  // Optional so a client that hot-reloaded ahead of its Host still reads an older result.
+  incoming: Schema.optional(Schema.Number),
+  outgoing: Schema.optional(Schema.Number),
+  recovery: Schema.optional(Schema.Array(checkoutRecoverySchema)),
 })
 
 const remoteFactsSchema = Schema.Struct({
@@ -486,6 +492,7 @@ const remoteFactsSchema = Schema.Struct({
     commitId: Schema.optional(Schema.String),
     description: Schema.optional(Schema.String),
     conflicts: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()),
+    conflictedBookmarks: Schema.Array(Schema.String),
     mainOrigin: Schema.optional(Schema.String),
   }),
 })
@@ -533,13 +540,68 @@ const remoteRuntimeStatusSchema = Schema.Struct({
   logBytes: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt())),
 })
 
-const checkoutSyncPlanSchema = Schema.Struct({
+const checkoutRevisionSchema = Schema.Struct({
+  changeId: Schema.String,
+  commitId: Schema.String,
+  description: Schema.String,
+  conflict: Schema.Boolean,
+  empty: Schema.Boolean,
+})
+const checkoutRevisionListSchema = Schema.Struct({ total: Schema.Number, revisions: Schema.Array(checkoutRevisionSchema) })
+const checkoutWorkspaceSchema = Schema.Struct({
+  name: Schema.String,
+  path: Schema.optional(Schema.String),
+  commitId: Schema.String,
+  description: Schema.String,
+  blocksSync: Schema.Boolean,
+  threads: Schema.Array(Schema.Struct({ sessionId: Schema.String, title: Schema.String })),
+})
+const checkoutSyncResultSchema = Schema.Struct({
+  ok: Schema.Boolean,
+  applied: Schema.Boolean,
+  status: Schema.Literals([
+    'up-to-date',
+    'ahead',
+    'would-sync',
+    'synced',
+    'jj-missing',
+    'no-checkout',
+    'not-jj',
+    'fetch-failed',
+    'no-remote-bookmark',
+    'stale',
+    'bookmark-conflict',
+    'workspace-busy',
+    'unpushed-work',
+    'conflicted',
+    'moved',
+    'failed',
+  ]),
   path: Schema.String,
   bookmark: Schema.String,
-  upToDate: Schema.Boolean,
-  reason: Schema.String,
-  commands: Schema.Array(Schema.String),
+  detail: Schema.String,
+  recovery: Schema.Array(checkoutRecoverySchema),
+  head: Schema.optional(Schema.String),
+  target: Schema.optional(Schema.String),
+  bookmarkState: Schema.Struct({
+    name: Schema.String,
+    local: Schema.Array(Schema.String),
+    origin: Schema.optional(Schema.String),
+    tracked: Schema.Boolean,
+    conflicted: Schema.Boolean,
+  }),
+  incoming: checkoutRevisionListSchema,
+  outgoing: checkoutRevisionListSchema,
+  unpushedBookmark: checkoutRevisionListSchema,
+  absorbed: Schema.Array(checkoutRevisionSchema),
+  conflictFiles: Schema.Array(Schema.String),
+  workspace: Schema.optional(checkoutWorkspaceSchema),
+  otherWorkspaces: Schema.Array(checkoutWorkspaceSchema),
 })
+
+/** A jj bookmark name; it lands inside a revset, so anything that could end the string is refused. */
+const checkoutBookmarkSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(128), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/u))
+const checkoutCommitSchema = Schema.String.check(Schema.isPattern(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u))
 
 const effectMultiHostApi = defineApi({
   id: 'multi-host',
@@ -1035,22 +1097,14 @@ const effectMultiHostApi = defineApi({
       input: Schema.Struct({
         sshTarget: sshTargetSchema,
         path: remotePathSchema,
-        bookmark: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(128)).pipe(Schema.withDecodingDefault(Effect.succeed('main'))),
+        bookmark: checkoutBookmarkSchema.pipe(Schema.withDecodingDefault(Effect.succeed('main'))),
         apply: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+        expectedHead: Schema.optional(checkoutCommitSchema),
+        expectedTarget: Schema.optional(checkoutCommitSchema),
       }),
-      output: Schema.Union([
-        Schema.Struct({
-          ok: Schema.Literal(true),
-          applied: Schema.Boolean,
-          detail: Schema.String,
-          plan: checkoutSyncPlanSchema,
-          stdout: Schema.String,
-          stderr: Schema.String,
-        }),
-        failedSchema,
-      ]),
+      output: Schema.Union([checkoutSyncResultSchema, failedSchema]),
       description:
-        'Fetch and rebase one checkout on an SSH host onto its bookmark origin, keeping that machine edits. Without apply it only reports the commands. Call only when the user asked to update that checkout.',
+        'Sync one jj checkout on an SSH host with <bookmark>@origin. Without apply it fetches (which moves remote bookmarks only), simulates the rebase and reports the incoming and outgoing revisions, the bookmark state, which workspace this is, the others that share the repository, and the recovery commands for that host; no file changes. With apply it rebases, keeping undescribed local edits. It never pushes and never moves a bookmark. Described work origin lacks, a conflict, a conflicted bookmark, a stale working copy or another workspace built on these revisions refuses the sync and leaves the checkout as it was. Pass the head and target of the report as expectedHead and expectedTarget to refuse when the checkout moved since. Call only when the user asked to check or update that checkout.',
       tool: { name: 'multi_host_checkout_sync', render: compactJson },
     }),
     hostUpdate: method({

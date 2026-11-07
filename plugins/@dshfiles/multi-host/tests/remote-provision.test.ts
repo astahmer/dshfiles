@@ -36,6 +36,7 @@ const factsOf = ({ overrides = {} }: { readonly overrides?: Partial<RemoteFacts>
     commitId: undefined,
     description: undefined,
     conflicts: 0,
+    conflictedBookmarks: [],
     mainOrigin: undefined,
   },
   ...overrides,
@@ -65,6 +66,7 @@ const readyFacts = (): RemoteFacts => ({
     commitId: 'def456',
     description: 'feat(multi-host): x',
     conflicts: 0,
+    conflictedBookmarks: [],
     mainOrigin: 'def456',
   },
 })

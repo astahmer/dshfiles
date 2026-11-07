@@ -634,9 +634,12 @@ const handlers = Api.handlers(multiHostApi, {
   }),
   checkoutSync: Effect.fn('multi-host checkout sync')(function* (input) {
     return yield* Effect.gen(function* () {
-      const facts = yield* RemoteDoctor.readFacts({ sshTarget: input.sshTarget, profile: 'web', checkoutPath: input.path })
-      const run = yield* RemoteCheckout.run({ sshTarget: input.sshTarget, facts, bookmark: input.bookmark, apply: input.apply })
-      return { ok: true as const, applied: run.applied, detail: run.detail, plan: run.plan, stdout: run.stdout, stderr: run.stderr }
+      const result = yield* RemoteCheckout.run(input)
+      const directory = yield* HostDirectory
+      const threads = yield* RemoteThreads
+      const hosts = (yield* directory.listHosts).filter(host => host.connector.kind === 'ssh' && host.connector.sshTarget === input.sshTarget)
+      const runtimes = (yield* Effect.forEach(hosts, host => directory.listRuntimes(host.id))).flat()
+      return RemoteCheckout.withThreads({ result, threads: (yield* threads.list).filter(thread => runtimes.some(runtime => runtime.id === thread.runtimeId)) })
     }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
   }),
   sshConfigHosts: Effect.fn('multi-host ssh config hosts')(function* () {
