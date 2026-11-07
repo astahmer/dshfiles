@@ -1041,7 +1041,7 @@
     },
     {
       "name": "ai_accounts_refresh_quota",
-      "description": "Read live subscription quota now, bypassing the shared short-lived cache. Call only when the user asked for a fresh reading.",
+      "description": "Read live subscription quota now, bypassing the shared short-lived cache. A card’s own `readAt` says when its provider answered, and `nextReadAt` when reads are held back (Claude shares one reading and backs off after a 429), so check them rather than assuming the reading is new. Call only when the user asked for a fresh reading.",
       "parameters": {
         "type": "object",
         "properties": {}
