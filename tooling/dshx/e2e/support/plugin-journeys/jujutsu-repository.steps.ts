@@ -526,5 +526,6 @@ After(async ({ page }: { page: Page }) => {
   if (repository === undefined) return
   repositories.delete(page)
   foreignRepositories.delete(page)
-  await rm(repository.root, { recursive: true, force: true })
+  // A jj process the Host started can still be writing here when the scenario ends.
+  await rm(repository.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
