@@ -291,3 +291,12 @@ Feature: Thread sidebar journeys
     Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
     When the GUI is opened with a prompt link for a registered project
     Then a new thread in that project holds the prompt unsent and the address no longer carries the link
+
+  @scenario:thread-sidebar.subagent-live-preview
+  Scenario: The transcript follows a delegated subagent and links to its thread
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread delegates a long command to a subagent
+    Then the transcript row reports the working subagent and what it runs
+    And stopping the subagent from the row takes a confirmation
+    And the row opens the subagent's thread

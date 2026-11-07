@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PartialArguments } from '@deepseek-ai/dsh-util-values'
+import type { SubagentPreviewBindings } from './subagent-live-preview.js'
 import { SubagentProvenanceToolRow } from './subagent-tool-row.js'
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
@@ -29,6 +30,15 @@ const translate: Props['t'] = key => {
   if (key === 'row.inspect') return 'Inspect'
   return key
 }
+
+const previewBindings = (overrides: Partial<SubagentPreviewBindings> = {}): SubagentPreviewBindings => ({
+  t: (key => key) as SubagentPreviewBindings['t'],
+  retainChild: vi.fn(() => ({ ready: new Promise<never>(() => undefined), release: vi.fn() })),
+  openChild: vi.fn(),
+  openChildAside: vi.fn(),
+  canOpenAside: () => true,
+  ...overrides,
+})
 
 const props = ({
   provider,
@@ -69,8 +79,9 @@ const props = ({
   useWorkspaces: unused,
   usePanelInfo: unused,
   useResource: unused,
-  useSessions: unused,
-  useSessionStatus: unused,
+  useSessions: ((selector: (list: { byId: Record<string, never> }) => unknown) => selector({ byId: {} })) as unknown as Props['useSessions'],
+  useSessionStatus: ((selector: (statuses: ReadonlyMap<string, never>) => unknown) =>
+    selector(new Map<string, never>())) as unknown as Props['useSessionStatus'],
   useSessionRetainInfo: unused,
   useChat: unused,
   useConversation: unused,
@@ -88,7 +99,42 @@ const props = ({
   useSession: unused,
   useProjection: unused,
   t: translate,
+  preview: previewBindings(),
 })
+
+const CHILD = 'child-session'
+
+/** A settled delegation: its result only names the child. */
+const settled = (input: {
+  readonly expanded?: boolean
+  readonly running?: boolean
+  readonly lastTurnCompleted?: boolean
+  readonly preview?: SubagentPreviewBindings
+  readonly isError?: boolean
+}): Props => {
+  const base = props({ provider: 'openai', model: 'gpt-6.1-luna', expanded: input.expanded ?? false })
+  if (base.phase !== 'start') throw new Error('fixture starts from the start phase')
+  // SAFETY: the row reads only these fields of a settled block.
+  const block = {
+    call: base.block,
+    content: [{ type: 'text', text: input.isError === true ? 'no route' : `started subagent ${CHILD}` }],
+    isError: input.isError === true,
+  } as unknown as Extract<Props, { phase: 'result' }>['block']
+  return {
+    ...base,
+    phase: 'result',
+    block,
+    useSessionStatus: ((selector: (statuses: ReadonlyMap<string, { running: boolean }>) => unknown) =>
+      selector(new Map([[CHILD, { running: input.running === true }]]))) as unknown as Props['useSessionStatus'],
+    useSessions: ((selector: (list: unknown) => unknown) =>
+      selector({
+        byId: { [CHILD]: { projectionValues: { subagentTiming: { lastTurnCompleted: input.lastTurnCompleted } } } },
+      })) as unknown as Props['useSessions'],
+    preview: input.preview ?? previewBindings(),
+  } as Props
+}
+
+const previewRoot = () => document.querySelector('[data-dshfiles-live-preview="agent"]')
 
 afterEach(cleanup)
 
@@ -115,5 +161,66 @@ describe('SubagentProvenanceToolRow', () => {
     render(<SubagentProvenanceToolRow {...props({ provider: 'alex@example.com', model: 'gpt-6.1-luna' })} />)
     expect(screen.getByText(/^Create subagent · [A-Z][a-z]+ [A-Z][a-z]+$/)).not.toBeNull()
     expect(screen.queryByText(/alex@example\.com/)).toBeNull()
+  })
+
+  it('reports the child in agent terms, never the job lifecycle', () => {
+    const { rerender } = render(<SubagentProvenanceToolRow {...settled({ running: true })} />)
+    expect(previewRoot()?.getAttribute('data-state')).toBe('working')
+    expect(screen.getByText(/subagentPreviewWorking$/)).not.toBeNull()
+    rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: true })} />)
+    expect(previewRoot()?.getAttribute('data-state')).toBe('finished')
+    rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: false })} />)
+    expect(previewRoot()?.getAttribute('data-state')).toBe('interrupted')
+    rerender(<SubagentProvenanceToolRow {...settled({})} />)
+    expect(previewRoot()?.getAttribute('data-state')).toBe('idle')
+  })
+
+  it('shows the failure of a call that started no child', () => {
+    render(<SubagentProvenanceToolRow {...settled({ isError: true, expanded: true })} />)
+    expect(previewRoot()).toBeNull()
+    expect(screen.getByTestId('expanded-content').textContent).toContain('no route')
+  })
+
+  it('opens the child only while expanded, and releases it on collapse', async () => {
+    const release = vi.fn()
+    const retainChild = vi.fn(() => ({ ready: new Promise<never>(() => undefined), release }))
+    const preview = previewBindings({ retainChild })
+    const { rerender, unmount } = render(<SubagentProvenanceToolRow {...settled({ running: true, preview })} />)
+    expect(retainChild).not.toHaveBeenCalled()
+    rerender(<SubagentProvenanceToolRow {...settled({ running: true, preview, expanded: true })} />)
+    expect(retainChild).toHaveBeenCalledOnce()
+    rerender(<SubagentProvenanceToolRow {...settled({ running: true, preview })} />)
+    await waitFor(() => expect(release).toHaveBeenCalledOnce())
+    unmount()
+    expect(release).toHaveBeenCalledOnce()
+  })
+
+  it('names the owning thread and offers it even when live progress failed', async () => {
+    const preview = previewBindings({ retainChild: () => ({ ready: Promise.reject(new Error('gone')), release: vi.fn() }) })
+    render(<SubagentProvenanceToolRow {...settled({ expanded: true, preview })} />)
+    await screen.findByText('subagentPreviewUnavailable')
+    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewOpenThread' }))
+    expect(preview.openChild).toHaveBeenCalledWith(CHILD)
+  })
+
+  it('stops a working child only after confirmation', async () => {
+    const cancel = vi.fn(async () => ({ ok: true }))
+    const eventSource = {
+      getSnapshot: () => ({ entries: [], hasMore: false, revision: 0, change: { kind: 'replace', entries: [] } }),
+      subscribe: () => () => undefined,
+    }
+    // SAFETY: the preview reads only these two fields of the binding.
+    const ready = Promise.resolve({ eventSource, session: { cancel } } as never)
+    const preview = previewBindings({ retainChild: () => ({ ready, release: vi.fn() }) })
+    render(<SubagentProvenanceToolRow {...settled({ running: true, expanded: true, preview })} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'subagentPreviewStop' }))
+    expect(cancel).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewKeepWorking' }))
+    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewStop' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewConfirmStop' }))
+      await Promise.resolve()
+    })
+    expect(cancel).toHaveBeenCalledOnce()
   })
 })
