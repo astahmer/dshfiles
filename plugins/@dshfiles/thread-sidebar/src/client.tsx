@@ -159,6 +159,7 @@ import { restartRecoveryRefetchInterval } from './restart-recovery-poll.js'
 import { selectRecoveryRows } from './restart-recovery-rows.js'
 import type { RecoveryReason } from './restart-recovery.js'
 import { UsageLimitRowsModel, type QuotaContinuation, type UsageLimitRow } from './usage-limit-rows.js'
+import { ResumeAttentionModel } from './resume-attention.js'
 import { usageLimitRefetchInterval } from './usage-limit-poll.js'
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
@@ -1947,7 +1948,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [allUsageLimitRows, threadView.sourceFilter],
   )
   const allUsageLimitSessionIds = useMemo(() => new Set(allUsageLimitRows.map(row => row.session.id)), [allUsageLimitRows])
-  const sessionIdByContinuationId = useMemo(() => new Map(usageLimitRows.map(row => [row.continuation.continuationId, row.session.id])), [usageLimitRows])
   const recoverySettled = (settled: RecoveryOperationsSettled): void => {
     void queryClient.invalidateQueries({ queryKey: restartRecoveryQueryKey })
     const failedSessionIds = settled.results
@@ -1979,6 +1979,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             openThread,
           }),
     )
+    // A batch may have resumed quota continuations, whose group reads its own durable list.
+    void queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
   }
   const usageLimitSettled = (settled: RecoveryOperationsSettled): void => {
     void queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
@@ -1988,34 +1990,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
       return
     }
-    if (settled.tag === 'usage-limit-row') {
-      if (failedKeys.length === 0) setNotice({ tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: 1 }) })
-      else if (settled.results[0]?.status === 'rejected') setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarUsageLimitSuperseded') })
-      else setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
-      return
-    }
-    if (failedKeys.length === 0) {
-      setNotice({ tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: settled.results.length }) })
-      return
-    }
-    setNotice(
-      failedResumeNotice({
-        message: props.tSidebar('threadSidebarResumePartial', { sent: settled.results.length - failedKeys.length, failed: failedKeys.length }),
-        actionLabel: props.tSidebar('threadSidebarOpenFailedResume'),
-        failedSessionIds: failedKeys.flatMap(key => {
-          const sessionId = sessionIdByContinuationId.get(key)
-          return sessionId === undefined ? [] : [sessionId]
-        }),
-        openThread,
-      }),
-    )
+    if (failedKeys.length === 0) setNotice({ tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: 1 }) })
+    else if (settled.results[0]?.status === 'rejected') setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarUsageLimitSuperseded') })
+    else setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
   }
   const usageLimitOperations = useRecoveryOperations({ onSettled: usageLimitSettled })
   const recoveryOperations = useRecoveryOperations({ onSettled: recoverySettled })
-  const usageLimitBusyIds = usageLimitOperations.busyKeys
-  const usageLimitResumeAllBusy = usageLimitOperations.running
   const resumeBusySessionIds = recoveryOperations.busyKeys
   const resumeAllBusy = recoveryOperations.running
+  const continuationBySessionId = useMemo(() => new Map(usageLimitRows.map(row => [row.session.id, row.continuation])), [usageLimitRows])
+  const usageLimitBusyIds = useMemo(() => {
+    const busy = new Set(usageLimitOperations.busyKeys)
+    for (const row of usageLimitRows) if (resumeBusySessionIds.has(row.session.id)) busy.add(row.continuation.continuationId)
+    return busy
+  }, [resumeBusySessionIds, usageLimitOperations.busyKeys, usageLimitRows])
   const resumeUsageLimitThread = (input: { readonly continuationId: string }): void => {
     usageLimitOperations.run({
       tag: 'usage-limit-row',
@@ -2056,15 +2044,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       ],
     })
   }
-  const resumeAllUsageLimits = (): void => {
-    usageLimitOperations.run({
-      tag: 'usage-limit-batch',
-      operations: usageLimitRows.map(row => ({
-        key: row.continuation.continuationId,
-        run: ({ signal }) => accountsApi.resumeQuotaContinuation({ continuationId: row.continuation.continuationId }, { signal }),
-      })),
-    })
-  }
   const resumeRecoverySession = (sessionId: SessionSummary['id']): void => {
     recoveryOperations.run({
       tag: 'recovery-row',
@@ -2075,12 +2054,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     recoveryOperations.run({
       tag: 'recovery-dismiss',
       operations: [{ key: `dismiss:${sessionId}`, run: ({ signal }) => recoveryApi.dismiss({ sessionId }, { signal }).then(() => ({ accepted: true })) }],
-    })
-  }
-  const resumeAllRecoveries = (rows: readonly SessionSummary[]): void => {
-    recoveryOperations.run({
-      tag: 'recovery-batch',
-      operations: rows.map(row => ({ key: row.id, run: ({ signal }) => recoveryApi.resume({ sessionId: row.id }, { signal }) })),
     })
   }
   const unreadSessionIds = useStableValue(
@@ -3181,6 +3154,27 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // sidebar already classifies, with subagents rolled up into their parent.
   const stateGrouping = threadView.groupBy === 'state'
   const inbox = useInboxThreadSignals({ enabled: stateGrouping && sessionState.phase === 'ready' })
+  /**
+   * Resume one row however it stopped: its inbox verb (quota, another provider), its stored quota continuation when the
+   * inbox is absent, or the turn a previous Host process left open.
+   */
+  const resumeAttentionSession = async (sessionId: SessionSummary['id'], abortSignal: AbortSignal): Promise<{ readonly accepted: boolean }> => {
+    const target = ResumeAttentionModel.targetOf({
+      sessionId,
+      signal: inbox.signals.get(sessionId),
+      continuation: continuationBySessionId.get(sessionId),
+    })
+    if (target.kind === 'inbox') return inbox.act(target.itemId, 'Resume').then(outcome => ({ accepted: outcome.ok }))
+    if (target.kind === 'quota') return accountsApi.resumeQuotaContinuation({ continuationId: target.continuationId }, { signal: abortSignal })
+    return recoveryApi.resume({ sessionId: target.sessionId }, { signal: abortSignal })
+  }
+  /** Every Resume all in the list: one batch keyed by thread, so a mixed Needs you group resumes in one notice. */
+  const resumeAllAttention = (rows: readonly SessionSummary[]): void => {
+    recoveryOperations.run({
+      tag: 'recovery-batch',
+      operations: rows.map(row => ({ key: row.id, run: ({ signal }) => resumeAttentionSession(row.id, signal) })),
+    })
+  }
   const childStatusById = useMemo(() => {
     const statuses = new Map<SessionSummary['id'], ThreadStatus>()
     if (!stateGrouping) return statuses
@@ -3836,6 +3830,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     visibleThreadEntries,
     workspaceState.pinnedSessionIds,
   ])
+  /** Rows of a status group whose inline verb is Resume, so the group header can offer one bulk verb. */
+  const statusGroupResumableSessions = useMemo(() => {
+    const byGroupKey = new Map<string, readonly SessionSummary[]>()
+    if (threadView.groupBy !== 'state') return byGroupKey
+    for (const group of groupedThreadEntries) {
+      if (group.threads.length === 0) continue
+      const resumable = ResumeAttentionModel.resumableRowsOf({
+        rows: group.threads.flatMap(entry => (entry.kind === 'local' ? [entry.session] : [])),
+        statusOf: session => threadStatusById.get(session.id) ?? childStatusById.get(session.id),
+      })
+      if (resumable.length > 0) byGroupKey.set(group.key, resumable)
+    }
+    return byGroupKey
+  }, [childStatusById, groupedThreadEntries, threadStatusById, threadView.groupBy])
 
   const rowStyle = useMemo<RowStyle>(
     () => ({
@@ -4973,7 +4981,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({hoistedInterruptedRows.length})</span>
                 <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllRecoveries(hoistedInterruptedRows)}>
+                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllAttention(hoistedInterruptedRows)}>
                   {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
                   {props.tSidebar('threadSidebarResumeAll')}
                 </Button>
@@ -4995,7 +5003,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({hoistedNeedsResumeRows.length})</span>
                 <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllRecoveries(hoistedNeedsResumeRows)}>
+                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllAttention(hoistedNeedsResumeRows)}>
                   {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
                   {props.tSidebar('threadSidebarResumeAll')}
                 </Button>
@@ -5009,11 +5017,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             onAutoRetry={input => void changeUsageLimitRecovery(input)}
             onDismiss={input => void changeUsageLimitRecovery({ continuationId: input.continuationId, dismiss: true })}
             onResume={input => void resumeUsageLimitThread(input)}
-            onResumeAll={() => void resumeAllUsageLimits()}
+            onResumeAll={() => void resumeAllAttention(hoistedUsageLimitRows.map(row => row.session))}
             onSnooze={input => void changeUsageLimitRecovery(input)}
             open={openThread}
             selectedSessionId={selectedSessionId}
-            resumeAllBusy={usageLimitResumeAllBusy}
+            resumeAllBusy={resumeAllBusy}
             rows={hoistedUsageLimitRows}
             translate={props.tSidebar}
             withThreadMenu={(session, row) => (
@@ -5259,6 +5267,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     (group.key.startsWith(STATUS_GROUP_KEY_PREFIX)
                       ? ThreadStatusModel.isCollapsed(group.key, collapsedGroups)
                       : collapsedGroups.includes(group.key))
+                  const resumableSessions = statusGroupResumableSessions.get(group.key) ?? []
                   return (
                     <section
                       className={cn(
@@ -5279,6 +5288,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           onToggle={() => toggleGroup(group.key)}
                           startProjectSession={props.startProjectSession}
                           t={props.tSidebar}
+                          action={
+                            resumableSessions.length === 0 ? undefined : (
+                              <Button
+                                type="button"
+                                size="xs"
+                                variant="outline"
+                                disabled={resumeAllBusy}
+                                onClick={() => void resumeAllAttention(resumableSessions)}
+                              >
+                                {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
+                                {props.tSidebar('threadSidebarResumeAll')}
+                              </Button>
+                            )
+                          }
                         />
                       ) : null}
                       {groupCollapsed

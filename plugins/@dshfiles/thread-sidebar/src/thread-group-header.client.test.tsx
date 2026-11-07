@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
+import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ThreadGroupHeader } from './thread-group-header.js'
 
-const mount = (options: { collapsed?: boolean; projectId?: string; label?: string } = {}) => {
+const mount = (options: { collapsed?: boolean; projectId?: string; label?: string; action?: ReactNode } = {}) => {
   const onToggle = vi.fn()
   const startProjectSession = vi.fn()
   const props: Parameters<typeof ThreadGroupHeader>[0] = {
@@ -15,6 +16,7 @@ const mount = (options: { collapsed?: boolean; projectId?: string; label?: strin
     className: 'dshx:sticky dshx:top-0',
     onToggle,
     startProjectSession,
+    ...(options.action === undefined ? {} : { action: options.action }),
     t: (_key, params) => `New chat in ${String(params?.project)}`,
   }
   const view = render(
@@ -69,6 +71,24 @@ describe('ThreadGroupHeader', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Shared project (12)' }))
     expect(header.onToggle).toHaveBeenCalledOnce()
     expect(header.startProjectSession).not.toHaveBeenCalled()
+  })
+
+  it('keeps a group-wide action beside the toggle, not inside it', () => {
+    const onResumeAll = vi.fn()
+    const header = mount({
+      action: (
+        <button type="button" onClick={onResumeAll}>
+          Resume all
+        </button>
+      ),
+    })
+    const action = screen.getByRole('button', { name: 'Resume all' })
+    const toggle = screen.getByRole('button', { name: 'Shared project (12)' })
+    expect(action.parentElement).toBe(toggle.parentElement)
+    expect(toggle.contains(action)).toBe(false)
+    fireEvent.click(action)
+    expect(onResumeAll).toHaveBeenCalledOnce()
+    expect(header.onToggle).not.toHaveBeenCalled()
   })
 
   it('truncates long project names without shrinking or hover-hiding creation at narrow widths', () => {

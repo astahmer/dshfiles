@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -14,9 +15,11 @@ interface ThreadGroupHeaderProps {
   readonly onToggle: () => void
   readonly startProjectSession: (projectId: string) => void
   readonly t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
+  /** A group-wide verb (Needs you offers Resume all); it sits beside the toggle, not inside it. */
+  readonly action?: ReactNode
 }
 
-export const ThreadGroupHeader = ({ label, count, collapsed, projectId, className, onToggle, startProjectSession, t }: ThreadGroupHeaderProps) => {
+export const ThreadGroupHeader = ({ label, count, collapsed, projectId, className, onToggle, startProjectSession, t, action }: ThreadGroupHeaderProps) => {
   const createLabel = t('threadSidebarNewChatInProject', { project: label })
   return (
     <div className={cn(className, 'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-2.5')}>
@@ -34,6 +37,7 @@ export const ThreadGroupHeader = ({ label, count, collapsed, projectId, classNam
           {collapsed ? <ChevronDownIcon size={12} /> : <ChevronUpIcon size={12} />}
         </span>
       </button>
+      {action}
       {projectId === undefined ? null : (
         <Tooltip>
           <TooltipTrigger asChild>

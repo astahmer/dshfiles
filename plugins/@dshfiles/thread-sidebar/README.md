@@ -62,7 +62,10 @@ classifies. Each row shows the kit's `StatusGlyph` (Working spins without colour
 draw the eye), the title, a muted second line with why it needs you, the agent preset, project and host, the elapsed
 time, and one inline verb when it needs you: **Answer** and **Approve** open the thread, where the card is answered in
 place; **Retry**, **Resume** and **Land** on an inbox item run that item's own verb through the inbox's `act`. The
-hover-action strip opens to the left of that verb and never over it, so the visible verb stays clickable.
+hover-action strip opens to the left of that verb and never over it, so the visible verb stays clickable. The Needs you
+group header offers **Resume all**: every row whose verb is Resume moves at once (three requests at a time), whether it
+stopped on a usage limit, on an interrupted turn or on a provider's own resumable item, and a mixed group still reports
+one combined result.
 Subagents stay nested one level under their parent and roll up into it ("2 subagents need you", "waiting on 1
 subagent"), so a parent never looks finished while a child waits or failed. **Group › Arrange manually** brings back
 the drag-to-arrange sections below; a saved view keeps whatever grouping it was saved with, so only a new profile
@@ -595,7 +598,8 @@ records every `turn/start` in a small durable in-flight file and clears it on
 that never closed; it promotes those ids into the same recovery store at boot,
 marked `interrupted` instead of `restart`, and clears the file so one exit is
 reported once. Both groups show explicit **Resume** and dismiss actions, and each
-offers **Resume all** (up to three requests at once). Resume sends a new
+offers **Resume all** (up to three requests at once). The status-grouped **Needs you** group and the **Usage limit**
+group offer the same verb, so every list of blocked threads can resume them together. Resume sends a new
 continuation prompt that directs the agent to inspect its transcript and
 workspace before continuing; it does not replay the interrupted model/tool call.
 A row leaves its group as soon as that thread runs again, and dismissing drops it
