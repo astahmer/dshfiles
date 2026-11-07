@@ -70,12 +70,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 574,
-  "apiToolBindings": 392,
-  "apiToolNameCount": 392,
-  "apiToolSchemas": 391,
+  "apiMethods": 579,
+  "apiToolBindings": 397,
+  "apiToolNameCount": 397,
+  "apiToolSchemas": 396,
   "definedTools": 24,
-  "tools": 415,
+  "tools": 420,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -1276,7 +1276,7 @@
     },
     {
       "name": "ai_accounts_set_auto_retry",
-      "description": "Change whether one quota-blocked turn resumes automatically at its known reset. Call only when the user asked for that.",
+      "description": "Change whether one quota-blocked turn resumes automatically at its reset, or on a growing backoff when the provider named none. Call only when the user asked for that.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -1717,7 +1717,7 @@
     },
     {
       "name": "apply_patch",
-      "description": "Edit one existing text file atomically: reads it first, applies literal replacements in order, ignores identical old/new pairs, then writes once. Whitespace-tolerant fallback finds a reindented or rewrapped anchor; an ambiguous or missing anchor fails without writing and names the candidate lines. Use it after inspecting a file with ast-outline, bash or grep instead of `edit`. Read-only when it fails; it never creates a file.",
+      "description": "Edit one existing text file atomically: reads it first, applies literal replacements in order, ignores identical old/new pairs, then writes once. Whitespace-tolerant fallback finds a reindented or rewrapped anchor; an ambiguous or missing anchor fails without writing and names the candidate lines. Read the target immediately before patching and keep each anchor unique; shell or script edits invalidate the native read snapshot, so re-read before the native write rather than mixing writers. Use it after inspecting a file with ast-outline, bash or grep instead of `edit`. Read-only when it fails; it never creates a file.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -1835,7 +1835,7 @@
     },
     {
       "name": "attention_list",
-      "description": "List inbox items that need the user: one view at a time plus the count of every view and the muted sources. Needs you = blocking and failed items not done, snoozed, resolved or muted. Read-only.",
+      "description": "List inbox items that need the user: one view at a time plus the count of every view and the muted sources. An item published about a subagent Session lists as its parent thread, the one the user acts on. Needs you = blocking and failed items not done, snoozed, resolved or muted. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -4854,6 +4854,7 @@
             "type": "string"
           },
           "limit": {
+            "description": "Revisions in the first page, 1 to 10; omit it for the default page. Use jj_graph_page to continue.",
             "type": "integer"
           }
         },
@@ -7946,6 +7947,38 @@
       }
     },
     {
+      "name": "project_clone_retry",
+      "description": "Retry a failed or cancelled clone into the same folder, as a new job; a running or succeeded job is refused. Follow it with project_clone_jobs. Call only when the user asked to retry that clone.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "project_config_read",
+      "description": "Read the dsh.project.json a repository declares at its root: icon path, default thread workspace, bookmark, trusted check ids and suggested scripts. A missing or invalid file is reported, never thrown; scripts in the file only run after the user imports them into the profile-trusted project checks. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "project_create",
       "description": "Create a new project folder <parentPath>/<name>: jj git init (colocated), a README.md, a first described commit and a main bookmark, then register it as a project. createGitHubRepository: true also creates a PRIVATE GitHub repository with the GitHub CLI and pushes main; pass it only when the user asked for a GitHub repository. Refuses an existing folder. Call only when the user asked to create a project.",
       "parameters": {
@@ -7986,11 +8019,70 @@
       }
     },
     {
+      "name": "project_init",
+      "description": "Turn an existing folder into a project in place: jj git init (colocated), a README.md when it has none, a first described commit and a main bookmark, then register it as a project. Existing files are kept and become the first revision. Refuses a folder that is already a repository or sits inside one. Call only when the user asked to initialize that folder.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "project_inspect",
+      "description": "Report what a folder is before it becomes a project: no repository, a Git checkout or a Jujutsu repository, its root, origin URL and default branch, and whether Jujutsu can be enabled alongside Git. Never writes. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "project_list",
       "description": "List registered projects (DSH Workspaces): id, title, path and thread count. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "project_publish",
+      "description": "Publish a local repository that has no origin: create the GitHub repository with the GitHub CLI, add it as origin and push the bookmark. visibility is required so nothing is created by default; a repository that already has an origin, or no commits, is refused with the next command. Call only when the user asked to publish that repository.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public"
+            ]
+          },
+          "bookmark": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "visibility"
+        ],
         "additionalProperties": false
       }
     },
