@@ -117,6 +117,7 @@ api.add(Command, {
   keys: ['Mod+Shift+A'],
   editable: true, // listed in Keyboard shortcuts (Mod+/), where the user can rebind it
   scope: 'page', // its keys stay off while a text field has focus
+  allowInTerminal: false, // its keys stay off while a terminal owns the keyboard
   slash: 'acme', // `/acme` in the composer runs it
   suggested: true, // shown in the palette before anything is typed
   run: openAcme,
@@ -128,6 +129,10 @@ An editable command's Host row carries no default binding: the Host refuses over
 registers second, so a default could stop a core plugin's setup. Until the user binds one, its own `keys` apply and the
 row reads "No shortcut". Settings › General › Keyboard shortcuts (or Mod+/) lists it. Its id must map to a Host shortcut id (`CommandChords.shortcutId`); the capture-phase listener
 binds only Mod (+ Shift) chords. `CommandChords` converts `Mod+Shift+K` to and from Host bindings.
+
+`allowInTerminal` defaults to true and exists for chords the shell reads as input: xterm's hidden
+textarea is a text field, so a command would otherwise claim `Ctrl+J` (a line feed) while the
+terminal has focus. The Host adapter calls the same owner its `terminal` region.
 
 ### Contracts owned plugins provide
 

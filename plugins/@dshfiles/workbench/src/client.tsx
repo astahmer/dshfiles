@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import { defineClient, Command, useRegistry, useSettings } from '@dshfiles/dshx/client'
 import type { RightPanelMode } from '@dshfiles/frame-layout/regions'
 // Type-only: the frame's right-column seat and the `shell.dock` slot it declares.
 import type {} from '@dshfiles/frame-layout/regions'
@@ -54,6 +54,7 @@ import { FacetFollowing } from './facet-following.js'
 import { threadOnScreen } from './thread-on-screen.js'
 import { captureLayoutArrangement, restoreLayoutArrangement } from './layout-arrangements.js'
 import { SavedLayouts, savedLayouts, type SavedLayout } from './saved-layouts.js'
+import { bottomPanelCommand } from './bottom-panel-shortcut.js'
 import { workbenchSettings } from './settings.js'
 import { WorkbenchView, type WorkbenchPanelDrop } from './workbench-view.js'
 import { NewViewTabs, type NewViewSelection } from './new-view.js'
@@ -94,7 +95,7 @@ export default defineClient({
   name: '@dshfiles/workbench',
   locales: [workbenchLocale],
   inject: ['slots', 'layout', 'sidebarRightTabs', 'sidebarRight', 'shortcuts', 'sessions', 'mainSurface', 'rightPanel', 'frameBottom'],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
     const translate = ctx.locale.bind(WORKBENCH_LOCALE_NAMESPACE)
     const registry = workbenchPanels()
     const terminalSource = createWorkbenchTerminalSource(sidebarResourcePanels(), registry)
@@ -1378,6 +1379,11 @@ export default defineClient({
     // only while the row is open, so the component that opens it must be mounted
     // regardless. `set` is what the header action and the command call.
     let switchBottomPanel: ((shown: boolean) => void) | undefined
+    // One toggle for the header action and the keyboard: the row's own height says
+    // whether it is open, so a chord pressed from any surface agrees with it.
+    const toggleBottomPanel = (): void => {
+      switchBottomPanel?.(ctx.get('frameBottom')?.height() === 0)
+    }
     const BottomPanelPresence = decorate(() => {
       const settings = useSettings(workbenchSettings)
       const shown = settings.value?.bottomPanel === 'shown'
@@ -1410,7 +1416,6 @@ export default defineClient({
 
     const toggleRightPanel = dockActions.toggle
 
-    const BOTTOM_COMMAND_ID = 'workbench.toggleBottomPanel'
     const RESET_COMMAND_ID = 'workbench.resetLayout'
     const SHOW_TAB_ROWS_COMMAND_ID = 'workbench.showTabRows'
     const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
@@ -1451,24 +1456,10 @@ export default defineClient({
         'workbench: global layout recovery command',
       )
     }
-    if (isShortcutCommandId(BOTTOM_COMMAND_ID)) {
-      ctx.effect(() => {
-        try {
-          return ctx.shortcuts.register({
-            id: BOTTOM_COMMAND_ID,
-            label: () => translate('toggleBottomPanel'),
-            aliases: ['workbench', 'dock', 'panel', 'bottom panel'],
-            defaults: {},
-            regions: ['page', 'editable'],
-            modals: [],
-            resolve: () => ({ status: 'handled', run: () => switchBottomPanel?.(ctx.get('frameBottom')?.height() === 0) }),
-          })
-        } catch (error) {
-          console.warn('workbench: the bottom panel toggle command could not be registered', error)
-          return () => undefined
-        }
-      }, 'workbench: bottom panel toggle command')
-    }
+    // The bottom-panel toggle arrives as a command, not as a Host shortcut row:
+    // the browser owns `primary+J`, so `@dshfiles/shortcuts` binds the chord in its
+    // capture listener and Settings › Shortcuts rebinds it there.
+    metadata?.plugin?.add(Command, bottomPanelCommand({ title: translate('toggleBottomPanel'), toggle: toggleBottomPanel }))
     if (isShortcutCommandId(TOGGLE_COMMAND_ID)) {
       // No default chord: listed under Settings › Shortcuts and in the command palette for the user to bind.
       ctx.effect(() => {

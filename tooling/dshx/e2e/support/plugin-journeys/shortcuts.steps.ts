@@ -1,19 +1,10 @@
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
-
-type ModifierKey = 'Control' | 'Meta'
+import { alternateModifierFor, primaryModifierFor } from './platform-modifier.js'
 
 const collapsedSidebar = (page: Page) => page.locator('[data-sidebar-collapsed]')
 const composerInput = (page: Page) => page.getByRole('textbox').first()
-
-const primaryModifierFor = async (page: Page): Promise<ModifierKey> => {
-  const platform = await page.evaluate(() => navigator.platform)
-  if (platform === 'macOS' || platform.startsWith('Mac')) return 'Meta'
-  return 'Control'
-}
-
-const alternateModifierFor = async (page: Page): Promise<ModifierKey> => ((await primaryModifierFor(page)) === 'Meta' ? 'Control' : 'Meta')
 
 const pressPrimaryB = async (page: Page): Promise<void> => {
   await page.keyboard.press(`${await primaryModifierFor(page)}+b`)

@@ -88,6 +88,13 @@ export interface CommandItem {
   readonly editable?: boolean
   /** `page` turns its keys off while a text field has focus; `global` (the default) keeps them on. */
   readonly scope?: 'global' | 'page'
+  /**
+   * Whether its keys still apply while a terminal owns the keyboard.
+   *
+   * The default, `true`, keeps them on: only the chords the terminal itself reads
+   * (`Ctrl+J` is a line feed) need the shell to receive the key instead.
+   */
+  readonly allowInTerminal?: boolean
   /** Name of a `/` menu entry in the composer that runs it, without the slash. */
   readonly slash?: string
   /** Shown in the palette before anything is typed. */
