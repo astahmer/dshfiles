@@ -4,6 +4,7 @@ import { ExtraUsageMeter } from './extra-usage-view.js'
 import { quotaTone, type QuotaTone } from './quota-tone.js'
 import { QuotaHistoryAnalysis } from './usage-history-analysis.js'
 import { UsageOverviewModel } from './usage-overview-model.js'
+import { UsageReadStatus } from './usage-read-status.js'
 
 const SPARKLINE_POINTS = 12
 
@@ -43,15 +44,19 @@ export const quotaWindowCategories = (input: {
 export const UsageCardView = (props: {
   readonly usage: UsageCard | undefined
   readonly now: number
+  readonly refreshing: boolean
+  readonly onRetry: () => void
   readonly history?: readonly UsageHistoryPoint[]
 }): JSX.Element | null => {
   const usage = props.usage
   if (usage === undefined) return null
+  const readStatus = <UsageReadStatus onRetry={props.onRetry} refreshing={props.refreshing} sweepReadAt={props.now} usage={usage} />
   if (usage.status !== 'ok' || (usage.windows.length === 0 && usage.extraUsage === undefined)) {
     return (
-      <p className="dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:text-xs dshx:text-muted-foreground">
-        {usage.message ?? (usage.status === 'unauthenticated' ? "Sign in to read this account's quota." : 'This provider reported no quota windows.')}
-      </p>
+      <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:text-xs dshx:text-muted-foreground">
+        <p>{usage.message ?? (usage.status === 'unauthenticated' ? "Sign in to read this account's quota." : 'This provider reported no quota windows.')}</p>
+        {readStatus}
+      </div>
     )
   }
   const now = props.now
@@ -59,6 +64,7 @@ export const UsageCardView = (props: {
   const categories = quotaWindowCategories({ windows: usage.windows, now, history: props.history ?? [] })
   return (
     <CreditsUsage categories={categories} heading="Quota windows">
+      {readStatus}
       {usage.extraUsage === undefined ? null : <ExtraUsageMeter className="dshx:rounded-xl dshx:bg-muted/60 dshx:p-3" extra={usage.extraUsage} now={now} />}
       {usage.bankedResets > 0 ? (
         <p className="dshx:text-xs dshx:text-info">

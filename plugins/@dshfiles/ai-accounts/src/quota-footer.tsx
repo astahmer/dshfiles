@@ -210,7 +210,7 @@ const UsagePopoverContent = (props: {
   readonly onConnectAccount: (accountId: string) => void
   readonly close: () => void
 }): JSX.Element => {
-  const { usage, refreshing, failed, refresh } = useAccountsUsage()
+  const { usage, refreshing, failure, refresh } = useAccountsUsage()
   return (
     <PopoverContent
       align="start"
@@ -223,7 +223,7 @@ const UsagePopoverContent = (props: {
       sideOffset={8}
     >
       <UsageOverview
-        failed={failed}
+        failure={failure}
         onOpenHistory={() => {
           props.close()
           props.onOpenUsageHistory()

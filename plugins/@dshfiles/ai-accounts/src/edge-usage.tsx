@@ -87,7 +87,7 @@ export const EdgeUsageWidget = (props: {
 }): JSX.Element | null => {
   const { edgeWidget } = usePreferences()
   const { layout } = useUsageLayout()
-  const { usage, refreshing, failed, refresh } = useAccountsUsage({ enabled: edgeWidget })
+  const { usage, refreshing, failure, refresh } = useAccountsUsage({ enabled: edgeWidget })
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<EdgePosition>(readPosition)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -229,7 +229,7 @@ export const EdgeUsageWidget = (props: {
             sideOffset={8}
           >
             <UsageOverview
-              failed={failed}
+              failure={failure}
               onOpenHistory={() => {
                 setOpen(false)
                 props.onOpenUsageHistory()

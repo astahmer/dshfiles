@@ -69,11 +69,13 @@ describe('Claude extra usage', () => {
 
   it('renders the meter on the account card, including a spend-only account with no plan windows', () => {
     const card = ClaudeAccountModel.parseClaudeUsage(claudeUsageWithExtraUsage, 'max')
-    const markup = renderToStaticMarkup(<UsageCardView now={0} usage={card} />)
+    const markup = renderToStaticMarkup(<UsageCardView now={0} onRetry={() => undefined} refreshing={false} usage={card} />)
     expect(markup).toContain('data-testid="extra-usage"')
     expect(markup).toContain('Extra usage')
     expect(markup).toContain('of cap used')
-    const spendOnly = renderToStaticMarkup(<UsageCardView now={0} usage={ClaudeAccountModel.parseClaudeUsage(claudeUsageSpendOnly, undefined)} />)
+    const spendOnly = renderToStaticMarkup(
+      <UsageCardView now={0} onRetry={() => undefined} refreshing={false} usage={ClaudeAccountModel.parseClaudeUsage(claudeUsageSpendOnly, undefined)} />,
+    )
     expect(spendOnly).toContain('Monthly cap reached')
     expect(spendOnly).not.toContain('reported no quota windows')
     const off = renderToStaticMarkup(

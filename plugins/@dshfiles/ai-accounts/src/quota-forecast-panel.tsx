@@ -13,6 +13,8 @@ import { HandoffBoardView } from './quota-handoff-board.js'
 import { PaceBoardView } from './quota-pace-board.js'
 import { QuotaPaceModel } from './quota-pace-model.js'
 import { QuotaForecastModel } from './quota-forecast-model.js'
+import { UsageOverviewModel } from './usage-overview-model.js'
+import { UsageRefreshNotice, UsageUpdatedAt } from './usage-read-status.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
 import { QuotaViewFrame } from './quota-view-frame.js'
@@ -29,7 +31,7 @@ type View = 'forecast' | 'pace' | 'table' | 'coverage' | 'handoff'
 export const QuotaForecastPanel = (props: { readonly onBack: () => void; readonly embedded?: boolean }): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
   const { usageRefreshMs, workHours } = usePreferences()
-  const { usage, refresh, refreshing } = useAccountsUsage()
+  const { usage, refresh, refreshing, failure } = useAccountsUsage()
   const [view, setView] = useState<View>('forecast')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [coverageSelection, setCoverageSelection] = useState<CoverageSelection | null>(null)
@@ -91,6 +93,13 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void; readonl
       }}
       bodyClassName="dshx:mx-auto dshx:w-full dshx:max-w-[1500px]"
     >
+      <UsageRefreshNotice
+        failure={failure ?? UsageOverviewModel.staleSummary(usage)}
+        hasReading={usage !== null}
+        onRetry={() => void refresh()}
+        refreshing={refreshing}
+      />
+      {usage === null ? null : <UsageUpdatedAt readAt={UsageOverviewModel.oldestReadAt(usage)} />}
       {(() => {
         if (loading && board.accounts.length === 0) {
           return (

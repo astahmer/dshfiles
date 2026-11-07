@@ -20,6 +20,7 @@ import { QuotaHistoryAnalysis } from './usage-history-analysis.js'
 import { QuotaHistoryChart } from './quota-history-chart.js'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { quotaWindowCategories } from './usage-card-view.js'
+import { UsageReadStatus, UsageRefreshNotice } from './usage-read-status.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
 import { QuotaViewFrame } from './quota-view-frame.js'
@@ -49,19 +50,25 @@ const formatForecast = (forecast: ReturnType<typeof QuotaHistoryAnalysis.forecas
   }
 }
 
-export const CurrentQuota = (props: { accountId: string; usage: AccountsUsage | null }): JSX.Element => {
+export const CurrentQuota = (props: { accountId: string; usage: AccountsUsage | null; refreshing: boolean; onRetry: () => void }): JSX.Element => {
   const card = props.usage?.cards.find(value => value.instanceId === props.accountId)?.usage
   if (card === undefined) return <p className="dshx:text-xs dshx:text-muted-foreground">Current provider usage is not available for this account.</p>
+  const sweepReadAt = props.usage?.readAt ?? 0
+  const readStatus = <UsageReadStatus onRetry={props.onRetry} refreshing={props.refreshing} sweepReadAt={sweepReadAt} usage={card} />
   if (card.status !== 'ok') {
     return (
       <Alert variant="warning">
-        <AlertDescription>{card.message ?? `Provider status: ${card.status}.`}</AlertDescription>
+        <AlertDescription>
+          {card.message ?? `Provider status: ${card.status}.`}
+          {readStatus}
+        </AlertDescription>
       </Alert>
     )
   }
 
   return (
-    <CreditsUsage categories={quotaWindowCategories({ windows: card.windows, now: props.usage?.readAt ?? 0, history: [] })} heading="Current limits">
+    <CreditsUsage categories={quotaWindowCategories({ windows: card.windows, now: sweepReadAt, history: [] })} heading="Current limits">
+      {readStatus}
       {card.bankedResets > 0 ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-info/30 dshx:bg-info/5 dshx:p-3">
           <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2">
@@ -131,7 +138,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void; readonly
   const accounts = useApi(aiAccountsApi)
   const queryClient = useQueryClient()
   const { usageRefreshMs } = usePreferences()
-  const { usage, refresh: refreshUsage } = useAccountsUsage()
+  const { usage, refresh: refreshUsage, refreshing, failure } = useAccountsUsage()
   const [chosenId, setChosenId] = useState(props.accountId ?? '')
   const [days, setDays] = useState(7)
   const [notice, setNotice] = useState<string | null>(null)
@@ -304,7 +311,8 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void; readonly
           </Collapsible>
 
           <HistoryCard description={`${selected.displayName || selected.instanceId}${selected.kind ? ` · ${selected.kind}` : ''}`} heading="Current limits">
-            <CurrentQuota accountId={selectedId} usage={usage} />
+            <UsageRefreshNotice failure={failure} hasReading={usage !== null} onRetry={() => void refreshUsage()} refreshing={refreshing} />
+            <CurrentQuota accountId={selectedId} onRetry={() => void refreshUsage()} refreshing={refreshing} usage={usage} />
           </HistoryCard>
 
           <HistoryCard
