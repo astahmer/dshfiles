@@ -90,6 +90,12 @@ DSH it builds and tests against in `devDependencies`:
 missing or invalid, extends beyond the supported range, spans generations, does
 not contain the installed DSH, or when the devDependency floats.
 
+A [registry item](./registry.md#compatibility) repeats this range as `engines.dsh`
+so search can show it before anything downloads. `dshx registry build` copies it
+from the package (`engines.dsh`, then the peer range). DSH still decides from the
+package's own manifest; only a `dsh:source` item, which DSH never sees, is checked
+by dshx.
+
 ## Status semantics
 
 | Status         | Meaning                                                                                               |
