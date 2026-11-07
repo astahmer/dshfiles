@@ -457,6 +457,15 @@ with nothing running.
 | The user             | async `ask_user_question`, or a `schedule_*` reminder; a pending question or the next message resumes you    |
 | Thread questions     | `list_thread_questions` once, with `sessionId` when known; never in a poll loop                              |
 
+**Cap every blocking wait.** Steering is boundary input: a user's steer is only
+read at the start of the next step, so it cannot interrupt a tool call already
+running. A tool that waits for minutes therefore also delays the steer by
+minutes. Keep a blocking wait to about a minute, ask with `timeoutMs` set from
+that bound, and when it times out report the job is still running and end the
+turn instead of waiting again in the same turn — the user can steer, and the
+job's completion notice resumes you. The same cap applies to
+`job_output { wait: true }`.
+
 ## Warnings and errors
 
 Every user-facing warning or error must include an actionable recovery path: tell the user what they can change or do next, and offer a direct control or exact command when available. If no safe recovery exists, explain the limitation and the next practical alternative; never leave the user with a dead-end message.
