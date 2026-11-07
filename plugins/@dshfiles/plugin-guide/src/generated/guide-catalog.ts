@@ -1191,6 +1191,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/jj-integration/merged-pull-requests",
+      "kind": "module",
+      "title": "@dshfiles/jj-integration/merged-pull-requests",
+      "summary": "Merged pull requests for a set of thread Sessions. Published as the `@dshfiles/jj-integration/merged-pull-requests` dshx module. Jujutsu integration owns the cleanup that wants this state, and `@dshfiles/pull-requests` already depends on it, so this plugin declares the contract and that one provides it: importing the…",
+      "publicSymbol": "MergedPullRequestMethods, MergedPullRequests",
+      "importFrom": "@dshfiles/jj-integration/merged-pull-requests",
+      "owner": "@dshfiles/jj-integration",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/jj-integration/src/merged-pull-requests.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/loopback-access/startup",
       "kind": "module",
       "title": "@dshfiles/loopback-access/startup",
@@ -2349,8 +2369,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/workspace-folder-picker owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: tools, startClone, cloneJobs, cancelClone, retryClone, createProject, inspect, initProject, readProjectConfig, publishProject, removeProject",
-        "Agent tools: project_tools_status (read-only), project_clone, project_clone_jobs (read-only), project_clone_cancel, project_clone_retry, project_create, project_inspect (read-only), project_init, project_config_read (read-only), project_publish"
+        "Methods: tools, startClone, cloneJobs, cancelClone, retryClone, createProject, inspect, initProject, readProjectConfig, icon, publishProject, removeProject",
+        "Agent tools: project_tools_status (read-only), project_clone, project_clone_jobs (read-only), project_clone_cancel, project_clone_retry, project_create, project_inspect (read-only), project_init, project_config_read (read-only), project_icon (read-only), project_publish"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -2372,6 +2392,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/workspace-folder-picker/src/picker/index.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/workspace-folder-picker/project-icon-view",
+      "kind": "module",
+      "title": "@dshfiles/workspace-folder-picker/project-icon-view",
+      "summary": "A project's mark, wherever a project is named: the icon its repository ships (declared in `dsh.project.json` or found at a conventional path), else a stable monogram. The Host resolves and caches it, so a row never scans a checkout.",
+      "publicSymbol": "ProjectIcon",
+      "importFrom": "@dshfiles/workspace-folder-picker/project-icon-view",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-icon-view.tsx",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
