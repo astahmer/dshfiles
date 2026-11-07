@@ -23,6 +23,7 @@ Feature: Workspace folder picker
     Then native folder selection supports cancellation, recovery and registration
 
   @scenario:workspace-folder-picker.folder-setup
+  @scenario:workspace-folder-picker.setup-panel
   Scenario: Inspect an existing Git checkout before adding it
     Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker" is booted
     When the header workspace Add workspace action is opened
