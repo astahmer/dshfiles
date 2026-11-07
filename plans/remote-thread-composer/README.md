@@ -60,7 +60,7 @@ running }`, marked so the UI can badge them.
 | 3   | `session/prompt` (text), `cancel`, `updateQueue` forwarded                                  | the native composer sends, steers, queues and stops a remote turn; the plain-textarea view is deleted                                                                                                                                                                             | done    |
 | 4   | Per-session model catalog + reasoning effort | remote selection is reported (projections + follow frames), `selectModel` forwards on the no-replay path, the chip offers the runtime catalog (`model-effort-picker` → `runtimeModels`); unit-tested in multi-host and session-controller; the browser chip on a remote thread opens that catalog and selects GPT-6 Luna (`multi-host.auto-destination`) | done |
 | 5   | Image and file uploads, file references (`@`) resolved on the host | SSH E2E covers upload and `@` through Host APIs, and the composer's own file picker on a remote thread stores the bytes under the owning host's home only (`multi-host.auto-destination`); a message naming this machine is refused before it reaches the owner | done |
-| 6   | JJ/workspace proxy; native question/approval path or Host UI fallback | owner-resolved read-only repository/workspace status proxy ships; **Open on remote host** opens the exact mirrored thread (fleet-dx 6: `runtimeOpenView` takes a Session id and returns a token-free `threadUrl`); native waterfall, approvals, path-scoped JJ/workspace mutations and terminals remain in Host UI with exact gaps documented | partial |
+| 6   | JJ/workspace proxy; native question/approval path or Host UI fallback | the thread's JJ control and integrate offer, questions (blocking, timed, late) and approvals work in the controlling chat, answered on the owner (`multi-host.remote-question`, `-timed`, `-approval`, `-jj`); **Open on remote host** opens the exact thread (fleet-dx 6) for the rest; terminals, session handoff and the JJ panel's graph and diffs stay in Host UI | partial |
 
 ## Risks and stop conditions
 
@@ -95,18 +95,16 @@ M5 closed on 2026-11-07: the owner chose the "local path in free text" rule (`@`
 Host's home or `~`; prose is left alone). See
 [Cross-machine references](../../plugins/@dshfiles/multi-host/docs/remote-thread-architecture.md#cross-machine-references).
 
-Milestone 6 partial: `sessionJjRepositories(sessionId)` resolves the mirrored Session's
-owner and reads validated repository/workspace status there without passing a path or
-enabling JJ writes. The mirrored thread header offers **Open on remote host**, which opens
-the exact thread since fleet-dx 6: `runtimeOpenView` takes an optional Session id and
-returns a token-free `threadUrl`, the client fetches the launch URL to set the host's
-cookie, then opens `?thread=` (when page and host have different machine names the tab
-opens the host home). Native questions and approvals now reach the controlling chat through the owner's event
-stream, answered on the owner (see
+Milestone 6: `sessionJjCall` resolves the mirrored Session's owner and runs the thread
+control's JJ actions there, limited to that thread's folder. Questions and approvals come
+through the owner's event stream, answered on the owner (see
 [Questions](../../plugins/@dshfiles/multi-host/docs/remote-thread-architecture.md#questions)).
-Per-session JJ path operations, workspace mutations, landing, terminal access, and
-session handoff remain unavailable locally. See the multi-host README for exact fallback and
-limits.
+The mirrored thread header offers **Open on remote host**, which opens the exact thread
+since fleet-dx 6: `runtimeOpenView` takes an optional Session id and returns a token-free
+`threadUrl`, the client fetches the launch URL to set the host's cookie, then opens
+`?thread=` (when page and host have different machine names the tab opens the host home).
+Terminal access, session handoff and the JJ panel's graph and diffs remain unavailable
+locally. See the multi-host README for exact fallback and limits.
 
 The multi-host journeys were all red on main after the rail moved Hosts under **Observe**;
 2026-11-05 fixes: reach Hosts through the rail helper, return to **Threads** before selecting
@@ -119,4 +117,5 @@ response was lost as `gateway-unreachable` (safe-to-retry) instead of
 
 ## Resume here
 
-Proxy the path-scoped JJ actions.
+Route the JJ panel's graph and diffs through the owner when that is worth doing, then
+decide whether terminals belong here at all.

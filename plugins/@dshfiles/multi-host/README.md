@@ -245,7 +245,8 @@ title}` for threads started here, so the sidebar and view can list them.
 - **APIs**: `multi-host` v1 is owned by this package, so other plugins' clients
   call it (`@dshfiles/multi-host/destination` exports the contract and the UI
   pieces). Remote plugin calls are allowlisted to jj-integration's
-  `projects`, `destination`, `provision` and `noFolder`; native calls to the
+  `projects`, `destination`, `provision` and `noFolder`, plus the thread actions
+  of `sessionJjCall`, scoped to the Session's folder; native calls to the
   session list/search/create/prompt/page/cancel/rename/fork and archive
   methods. `runtimePeerRead` lets another plugin of this Host read a remote
   runtime through a closed list of read-only calls (`remotePeerReadCalls`:
@@ -296,12 +297,13 @@ title}` for threads started here, so the sidebar and view can list them.
   Session's question is not offered, because the owner refuses to ask from one.
   An approval from a child Session opens under that child Session, not its
   parent.
-- Remote JJ data can be read through the read-only
-  `sessionJjRepositories(sessionId)` API, which resolves the Session's owner and
-  reads that runtime's repository/workspace status. It sends no path and cannot
-  mutate JJ state. Per-session JJ panels/path operations, workspace changes,
-  thread landing, terminal interactions, and session handoff are not proxied;
-  use the owning Host UI for these operations.
+- A remote thread's own JJ workspace works from here: the thread's workspace
+  control and its integrate offer read its status from the runtime that owns it,
+  and **Land**, queue and undo run there. `sessionJjCall` (`multi_host_session_jj`)
+  reaches that thread's folder and nothing else, so another path is refused here
+  before it leaves. The JJ panel's revision graph, diffs and the Land page still
+  read this machine's repositories; terminal interactions and session handoff
+  are not proxied. Use the owning Host UI for those.
 - LSP is not advertised by remote runtimes (unchanged from earlier
   validation).
 

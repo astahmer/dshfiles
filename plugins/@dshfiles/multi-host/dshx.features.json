@@ -846,6 +846,48 @@
           "testName": "records one span per answer, naming no question text"
         }
       ]
+    },
+    {
+      "id": "remote-thread-jj",
+      "title": "Work a remote thread's own JJ workspace from this client",
+      "summary": "The thread workspace control and the integrate offer of a mirrored thread read its JJ status from the runtime that owns it, and land, queue and undo run there. Each action is authorized for that Session and limited to its own folder.",
+      "surfaces": ["client", "host", "integration"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-header: Current thread workspace",
+      "configuration": [],
+      "states": ["local-session", "remote-owner-resolved", "landed", "queued", "owner-refused", "path-refused"],
+      "failureModes": [
+        "A path outside the thread's folder, or another thread's id, is refused before it reaches the runtime, naming the Host UI as the way to work elsewhere.",
+        "A connection lost after a mutation was sent reports an unknown outcome and is never replayed.",
+        "A reply outside the JJ contract is refused rather than shown."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "click button \"Sidebar settings\"",
+        "click checkbox \"Show remote threads in a separate group\"",
+        "click button \"Remote threads started from this DSH\"",
+        "expect heading \"Remote threads\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-jj",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.jj-path-scope",
+          "file": "plugins/@dshfiles/multi-host/src/remote-jj-scope.test.ts",
+          "testName": "reaches the thread folder, with or without naming the thread"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     }
   ],
   "kind": "bundle",

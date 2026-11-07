@@ -450,6 +450,9 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
 Given('a loopback SSH DSH pair with timed questions is booted', async ({ page }: { readonly page: Page }) => {
   await bootLoopbackPair(page, { cordisPatch: await seedPresetRow(), packageIds: ['@dshfiles/tool-ask-user'] })
 })
+
+Given('a loopback SSH DSH pair with JJ on the remote is booted', async ({ page }: { readonly page: Page }) => {
+  await bootLoopbackPair(page, { packageIds: ['@dshfiles/jj-integration'] })
 })
 
 When('the scratch remote is added from the host UI', async ({ page }: { readonly page: Page }) => {
@@ -678,6 +681,110 @@ Then('the remote agent learns the question was dismissed', async ({ page }: { re
       .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.role === 'tool' && /cancel/iu.test(message.text)), { timeout: 30_000 })
       .toBe(true)
     await expect(remoteQuestionCard(page).getByRole('button', { name: 'Submit', exact: true })).toHaveCount(0, { timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+const runScratchJj = (cwd: string, ...args: readonly string[]): string => {
+  const result = spawnSync('jj', ['--config', 'user.name=Scratch', '--config', 'user.email=scratch@example.invalid', ...args], {
+    cwd,
+    encoding: 'utf8',
+    timeout: 15_000,
+  })
+  if (result.error !== undefined || result.status !== 0) throw new Error(`jj ${args.join(' ')} failed: ${result.error?.message ?? result.stderr.trim()}`)
+  return result.stdout
+}
+
+const remoteJjJourneys = new WeakMap<Page, { readonly repository: string; readonly threadPath: string; readonly sessionId: string; readonly description: string }>()
+const jjCallResultSchema = Schema.Struct({
+  ok: Schema.Boolean,
+  code: Schema.optional(Schema.String),
+  value: Schema.optional(Schema.Unknown),
+  message: Schema.optional(Schema.String),
+})
+
+When('a thread on the remote has described work in its own JJ workspace', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const call = await hostApi(pair.manager)
+  const runtimeId = Schema.decodeUnknownSync(withUnknownProperties({ runtimes: Schema.Array(Schema.Struct({ id: Schema.String })) }))(
+    await call('list'),
+  ).runtimes[0]?.id
+  if (runtimeId === undefined) throw new Error('The scratch remote is not registered.')
+  const repository = join(pair.remote.homeRoot, `jj-${randomUUID()}`)
+  await mkdir(repository, { recursive: true })
+  runScratchJj(repository, 'git', 'init', '--colocate')
+  await writeFile(join(repository, 'README.md'), 'scratch\n')
+  runScratchJj(repository, 'describe', '-m', 'Initial scratch revision')
+  runScratchJj(repository, 'bookmark', 'create', 'main', '-r', '@')
+  runScratchJj(repository, 'new')
+  const opened = Schema.decodeUnknownSync(withUnknownProperties({ ok: Schema.Literal(true), workspaceId: Schema.String }))(
+    await call('runtimeOpenFolder', { runtimeId, path: repository }),
+  )
+  const provisioned = Schema.decodeUnknownSync(
+    withUnknownProperties({ ok: Schema.Literal(true), value: withUnknownProperties({ workspaceId: Schema.String }) }),
+  )(await call('runtimePluginCall', { runtimeId, method: 'provision', input: { workspaceId: opened.workspaceId, isolate: true } }))
+  // The status read answers from its cache while it refreshes, so the new workspace appears on a later read.
+  let threadPath: string | undefined
+  await expect
+    .poll(
+      async () => {
+        const status = Schema.decodeUnknownSync(withUnknownProperties({ workspaces: Schema.optional(Schema.Array(withUnknownProperties({ workspaceId: Schema.String, path: Schema.String }))) }))(
+          await call('runtimeStatus', { runtimeId }),
+        )
+        threadPath = status.workspaces?.find(workspace => workspace.workspaceId === provisioned.value.workspaceId)?.path
+        return threadPath
+      },
+      { timeout: 30_000 },
+    )
+    .toBeDefined()
+  if (threadPath === undefined) throw new Error('The remote did not report its thread workspace.')
+  const created = Schema.decodeUnknownSync(withUnknownProperties({ ok: Schema.Literal(true), sessionId: Schema.String }))(
+    await call('threadStart', {
+      runtimeId,
+      cwd: threadPath,
+      text: '[[title Remote JJ fixture]] [[answer Ready.]]',
+      model: { provider: 'commandcode_work', model: 'gpt-6-luna' },
+    }),
+  )
+  const description = `Remote work landed from this client ${randomUUID()}`
+  await writeFile(join(threadPath, 'landed.txt'), 'landed\n')
+  runScratchJj(threadPath, 'describe', '-m', description)
+  remoteJjJourneys.set(page, { repository, threadPath, sessionId: created.sessionId, description })
+})
+
+Then('this client reads that workspace from its owner and refuses any other path', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  const call = await hostApi(pairFor(page).manager)
+  await recordAssertion(page, 'multi-host-remote-jj-read', async () => {
+    const read = Schema.decodeUnknownSync(jjCallResultSchema)(
+      await call('sessionJjCall', { sessionId: journey.sessionId, method: 'threadAt', input: { path: journey.threadPath, sessionId: journey.sessionId } }),
+    )
+    expect(read.ok, read.message).toBe(true)
+    expect(JSON.stringify(read.value)).toContain(journey.description)
+    const refused = Schema.decodeUnknownSync(jjCallResultSchema)(
+      await call('sessionJjCall', { sessionId: journey.sessionId, method: 'threadAt', input: { path: journey.repository } }),
+    )
+    expect(refused).toMatchObject({ ok: false, code: 'session/path-mismatch' })
+  })
+})
+
+When('the thread is integrated from this client', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await page.goto(new URL(`/?thread=${journey.sessionId}`, page.url()).href)
+  await expect(page.getByText('Ready.', { exact: true })).toBeVisible({ timeout: 45_000 })
+  const workspace = page.getByRole('button', { name: /^Current thread workspace: / })
+  await expect(workspace).toBeVisible({ timeout: 30_000 })
+  await workspace.click()
+  await page.getByRole('button', { name: 'Land this thread on main', exact: true }).click()
+})
+
+Then('the work is on the remote main bookmark', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await recordAssertion(page, 'multi-host-remote-jj-landed', async () => {
+    await expect.poll(() => runScratchJj(journey.repository, 'log', '--no-graph', '-r', 'main', '-T', 'description')).toContain(journey.description)
   })
   await finishJourneyAssertions(page)
 })

@@ -87,6 +87,15 @@ Feature: Multi-host loopback SSH lifecycle
     When the remote approval is allowed once here
     Then the remote command runs on its owning host
 
+  @scenario:multi-host.remote-jj
+  Scenario: A remote thread's JJ workspace is read and integrated on its owner
+    Given a loopback SSH DSH pair with JJ on the remote is booted
+    When the scratch remote is added from the host UI
+    And a thread on the remote has described work in its own JJ workspace
+    Then this client reads that workspace from its owner and refuses any other path
+    When the thread is integrated from this client
+    Then the work is on the remote main bookmark
+
   @scenario:multi-host.host-resources
   Scenario: The Hosts page shows live SSH resource pressure
     Given a loopback SSH DSH pair is booted

@@ -57,6 +57,8 @@ export class RemoteSessions extends Context.Service<
     readonly source: EffectSessionSource
     /** One conversation snapshot from the runtime owning `sessionId`, or nothing when no runtime answers. */
     readonly snapshot: (input: { readonly sessionId: string; readonly maxMessages: number }) => Effect.Effect<readonly unknown[] | undefined>
+    /** The folder a mirrored thread works in, as its runtime reports it. */
+    readonly threadFolder: (sessionId: string) => Effect.Effect<string | undefined, SessionOwnerMissing>
     /** Remember where an upload was staged, so a message on another thread or machine is refused here. */
     readonly recordUpload: (input: StagedUpload & { readonly receiptId: string }) => Effect.Effect<void>
   }
@@ -282,9 +284,10 @@ export class RemoteSessions extends Context.Service<
           })
           if (foreignUpload !== undefined) return yield* new SessionPromptRefused({ reason: foreignUpload })
           return yield* forward({ sessionId: request.sessionId, method: 'prompt', request, mutation: true, decode: SessionPayload.prompt }).pipe(
-            Effect.catchIf(
-              error => error instanceof RemoteRequestFailed && error.code === 'session/attachment-invalid',
-              () => Effect.fail(new SessionPromptRefused({ reason: RemotePromptGuard.attachmentNotStagedMessage(runtime.label) })),
+            Effect.mapError(error =>
+              error instanceof RemoteRequestFailed && error.code === 'session/attachment-invalid'
+                ? new SessionPromptRefused({ reason: RemotePromptGuard.attachmentNotStagedMessage(runtime.label) })
+                : error,
             ),
           )
         })
@@ -358,7 +361,9 @@ export class RemoteSessions extends Context.Service<
           forward({ sessionId: request.sessionId, method: 'selectModel', request, mutation: true, decode: SessionPayload.selectedModel }),
       }
 
-      return RemoteSessions.of({ source, snapshot, recordUpload })
+      const threadFolder = (sessionId: string) => Effect.flatMap(requireRuntime(sessionId), runtime => cwdFor(sessionId, runtime))
+
+      return RemoteSessions.of({ source, snapshot, recordUpload, threadFolder })
     }),
   )
 }

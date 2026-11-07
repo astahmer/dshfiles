@@ -226,6 +226,8 @@ const remoteThreadSchema = Schema.Struct({
 })
 /** jj-integration methods a manager may call on a remote runtime; the folder and bookmark pickers need these. */
 const remotePluginMethodSchema = Schema.Literals(['projects', 'classifyWorkspaces', 'destination', 'provision', 'noFolder'])
+/** The JJ thread actions a mirrored thread reaches on its owner; each one names that thread's own folder. */
+const sessionJjMethodSchema = Schema.Literals(['threadAt', 'land', 'queueLand', 'cancelQueuedLand', 'discard'])
 /**
  * Read-only plugin methods another plugin of this Host may call on a remote runtime, as `<api id>/<method>`. Only these
  * pass: a peer can read what it replicates and nothing else, and no call here writes on the remote runtime.
@@ -611,7 +613,9 @@ const remoteQuestionItemSchema = Schema.Struct({
   header: Schema.optional(Schema.String),
   options: Schema.optional(Schema.Array(remoteQuestionOptionSchema)),
   multiSelect: Schema.optional(Schema.Boolean),
-  intent: Schema.optional(Schema.Struct({ kind: Schema.String, approve: Schema.String, callId: Schema.optional(Schema.String) }).pipe(SchemaFields.passthrough)),
+  intent: Schema.optional(
+    Schema.Struct({ kind: Schema.String, approve: Schema.String, callId: Schema.optional(Schema.String) }).pipe(SchemaFields.passthrough),
+  ),
 }).pipe(SchemaFields.passthrough)
 
 /** The `user-questions/request` waterfall as the owning runtime forwards it. */
@@ -931,7 +935,8 @@ const effectMultiHostApi = defineApi({
     sessionQuestionDecline: method({
       input: Schema.Struct({ sessionId: sessionIdSchema, interactionId: interactionIdSchema, reason: Schema.Literals(['cancelled', 'timed-out']) }),
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true) }), failedSchema]),
-      description: 'End one waiting question on a remote thread without answering it. Not an agent tool: the card calls it when the person cancels or the countdown ends.',
+      description:
+        'End one waiting question on a remote thread without answering it. Not an agent tool: the card calls it when the person cancels or the countdown ends.',
     }),
     /** Deliberately no agent tool: an approval is the human's decision (plans/dsh-host-gaps.md row 41). */
     sessionApprovalDecide: method({
@@ -944,6 +949,13 @@ const effectMultiHostApi = defineApi({
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), repositories: jjRepositoriesEffectSchema }), failedSchema]),
       description: 'Read JJ repository and thread-workspace status from the runtime that owns this mirrored Session. Read-only.',
       tool: { name: 'multi_host_session_jj_repositories', readOnly: true, render: compactJson },
+    }),
+    sessionJjCall: method({
+      input: Schema.Struct({ sessionId: sessionIdSchema, method: sessionJjMethodSchema, input: jsonValueSchema }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }), failedSchema]),
+      description:
+        "Run one JJ thread action in a remote thread's own folder, on the runtime that owns the thread: threadAt reads it; land, queueLand, cancelQueuedLand and discard change it (discard needs an explicit force, and force: true abandons unlanded work). Call only when the user asked for that action.",
+      tool: { name: 'multi_host_session_jj', render: compactJson },
     }),
     runtimeFileReferences: method({
       input: Schema.Struct({ runtimeId: idSchema, sessionId: sessionIdSchema, query: Schema.String.check(Schema.isMaxLength(4096)) }),
