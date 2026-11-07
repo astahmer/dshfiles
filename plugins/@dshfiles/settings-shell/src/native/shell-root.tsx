@@ -9,27 +9,13 @@ import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/cli
 import type { SettingsLauncherOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { ConnectionIndicator, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { connectionIndicatorMachine, connectionIndicatorState } from './connection-indicator-machine.js'
 import { DesktopUpdateIndicator, type DesktopUpdateSource } from './desktop-update.js'
 import type { ShellTranslate } from './locales.js'
 import type { ShellRenderSlot } from './slots.js'
 import { useObservable } from './use-observable.js'
-
-const RECOVERY_CONFIRMATION_MS = 2_000
-/** Minimum visible time for the connecting pill; shorter attempts read as flicker. */
-const CONNECTING_MIN_VISIBLE_MS = 800
-
-type IndicatorState = 'connecting' | 'disconnected' | 'recovered' | undefined
-
-const indicatorState = (input: {
-  readonly connectionState: ConnectionState | undefined
-  readonly holdConnecting: boolean
-  readonly showRecovery: boolean
-}): IndicatorState => {
-  if (input.connectionState === 'connecting' || input.holdConnecting) return 'connecting'
-  if (input.connectionState === 'disconnected') return 'disconnected'
-  return input.showRecovery ? 'recovered' : undefined
-}
 
 export interface OnboardingStep {
   readonly id: string
@@ -68,10 +54,7 @@ export const ShellRoot = (props: {
   const onboardingActive = useObservable(deps.onboardingActive)
   const [requestedOnboarding, setRequestedOnboarding] = useState<string | undefined>()
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
-  const [showRecovery, setShowRecovery] = useState(false)
-  const [holdConnecting, setHoldConnecting] = useState(false)
-  const connectingShownAt = useRef<number | undefined>(undefined)
-  const previousConnectionState = useRef(connectionState)
+  const [connection, sendConnection] = useMachine(connectionIndicatorMachine, { input: { connectionState } })
 
   const pendingStep = onboardingActive ? onboardingSteps.find(step => !completedOnboarding.has(step.id)) : undefined
   const onboardingStep = requestedOnboarding === undefined ? pendingStep : onboardingSteps.find(step => step.id === requestedOnboarding)
@@ -87,47 +70,16 @@ export const ShellRoot = (props: {
     if (appeared && open) deps.closeSettings()
   }, [onboardingStep, open, deps])
 
-  useLayoutEffect(() => {
-    const previous = previousConnectionState.current
-    previousConnectionState.current = connectionState
-    if (connectionState !== 'connected') {
-      setShowRecovery(false)
-      return
-    }
-    if (previous !== 'disconnected' && previous !== 'connecting') return
-    setShowRecovery(true)
-  }, [connectionState])
-
-  useLayoutEffect(() => {
-    if (!showRecovery || holdConnecting) return
-    const timeout = window.setTimeout(() => setShowRecovery(false), RECOVERY_CONFIRMATION_MS)
-    return () => window.clearTimeout(timeout)
-  }, [showRecovery, holdConnecting])
-
-  useLayoutEffect(() => {
-    if (connectionState === 'connecting') {
-      connectingShownAt.current = Date.now()
-      return
-    }
-    const shownAt = connectingShownAt.current
-    if (shownAt === undefined) return
-    connectingShownAt.current = undefined
-    const remaining = CONNECTING_MIN_VISIBLE_MS - (Date.now() - shownAt)
-    if (remaining <= 0) return
-    setHoldConnecting(true)
-    const timeout = window.setTimeout(() => setHoldConnecting(false), remaining)
-    return () => {
-      window.clearTimeout(timeout)
-      setHoldConnecting(false)
-    }
-  }, [connectionState])
+  useEffect(() => {
+    sendConnection({ type: 'connection.changed', state: connectionState })
+  }, [connectionState, sendConnection])
 
   const completeOnboardingStep = useCallback((id: string) => {
     setRequestedOnboarding(undefined)
     setCompletedOnboarding(previous => (previous.has(id) ? previous : new Set([...previous, id])))
   }, [])
 
-  const connectionIndicator = indicatorState({ connectionState, holdConnecting, showRecovery })
+  const connectionIndicator = connectionIndicatorState(connection)
   const installing = desktopUpdate.presentation?.phase === 'installing'
   const launcherProps: SettingsLauncherOwnerProps = {
     wide,
