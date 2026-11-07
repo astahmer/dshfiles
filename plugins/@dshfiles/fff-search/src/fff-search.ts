@@ -105,7 +105,7 @@ export class FffSearch {
 
   /**
    * fff reads the first token of a grep query as a glob constraint, so a wildcard-only
-   * include (`*`, `**`, `**​/*`) becomes `* pattern`: with a regex pattern the parser then
+   * include (`*`, `**`, or a `**`-rooted glob) becomes `* pattern`: with a regex pattern the parser then
    * fails with "repetition operator missing expression" (24 hits across 14 Sessions in one
    * week). Such an include filters nothing, so it is dropped instead of narrowing the query.
    */
