@@ -23,7 +23,8 @@ import {
 
 export const WorktreeMemorySettings = Settings.Tag<SettingsValue<typeof worktreeMemorySettings.schema>>(worktreeMemorySettings.namespace)
 
-const SNAPSHOT_TTL = Duration.seconds(3)
+/** Matches the panel's poll: each poll probes once, and the badges or another tab inside that window share the same probe. */
+const SNAPSHOT_TTL = Duration.seconds(15)
 const PROBE_TIMEOUT = Duration.seconds(10)
 const KILL_GRACE = Duration.seconds(3)
 const MAX_PS_CHARACTERS = 8 * 1024 * 1024
