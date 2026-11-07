@@ -45,7 +45,7 @@ type SessionControllerPort = {
 type AgentUserMessage = Agent['inbox']['nextTurn'][number]
 type QuotaFailureAgent = {
   readonly id: Agent['id']
-  readonly session: { readonly seq: number }
+  readonly session: { readonly seq: number; readonly header?: { readonly origin?: 'subagent' } }
   readonly inbox: Pick<Agent['inbox'], 'nextTurn' | 'nextStep'>
 }
 type SessionUserActivity = {
@@ -104,6 +104,9 @@ const collectUserActivities = <Event extends { readonly seq: number }>(
 
 const hasNewerUserWork = (record: QuotaContinuationRecord, activities: readonly SessionUserActivity[]): boolean =>
   activities.some(activity => activity.seq >= record.failedSeq && activity.continuationId !== record.continuationId)
+
+/** A subagent's stopped turn is not a recovery the user can resume: its parent thread is the one they continue. */
+const isSubagentSession = (agent: Pick<QuotaFailureAgent, 'session'>): boolean => agent.session.header?.origin === 'subagent'
 
 const snoozeUntil = (duration: SnoozeDuration, now: number): number | null => (duration === 'unsnooze' ? null : now + SNOOZE_MS[duration])
 
@@ -451,6 +454,7 @@ const createQuotaContinuationService = ({
     failureMessage?: string,
   ): Promise<void> => {
     try {
+      if (isSubagentSession(agent)) return
       const nowAtFailure = now()
       const resetAt = (await readResetAt(accountId).catch(() => null)) ?? resetAtFromMessage(failureMessage ?? '', nowAtFailure)
       await serialize(agent.id, async () => {
@@ -638,6 +642,19 @@ const createQuotaContinuationService = ({
     })
   }
 
+  /** Sessions a subagent owns: an earlier build stored their stopped turns as recoveries no one can resume here. */
+  const subagentSessionIds = async (): Promise<ReadonlySet<string>> => {
+    const listSessions = sessionController()?.list
+    if (listSessions === undefined) return new Set()
+    try {
+      const listed = await listSessions({}, AbortSignal.timeout(15_000))
+      return new Set(listed.items.filter(session => session.origin === 'subagent').map(session => String(session.sessionId)))
+    } catch {
+      context.logger.warn('ai-accounts: could not read Session origins for quota recovery')
+      return new Set()
+    }
+  }
+
   const reportActivity = async (
     request: { readonly sessionId: string },
     next: () => Promise<readonly SessionActivity[]>,
@@ -665,8 +682,10 @@ const createQuotaContinuationService = ({
     const offStop = context.on('workspace/session-stop', ({ sessionId }) => stopSession(sessionId))
     void allRecords()
       .then(async records => {
+        const subagents = records.some(isActive) ? await subagentSessionIds() : new Set<string>()
         for (const record of records) {
           if (record.state === 'invalidated') await cancelScheduled(record)
+          else if (subagents.has(record.sessionId)) await invalidate(record)
           else if (record.state === 'waiting') await serialize(record.sessionId, () => ensureScheduled(record))
         }
       })

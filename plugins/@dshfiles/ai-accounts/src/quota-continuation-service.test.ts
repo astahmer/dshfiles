@@ -395,6 +395,71 @@ describe('quota continuation service', () => {
     }
   })
 
+  it("does not offer a recovery for a subagent's stopped turn", async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-subagent-'))
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+
+    try {
+      context = await openContext(root)
+      service = createQuotaContinuationService({ context, readResetAt: async () => null })
+      const subagent: QuotaFailureAgent = { ...createFailureAgent(SessionId('quota-subagent')), session: { seq: 12, header: { origin: 'subagent' } } }
+
+      await service.recordFailure(subagent, 'codex_work', false)
+
+      await expect(service.list()).resolves.toMatchObject({ continuations: [] })
+    } finally {
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it("retires a recovery an earlier build stored for a subagent's Session", async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-subagent-legacy-'))
+    const subagentSessionId = SessionId('quota-legacy-subagent')
+    let seedContext: Context | undefined
+    let seedService: ReturnType<typeof createQuotaContinuationService> | undefined
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+    let stop: (() => void) | undefined
+
+    try {
+      seedContext = await openContext(root)
+      seedService = createQuotaContinuationService({ context: seedContext, readResetAt: async () => null })
+      await seedService.recordFailure(createFailureAgent(subagentSessionId), 'codex_work', false)
+      await seedService.close()
+      seedService = undefined
+      await seedContext.fiber.dispose()
+      seedContext = undefined
+
+      context = await openContext(root)
+      service = createQuotaContinuationService({
+        context,
+        readResetAt: async () => null,
+        sessionController: {
+          inspect: async () => ({ events: [] }),
+          prompt: async () => ({ accepted: true as const }),
+          list: async () => ({
+            items: [{ sessionId: subagentSessionId, updatedAt: 5_000, running: false, blank: false, agentAvailable: false, origin: 'subagent' }],
+          }),
+        },
+      })
+      stop = service.start()
+
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        if ((await service.list()).continuations.length === 0) break
+        await new Promise(resolvePromise => setTimeout(resolvePromise, 25))
+      }
+      await expect(service.list()).resolves.toMatchObject({ continuations: [] })
+    } finally {
+      stop?.()
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('uses the reset a provider message names when the usage card reports none', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-quota-message-reset-'))
     const now = () => 6_000_000
