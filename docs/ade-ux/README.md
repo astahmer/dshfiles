@@ -56,8 +56,8 @@ owner.
 **Thread loop (Phase 4)**
 
 - [ ] Done / Restore releases and recreates the workspace (C3 in [t3code parity](../../plans/t3code-parity.md)).
-- [x] ~~Walkthrough card~~: turn-summary renders `ActivityDock` after a turn that changed files, with Review in
-      Changes (setting `walkthrough`).
+- [x] ~~Walkthrough~~: turn-summary renders a Walkthrough row under a turn that changed files: the files by folder
+      and Review in Changes (setting `walkthrough`).
 - [x] ~~Step timestamps and durations~~: already shipped by `@dshfiles/tool-meta` on every tool card.
 - [ ] git-worktree workspaces get only the This-turn Changes scope (the VCS port has no diff verb); no
       rebase-without-land verb (History's previewed rebase stands in).

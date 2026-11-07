@@ -480,7 +480,7 @@ cards inline in the active thread; 25 features.
 | chat/windowed-transcript: Open a thread on its latest messages | transcriptCard | transcript: windowed rendering |
 | html-render/html-page-card: Agent-published HTML page as a sandboxed card | transcriptCard | transcript: html_render card |
 | html-render/html-preview-card: Workspace HTML file shown as a sandboxed card | transcriptCard | transcript: html_preview card |
-| jj-integration/turn-end-integrate: Integrate from the end of a turn | transcriptCard | transcript: turn tail › Land on main |
+| jj-integration/turn-end-integrate: Integrate from the end of a turn | transcriptCard | transcript: turn tail › Land on main › revisions |
 | secret-catalog/agent-secret-request: Let an agent ask the user to store a secret | transcriptCard | transcript: turn tail › Secret request |
 | secret-catalog/backlog-jev-chat-setup: Set up a Jev key from chat | transcriptCard | transcript: turn tail › Set up missing secrets |
 | test-runs/test-run-card: Vitest runs as a test-results card | transcriptCard | transcript: Vitest results card |
@@ -488,7 +488,7 @@ cards inline in the active thread; 25 features.
 | tool-meta/tool-call-timing: Start time and duration on every tool call | transcriptCard | transcript: tool call timing |
 | traces/trace-transcript-links: Span ↔ transcript links | transcriptCard | transcript: Open the trace of turn |
 | turn-summary/turn-summary-line: A summary footer under each finished turn | transcriptCard | transcript: turn summary footer |
-| turn-summary/turn-walkthrough: A walkthrough card after a turn that changed code | transcriptCard | transcript: turn walkthrough card |
+| turn-summary/turn-walkthrough: A walkthrough under a turn that changed code | transcriptCard | transcript: turn walkthrough row |
 | user-questions/answered-question-stays-closed: An answered question form stays closed while its reply waits for admission | transcriptCard | transcript: question form |
 | user-questions/markdown-question: Markdown questions with sandboxed HTML previews | transcriptCard | transcript: question form |
 

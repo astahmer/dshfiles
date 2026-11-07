@@ -6,7 +6,7 @@ import { Fragment, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { turnSummarySettings } from './settings.js'
 import { TURN_ACTIVITY_KEY } from './turn-activity-node.js'
 import { TurnActivity, type TurnActivitySummary, type TurnSegment } from './turn-activity.js'
-import { TurnWalkthrough } from './turn-walkthrough.js'
+import { hasWalkthrough, TurnWalkthroughList, TurnWalkthroughToggle } from './turn-walkthrough.js'
 
 type OpenList = 'files' | 'commands' | 'failures'
 
@@ -80,6 +80,7 @@ export const TurnSummaryLine = (props: {
   const summary = useSyncExternalStore(source.subscribe, source.getSnapshot)
   const settings = useSettings(turnSummarySettings).value
   const [open, setOpen] = useState<OpenList | undefined>(undefined)
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false)
   if (summary === undefined || settings?.enabled === false || TurnActivity.isEmpty(summary)) return null
   const segments = TurnActivity.segments(summary, {
     includeReads: settings?.includeReads !== false,
@@ -95,6 +96,7 @@ export const TurnSummaryLine = (props: {
   const end = props.turn.end?.time
   const duration = settings?.duration !== false && start !== undefined && end !== undefined ? TurnActivity.duration(end - start) : undefined
   const changesSeq = summary.changesSeq
+  const walkthrough = settings?.walkthrough !== false && hasWalkthrough(summary)
   const label = (segment: TurnSegment, index: number): string => (index === 0 ? segment.text.charAt(0).toUpperCase() + segment.text.slice(1) : segment.text)
   const segmentView = (segment: TurnSegment, index: number): ReactNode => {
     const list = segment.key === 'files' || segment.key === 'commands' ? segment.key : undefined
@@ -135,15 +137,20 @@ export const TurnSummaryLine = (props: {
             {duration}
           </span>
         )}
+        {walkthrough ? (
+          <>
+            <span aria-hidden>·</span>
+            <TurnWalkthroughToggle open={walkthroughOpen} onToggle={() => setWalkthroughOpen(current => !current)} />
+          </>
+        ) : null}
       </div>
       {open === 'files' && <FileList openFile={props.openFile} summary={summary} />}
       {open === 'commands' && <CommandList onlyFailed={false} summary={summary} />}
       {open === 'failures' && canList && <CommandList onlyFailed summary={summary} />}
-      {settings?.walkthrough !== false && (
-        <TurnWalkthrough
+      {walkthrough && walkthroughOpen && (
+        <TurnWalkthroughList
           openChanges={changesSeq === undefined ? undefined : () => props.openChanges({ seq: changesSeq, turn: props.turn.turn })}
           summary={summary}
-          turn={props.turn.turn}
         />
       )}
     </div>
