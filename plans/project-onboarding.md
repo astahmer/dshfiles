@@ -287,10 +287,11 @@ Goal: a repository can declare how it wants to be worked in, safely.
       repository (it already has `isolateByDefault` / `autoIntegrationScope` and a
       `RepositoryAutoIntegration` exclusion list; the file becomes another resolver in front
       of the profile setting).
-- [ ] Show a read-only **Project** section (Settings) listing the file's declared values, the
-      tier that won (project → profile → file → built-in), and the import button for scripts.
-      This is the first project-scoped tier we have: keep it to file-backed, non-executable
-      keys and say so in the UI rather than building a general override store.
+- [x] Show a **Project** section (Settings) listing the file's declared values and the tier that
+      won (project → profile → file → built-in). The import is `Copy entry`: it copies the exact
+      profile-trusted action YAML, because writing shell-running configuration from a repository
+      file is precisely the trust boundary this plan keeps. Keep it to file-backed,
+      non-executable keys and say so in the UI rather than building a general override store.
 - [ ] Agent tools: `project_config_read` (read-only) and `project_config_import` (write, only
       when asked) over the same Host methods.
 
