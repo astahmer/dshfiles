@@ -68,9 +68,12 @@ When('the {string} scope is chosen in the Changes facet', async ({ page }: { pag
 })
 
 When('{string} is marked viewed in the Changes facet', async ({ page }: { page: Page }, file: string) => {
+  // The count moves before the Host stores the mark, so a step that reloads next has to wait for the store's answer.
+  const stored = page.waitForResponse(response => response.url().includes('/api/dshx') && (response.request().postData() ?? '').includes('"viewed":true'))
   await facet(page)
     .getByRole('checkbox', { name: `Mark viewed: ${file}`, exact: true })
     .click()
+  await stored
 })
 
 Then('the Changes facet reads {string}', async ({ page }: { page: Page }, text: string) => {

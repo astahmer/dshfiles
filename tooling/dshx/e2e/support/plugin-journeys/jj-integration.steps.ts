@@ -585,7 +585,13 @@ When('No folder is chosen as the New thread project', async ({ page }: { page: P
 
 When('a message is sent in the thread workspace', async ({ page }: { page: Page }) => {
   const composer = page.getByRole('textbox', { name: newThreadComposerName, exact: true })
-  await composer.fill('jj integration rebase e2e thread\n\n[[title jj integration rebase e2e thread]]')
+  // Choosing a project swaps the composer a moment after its button changes, and a send before that goes to the previous
+  // project. A draft that survives the swap is in the composer the send will use.
+  await expect(async () => {
+    await composer.fill('jj integration rebase e2e thread\n\n[[title jj integration rebase e2e thread]]')
+    await page.waitForTimeout(750)
+    await expect(composer).toContainText('jj integration rebase e2e thread', { timeout: 1_000 })
+  }).toPass({ timeout: 20_000 })
   await composer.press('Enter')
   await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
 })
