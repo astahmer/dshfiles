@@ -95,6 +95,19 @@ describe('FffSearch.grep', () => {
     expect(grep('\\*\\.yml').matches.map(match => match.path)).toEqual(['src/rules.ts'])
   })
 
+  it('drops only a wildcard-only include', () => {
+    expect(FffSearch.includeConstraint('*')).toBeUndefined()
+    expect(FffSearch.includeConstraint('**')).toBeUndefined()
+    expect(FffSearch.includeConstraint('**/*')).toBeUndefined()
+    expect(FffSearch.includeConstraint(' *.tsx ')).toBe('*.tsx')
+    expect(FffSearch.includeConstraint(undefined)).toBeUndefined()
+  })
+
+  it('keeps a wildcard include from breaking a valid regex pattern', () => {
+    const outcome = grep('LifecycleRules.apply|LifecycleRules.check', { include: '*' })
+    expect(outcome.matches.map(match => match.path).sort()).toEqual(['src/nested/use.tsx', 'src/rules.test.ts'])
+  })
+
   it('matches case-sensitively, like ripgrep', () => {
     expect(grep('lifecyclerules').matches.map(match => match.path)).toEqual(['docs/notes.md'])
   })

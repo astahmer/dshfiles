@@ -103,8 +103,20 @@ export class FffSearch {
     })
   }
 
+  /**
+   * fff reads the first token of a grep query as a glob constraint, so a wildcard-only
+   * include (`*`, `**`, `**​/*`) becomes `* pattern`: with a regex pattern the parser then
+   * fails with "repetition operator missing expression" (24 hits across 14 Sessions in one
+   * week). Such an include filters nothing, so it is dropped instead of narrowing the query.
+   */
+  static includeConstraint(include: string | undefined): string | undefined {
+    if (include === undefined) return undefined
+    const trimmed = include.trim()
+    return /^\*{1,2}(?:\/\*{1,2})?$/u.test(trimmed) ? undefined : trimmed
+  }
+
   static grep(options: { finder: FileFinder; scope: SearchScope; pattern: string; include: string | undefined; workingDirectory: string }): GrepOutcome {
-    const constraints = [options.scope.directory === undefined ? undefined : `${options.scope.directory}/`, options.include]
+    const constraints = [options.scope.directory === undefined ? undefined : `${options.scope.directory}/`, FffSearch.includeConstraint(options.include)]
     // A pattern with no regex syntax is a literal; fff's plain mode matches it fastest, as fff-mcp does for identifiers.
     const constraintShaped = options.pattern.split(/\s+/).some(token => /[/*?{}!]|\.\w+$/.test(token))
     const mode = constraintShaped || /[\\^$.|?*+()[\]{}]/.test(options.pattern) ? 'regex' : 'plain'
