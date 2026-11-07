@@ -83,9 +83,10 @@ const conversionFailureMessage = (error: unknown): string => (error instanceof E
 
 /**
  * Autosave for one open board: edits settle for {@link SAVE_DEBOUNCE_MS}, then one revision-checked save runs.
- * Edits during a save queue the next one. A stale revision parks the board in `conflict` until the user reloads
- * the newer version (`SYNCED`) or overwrites it with theirs (`OVERWRITE`); any other failure waits in `failed`
- * for `RETRY` or the next edit. The queued agent source converts once the editor is ready (`converting`), a newer
+ * Edits during a save queue the next one. A stale revision parks the board in `conflict` until the user loads the
+ * newer version (`RELOAD`) or overwrites it with theirs (`OVERWRITE`); any other failure waits in `failed`
+ * for `RETRY` or the next edit. `SYNCED` records a revision a rename advanced to, and never discards an edit that is
+ * still waiting for its save. The queued agent source converts once the editor is ready (`converting`), a newer
  * remote revision is adopted while nothing local is unsaved (`adopting`), and leaving flushes the last edit before
  * the component hears `left`. Data stays in Query; this machine only owns the save, conversion, adopt and leave flows.
  */
@@ -158,7 +159,12 @@ export const boardSyncMachine = setup({
   }),
   initial: 'clean',
   on: {
-    SYNCED: { target: '.clean', actions: assign(({ event }) => ({ revision: event.revision, scene: null, conflictRevision: null, error: null })) },
+    // `SYNCED` is the rename response. An edit made while the rename was in flight still waits for its save, so with a
+    // scene in hand only the revision advances and the current state keeps its own save, conflict or conversion flow.
+    SYNCED: [
+      { guard: 'hasScene', actions: assign(({ event }) => ({ revision: event.revision, conflictRevision: null, error: null })) },
+      { target: '.clean', actions: assign(({ event }) => ({ revision: event.revision, scene: null, conflictRevision: null, error: null })) },
+    ],
     REMOTE_REVISION: { actions: 'keepRemoteRevision' },
     EDITOR_READY: { actions: 'captureEditor' },
     DISCARD_PENDING: { guard: 'canDiscard', target: '.saving', actions: 'discardPending' },

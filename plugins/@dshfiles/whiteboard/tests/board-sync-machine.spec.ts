@@ -109,7 +109,7 @@ describe('board autosave', () => {
 
   it('parks a stale save in conflict until the user keeps theirs or loads the newer version', async () => {
     const { save, calls } = manualSave()
-    const actor = start(save)
+    const actor = start(save, 1, { read: async () => board(5) })
     actor.send({ type: 'EDIT', scene: scene('mine') })
     actor.send({ type: 'FLUSH' })
     calls[0]?.reject(new SaveConflict(5))
@@ -118,9 +118,33 @@ describe('board autosave', () => {
     expect(calls[1]?.request).toMatchObject({ expectedRevision: 5, scene: scene('mine') })
     calls[1]?.reject(new SaveConflict(6))
     await waitFor(actor, snapshot => snapshot.value === 'conflict')
-    actor.send({ type: 'SYNCED', revision: 6 })
-    expect(actor.getSnapshot().value).toBe('clean')
-    expect(actor.getSnapshot().context).toMatchObject({ revision: 6, scene: null })
+    actor.send({ type: 'RELOAD' })
+    await waitFor(actor, snapshot => snapshot.matches('clean'))
+    expect(actor.getSnapshot().context).toMatchObject({ revision: 5, scene: null })
+  })
+
+  it('keeps an unsaved edit when a rename advances the revision mid-edit', async () => {
+    const { save, calls } = manualSave()
+    const actor = start(save)
+    actor.send({ type: 'EDIT', scene: scene('stroke') })
+    actor.send({ type: 'SYNCED', revision: 4 })
+
+    expect(actor.getSnapshot().matches('dirty')).toBe(true)
+    expect(actor.getSnapshot().context).toMatchObject({ revision: 4, scene: scene('stroke') })
+
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS)
+    expect(calls[0]?.request).toMatchObject({ expectedRevision: 4, scene: scene('stroke') })
+    actor.stop()
+  })
+
+  it('settles to clean on a rename that arrives while nothing is unsaved', () => {
+    const { save } = manualSave()
+    const actor = start(save)
+    actor.send({ type: 'SYNCED', revision: 7 })
+
+    expect(actor.getSnapshot().matches('clean')).toBe(true)
+    expect(actor.getSnapshot().context).toMatchObject({ revision: 7, scene: null })
+    actor.stop()
   })
 
   it('keeps the drawing after a failed save and retries it', async () => {
