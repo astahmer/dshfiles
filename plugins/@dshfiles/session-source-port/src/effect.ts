@@ -10,6 +10,10 @@ import type {
   SessionProjectionsValue,
   SessionPromptRequest,
   SessionPromptValue,
+  SessionForkRequest,
+  SessionForkValue,
+  SessionRenameRequest,
+  SessionRenameValue,
   SessionSelectModelRequest,
   SessionSelectModelValue,
   SessionSummary,
@@ -30,6 +34,39 @@ export class SessionSourceRegistryError extends Schema.TaggedError<SessionSource
     return `Asking the session sources which one owns ${this.sessionId} failed.`
   }
 }
+
+/**
+ * A source declined a message it will not forward. The text is written for the person at the composer, so the Session
+ * controller shows it as it stands instead of reporting an unanswering runtime.
+ */
+export class SessionPromptRefused extends Schema.TaggedError<SessionPromptRefused>()('SessionPromptRefused', {
+  reason: Schema.String,
+}) {
+  override get message(): string {
+    return this.reason
+  }
+}
+
+const refusedShape = Schema.is(Schema.Struct({ _tag: Schema.Literal('SessionPromptRefused'), reason: Schema.String }))
+
+/** The owner refused a fork, usually because no turn has finished; a client reads this to say why. */
+export class SessionForkUnavailable extends Schema.TaggedError<SessionForkUnavailable>()('SessionForkUnavailable', {
+  sessionId: Schema.String,
+  reason: Schema.String,
+}) {
+  override get message(): string {
+    return this.reason
+  }
+}
+
+const forkUnavailableShape = Schema.is(Schema.Struct({ _tag: Schema.Literal('SessionForkUnavailable'), sessionId: Schema.String, reason: Schema.String }))
+
+/** Structural, because each bundle holds its own copy of the class. */
+export const isSessionForkUnavailable = (error: unknown): error is SessionForkUnavailable =>
+  error instanceof SessionForkUnavailable || forkUnavailableShape(error)
+
+/** Structural, because each bundle holds its own copy of the class. */
+export const isSessionPromptRefused = (error: unknown): error is SessionPromptRefused => error instanceof Error && refusedShape(error)
 
 /** The Session controller's registry of mirrored Session sources. */
 export class SessionSources extends Context.Service<
@@ -85,5 +122,7 @@ export interface EffectSessionSource<R = never> {
   readonly cancel?: (request: SessionCancelRequest) => Effect.Effect<SessionCancelValue, unknown, R>
   readonly updateQueue?: (request: SessionUpdateQueueRequest) => Effect.Effect<SessionUpdateQueueValue, unknown, R>
   readonly projections?: (request: SessionProjectionsRequest) => Effect.Effect<SessionProjectionsValue, unknown, R>
+  readonly fork?: (request: SessionForkRequest) => Effect.Effect<SessionForkValue, unknown, R>
+  readonly rename?: (request: SessionRenameRequest) => Effect.Effect<SessionRenameValue, unknown, R>
   readonly selectModel?: (request: SessionSelectModelRequest) => Effect.Effect<SessionSelectModelValue, unknown, R>
 }

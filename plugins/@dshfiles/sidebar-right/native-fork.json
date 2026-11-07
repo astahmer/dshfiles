@@ -34,5 +34,6 @@
     "src/native/client/tabs/guide/GuideBody.module.css",
     "src/native/client/tabs/guide/GuideBody.tsx",
     "src/native/client/tabs/guide/GuideTitle.tsx"
-  ]
+  ],
+  "added": ["src/native/client/tab-substitutes.ts"]
 }

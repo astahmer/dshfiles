@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-session-log-export/client'
-import { Changes, createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
+import { Changes, createApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -39,6 +39,7 @@ import { ThreadNotices, ThreadNoticeToast } from './thread-notices.js'
 import { ThreadPreparation, ThreadWarmup } from './thread-warmup.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { ThreadWorkspaceControl } from './thread-workspace-control.js'
+import { useSessionThreadApi } from './use-session-thread-api.js'
 import { useToast } from './toast.js'
 import { DraftAttachmentCarry } from './draft-attachment-carry.js'
 import { deferWorkspaceSubmit, deliverFirstSend } from './workspace-submit.js'
@@ -292,7 +293,7 @@ export default defineClient({
     const integrationTimeline = new IntegrationTimeline()
     const TURN_END_STATUS_REFRESH_WINDOW_MS = 30_000
     const ThreadIntegrationMarkers = (props: { readonly turn: TurnLocation; readonly sessionId: SessionSummary['id'] }): JSX.Element | null => {
-      const api = useApi(jjIntegrationApi)
+      const api = useSessionThreadApi(props.sessionId)
       const turnStartedAt = props.turn.start?.time ?? props.turn.end?.time
       useLayoutEffect(() => {
         if (turnStartedAt !== undefined) integrationTimeline.publishTurnStart({ sessionId: props.sessionId, turn: props.turn.turn, startedAt: turnStartedAt })

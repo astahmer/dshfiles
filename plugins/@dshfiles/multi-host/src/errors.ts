@@ -397,11 +397,11 @@ export class ApiUnreachable extends Schema.TaggedError<ApiUnreachable>()(
 /** A plugin API on the remote runtime failed; `code` is that API's own code. */
 export class RemoteApiFailed extends Schema.TaggedError<RemoteApiFailed>()(
   'RemoteApiFailed',
-  { code: Schema.String.check(Schema.isMaxLength(128)), cause: Schema.optional(Schema.Defect()) },
+  { code: Schema.String.check(Schema.isMaxLength(128)), detail: Schema.optional(Schema.String), cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'remote-api-failed' },
 ) {
   override get message(): string {
-    return 'The runtime request failed. Check the host status and reconnect if needed.'
+    return this.detail ?? 'The runtime request failed. Check the host status and reconnect if needed.'
   }
 }
 

@@ -125,8 +125,9 @@ Full notes, with the files and URLs read for each product, are in
 5. **A dropped connection restricts submission; it never replaces the composer.** The
    native composer remains in place and retains its draft when remote calls fail.
 6. **Strict machine-local paths.** A local attachment is uploaded through the
-   owning-runtime API; it is not passed as a local filesystem path. Cross-machine
-   absolute-path refusal messaging remains unverified.
+   owning-runtime API; it is not passed as a local filesystem path. A message that
+   names this machine is refused before it reaches the owner (see
+   [Cross-machine references](#cross-machine-references)).
 
 ## What DSH already gives us
 
@@ -154,7 +155,7 @@ the owning runtime before forwarding.
 | ------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | **A. Embed the host's own client** in the remote panel                                | 100%, forever                 | No: the host's own plugins act                              | none               | small: iframe on the stable loopback origin + `?thread=` consumer + embed chrome hide; probed working (token→cookie→UI) |
 | **B. Port capabilities into the local remote composer**                               | partial, per feature          | Yes, for the ported ones                                    | a second composer  | each feature needs a remote endpoint; never converges                                                                   |
-| **C. Give the data plane an environment dimension** (this is what bb/t3code/Codex do) | 100% (native composer + chat) | Yes, once path services are proxied                         | none               | large: session source for remote Sessions, then models/uploads/mentions; approvals stay host-side until waterfall proxy |
+| **C. Give the data plane an environment dimension** (this is what bb/t3code/Codex do) | 100% (native composer + chat) | Yes, once path services are proxied                         | none               | large: session source for remote Sessions, then models/uploads/mentions, then the owner's event stream                  |
 
 C splits into two implementations, and one of them is much cheaper here:
 
@@ -210,17 +211,120 @@ from that runtime with Session ownership checked before forwarding. Drafts stay 
 client; questions/approvals and terminal interactions still require the host UI.
 
 Validation: `DSHX_E2E_ONLY=@dshfiles/multi-host node --run check:e2e` covers remote
-Session creation, file-reference results, and a file upload over loopback SSH. Focused
-unit tests cover Session ownership authorization and mirrored model selection. Direct
-browser interaction with model selection and the file picker, plus cross-machine
-absolute-path refusal messaging, remain unverified.
+Session creation, file-reference results, a file upload over loopback SSH, and the
+browser's model picker and file picker on a remote thread (`multi-host.auto-destination`).
+Focused unit tests cover Session ownership authorization, mirrored model selection and
+the cross-machine refusals below.
+
+## Cross-machine references
+
+A path in a message is text: nothing reads it until the remote agent or its `@` resolver
+looks it up there, so a path from this machine fails or silently names another file.
+`remote-prompt-guard.ts` applies the rule the owner chose on 2026-11-07 to every message
+the Session source forwards (`prompt`, a queued edit) and to `threadReply`/`threadStart`:
+
+| Message on a remote thread                                   | Result                  |
+| ------------------------------------------------------------ | ----------------------- |
+| `@~/x`, or `@/abs/path` under this Host's home               | refused                 |
+| `@relative/path`, or `@/abs/path` inside the thread's folder | sent                    |
+| `@/abs/path` anywhere else, such as `@/etc/hosts`            | sent                    |
+| a path in plain prose, such as a stack trace                 | sent                    |
+| an upload this Host staged for another thread or runtime     | refused                 |
+| an upload this Host has no record of                         | sent; the owner decides |
+
+Two machines can share a home path, so the thread's folder wins over the home. The
+upload ledger is in memory: after a local restart a receipt is unknown rather than
+foreign, and it goes to the owner, whose `session/attachment-invalid` becomes the same
+recovery message. The refusal is `SessionPromptRefused`, which the Session controller shows
+as written (`session-source-port`), and the composer keeps the draft.
+
+## Questions
+
+The owning runtime forwards `user-questions/request` as a waterfall to any owner client
+of its gateway, so this Host becomes one (`remote-interactions.ts`). A runtime's launch
+cookie authenticates as its owner browser peer, which may answer forwarded events: while
+a mirrored Session is followed, the Host opens that runtime's `$events` stream on the
+`/api/remote.mux` socket and holds each request, and an answer goes back as
+`$events/result` over the same peer.
+
+The owner stays the authority. It accepts a result only for a request it delivered to
+that client, and this Host also checks that the request belongs to the Session and that
+the Session controller agrees which runtime owns it. Nothing is fabricated from a
+transcript, and nothing answers `next`: delegation would tell the owner no client wants
+the request, while holding it leaves it for the owner's own UI. A dropped stream forgets
+what it held and the owner delivers it again on the next one.
+
+A timed question claims the owner's wait through `userQuestions/attachWait`, as the
+native client does, and only then reaches a card: a card that mounts without a deadline
+takes focus, and focus freezes a countdown that has not started. A runtime that refuses
+the claim keeps its own timer, and its `cancel` frame ends the card.
+
+Being an owner client has two effects on the owner worth knowing. A client that holds a
+timed question counts down as a second browser would, so its timeout continues the agent
+even while someone takes their time at the host; the question stays answerable. And
+`hasLiveClient` is true while the bridge is open, which only changes how the owner reports
+a `dsh inspect` query with no page attached.
+
+`sessionInteractions` is what keeps these streams open for threads that are not open
+here: a browser's feed reads it at least every 15 seconds, and each read marks every
+visible runtime with recorded threads as watched for the next 45 seconds. Held requests
+publish through the same pending-interaction channel as local ones, so the thread list's
+**Needs you** group needs no multi-host code. Nothing is watched with no browser reading,
+and a stream that keeps failing retries at a doubling delay up to a minute.
+
+A question that outlived its wait is `continued`, and it comes from the `userQuestions`
+projection. Live projection values travel on `session/control`, which serves one Host's
+own Sessions, so the bridge also follows the runtime's control stream and hands each
+value to the Session controller through `SessionSourceRegistry.publishProjection`. This
+is also what keeps a mirrored thread's other live values, such as its inbox, current
+after the opening snapshot.
+
+## Approvals
+
+`approval/request` arrives on the same stream and is held the same way. The native panel
+is private to `@deepseek-ai/dsh-client-ui-approval` (its selector tests a private class),
+so `remote-approval-panel.tsx` is a small owned panel in the same composer seat, with the
+native keys and one lock across keys and pointer. The decision goes to the owner as that
+waterfall's result, and the owner writes the `approval/decided` audit event.
+
+`sessionApprovalDecide` deliberately has no agent tool: an approval is the human's, and
+[row 41](../../../../plans/dsh-host-gaps.md) keeps it out of reach of any Agent. It is an
+exception to the rule that a user capability carries a tool, stated here so nobody adds one.
+
+## JJ actions
+
+A mirrored thread's folder means nothing on this machine, so `threadAt` here could only
+answer "not a thread". `sessionThreadApi` in jj-integration resolves the Session's owner
+once and sends the thread control's four calls to it through `sessionJjCall`; a local
+Session keeps this Host's API unchanged. The owner's refusal code survives, so a queued
+integration is recognized the same way on both sides.
+
+The side panel and the composer's changes bar go further through `sessionRepositoryCall`:
+`OwnerRouting.api` gives them a client of the same shape whose calls reach the owner, so
+no component changed beyond which client it asks for. The owner mints a new repository id
+per registration, so the Host cannot compare with one id: it remembers the ids returned
+for this thread's folder and accepts only those. An id from before a Host restart is
+refused, and reopening the panel registers a new one. A workspace added from the panel may
+only sit beside the thread's folder.
+
+The Host authorizes the Session as usual, then `RemoteJjScope` requires the action's path
+to be that thread's own folder: owning a Session is not a grant over the machine, so an
+agent or a stale client cannot name another workspace. `discard` keeps its required
+`force`, and the runtime still applies every eligibility check of its own.
+
+The Land page merges `remoteRepositories` into its own list. That read asks each runtime
+to rescan first, because `repositories` answers from the last scan, and it matches
+workspaces to recorded threads by folder, because an owner may list no Session against a
+workspace. Only those threads appear: anything else on that machine has no Session to
+authorize an action. Each row's land and remove go through one of its Sessions, so they
+pass the same owner and folder checks as the thread control.
+
+## Fork and rename
+
+A mirrored Session's log lives on its owner, so `session/fork` and `session/rename` go there
+too. A fork stays on that host and is recorded here as one of its threads, so it opens in
+this client like any other.
 
 ## Remaining boundaries
 
-- `sessionJjRepositories(sessionId)` is read-only status, not a local JJ panel. Per-thread path-scoped JJ reads, workspace mutations and landing are not mirrored; the native thread still offers Host UI.
-- In-client question/approval answers and terminal access are not mirrored. The remote waterfall payload/answer RPC is only delivered to the owner Host's client. The local transcript's open tool-call name is not sufficient authorization to fabricate an answer or approve a call; Host UI is the safe fallback.
-- The loopback SSH E2E tests Host API transport for remote file references and uploads,
-  but does not drive the browser's model picker or attachment picker.
-- The implementation routes selected local files through the owning runtime's upload
-  service. A specific cross-machine absolute-path refusal message has not been
-  implemented or tested.
+- Terminals stay on the host by decision: a shell in this client would be new interactive access to that machine, so a terminal tab on a mirrored thread offers the host's own DSH instead (`sidebarRight.substituteTab`).

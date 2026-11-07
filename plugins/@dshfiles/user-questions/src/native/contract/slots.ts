@@ -127,8 +127,11 @@ function questionError(code: QuestionRejectionCode): Error {
 export interface QuestionWaterfallChannel {
   /** Client-clock deadline in epoch milliseconds; absent for a blocking question. */
   readonly deadline: number | undefined
-  /** Resolve the Host waterfall with the whole answer batch. */
-  resolve(answer: QuestionAnswer): void
+  /**
+   * Resolve the Host waterfall with the whole answer batch. A channel to another machine settles when its owner
+   * answers, so a refusal stays a failed attempt on the card instead of a sent one.
+   */
+  resolve(answer: QuestionAnswer): void | Promise<void>
   /** Reject the Host waterfall with a wire-preserved code. */
   reject(code: Exclude<QuestionRejectionCode, 'ASK_ABORTED'>): void
   /** Hand the request to the next waterfall listener. */
@@ -606,7 +609,7 @@ export class PendingQuestion {
   async #answerWaterfall(answer: QuestionAnswer): Promise<void> {
     const waterfall = this.#waterfall
     if (waterfall === undefined) throw new Error('no channel accepts an answer yet')
-    await settlePendingComposer(() => { waterfall.resolve(answer) }, 'pending question settlement failed')
+    await waterfall.resolve(answer)
   }
 
   async #answerRemote(answer: QuestionAnswer): Promise<void> {

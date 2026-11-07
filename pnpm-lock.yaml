@@ -3651,6 +3651,9 @@ importers:
       '@dshfiles/jj-integration':
         specifier: workspace:*
         version: link:../jj-integration
+      '@dshfiles/multi-host':
+        specifier: workspace:*
+        version: link:../multi-host
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -4599,7 +4602,13 @@ importers:
       '@deepseek-ai/dsh-client-ui-primitives':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@deepseek-ai/dsh-client-ui-session':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-client-ui-sidebar':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@deepseek-ai/dsh-client-ui-sidebar-right':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-client-ui-slots':
@@ -8210,6 +8219,9 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
+      '@dshfiles/multi-host':
+        specifier: workspace:*
+        version: link:../multi-host
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.20

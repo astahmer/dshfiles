@@ -20,7 +20,8 @@ import { RuntimeLaunchFile } from '../../../../../plugins/@dshfiles/multi-host/s
 
 const { launchFilePaths, parseRuntimeLaunch } = RuntimeLaunchFile
 import { mergeInventory } from '../../../../../plugins/@dshfiles/multi-host/src/inventory.js'
-import { startFakeCommandCode } from '../fake-command-code.js'
+import { fakeCommandCodeFor, startFakeCommandCode } from '../fake-command-code.js'
+import { seedPresetRow } from './agent-questions-timed.steps.js'
 import { openGlobalPanel } from '../plugin-view-names.js'
 
 const multiHostPackageId = '@dshfiles/multi-host'
@@ -238,6 +239,10 @@ const readProcessDetails = (processId: number) => {
   })
 }
 
+/** A scratch Host runs under its parent-death guard, and `host.pid` is the guard's, so its children sit one level below. */
+const isChildOfGuardedHost = (parentProcessId: number, guardProcessId: number): boolean =>
+  parentProcessId === guardProcessId || readProcessDetails(parentProcessId).parentProcessId === guardProcessId
+
 const isProcessRunning = (processId: number): boolean => {
   try {
     process.kill(processId, 0)
@@ -355,16 +360,20 @@ const startScratchGitServer = async (input: { readonly projectPath: string; read
   }
 }
 
-Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Page }) => {
+const bootLoopbackPair = async (
+  page: Page,
+  remote_: { readonly cordisPatch?: string; readonly packageIds?: readonly string[]; readonly managerPackageIds?: readonly string[] } = {},
+): Promise<void> => {
   const fakeCommandCode = await startFakeCommandCode(page)
   const sshd = await startLoopbackSshd({ gitSslNoVerify: true })
   let remote: BootedProfile | undefined
   let manager: BootedProfile | undefined
   try {
     remote = await bootComposedPluginProfile({
-      packageIds: ['@dshfiles/multi-host', '@dshfiles/ai-accounts'],
+      packageIds: ['@dshfiles/multi-host', '@dshfiles/ai-accounts', ...(remote_.packageIds ?? [])],
       profileLabel: 'multi-host-remote',
-      hostEnv: { DSH_E2E_REMOTE_KEY: 'e2e-fake-key-ALPHA1' },
+      ...(remote_.cordisPatch !== undefined && { cordisPatch: remote_.cordisPatch }),
+      hostEnv: { DSH_E2E_REMOTE_API_KEY: 'e2e-fake-key-ALPHA1' },
       seedHome: async homeRoot => {
         const accountsPath = join(homeRoot, 'plugins', 'ai-accounts', 'accounts.json')
         await mkdir(dirname(accountsPath), { recursive: true })
@@ -383,7 +392,7 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
                   enabled: true,
                   homePath: '',
                   shadowHomePath: '',
-                  apiKeyEnv: 'DSH_E2E_REMOTE_KEY',
+                  apiKeyEnv: 'DSH_E2E_REMOTE_API_KEY',
                   apiBaseUrl: fakeCommandCode.baseUrl,
                   badge: '',
                   accentColor: '',
@@ -409,6 +418,9 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
         '@dshfiles/rich-composer',
         '@dshfiles/session-controller',
         '@dshfiles/model-effort-picker',
+        '@dshfiles/user-questions',
+        '@dshfiles/sidebar-right',
+        ...(remote_.managerPackageIds ?? []),
       ],
       profileLabel: 'multi-host-manager',
       seedHome: async homeRoot => {
@@ -435,6 +447,18 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
     }
     throw error
   }
+}
+
+Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Page }) => {
+  await bootLoopbackPair(page)
+})
+
+Given('a loopback SSH DSH pair with timed questions is booted', async ({ page }: { readonly page: Page }) => {
+  await bootLoopbackPair(page, { cordisPatch: await seedPresetRow(), packageIds: ['@dshfiles/tool-ask-user'] })
+})
+
+Given('a loopback SSH DSH pair with JJ on the remote is booted', async ({ page }: { readonly page: Page }) => {
+  await bootLoopbackPair(page, { packageIds: ['@dshfiles/jj-integration', '@dshfiles/jujutsu'], managerPackageIds: ['@dshfiles/jujutsu'] })
 })
 
 When('the scratch remote is added from the host UI', async ({ page }: { readonly page: Page }) => {
@@ -535,10 +559,10 @@ When('the remote model picker selects its model', async ({ page }: { readonly pa
   // The picker lists one row per model and account; its Use button names both.
   const models = page.getByRole('list', { name: 'Models and accounts', exact: true })
   await expect(models).toBeVisible()
-  const model = models.getByRole('button', { name: /^Use GPT-6 Luna \(/u })
+  const model = models.getByRole('button', { name: 'Use gpt-6-luna (Command Code 1)', exact: true })
   await expect(model).toBeVisible()
   await model.click()
-  await expect(page.locator('[data-model-picker-text]')).toHaveText('GPT-6 Luna')
+  await expect(page.locator('[data-model-picker-text]')).toHaveText('gpt-6-luna')
 })
 
 const pickedAttachments = new WeakMap<Page, { readonly name: string; readonly content: string }>()
@@ -591,6 +615,501 @@ When('the native composer sends a prompt to the remote Session', async ({ page }
   await expect(send).toBeEnabled()
   await send.click()
   autoDestinationObservations.set(page, { ...observation, prompt })
+})
+
+const REMOTE_QUESTION = 'Which environment should the remote fixture deploy to?'
+const remoteQuestionCard = (page: Page) => page.locator('[data-question-key]').filter({ hasText: REMOTE_QUESTION })
+const remoteComposer = (page: Page) => page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/u })
+
+const askOnRemote = async (page: Page, timeout?: number): Promise<void> => {
+  const directive = `[[title Remote question fixture]] [[once call ask_user_question ${JSON.stringify({
+    questions: [{ id: 'deploy-target', header: 'Deploy', question: REMOTE_QUESTION, options: [{ label: 'Staging' }, { label: 'Production' }] }],
+    ...(timeout !== undefined && { timeout }),
+  })}]]`
+  await remoteComposer(page).fill(directive)
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+}
+
+When('the remote agent asks a question', async ({ page }: { readonly page: Page }) => {
+  await askOnRemote(page)
+})
+
+When('the remote agent asks a timed question lasting {int} seconds', async ({ page }: { readonly page: Page }, seconds: number) => {
+  await askOnRemote(page, seconds)
+})
+
+Then('the remote question opens in the controlling chat', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-question-card', async () => {
+    await expect(remoteQuestionCard(page)).toBeVisible({ timeout: 45_000 })
+    await expect(remoteQuestionCard(page).getByRole('radio', { name: 'Production', exact: true })).toBeVisible()
+  })
+})
+
+Then('the remote question counts down with what its owner reports', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-question-countdown', async () => {
+    await expect(remoteQuestionCard(page).locator('header span').filter({ hasText: /^Continuing in \d+s$/u })).toBeVisible({ timeout: 15_000 })
+  })
+})
+
+Then('the remote question stays answerable after its wait ends', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-question-continued', async () => {
+    await expect(remoteQuestionCard(page).getByText('Work continued — you can still answer', { exact: true })).toBeVisible({ timeout: 45_000 })
+  })
+})
+
+When('the remote question is answered {string} here', async ({ page }: { readonly page: Page }, option: string) => {
+  const card = remoteQuestionCard(page)
+  await card.getByRole('radio', { name: option, exact: true }).click()
+  await card.getByRole('button', { name: 'Submit', exact: true }).click()
+})
+
+Then('the remote agent receives the answer {string}', async ({ page }: { readonly page: Page }, option: string) => {
+  await recordAssertion(page, 'multi-host-remote-question-answered', async () => {
+    const fake = fakeCommandCodeFor(page)
+    await expect
+      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.text.includes(option) && message.text.includes('deploy-target')), {
+        timeout: 30_000,
+      })
+      .toBe(true)
+    await expect(remoteQuestionCard(page)).toHaveCount(0, { timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the connection to the remote drops while the question waits', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const records = await readTunnelProcessRecords(pair.tunnelProcessLogPath)
+  const tunnel = records.at(-1)
+  if (tunnel === undefined || tunnel.marker !== 'persistent-forward') throw new Error('The persistent SSH forward was not recorded.')
+  const details = readProcessDetails(tunnel.processId)
+  const manager = pair.manager.host.pid
+  if (manager === undefined || details.commandName !== 'ssh' || !isChildOfGuardedHost(details.parentProcessId, manager)) {
+    throw new Error('Refusing to signal a process the manager DSH does not own.')
+  }
+  process.kill(tunnel.processId, 'SIGKILL')
+  await expect.poll(async () => (await readTunnelProcessRecords(pair.tunnelProcessLogPath)).length, { timeout: 30_000 }).toBeGreaterThan(records.length)
+})
+
+Then('the remote question is back in the controlling chat after reconnecting', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-question-reconnected', async () => {
+    await expect(remoteQuestionCard(page).getByRole('radio', { name: 'Production', exact: true })).toBeVisible({ timeout: 45_000 })
+  })
+})
+
+const UNOPENED_QUESTION = 'Which region should the unopened thread use?'
+const UNOPENED_TITLE = 'Unopened question fixture'
+
+When('another remote thread that is not open here asks a question', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+  const call = await hostApi(pairFor(page).manager)
+  const directive = `[[title ${UNOPENED_TITLE}]] [[once call ask_user_question ${JSON.stringify({
+    questions: [{ id: 'region', header: 'Region', question: UNOPENED_QUESTION, options: [{ label: 'Paris' }, { label: 'Tokyo' }] }],
+  })}]]`
+  const started = Schema.decodeUnknownSync(withUnknownProperties({ ok: Schema.Boolean, message: Schema.optional(Schema.String) }))(
+    await call('threadStart', { runtimeId: observation.runtimeId, cwd: observation.folderPath, text: directive, model: { provider: 'commandcode_work', model: 'gpt-6-luna' } }),
+  )
+  expect(started.ok, started.message).toBe(true)
+})
+
+Then('the unopened thread reports it is waiting and its question opens with it', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-unopened-thread-waiting', async () => {
+    await page.getByRole('tab', { name: 'Threads', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Needs you (1)', exact: true })).toBeVisible({ timeout: 45_000 })
+    await page.getByRole('button', { name: new RegExp(UNOPENED_TITLE, 'u') }).first().click()
+    const card = page.locator('[data-question-key]').filter({ hasText: UNOPENED_QUESTION })
+    await expect(card).toBeVisible({ timeout: 30_000 })
+    await card.getByRole('radio', { name: 'Tokyo', exact: true }).click()
+    await card.getByRole('button', { name: 'Submit', exact: true }).click()
+    const fake = fakeCommandCodeFor(page)
+    await expect.poll(() => fake.requests.flatMap(request => request.messages).some(message => message.text.includes('Tokyo') && message.text.includes('region')), { timeout: 30_000 }).toBe(true)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the remote question is dismissed here', async ({ page }: { readonly page: Page }) => {
+  await remoteQuestionCard(page).getByRole('button', { name: 'Dismiss all questions', exact: true }).click()
+})
+
+Then('the remote agent learns the question was dismissed', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-question-dismissed', async () => {
+    const fake = fakeCommandCodeFor(page)
+    await expect
+      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.role === 'tool' && /cancel/iu.test(message.text)), { timeout: 30_000 })
+      .toBe(true)
+    await expect(remoteQuestionCard(page).getByRole('button', { name: 'Submit', exact: true })).toHaveCount(0, { timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+const runScratchJj = (cwd: string, ...args: readonly string[]): string => {
+  const result = spawnSync('jj', ['--config', 'user.name=Scratch', '--config', 'user.email=scratch@example.invalid', ...args], {
+    cwd,
+    encoding: 'utf8',
+    timeout: 15_000,
+  })
+  if (result.error !== undefined || result.status !== 0) throw new Error(`jj ${args.join(' ')} failed: ${result.error?.message ?? result.stderr.trim()}`)
+  return result.stdout
+}
+
+const remoteForks = new WeakMap<Page, string>()
+const remoteJjJourneys = new WeakMap<Page, { readonly repository: string; readonly threadPath: string; readonly sessionId: string; readonly description: string }>()
+const jjCallResultSchema = Schema.Struct({
+  ok: Schema.Boolean,
+  code: Schema.optional(Schema.String),
+  value: Schema.optional(Schema.Unknown),
+  message: Schema.optional(Schema.String),
+})
+
+When('a thread on the remote has described work in its own JJ workspace', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const call = await hostApi(pair.manager)
+  const runtimeId = Schema.decodeUnknownSync(withUnknownProperties({ runtimes: Schema.Array(Schema.Struct({ id: Schema.String })) }))(
+    await call('list'),
+  ).runtimes[0]?.id
+  if (runtimeId === undefined) throw new Error('The scratch remote is not registered.')
+  const repository = join(pair.remote.homeRoot, `jj-${randomUUID()}`)
+  await mkdir(repository, { recursive: true })
+  runScratchJj(repository, 'git', 'init', '--colocate')
+  await writeFile(join(repository, 'README.md'), 'scratch\n')
+  runScratchJj(repository, 'describe', '-m', 'Initial scratch revision')
+  runScratchJj(repository, 'bookmark', 'create', 'main', '-r', '@')
+  runScratchJj(repository, 'new')
+  const opened = Schema.decodeUnknownSync(withUnknownProperties({ ok: Schema.Literal(true), workspaceId: Schema.String }))(
+    await call('runtimeOpenFolder', { runtimeId, path: repository }),
+  )
+  const provisioned = Schema.decodeUnknownSync(
+    withUnknownProperties({ ok: Schema.Literal(true), value: withUnknownProperties({ workspaceId: Schema.String }) }),
+  )(await call('runtimePluginCall', { runtimeId, method: 'provision', input: { workspaceId: opened.workspaceId, isolate: true } }))
+  // The status read answers from its cache while it refreshes, so the new workspace appears on a later read.
+  let threadPath: string | undefined
+  await expect
+    .poll(
+      async () => {
+        const status = Schema.decodeUnknownSync(withUnknownProperties({ workspaces: Schema.optional(Schema.Array(withUnknownProperties({ workspaceId: Schema.String, path: Schema.String }))) }))(
+          await call('runtimeStatus', { runtimeId }),
+        )
+        threadPath = status.workspaces?.find(workspace => workspace.workspaceId === provisioned.value.workspaceId)?.path
+        return threadPath
+      },
+      { timeout: 30_000 },
+    )
+    .toBeDefined()
+  if (threadPath === undefined) throw new Error('The remote did not report its thread workspace.')
+  const created = Schema.decodeUnknownSync(withUnknownProperties({ ok: Schema.Literal(true), sessionId: Schema.String }))(
+    await call('threadStart', {
+      runtimeId,
+      cwd: threadPath,
+      text: '[[title Remote JJ fixture]] [[answer Ready.]]',
+      model: { provider: 'commandcode_work', model: 'gpt-6-luna' },
+    }),
+  )
+  const description = `Remote work landed from this client ${randomUUID()}`
+  await writeFile(join(threadPath, 'landed.txt'), 'landed\n')
+  runScratchJj(threadPath, 'describe', '-m', description)
+  remoteJjJourneys.set(page, { repository, threadPath, sessionId: created.sessionId, description })
+})
+
+Then('this client reads that workspace from its owner and refuses any other path', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  const call = await hostApi(pairFor(page).manager)
+  await recordAssertion(page, 'multi-host-remote-jj-read', async () => {
+    const read = Schema.decodeUnknownSync(jjCallResultSchema)(
+      await call('sessionJjCall', { sessionId: journey.sessionId, method: 'threadAt', input: { path: journey.threadPath, sessionId: journey.sessionId } }),
+    )
+    expect(read.ok, read.message).toBe(true)
+    expect(JSON.stringify(read.value)).toContain(journey.description)
+    const refused = Schema.decodeUnknownSync(jjCallResultSchema)(
+      await call('sessionJjCall', { sessionId: journey.sessionId, method: 'threadAt', input: { path: journey.repository } }),
+    )
+    expect(refused).toMatchObject({ ok: false, code: 'session/path-mismatch' })
+  })
+})
+
+When('a revision of that thread is described through the owner', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  const call = await hostApi(pairFor(page).manager)
+  const repositoryCall = async (method: string, input: Record<string, Schema.Json>) =>
+    Schema.decodeUnknownSync(jjCallResultSchema)(await call('sessionRepositoryCall', { sessionId: journey.sessionId, api: 'jujutsu', method, input }))
+  const refused = await repositoryCall('registerRepository', { path: journey.repository })
+  expect(refused).toMatchObject({ ok: false, code: 'session/path-mismatch' })
+  const registered = await repositoryCall('registerRepository', { path: journey.threadPath })
+  expect(registered.ok, registered.message).toBe(true)
+  const { repoId } = Schema.decodeUnknownSync(withUnknownProperties({ repoId: Schema.String }))(registered.value)
+  const commitId = runScratchJj(journey.threadPath, 'log', '--no-graph', '-r', '@', '-T', 'commit_id').trim()
+  const description = `${journey.description} described here`
+  const prepared = await repositoryCall('prepare', { repoId, action: { kind: 'describe', commitId, message: description } })
+  expect(prepared.ok, prepared.message).toBe(true)
+  const preview = Schema.decodeUnknownSync(withUnknownProperties({ id: Schema.String }))(prepared.value)
+  const confirmed = await repositoryCall('confirm', { repoId, previewId: preview.id })
+  expect(confirmed.ok, confirmed.message).toBe(true)
+  remoteJjJourneys.set(page, { ...journey, description })
+})
+
+Then('the revision panel shows that thread from its owner', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await page.goto(new URL(`/?thread=${journey.sessionId}`, page.url()).href)
+  await expect(page.getByText('Ready.', { exact: true })).toBeVisible({ timeout: 45_000 })
+  await recordAssertion(page, 'multi-host-remote-jj-panel', async () => {
+    await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+    await page.getByRole('button', { name: /^Jujutsu/u }).first().click({ timeout: 15_000 })
+    await expect(page.getByText(journey.description).first()).toBeVisible({ timeout: 30_000 })
+  })
+})
+
+When('the thread is integrated from this client', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  const workspace = page.getByRole('button', { name: /^Current thread workspace: / })
+  await expect(workspace).toBeVisible({ timeout: 30_000 })
+  await workspace.click()
+  await page.getByRole('button', { name: 'Land this thread on main', exact: true }).click()
+})
+
+When('the thread is landed from the Land page', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  const row = page.locator('article, li').filter({ hasText: basename(journey.threadPath) }).first()
+  await expect(async () => {
+    await page.reload()
+    await page.getByRole('tab', { name: 'Land', exact: true }).click()
+    await page.getByRole('button', { name: /^Workspaces/u }).first().click()
+    await expect(row).toBeVisible({ timeout: 6_000 })
+  }).toPass({ timeout: 60_000 })
+  await row.getByRole('button', { name: 'Land', exact: true }).click()
+})
+
+Then('the work reached the remote main bookmark', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await recordAssertion(page, 'multi-host-remote-land-page', async () => {
+    await expect.poll(() => runScratchJj(journey.repository, 'log', '--no-graph', '-r', 'main', '-T', 'description'), { timeout: 30_000 }).toContain(journey.description)
+  })
+})
+
+Then('the workspace is removed from the Land page', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await recordAssertion(page, 'multi-host-remote-land-discard', async () => {
+    // A landed workspace leaves the default "Needs you" filter.
+    await page.getByRole('button', { name: 'All', exact: true }).first().click()
+    await page.getByRole('button', { name: `More actions for ${basename(journey.threadPath)}`, exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Remove workspace…', exact: true }).click()
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Remove workspace and folder', exact: true }).click()
+    await expect.poll(() => existsSync(journey.threadPath), { timeout: 30_000 }).toBe(false)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a turn is running on that thread', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await page.goto(new URL(`/?thread=${journey.sessionId}`, page.url()).href)
+  await expect(page.getByText('Ready.', { exact: true })).toBeVisible({ timeout: 45_000 })
+  const composer = remoteComposer(page)
+  await composer.fill('[[hold]]')
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+  // The Stop button lights before the owner starts the turn, and an idle owner would land at once rather than queue.
+  const fake = fakeCommandCodeFor(page)
+  await expect.poll(() => fake.requests.some(request => request.messages.some(message => message.text.includes('[[hold]]'))), { timeout: 30_000 }).toBe(true)
+})
+
+Then('landing is queued and undone from this client', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await recordAssertion(page, 'multi-host-remote-land-queue', async () => {
+    await page.getByRole('button', { name: /^Current thread workspace: / }).click()
+    await page.getByRole('button', { name: /^Queue/u }).first().click({ timeout: 30_000 })
+    await page.getByRole('button', { name: 'Cancel the queued landing on main', exact: true }).first().click({ timeout: 30_000 })
+    await expect(page.getByRole('button', { name: /^Queue/u }).first()).toBeVisible({ timeout: 30_000 })
+    expect(runScratchJj(journey.repository, 'log', '--no-graph', '-r', 'main', '-T', 'description')).not.toContain(journey.description)
+  })
+  fakeCommandCodeFor(page).releaseHeldTurns()
+  await finishJourneyAssertions(page)
+})
+
+When('the remote thread is forked', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await page.goto(new URL(`/?thread=${journey.sessionId}`, page.url()).href)
+  await expect(page.getByText('Ready.', { exact: true })).toBeVisible({ timeout: 45_000 })
+  const created = await page.evaluate(async sessionId => {
+    const response = await fetch('/api/session/fork', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method: 'session/fork', payload: { args: { request: { sessionId } } } }),
+    })
+    return await response.json()
+  }, journey.sessionId)
+  const fork = Schema.decodeUnknownSync(withUnknownProperties({ result: withUnknownProperties({ ok: Schema.Literal(true), value: withUnknownProperties({ sessionId: Schema.String }) }) }))(created)
+  remoteForks.set(page, fork.result.value.sessionId)
+})
+
+Then('the fork is a thread of the same host', async ({ page }: { readonly page: Page }) => {
+  const forkId = remoteForks.get(page)
+  if (forkId === undefined) throw new Error('The journey has no fork.')
+  await recordAssertion(page, 'multi-host-remote-fork', async () => {
+    const call = await hostApi(pairFor(page).manager)
+    const threads = Schema.decodeUnknownSync(remoteThreadListSchema)(await call('threadList')).threads
+    expect(threads.some(thread => thread.sessionId === forkId)).toBe(true)
+    expect(Schema.decodeUnknownSync(sessionRuntimeSchema)(await call('sessionRuntime', { sessionId: SessionId(forkId) }))).toMatchObject({ ok: true })
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the work is on the remote main bookmark', async ({ page }: { readonly page: Page }) => {
+  const journey = remoteJjJourneys.get(page)
+  if (journey === undefined) throw new Error('The remote JJ journey has no thread.')
+  await recordAssertion(page, 'multi-host-remote-jj-landed', async () => {
+    await expect.poll(() => runScratchJj(journey.repository, 'log', '--no-graph', '-r', 'main', '-T', 'description')).toContain(journey.description)
+  })
+  await finishJourneyAssertions(page)
+})
+
+const APPROVAL_MARKER = 'approved-on-the-owning-host'
+const remoteApproval = (page: Page) => page.locator('[data-remote-approval]')
+
+When('the remote agent asks to run a command with wider access', async ({ page }: { readonly page: Page }) => {
+  const directive = `[[title Remote approval fixture]] [[once call bash ${JSON.stringify({
+    command: `echo ${APPROVAL_MARKER}`,
+    description: 'Echo a marker',
+    sandbox_permissions: 'danger-full-access',
+    justification: 'The journey asks for wider access.',
+  })}]]`
+  await remoteComposer(page).fill(directive)
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+})
+
+Then('the remote approval opens in the controlling chat with its command', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-approval-panel', async () => {
+    await expect(remoteApproval(page)).toBeVisible({ timeout: 45_000 })
+    await expect(remoteApproval(page).getByText(`echo ${APPROVAL_MARKER}`, { exact: true })).toBeVisible()
+  })
+})
+
+When('the remote approval is allowed once here', async ({ page }: { readonly page: Page }) => {
+  await remoteApproval(page).getByRole('button', { name: 'Allow once', exact: true }).click()
+})
+
+Then('the remote command runs on its owning host', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-approval-applied', async () => {
+    await expect(remoteApproval(page)).toHaveCount(0, { timeout: 30_000 })
+    const fake = fakeCommandCodeFor(page)
+    await expect
+      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.role === 'tool' && message.text.includes(APPROVAL_MARKER)), {
+        timeout: 30_000,
+      })
+      .toBe(true)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a child agent on the remote asks for an approval', async ({ page }: { readonly page: Page }) => {
+  const child = `[[once call bash ${JSON.stringify({ command: `echo ${APPROVAL_MARKER}-child`, description: 'Echo', sandbox_permissions: 'danger-full-access', justification: 'child' })}]]`
+  // The directive ends at the first closing brace, so the child's own directive travels as JSON string escapes.
+  const escaped = JSON.stringify({ description: 'child work', prompt: child })
+    .replace(/^\{/u, 'OPEN')
+    .replace(/\}$/u, 'CLOSE')
+    .replaceAll('{', '\\u007b')
+    .replaceAll('}', '\\u007d')
+    .replaceAll('[', '\\u005b')
+    .replaceAll(']', '\\u005d')
+    .replace('OPEN', '{')
+    .replace('CLOSE', '}')
+  const directive = `[[title Child fixture]] [[once call subagent ${escaped}]]`
+  await remoteComposer(page).fill(directive)
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+})
+
+Then('the owner refuses the child agent without asking anyone', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-child-approval', async () => {
+    const fake = fakeCommandCodeFor(page)
+    await expect
+      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.role === 'tool' && message.text.includes('rejected escalating')), { timeout: 45_000 })
+      .toBe(true)
+    const call = await hostApi(pairFor(page).manager)
+    expect(Schema.decodeUnknownSync(withUnknownProperties({ interactions: Schema.Array(Schema.Unknown) }))(await call('sessionInteractions', {})).interactions).toEqual([])
+    await expect(remoteApproval(page)).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the remote approval is rejected here', async ({ page }: { readonly page: Page }) => {
+  await remoteApproval(page).getByRole('button', { name: 'Reject', exact: true }).click()
+})
+
+Then('the remote command does not run', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-approval-rejected', async () => {
+    await expect(remoteApproval(page)).toHaveCount(0, { timeout: 30_000 })
+    const fake = fakeCommandCodeFor(page)
+    await expect.poll(() => fake.requests.flatMap(request => request.messages).filter(message => message.role === 'tool').length, { timeout: 30_000 }).toBeGreaterThan(0)
+    const toolText = fake.requests.flatMap(request => request.messages).filter(message => message.role === 'tool').map(message => message.text).join('\n')
+    expect(toolText).not.toMatch(new RegExp(`^${APPROVAL_MARKER}$`, 'mu'))
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the approval panel fits a phone', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-approval-phone', async () => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    const panel = remoteApproval(page)
+    await expect(panel.getByRole('button', { name: 'Allow once', exact: true })).toBeInViewport({ timeout: 15_000 })
+    await expect(panel.getByRole('button', { name: 'Reject', exact: true })).toBeInViewport()
+    const overflow = await panel.evaluate(element => element.scrollWidth - element.clientWidth)
+    expect(overflow).toBeLessThanOrEqual(1)
+    await page.setViewportSize({ width: 1280, height: 800 })
+  })
+})
+
+Then('a host without the repository plugins says so', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+  const call = await hostApi(pairFor(page).manager)
+  await recordAssertion(page, 'multi-host-host-without-plugins', async () => {
+    const repositories = Schema.decodeUnknownSync(withUnknownProperties({ unreachable: Schema.Array(Schema.String) }))(await call('remoteRepositories', {}))
+    expect(repositories.unreachable).toEqual([])
+    const reply = Schema.decodeUnknownSync(jjCallResultSchema)(
+      await call('sessionRepositoryCall', { sessionId: observation.sessionId, api: 'jujutsu', method: 'registerRepository', input: { path: observation.folderPath } }),
+    )
+    expect(reply).toMatchObject({ ok: false, code: 'api-not-served', message: 'This host does not have the plugin for that. Update DSH there, or open the thread on its host.' })
+  })
+})
+
+When('a terminal is opened on the remote thread', async ({ page }: { readonly page: Page }) => {
+  await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+  await page.getByRole('button', { name: /^New terminal/u }).first().click({ timeout: 15_000 })
+})
+
+Then('the terminal is offered on its host', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-terminal', async () => {
+    const panel = page.locator('[data-remote-terminal]')
+    await expect(panel).toBeVisible({ timeout: 30_000 })
+    const observation = autoDestinationObservations.get(page)
+    if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+    const call = await hostApi(pairFor(page).manager)
+    const view = Schema.decodeUnknownSync(runtimeOpenViewSchema, { onExcessProperty: 'error' })(await call('runtimeOpenView', { runtimeId: observation.runtimeId }))
+    allowLoopbackBrowserOrigin(page, view.launchUrl)
+    const [hostPage] = await Promise.all([page.context().waitForEvent('page'), panel.getByRole('button', { name: 'Open terminal on host', exact: true }).click()])
+    await expect.poll(() => hostPage.url(), { timeout: 30_000 }).not.toBe('about:blank')
+    await expect(hostPage.getByRole('button', { name: 'New session', exact: true }).first()).toBeVisible({ timeout: 30_000 })
+    expect(new URL(hostPage.url()).origin).not.toBe(new URL(page.url()).origin)
+    await hostPage.close()
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('a message naming this machine is refused and keeps its draft', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-local-path-refused', async () => {
+    const draft = 'please read @~/notes-on-this-machine.md'
+    await remoteComposer(page).fill(draft)
+    await page.getByRole('button', { name: 'Send message', exact: true }).click()
+    await expect(page.getByText('points to this machine', { exact: false })).toBeVisible({ timeout: 15_000 })
+    await expect(remoteComposer(page)).toContainText('notes-on-this-machine')
+    await remoteComposer(page).clear()
+  })
 })
 
 When('the Hosts page is opened', async ({ page }: { readonly page: Page }) => {
@@ -845,7 +1364,7 @@ When('the SSH tunnel drops and reconnects', async ({ page }: { readonly page: Pa
   if (
     tunnelProcessRecord.marker !== 'persistent-forward' ||
     tunnelProcessDetails.commandName !== 'ssh' ||
-    tunnelProcessDetails.parentProcessId !== managerProcessId ||
+    !isChildOfGuardedHost(tunnelProcessDetails.parentProcessId, managerProcessId) ||
     !ownsProcessGroup(tunnelProcessDetails.processGroupId, { processId: tunnelProcessId, managerProcessId }) ||
     !isProcessRunning(tunnelProcessId)
   ) {
@@ -869,7 +1388,7 @@ When('the SSH tunnel drops and reconnects', async ({ page }: { readonly page: Pa
   if (
     recoveredTunnelProcessRecord.marker !== 'persistent-forward' ||
     recoveredTunnelProcessDetails.commandName !== 'ssh' ||
-    recoveredTunnelProcessDetails.parentProcessId !== managerProcessId ||
+    !isChildOfGuardedHost(recoveredTunnelProcessDetails.parentProcessId, managerProcessId) ||
     !ownsProcessGroup(recoveredTunnelProcessDetails.processGroupId, { processId: recoveredTunnelProcessRecord.processId, managerProcessId }) ||
     !isProcessRunning(recoveredTunnelProcessRecord.processId)
   ) {

@@ -1,9 +1,15 @@
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createSessionSourceRegistry, SessionSourcePayload, type MirroredSessionSource } from '@dshfiles/session-source-port'
+import {
+  createSessionSourceRegistry,
+  SessionPromptRefused,
+  SessionForkUnavailable,
+  SessionSourcePayload,
+  type MirroredSessionSource,
+} from '@dshfiles/session-source-port'
 import { MirroredSessions } from '../../src/mirrored-sessions.ts'
-import type { SessionFollowFrame, SessionSummary } from '../../src/native/types.ts'
+import type { SessionFollowFrame, SessionForkRequest, SessionRenameRequest, SessionSummary } from '../../src/native/types.ts'
 
 const contexts = new Set<Context>()
 
@@ -210,6 +216,49 @@ describe('mirrored sessions', () => {
     ).resolves.toMatchObject({ values: { modelSelection: { next: { model: 'reasoner' } } } })
   })
 
+  it("keeps the owner's own code when it refuses a fork", async () => {
+    const { mirrored, source } = await fixture()
+    mirrored.registry.register(
+      source({
+        rows: [summary('session-remote', 100)],
+        fork: async () => {
+          throw new SessionForkUnavailable({ sessionId: 'session-remote', reason: 'No completed turn yet.' })
+        },
+      }),
+    )
+    await mirrored.merge([], {}, new AbortController().signal)
+    await expect(
+      mirrored.fork({ sessionId: SessionId('session-remote') }, async () => {
+        throw new Error('local fallback must not run')
+      }),
+    ).rejects.toMatchObject({ code: 'session/fork-unavailable', message: 'No completed turn yet.' })
+  })
+
+  it('forks and renames on the owner, and keeps a local Session on this Host', async () => {
+    const { mirrored, source } = await fixture()
+    const forked: unknown[] = []
+    mirrored.registry.register(
+      source({
+        rows: [summary('session-remote', 100)],
+        fork: async (request: SessionForkRequest) => {
+          forked.push(request)
+          return { sessionId: SessionId('session-forked') }
+        },
+        rename: async (request: SessionRenameRequest) => ({ title: request.title, seq: 5 }),
+      }),
+    )
+    await mirrored.merge([], {}, new AbortController().signal)
+    const mustNotRun = async () => {
+      throw new Error('local fallback must not run')
+    }
+    await expect(mirrored.fork({ sessionId: SessionId('session-remote') }, mustNotRun)).resolves.toEqual({ sessionId: 'session-forked' })
+    expect(forked).toHaveLength(1)
+    await expect(mirrored.rename({ sessionId: SessionId('session-remote'), title: 'New' }, mustNotRun)).resolves.toEqual({ title: 'New', seq: 5 })
+    await expect(mirrored.fork({ sessionId: SessionId('session-local') }, async () => ({ sessionId: SessionId('session-here') }))).resolves.toEqual({
+      sessionId: 'session-here',
+    })
+  })
+
   it('refuses model selection for a mirrored Session whose source cannot select', async () => {
     const { mirrored, source } = await fixture()
     mirrored.registry.register(source({ rows: [summary('session-remote', 100)] }))
@@ -239,6 +288,26 @@ describe('mirrored sessions', () => {
         async () => ({ accepted: true }),
       ),
     ).rejects.toMatchObject({ code: 'gateway/internal', message: expect.stringContaining('tunnel closed') })
+  })
+
+  it('shows a source refusal as written, not as a runtime that did not answer', async () => {
+    const { mirrored, source } = await fixture()
+    mirrored.registry.register(
+      source({
+        rows: [summary('session-remote', 100)],
+        prompt: async () => {
+          throw new SessionPromptRefused({ reason: 'Attach the file to send it there.' })
+        },
+      }),
+    )
+    await mirrored.merge([], {}, new AbortController().signal)
+    await expect(
+      mirrored.prompt(
+        { requestId: 'request-1' as never, sessionId: SessionId('session-remote'), mode: 'queue', content: [{ type: 'text', text: 'hi' }] },
+        new AbortController().signal,
+        async () => ({ accepted: true }),
+      ),
+    ).rejects.toMatchObject({ code: 'gateway/bad-request', message: 'Attach the file to send it there.' })
   })
 
   it('creates an empty registry the Host can provide', () => {

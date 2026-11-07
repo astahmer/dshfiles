@@ -1,11 +1,21 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { createSessionSourceRegistry, type MirroredSessionSource, type SessionSourceRegistry } from '@dshfiles/session-source-port'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
+import {
+  createSessionSourceRegistry,
+  isSessionPromptRefused,
+  isSessionForkUnavailable,
+  type MirroredSessionSource,
+  type SessionSourceRegistry,
+} from '@dshfiles/session-source-port'
 import type {
   SessionAddress,
   SessionCancelRequest,
   SessionCancelValue,
+  SessionForkRequest,
+  SessionForkValue,
+  SessionRenameRequest,
+  SessionRenameValue,
   SessionSelectModelRequest,
   SessionSelectModelValue,
   SessionFollowFrame,
@@ -78,6 +88,9 @@ export class MirroredSessions {
   /** Wrap a source failure so the browser gets a stable code instead of a transport error. */
   static failure(endpoint: string, error: unknown): RemoteError {
     if (error instanceof RemoteError) return error
+    // The source answered: its refusal is written for the composer, so it does not read as a runtime that went away.
+    if (isSessionPromptRefused(error)) return new RemoteError('gateway/bad-request', error.message, {})
+    if (isSessionForkUnavailable(error)) return new RemoteError('session/fork-unavailable', error.reason, { sessionId: SessionId(error.sessionId) })
     return new RemoteError('gateway/internal', `The runtime that owns this Session did not answer ${endpoint}: ${messageOf(error)}`, {}, { cause: error })
   }
 
@@ -276,6 +289,42 @@ export class MirroredSessions {
       return await source.selectModel(request)
     } catch (error) {
       throw MirroredSessions.failure('session/selectModel', error)
+    }
+  }
+
+  /**
+   * Fork a mirrored Session on the runtime that owns it: its log lives there, so this Host cannot.
+   * @param request - the Session and the event to fork at.
+   * @param local - the Host's own fork.
+   * @returns the new Session.
+   */
+  async fork(request: SessionForkRequest, local: (request: SessionForkRequest) => Promise<SessionForkValue>): Promise<SessionForkValue> {
+    const source = await this.resolve(request.sessionId)
+    if (source === undefined) return local(request)
+    if (source.fork === undefined)
+      throw new RemoteError('gateway/bad-request', 'This host cannot fork that Session. Update DSH there, or open the thread on its host.', {})
+    try {
+      return await source.fork(request)
+    } catch (error) {
+      throw MirroredSessions.failure('session/fork', error)
+    }
+  }
+
+  /**
+   * Rename a mirrored Session on the runtime that owns it.
+   * @param request - the Session and its new title.
+   * @param local - the Host's own rename.
+   * @returns the committed title.
+   */
+  async rename(request: SessionRenameRequest, local: (request: SessionRenameRequest) => Promise<SessionRenameValue>): Promise<SessionRenameValue> {
+    const source = await this.resolve(request.sessionId)
+    if (source === undefined) return local(request)
+    if (source.rename === undefined)
+      throw new RemoteError('gateway/bad-request', 'This host cannot rename that Session. Update DSH there, or open the thread on its host.', {})
+    try {
+      return await source.rename(request)
+    } catch (error) {
+      throw MirroredSessions.failure('session/rename', error)
     }
   }
 }

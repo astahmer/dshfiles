@@ -36,6 +36,17 @@ describe('session source registry', () => {
     expect(registry.ownerOf(id('session-a'))).toBeUndefined()
   })
 
+  test('hands a published projection value to its listener until it leaves', () => {
+    const registry = createSessionSourceRegistry()
+    const received: unknown[] = []
+    const stop = registry.onProjection(update => received.push(update))
+    const update = { sessionId: id('session-a'), key: 'userQuestions', value: { active: [] }, seq: 3 }
+    registry.publishProjection(update)
+    stop()
+    registry.publishProjection(update)
+    expect(received).toEqual([update])
+  })
+
   test('resolveOwner asks each source only when nothing is claimed', async () => {
     const registry = createSessionSourceRegistry()
     const asked: string[] = []

@@ -39,6 +39,145 @@ Feature: Multi-host loopback SSH lifecycle
     Then the new thread is owned by the automatically selected remote runtime
     And the picked file is stored by the owning remote host only
 
+  @scenario:multi-host.local-path-refused
+  @scenario:multi-host.remote-question
+  Scenario: A remote agent's question is answered in the controlling chat
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    Then a message naming this machine is refused and keeps its draft
+    When the remote agent asks a question
+    Then the remote question opens in the controlling chat
+    When the remote question is answered "Production" here
+    Then the remote agent receives the answer "Production"
+
+  @scenario:multi-host.remote-unopened-waiting
+  Scenario: A remote thread that is not open here reports what it waits on
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the native composer sends a prompt to the remote Session
+    And another remote thread that is not open here asks a question
+    Then the unopened thread reports it is waiting and its question opens with it
+
+  @scenario:multi-host.remote-question-reconnect
+  Scenario: A waiting remote question survives a dropped tunnel
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the remote agent asks a question
+    Then the remote question opens in the controlling chat
+    When the connection to the remote drops while the question waits
+    Then the remote question is back in the controlling chat after reconnecting
+    When the remote question is answered "Production" here
+    Then the remote agent receives the answer "Production"
+
+  @scenario:multi-host.remote-question-dismissed
+  Scenario: A remote agent's question is dismissed in the controlling chat
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the remote agent asks a question
+    Then the remote question opens in the controlling chat
+    When the remote question is dismissed here
+    Then the remote agent learns the question was dismissed
+
+  @scenario:multi-host.remote-question-timed
+  Scenario: A remote agent's timed question counts down here and accepts a late answer
+    Given a loopback SSH DSH pair with timed questions is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the remote agent asks a timed question lasting 12 seconds
+    Then the remote question opens in the controlling chat
+    And the remote question counts down with what its owner reports
+    And the remote question stays answerable after its wait ends
+    When the remote question is answered "Production" here
+    Then the remote agent receives the answer "Production"
+
+  @scenario:multi-host.remote-terminal-handoff
+  Scenario: A terminal on a remote thread opens on its host
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the native composer sends a prompt to the remote Session
+    And a terminal is opened on the remote thread
+    Then the terminal is offered on its host
+
+  @scenario:multi-host.remote-child-approval
+  Scenario: A remote child agent cannot widen its access through this client
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And a child agent on the remote asks for an approval
+    Then the owner refuses the child agent without asking anyone
+
+  @scenario:multi-host.remote-approval-rejected
+  Scenario: A remote tool call is rejected in the controlling chat
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    Then a host without the repository plugins says so
+    When the remote agent asks to run a command with wider access
+    Then the remote approval opens in the controlling chat with its command
+    And the approval panel fits a phone
+    When the remote approval is rejected here
+    Then the remote command does not run
+
+  @scenario:multi-host.remote-approval
+  Scenario: A remote tool call is approved in the controlling chat
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the remote agent asks to run a command with wider access
+    Then the remote approval opens in the controlling chat with its command
+    When the remote approval is allowed once here
+    Then the remote command runs on its owning host
+
+  @scenario:multi-host.remote-jj
+  Scenario: A remote thread's JJ workspace is read and integrated on its owner
+    Given a loopback SSH DSH pair with JJ on the remote is booted
+    When the scratch remote is added from the host UI
+    And a thread on the remote has described work in its own JJ workspace
+    Then this client reads that workspace from its owner and refuses any other path
+    When a revision of that thread is described through the owner
+    Then the revision panel shows that thread from its owner
+    When the thread is integrated from this client
+    Then the work is on the remote main bookmark
+
+  @scenario:multi-host.remote-land-queue
+  Scenario: Landing a busy remote thread is queued and undone here
+    Given a loopback SSH DSH pair with JJ on the remote is booted
+    When the scratch remote is added from the host UI
+    And a thread on the remote has described work in its own JJ workspace
+    And a turn is running on that thread
+    Then landing is queued and undone from this client
+
+  @scenario:multi-host.remote-fork
+  Scenario: A remote thread forks on its host
+    Given a loopback SSH DSH pair with JJ on the remote is booted
+    When the scratch remote is added from the host UI
+    And a thread on the remote has described work in its own JJ workspace
+    And the remote thread is forked
+    Then the fork is a thread of the same host
+
+  @scenario:multi-host.remote-land-page
+  Scenario: A remote thread is landed and removed from the Land page
+    Given a loopback SSH DSH pair with JJ on the remote is booted
+    When the scratch remote is added from the host UI
+    And a thread on the remote has described work in its own JJ workspace
+    And the thread is landed from the Land page
+    Then the work reached the remote main bookmark
+    And the workspace is removed from the Land page
+
   @scenario:multi-host.host-resources
   Scenario: The Hosts page shows live SSH resource pressure
     Given a loopback SSH DSH pair is booted

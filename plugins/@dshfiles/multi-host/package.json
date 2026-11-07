@@ -20,6 +20,10 @@
       "types": "./src/api.ts",
       "default": "./dist/api.js"
     },
+    "./interaction-feed": {
+      "types": "./src/interaction-feed.ts",
+      "default": "./dist/interaction-feed.js"
+    },
     "./destination": {
       "types": "./src/destination/index.ts",
       "default": "./src/destination/index.ts"
@@ -51,7 +55,9 @@
     "@deepseek-ai/dsh-client-ui-conversation": "catalog:",
     "@deepseek-ai/dsh-client-ui-layout": "catalog:",
     "@deepseek-ai/dsh-client-ui-primitives": "catalog:",
+    "@deepseek-ai/dsh-client-ui-session": "catalog:",
     "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/dsh-cordis-host-runner": "catalog:",
     "@deepseek-ai/dsh-host-webserver": "catalog:",
@@ -106,6 +112,7 @@
         "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-primitives",
         "@deepseek-ai/dsh-client-ui-workspace",

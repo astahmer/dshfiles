@@ -70,6 +70,15 @@ Inbox several awaits before the admitted `user/message` settles the `userQuestio
 projection still offers the call as answerable, and the native reconcile took the seat again with the form just
 answered.
 
+## Questions from another machine
+
+A mirrored thread's question lives on the runtime that owns it. `src/remote-questions.ts` keeps the cards equal to what
+`@dshfiles/multi-host` holds, using the same `PendingQuestion`: its channel sends the answer to the owner, so a refusal
+stays a failed attempt on the card, and leaving the seat hands nothing on because the owner keeps the request. That is
+why `QuestionWaterfallChannel.resolve` may return a promise, the one change to the card itself. A `continued` question
+routes through the same Host API, resolved per Session, since this Host's own answer path cannot reach another
+machine's Agent. Without multi-host every Session is local and nothing changes.
+
 ## Verification
 
 The delta's regression tests live upstream, in `packages/client/ui-user-questions/tests/browser-plugin.client.spec.ts`

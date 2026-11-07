@@ -446,7 +446,8 @@
         "Auto skips hidden, stale, unsupported, or unreachable hosts and leaves the current destination unchanged when none is eligible.",
         "A capability or version mismatch disables incompatible actions.",
         "A file-reference request for an unowned Session or wrong runtime is refused before the remote filesystem is queried.",
-        "An unknown mutation result after a lost reply is inspected and never automatically replayed."
+        "An unknown mutation result after a lost reply is inspected and never automatically replayed.",
+        "An @ mention under this Host's home, or an upload staged for another thread, is refused with a recovery message before it reaches the owning runtime; the composer keeps the draft."
       ],
       "externalDependencies": [
         {
@@ -483,6 +484,18 @@
           "id": "multi-host.native-rpc-outcome",
           "file": "plugins/@dshfiles/multi-host/tests/native-rpc-outcome.test.ts",
           "testName": "reports an admitted create as unknown after its reply is lost and reconciles without replay"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.local-path-refusal",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-sessions.test.ts",
+          "testName": "refuses a mention under this machine home before it reaches the runtime"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.foreign-upload-refusal",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-sessions.test.ts",
+          "testName": "refuses an upload staged for another thread before it reaches the runtime"
         }
       ],
       "telemetry": [
@@ -635,7 +648,7 @@
     {
       "id": "remote-host-fallback",
       "title": "Open a mirrored thread on its host",
-      "summary": "The mirrored-thread header resolves its remote owner and opens that runtime's DSH home for native questions, approvals, terminals, and JJ tools. The remote DSH does not consume a Session deep link, so the user locates the thread there.",
+      "summary": "The mirrored-thread header resolves its remote owner and opens that runtime's own DSH on the same thread, for what the mirror does not reach.",
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "threads",
@@ -670,6 +683,194 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "remote-interactions",
+      "title": "Answer a remote agent's questions and approvals in this client",
+      "summary": "While a mirrored thread is followed, this Host opens the owning runtime's forwarded-event stream as an owner client, holds what the runtime waits on, and shows it in the native question card or an approval panel in the same seat. Answers go back to that runtime, which stays the authority; the first answer from any client wins and nothing is delegated away from the owner's own UI.",
+      "surfaces": ["client", "host", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "conversation composer seat of a mirrored thread",
+      "configuration": [],
+      "states": ["held", "claiming", "counting-down", "answered", "continued", "owner-withdrew", "stream-reconnecting"],
+      "failureModes": [
+        "A request the owner withdrew is refused here with a message to check the thread, and the card closes.",
+        "An answer the owner refuses stays a failed attempt on the card, and the request stays held.",
+        "A connection lost after an answer was sent reports an unknown outcome and is never retried automatically.",
+        "A runtime that refuses the wait claim keeps its own timer and the card shows no countdown.",
+        "A dropped event stream forgets what it held; the owner delivers it again on the next stream."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "click button \"Sidebar settings\"",
+        "click checkbox \"Show remote threads in a separate group\"",
+        "click button \"Remote threads started from this DSH\"",
+        "expect heading \"Remote threads\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-question",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-question-timed",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-question-dismissed",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-question-reconnect",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-unopened-waiting",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-approval",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-approval-rejected",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-child-approval",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.local-path-refused",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.interaction-hold-and-answer",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-interactions.test.ts",
+          "testName": "holds a question and an approval the owner delivered, and answers each on that client"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "multi-host remote interaction settle",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-interactions.test.ts",
+          "testName": "records one span per answer, naming no question text"
+        }
+      ]
+    },
+    {
+      "id": "remote-thread-jj",
+      "title": "Work a remote thread's repository from this client",
+      "summary": "The thread workspace control, the integrate offer, the JJ side panel and the composer's changes bar of a mirrored thread read from the runtime that owns it, and land, queue, undo and prepared jujutsu actions run there. Each call is authorized for that Session and limited to its own folder or a repository id the owner issued for that folder.",
+      "surfaces": ["client", "host", "integration"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-header: Current thread workspace",
+      "configuration": [],
+      "states": ["local-session", "remote-owner-resolved", "landed", "queued", "owner-refused", "path-refused"],
+      "failureModes": [
+        "A path outside the thread's folder, or another thread's id, is refused before it reaches the runtime, naming the Host UI as the way to work elsewhere.",
+        "A connection lost after a mutation was sent reports an unknown outcome and is never replayed.",
+        "A reply outside the JJ contract is refused rather than shown."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "click button \"Sidebar settings\"",
+        "click checkbox \"Show remote threads in a separate group\"",
+        "click button \"Remote threads started from this DSH\"",
+        "expect heading \"Remote threads\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-jj",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-land-page",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-land-queue",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-fork",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.jj-path-scope",
+          "file": "plugins/@dshfiles/multi-host/src/remote-jj-scope.test.ts",
+          "testName": "reaches the thread folder, with or without naming the thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.repository-scope",
+          "file": "plugins/@dshfiles/multi-host/src/remote-jj-scope.test.ts",
+          "testName": "reaches the thread folder and the repository it resolves to"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "remote-terminal-handoff",
+      "title": "Open a remote thread's terminal on its host",
+      "summary": "A terminal tab on a mirrored thread replaces the native body, which has no agent to run against here, with a button that opens that thread in the host's own DSH. Every route into a terminal lands on it: the start page, the shortcut and a restored tab.",
+      "surfaces": ["client"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "right sidebar: Terminal tab of a mirrored thread",
+      "configuration": [],
+      "states": ["resolving-owner", "offered", "opening", "popup-blocked", "host-unreachable"],
+      "failureModes": [
+        "A blocked pop-up says to allow pop-ups for this page, and the button stays.",
+        "A host that cannot be reached says to check the Hosts page, and the button stays."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "click button \"Sidebar settings\"",
+        "click checkbox \"Show remote threads in a separate group\"",
+        "click button \"Remote threads started from this DSH\"",
+        "expect heading \"Remote threads\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-terminal-handoff",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: it reads the owner and opens the host through Host APIs that record their own spans."
         }
       ]
     }

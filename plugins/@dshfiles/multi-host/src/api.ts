@@ -2,7 +2,7 @@ import type { FileUploadValue } from '@deepseek-ai/dsh-client-file-upload/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
-import { defineApi, method as defineMethod, zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import { defineApi, event, method as defineMethod, zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
 import { nativeRpcRequestSchema } from '@dshfiles/dshx/platform/native-rpc'
 import type { NativeRpcRequest as DshxNativeRpcRequest } from '@dshfiles/dshx/platform/native-rpc'
@@ -226,6 +226,35 @@ const remoteThreadSchema = Schema.Struct({
 })
 /** jj-integration methods a manager may call on a remote runtime; the folder and bookmark pickers need these. */
 const remotePluginMethodSchema = Schema.Literals(['projects', 'classifyWorkspaces', 'destination', 'provision', 'noFolder'])
+/** The JJ thread actions a mirrored thread reaches on its owner; each one names that thread's own folder. */
+const sessionJjMethodSchema = Schema.Literals(['threadAt', 'integrationProgress', 'land', 'queueLand', 'cancelQueuedLand', 'discard'])
+/** The repository reads and actions a mirrored thread reaches on its owner, by the API that serves them there. */
+export const sessionRepositoryReads = {
+  jujutsu: [
+    'registerRepository',
+    'load',
+    'graphPage',
+    'workspaces',
+    'graphNavigation',
+    'revisionRelationship',
+    'graphSlice',
+    'referenceGraph',
+    'referenceTitles',
+    'details',
+    'revisionFiles',
+    'editTimes',
+    'workingDiff',
+    'prepare',
+  ],
+  'jujutsu-composer': ['context', 'diff'],
+} as const
+/** These change the repository, so a reply lost after sending is never treated as safe to repeat. */
+export const sessionRepositoryWrites = ['openRepository', 'confirm'] as const
+const sessionRepositoryMethodSchema = Schema.Literals([
+  ...sessionRepositoryReads.jujutsu,
+  ...sessionRepositoryReads['jujutsu-composer'],
+  ...sessionRepositoryWrites,
+])
 /**
  * Read-only plugin methods another plugin of this Host may call on a remote runtime, as `<api id>/<method>`. Only these
  * pass: a peer can read what it replicates and nothing else, and no call here writes on the remote runtime.
@@ -541,6 +570,64 @@ const checkoutSyncPlanSchema = Schema.Struct({
   commands: Schema.Array(Schema.String),
 })
 
+const remoteQuestionOptionSchema = Schema.Struct({ label: Schema.String, description: Schema.optional(Schema.String) }).pipe(SchemaFields.passthrough)
+const remoteQuestionItemSchema = Schema.Struct({
+  id: Schema.String,
+  question: Schema.String,
+  detail: Schema.optional(Schema.String),
+  header: Schema.optional(Schema.String),
+  options: Schema.optional(Schema.Array(remoteQuestionOptionSchema)),
+  multiSelect: Schema.optional(Schema.Boolean),
+  intent: Schema.optional(
+    Schema.Struct({ kind: Schema.String, approve: Schema.String, callId: Schema.optional(Schema.String) }).pipe(SchemaFields.passthrough),
+  ),
+}).pipe(SchemaFields.passthrough)
+
+/** The `user-questions/request` waterfall as the owning runtime forwards it. */
+export const remoteQuestionWireSchema = Schema.Struct({
+  questions: Schema.Array(remoteQuestionItemSchema),
+  wait: Schema.optional(Schema.Struct({ callId: Schema.optional(Schema.String), timed: Schema.optional(Schema.Boolean) }).pipe(SchemaFields.passthrough)),
+}).pipe(SchemaFields.passthrough)
+
+const remoteApprovalFields = {
+  toolName: Schema.String,
+  callId: Schema.optional(Schema.String),
+  reason: Schema.optional(Schema.String),
+  displayReason: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+}
+
+/** The `approval/request` waterfall as the owning runtime forwards it. */
+export const remoteApprovalWireSchema = Schema.Struct(remoteApprovalFields).pipe(SchemaFields.passthrough)
+
+/** One request the owning runtime holds open for a human, as this Host's clients see it. */
+const remoteInteractionSchema = Schema.Struct({
+  id: Schema.String,
+  runtimeId: Schema.String,
+  sessionId: Schema.String,
+  request: Schema.Union([
+    Schema.Struct({
+      kind: Schema.Literal('question'),
+      questions: Schema.Array(remoteQuestionItemSchema),
+      callId: Schema.optional(Schema.String),
+      /** How long the owner's foreground wait still has; absent for a blocking question or a runtime that refused the claim. */
+      remainingMs: Schema.optional(Schema.Number),
+    }),
+    Schema.Struct({ kind: Schema.Literal('approval'), ...remoteApprovalFields }),
+  ]),
+})
+
+const remoteQuestionAnswerSchema = Schema.Struct({
+  answers: Schema.Array(
+    Schema.Struct({
+      id: Schema.String.check(Schema.isMaxLength(256)),
+      selected: Schema.Array(Schema.String.check(Schema.isMaxLength(4096))).check(Schema.isMaxLength(64)),
+      custom: Schema.optional(Schema.String.check(Schema.isMaxLength(100_000))),
+    }),
+  ).check(Schema.isMaxLength(64)),
+})
+
+const interactionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))
+
 const effectMultiHostApi = defineApi({
   id: 'multi-host',
   version: 1,
@@ -789,11 +876,80 @@ const effectMultiHostApi = defineApi({
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), runtimeId: Schema.NullOr(idSchema) }), failedSchema]),
       description: 'Return the known runtime for a Session already claimed by a source, or null when no runtime is known.',
     }),
+    sessionInteractions: method({
+      input: Schema.Struct({ sessionId: Schema.optional(sessionIdSchema) }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), interactions: Schema.Array(remoteInteractionSchema) }), failedSchema]),
+      description:
+        'Questions and approvals remote threads are waiting on right now, read from the runtimes this Host is following. A thread that is not open here may hold more on its own host. Read-only.',
+      tool: { name: 'multi_host_session_interactions', readOnly: true, render: compactJson },
+    }),
+    sessionQuestionAnswer: method({
+      input: Schema.Struct({
+        sessionId: sessionIdSchema,
+        /** A question the agent is still waiting on, by the id `sessionInteractions` lists. */
+        interactionId: Schema.optional(interactionIdSchema),
+        /** A question that outlived its wait, by the tool call of its projection row. */
+        callId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))),
+        answer: remoteQuestionAnswerSchema,
+      }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), accepted: Schema.Boolean }), failedSchema]),
+      description:
+        'Answer one question on a remote thread with one answer per question, on the runtime that owns the thread. Call only when the user asked you to give that answer; never choose one yourself.',
+      tool: { name: 'multi_host_answer_question', render: compactJson },
+    }),
+    sessionQuestionDecline: method({
+      input: Schema.Struct({ sessionId: sessionIdSchema, interactionId: interactionIdSchema, reason: Schema.Literals(['cancelled', 'timed-out']) }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true) }), failedSchema]),
+      description:
+        'End one waiting question on a remote thread without answering it. Not an agent tool: the card calls it when the person cancels or the countdown ends.',
+    }),
+    /** Deliberately no agent tool: an approval is the human's decision (plans/dsh-host-gaps.md row 41). */
+    sessionApprovalDecide: method({
+      input: Schema.Struct({ sessionId: sessionIdSchema, interactionId: interactionIdSchema, outcome: Schema.Literals(['allowed-once', 'rejected']) }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true) }), failedSchema]),
+      description: 'Send one human approval decision to the runtime that owns the thread. Not an agent tool: only the approval panel calls it.',
+    }),
     sessionJjRepositories: method({
       input: Schema.Struct({ sessionId: sessionIdSchema }),
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), repositories: jjRepositoriesEffectSchema }), failedSchema]),
       description: 'Read JJ repository and thread-workspace status from the runtime that owns this mirrored Session. Read-only.',
       tool: { name: 'multi_host_session_jj_repositories', readOnly: true, render: compactJson },
+    }),
+    sessionJjCall: method({
+      input: Schema.Struct({ sessionId: sessionIdSchema, method: sessionJjMethodSchema, input: jsonValueSchema }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }), failedSchema]),
+      description:
+        "Run one JJ thread action in a remote thread's own folder, on the runtime that owns the thread: threadAt and integrationProgress read it; land, queueLand, cancelQueuedLand and discard change it (discard needs an explicit force, and force: true abandons unlanded work). Call only when the user asked for that action.",
+      tool: { name: 'multi_host_session_jj', render: compactJson },
+    }),
+    remoteRepositories: method({
+      input: Schema.Struct({}),
+      output: Schema.Struct({
+        hosts: Schema.Array(
+          Schema.Struct({
+            runtimeId: Schema.String,
+            hostName: Schema.String,
+            refreshing: Schema.Boolean,
+            repositories: jjRepositoriesEffectSchema.fields.repositories,
+          }),
+        ),
+        unreachable: Schema.Array(Schema.String),
+      }),
+      description:
+        'The thread workspaces of every visible remote host, limited to threads recorded on this DSH, plus the hosts that did not answer. Read-only.',
+      tool: { name: 'multi_host_land_repositories', readOnly: true, render: compactJson },
+    }),
+    sessionRepositoryCall: method({
+      input: Schema.Struct({
+        sessionId: sessionIdSchema,
+        api: Schema.Literals(['jujutsu', 'jujutsu-composer']),
+        method: sessionRepositoryMethodSchema,
+        input: jsonValueSchema,
+      }),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }), failedSchema]),
+      description:
+        "Read or change a remote thread's own repository on the runtime that owns it: revision graph, details, diffs and composer context, or a prepared jujutsu action. The call must name the thread's folder or the repository id it resolves to. Reads are safe. confirm and openRepository change the repository: Call only when the user asked for that action.",
+      tool: { name: 'multi_host_session_repository', render: compactJson },
     }),
     runtimeFileReferences: method({
       input: Schema.Struct({ runtimeId: idSchema, sessionId: sessionIdSchema, query: Schema.String.check(Schema.isMaxLength(4096)) }),
@@ -1096,6 +1252,12 @@ const effectMultiHostApi = defineApi({
       tool: { name: 'multi_host_remove_runtime', render: compactJson },
     }),
   },
+  events: {
+    interactionsChanged: event({
+      schema: Schema.Struct({}),
+      description: 'What remote threads are waiting on changed. Read sessionInteractions again.',
+    }),
+  },
 })
 
 export type EffectMultiHostApi = typeof effectMultiHostApi
@@ -1108,6 +1270,8 @@ export type DirectoryListing = Schema.Schema.Type<typeof directoryListingSchema>
 export type TranscriptEntry = Schema.Schema.Type<typeof transcriptEntrySchema>
 export type TranscriptWaiting = Schema.Schema.Type<typeof transcriptWaitingSchema>
 export type ModelSelection = Schema.Schema.Type<typeof modelSelectionSchema>
+export type RemoteInteraction = Schema.Schema.Type<typeof remoteInteractionSchema>
+export type RemoteQuestionAnswer = Schema.Schema.Type<typeof remoteQuestionAnswerSchema>
 export type RuntimeSummary = Schema.Schema.Type<typeof runtimeSummarySchema>
 export type WorkspaceSummary = Schema.Schema.Type<typeof workspaceSchema>
 export type SessionSummary = Schema.Schema.Type<typeof sessionSchema>

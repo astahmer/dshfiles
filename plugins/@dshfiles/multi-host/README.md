@@ -8,6 +8,8 @@ one tunnel open per host. Works on stock DSH 0.2.0-rc.2, no core patch.
 
 Manage hosts on a dedicated page:
 
+![Answer a remote agent's questions and approvals in this client](docs/screenshots/remote-interactions.png)
+
 ![Manage remote hosts and inspect the resource pressure used by Auto placement](docs/screenshots/host-management.png)
 
 Update every host's dshfiles checkout from the same page:
@@ -88,16 +90,18 @@ With a host chosen:
   Existing command, prompt, queue, plan, permission, todo, and jj/workspace
   surfaces remain subject to the capabilities available from the remote Host.
   If the runtime is unreachable, the native composer stays visible and keeps the
-  draft; its send is refused until the owner is reachable. Interactive browser
-  verification of the model picker and attachment picker is still pending.
+  draft; its send is refused until the owner is reachable. A message that names
+  this machine is refused before it leaves: an `@` mention under this machine's
+  home or `~` (a path inside the thread's folder is fine, and so is a path in
+  plain prose), and an attachment uploaded for another thread. The composer keeps
+  the draft and says how to recover.
   The ownership boundary and unsupported surfaces are described in
   [docs/remote-thread-architecture.md](docs/remote-thread-architecture.md).
 - The started thread opens in the main area as a **normal thread of this client**:
   this Host mirrors the remote Session, so the native chat, its live transcript,
   and this machine's own composer (commands, references, attachments, queue,
   stop) work on it. **Open on remote host** opens the host's own DSH in a new tab
-  on a stable loopback origin, on that same thread, for what the mirror cannot
-  answer yet (approvals, terminals). If the host drops, the composer keeps its draft and the message is
+  on a stable loopback origin, on that same thread. If the host drops, the composer keeps its draft and the message is
   refused until the host is back.
 - The **Remote threads** list shows every thread on every registered host,
   grouped by host and newest first: threads started from here keep their title,
@@ -106,17 +110,26 @@ With a host chosen:
   thread in this client like any other. Status is polled only while that list is
   open. An offline host shows one muted "unavailable" line and still lists the
   threads started here.
-- While a remote turn waits, the open-thread view says what it waits on:
-  **The agent ... is asking a question** when the last tool call is
-  `ask_user_question` (or `ask_parent_question`), and **Waiting on <tool>**
-  when any other call has stayed open for more than a minute, since the log
-  cannot tell a slow command from a pending approval. Both offer **Host UI**;
-  answering and approving stay in the host's own DSH. The mirrored thread header
-  offers **Open on remote host**; it opens the owner's DSH home in a new tab, and
-  you select the thread there. The current runtime view API cannot deep-link to a
-  Session, so it does not open the exact conversation automatically. The mirror
-  sees an open tool call, not the native waterfall payload or approval request; it
-  never fabricates a question, submits an inferred answer, or approves a tool call.
+- While a thread is open here, a question its remote agent asks opens in this
+  client's own question card, with the same countdown, **Take time** and plan
+  review, and the answer goes to the runtime that owns the thread. A question
+  that outlives its wait stays answerable as usual. The first answer from any
+  client wins, including the host's own UI, and the other card closes.
+- ![A remote tool call waiting on approval in this client](docs/screenshots/remote-interactions-approval.png)
+
+  A tool call that needs approval opens the same way, with the reason and the
+  command: **Allow once** and **Reject** (or Enter and Escape with the details
+  focused) go to the runtime that owns the thread, which decides whether the
+  request is still waiting. No agent can answer one; there is no tool for it.
+
+- ![A terminal tab on a remote thread offering the host's own DSH](docs/screenshots/remote-terminal-handoff.png)
+
+  A terminal belongs to the machine the thread runs on. **New terminal** on a
+  remote thread, however it is opened, shows **Open terminal on host**, which opens
+  that thread in the host's own DSH.
+
+- **Open on remote host** in the mirrored thread header opens the owner's DSH on
+  that same thread.
 - The thread sidebar shows a **Remote** section: every thread started from
   here, badged with its host and whether its connection is open. A row opens the
   mirrored Session; a brand-new thread appears in the sidebar as soon as the host
@@ -202,7 +215,8 @@ title}` for threads started here, so the sidebar and view can list them.
 - **APIs**: `multi-host` v1 is owned by this package, so other plugins' clients
   call it (`@dshfiles/multi-host/destination` exports the contract and the UI
   pieces). Remote plugin calls are allowlisted to jj-integration's
-  `projects`, `destination`, `provision` and `noFolder`; native calls to the
+  `projects`, `destination`, `provision` and `noFolder`, plus the thread actions
+  of `sessionJjCall`, scoped to the Session's folder; native calls to the
   session list/search/create/prompt/page/cancel/rename/fork and archive
   methods. `runtimePeerRead` lets another plugin of this Host read a remote
   runtime through a closed list of read-only calls (`remotePeerReadCalls`:
@@ -225,7 +239,7 @@ title}` for threads started here, so the sidebar and view can list them.
 | Credentials                       | hostKey file 0600                                       | system ssh + askpass, safeStorage                          | system ssh agent/keys only; no password prompt                        |
 | Pairing without SSH               | —                                                       | `t3 pair` token/QR, Tailscale routes, T3 Connect relay     | none                                                                  |
 | Automatic placement               | —                                                       | Auto balance (cpu × free memory, 15 s freshness)           | Auto: lowest max(load/cores, memory used)                             |
-| Remote approvals, terminal, diffs | —                                                       | native: each environment is a full server connection       | open the host's own DSH (Host UI)                                     |
+| Terminals                         | Open on the host                                        | **Open terminal on host** in the terminal tab              |
 | Fleet update                      | —                                                       | Update Everything dialog, version-mismatch banner          | Update hosts dialog (sync + rebuild, restart left to you), drift line |
 | Delegate across machines          | —                                                       | `delegate_task` with `target.environmentId`                | `multi_host_delegate`: host or Auto, waits for the answer             |
 
@@ -234,9 +248,9 @@ title}` for threads started here, so the sidebar and view can list them.
 - A remote thread is a Session of another runtime, mirrored into this Host:
   `session/list`, `follow`, `page`, `prompt`, `cancel` and `updateQueue` forward
   to the runtime that owns it, so the native chat and composer work. Model
-  catalogs, attachments, `@` references, approvals and terminals still resolve
-  on this machine or stay in the host's own DSH; the remaining slices are listed
-  in [docs/remote-thread-architecture.md](docs/remote-thread-architecture.md).
+  catalogs, attachments and `@` references resolve on that runtime too; the
+  remaining slices are listed in
+  [docs/remote-thread-architecture.md](docs/remote-thread-architecture.md).
 - The agent preset chip of the New thread row does not apply to remote
   threads; the model is picked in the remote composer.
 - No password or keyboard-interactive SSH (BatchMode only). Provisioning runs
@@ -247,20 +261,29 @@ title}` for threads started here, so the sidebar and view can list them.
   list, not the sidebar.
 - The remote transcript is polled (1.5 s while a turn runs, 8 s idle), not
   streamed; the conversation is still written and read on the host.
-- DSH writes no question-request or approval-request event, so a pending
-  question is only visible as an open `tool/call`. The host-local
-  `user-questions/request` waterfall and answer RPC are not delivered to this
-  mirror. The `agent-questions` API only supports continued forms on live root
-  Sessions; it cannot answer open waterfalls, child Sessions, or stopped
-  Sessions, and is not a general approval API. There is no safe generic proxy
-  for these interactions: **Host UI** opens the owning runtime's DSH, where
-  questions and approvals must be completed.
-- Remote JJ data can be read through the read-only
-  `sessionJjRepositories(sessionId)` API, which resolves the Session's owner and
-  reads that runtime's repository/workspace status. It sends no path and cannot
-  mutate JJ state. Per-session JJ panels/path operations, workspace changes,
-  thread landing, terminal interactions, and session handoff are not proxied;
-  use the owning Host UI for these operations.
+- While a browser is open on this DSH, it follows every visible host with threads
+  recorded here, so a thread you have not opened still shows under **Needs you**
+  with its question or approval. Threads started on a host and never recorded
+  here are not followed. When no browser is reading, the connections close after
+  about a minute, and an unreachable host is retried at most once a minute. A
+  child Session's question is not offered, because the owner refuses to ask from
+  one. A child agent's request for wider access is refused by the owner without
+  asking anyone, as it is on that host.
+- A remote thread's repository works from here: the workspace control, the
+  integrate offer, the JJ side panel (graph, details, diffs, prepared actions) and
+  the composer's changes bar all read from the runtime that owns the thread.
+  `sessionJjCall` (`multi_host_session_jj`) and `sessionRepositoryCall`
+  (`multi_host_session_repository`) reach that thread's folder, or a repository id
+  the owner issued for it, and nothing else on the machine; another path is
+  refused here before it leaves. The host needs `@dshfiles/jujutsu` installed for
+  the panel. Global panels with no thread still read this machine.
+- A land from this client names the thread, so its owner waits for that running
+  agent. The host's own Land page does not see a thread started from here as
+  running, because the owner lists no Session against that workspace.
+- The Land page lists the thread workspaces of every visible host, under
+  `<repository> · <host>`, for threads recorded on this DSH. **Land** and
+  **Remove workspace** run on the host that owns the thread. A host that does not
+  answer is named at the top of the page.
 - LSP is not advertised by remote runtimes (unchanged from earlier
   validation).
 

@@ -49,7 +49,9 @@ import { useApi, useRegistry, useSettings } from '@dshfiles/dshx/client'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
+import { multiHostApi } from '@dshfiles/multi-host/api'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
+import { landRepositoriesApi, type LandRepositories, type LocalLandApi, type RemoteLandPort } from './land-repositories.js'
 import { sessionPreviewMessages } from './session-preview.js'
 import { useDiscardConfirmation } from './discard-machine.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
@@ -802,6 +804,9 @@ export const ThreadWorkspacesPanel = (props: {
   const now = useMinuteTick()
   const { byId: sessionById, userMessagesBySession } = useSessionDirectory(props.sessions)
   const api = useApi(jjIntegrationApi)
+  const multiHost = useApi(multiHostApi)
+  // SAFETY: multi-host's client has these two calls with wider inputs; the Host validates each one.
+  const landApi = useMemo(() => landRepositoriesApi({ local: api as never as LocalLandApi, remote: multiHost as never as RemoteLandPort }), [api, multiHost])
   const queryClient = useQueryClient()
   const rebasesPending = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0
   const toast = useToast()
@@ -819,7 +824,7 @@ export const ThreadWorkspacesPanel = (props: {
   }
   const repositories = useQuery({
     queryKey: threadQueryKeys.repositories,
-    queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 60_000, request: hostSignal => api.repositories({}, { signal: hostSignal }) }),
+    queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 60_000, request: hostSignal => landApi.repositories({}, { signal: hostSignal }) }),
     staleTime: 15_000,
     refetchInterval: query => (query.state.data?.refreshing === true ? 5_000 : 60_000),
   })
@@ -841,14 +846,15 @@ export const ThreadWorkspacesPanel = (props: {
       runHostRequest({
         signal: input.signal,
         timeoutMs: 300_000,
-        request: signal => api.land(input.bookmark === undefined ? { path: input.path } : { path: input.path, bookmark: input.bookmark }, { signal }),
+        request: signal => landApi.land(input.bookmark === undefined ? { path: input.path } : { path: input.path, bookmark: input.bookmark }, { signal }),
       }),
     onSuccess: async (result, input) => {
       if (result.status === 'landed') {
         await queryClient.cancelQueries({ queryKey: threadQueryKeys.repositories })
-        queryClient.setQueryData<Awaited<ReturnType<typeof api.repositories>>>(threadQueryKeys.repositories, previous => {
+        queryClient.setQueryData<LandRepositories>(threadQueryKeys.repositories, previous => {
           if (previous === undefined) return previous
           return {
+            ...previous,
             repositories: previous.repositories.map(repository => ({
               ...repository,
               threads: repository.threads.map(thread =>
@@ -868,7 +874,7 @@ export const ThreadWorkspacesPanel = (props: {
       client: {
         land: ({ path, signal }) => rebase.mutateAsync({ path, signal }),
         integrationProgress: ({ path, signal }) =>
-          runHostRequest({ signal, timeoutMs: 15_000, request: hostSignal => api.integrationProgress({ path }, { signal: hostSignal }) }),
+          runHostRequest({ signal, timeoutMs: 15_000, request: hostSignal => landApi.integrationProgress({ path }, { signal: hostSignal }) }),
       },
     },
   })
@@ -885,7 +891,7 @@ export const ThreadWorkspacesPanel = (props: {
   const discard = useDiscardConfirmation({
     client: {
       discard: (input, options) =>
-        runHostRequest({ signal: options.signal, timeoutMs: 120_000, request: hostSignal => api.discard(input, { signal: hostSignal }) }),
+        runHostRequest({ signal: options.signal, timeoutMs: 120_000, request: hostSignal => landApi.discard(input, { signal: hostSignal }) }),
     },
     onSettled: refreshAfterChange,
   })
@@ -1148,6 +1154,11 @@ export const ThreadWorkspacesPanel = (props: {
             </AlertDescription>
           </Alert>
         ) : null}
+        {(repositories.data?.unreachableHosts.length ?? 0) > 0 ? (
+          <p role="status" className="dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">
+            {t('remoteHostsUnreachable', { hosts: repositories.data?.unreachableHosts.join(', ') ?? '' })}
+          </p>
+        ) : null}
         {repositories.isPending || (repositories.data?.refreshing === true && repositories.data.repositories.length === 0) ? <PanelSkeleton /> : null}
         {repositories.data?.refreshFailed === true ? (
           <Alert variant="default">
@@ -1316,7 +1327,8 @@ export const ThreadWorkspacesPanel = (props: {
                                 userMessagesBySession={userMessagesBySession}
                                 sessions={props.sessions}
                                 openSession={props.openSession}
-                                openChanges={props.openChanges}
+                                // This Host's review surfaces have nothing to show for a folder on another machine.
+                                openChanges={landApi.isRemote(entry.thread.path) ? undefined : props.openChanges}
                                 t={t}
                                 bookmark={props.bookmark}
                                 bookmarks={repository.bookmarks}

@@ -120,9 +120,11 @@ const make = Effect.gen(function* () {
     const validate = Effect.gen(function* () {
       const workspace = yield* registry.resolveByPath(location.workspaceRoot)
       if (workspace === undefined) return yield* new ThreadActivityUnknown({ detail: 'Could not verify thread activity before rebasing.' })
-      const current = yield* activity.guard(workspace.sessionIds)
+      // A thread started with a bare cwd, as a remote one is, is never listed on its workspace, so the Session asking counts too.
+      const sessionIds = [...new Set([...workspace.sessionIds, ...(input.sessionId === undefined ? [] : [input.sessionId])])]
+      const current = yield* activity.guard(sessionIds)
       const eligible = ThreadRebaseEligibilityModel.eligibility({
-        sessionIds: workspace.sessionIds,
+        sessionIds,
         activity: current,
         fromAgent: input.fromAgent,
         sessionId: input.sessionId,
@@ -141,7 +143,7 @@ const make = Effect.gen(function* () {
       }
       if (!eligible)
         return yield* new ThreadActive({
-          detail: busyWorkspaceMessage(ThreadRebaseEligibilityModel.blockers({ sessionIds: workspace.sessionIds, activity: current })),
+          detail: busyWorkspaceMessage(ThreadRebaseEligibilityModel.blockers({ sessionIds, activity: current })),
         })
       if (input.stillQueued !== undefined && !(yield* input.stillQueued)) return yield* new IntegrationCancelled({ path: input.path })
     })

@@ -1,14 +1,16 @@
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { Popover, PopoverAnchor, PopoverContent, PopoverHeader, PopoverTitle } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { jujutsuApi } from './api.js'
 import { ChatReferenceModel, chatReferenceQueryKeys } from './chat-reference.js'
 import { ChatReferenceLinks } from './chat-reference-links.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { ReferenceGraphView } from './reference-graph-view.js'
+import { OwnerRouting } from './owner-routed-api.js'
+import { useOwnerPort, useThreadJujutsuApi } from './use-jujutsu-api.js'
 import {
   chatReferencePreviewDismissEvent,
   chatReferencePreviewEvent,
@@ -24,10 +26,11 @@ const CLOSE_GRACE_MS = 140
  * registry; a hover arrives as a window event carrying the chip's anchor, so one overlay serves every message.
  */
 export const ChatReferenceOverlay = (props: { readonly projectPathForSession: (sessionId: string) => string | undefined }): JSX.Element => {
-  const api = useApi(jujutsuApi)
   const jjIntegration = useApi(jjIntegrationApi)
+  const owner = useOwnerPort()
   const queryClient = useQueryClient()
   const [request, setRequest] = useState<ChatReferencePreviewRequest | null>(null)
+  const api = useThreadJujutsuApi(request === null ? null : SessionId(request.sessionId))
   const closeTimer = useRef<number | undefined>(undefined)
   const cancelClose = useCallback((): void => {
     if (closeTimer.current === undefined) return
@@ -99,6 +102,8 @@ export const ChatReferenceOverlay = (props: { readonly projectPathForSession: (s
       staleTime: 30_000,
     })
     if (local !== null) return [local]
+    // The other registered projects are this machine's; a remote thread's reference can only be in its own repository.
+    if (request !== null && (await OwnerRouting.ownerOf(owner, SessionId(request.sessionId), { signal }).catch(() => null)) !== null) return []
     const projects = await queryClient.fetchQuery({
       queryKey: chatReferenceQueryKeys.projects,
       queryFn: ({ signal: querySignal }) => jjIntegration.projects({}, { signal: querySignal }),

@@ -28,6 +28,7 @@
     "@dshfiles/chat": "workspace:*",
     "@dshfiles/jj-cli": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
+    "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",

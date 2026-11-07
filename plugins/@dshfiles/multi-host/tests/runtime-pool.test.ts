@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from '@effect/vitest'
-import { Deferred, Duration, Effect, Exit, Fiber, Layer, Ref, Schema, type Scope } from 'effect'
+import { Deferred, Duration, Effect, Exit, Fiber, Layer, Ref, Schema, type Scope, Stream } from 'effect'
 import { TestClock } from 'effect/testing'
 import { FetchHttpClient } from 'effect/http'
 import { Connectors } from '../src/connectors/connectors.js'
@@ -70,6 +70,8 @@ const fakeConnectors = Effect.gen(function* () {
         pluginApi: () => () => unused,
         follow: () => unused,
         stream: () => unused,
+        events: Stream.die('The pool never reads the event stream itself.'),
+        answerEvent: () => unused,
       } satisfies Gateway
     })
   return {
