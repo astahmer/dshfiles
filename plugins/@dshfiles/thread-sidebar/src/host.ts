@@ -20,6 +20,9 @@ import { InflightTurns } from './inflight-turns.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { MachineName } from './machine-name.js'
 import { threadSidebarNavigationApi } from './navigation-api.js'
+import { notificationHistoryApi } from './notification-history-api.js'
+import { NotificationHistory } from './notification-history.js'
+import { notificationHistoryRecorder } from './notification-history-host.js'
 import { NavigationCounter } from './navigation-counter.js'
 import { OutsideReload } from './outside-reload-promise.js'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
@@ -102,6 +105,7 @@ const threads = threadCommandsLayer.pipe(Layer.provideMerge(Layer.mergeAll(Threa
 
 const services = Layer.mergeAll(
   ThreadAttention.layer,
+  NotificationHistory.layer,
   restart,
   autoSettle,
   threads,
@@ -111,6 +115,7 @@ const services = Layer.mergeAll(
 
 const workers = Layer.mergeAll(
   attentionRecorder,
+  notificationHistoryRecorder,
   inflightTracker,
   bootRecovery,
   settledGate,
@@ -138,6 +143,12 @@ export default DshxPlugin.make({
   ],
   layer: threadSidebarLayer,
   apis: [
+    Api.bind(notificationHistoryApi, {
+      list: () => NotificationHistory.use(history => history.snapshot),
+      setRead: input => NotificationHistory.use(history => history.setRead(input)),
+      setDismissed: input => NotificationHistory.use(history => history.setDismissed(input)),
+      clear: input => NotificationHistory.use(history => history.clear(input)),
+    }),
     Api.bind(threadSidebarRestartApi, {
       availability: () =>
         Effect.gen(function* () {

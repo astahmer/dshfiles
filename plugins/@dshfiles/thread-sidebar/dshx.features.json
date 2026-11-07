@@ -2,6 +2,44 @@
   "schemaVersion": 1,
   "features": [
     {
+      "id": "notification-history",
+      "title": "Review retained thread notifications",
+      "summary": "Review the last 500 thread events in Host-owned storage, independently of toast delivery and thread attention. Mark entries read or unread, dismiss or restore them, clear captured entries with confirmation, and open an existing thread.",
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "Observe › Notifications",
+      "reach": ["seed tool-call-thread", "click tab \"Observe\"", "click button \"Notifications\"", "expect heading \"Notifications\""],
+      "surfaces": ["client", "host"],
+      "configuration": [],
+      "states": ["loading", "empty", "unread", "read", "dismissed", "confirm-clear", "unavailable-thread", "host-unavailable"],
+      "failureModes": [
+        "Storage errors leave the previous history unchanged and offer retry guidance.",
+        "Clearing the captured entry IDs preserves concurrent arrivals.",
+        "Missing threads leave readable notification entries without a navigation action.",
+        "No prompt, response, question, approval detail or raw error text is retained."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "thread-sidebar.notification-history", "featureFile": "tooling/dshx/e2e/features/notification-history.feature" },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notification-history-contract",
+          "file": "plugins/@dshfiles/thread-sidebar/src/notification-history-api.test.ts",
+          "testName": "exposes one shared operation per UI verb, with explicit clear confirmation"
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "custom",
+          "span": "notification history record",
+          "file": "plugins/@dshfiles/thread-sidebar/src/notification-history-host.test.ts",
+          "testName": "records a tracing span without adding request content"
+        }
+      ]
+    },
+    {
       "id": "multi-model-fan-out",
       "title": "Send one prompt to several models",
       "surface": "command",

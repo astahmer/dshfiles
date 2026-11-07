@@ -5,7 +5,7 @@ import { HostContext, cordisLogger } from './host-context.js'
 import { causeReport } from './cause-report.js'
 import { detached, detachedContext } from './detached.js'
 
-type EventName = keyof Events & string
+type EventName = Extract<keyof Events, string>
 type EventArguments<K extends EventName> = Parameters<Events[K]>
 type EventResult<K extends EventName> = ReturnType<Events[K]>
 type LeadingArguments<Arguments> = Arguments extends readonly [...infer Leading, unknown] ? Leading : never
@@ -18,9 +18,14 @@ export interface Interception<K extends EventName> {
   readonly next: Effect.Effect<EventResult<K>>
 }
 
-const register = <K extends EventName>(input: { readonly host: HostContext['Service']; readonly name: K; readonly listener: Events[K] }) =>
+const register = <K extends EventName>(input: {
+  readonly host: HostContext['Service']
+  readonly name: K
+  readonly listener: Events[K]
+  readonly prepend?: boolean
+}) =>
   Effect.acquireRelease(
-    Effect.sync(() => input.host.ctx.on(input.name, input.listener)),
+    Effect.sync(() => input.host.ctx.on(input.name, input.listener, { prepend: input.prepend ?? false })),
     dispose => Effect.sync(dispose),
   )
 
@@ -113,6 +118,7 @@ export interface AsyncInterception<K extends EventName> {
 export const interceptAsync = <K extends EventName, R>(
   name: K,
   handler: (interception: AsyncInterception<K>) => Effect.Effect<Awaited<EventResult<K>>, never, R>,
+  options: { readonly prepend?: boolean } = {},
 ): Effect.Effect<void, never, Scope.Scope | HostContext | R> =>
   Effect.gen(function* () {
     const host = yield* HostContext
@@ -136,7 +142,7 @@ export const interceptAsync = <K extends EventName, R>(
       })
     }
     // SAFETY: Cordis types a listener as Events[K]; this one takes exactly its parameters and resolves its result.
-    yield* register({ host, name, listener: listener as Events[K] })
+    yield* register({ host, name, listener: listener as Events[K], prepend: options.prepend ?? false })
   })
 
 /**

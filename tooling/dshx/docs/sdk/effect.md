@@ -131,7 +131,8 @@ Cordis `waterfall` and `bail` events return a value to the emitter synchronously
 
 - `interceptAsync` is `intercept` for a waterfall whose result is a Promise (`agent/pre-step`,
   `system-prompt/assemble`): the handler may suspend, `next` awaits the rest of the chain, and the handler's value
-  resolves the emitter's Promise.
+  resolves the emitter's Promise. Its optional third argument, `{ prepend: true }`, registers before existing listeners.
+  Thread Sidebar uses this to record notification history before an answerer consumes a request, then delegates `next` unchanged.
 
 ```ts
 const hooks = Layer.effectDiscard(

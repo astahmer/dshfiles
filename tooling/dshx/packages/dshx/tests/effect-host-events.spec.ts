@@ -10,6 +10,7 @@ declare module '@deepseek-ai/cordis' {
   interface Events {
     'dshx-events-test/wrap'(value: string, next: () => string): string
     'dshx-events-test/ask'(key: string): string | undefined
+    'dshx-events-test/async'(value: string, next: () => Promise<string>): Promise<string>
   }
 }
 
@@ -92,6 +93,49 @@ describe('HostEvents.intercept', () => {
       recorder.stop()
       expect(recorder.span('intercept probe').parentSpanId).toBeUndefined()
     }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(hostContext, tracerLayer)), Effect.provide(TestHost.layer)),
+  )
+})
+
+describe('HostEvents.interceptAsync', () => {
+  it.effect('prepends an observer before an existing consuming answerer and disposes it with its scope', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      const observed: string[] = []
+      host.ctx.on('dshx-events-test/async', async value => `answer:${value}`)
+      yield* withScope(scope =>
+        Effect.gen(function* () {
+          yield* HostEvents.interceptAsync(
+            'dshx-events-test/async',
+            ({ args: [value], next }) =>
+              Effect.andThen(
+                Effect.sync(() => observed.push(value)),
+                next,
+              ),
+            { prepend: true },
+          ).pipe(Scope.provide(scope))
+          expect(yield* Effect.promise(() => host.ctx.waterfall('dshx-events-test/async', 'first', async () => 'unused'))).toBe('answer:first')
+          expect(observed).toEqual(['first'])
+          yield* Scope.close(scope, Exit.void)
+        }),
+      )
+      expect(yield* Effect.promise(() => host.ctx.waterfall('dshx-events-test/async', 'second', async () => 'unused'))).toBe('answer:second')
+      expect(observed).toEqual(['first'])
+    }).pipe(Effect.provide(hostContext), Effect.provide(TestHost.layer)),
+  )
+
+  it.effect('a failed prepended observer delegates once without changing the answer', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      yield* recordErrors
+      let answers = 0
+      host.ctx.on('dshx-events-test/async', async () => {
+        answers += 1
+        return 'accepted'
+      })
+      yield* HostEvents.interceptAsync('dshx-events-test/async', () => Effect.die('storage unavailable'), { prepend: true })
+      expect(yield* Effect.promise(() => host.ctx.waterfall('dshx-events-test/async', 'value', async () => 'unused'))).toBe('accepted')
+      expect(answers).toBe(1)
+    }).pipe(Effect.scoped, Effect.provide(hostContext), Effect.provide(TestHost.layer)),
   )
 })
 
