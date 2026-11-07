@@ -28,11 +28,11 @@ const routeOf = (summary: QuotaContinuationSummary): string =>
 const detailOf = (summary: QuotaContinuationSummary): string => {
   const reset =
     summary.resetAt === null
-      ? 'The account did not report when its quota resets.'
+      ? `The account did not report when its quota resets, so the thread retries on a growing backoff from 30 seconds up to every 10 minutes.`
       : summary.ready
         ? 'The quota window has reset.'
         : `The quota resets at ${new Date(summary.resetAt).toISOString()}.`
-  const retry = summary.autoRetry && summary.resetAt !== null ? ' It resumes by itself then.' : ''
+  const retry = summary.autoRetry ? ' It resumes by itself then.' : ''
   return `${reset}${retry} Resume continues the stopped turn now; open the thread to switch it to another account or model first.`
 }
 

@@ -41,7 +41,7 @@ export const QuotaAutoResumeToggle = (props: { readonly sessionId: string; reado
   const knownReset = continuation.resetAt !== null
   const title = knownReset
     ? `Resume this thread 1 minute after your limit resets ${resetLabel(continuation.resetAt ?? 0)}.`
-    : 'Automatic resume needs a known reset time.'
+    : `Resume this thread by itself: retries back off from 30 seconds up to every 10 minutes, because your provider did not say when its limit resets.`
   return (
     <TooltipProvider delayDuration={500}>
       <Tooltip>
@@ -50,7 +50,7 @@ export const QuotaAutoResumeToggle = (props: { readonly sessionId: string; reado
             <Checkbox
               aria-label="Automatically resume after the limit resets"
               checked={continuation.autoRetry}
-              disabled={!knownReset || retry.isPending}
+              disabled={retry.isPending}
               onCheckedChange={checked => retry.mutate(checked === true)}
             />
             <span className="dshx:whitespace-nowrap">Auto-resume</span>

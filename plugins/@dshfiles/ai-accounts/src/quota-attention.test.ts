@@ -28,6 +28,8 @@ const summary = (overrides: Partial<QuotaContinuationSummary> = {}): QuotaContin
   failedModel: 'gpt-6-luna',
   failedAt: 1,
   resetAt: null,
+  retryAt: null,
+  retryAttempt: 0,
   autoRetry: false,
   snoozedUntil: null,
   state: 'waiting',
@@ -53,7 +55,7 @@ describe('ai-accounts quota inbox provider', () => {
         subject: { kind: 'session', id: 'session-quota', label: 'Fix login' },
         reason: 'Stopped by the gpt-6-luna on codex_work usage limit.',
         detail:
-          'The account did not report when its quota resets. Resume continues the stopped turn now; open the thread to switch it to another account or model first.',
+          'The account did not report when its quota resets, so the thread retries on a growing backoff from 30 seconds up to every 10 minutes. Resume continues the stopped turn now; open the thread to switch it to another account or model first.',
         severity: 'blocking',
         verbs: ['Resume', 'Open', 'Done', 'Snooze', 'MuteSource'],
       },

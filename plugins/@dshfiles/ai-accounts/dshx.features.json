@@ -1079,7 +1079,7 @@
     {
       "id": "quota-auto-retry",
       "title": "Retry exhausted quota when its reset arrives",
-      "summary": "Explain exhausted provider limits inline, let the user resume with another available provider/account/model/reasoning effort (defaulting to the same model on another provider), and auto-resume one minute after a known reset from a checkbox beside Resume, on by default and overridable per thread.",
+      "summary": "Explain exhausted provider limits inline, let the user resume with another available provider/account/model/reasoning effort (defaulting to the same model on another provider), and auto-resume one minute after a known reset — or on a 30 s to 10 min growing backoff when the provider names none — from a checkbox beside Resume, on by default and overridable per thread.",
       "surfaces": ["client", "host", "settings", "storage"],
       "surface": "attentionProvider",
       "destination": "inbox",
@@ -1102,7 +1102,8 @@
       ],
       "states": ["quota-exhausted", "route-selection", "waiting-for-reset", "resume-queued", "reset-unknown"],
       "failureModes": [
-        "Automatic resume is on by default for a known reset and cannot be enabled without one; it queues one minute after reset.",
+        "Automatic resume is on by default and never needs a provider-declared reset: a known reset queues one minute after it, and an unknown one retries on a 30 s, 1 min, 3 min, 5 min, then every 10 min backoff.",
+        "A recovery that already ran and hit the same quota wall again takes the next backoff rung, so an unannounced reset is not re-tried every 30 seconds forever.",
         "A thread keeps the choice made for its earlier recovery, so the global default cannot silently undo it.",
         "Changing one turn's choice creates or removes only that turn's scheduled recovery.",
         "The beside-Resume choice only renders for a thread whose lost turn stored a recovery.",
@@ -1148,6 +1149,18 @@
           "id": "ai-accounts.quota-recovery-notice-visibility",
           "file": "plugins/@dshfiles/ai-accounts/src/quota-recovery-notice.test.ts",
           "testName": "appears with failover on only when the ladder still stored a recovery to act on"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.quota-unknown-reset-backoff",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-retry-backoff.test.ts",
+          "testName": "backs off 30 s, 1 min, 3 min, 5 min, then every 10 min"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.quota-unknown-reset-escalates",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-continuation-service.test.ts",
+          "testName": "backs an unknown-reset thread off one rung further after a recovery that already ran"
         },
         {
           "kind": "gherkin",

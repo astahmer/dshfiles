@@ -110,13 +110,15 @@ describe('reset precedence', () => {
     expect((await service.list()).continuations).toMatchObject([{ resetAt: NOW + 30 * MINUTE, autoRetry: true, scheduled: true }])
   })
 
-  it('stays manual when neither source names a reset, whatever the retry default', async () => {
+  it('backs off from 30 seconds when neither source names a reset, whatever the retry default', async () => {
     const scheduler = recordingSchedule()
     const { service } = await serviceIn({ readResetAt: async () => null, schedule: scheduler.schedule })
     await service.recordFailure(failureAgent('thread-1'), 'codex_work', true, undefined, 'quota exceeded')
 
-    expect((await service.list()).continuations).toMatchObject([{ resetAt: null, autoRetry: false, scheduled: false, ready: false }])
-    expect(scheduler.created).toEqual([])
+    expect((await service.list()).continuations).toMatchObject([
+      { resetAt: null, retryAt: NOW + 30_000, retryAttempt: 0, autoRetry: true, scheduled: true, ready: false },
+    ])
+    expect(scheduler.created).toEqual([{ sessionId: 'thread-1', afterSeconds: 30 }])
   })
 
   it('keeps a known reset but schedules nothing when the retry default is off', async () => {

@@ -9,6 +9,8 @@ const record = (state: QuotaContinuationRecord['state']): QuotaContinuationRecor
   failedSeq: 12,
   failedAt: 1_800_000_000_000,
   resetAt: 1_800_000_600_000,
+  retryAt: null,
+  retryAttempt: 0,
   autoRetry: true,
   autoRetrySource: 'user',
   snoozedUntil: null,

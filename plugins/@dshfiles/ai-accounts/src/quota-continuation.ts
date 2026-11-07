@@ -16,6 +16,7 @@ import { quotaContinuationDomain, type QuotaContinuationTable } from './quota-co
 import type { QuotaContinuationRecord, QuotaContinuationSummary } from './quota-continuation-model.js'
 import { QuotaContinuationMessage, type UserActivityIdentity } from './quota-continuation-message.js'
 import { isActive, transition } from './quota-continuation-transition.js'
+import { quotaRetryAt } from './quota-retry-backoff.js'
 import { resetAtFromMessage } from './quota-reset.js'
 
 const MAX_CONTINUATIONS = 500
@@ -84,7 +85,10 @@ declare module '@deepseek-ai/dsh-workspace/types' {
   }
 }
 
-const isReady = (record: QuotaContinuationRecord, now: number): boolean => record.resetAt !== null && Math.max(record.resetAt, record.snoozedUntil ?? 0) <= now
+const isReady = (record: QuotaContinuationRecord, now: number): boolean => {
+  const dueAt = record.resetAt ?? record.retryAt
+  return dueAt !== null && Math.max(dueAt, record.snoozedUntil ?? 0) <= now
+}
 
 const collectUserActivities = <Event extends { readonly seq: number }>(
   events: readonly Event[],
@@ -197,7 +201,8 @@ const createQuotaContinuationService = ({
 
   const ensureScheduled = async (record: QuotaContinuationRecord): Promise<void> => {
     if (record.state !== 'waiting') return
-    if (!record.autoRetry || record.resetAt === null) {
+    const dueAt = record.resetAt ?? record.retryAt
+    if (!record.autoRetry || dueAt === null) {
       await cancelScheduled(record)
       if (record.scheduleId !== null) {
         const storage = await table()
@@ -220,8 +225,10 @@ const createQuotaContinuationService = ({
         return
       }
 
-      const dueAt = Math.max(record.resetAt, record.snoozedUntil ?? 0, now()) + AUTO_RESUME_DELAY_MS
-      const afterSeconds = Math.max(1, Math.ceil((dueAt - now()) / 1_000))
+      // A known reset keeps the one-minute grace the user was promised; a backoff rung is due exactly when it says.
+      const marginMs = record.resetAt === null ? 0 : AUTO_RESUME_DELAY_MS
+      const scheduledAt = Math.max(dueAt, record.snoozedUntil ?? 0, now()) + marginMs
+      const afterSeconds = Math.max(1, Math.ceil((scheduledAt - now()) / 1_000))
       const created = await scheduler.create(SessionId(record.sessionId), {
         title: 'Quota recovery',
         prompt: QuotaContinuationMessage.promptFor(record.continuationId),
@@ -250,6 +257,8 @@ const createQuotaContinuationService = ({
       accountId: record.accountId,
       failedAt: record.failedAt,
       resetAt: record.resetAt,
+      retryAt: record.retryAt,
+      retryAttempt: record.retryAttempt,
       autoRetry: record.autoRetry,
       snoozedUntil: record.snoozedUntil,
       state: record.state === 'queued' ? 'queued' : 'waiting',
@@ -456,6 +465,11 @@ const createQuotaContinuationService = ({
           .filter(record => record.sessionId === agent.id && record.autoRetrySource === 'user')
           .sort((left, right) => right.failedAt - left.failedAt)[0]
         const retryChoice = chosen?.autoRetry ?? autoRetry
+        // A recovery that already ran and hit the same wall backs off one rung further.
+        const lastRan = records
+          .filter(record => record.sessionId === agent.id && record.state === 'completed')
+          .sort((left, right) => right.failedAt - left.failedAt)[0]
+        const retryAttempt = lastRan === undefined ? 0 : lastRan.retryAttempt + 1
         if (!(await makeRoom(records, nowAtFailure))) {
           context.logger.warn('ai-accounts: quota recovery capacity is full')
           return
@@ -472,7 +486,9 @@ const createQuotaContinuationService = ({
           failedSeq: agent.session.seq,
           failedAt: nowAtFailure,
           resetAt,
-          autoRetry: retryChoice && resetAt !== null,
+          retryAt: resetAt === null ? quotaRetryAt({ failedAt: nowAtFailure, attempt: retryAttempt }) : null,
+          retryAttempt,
+          autoRetry: retryChoice,
           autoRetrySource: 'default' as const,
           snoozedUntil: null,
           scheduleId: null,
@@ -570,12 +586,11 @@ const createQuotaContinuationService = ({
   const setAutoRetry = async (continuationId: string, sessionId: string, enabled: boolean): Promise<{ updated: boolean }> => {
     const storage = await table()
     const record = storage.get(continuationId)
-    if (record === undefined || record.sessionId !== sessionId || record.state !== 'waiting' || (enabled && record.resetAt === null)) return { updated: false }
+    if (record === undefined || record.sessionId !== sessionId || record.state !== 'waiting') return { updated: false }
 
     return serialize(record.sessionId, async () => {
       const current = storage.get(continuationId)
-      if (current === undefined || current.sessionId !== sessionId || current.state !== 'waiting' || (enabled && current.resetAt === null))
-        return { updated: false }
+      if (current === undefined || current.sessionId !== sessionId || current.state !== 'waiting') return { updated: false }
       const updated = { ...current, autoRetry: enabled, autoRetrySource: 'user' as const, scheduleId: null }
       await storage.put(continuationId, updated)
       await cancelScheduled(current)

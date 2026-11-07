@@ -812,7 +812,7 @@ export const aiAccountsApi = defineApi({
         render: output => (output.accepted ? 'Queued the stored continuation.' : 'The Host did not accept the continuation.'),
       },
     }),
-    /** Change whether a waiting quota-blocked turn resumes automatically at its known reset. */
+    /** Change whether a waiting quota-blocked turn resumes automatically at its reset, or on a growing backoff when the provider named none. */
     setQuotaContinuationAutoRetry: method({
       input: Schema.Struct({
         continuationId: Schema.String.check(Schema.isUUID()),
@@ -820,7 +820,8 @@ export const aiAccountsApi = defineApi({
         enabled: Schema.Boolean,
       }),
       output: Schema.Struct({ updated: Schema.Boolean }),
-      description: 'Change whether one quota-blocked turn resumes automatically at its known reset. Call only when the user asked for that.',
+      description:
+        'Change whether one quota-blocked turn resumes automatically at its reset, or on a growing backoff when the provider named none. Call only when the user asked for that.',
       tool: {
         name: 'ai_accounts_set_auto_retry',
         render: output => (output.updated ? 'Updated automatic retry for that continuation.' : 'That continuation was not found.'),

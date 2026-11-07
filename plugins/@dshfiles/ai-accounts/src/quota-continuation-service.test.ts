@@ -13,6 +13,7 @@ import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from 'vitest'
 import { createQuotaContinuationService, type QuotaFailureAgent } from './quota-continuation.js'
 import { QuotaContinuationMessage } from './quota-continuation-message.js'
+import { quotaContinuationDomain } from './quota-continuation-store.js'
 
 type SchedulePort = Pick<NonNullable<Context['schedule']>, 'create' | 'delete' | 'list'>
 type ScheduleCreateRequest = Parameters<NonNullable<Context['schedule']>['create']>[1]
@@ -204,8 +205,8 @@ describe('quota continuation service', () => {
     }
   })
 
-  it('keeps unknown resets manual and queues one stable request through Session Controller', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-manual-'))
+  it('backs off an unknown reset and queues one stable request through Session Controller', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-unknown-reset-'))
     const now = () => 2_000_000
     const sessionId = SessionId('quota-manual-session')
     const prompts: SessionPromptRequest[] = []
@@ -240,7 +241,10 @@ describe('quota continuation service', () => {
       if (record === undefined) throw new Error('Quota continuation was not stored.')
       expect(record).toMatchObject({ resetAt: null, autoRetry: false, ready: false, scheduled: false })
       expect(scheduler.requests).toHaveLength(0)
-      await expect(service.setAutoRetry(record.continuationId, sessionId, true)).resolves.toEqual({ updated: false })
+      // An unknown reset is still retryable: opting in schedules the first backoff rung, 30 s out.
+      await expect(service.setAutoRetry(record.continuationId, sessionId, true)).resolves.toEqual({ updated: true })
+      expect((await service.list()).continuations[0]).toMatchObject({ autoRetry: true, scheduled: true })
+      expect(scheduler.requests[0]?.after_seconds).toBe(30)
 
       await expect(service.resume(record.continuationId, { provider: 'codex_alt', model: 'gpt-6-luna', reasoningEffort: 'high' })).resolves.toEqual({
         accepted: true,
@@ -405,6 +409,42 @@ describe('quota continuation service', () => {
       const [record] = (await service.list()).continuations
       expect(record).toMatchObject({ resetAt: now() + 42 * 60_000, autoRetry: true, scheduled: true })
       expect(scheduler.requests[0]?.after_seconds).toBe(42 * 60 + 60)
+    } finally {
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('backs an unknown-reset thread off one rung further after a recovery that already ran', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-backoff-'))
+    const sessionId = SessionId('quota-backoff-session')
+    let clock = 7_000_000
+    const now = () => clock
+    const scheduler = createScheduleFixture(now)
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+
+    try {
+      context = await openContext(root)
+      service = createQuotaContinuationService({ context, readResetAt: async () => null, schedule: scheduler.schedule, now })
+      await service.recordFailure(createFailureAgent(sessionId), 'codex_work', true)
+      const [first] = (await service.list()).continuations
+      if (first === undefined) throw new Error('Quota continuation was not stored.')
+      expect(scheduler.requests[0]?.after_seconds).toBe(30)
+
+      // The recovery ran and the thread hit the same wall again, so its next try waits a rung longer.
+      clock += 30_000
+      await service.close()
+      service = undefined
+      const completed = await context.storageDomain.open(quotaContinuationDomain)
+      await (await completed.table('continuations')).update(first.continuationId, current => ({ ...current, state: 'completed' as const }))
+      await completed.close()
+
+      service = createQuotaContinuationService({ context, readResetAt: async () => null, schedule: scheduler.schedule, now })
+      await service.recordFailure(createFailureAgent(sessionId), 'codex_work', true)
+      expect((await service.list()).continuations[0]).toMatchObject({ resetAt: null, retryAttempt: 1, autoRetry: true, scheduled: true })
+      expect(scheduler.requests.map(request => request.after_seconds)).toEqual([30, 60])
     } finally {
       await service?.close()
       await context?.fiber.dispose()

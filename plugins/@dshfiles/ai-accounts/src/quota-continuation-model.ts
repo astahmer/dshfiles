@@ -23,6 +23,10 @@ export const quotaContinuationRecordSchema = Schema.Struct({
   failedSeq: safeNonNegativeInteger,
   failedAt: safeNonNegativeInteger,
   resetAt: Schema.NullOr(safeNonNegativeInteger),
+  /** When an unknown-reset recovery retries next; `null` for a known reset, which waits for `resetAt` instead. */
+  retryAt: Schema.NullOr(safeNonNegativeInteger).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null))),
+  /** How many backoff rungs this thread already spent, so a repeat failure waits longer than the first one. */
+  retryAttempt: safeNonNegativeInteger.pipe(Schema.withDecodingDefaultKey(Effect.succeed(0))),
   autoRetry: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   /** `user` once someone ticked or unticked this recovery, so its choice carries to the thread's next failure. */
   autoRetrySource: Schema.optional(Schema.Literals(['user', 'default'])),
@@ -44,6 +48,8 @@ export const quotaContinuationSummarySchema = Schema.Struct({
   failedModel: Schema.optional(routeText(200)),
   failedAt: safeNonNegativeInteger,
   resetAt: Schema.NullOr(safeNonNegativeInteger),
+  retryAt: Schema.NullOr(safeNonNegativeInteger).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null))),
+  retryAttempt: safeNonNegativeInteger.pipe(Schema.withDecodingDefaultKey(Effect.succeed(0))),
   autoRetry: Schema.Boolean.pipe(
     Schema.catchDecoding(() => Effect.succeed(Option.some(false))),
     Schema.withDecodingDefaultKey(Effect.succeed(false)),

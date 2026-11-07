@@ -394,8 +394,11 @@ the turn that hit it.
 When a turn stops on an exhausted quota, the Session is listed under **Quota
 recovery** in the account's panel. **Resume now** queues a recovery prompt;
 **Snooze** (1 h, 4 h, 1 day) pushes it back. If the provider declared a reset
-time and the Schedule service is loaded, the prompt is scheduled for that time;
-an unknown reset gets no invented timer and waits for a manual resume. Any newer
+time and the Schedule service is loaded, the prompt is scheduled for that time.
+A provider that declares nothing still leaves a workable timer: the retry backs
+off 30 s, 1 min, 3 min, 5 min, then every 10 min, and a recovery that ran and hit
+the same wall again takes the next rung, so an unannounced reset is picked up
+without the user watching the thread. Any newer
 user message, other queued work, or stopping the Session invalidates the
 pending recovery, so an old continuation never runs over newer work. Records live
 in Host storage, so they survive a restart; finished ones are pruned after 30
@@ -406,7 +409,8 @@ exhausted-limit failover is off, and also when failover is on and the ladder
 still stored a recovery for the turn — which happens when no other account
 could take the request. It dates the reset and offers **Automatically
 resume 1 minute after reset**, which schedules the saved request for one minute
-past the reset instead of at the reset instant. **Resume with another model**
+past the reset instead of at the reset instant; when the provider named no reset
+the same checkbox offers the backoff above instead. **Resume with another model**
 opens the currently available provider/account, model, and reasoning-effort
 selects, defaulting to the same model on another provider when one offers it;
 **Resume with this selection** applies that route to the Session and then queues
