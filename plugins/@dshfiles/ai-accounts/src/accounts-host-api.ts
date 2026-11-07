@@ -33,6 +33,7 @@ import type { AccountStorePromise } from './account-store-promise.js'
 import { accountSessionRelatedIds } from './account-session-host.js'
 import { ModelCurationModel } from './model-curation-model.js'
 import { readAccountUsage } from './account-usage.js'
+import { ProviderUsageModel } from './usage.js'
 import { resolveKeyFromContext } from './credentials.js'
 import { createUsageHistoryService } from './usage-recorder.js'
 import { knownQuotaResetAt } from './quota-reset.js'
@@ -460,7 +461,10 @@ const readAccountsUsage = async (ctx: Context, store: AccountStorePromise, signa
       displayName: account.displayName,
       kind: account.kind,
       enabled: account.enabled,
-      usage: await readAccountUsage({ account, shadowRoot: file.shadowRoot, resolveCredential, readCopilotCredential, signal }),
+      usage: ProviderUsageModel.stamped(
+        await readAccountUsage({ account, shadowRoot: file.shadowRoot, resolveCredential, readCopilotCredential, signal }),
+        Date.now(),
+      ),
     }),
   })
   return { readAt: Date.now(), hostName: hostname(), cards }

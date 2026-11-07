@@ -3,15 +3,17 @@ import type { AccountProfile, AccountsUsage } from './api.js'
 /** Local credentials are not a token-validity probe. Only authenticated provider data earns Connected. */
 export const accountConnectionStatus = (account: AccountProfile, usage: AccountsUsage | null) => {
   const card = usage?.cards.find(item => item.instanceId === account.instanceId)
+  // The card's own read time: a reading kept through a failed read was not checked by the latest sweep.
+  const checkedAt = card === undefined ? null : (card.usage.readAt ?? usage?.readAt ?? null)
   if (card?.usage.status === 'unauthenticated')
-    return { label: 'Not signed in', tone: 'muted' as const, detail: card.usage.message, checkedAt: usage?.readAt ?? null, authenticated: false }
+    return { label: 'Not signed in', tone: 'muted' as const, detail: card.usage.message, checkedAt, authenticated: false }
   // Current routing health wins over a previously authenticated quota reading.
   if (account.state === 'cooling' || card?.usage.status === 'rate-limited')
     return {
       label: 'Rate limited',
       tone: 'warning' as const,
       detail: account.detail ?? card?.usage.message ?? null,
-      checkedAt: card === undefined ? null : (usage?.readAt ?? null),
+      checkedAt,
       authenticated: false,
     }
   if (card?.usage.status === 'ok')
@@ -19,14 +21,14 @@ export const accountConnectionStatus = (account: AccountProfile, usage: Accounts
       label: 'Connected',
       tone: 'success' as const,
       detail: 'Authenticated provider quota response.',
-      checkedAt: usage?.readAt ?? null,
+      checkedAt,
       authenticated: true,
     }
   return {
     label: account.signedIn ? 'Credentials available' : 'Not signed in',
     tone: 'muted' as const,
     detail: card?.usage.message ?? account.detail,
-    checkedAt: card === undefined ? null : (usage?.readAt ?? null),
+    checkedAt,
     authenticated: false,
   }
 }

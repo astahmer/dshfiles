@@ -249,11 +249,21 @@ const isFresh = (reading: UsageReading, now: number): boolean => now - reading.a
 
 const cancelledUsage = (): UsageCard => ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
 
+/** A shared reading says how old it is and when a new one can reach Claude, so a refresh it answers does not look live. */
+const heldReading = (reading: UsageReading): UsageCard => ({ ...reading.card, readAt: reading.at, nextReadAt: reading.at + CLAUDE_USAGE_FRESH_MS })
+
 /** The last good reading, labelled with its age, while Anthropic asks us to wait; a rate-limited card without one. */
-const staleOrLimited = (reading: UsageReading | undefined, now: number): UsageCard => {
-  if (reading === undefined) return ProviderUsageModel.emptyUsage('rate-limited', 'Claude rate-limited the usage request.')
+const staleOrLimited = (reading: UsageReading | undefined, until: number, now: number): UsageCard => {
+  if (reading === undefined) return { ...ProviderUsageModel.emptyUsage('rate-limited', 'Claude rate-limited the usage request.'), nextReadAt: until }
   const minutes = Math.max(1, Math.round((now - reading.at) / 60_000))
-  return { ...reading.card, message: `Reading from ${String(minutes)} min ago; Claude asked to wait before the next one.` }
+  const message = `Reading from ${String(minutes)} min ago; Claude asked to wait before the next one.`
+  return {
+    ...reading.card,
+    message,
+    readAt: reading.at,
+    nextReadAt: until,
+    readFailure: { status: 'rate-limited', message: 'Claude asked to wait before the next usage reading.' },
+  }
 }
 
 const settledEntry = (read: UsageRead, reading: UsageReading | undefined, now: number): UsageCacheEntry | undefined => {
@@ -262,8 +272,10 @@ const settledEntry = (read: UsageRead, reading: UsageReading | undefined, now: n
   return reading === undefined ? undefined : { kind: 'cached', reading }
 }
 
-const settledCard = (read: UsageRead, entry: UsageCacheEntry | undefined, now: number): UsageCard =>
-  entry?.kind === 'backoff' ? staleOrLimited(entry.reading, now) : read.card
+const settledCard = (read: UsageRead, entry: UsageCacheEntry | undefined, now: number): UsageCard => {
+  if (entry?.kind === 'backoff') return staleOrLimited(entry.reading, entry.until, now)
+  return entry?.kind === 'cached' && read.card.status === 'ok' ? heldReading(entry.reading) : read.card
+}
 
 /** A shared read outlives any one caller: cancelling your request stops only your wait on it. */
 const abortableUsage = (request: Promise<UsageCard>, signal: AbortSignal | undefined): Promise<UsageCard> => {
@@ -386,8 +398,8 @@ export const createClaudeAccountService = (dependencies: ClaudeAccountServiceDep
       // endpoint after a few calls a minute, so one reading serves them all for a while and a 429 backs off.
       const now = dependencies.now()
       const known = usageReads.get(configDir)
-      if (known?.kind === 'cached' && isFresh(known.reading, now)) return known.reading.card
-      if (known?.kind === 'backoff' && now < known.until) return staleOrLimited(known.reading, now)
+      if (known?.kind === 'cached' && isFresh(known.reading, now)) return heldReading(known.reading)
+      if (known?.kind === 'backoff' && now < known.until) return staleOrLimited(known.reading, known.until, now)
       if (known?.kind === 'fetching') return abortableUsage(known.request, signal)
       if (signal?.aborted === true) return cancelledUsage()
       const reading = known?.reading
