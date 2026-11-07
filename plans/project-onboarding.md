@@ -1,6 +1,9 @@
 # Project onboarding, the way t3code does it
 
-Open. Compared 2026-11-07 against our `main` at `1eebe26d` and
+P1 (folder inspection + Enable Jujutsu), P2 (clone stages + retry), P3 (publish) and the
+read side of P4 (`dsh.project.json` + thread default) shipped on 2026-11-07 as four revisions.
+P5 (setup on workspace create) and P6 (icons, grouping, promotion, cleanup reasons) are not
+started; each still needs its own pass. Compared 2026-11-07 against our `main` at `1eebe26d` and
 [pingdotgg/t3code](https://github.com/pingdotgg/t3code) at tag
 `v0.1.8-nightly.20261104.4179` (commit `9e85538`, 2026-11-04). t3code paths below are
 relative to that tag; our paths are relative to this repository.
