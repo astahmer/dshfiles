@@ -4395,12 +4395,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
   const remoteThreadRowLabels = useMemo(
     (): RemoteThreadRowLabels => ({
-      settle: props.tSidebar('threadSidebarSettle'),
-      unsettle: props.tSidebar('threadSidebarUnsettle'),
-      park: props.tSidebar('threadSidebarPark'),
-      unpark: props.tSidebar('threadSidebarUnpark'),
+      settle: tSidebar('threadSidebarSettle'),
+      unsettle: tSidebar('threadSidebarUnsettle'),
+      park: tSidebar('threadSidebarPark'),
+      unpark: tSidebar('threadSidebarUnpark'),
     }),
-    [props.tSidebar],
+    [tSidebar],
   )
   const renderRemoteThreadRow = (thread: RemoteSidebarThread): JSX.Element => {
     const sessionId = SessionId(thread.sessionId)

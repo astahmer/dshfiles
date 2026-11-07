@@ -16,12 +16,12 @@ const mount = (options: { collapsed?: boolean; projectId?: string; label?: strin
     className: 'dshx:sticky dshx:top-0',
     onToggle,
     startProjectSession,
-    ...(options.action === undefined ? {} : { action: options.action }),
     t: (_key, params) => `New chat in ${String(params?.project)}`,
   }
+  const withAction = options.action === undefined ? props : { ...props, action: options.action }
   const view = render(
     <TooltipProvider>
-      <ThreadGroupHeader {...props} />
+      <ThreadGroupHeader {...withAction} />
     </TooltipProvider>,
   )
   return { ...view, onToggle, startProjectSession }
