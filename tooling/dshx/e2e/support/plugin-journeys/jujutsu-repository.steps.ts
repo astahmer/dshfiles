@@ -336,10 +336,18 @@ When('the repository is registered and a thread is started in it', async ({ page
   await page.getByRole('button', { name: /^Workspace: / }).click()
   await page.getByRole('option', { name: /^Own workspace/ }).click()
   await sendMessage(page, 'jujutsu composer context thread')
+  // Choosing Own workspace and sending can each provision one, so the thread's own workspace is the one its chip names.
+  const chip = page.getByRole('button', { name: /^repo \(thread-[0-9a-f]{6} \/ main\+\)$/ })
+  await expect(chip).toBeVisible({ timeout: 30_000 })
+  const threadName = /thread-[0-9a-f]{6}/u.exec((await chip.getAttribute('aria-label')) ?? (await chip.textContent()) ?? '')?.[0]
   const workspaces = jj(repository, ['--ignore-working-copy', 'workspace', 'list'])
-  const threadWorkspace = /^(thread-[\w-]+): (.+?)(?: \(current\))?$/mu.exec(workspaces)
-  const threadRelativePath = threadWorkspace?.[2]?.trim().split(/\s/u)[0]
-  if (threadRelativePath === undefined) throw new Error(`The thread workspace was not listed:\n${workspaces}`)
+  const threadRelativePath = workspaces
+    .split('\n')
+    .find(line => threadName !== undefined && line.startsWith(`${threadName}: `))
+    ?.slice(`${String(threadName)}: `.length)
+    .trim()
+    .split(/\s/u)[0]
+  if (threadRelativePath === undefined) throw new Error(`The thread workspace ${String(threadName)} was not listed:\n${workspaces}`)
   const threadPath = resolve(repository.path, threadRelativePath)
   const threadRepository = { root: threadPath, path: threadPath }
   await writeFile(join(threadPath, 'review-one.txt'), 'First reviewed file.\n')
