@@ -150,7 +150,7 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     label: 'Usage',
     description: 'Cost, quota, requests and tools.',
     order: 1,
-    formerLabels: ['Usage: Analytics', 'AI Accounts: Usage history', 'AI Accounts: Quota forecast', 'Quota history', 'Quota forecast'],
+    formerLabels: ['Usage', 'Usage: Analytics', 'AI Accounts: Usage history', 'AI Accounts: Quota forecast', 'Quota history', 'Quota forecast'],
   },
   // Listed only in compositions without @dshfiles/usage, where ai-accounts keeps these pages of its own.
   { panelId: 'ai-accounts-usage', destination: 'observe', label: 'Quota history', description: 'Account quota over time.', order: 2 },
