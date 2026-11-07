@@ -2311,6 +2311,39 @@ Then('the blocked session is listed only in the Usage limit group when grouped b
   await finishJourneyAssertions(page)
 })
 
+Then('the blocked row keeps its Resume verb clear of the hover actions', async ({ page }: { page: Page }) => {
+  await ThreadSidebarJourney.groupByStatus(page)
+  await expect.poll(() => currentThreadId(page), { timeout: 30_000 }).not.toBeNull()
+  const sessionId = currentThreadId(page)
+  if (sessionId === null) throw new Error('The blocked thread is not selected.')
+  const row = threadRow(page, sessionId)
+  const verb = row.getByTestId('thread-row-verb')
+  const actions = row.getByTestId('thread-row-actions')
+  await recordAssertion(page, 'thread-sidebar-row-verb-clear-of-hover-actions', async () => {
+    // The recovery state arrives after the failed turn settles, so the row can still read Idle when the seed returns.
+    await expect(verb).toHaveText('Resume', { timeout: 45_000 })
+    const rowBounds = await row.boundingBox()
+    if (rowBounds === null) throw new Error('The blocked thread row has no layout box.')
+    await page.mouse.move(rowBounds.x + 8, rowBounds.y + rowBounds.height / 2)
+    await expect.poll(() => actions.evaluate(element => getComputedStyle(element).pointerEvents)).toBe('auto')
+    await expect.poll(() => actions.evaluate(element => getComputedStyle(element).opacity)).toBe('1')
+    const geometry = await row.evaluate(element => {
+      const verbBox = element.querySelector('[data-testid="thread-row-verb"]')?.getBoundingClientRect()
+      const actionsBox = element.querySelector('[data-testid="thread-row-actions"]')?.getBoundingClientRect()
+      if (verbBox === undefined || actionsBox === undefined) return null
+      const hit = document.elementFromPoint(verbBox.left + verbBox.width / 2, verbBox.top + verbBox.height / 2)
+      return {
+        overlaps: verbBox.left < actionsBox.right && actionsBox.left < verbBox.right && verbBox.top < actionsBox.bottom && actionsBox.top < verbBox.bottom,
+        hitIsVerb: hit !== null && hit.closest('[data-testid="thread-row-verb"]') !== null,
+      }
+    })
+    expect(geometry).not.toBeNull()
+    expect(geometry?.overlaps).toBe(false)
+    expect(geometry?.hitIsVerb).toBe(true)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('a thread title is renamed from its row menu and a second edit is cancelled', async ({ page }: { page: Page }) => {
   const threadId = await startBlankThread(page)
   const composer = page.getByRole('textbox').first()

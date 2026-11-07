@@ -346,7 +346,7 @@
     {
       "id": "status-grouped-thread-list",
       "title": "See every thread grouped by what it needs from you",
-      "summary": "All threads is grouped by the ADE status vocabulary: Pinned on top, then Needs you, Working, Ready, Idle and Done (Done folded; a thread idle for 72 hours folds into Done unless pinned). Within a group the newest return comes first. Needs you and Failed are a projection of the inbox (open items about the thread) plus the questions, approvals, usage limits and interrupted turns the sidebar already sees, and a parent rolls up its subagents so it never looks finished while a child waits or failed. Each row shows a status glyph, the title, the agent preset, muted project and host chips, the elapsed time and one inline verb when it needs you (Answer and Approve open the thread; Retry, Resume and Land run the inbox item's verb). Group › Arrange manually brings back the drag-to-arrange sections; saved views keep their own grouping.",
+      "summary": "All threads is grouped by the ADE status vocabulary: Pinned on top, then Needs you, Working, Ready, Idle and Done (Done folded; a thread idle for 72 hours folds into Done unless pinned). Within a group the newest return comes first. Needs you and Failed are a projection of the inbox (open items about the thread) plus the questions, approvals, usage limits and interrupted turns the sidebar already sees, and a parent rolls up its subagents so it never looks finished while a child waits or failed. Each row shows a status glyph, the title, the agent preset, muted project and host chips, the elapsed time and one inline verb when it needs you (Answer and Approve open the thread; Retry, Resume and Land run the inbox item's verb); the hover action strip opens to the left of that verb, so neither covers the other. Group › Arrange manually brings back the drag-to-arrange sections; saved views keep their own grouping.",
       "reach": [
         "expect region \"Threads\"",
         "click button \"Group: Status\"",
@@ -381,6 +381,11 @@
         }
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.row-verb-clear-of-hover-actions",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar-usage-limit.feature"
+        },
         {
           "kind": "unit-test",
           "id": "thread-sidebar.status-grouping-mapping",

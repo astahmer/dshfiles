@@ -23,6 +23,22 @@ const arrangeManually = async (page: Page, scope: Locator = threadsRegion(page))
 }
 
 /**
+ * A journey about the inline status verb needs the shipping status grouping: the verb exists only there, because the
+ * manual sections keep the older rows. Arranged manually earlier in the same journey, this goes back through the Group
+ * menu as a user would.
+ */
+const groupByStatus = async (page: Page, scope: Locator = threadsRegion(page)): Promise<void> => {
+  const railThreads = page.getByRole('tab', { name: 'Threads', exact: true })
+  if ((await railThreads.count()) > 0 && (await railThreads.first().getAttribute('aria-selected')) !== 'true') await railThreads.first().click()
+  const status = scope.getByRole('button', { name: 'Group: Status', exact: true })
+  if ((await status.count()) === 0) {
+    await scope.getByRole('button', { name: /^Group: /u }).first().click()
+    await page.getByRole('menuitemradio', { name: 'Status', exact: true }).click()
+  }
+  await expect(status).toBeVisible()
+}
+
+/**
  * The sidebar's New thread button, wherever the layout seats it: the header row beside the history arrows (fixed
  * layout, expanded), the top of the rail (fixed layout, collapsed) or the `Sidebar navigation` header (free docking).
  * Only one of them is visible at a time.
@@ -58,6 +74,7 @@ const useFreeDocking = async (page: Page): Promise<void> => {
 
 export class ThreadSidebarJourney {
   static readonly arrangeManually = arrangeManually
+  static readonly groupByStatus = groupByStatus
   static readonly newThreadButton = newThreadButton
   static readonly useFreeDocking = useFreeDocking
   static readonly sidebarNavigation = sidebarNavigation

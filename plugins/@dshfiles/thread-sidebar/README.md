@@ -61,7 +61,8 @@ projection of the inbox: an open `@dshfiles/activity-timeline/attention-api` ite
 classifies. Each row shows the kit's `StatusGlyph` (Working spins without colour; only Needs you, Failed and Ready
 draw the eye), the title, a muted second line with why it needs you, the agent preset, project and host, the elapsed
 time, and one inline verb when it needs you: **Answer** and **Approve** open the thread, where the card is answered in
-place; **Retry**, **Resume** and **Land** on an inbox item run that item's own verb through the inbox's `act`.
+place; **Retry**, **Resume** and **Land** on an inbox item run that item's own verb through the inbox's `act`. The
+hover-action strip opens to the left of that verb and never over it, so the visible verb stays clickable.
 Subagents stay nested one level under their parent and roll up into it ("2 subagents need you", "waiting on 1
 subagent"), so a parent never looks finished while a child waits or failed. **Group › Arrange manually** brings back
 the drag-to-arrange sections below; a saved view keeps whatever grouping it was saved with, so only a new profile

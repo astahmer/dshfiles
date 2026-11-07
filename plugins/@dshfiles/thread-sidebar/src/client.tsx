@@ -1389,29 +1389,45 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               )}
             </button>
           ) : null}
-          {inlineVerb === undefined || workStatus === undefined || props.renaming ? null : (
-            <Button
-              type="button"
-              size="xs"
-              variant={workStatus.status === 'ready' ? 'outline' : 'default'}
-              className="dshx:absolute dshx:top-1.5 dshx:right-1.5 dshx:h-6 dshx:px-2 dshx:pointer-coarse:right-10"
-              data-testid="thread-row-verb"
-              data-verb={inlineVerb}
-              onClick={() => props.actions.actOnStatus(session.id, workStatus)}
-            >
-              {t(inlineVerbLabelKeys[inlineVerb])}
-            </Button>
-          )}
-          {nearViewport && !props.renaming ? (
+          {props.renaming || (inlineVerb === undefined && !nearViewport) ? null : (
+            // The inline verb and the hover strip share one corner: the strip opens to the left of the verb, so
+            // neither ever covers the other (the verb is the row's visible action, not a hover affordance).
             <div
-              data-testid="thread-row-actions"
-              className="dshx:pointer-events-none dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden"
+              data-testid="thread-row-overlay"
+              className={cn(
+                'dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:items-center',
+                // Touch: the row's actions menu button takes the top-right corner, so the verb moves left of it.
+                inlineVerb !== undefined && 'dshx:pointer-coarse:right-10',
+              )}
             >
-              {props.rowActions.map(action => (
-                <Fragment key={action}>{renderRowAction(action)}</Fragment>
-              ))}
+              {inlineVerb === undefined || workStatus === undefined ? null : (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant={workStatus.status === 'ready' ? 'outline' : 'default'}
+                  className="dshx:h-6 dshx:px-2"
+                  data-testid="thread-row-verb"
+                  data-verb={inlineVerb}
+                  onClick={() => props.actions.actOnStatus(session.id, workStatus)}
+                >
+                  {t(inlineVerbLabelKeys[inlineVerb])}
+                </Button>
+              )}
+              {nearViewport ? (
+                <div
+                  data-testid="thread-row-actions"
+                  className={cn(
+                    'dshx:pointer-events-none dshx:absolute dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden',
+                    inlineVerb === undefined ? 'dshx:top-0 dshx:right-0' : 'dshx:top-1/2 dshx:right-full dshx:mr-1 dshx:-translate-y-1/2',
+                  )}
+                >
+                  {props.rowActions.map(action => (
+                    <Fragment key={action}>{renderRowAction(action)}</Fragment>
+                  ))}
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          )}
           {nearViewport && !props.renaming ? (
             // Touch has no hover and iOS WebKit fires no contextmenu on a long press: this button opens the row's own
             // actions menu (the right-click menu, which also holds every hover action) at the button.
