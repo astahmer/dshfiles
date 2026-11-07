@@ -37,7 +37,11 @@ const fixture = Effect.acquireRelease(
     await jj(workspace, 'commit', '-m', 'second change')
     await writeFile(join(workspace, 'third.ts'), 'export const third = true\n')
     await jj(workspace, 'commit', '-m', 'third change')
-    const ids = { first: await changeIdOf(workspace, 'first change'), second: await changeIdOf(workspace, 'second change'), third: await changeIdOf(workspace, 'third change') }
+    const ids = {
+      first: await changeIdOf(workspace, 'first change'),
+      second: await changeIdOf(workspace, 'second change'),
+      third: await changeIdOf(workspace, 'third change'),
+    }
     const host = await createTestHost()
     await host.ctx.plugin(LocalSubprocessRuntime)
     await host.mount(plugin, { packageId: '@dshfiles/pulls-review', native: false })
@@ -91,7 +95,9 @@ describe.skipIf(!jjAvailable)('combined revision review', () => {
           await jj(workspace, 'describe', '-r', ids.second, '-m', 'second rewritten')
           await jj(workspace, '--at-op', operation, 'describe', '-r', ids.second, '-m', 'second diverged')
         })
-        const result = yield* Effect.promise(() => client(host).reviewRevisions({ path: workspace, revisions: [ids.first, ids.second.slice(0, 12), 'kkkkkkkkkkkk'] }))
+        const result = yield* Effect.promise(() =>
+          client(host).reviewRevisions({ path: workspace, revisions: [ids.first, ids.second.slice(0, 12), 'kkkkkkkkkkkk'] }),
+        )
         if (result.status !== 'ok') throw new Error(result.message)
         expect(result.revisions.map(revision => revision.description)).toEqual(['first change'])
         expect(result.unresolved.map(item => [item.revision, item.reason])).toEqual([

@@ -6,7 +6,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
-import { Check, ChevronDown, PanelRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeft, Check, ChevronDown, PanelRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type R
 import { pullsReviewApi } from './api.js'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import type { ChangesRequest } from './changes-scope.js'
+import { CombinedReview } from './combined-review.js'
 import { useRangeViewedMarks } from './viewed-marks.js'
 import { PageReviewContextModel } from './review-page-context.js'
 import { reviewWithHistoryFallback } from './review-source.js'
@@ -48,7 +49,37 @@ const Stat = (props: { readonly label: string; readonly tone?: 'add' | 'del' }):
   </span>
 )
 
+/** The page's combined review, for revisions selected in a graph no thread on screen belongs to. */
+const CombinedReviewPage = (props: { readonly workspacePath: string; readonly revisions: readonly string[] }): ReactNode => (
+  <div className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto">
+    <Page
+      heading="Review"
+      description="The selected revisions, oldest first, each as its own change."
+      actions={[
+        {
+          id: 'back-to-workspace',
+          label: 'Back to workspace review',
+          icon: <ArrowLeft aria-hidden />,
+          onSelect: () => PageReviewContextModel.set({ workspacePath: props.workspacePath }),
+        },
+      ]}
+      className="dshx:shrink-0"
+    />
+    <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-3 dshx:px-5 dshx:pb-5 dshx:@max-pane-narrow:px-3">
+      <CombinedReview key={props.revisions.join(' ')} refreshable revisions={props.revisions} workspacePath={props.workspacePath} />
+    </div>
+  </div>
+)
+
 export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
+  const pageReview = useSyncExternalStore(PageReviewContextModel.subscribe, PageReviewContextModel.read, noBody)
+  if (pageReview?.revisions !== undefined && pageReview.workspacePath !== undefined) {
+    return <CombinedReviewPage revisions={pageReview.revisions} workspacePath={pageReview.workspacePath} />
+  }
+  return <WorkspaceReview {...props} />
+}
+
+const WorkspaceReview = (props: PullsReviewPanelProps): ReactNode => {
   const api = useApi(pullsReviewApi)
   const jjApi = useApi(jjIntegrationApi)
 
