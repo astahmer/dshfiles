@@ -22,6 +22,7 @@ const triggers = (): InputTriggerController => ({
   serializeReference: async () => '',
   adjudicate: async () => undefined,
   resolveClaim: async () => undefined,
+  restoreReferences: () => [],
   openReference: () => false,
   toggleSource: () => undefined,
 })
