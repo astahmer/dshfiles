@@ -58,11 +58,7 @@ export const loadProjectConfig = (fs: FileSystem.FileSystem, workspaceRoot: stri
       Effect.orElseSucceed(() => Option.none<string>()),
     )
     if (Option.isNone(text)) return { file, config: null, invalid: null } satisfies LoadedProjectConfig
-    const parsed = yield* Effect.try({
-      try: () => JSON.parse(text.value) as unknown,
-      catch: () => null,
-    }).pipe(Effect.orElseSucceed(() => null))
-    if (parsed === null) return invalidConfig(file)
-    const decoded = Schema.decodeUnknownResult(projectConfigSchema)(parsed)
+    // The file is repository data, so it goes through the schema's JSON decoder rather than a bare JSON.parse.
+    const decoded = Schema.decodeUnknownResult(Schema.fromJsonString(projectConfigSchema))(text.value)
     return decoded._tag === 'Success' ? { file, config: decoded.success, invalid: null } : invalidConfig(file)
   })
