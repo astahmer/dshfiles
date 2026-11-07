@@ -31,6 +31,23 @@ export class SessionSourceRegistryError extends Schema.TaggedError<SessionSource
   }
 }
 
+/**
+ * A source declined a message it will not forward. The text is written for the person at the composer, so the Session
+ * controller shows it as it stands instead of reporting an unanswering runtime.
+ */
+export class SessionPromptRefused extends Schema.TaggedError<SessionPromptRefused>()('SessionPromptRefused', {
+  reason: Schema.String,
+}) {
+  override get message(): string {
+    return this.reason
+  }
+}
+
+const refusedShape = Schema.is(Schema.Struct({ _tag: Schema.Literal('SessionPromptRefused'), reason: Schema.String }))
+
+/** Structural, because each bundle holds its own copy of the class. */
+export const isSessionPromptRefused = (error: unknown): error is SessionPromptRefused => error instanceof Error && refusedShape(error)
+
 /** The Session controller's registry of mirrored Session sources. */
 export class SessionSources extends Context.Service<
   SessionSources,

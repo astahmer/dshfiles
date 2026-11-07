@@ -49,6 +49,7 @@ import { RemoteDelegation, type DelegationProgress } from './remote-delegation.j
 import { RemoteDoctor, type RemoteFacts } from './remote-doctor.js'
 import { RemoteExec } from './remote-exec.js'
 import { RemoteIdentity } from './remote-identity.js'
+import { RemotePromptGuard } from './remote-prompt-guard.js'
 import { RemoteProvision } from './remote-provision.js'
 import { RemoteReferenceContext } from './remote-reference-context.js'
 import { RemoteSessions } from './remote-sessions.js'
@@ -414,11 +415,33 @@ const fetchBeforeThread = Effect.fn('multi-host fetch before thread')(function* 
   )
 })
 
+/** Sent outside the composer, a message to a remote thread obeys the same rule as one the Session source forwards. */
+const localPathRefusal = Effect.fn('multi-host local path refusal')(function* (input: {
+  readonly runtimeId: string
+  readonly sessionId?: string
+  readonly cwd?: string
+  readonly text: string
+}) {
+  const directory = yield* HostDirectory
+  const threads = yield* RemoteThreads
+  const runtime = yield* directory.findRuntime(input.runtimeId).pipe(Effect.orElseSucceed(() => undefined))
+  const recordedCwd = (yield* threads.list.pipe(Effect.orElseSucceed(() => []))).find(thread => thread.sessionId === input.sessionId)?.cwd
+  const message = RemotePromptGuard.localPathRefusal({
+    text: input.text,
+    cwd: input.cwd ?? recordedCwd,
+    localHome: homedir(),
+    hostName: runtime?.name ?? 'the remote host',
+  })
+  return message === undefined ? undefined : { ok: false as const, code: 'prompt-local-path', message }
+})
+
 const startRemoteThread = Effect.fn('multi-host thread start')(function* (input: ThreadStartInput) {
   const directory = yield* HostDirectory
   const threads = yield* RemoteThreads
   const runtime = yield* directory.findRuntime(input.runtimeId)
   if (runtime === undefined) return threadRefused({ code: 'runtime-not-found', message: 'This host is no longer recorded.' })
+  const refused = yield* localPathRefusal({ runtimeId: input.runtimeId, cwd: input.cwd, text: input.text })
+  if (refused !== undefined) return threadRefused({ code: refused.code, message: refused.message })
   const host = yield* directory.findHost(runtime.hostId)
   const fetch =
     host?.fetchBeforeThread === true && host.connector.kind === 'ssh'
@@ -1095,6 +1118,8 @@ const handlers = Api.handlers(multiHostApi, {
           ),
         { mutation: true },
       )
+      const sessions = yield* RemoteSessions
+      yield* sessions.recordUpload({ receiptId: String(value.receiptId), runtimeId: runtime.id, sessionId: input.sessionId })
       return { ok: true as const, value }
     }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
   }),
@@ -1131,6 +1156,8 @@ const handlers = Api.handlers(multiHostApi, {
     return { removed: yield* threads.forget(input) }
   }),
   threadReply: Effect.fn('multi-host thread reply')(function* (input) {
+    const refused = yield* localPathRefusal({ runtimeId: input.runtimeId, sessionId: input.sessionId, text: input.text })
+    if (refused !== undefined) return refused
     return yield* withRuntime(
       input.runtimeId,
       gateway =>
