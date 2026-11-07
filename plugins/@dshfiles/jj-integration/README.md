@@ -334,6 +334,14 @@ with revisions to rebase is never removed automatically; its row's More menu
 offers **Remove workspace and work to rebase…** behind a confirmation that names
 how many revisions will be abandoned.
 
+The same sweep clears the `node_modules` of an archived thread kept for its
+unlanded work with the project's cleanup script. When either removal fails, the
+activity timeline records `workspace.cleanup-failed` (attention) on the owning
+project's path, with the reason and the next step: remove the workspace from its
+row once the cause is fixed, or rerun the cleanup script with the exact command
+it names. Each sweep retries, so a failure is reported once per workspace and
+reason, and again only after a success or a new reason.
+
 Manual removal forgets the jj workspace, removes its DSH workspace registration,
 and permanently deletes its folder. It does **not** archive or delete the
 conversation sessions; they remain in DSH with their original archive state.
@@ -361,6 +369,23 @@ The same job is readable and replayed from the activity timeline, and a second
 click on the same scope attaches to the job already running instead of queuing
 it twice. A Host restart drops the trail with the job; what it had already
 removed stays removed.
+
+Every job records the repository that owns the folder it was asked from
+(`repoRoot`), so a cleanup started from an isolated thread workspace, which
+sits in the sibling `-threads` directory, belongs to its project. The owner
+comes from the cached repository scan, then `jj root`, then the trail itself,
+which keeps a half-removed thread workspace (forgotten by jj, folder left
+behind) linked to its project. Each panel shows only its project's jobs
+(`cleanupJobs { path }`; the newest job of each repository keeps its rows), so
+a run in another project never hides this one's failure. A job that failed, or
+finished with a workspace or folder it could not remove, carries a `recovery`:
+fix what the reason names (the file-system cause, such as `PermissionDenied`,
+stays in the message), then run the guarded preview again; it never suggests a
+forced removal. The panel keeps that failure, with a **Review cleanup…** button
+that reopens the dialog, until it is dismissed or a later cleanup of the project
+replaces it, and the activity timeline records it as `workspace.cleanup-failed`
+(attention) on the project's path. `jj_thread_cleanup_jobs` takes the same
+`path` and prints each job's repository and recovery.
 
 **Untracked folders** also deletes threads-directory folders and files no jj
 workspace owns (forgotten workspaces, stray logs, recovery copies) that were not
@@ -404,7 +429,8 @@ Session, or a queued integration is always kept. Each run lands in the cleanup
 trail (`jj_thread_cleanup_jobs` marks it `automatic`) and in the activity
 timeline as `workspace.cleaned` — routine when nothing was removed, with the
 skip counts (`Skipped 41: 29 activity-unknown, 12 has-work.`) as its detail — or
-`workspace.cleanup-failed` when the job failed. An empty `kinds` list or
+`workspace.cleanup-failed` on the repository's path when the job failed or left
+a workspace behind, as for a manual run. An empty `kinds` list or
 `enabled: false` turns it off; settings are read at each run.
 
 A run is scoped to the projects in use: only repositories whose checkout or one

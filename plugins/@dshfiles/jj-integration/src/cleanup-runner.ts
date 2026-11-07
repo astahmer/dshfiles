@@ -11,6 +11,8 @@ import {
 
 /** What an executing cleanup reports back while it runs; the job owns the queue, the executor owns the work. */
 export interface CleanupReporter {
+  /** The scan traced the requested folder to the repository that owns it. */
+  readonly scoped: (repoRoot: string) => Effect.Effect<void>
   /** The scan finished: its candidates are what the removal pass now walks through. */
   readonly planned: (total: number) => Effect.Effect<void>
   readonly beginPhase: (phase: Extract<CleanupJobPhase, 'removing' | 'abandoning'>) => Effect.Effect<void>
@@ -37,6 +39,8 @@ const errorText = (cause: Cause.Cause<unknown>): string => {
 const make = Effect.fnUntraced(function* <E>(input: {
   readonly execute: (job: { readonly request: CleanupJobRequest; readonly report: CleanupReporter }) => Effect.Effect<CleanupResult, E>
   readonly limit?: number | undefined
+  /** Runs once the job settled, with its final view, e.g. to report a failure where its project shows it. */
+  readonly onSettled?: ((job: CleanupJobView) => Effect.Effect<void>) | undefined
 }) {
   const clock = yield* Clock.Clock
   const trail = createCleanupJobTrail({ now: () => clock.currentTimeMillisUnsafe(), ...(input.limit !== undefined && { limit: input.limit }) })
@@ -44,27 +48,30 @@ const make = Effect.fnUntraced(function* <E>(input: {
   const running = yield* FiberMap.make<string, CleanupResult, E>()
 
   const reporter = (id: string): CleanupReporter => ({
+    scoped: repoRoot => Effect.sync(() => trail.scoped(id, repoRoot)),
     planned: total => Effect.sync(() => trail.planned(id, total)),
     beginPhase: phase => Effect.sync(() => trail.begin(id, phase)),
     beginItem: name => Effect.sync(() => trail.current(id, name)),
     settleItem: outcome => Effect.sync(() => trail.settled(id, outcome)),
   })
 
-  const start = Effect.fn('cleanup jobs start')(function* (request: CleanupJobRequest) {
+  /** `repoRoot` is the repository that owns `request.path`, when the caller could trace it before the scan. */
+  const start = Effect.fn('cleanup jobs start')(function* (request: CleanupJobRequest, repoRoot: string | null = null) {
     const live = trail.live()
     if (live !== undefined && CleanupJobModel.sameRequest(live.request, request)) {
       const fiber = yield* FiberMap.get(running, live.id)
       if (Option.isSome(fiber)) return { job: live, done: Fiber.join(fiber.value) } satisfies StartedCleanup<E>
     }
-    const job = trail.start(request)
+    const job = trail.start(request, repoRoot)
     const work = Effect.gen(function* () {
       yield* Effect.sync(() => trail.begin(job.id, 'scanning'))
       return yield* input.execute({ request: job.request, report: reporter(job.id) })
     }).pipe(
       Effect.onExit(exit =>
-        Effect.sync(() => {
-          if (Exit.isSuccess(exit)) trail.done(job.id, exit.value)
-          else trail.failed(job.id, errorText(exit.cause))
+        Effect.gen(function* () {
+          const settled = Exit.isSuccess(exit) ? trail.done(job.id, exit.value) : trail.failed(job.id, errorText(exit.cause))
+          if (input.onSettled !== undefined)
+            yield* input.onSettled(settled).pipe(Effect.catchCause(cause => Effect.logWarning('jj-integration: reporting a settled cleanup failed', cause)))
         }),
       ),
       permit.withPermits(1),

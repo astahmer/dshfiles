@@ -1,4 +1,17 @@
-import { Schema } from 'effect'
+import { PlatformError, Schema } from 'effect'
+
+/**
+ * The reason behind a file-system failure, without the path the detail already names: a platform error's message
+ * repeats it, which doubles a long thread path and can push the reason past a message length limit.
+ */
+const fileSystemReason = (cause: unknown): string => {
+  if (PlatformError.isPlatformError(cause)) {
+    const reason = cause.reason
+    if (reason._tag === 'BadArgument') return reason.message
+    return `${reason._tag}${reason.description === undefined || reason.description.length === 0 ? '' : `: ${reason.description}`}`
+  }
+  return cause instanceof Error ? cause.message.trim() : ''
+}
 
 /** A path is not inside a jj repository, or the owning project stopped being one. */
 export class NotARepository extends Schema.TaggedError<NotARepository>()(
@@ -72,8 +85,10 @@ export class WorkspaceFilesFailed extends Schema.TaggedError<WorkspaceFilesFaile
   { detail: Schema.String, cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'workspace-files-failed' },
 ) {
+  /** The file-system reason (a permission, a busy file) is what tells the user what to fix, so it stays in the message. */
   override get message(): string {
-    return this.detail
+    const reason = fileSystemReason(this.cause)
+    return reason.length === 0 || this.detail.includes(reason) ? this.detail : `${this.detail} ${reason}`
   }
 }
 

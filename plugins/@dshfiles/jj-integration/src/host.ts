@@ -89,7 +89,7 @@ const handlers = Api.handlers(jjIntegrationApi, {
     Cleanup.use(cleanup => (input.apply ? Effect.flatMap(cleanup.startManual(input), started => started.done) : cleanup.preview(input))),
   // The job owns the removal once queued; its failure is reported on the trail, not to a request that already returned.
   startCleanup: input => Cleanup.use(cleanup => Effect.map(cleanup.startManual(input), started => ({ job: started.job }))),
-  cleanupJobs: () => Cleanup.use(cleanup => Effect.map(cleanup.jobs, jobs => ({ jobs: [...jobs] }))),
+  cleanupJobs: input => Cleanup.use(cleanup => Effect.map(cleanup.jobs(input.path), scoped => ({ repoRoot: scoped.repoRoot, jobs: [...scoped.jobs] }))),
 })
 
 /** jj-integration as a `@dshfiles/vcs-provider-port` provider: the port's callers isolate and snapshot without naming jj. */
