@@ -302,6 +302,68 @@
           "source": "api-dispatch"
         }
       ]
+    },
+    {
+      "id": "transcript-job-preview",
+      "title": "Live job preview in the transcript and above the composer",
+      "summary": "Under the tool card that started a background job, and above the composer while it runs, an expandable preview shows the job's lifecycle, progress and elapsed time and streams its output while open, with Stop behind a confirmation, the owning thread and a way to Processes.",
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"for i in 1 2 3 4 5 6 7 8 9 10; do echo compiled module $i; sleep 1; done; sleep 300\\\",\\\"description\\\":\\\"Build\\\",\\\"run_in_background\\\":true}]]\"",
+        "press Enter",
+        "expect region \"Running background jobs\"",
+        "click button \"Show or hide the live output of *\"",
+        "expect text \"compiled module*\""
+      ],
+      "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: under the tool card that started the job; composer dock while it runs",
+      "configuration": [],
+      "states": ["collapsed", "streaming", "no-output", "stream-failed", "stop-armed", "stopping", "settled", "no-longer-tracked"],
+      "failureModes": [
+        "A job the registry no longer holds (an earlier DSH process or retention) renders no preview, so history stays quiet.",
+        "An interrupted output stream says what stopped and points to Processes for what was retained.",
+        "A failed stop leaves the job shown as running and says so beside the control."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@deepseek-ai/dsh-api-job-controller",
+          "boundary": "Reads the client jobs service: the roster stream and the output observation it shares with the native header control. Stop goes through this plugin's own kill method.",
+          "deterministicFake": "src/job-preview.test.tsx drives a fake jobs service that publishes roster and output frames."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "background-jobs.transcript-job-preview",
+          "featureFile": "tooling/dshx/e2e/features/background-jobs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.preview-no-transcript-render",
+          "file": "plugins/@dshfiles/background-jobs/src/job-preview.test.tsx",
+          "testName": "does not re-render the transcript above it per output chunk, and the collapsed card ignores roster offsets"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.preview-stop-confirmation",
+          "file": "plugins/@dshfiles/background-jobs/src/job-preview.test.tsx",
+          "testName": "stops a job only after an explicit confirmation, which can be backed out of"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.preview-dock-clears",
+          "file": "plugins/@dshfiles/background-jobs/src/job-preview.test.tsx",
+          "testName": "lists running jobs only, and clears as they settle"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     }
   ]
 }

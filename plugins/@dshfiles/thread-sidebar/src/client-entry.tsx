@@ -41,7 +41,9 @@ import { ThreadAsideOpenProvider, ThreadSidebar, type ThreadSidebarStandardProps
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import { HeaderThreadActions } from './header-actions.js'
 import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentCatalogInjected } from './subagent-provenance/SubagentHeaderLineage.js'
-import { SubagentProvenanceToolRow } from './subagent-provenance/subagent-tool-row.js'
+import type { SubagentPreviewBindings } from './subagent-provenance/subagent-live-preview.js'
+import { SubagentPreviewDock } from './subagent-provenance/subagent-preview-dock.js'
+import { SubagentProvenanceToolRow, type SubagentToolViewProps } from './subagent-provenance/subagent-tool-row.js'
 import { NS as SUBAGENT_LOCALE_NAMESPACE } from './subagent-provenance/locales.js'
 import { subagentChatAddress } from './subagent-provenance/resource.js'
 import { ThreadAsideConversation } from './thread-aside-panel.js'
@@ -85,6 +87,8 @@ const WAITING_THREADS_PANEL_ID = 'thread-sidebar-waiting'
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
     threadSidebarFollowUp: unknown
+    /** One subagent followed from its transcript row while that row is open. */
+    threadSidebarSubagentPreview: unknown
     threadSidebarPromptLink: unknown
     threadSidebarArchivedView: unknown
     threadSidebarSkillAutocomplete: unknown
@@ -860,18 +864,47 @@ export default defineClient({
         decorate(SubagentCatalogAction),
       ),
     )
-    ctx.slots.inject('tool.call.toolview', () =>
+    const subagentTarget = (childId: string): SubagentAddress | SessionId => ctx.sessions.subagentAddress(SessionId(childId)) ?? SessionId(childId)
+    const subagentPreview: SubagentPreviewBindings = {
+      t: translate,
+      retainChild: (childId, signal) => {
+        const reference = ctx.sessions.retain(subagentTarget(childId), { source: 'threadSidebarSubagentPreview', signal })
+        return { ready: reference.ready, release: () => reference.release() }
+      },
+      openChild: childId => ctx.uiWorkspace.openSession(subagentTarget(childId)),
+      openChildAside: childId => {
+        const address = ctx.sessions.subagentAddress(SessionId(childId))
+        if (address !== undefined) subagentCatalogActions(address.parentSessionId).openChildAside(address)
+      },
+      canOpenAside: childId => ctx.sessions.subagentAddress(SessionId(childId)) !== undefined,
+    }
+    ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
-        {
-          name: 'tool.call.toolview',
-          key: 'subagent',
-          registrant: '@dshfiles/thread-sidebar',
-          priority: -1000,
-          locale: 'conversation',
-        },
-        decorate(SubagentProvenanceToolRow),
+        { name: 'conversation.input.dock', id: 'thread-sidebar-subagents-live', order: 4, inject: sessionId => ({ sessionId }) },
+        decorate((props: PropsRuntime<'conversation.input.dock'> & { readonly sessionId: SessionSummary['id'] }) => (
+          <SubagentPreviewDock
+            useSessions={props.useSessions}
+            useSessionStatus={props.useSessionStatus}
+            sessionId={props.sessionId}
+            preview={subagentPreview}
+          />
+        )),
       ),
     )
+    const SubagentRow = decorate((props: SubagentToolViewProps) => <SubagentProvenanceToolRow {...props} preview={subagentPreview} />)
+    for (const key of ['subagent', 'subagent_fork'])
+      ctx.slots.inject('tool.call.toolview', () =>
+        ctx.slots.register(
+          {
+            name: 'tool.call.toolview',
+            key,
+            registrant: '@dshfiles/thread-sidebar',
+            priority: -1000,
+            locale: 'conversation',
+          },
+          SubagentRow,
+        ),
+      )
 
     const continueInProject = async (sessionId: SessionSummary['id'], projectId: string) => {
       const continued = await createApiClient(ctx, threadActionsApi).continueIn({ sessionId, projectId })

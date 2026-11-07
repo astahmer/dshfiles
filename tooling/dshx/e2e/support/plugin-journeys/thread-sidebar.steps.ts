@@ -8,7 +8,7 @@ import * as Schema from 'effect/Schema'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion, reloadPastProviderSetup, settingsPage, settingsNavEntry } from '../steps.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
-import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFolder } from '../threads.js'
+import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 import { materializeNonblankThread } from '../thread-composer.js'
 import { ThreadSidebarJourney } from '../thread-list-grouping.js'
 
@@ -2469,6 +2469,58 @@ Then('a new thread in that project holds the prompt unsent and the address no lo
   })
   await recordAssertion(page, 'thread-sidebar-prompt-link-never-sends', async () => {
     await expect(page.locator('[data-conversation-content]')).toHaveAttribute('data-content-phase', 'hero')
+  })
+  await finishJourneyAssertions(page)
+})
+
+// The parent's turn ends once it has delegated, which folds the row; the dock is the seat that stays in view.
+const subagentRow = (page: Page): Locator => page.locator('[data-dshfiles-live-preview="agent"][data-dshfiles-live-preview-seat="dock"]')
+const SUBAGENT_CHILD_DIRECTIVE = String.raw`\u005b\u005bonce call bash \u007b\u0022command\u0022:\u0022sleep 240\u0022,\u0022description\u0022:\u0022Keep the child busy\u0022\u007d\u005d\u005d`
+
+When('a thread delegates a long command to a subagent', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-thread-sidebar-subagent-')
+  const workspace = join(root, 'subagent-preview-project')
+  await mkdir(workspace)
+  await page.getByRole('button', { name: /^New (thread|session)$/ }).first().click()
+  await registerWorkspaceFolder(page, workspace, openNewThreadAddWorkspace)
+  await startThreadWithModel(page, { project: 'subagent-preview-project', model: 'commandcode_work/gpt-6-luna' })
+  const composer = page.getByRole('textbox', { name: /(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions/ })
+  await expect(composer).toBeEnabled({ timeout: 45_000 })
+  await composer.fill(`[[once call subagent {"description":"Long child","prompt":"${SUBAGENT_CHILD_DIRECTIVE}"}]]`)
+  await composer.press('Enter')
+})
+
+Then('the composer dock reports the working subagent and what it runs', async ({ page }: { page: Page }) => {
+  const row = subagentRow(page)
+  await recordAssertion(page, 'thread-sidebar-subagent-preview-working', async () => {
+    await expect(row).toHaveAttribute('data-state', 'working', { timeout: 45_000 })
+    await row.getByRole('button', { name: /^Show or hide the progress of / }).click()
+    await expect(row.locator('[data-dshfiles-live-preview-progress]')).toContainText('In bash', { timeout: 30_000 })
+  })
+})
+
+Then('stopping the subagent from the dock takes a confirmation', async ({ page }: { page: Page }) => {
+  const row = subagentRow(page)
+  await recordAssertion(page, 'thread-sidebar-subagent-preview-stop', async () => {
+    await row.getByRole('button', { name: 'Stop subagent', exact: true }).click()
+    await expect(row).toHaveAttribute('data-state', 'working')
+    await row.getByRole('button', { name: 'Keep working', exact: true }).click()
+    await row.getByRole('button', { name: 'Stop subagent', exact: true }).click()
+    await row.getByRole('button', { name: 'Confirm stop', exact: true }).click()
+    await expect(row).toHaveCount(0, { timeout: 30_000 })
+  })
+})
+
+Then("the transcript row opens the subagent's thread", async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-subagent-preview-owner-link', async () => {
+    await page.getByText(/^Completed in /).first().click()
+    await page.getByText('Coordinated subagents', { exact: true }).first().click()
+    const row = page.locator('[data-dshfiles-live-preview="agent"]').first()
+    await expect(row).toHaveAttribute('data-state', /^(interrupted|idle)$/, { timeout: 30_000 })
+    await row.getByRole('button').first().click()
+    await row.getByRole('button', { name: 'Open thread', exact: true }).click()
+    // A child keeps the parent's address; its own first message is what proves the navigation.
+    await expect(page.getByText('Your parent agent id is', { exact: false })).toBeVisible({ timeout: 30_000 })
   })
   await finishJourneyAssertions(page)
 })

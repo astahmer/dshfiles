@@ -184,3 +184,59 @@ Then("the thread's Jobs facet lists only that thread's running job", async ({ pa
   })
   await finishJourneyAssertions(page)
 })
+
+const PREVIEWED_COMMAND = 'i=0; while [ "$i" -lt 180 ]; do echo "preview-tick-$i"; i=$((i + 1)); sleep 1; done'
+// The turn ends right after the job starts, which folds the tool card; the dock is the seat that stays in view.
+const jobPreview = (page: Page) => page.locator('[data-dshfiles-live-preview-seat="dock"]')
+
+When('a thread starts a background job that keeps writing output', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-background-jobs-preview-')
+  const workspace = join(root, 'job-preview-project')
+  await mkdir(workspace)
+  await registerWorkspaceFolder(page, workspace)
+  await startThreadWithModel(page, { project: 'job-preview-project', model: 'commandcode_work/gpt-6-luna' })
+  const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
+  await expect(composer).toBeEnabled({ timeout: 45_000 })
+  await composer.fill(`[[call bash ${JSON.stringify({ command: PREVIEWED_COMMAND, description: 'Keep writing output', run_in_background: true })}]]`)
+  await composer.press('Enter')
+})
+
+Then('the composer dock previews the running job and streams its output', async ({ page }: { page: Page }) => {
+  const preview = jobPreview(page)
+  await recordAssertion(page, 'background-jobs-transcript-preview-streams', async () => {
+    await expect(preview).toHaveAttribute('data-state', 'running', { timeout: 45_000 })
+    await expect(preview.getByRole('status')).toContainText('running')
+    const toggle = preview.getByRole('button', { name: /^Show or hide the live output of / })
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(preview.getByText('Started by this thread', { exact: true })).toBeVisible()
+    const output = preview.locator('[data-dshfiles-live-preview-output]')
+    await expect(output).toContainText('preview-tick-', { timeout: 30_000 })
+    const earlier = (await output.textContent()) ?? ''
+    await expect.poll(async () => ((await output.textContent()) ?? '').length, { timeout: 30_000 }).toBeGreaterThan(earlier.length)
+    // The same job also keeps its card under the tool call, inside the folded turn.
+    await page.getByText(/^Completed in /).last().click()
+    await page.getByText('Ran commands', { exact: true }).last().click()
+    await expect(page.locator('[data-dshfiles-live-preview-seat="tool-card"]')).toHaveAttribute('data-state', 'running')
+    const desktop = page.viewportSize()
+    await page.setViewportSize({ width: 360, height: 780 })
+    await expect(preview.getByRole('button', { name: 'Stop', exact: true })).toBeInViewport()
+    expect(await preview.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    if (desktop !== null) await page.setViewportSize(desktop)
+  })
+})
+
+Then('stopping the job from the preview takes a confirmation', async ({ page }: { page: Page }) => {
+  const preview = jobPreview(page)
+  await recordAssertion(page, 'background-jobs-transcript-preview-stop', async () => {
+    await preview.getByRole('button', { name: 'Stop', exact: true }).click()
+    await expect(preview).toHaveAttribute('data-state', 'running')
+    await preview.getByRole('button', { name: 'Keep running', exact: true }).click()
+    await expect(preview).toHaveAttribute('data-state', 'running')
+    await preview.getByRole('button', { name: 'Stop', exact: true }).click()
+    await preview.getByRole('button', { name: 'Confirm stop', exact: true }).click()
+    await expect(preview).toHaveCount(0, { timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})

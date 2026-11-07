@@ -1,10 +1,24 @@
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ToolCallOwnerProps } from '@deepseek-ai/dsh-client-ui-tool/client'
-import { defineClient } from '@dshfiles/dshx/client'
+import { defineClient, useRegistry } from '@dshfiles/dshx/client'
 import { TOOL_META_LOCALE_NAMESPACE, toolMetaLocale } from './locales.js'
+import { ToolCallSections, type ToolCallSectionProps } from './tool-call-sections.js'
 import { installToolCallTreeWrapper, isToolCallTreeWrapped } from './tool-call-tree.js'
 import { ToolMetaLine } from './tool-meta-line.js'
 import { warnOnce } from './warn-once.js'
+
+const ToolCallSectionList = (props: ToolCallSectionProps): JSX.Element | null => {
+  const sections = useRegistry(ToolCallSections)
+  if (sections.length === 0) return null
+  const ordered = sections.toSorted((left, right) => (left.order ?? 0) - (right.order ?? 0))
+  return (
+    <>
+      {ordered.map(({ id, Section }) => (
+        <Section key={id} owner={props.owner} sessionId={props.sessionId} />
+      ))}
+    </>
+  )
+}
 
 /** The chat and the tool renderer load beside this plugin; past this they are not coming. */
 const WRAP_DEADLINE_MS = 15_000
@@ -17,7 +31,8 @@ export default defineClient({
     const t = ctx.locale.bind(TOOL_META_LOCALE_NAMESPACE)
     const TimedLine = decorate(ToolMetaLine)
     const Meta = ({ owner }: { readonly owner: ToolCallOwnerProps }) => <TimedLine owner={owner} t={t} />
-    ctx.effect(() => installToolCallTreeWrapper({ slots: ctx.slots, Meta }), 'tool-meta: wrap the tool-call renderer')
+    const Sections = decorate(ToolCallSectionList)
+    ctx.effect(() => installToolCallTreeWrapper({ slots: ctx.slots, Meta, Sections }), 'tool-meta: wrap the tool-call renderer')
     ctx.effect(() => {
       const timer = setTimeout(() => {
         if (!isToolCallTreeWrapped(ctx.slots)) warnOnce('no conversation.chat.node "tool-call" renderer to wrap; tool timings are hidden')

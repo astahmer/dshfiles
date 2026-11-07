@@ -968,3 +968,11 @@ These are runtime-core checks, not a boot of the user's active DSH profile.
 
 The parent workstream must add this package to its composed plugin list. This
 child does not edit the active profile or root workspace manifests/lockfiles.
+
+## Subagent row in the transcript
+
+![Live subagent preview in the transcript and above the composer](docs/screenshots/subagent-live-preview.png)
+
+The row of a `subagent` or `subagent_fork` call reports the child rather than the call: Working, Finished, Interrupted or Idle, from the session status and the child's timing projection. These are agent states, deliberately not the job lifecycle: a child that went idle can be followed up. Opened, the row holds a client reference to the child and folds its event window into the current tool and the tail of its latest answer; collapsing releases it, and the window repaints on a timer rather than per token, so the parent transcript never re-renders for it. The row links to the child's thread, opens it beside the chat, and offers Stop behind a confirmation. Stop is the session's own cancel, which `interrupt_agent` also reaches; an interrupted child can be messaged again.
+
+A parent commonly ends its turn to wait for its children, which folds these rows, so working subagents also list above the composer (`conversation.input.dock`) with the same preview, and leave as they go idle.

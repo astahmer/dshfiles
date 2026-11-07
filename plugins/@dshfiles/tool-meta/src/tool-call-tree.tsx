@@ -9,6 +9,12 @@ const TOOL_CALL_NODE = 'tool-call'
 type RenderToolView = ToolTreeProps['renderSlot']
 export type ToolMetaComponent = ComponentType<{ readonly owner: ToolCallOwnerProps }>
 
+/** What the frame renders around each call: the timing line, and what other plugins add under the card. */
+export interface ToolCallFrameParts {
+  readonly Meta: ToolMetaComponent
+  readonly Sections?: ComponentType<{ readonly owner: ToolCallOwnerProps; readonly sessionId: string }> | undefined
+}
+
 /** Every wrapper this module made, so a re-registration is wrapped once and dispose can tell ours apart. */
 const wrappers = new Set<unknown>()
 
@@ -17,10 +23,11 @@ const wrappers = new Set<unknown>()
  * ('tool.call.toolview', owner). Handing it a `renderSlot` that frames each dispatch with a meta line decorates every
  * tool card, whichever plugin owns it, while the tree keeps its own slot authorization, keys and memoization.
  */
-const wrapToolCallTree = (input: { readonly tree: ComponentType<ToolTreeProps>; readonly Meta: ToolMetaComponent }): ComponentType<ToolTreeProps> => {
-  const { tree: Tree, Meta } = input
+const wrapToolCallTree = (input: ToolCallFrameParts & { readonly tree: ComponentType<ToolTreeProps> }): ComponentType<ToolTreeProps> => {
+  const { tree: Tree, Meta, Sections } = input
   const ToolCallTreeWithMeta = (props: ToolTreeProps): ReactElement => {
     const nativeRenderSlot: RenderToolView | undefined = props.renderSlot
+    const sessionId = props.sessionId
     const dispatched = useRef(false)
     const renderSlot = useMemo((): RenderToolView | undefined => {
       if (nativeRenderSlot === undefined) return undefined
@@ -39,13 +46,14 @@ const wrapToolCallTree = (input: { readonly tree: ComponentType<ToolTreeProps>; 
                 <Meta owner={owner} />
               </span>
             )}
+            {Sections === undefined ? null : <Sections owner={owner} sessionId={sessionId} />}
           </div>
         )
       }
       // SAFETY: the tree declares one child slot, 'tool.call.toolview', so the generic key is always that one and
       // its owner is ToolCallOwnerProps.
       return framed as RenderToolView
-    }, [nativeRenderSlot])
+    }, [nativeRenderSlot, sessionId])
     useEffect(() => {
       if (nativeRenderSlot === undefined) warnOnce('the tool-call renderer no longer receives renderSlot; tool timings are hidden')
       else if (!dispatched.current) warnOnce('the tool-call renderer rendered without dispatching tool.call.toolview; tool timings are hidden')
@@ -71,7 +79,7 @@ const toolCallEntryOf = (slots: Pick<SlotLedger, 'entriesOfSlot'>): StoredEntry 
  * shadowing entry would not hold the tree's 'tool.call.toolview' child declaration, so it could not render the cards.
  * Returns the disposer that puts every original back.
  */
-export const installToolCallTreeWrapper = (input: { readonly slots: SlotLedger; readonly Meta: ToolMetaComponent }): (() => void) => {
+export const installToolCallTreeWrapper = (input: ToolCallFrameParts & { readonly slots: SlotLedger }): (() => void) => {
   const originals = new Map<StoredEntry, unknown>()
   const wrap = (): void => {
     const entry = toolCallEntryOf(input.slots)
@@ -83,7 +91,11 @@ export const installToolCallTreeWrapper = (input: { readonly slots: SlotLedger; 
     originals.set(entry, entry.component)
     // SAFETY: the ledger erases component types; ui-renderer renders this entry's component with ToolTreeProps,
     // which is the 'tool-call' key's declared prop contract.
-    entry.component = wrapToolCallTree({ tree: entry.component as ComponentType<ToolTreeProps>, Meta: input.Meta })
+    entry.component = wrapToolCallTree({
+      tree: entry.component as ComponentType<ToolTreeProps>,
+      Meta: input.Meta,
+      Sections: input.Sections,
+    })
   }
   wrap()
   const unsubscribe = input.slots.subscribe(CHAT_NODE_SLOT, wrap)

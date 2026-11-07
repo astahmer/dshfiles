@@ -32,6 +32,7 @@ import { useApi, useApiEvent } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { backgroundJobsApi } from './api.js'
 import { jobCategoryValues, type JobCategory } from './classify.js'
+import { JobPreviewModel } from './job-preview-model.js'
 import { JobSelectionModel } from './job-selection.js'
 import type { BackgroundJobsKey, BackgroundJobsTranslate } from './locales.js'
 import { backgroundJobStopMachine } from './stop-machine.js'
@@ -67,7 +68,7 @@ const CATEGORY_KEY = {
   other: 'categoryOther',
 } as const satisfies Record<JobCategory, BackgroundJobsKey>
 
-const STATUS_KEY = {
+export const STATUS_KEY = {
   running: 'statusRunning',
   stopping: 'statusStopping',
   completed: 'statusCompleted',
@@ -80,11 +81,7 @@ const isLiveStatus = (status: JobStatus): boolean => status === 'running' || sta
 
 const durationLabel = (row: JobRow, now: number): string => {
   if (row.finishedAt === null && !isLiveStatus(row.status)) return '—'
-  const seconds = Math.max(0, Math.round(((row.finishedAt ?? now) - row.startedAt) / 1000))
-  if (seconds < 60) return `${String(seconds)}s`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${String(minutes)}m ${String(seconds % 60)}s`
-  return `${String(Math.floor(minutes / 60))}h ${String(minutes % 60)}m`
+  return JobPreviewModel.formatElapsed((row.finishedAt ?? now) - row.startedAt)
 }
 
 /** A clock alone is ambiguous across days, so anything older than today carries its date. */
@@ -105,7 +102,7 @@ const WORK_STATUS = {
   failed: 'failed',
 } as const satisfies Record<JobStatus, WorkStatus>
 
-const statusVariant = (status: JobStatus): 'default' | 'secondary' | 'outline' | 'destructive' => {
+export const statusVariant = (status: JobStatus): 'default' | 'secondary' | 'outline' | 'destructive' => {
   if (status === 'failed') return 'destructive'
   if (isLiveStatus(status)) return 'secondary'
   return 'outline'

@@ -48,7 +48,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/client/index.ts:69",
+      "source": "tooling/dshx/packages/dshx/src/client/index.ts:94",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -68,7 +68,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/client/index.ts:68",
+      "source": "tooling/dshx/packages/dshx/src/client/index.ts:93",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -373,7 +373,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "attentionApi",
       "importFrom": "@dshfiles/activity-timeline/attention-api",
       "owner": "@dshfiles/activity-timeline",
-      "source": "plugins/@dshfiles/activity-timeline/src/attention-api.ts:165",
+      "source": "plugins/@dshfiles/activity-timeline/src/attention-api.ts:169",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/activity-timeline:attention",
@@ -390,6 +390,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "Agent tools: attention_list (read-only), attention_done, attention_snooze, attention_reopen, attention_mute_source"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "AttentionSubjectOpeners",
+      "importFrom": "@dshfiles/activity-timeline/attention-openers",
+      "owner": "@dshfiles/activity-timeline",
+      "source": "plugins/@dshfiles/activity-timeline/src/attention-openers.ts:18",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/activity-timeline.subject-opener",
+      "kind": "registry",
+      "title": "AttentionSubjectOpeners",
+      "summary": "Contribution registry owned by @dshfiles/activity-timeline.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(AttentionSubjectOpeners, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/activity-timeline renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/activity-timeline.subject-opener"
+      ],
+      "docs": "docs/plugin-boundaries.md",
       "command": null
     },
     {
@@ -683,7 +705,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "backlogApi",
       "importFrom": "@dshfiles/backlog/api",
       "owner": "@dshfiles/backlog",
-      "source": "plugins/@dshfiles/backlog/src/api.ts:268",
+      "source": "plugins/@dshfiles/backlog/src/api.ts:611",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/backlog:backlog",
@@ -696,8 +718,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/backlog owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: list, revision, aiActivity, projects, get, getMany, referencing, capture, attachFile, readFile, removeFile, delete, speechStatus, jevSetupStatus, classifyReply, generateReply, transcribeSpeech, enrichTweet, update, link, agentContinuationCandidates, continueAgentThread, startThread, syncStatus, syncNow, linkRemote, testSyncBackend, testSyncBackends, importRemote, acknowledge, triage, backfillTriage, backfillTriageStatus, applyProposal, dismissProposal, comment, editComment, deleteComment",
-        "Agent tools: backlog_list (read-only), backlog_projects (read-only), backlog_get (read-only), backlog_get_many (read-only), backlog_referencing (read-only), backlog_capture, backlog_attach_file, backlog_read_file (read-only), backlog_remove_file, backlog_delete, backlog_enrich_tweet, backlog_update, backlog_link, backlog_start_thread, backlog_sync_status (read-only), backlog_sync_now, backlog_link_remote, backlog_sync_test_connection (read-only), backlog_sync_test_all (read-only), backlog_import_remote, backlog_triage, backlog_triage_backfill, backlog_triage_backfill_status (read-only), backlog_accept_proposal, backlog_dismiss_proposal, backlog_comment"
+        "Methods: list, revision, aiActivity, projects, get, getMany, referencing, capture, attachFile, readFile, removeFile, delete, speechStatus, jevSetupStatus, classifyReply, generateReply, transcribeSpeech, enrichTweet, update, ready, claim, release, link, agentContinuationCandidates, continueAgentThread, startThread, syncStatus, syncNow, linkRemote, syncSources, saveSyncConnection, removeSyncConnection, moveSyncConnection, saveSyncBinding, removeSyncBinding, discoverSync, testSyncConnection, testSyncConnections, importRemote, importAllRemote, acknowledge, triage, backfillTriage, backfillTriageStatus, applyProposal, dismissProposal, comment, editComment, revert, setProjectGuidance, scheduleRule, pullRequests, linkPullRequest, merge, export, shipped, summarizeShipped, deleteComment, peerInfo, peerOpsSince, peerFiles, peerStatus, peerSync, configurePeers, eventHosts",
+        "Agent tools: backlog_list (read-only), backlog_projects (read-only), backlog_get (read-only), backlog_get_many (read-only), backlog_referencing (read-only), backlog_capture, backlog_attach_file, backlog_read_file (read-only), backlog_remove_file, backlog_delete, backlog_enrich_tweet, backlog_update, backlog_ready (read-only), backlog_claim, backlog_release, backlog_link, backlog_start_thread, backlog_sync_status (read-only), backlog_sync_now, backlog_link_remote, backlog_sync_connections (read-only), backlog_sync_connection_save, backlog_sync_connection_remove, backlog_sync_connection_move, backlog_sync_binding_save, backlog_sync_binding_remove, backlog_sync_discover (read-only), backlog_sync_test_connection (read-only), backlog_sync_test_all (read-only), backlog_import_remote, backlog_sync_import_all, backlog_triage, backlog_triage_backfill, backlog_triage_backfill_status (read-only), backlog_accept_proposal, backlog_dismiss_proposal, backlog_comment, backlog_revert, backlog_set_project_guidance, backlog_schedule_rule, backlog_pull_requests (read-only), backlog_link_pr, backlog_merge, backlog_export, backlog_shipped (read-only), backlog_summarize_shipped, backlog_peer_status (read-only), backlog_peer_sync, backlog_peers_configure"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -741,6 +763,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "details": [
         "Contract id: SecretLinkReveal"
       ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/backlog/backlog-provider",
+      "kind": "module",
+      "title": "@dshfiles/backlog/backlog-provider",
+      "summary": "The backlog provider port: one remote source of items (Linear, GitHub Issues, a folder of markdown files, Notion…). Providers speak the backlog's canonical vocabulary, so the sync engine never sees a GraphQL or REST shape. Built-in providers implement `BacklogProvider` in-process; a provider from another plugin serves…",
+      "publicSymbol": "BacklogProviderMethods, ProviderCapabilities, ProviderDescriptor, ProviderBindingOption, ProviderBindingOptions, ProviderConnection",
+      "importFrom": "@dshfiles/backlog/backlog-provider",
+      "owner": "@dshfiles/backlog",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [
+        "Also exports: ProviderContainer, ProviderIdentity, RemoteStatus, RemoteComment, RemoteRelation, RemoteRecord, RemotePatch, ProviderField, ProviderExtraField, RemoteCriterion, PullInput, PullPage, ProviderScope, ProviderFailureCode, BacklogProviderFailed, BacklogProvider, BacklogProviders"
+      ],
+      "source": "plugins/@dshfiles/backlog/src/provider-port.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -1281,7 +1325,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/multi-host/api",
       "summary": "Public module of @dshfiles/multi-host.",
-      "publicSymbol": "JsonValue, LocalProjectFileCandidate, jsonValueSchema, resourceSnapshotSchema, fileUploadValueSchema, jjRevisionEffectSchema",
+      "publicSymbol": "JsonValue, LocalProjectFileCandidate, jsonValueSchema, resourceSnapshotSchema, fileUploadValueSchema, remotePeerReadCalls",
       "importFrom": "@dshfiles/multi-host/api",
       "owner": "@dshfiles/multi-host",
       "scope": "client or host",
@@ -1292,7 +1336,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: jjThreadEffectSchema, jjRepositoryEffectSchema, jjRepositoriesEffectSchema, jjRevisionSchema, jjThreadSchema, jjRepositorySchema, jjRepositoriesSchema, JjRevisionView, JjThreadView, JjRepositoryView, nativeRpcSchema, nativeRpcResultSchema, ProjectOriginsInput, cloneProjectInputEffectSchema, EffectMultiHostApi, multiHostApi, HostSummary, ConnectionTestStep"
+        "Also exports: jjRevisionEffectSchema, jjThreadEffectSchema, jjRepositoryEffectSchema, jjRepositoriesEffectSchema, jjRevisionSchema, jjThreadSchema, jjRepositorySchema, jjRepositoriesSchema, JjRevisionView, JjThreadView, JjRepositoryView, nativeRpcSchema, nativeRpcResultSchema, ProjectOriginsInput, cloneProjectInputEffectSchema, EffectMultiHostApi, multiHostApi, HostSummary"
       ],
       "source": "plugins/@dshfiles/multi-host/src/api.ts",
       "docs": "docs/plugin-boundaries.md",
@@ -1316,6 +1360,29 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Calling is additive; @dshfiles/preview owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
         "Methods: screenshotHtml"
+      ],
+      "docs": "tooling/dshx/docs/guides/api.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "automationsApi",
+      "importFrom": "@dshfiles/project-automations/api",
+      "owner": "@dshfiles/project-automations",
+      "source": "plugins/@dshfiles/project-automations/src/automations-api.ts:122",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "api:@dshfiles/project-automations:project-automations",
+      "kind": "api",
+      "title": "automationsApi (project-automations)",
+      "summary": "Project automations: schedules and signed webhooks that each start a new thread in a project. Every user verb in the Automations page is a method here, and each one the agent may use carries its tool.",
+      "scope": "host, called from clients, other Host plugins and agents",
+      "mode": "host methods",
+      "registration": "useApi(automationsApi) in a Client slot, or createHostApiClient(ctx, automationsApi, packageId) on the Host",
+      "risk": "additive",
+      "riskNote": "Calling is additive; @dshfiles/project-automations owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
+      "details": [
+        "Methods: list, runs, projects, save, setEnabled, runNow, delete",
+        "Agent tools: automation_list (read-only), automation_runs (read-only), automation_projects (read-only), automation_save, automation_set_enabled, automation_run_now, automation_delete"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -1361,6 +1428,29 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "details": [],
       "source": "plugins/@dshfiles/project-checks/src/completion-event.ts",
       "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "pullRequestApi",
+      "importFrom": "@dshfiles/pull-requests/api",
+      "owner": "@dshfiles/pull-requests",
+      "source": "plugins/@dshfiles/pull-requests/src/api.ts:47",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "api:@dshfiles/pull-requests:pull-requests",
+      "kind": "api",
+      "title": "pullRequestApi (pull-requests)",
+      "summary": "Host API served by @dshfiles/pull-requests.",
+      "scope": "host, called from clients, other Host plugins and agents",
+      "mode": "host methods",
+      "registration": "useApi(pullRequestApi) in a Client slot, or createHostApiClient(ctx, pullRequestApi, packageId) on the Host",
+      "risk": "additive",
+      "riskNote": "Calling is additive; @dshfiles/pull-requests owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
+      "details": [
+        "Methods: link, unlink, list, watch, createPreview, create, unwatch",
+        "Agent tools: pull_request_link, pull_request_unlink, pull_request_list (read-only), pull_request_watch, pull_request_create_preview (read-only), pull_request_create, pull_request_unwatch"
+      ],
+      "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
     },
     {
@@ -1688,7 +1778,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadSidebarAutoSettleApi",
       "importFrom": "@dshfiles/thread-sidebar/auto-settle-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/auto-settle-api.ts:86",
+      "source": "plugins/@dshfiles/thread-sidebar/src/auto-settle-api.ts:89",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-sidebar-auto-settle",
@@ -1877,6 +1967,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Additive: each contribution adds an entry; @dshfiles/thread-sidebar renders nothing for it when absent.",
       "details": [
         "Registry id: @dshfiles/thread-sidebar.pending-restart-source"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "ToolCallSections",
+      "importFrom": "@dshfiles/tool-meta/tool-call-sections",
+      "owner": "@dshfiles/tool-meta",
+      "source": "plugins/@dshfiles/tool-meta/src/tool-call-sections.ts:29",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/tool-meta.tool-call-section",
+      "kind": "registry",
+      "title": "ToolCallSections",
+      "summary": "Contribution registry owned by @dshfiles/tool-meta.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(ToolCallSections, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/tool-meta renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/tool-meta.tool-call-section"
       ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
@@ -2174,8 +2286,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/workspace-folder-picker owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: list, createDirectory",
-        "Agent tools: workspace_folder_browser_list (read-only), workspace_folder_browser_create_directory"
+        "Methods: capabilities, list, createDirectory",
+        "Agent tools: workspace_folder_browser_capabilities (read-only), workspace_folder_browser_list (read-only), workspace_folder_browser_create_directory"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -2272,7 +2384,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-communication › agent-directory"
       ],
       "details": [
-        "Used by 59 catalog feature(s)",
+        "Used by 75 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2300,7 +2412,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/background-jobs › thread-jobs-facet"
       ],
       "details": [
-        "Used by 27 catalog feature(s)",
+        "Used by 28 catalog feature(s)",
         "Destinations in use: thread-panel"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2325,10 +2437,10 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › board-links-and-history",
         "@dshfiles/backlog › rich-item-text",
         "@dshfiles/backlog › secret-link-reveal",
-        "@dshfiles/jj-integration › thread-integration-row-details"
+        "@dshfiles/backlog › revert-field-change"
       ],
       "details": [
-        "Used by 6 catalog feature(s)",
+        "Used by 10 catalog feature(s)",
         "Destinations in use: land, observe, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2375,14 +2487,14 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Catalog metadata only; features:check validates the surface/destination pair.",
       "occupancy": "static",
       "occupants": [
+        "@dshfiles/activity-timeline › inbox-opens-subject",
         "@dshfiles/background-jobs › batch-stop-jobs",
-        "@dshfiles/backlog › inline-title-edit",
-        "@dshfiles/backlog › multi-select-items",
-        "@dshfiles/backlog › selection-context-menu"
+        "@dshfiles/background-jobs › outlived-jobs",
+        "@dshfiles/backlog › inline-title-edit"
       ],
       "details": [
-        "Used by 28 catalog feature(s)",
-        "Destinations in use: knowledge, land, observe, settings, threads, work"
+        "Used by 30 catalog feature(s)",
+        "Destinations in use: inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
       "docs": "docs/observability.md",
@@ -2409,7 +2521,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 23 catalog feature(s)",
+        "Used by 25 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2465,8 +2577,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/hmr-gate › plugins-row"
       ],
       "details": [
-        "Used by 8 catalog feature(s)",
-        "Destinations in use: none"
+        "Used by 9 catalog feature(s)",
+        "Destinations in use: none, observe"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
       "docs": "docs/observability.md",
@@ -2493,7 +2605,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 48 catalog feature(s)",
+        "Used by 52 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2577,7 +2689,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › bounded-batch-resolution"
       ],
       "details": [
-        "Used by 21 catalog feature(s)",
+        "Used by 22 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2605,7 +2717,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › auxiliary-and-wait-spans"
       ],
       "details": [
-        "Used by 97 catalog feature(s)",
+        "Used by 99 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

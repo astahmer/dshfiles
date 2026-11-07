@@ -3397,6 +3397,73 @@
           "reason": "The page only has rows when the Host attention store holds items, which a fresh scratch profile does not; the empty page is reachable, and ordering plus counts are unit-tested."
         }
       ]
+    },
+    {
+      "id": "subagent-live-preview",
+      "title": "Live subagent preview in the transcript and above the composer",
+      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation.",
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"commands, @ files or sessions*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+        "press Enter",
+        "expect region \"Working subagents\"",
+        "click button \"Show or hide the progress of *\"",
+        "expect text \"In bash*\""
+      ],
+      "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: subagent tool row; composer dock while the child works",
+      "configuration": [],
+      "states": ["starting", "failed-to-start", "working", "finished", "interrupted", "idle", "stop-armed", "stopping", "progress-unavailable"],
+      "failureModes": [
+        "A child that cannot be opened keeps its row and thread link, and says live progress is unavailable.",
+        "A failed stop leaves the child working and points to its thread, where Stop is also available."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@deepseek-ai/dsh-api-session-controller",
+          "boundary": "Holds a client reference to the child session only while the row is open and reads its event window; Stop goes through the child's session cancel, which routes to the parent interrupt.",
+          "deterministicFake": "src/subagent-provenance/subagent-feed.test.ts drives a fake event source; the row test uses a fake binding."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.subagent-live-preview",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-feed-throttled",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-feed.test.ts",
+          "testName": "repaints on a timer rather than per token"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-open-while-expanded",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-tool-row.client.test.tsx",
+          "testName": "opens the child only while expanded, and releases it on collapse"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-stop-confirmation",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-tool-row.client.test.tsx",
+          "testName": "stops a working child only after confirmation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-dock-working",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
+          "testName": "lists working children only, and clears as they go idle"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: it reads an already-open event window and calls the native session cancel, which owns its own spans."
+        }
+      ]
     }
   ],
   "kind": "bundle"
