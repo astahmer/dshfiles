@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Clock, Context, Effect, FileSystem, Layer, Option, Path } from 'effect'
+import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { CleanupKindView, CleanupResult, CleanupTarget } from './api.js'
 import { CleanupJobModel, type CleanupJobRequest, type CleanupTrigger } from './cleanup-jobs.js'
 import { CleanupRunner, type CleanupReporter } from './cleanup-runner.js'
@@ -153,9 +154,12 @@ const make = Effect.gen(function* () {
         const secondary = yield* threads
           .secondaryWorkspaces(repository.repoRoot)
           .pipe(Effect.catch(warnAndSkip('list secondary workspaces', repository.repoRoot)))
+        // The registry canonicalizes the path it is given, so a workspace whose checkout folder is gone cannot be
+        // resolved by path; matching the recorded one keeps that row cleanable instead of failing the whole scan.
+        const registeredByPath = new Map<string, Workspace>((yield* registry.list).map(workspace => [workspace.path, workspace]))
         // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- secondary workspaces are few and each registry read is a map lookup.
         for (const workspace of secondary) {
-          const resolved = yield* registry.resolveByPath(workspace.path)
+          const resolved = workspace.missing ? registeredByPath.get(workspace.path) : yield* registry.resolveByPath(workspace.path)
           const registered = resolved?.path === workspace.path ? resolved : undefined
           workspaceIds.set(workspace.path, registered?.id ?? null)
           const sessionCwds = yield* Effect.filter(sessionRecords ?? [], record =>
