@@ -327,4 +327,4 @@ this client like any other.
 
 ## Remaining boundaries
 
-- Terminal access is not mirrored; Host UI is the fallback.
+- Terminals stay on the host by decision: a shell in this client would be new interactive access to that machine, so a terminal tab on a mirrored thread offers the host's own DSH instead (`sidebarRight.substituteTab`).

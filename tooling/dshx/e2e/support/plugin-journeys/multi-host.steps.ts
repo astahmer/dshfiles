@@ -419,6 +419,7 @@ const bootLoopbackPair = async (
         '@dshfiles/session-controller',
         '@dshfiles/model-effort-picker',
         '@dshfiles/user-questions',
+        '@dshfiles/sidebar-right',
         ...(remote_.managerPackageIds ?? []),
       ],
       profileLabel: 'multi-host-manager',
@@ -945,6 +946,70 @@ Then('the remote command runs on its owning host', async ({ page }: { readonly p
         timeout: 30_000,
       })
       .toBe(true)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the remote approval is rejected here', async ({ page }: { readonly page: Page }) => {
+  await remoteApproval(page).getByRole('button', { name: 'Reject', exact: true }).click()
+})
+
+Then('the remote command does not run', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-approval-rejected', async () => {
+    await expect(remoteApproval(page)).toHaveCount(0, { timeout: 30_000 })
+    const fake = fakeCommandCodeFor(page)
+    await expect.poll(() => fake.requests.flatMap(request => request.messages).filter(message => message.role === 'tool').length, { timeout: 30_000 }).toBeGreaterThan(0)
+    const toolText = fake.requests.flatMap(request => request.messages).filter(message => message.role === 'tool').map(message => message.text).join('\n')
+    expect(toolText).not.toMatch(new RegExp(`^${APPROVAL_MARKER}$`, 'mu'))
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the approval panel fits a phone', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-approval-phone', async () => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    const panel = remoteApproval(page)
+    await expect(panel.getByRole('button', { name: 'Allow once', exact: true })).toBeInViewport({ timeout: 15_000 })
+    await expect(panel.getByRole('button', { name: 'Reject', exact: true })).toBeInViewport()
+    const overflow = await panel.evaluate(element => element.scrollWidth - element.clientWidth)
+    expect(overflow).toBeLessThanOrEqual(1)
+    await page.setViewportSize({ width: 1280, height: 800 })
+  })
+})
+
+Then('a host without the repository plugins says so', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+  const call = await hostApi(pairFor(page).manager)
+  await recordAssertion(page, 'multi-host-host-without-plugins', async () => {
+    const repositories = Schema.decodeUnknownSync(withUnknownProperties({ unreachable: Schema.Array(Schema.String) }))(await call('remoteRepositories', {}))
+    expect(repositories.unreachable).toEqual([])
+    const reply = Schema.decodeUnknownSync(jjCallResultSchema)(
+      await call('sessionRepositoryCall', { sessionId: observation.sessionId, api: 'jujutsu', method: 'registerRepository', input: { path: observation.folderPath } }),
+    )
+    expect(reply).toMatchObject({ ok: false, code: 'api-not-served', message: 'This host does not have the plugin for that. Update DSH there, or open the thread on its host.' })
+  })
+})
+
+When('a terminal is opened on the remote thread', async ({ page }: { readonly page: Page }) => {
+  await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+  await page.getByRole('button', { name: /^New terminal/u }).first().click({ timeout: 15_000 })
+})
+
+Then('the terminal is offered on its host', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-terminal', async () => {
+    const panel = page.locator('[data-remote-terminal]')
+    await expect(panel).toBeVisible({ timeout: 30_000 })
+    const observation = autoDestinationObservations.get(page)
+    if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+    const call = await hostApi(pairFor(page).manager)
+    const view = Schema.decodeUnknownSync(runtimeOpenViewSchema, { onExcessProperty: 'error' })(await call('runtimeOpenView', { runtimeId: observation.runtimeId }))
+    allowLoopbackBrowserOrigin(page, view.launchUrl)
+    const [hostPage] = await Promise.all([page.context().waitForEvent('page'), panel.getByRole('button', { name: 'Open terminal on host', exact: true }).click()])
+    await expect.poll(() => hostPage.url(), { timeout: 30_000 }).not.toBe('about:blank')
+    await expect(hostPage.getByRole('button', { name: 'New session', exact: true }).first()).toBeVisible({ timeout: 30_000 })
+    expect(new URL(hostPage.url()).origin).not.toBe(new URL(page.url()).origin)
+    await hostPage.close()
   })
   await finishJourneyAssertions(page)
 })

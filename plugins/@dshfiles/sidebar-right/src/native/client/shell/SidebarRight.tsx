@@ -47,6 +47,7 @@ import type { TabOccurrence } from '../tab-domain.ts'
 import type { SidebarRightTabNavigation } from '../contract/slots.ts'
 import type { TabHookContext } from '../tab-info.ts'
 import css from './SidebarRight.module.css'
+import { useTabSubstitute } from '../tab-substitutes.ts'
 
 /** The store share the seat receives. */
 type Store = PropsStore<ReturnType<typeof createSidebarRightStore>>
@@ -212,7 +213,7 @@ export function intentsFor(
 /** One tab's slot dispatch: which seat, and what to render when no type registered. */
 interface TabSlotProps extends Pick<
   PanelProps,
-  'renderSlot' | 'occurrence' | 'useTabTypes' | 'useTabNavigation' | 'useStore' | 'fullscreen' | 'active' | 'retainTab' | 'shortcuts'
+  'renderSlot' | 'occurrence' | 'sessionId' | 'useTabTypes' | 'useTabNavigation' | 'useStore' | 'fullscreen' | 'active' | 'retainTab' | 'shortcuts'
 > {
   readonly tab: TabRecord
   readonly seat: 'sidebar.right.pane.tab' | 'sidebar.right.pane.tab.title'
@@ -227,6 +228,7 @@ interface TabSlotProps extends Pick<
 export function TabSlot({
   renderSlot,
   occurrence,
+  sessionId,
   useTabTypes,
   useTabNavigation,
   useStore,
@@ -258,7 +260,8 @@ export function TabSlot({
     }),
     [tab.id, seat, fullscreen, active, embedded, signal, tabActions, useStore, useTabNavigation, shortcuts],
   )
-  const content = renderSlot(seat, {}, { entryKey: definition?.id ?? tab.kind, fallback, hookContext })
+  const substitute = useTabSubstitute(tab.kind, sessionId)
+  const content = substitute.pending ? null : renderSlot(seat, {}, { entryKey: substitute.entryKey ?? definition?.id ?? tab.kind, fallback, hookContext })
   return seat === 'sidebar.right.pane.tab.title' ? (
     <span key={id} className={css.tabTitle} data-sidebar-right-tab={tab.id} data-sidebar-right-occurrence={id}>
       {content}
