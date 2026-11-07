@@ -52,6 +52,19 @@ Feature: Multi-host loopback SSH lifecycle
     When the remote question is answered "Production" here
     Then the remote agent receives the answer "Production"
 
+  @scenario:multi-host.remote-question-reconnect
+  Scenario: A waiting remote question survives a dropped tunnel
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the remote agent asks a question
+    Then the remote question opens in the controlling chat
+    When the connection to the remote drops while the question waits
+    Then the remote question is back in the controlling chat after reconnecting
+    When the remote question is answered "Production" here
+    Then the remote agent receives the answer "Production"
+
   @scenario:multi-host.remote-question-dismissed
   Scenario: A remote agent's question is dismissed in the controlling chat
     Given a loopback SSH DSH pair is booted
