@@ -94,6 +94,8 @@ const cleanupWorkspaceSchema = Schema.Struct({
   kind: Schema.Literals(['empty', 'integrated', 'secondary']),
   lastUsedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   missing: Schema.Boolean,
+  /** Other bookmarks that each hold all of this workspace's work: why a workspace with revisions is removable. */
+  integratedInto: Schema.optional(Schema.Array(Schema.String)),
   outcome: Schema.Literals(['would-remove', 'removed', 'has-work', 'failed']),
   message: Schema.optional(Schema.String.check(Schema.isMaxLength(400))),
 })
@@ -156,12 +158,17 @@ const cleanupJobSchema = Schema.Struct({
 })
 export type CleanupJobView = typeof cleanupJobSchema.Type
 
+const describeRemoved = (workspace: CleanupResult['workspaces'][number]): string => {
+  if (workspace.missing) return 'folder missing; registration forgotten'
+  return workspace.integratedInto === undefined ? workspace.kind : `${workspace.kind} into ${workspace.integratedInto.join(', ')}`
+}
+
 const renderCleanup = (output: CleanupResult): string => {
   const verb = output.applied ? 'Removed' : 'Would remove'
   const removed = output.workspaces.filter(workspace => workspace.outcome === 'removed' || workspace.outcome === 'would-remove')
   const refused = output.workspaces.filter(workspace => workspace.outcome === 'has-work' || workspace.outcome === 'failed')
   return [
-    `${verb} ${String(removed.length)} workspace(s)${removed.length === 0 ? '' : `: ${removed.map(workspace => `${workspace.name} (${workspace.missing ? 'folder missing; registration forgotten' : workspace.kind})`).join(', ')}`}.`,
+    `${verb} ${String(removed.length)} workspace(s)${removed.length === 0 ? '' : `: ${removed.map(workspace => `${workspace.name} (${describeRemoved(workspace)})`).join(', ')}`}.`,
     refused.length === 0 ? undefined : `Kept ${refused.map(workspace => `${workspace.name} (${workspace.message ?? workspace.outcome})`).join(', ')}.`,
     output.untracked.length === 0
       ? undefined
@@ -439,7 +446,7 @@ export const jjIntegrationApi = defineApi({
       input: Schema.Struct({ ...cleanupRequestSchema.fields, apply: Schema.Boolean }),
       output: cleanupResultSchema,
       description:
-        'Remove idle workspaces in one pass, then abandon empty undescribed revisions nothing builds on. Thread workspaces must have no unlanded revision, no live Session working, waiting for an answer or unreadable, no queued integration, and a listed kind; they must also have been unused longer than olderThanHours (empty: never landed; integrated: landed and nothing left). Other JJ workspaces are manual-only and opt-in: present checkouts must be idle, have no queued integration, a clean and verified working copy with no unlanded work, and a reported root outside the primary checkout and threads directory. Missing secondary checkouts can only be forgotten when their root stays absent and no unlanded work or live Session remains; cleanup never deletes their path. JJ snapshots present working-copy files before checking them, preserving them in the working-copy revision. The untracked kind removes stale threads-directory entries no JJ workspace owns. When targets is present, only matching preview rows are removed. Never forces unlanded work. apply: false previews; call with apply: true only when the user asked to clean up.',
+        'Remove idle workspaces in one pass, then abandon empty undescribed revisions nothing builds on. Thread workspaces must have no unlanded revision unless one other local bookmark holds all of it (preview rows name it in integratedInto, and the bookmark stays), no live Session working, waiting for an answer or unreadable, no queued integration, and a listed kind; they must also have been unused longer than olderThanHours (empty: never landed; integrated: landed and nothing left, or held by another bookmark). Other JJ workspaces are manual-only and opt-in: present checkouts must be idle, have no queued integration, a clean and verified working copy with no unlanded work, and a reported root outside the primary checkout and threads directory. Missing secondary checkouts can only be forgotten when their root stays absent and no unlanded work or live Session remains; cleanup never deletes their path. JJ snapshots present working-copy files before checking them, preserving them in the working-copy revision. The untracked kind removes stale threads-directory entries no JJ workspace owns. When targets is present, only matching preview rows are removed. Never forces unlanded work. apply: false previews; call with apply: true only when the user asked to clean up.',
       tool: { name: 'jj_thread_cleanup', render: renderCleanup },
     }),
     startCleanup: method({

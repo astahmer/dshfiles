@@ -15,6 +15,7 @@ import { WorkspaceSessionPath } from './workspace-session-path.js'
 import { WorkspaceSync } from './workspace-sync.js'
 
 const HOUR_MS = 60 * 60_000
+const BOOKMARK_READ_CONCURRENCY = 4
 
 type PlannedWorkspace = Omit<CleanupResult['workspaces'][number], 'outcome' | 'message'>
 type PlannedUntracked = Omit<CleanupResult['untracked'][number], 'outcome' | 'message'>
@@ -55,6 +56,27 @@ const make = Effect.gen(function* () {
   const warnAndSkip = (what: string, repoRoot: string) => (error: { readonly message: string }) =>
     Effect.as(Effect.logWarning(`jj-integration: could not ${what} in ${repoRoot}: ${error.message}`), [])
 
+  /** Which bookmarks hold each workspace's unlanded work; a read that fails names none, so the workspace is kept. */
+  const bookmarkedWork = Effect.fnUntraced(function* (input: {
+    readonly repoRoot: string
+    readonly threads: readonly { readonly name: string; readonly unlanded: readonly unknown[] }[]
+    readonly trigger: CleanupTrigger
+    readonly kinds: readonly CleanupKindView[]
+  }) {
+    const found = new Map<string, readonly string[]>()
+    if (!WorkspaceCleanupModel.readsBookmarkedWork(input)) return found
+    yield* Effect.forEach(
+      input.threads.filter(thread => thread.unlanded.length > 0),
+      thread =>
+        threads.containingBookmarks({ repoRoot: input.repoRoot, name: thread.name }).pipe(
+          Effect.catch(warnAndSkip(`read the bookmarks holding ${thread.name}`, input.repoRoot)),
+          Effect.map(bookmarks => found.set(thread.name, bookmarks)),
+        ),
+      { concurrency: BOOKMARK_READ_CONCURRENCY, discard: true },
+    )
+    return found
+  })
+
   const scan = Effect.fn('cleanup scan')(function* (input: CleanupRequest & { readonly apply: boolean; readonly trigger: CleanupTrigger }) {
     const kinds = input.trigger === 'automatic' ? input.kinds.filter(kind => kind !== 'secondary') : input.kinds
     const scopedRepoRoot = input.path === undefined ? undefined : (yield* threads.locate(input.path)).repoRoot
@@ -91,14 +113,17 @@ const make = Effect.gen(function* () {
     for (const repository of repositories) {
       repoRoots.push(repository.repoRoot)
       const changedAt = yield* threads.workingCopyChangedAt(repository.repoRoot).pipe(Effect.orElseSucceed(() => new Map<string, number>()))
+      const integratedInto = yield* bookmarkedWork({ repoRoot: repository.repoRoot, threads: repository.threads, trigger: input.trigger, kinds })
       // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- each decision reads in-memory registry and queue state; there is no jj work to batch.
       for (const thread of repository.threads) {
         workspaceIds.set(thread.path, thread.workspaceId)
         const createdAt = thread.workspaceId === null ? undefined : (yield* registry.get(thread.workspaceId))?.createdAt
+        const bookmarks = integratedInto.get(thread.name) ?? []
         const decision = WorkspaceCleanupModel.decide({
           thread: {
             name: thread.name,
             unlandedCount: thread.unlanded.length,
+            integratedInto: bookmarks,
             rebasedAt: thread.rebasedAt,
             sessionIds: thread.sessionIds,
             integrationQueued: (yield* requests.get(thread.path)) !== undefined,
@@ -121,6 +146,7 @@ const make = Effect.gen(function* () {
           kind: decision.kind,
           lastUsedAt: decision.lastUsedAt,
           missing: thread.missing,
+          ...(bookmarks.length > 0 && { integratedInto: bookmarks }),
         })
       }
       if (kinds.includes('secondary')) {
@@ -217,7 +243,12 @@ const make = Effect.gen(function* () {
       const threadOutcome =
         threadWorkspaces.length === 0
           ? { results: [] }
-          : yield* threads.discardMany({ repoRoot, names: threadWorkspaces.map(workspace => workspace.name), force: false })
+          : yield* threads.discardMany({
+              repoRoot,
+              names: threadWorkspaces.map(workspace => workspace.name),
+              force: false,
+              acceptBookmarkedWork: threadWorkspaces.some(workspace => workspace.integratedInto !== undefined),
+            })
       const secondaryOutcome =
         secondaryWorkspaces.length === 0
           ? { results: [] }

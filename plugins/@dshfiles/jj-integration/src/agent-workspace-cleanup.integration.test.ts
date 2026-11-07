@@ -63,4 +63,73 @@ describe.skipIf(!jjAvailable)('workspaces agents isolate for themselves', () => 
     expect(existsSync(isolated.path)).toBe(false)
     expect(jj(repo, '--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"')).not.toContain(isolated.name)
   })
+
+  const bookmarkCommit = (name: string): string =>
+    jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `bookmarks(exact:${JSON.stringify(name)})`, '-T', 'commit_id ++ "\\n"').trim()
+
+  const isolate = async (sessionId: string, file: string) => {
+    harness.setSession(sessionId, { running: false, questions: 0 })
+    const isolated = isolatedWorkspace(await harness.runTool('jj_thread_isolate', {}, { sessionId, cwd: repo }))
+    writeFileSync(join(isolated.path, file), `${file}\n`)
+    jj(isolated.path, 'describe', '-m', `feat: add ${file}`)
+    return isolated
+  }
+
+  it('offers work already on another bookmark, naming it, and leaves that bookmark and its revisions alone', async () => {
+    const isolated = await isolate('session-release', 'release.txt')
+    jj(isolated.path, 'bookmark', 'create', 'release', '-r', '@')
+    jj(isolated.path, 'new')
+    const held = bookmarkCommit('release')
+
+    harness.setSession('session-release', { running: true, questions: 0 })
+    expect((await cleanup(false)).skipped).toContainEqual({ repoRoot: repo, name: isolated.name, reason: 'busy' })
+    harness.setSession('session-release', { running: false, questions: 0 })
+
+    const preview = await cleanup(false)
+    expect(preview.workspaces).toContainEqual(
+      expect.objectContaining({ name: isolated.name, kind: 'integrated', integratedInto: ['release'], outcome: 'would-remove' }),
+    )
+    expect(existsSync(isolated.path)).toBe(true)
+
+    const applied = await cleanup(true)
+    expect(applied.workspaces).toContainEqual(expect.objectContaining({ name: isolated.name, integratedInto: ['release'], outcome: 'removed' }))
+    expect(existsSync(isolated.path)).toBe(false)
+    expect(bookmarkCommit('release')).toBe(held)
+    expect(jj(repo, '--ignore-working-copy', 'file', 'list', '-r', 'bookmarks(exact:"release")')).toContain('release.txt')
+  })
+
+  it('keeps a workspace with one revision above the bookmark', async () => {
+    const isolated = await isolate('session-above', 'above-base.txt')
+    jj(isolated.path, 'bookmark', 'create', 'partly', '-r', '@')
+    jj(isolated.path, 'new')
+    writeFileSync(join(isolated.path, 'above.txt'), 'above\n')
+    jj(isolated.path, 'describe', '-m', 'feat: add above')
+
+    const applied = await cleanup(true)
+    expect(applied.skipped).toContainEqual({ repoRoot: repo, name: isolated.name, reason: 'has-work' })
+    expect(existsSync(isolated.path)).toBe(true)
+  })
+
+  it('counts edits still on disk as work no bookmark holds', async () => {
+    const isolated = await isolate('session-dirty', 'dirty-base.txt')
+    jj(isolated.path, 'bookmark', 'create', 'dirty-base', '-r', '@')
+    jj(isolated.path, 'new')
+    writeFileSync(join(isolated.path, 'unsnapshotted.txt'), 'edit\n')
+
+    const applied = await cleanup(true)
+    expect(applied.workspaces.find(workspace => workspace.name === isolated.name)?.outcome).toBe('has-work')
+    expect(existsSync(join(isolated.path, 'unsnapshotted.txt'))).toBe(true)
+  })
+
+  it('does not trust a conflicted bookmark, which could still lose the work', async () => {
+    const isolated = await isolate('session-conflicted', 'conflicted.txt')
+    jj(repo, '--ignore-working-copy', 'bookmark', 'create', 'contested', '-r', 'main')
+    const before = jj(repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '-n', '1', '-T', 'id').trim()
+    jj(isolated.path, 'bookmark', 'set', 'contested', '-r', '@')
+    jj(repo, '--ignore-working-copy', '--at-op', before, 'bookmark', 'delete', 'contested')
+    jj(isolated.path, 'new')
+    expect(jj(repo, '--ignore-working-copy', 'bookmark', 'list', 'contested')).toContain('contested (conflicted)')
+
+    expect((await cleanup(false)).skipped).toContainEqual({ repoRoot: repo, name: isolated.name, reason: 'has-work' })
+  })
 })

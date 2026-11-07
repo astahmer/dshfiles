@@ -51,6 +51,7 @@ const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
 const HEX_ID = /^[0-9a-f]+$/u
 const OPERATION_ID = /^[0-9a-f]{12,128}$/u
 const isCommitId = (value: string): boolean => value.length >= 40 && HEX_ID.test(value)
+const RESOLVED_BOOKMARKS_TEMPLATE = 'local_bookmarks.filter(|bookmark| !bookmark.conflict()).map(|bookmark| bookmark.name() ++ "\\n").join("")'
 const exactBookmarkNamePattern = (bookmark: string): string => `exact:${JSON.stringify(bookmark)}`
 const bookmarkRevset = (bookmark: string): string => `bookmarks(${exactBookmarkNamePattern(bookmark)})`
 const isUnsupportedRevsetPath = (path: string): boolean =>
@@ -560,6 +561,11 @@ const make = Effect.gen(function* () {
     return bookmarkRevset(name)
   })
   const unlandedRevset = (name: string, target: string): string => `(::${name}@ ~ ::${target}) ~ empty()`
+  /**
+   * What removing a workspace abandons. Revisions a bookmark reaches stay: `jj abandon` deletes a bookmark that points at
+   * an abandoned revision, which would destroy the very branch that keeps the work.
+   */
+  const ownedRevset = (name: string, target: string): string => `(::${name}@ ~ ::${target}) ~ ::(working_copies() ~ ${name}@) ~ ::bookmarks()`
   /**
    * Commits the bookmark has that this working copy lacks. Comparing the other way round counts the workspace's own
    * commits — including its always-present empty working copy — so a workspace that merely predates the bookmark's
@@ -1226,7 +1232,7 @@ const make = Effect.gen(function* () {
         const target = yield* targetRevset(input.repoRoot)
         const work = yield* revisions(unlandedRevset(input.name, target), input.repoRoot, { observe: true })
         if (work.length > 0 && !input.force) return { status: 'has-work', revisions: work } satisfies DiscardOutcome
-        const owned = yield* revisions(`(::${input.name}@ ~ ::${target}) ~ ::(working_copies() ~ ${input.name}@)`, input.repoRoot, { observe: true })
+        const owned = yield* revisions(ownedRevset(input.name, target), input.repoRoot, { observe: true })
         yield* jj(['--ignore-working-copy', 'workspace', 'forget', input.name], input.repoRoot)
         if (owned.length > 0) yield* jj(['--ignore-working-copy', 'abandon', ...owned.map(revision => revision.commitId)], input.repoRoot)
         yield* removeTree(workspaceRoot)
@@ -1235,10 +1241,28 @@ const make = Effect.gen(function* () {
     )
   })
 
+  /** A bookmark counts only when it alone reaches every unlanded revision; a conflicted one could still lose them. */
+  const containingBookmarks = Effect.fn('thread workspaces containing bookmarks')(function* (input: { readonly repoRoot: string; readonly name: string }) {
+    const work = unlandedRevset(input.name, yield* targetRevset(input.repoRoot))
+    const target = yield* bookmark
+    const listed = yield* jj(
+      ['--ignore-working-copy', 'log', '--no-graph', '-r', `heads(${work}):: & bookmarks()`, '-T', RESOLVED_BOOKMARKS_TEMPLATE],
+      input.repoRoot,
+    )
+    const candidates = [...new Set(lines(listed))].filter(name => name !== target).sort()
+    return yield* Effect.filter(
+      candidates,
+      name =>
+        Effect.map(revisions(`(${work}) ~ ::${bookmarkRevset(name)}`, input.repoRoot, { observe: true, maxRevisions: 1 }), outside => outside.length === 0),
+      { concurrency: STATUS_READ_CONCURRENCY },
+    )
+  })
+
   const discardMany = Effect.fn('thread workspaces discard many')(function* (input: {
     readonly repoRoot: string
     readonly names: readonly string[]
     readonly force: boolean
+    readonly acceptBookmarkedWork?: boolean
   }) {
     return yield* locks.withRepo(input.repoRoot)(
       Effect.gen(function* () {
@@ -1253,8 +1277,10 @@ const make = Effect.gen(function* () {
             const workspaceRoot = path.join(directory, name)
             if (yield* exists(path.join(workspaceRoot, '.jj'))) yield* jj(['status'], workspaceRoot)
             const work = yield* revisions(unlandedRevset(name, target), input.repoRoot, { observe: true })
-            if (work.length > 0 && !input.force) return { name, status: 'has-work', revisions: work, error: null } satisfies ThreadDiscardResult
-            const owned = yield* revisions(`(::${name}@ ~ ::${target}) ~ ::(working_copies() ~ ${name}@)`, input.repoRoot, { observe: true })
+            const kept = work.length > 0 && !input.force
+            if (kept && (input.acceptBookmarkedWork !== true || (yield* containingBookmarks({ repoRoot: input.repoRoot, name })).length === 0))
+              return { name, status: 'has-work', revisions: work, error: null } satisfies ThreadDiscardResult
+            const owned = yield* revisions(ownedRevset(name, target), input.repoRoot, { observe: true })
             candidates.push({ name, workspaceRoot, owned })
             return undefined
           }).pipe(Effect.catch(error => Effect.succeed<ThreadDiscardResult>({ name, status: 'error', revisions: [], error: error.message })))
@@ -1565,6 +1591,7 @@ const make = Effect.gen(function* () {
     landVerified,
     discard,
     discardMany,
+    containingBookmarks,
     secondaryWorkspaces,
     discardSecondaryMany,
     workingCopyChangedAt,

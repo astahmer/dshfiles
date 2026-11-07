@@ -53,6 +53,22 @@ describe('jj-integration tool exposure', () => {
     }
   })
 
+  test('the cleanup tool names the bookmark that makes a workspace removable', () => {
+    const render = jjIntegrationApi.methods.cleanupWorkspaces.tool?.render
+    if (typeof render !== 'function') throw new Error('jj_thread_cleanup must render its result')
+    const row = {
+      repoRoot: '/work/project',
+      name: 'thread-aaaaaa',
+      path: '/t/a',
+      kind: 'integrated',
+      lastUsedAt: 1,
+      missing: false,
+      outcome: 'would-remove',
+    } as const
+    const text = render({ applied: false, workspaces: [{ ...row, integratedInto: ['release'] }], skipped: [], untracked: [], emptyRevisions: [] })
+    expect(text).toContain('thread-aaaaaa (integrated into release)')
+  })
+
   test('repository inventory accepts old Host output and reports background refresh state', async () => {
     const output = jjIntegrationApi.methods.repositories.output
     if (output === undefined) throw new Error('repositories must declare an output schema')

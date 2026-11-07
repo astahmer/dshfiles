@@ -115,6 +115,10 @@ const make = Effect.gen(function* () {
       (input: Parameters<ThreadWorkspacesBackend['discardMany']>[0]) => input.repoRoot,
       (backend, input) => backend.discardMany(input),
     ),
+    containingBookmarks: on(
+      (input: Parameters<ThreadWorkspacesBackend['containingBookmarks']>[0]) => input.repoRoot,
+      (backend, input) => backend.containingBookmarks(input),
+    ),
     secondaryWorkspaces: on(
       (repoRoot: string) => repoRoot,
       (backend, repoRoot) => backend.secondaryWorkspaces(repoRoot),
