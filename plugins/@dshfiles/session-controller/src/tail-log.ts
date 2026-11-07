@@ -3,14 +3,22 @@ import { SessionLogOffset, type SessionEvent, type SessionHeader, type SessionId
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type { ProjectionCheckpoint, ProjectionSnapshot } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
-import { readFile, stat } from 'node:fs/promises'
+import { open, stat } from 'node:fs/promises'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import { zstdDecompressSync } from 'node:zlib'
 import { Schema } from 'effect'
 
 const ZSTD_MAGIC = 0xfd2fb528
+const ZSTD_MAGIC_BYTES = Buffer.from([0x28, 0xb5, 0x2f, 0xfd])
 /** Below this a log decodes whole about as fast as its tail (median 155 ms vs 170 ms measured), so it keeps the full read. */
 const MIN_TAIL_BYTES = 1_000_000
+/**
+ * Bytes read from the end of a log first. The newest frames hold the newest events, so an 86 MB log costs 4 MB here:
+ * 2 ms instead of 153 ms plus 86 MB of buffer per concurrent cold open.
+ */
+const TAIL_WINDOW_BYTES = 4_000_000
+/** How many times the window doubles when it holds fewer than two complete frames (a log of huge appends). */
+const TAIL_WINDOW_GROWTHS = 6
 /** Opened tails kept for the opening's next pages; each holds its log's bytes. */
 const KEPT_TAILS = 3
 const KEPT_TAIL_MS = 120_000
@@ -49,7 +57,7 @@ interface FrameRange {
   readonly end: number
 }
 
-type TailReadPhase = 'stat_ms' | 'lookup_ms' | 'identity_ms' | 'read_ms' | 'scan_ms' | 'decode_ms'
+type TailReadPhase = 'stat_ms' | 'lookup_ms' | 'identity_ms' | 'size_ms' | 'read_ms' | 'scan_ms' | 'decode_ms'
 type TailReadMetrics = Partial<Record<TailReadPhase, number>> & {
   cache_hit?: boolean
   fallback_reason?: string
@@ -79,6 +87,8 @@ export class TailLog {
     readonly header: SessionHeader,
     private readonly bytes: Buffer,
     private readonly frames: readonly FrameRange[],
+    /** Whether `bytes` starts at the beginning of the log; a window starts at its newest frames instead. */
+    private readonly holdsFromLogStart: boolean,
   ) {
     this.firstFrame = frames.length
   }
@@ -101,7 +111,13 @@ export class TailLog {
       span.setAttributes(
         pluginAttributes({
           plugin: 'session-controller',
-          attributes: { served: tail !== undefined, bytes: tail?.bytes.length, frames: tail?.frames.length, ...metrics },
+          attributes: {
+            served: tail !== undefined,
+            bytes: tail?.bytes.length,
+            frames: tail?.frames.length,
+            windowed: tail === undefined ? undefined : !tail.holdsFromLogStart,
+            ...metrics,
+          },
         }),
       )
       return tail
@@ -157,20 +173,69 @@ export class TailLog {
       metrics.fallback_reason = 'log-identity-unavailable'
       return undefined
     }
-    const bytes = await measureTailPhase(metrics, 'read_ms', () => readFile(path.success, { signal: input.signal }))
-    const frames = await measureTailPhase(metrics, 'scan_ms', () => TailLog.scan(bytes))
-    if (frames === undefined || frames.length < 2) {
+    const opened = await TailLog.readTail(path.success, input.signal, metrics)
+    if (opened === undefined) {
       metrics.fallback_reason = 'invalid-zstd-frames'
       return undefined
     }
-    const tail = new TailLog(header, bytes, frames)
-    const finalLineComplete = await measureTailPhase(metrics, 'decode_ms', () => tail.textOf(frames.length - 1).endsWith('\n'))
+    const tail = new TailLog(header, opened.bytes, opened.frames, opened.holdsFromLogStart)
+    const finalLineComplete = await measureTailPhase(metrics, 'decode_ms', () => tail.textOf(opened.frames.length - 1).endsWith('\n'))
     if (!finalLineComplete) {
       metrics.fallback_reason = 'incomplete-final-line'
       return undefined
     }
     TailLog.keep(input.sessionId, { path: path.success, identity, tail })
     return tail
+  }
+
+  /** The log's newest window with its complete frames: the whole file only when it is small or holds one huge append. */
+  private static async readTail(
+    path: string,
+    signal: AbortSignal,
+    metrics: TailReadMetrics,
+  ): Promise<{ readonly bytes: Buffer; readonly frames: readonly FrameRange[]; readonly holdsFromLogStart: boolean } | undefined> {
+    const sizeBytes: number | undefined = await measureTailPhase(metrics, 'size_ms', () => TailLog.sizeOf(path))
+    if (sizeBytes === undefined) return undefined
+    let windowBytes = Math.min(sizeBytes, TAIL_WINDOW_BYTES)
+    for (let attempt = 0; attempt <= TAIL_WINDOW_GROWTHS; attempt += 1) {
+      const readStartedAt = performance.now()
+      const bytes = await TailLog.readWindow(path, sizeBytes, windowBytes, signal)
+      metrics.read_ms = Math.round(performance.now() - readStartedAt)
+      if (bytes === undefined) return undefined
+      const frames: readonly FrameRange[] | undefined = await measureTailPhase(metrics, 'scan_ms', () => TailLog.scanWindow(bytes))
+      if (frames !== undefined && frames.length >= 2) {
+        return { bytes, frames, holdsFromLogStart: bytes.length === sizeBytes }
+      }
+      if (bytes.length === sizeBytes) return undefined
+      windowBytes = Math.min(sizeBytes, windowBytes * 2)
+    }
+    return undefined
+  }
+
+  private static async sizeOf(path: string): Promise<number | undefined> {
+    const info = await stat(path, { bigint: true }).catch(() => undefined)
+    return info === undefined ? undefined : Number(info.size)
+  }
+
+  /** Read the last `windowBytes` of the file, or `undefined` when the file is shorter than the size just measured. */
+  private static async readWindow(path: string, sizeBytes: number, windowBytes: number, signal: AbortSignal): Promise<Buffer | undefined> {
+    const start = Math.max(0, sizeBytes - windowBytes)
+    const length = sizeBytes - start
+    signal.throwIfAborted()
+    const handle = await open(path, 'r')
+    try {
+      const buffer = Buffer.allocUnsafe(length)
+      let filled = 0
+      while (filled < length) {
+        const { bytesRead } = await handle.read(buffer, filled, length - filled, start + filled)
+        if (bytesRead === 0) break
+        filled += bytesRead
+        signal.throwIfAborted()
+      }
+      return filled === length ? buffer : undefined
+    } finally {
+      await handle.close()
+    }
   }
 
   private static keep(sessionId: SessionId, entry: { readonly path: string; readonly identity: string; readonly tail: TailLog }): void {
@@ -199,10 +264,10 @@ export class TailLog {
     return info === undefined ? undefined : `${String(info.ino)}:${String(info.size)}:${String(info.mtimeNs)}`
   }
 
-  /** Complete frame ranges, or `undefined` when the file ends inside a frame (a torn append the full read repairs). */
-  static scan(buffer: Buffer): readonly FrameRange[] | undefined {
+  /** Complete frame ranges from `start`, or `undefined` when the buffer ends inside a frame (a torn append the full read repairs). */
+  static scan(buffer: Buffer, start = 0): readonly FrameRange[] | undefined {
     const frames: FrameRange[] = []
-    let offset = 0
+    let offset = start
     while (offset < buffer.length) {
       // oxlint-disable-next-line antislop/no-passthrough-variable -- The frame start stays fixed while `offset` walks the frame.
       const start = offset
@@ -232,9 +297,23 @@ export class TailLog {
     return frames
   }
 
+  /** Frames of a buffer that may start mid-frame: the first magic that parses completely to the end wins. */
+  private static scanWindow(buffer: Buffer): readonly FrameRange[] | undefined {
+    for (let offset = buffer.indexOf(ZSTD_MAGIC_BYTES); offset !== -1; offset = buffer.indexOf(ZSTD_MAGIC_BYTES, offset + 1)) {
+      const frames = TailLog.scan(buffer, offset)
+      if (frames !== undefined) return frames
+    }
+    return undefined
+  }
+
   /** Whether the decoded events already start at the first event of the log. */
   get complete(): boolean {
-    return this.firstFrame <= 1
+    return this.holdsFromLogStart && this.firstFrame <= 1
+  }
+
+  /** Frames decoded so far; unchanged means the window holds nothing further back. */
+  get decodedFrames(): number {
+    return this.firstFrame
   }
 
   /** Seq of the first decoded event. */

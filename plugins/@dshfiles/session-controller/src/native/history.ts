@@ -34,6 +34,7 @@ import type {
   SessionWireEvent,
 } from './types.ts'
 import { SessionAssistantStreamAccumulator } from './assistant-stream.ts'
+import { coldReads } from './cold-reads.ts'
 import { BrowserEvent } from '../browser-event.ts'
 import { TailLog } from '../tail-log.ts'
 
@@ -84,6 +85,17 @@ export class SessionHistoryController {
     const beforeSeq = request.beforeSeq === undefined
       ? undefined
       : SessionLogOffset(request.beforeSeq)
+    const cold = request.address.kind === 'session' && this.ctx.sessions.get(request.address.sessionId) === undefined
+    if (!cold) return this.readPage(request, beforeSeq, throughSeq, signal)
+    return coldReads.use(() => this.readPage(request, beforeSeq, throughSeq, signal))
+  }
+
+  private async readPage(
+    request: SessionPageRequest,
+    beforeSeq: SessionLogOffsetType | undefined,
+    throughSeq: SessionSeqCursor,
+    signal: AbortSignal,
+  ): Promise<SessionPage> {
     // dshfiles delta: an older page of a cold Session comes from the same log tail its opening decoded.
     if (request.address.kind === 'session' && this.ctx.sessions.get(request.address.sessionId) === undefined) {
       const tailPage = await tailPageOf(this.ctx, request.address.sessionId, { ...request, beforeSeq, throughSeq }, signal)
@@ -185,10 +197,11 @@ export class SessionHistoryController {
     try {
       // dshfiles delta: a cold Session opens from the end of its log (see ../tail-log.ts); the full read stays the path
       // for a live Session and for every log the tail cannot serve exactly.
-      const tail = address.kind === 'session' && this.ctx.sessions.get(target) === undefined
-        ? await tailOpening(this.ctx, target, request, signal)
-        : undefined
-      using source = tail === undefined ? await this.sourceFor(address, signal, true) : undefined
+      const cold = address.kind === 'session' && this.ctx.sessions.get(target) === undefined
+      const tail = cold ? await coldReads.use(() => tailOpening(this.ctx, target, request, signal)) : undefined
+      using source = tail !== undefined
+        ? undefined
+        : await (cold ? coldReads.use(() => this.sourceFor(address, signal, true)) : this.sourceFor(address, signal, true))
       signal.throwIfAborted()
       const opening = tail ?? (source === undefined ? undefined : {
         header: source.header,
@@ -330,13 +343,18 @@ async function tailOpening(
     if (log === undefined) return undefined
     for (let frames = 16; ; frames *= 2) {
       signal.throwIfAborted()
+      const decoded = log.decodedFrames
       const events = log.before(frames)
       const last = events.at(-1)
       if (last === undefined) return undefined
       const marker = lastTurnMarker(events)
       if (marker === 'turn/start') return undefined
       const page = paginate(events, undefined, request.maxMessages ?? DEFAULT_MAX_MESSAGES, last.seq, request.turnWindow, log.base)
-      if ((marker === undefined || !page.settled) && !log.complete) continue
+      if ((marker === undefined || !page.settled) && !log.complete) {
+        // A window that decoded its first frame holds nothing further back: the full read serves the rest.
+        if (log.decodedFrames === decoded) return undefined
+        continue
+      }
       if (!page.settled) return undefined
       const projections = log.restore(ctx)
       return projections === undefined ? undefined : { header: log.header, cursor: last.seq, page, projections }
@@ -370,12 +388,14 @@ async function tailPageOf(
     if (request.throughSeq < 0) return { records: [], hasMore: true }
     for (let frames = 16; ; frames *= 2) {
       signal.throwIfAborted()
+      const decoded = log.decodedFrames
       const events = log.before(frames)
       const cursor = events.at(-1)?.seq
       if (cursor === undefined || request.throughSeq > cursor) return undefined
       const page = paginate(events, request.beforeSeq, request.maxMessages ?? DEFAULT_MAX_MESSAGES, request.throughSeq, request.turnWindow, log.base)
       if (page.settled) return { records: pageRecords(page.events), hasMore: page.hasMore }
-      if (log.complete) return undefined
+      // A window that decoded its first frame holds nothing further back: the full read serves the rest.
+      if (log.complete || log.decodedFrames === decoded) return undefined
     }
   } catch (error: unknown) {
     if (signal.aborted) throw error
