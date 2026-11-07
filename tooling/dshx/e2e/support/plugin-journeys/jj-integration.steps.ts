@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Page, type Request } from '@playwright/test'
 import { openGlobalPanel } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
@@ -54,6 +54,15 @@ const destinationRequestSchema = withUnknownProperties({
   payload: withUnknownProperties({ input: withUnknownProperties({ workspaceId: Schema.String }) }),
   rpcId: Schema.String,
 })
+const batchRequestSchema = withUnknownProperties({
+  entries: Schema.Array(withUnknownProperties({ id: Schema.Union([Schema.String, Schema.Number]), endpoint: Schema.String })),
+})
+/** Read calls share the `/api/dshx-batch` route, one NDJSON line per entry; a call left unanswered retries on its own route. */
+const batchedDestinationIds = (request: Request): readonly (string | number)[] => {
+  if (!request.url().endsWith('/api/dshx-batch')) return []
+  const batch = Schema.decodeUnknownOption(batchRequestSchema)(request.postDataJSON())
+  return Option.isNone(batch) ? [] : batch.value.entries.filter(entry => entry.endpoint.endsWith('/destination')).map(entry => entry.id)
+}
 const removeComposerAttachment = (page: Page, name: string) => page.getByRole('button', { name, exact: true })
 const expectDraftAndAttachments = async (page: Page, text: string): Promise<void> => {
   await expect(newThreadComposer(page)).toHaveText(text)
@@ -853,7 +862,7 @@ When('the New thread destination lookup is held', async ({ page }: { page: Page 
   })
   await page.context().route('**/api/**', async route => {
     const parsedRequest = Schema.decodeUnknownOption(destinationRequestSchema)(route.request().postDataJSON())
-    if (Option.isNone(parsedRequest) || requestSeen) return route.continue()
+    if ((Option.isNone(parsedRequest) && batchedDestinationIds(route.request()).length === 0) || requestSeen) return route.continue()
     requestSeen = true
     await lookupGate
     return route.continue()
@@ -882,6 +891,16 @@ Then('the completed first send leaves Backlog selected', async ({ page }: { page
 When('the next five New thread destination lookups fail', async ({ page }: { page: Page }) => {
   let remainingFailures = 5
   await page.context().route('**/api/**', async route => {
+    const failure = { ok: false, error: { code: 'e2e.destination-failed', message: 'Injected destination failure', details: {} } }
+    const batched = remainingFailures === 0 ? [] : batchedDestinationIds(route.request())
+    if (batched.length > 0) {
+      remainingFailures = Math.max(0, remainingFailures - batched.length)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/x-ndjson',
+        body: batched.map(id => `${JSON.stringify({ id, result: failure })}\n`).join(''),
+      })
+    }
     const parsedRequest = Schema.decodeUnknownOption(destinationRequestSchema)(route.request().postDataJSON())
     if (Option.isNone(parsedRequest) || remainingFailures === 0) return route.continue()
     remainingFailures -= 1
@@ -892,7 +911,7 @@ When('the next five New thread destination lookups fail', async ({ page }: { pag
       body: JSON.stringify({
         type: 'server-response',
         rpcId: request.rpcId,
-        result: { ok: false, error: { code: 'e2e.destination-failed', message: 'Injected destination failure', details: {} } },
+        result: failure,
       }),
     })
   })
