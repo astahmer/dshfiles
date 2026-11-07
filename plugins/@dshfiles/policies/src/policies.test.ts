@@ -40,6 +40,16 @@ describe('Policies.denying', () => {
 
 const namespace = policiesSettings.namespace
 
+/** A committed revision reaches the rules through several fibers, so wait for it on real time rather than one yield. */
+const waitUntil = (settled: Effect.Effect<boolean>) =>
+  Effect.gen(function* () {
+    const deadline = Date.now() + 5000
+    while (!(yield* settled)) {
+      if (Date.now() > deadline) return yield* Effect.die('the policy rules never followed the settings update')
+      yield* Effect.promise(() => new Promise(resolve => setTimeout(resolve, 5)))
+    }
+  })
+
 describe('PolicyRules', () => {
   const RulesSettings = Settings.Tag<{ readonly rules: readonly PolicyRule[] }>(namespace)
   const initial = { rules: [rule({ name: 'no rm', tool: 'shell', match: 'rm -rf' })] }
@@ -52,7 +62,7 @@ describe('PolicyRules', () => {
         expect(yield* rules.check({ name: 'shell', arguments: { command: 'rm -rf /' } })).toContain('Denied by policy “no rm”')
 
         yield* settings.update({ rules: [] })
-        yield* Effect.yieldNow
+        yield* waitUntil(Effect.map(rules.list, current => current.length === 0))
 
         expect(yield* rules.list).toEqual([])
         expect(yield* rules.check({ name: 'shell', arguments: { command: 'rm -rf /' } })).toBeUndefined()
@@ -98,17 +108,19 @@ describe('the policies plugin in the real tool runtime', () => {
       const signal = new AbortController().signal
       const execute = (callId: string, command: string) =>
         Effect.promise(() => host.tools.execute({ callId: ToolCallId(callId), name: 'shell', arguments: { command }, signal }))
-
-      const denied = yield* execute('call-1', 'rm -rf /')
-      const allowed = yield* execute('call-2', 'ls')
-      const listed = yield* Effect.promise(() =>
+      const listRules = Effect.promise(() =>
         host.connection
           .requestApi({ packageId: '@dshfiles/policies', apiId: 'policies', method: 'list', version: 1, input: {} })
           .then(response => response.json()),
       )
+
+      const denied = yield* execute('call-1', 'rm -rf /')
+      const allowed = yield* execute('call-2', 'ls')
+      const listed = yield* listRules
       document = { ns: namespace, value: { rules: [] }, revision: 2 }
       host.ctx.emit('settings/document-updated', namespace, 2)
-      yield* Effect.yieldNow
+      // The API serves the same rules the guard reads, so an empty list proves the guard has the new revision.
+      yield* waitUntil(Effect.map(listRules, rules => !JSON.stringify(rules).includes('no rm')))
       const afterRemoval = yield* execute('call-3', 'rm -rf /tmp/x')
 
       expect(denied.isError).toBe(true)

@@ -110,22 +110,23 @@ export const layer = <S extends z<any, object>>(
         if (descriptor === undefined) return yield* new SettingsUnavailable({ namespace })
         return yield* decode(descriptor.value, descriptor.revision)
       }).pipe(Effect.withSpan('settings read', { attributes: { 'dshx.settings.namespace': namespace } }))
+      // Listen before the first read and before anything forks: a revision committed while the plugin activates would
+      // otherwise be lost until the next one, leaving the plugin on stale settings.
+      const committed = yield* Queue.unbounded<number>()
+      yield* Effect.acquireRelease(
+        Effect.sync(() =>
+          host.ctx.on('settings/document-updated', (changed, revision) => {
+            if (changed === namespace) Queue.offerUnsafe(committed, revision)
+          }),
+        ),
+        dispose => Effect.sync(dispose),
+      )
       const initial = yield* read.pipe(
         Effect.catch(error => Effect.logWarning(`${error.message} Using the schema defaults until they load.`).pipe(Effect.andThen(decode({}, 0)))),
       )
       const ref = yield* SubscriptionRef.make(initial)
 
-      const committed = Stream.callback<number>(queue =>
-        Effect.acquireRelease(
-          Effect.sync(() =>
-            host.ctx.on('settings/document-updated', (changed, revision) => {
-              if (changed === namespace) Queue.offerUnsafe(queue, revision)
-            }),
-          ),
-          dispose => Effect.sync(dispose),
-        ),
-      )
-      yield* committed.pipe(
+      yield* Stream.fromQueue(committed).pipe(
         Stream.runForEach(() =>
           read.pipe(
             Effect.flatMap(snapshot => SubscriptionRef.set(ref, snapshot)),
