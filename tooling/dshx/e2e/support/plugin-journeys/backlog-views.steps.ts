@@ -27,6 +27,17 @@ const showInboxFilter = async (page: Page, filter: string): Promise<void> => {
   await expect(tab).toHaveAttribute('aria-selected', 'true')
 }
 
+Then('the Inbox filters stay on one line', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-inbox-filter-tabs', async () => {
+    const whiteSpaces = await inbox(page)
+      .getByRole('tab')
+      .evaluateAll(nodes => nodes.map(node => getComputedStyle(node).whiteSpace))
+    expect(whiteSpaces.length).toBeGreaterThan(0)
+    expect(whiteSpaces.every(whiteSpace => whiteSpace === 'nowrap')).toBe(true)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the feed shows one {string} separator above both entries', async ({ page }: { page: Page }, label: string) => {
   await recordAssertion(page, 'backlog-feed-day-separator', async () => {
     const separators = feed(page).getByRole('separator')

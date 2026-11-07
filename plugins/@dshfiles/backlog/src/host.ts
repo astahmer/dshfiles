@@ -140,7 +140,7 @@ const withWatch = <Result extends { readonly ok: boolean }>(
 ) =>
   Effect.gen(function* () {
     if (!result.ok) return result
-    const thread = [...result.value.item.links].reverse().find(link => link.type === 'thread')
+    const thread = [...result.value.item.links].reverse().find(link => link.type === 'thread' && BacklogItems.isSessionId(link.target))
     if (thread !== undefined) yield* PullRequestState.use(pulls => pulls.watch({ url, sessionId: thread.target }))
     return result
   })

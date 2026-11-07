@@ -223,9 +223,14 @@ const kindPrefixes = new Map<string, BacklogKind>([
   ['question', 'question'],
 ])
 
+const sessionIdPattern = /^(?:session-)?[0-9a-f]{6,}(?:-[0-9a-f]+)*$/iu
+
+/** A DSH thread target is a session id, never a word from prose (`session-controller` is a package, not a thread). */
+const isSessionId = (target: string): boolean => sessionIdPattern.test(target)
+
 const linkPatterns: readonly { readonly type: BacklogLink['type']; readonly pattern: RegExp }[] = [
   { type: 'revision', pattern: /(?<![\w/])jj:([\w.@/-]+[\w])/g },
-  { type: 'thread', pattern: /(?<![\w/-])(session-[\w-]{6,})/g },
+  { type: 'thread', pattern: /(?<![\w/-])(session-[0-9a-f]{6,}(?:-[0-9a-f]+)*)/giu },
   { type: 'branch', pattern: /(?<![\w/])branch:([\w./-]+[\w])/g },
   { type: 'workspace', pattern: /(?<![\w/])workspace:([^\s)]+)/g },
   { type: 'url', pattern: /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g },
@@ -454,6 +459,7 @@ export class BacklogItems {
   static readonly extractLinks = extractLinks
   static readonly extractTags = extractTags
   static readonly uniqueLinks = uniqueLinks
+  static readonly isSessionId = isSessionId
   static readonly sameLink = sameLink
   static readonly projectPath = projectPath
   static readonly projectOf = projectOf
