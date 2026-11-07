@@ -99,6 +99,29 @@ Feature: Multi-host loopback SSH lifecycle
     When the remote question is answered "Production" here
     Then the remote agent receives the answer "Production"
 
+  @scenario:multi-host.remote-terminal-handoff
+  Scenario: A terminal on a remote thread opens on its host
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the native composer sends a prompt to the remote Session
+    And a terminal is opened on the remote thread
+    Then the terminal is offered on its host
+
+  @scenario:multi-host.remote-approval-rejected
+  Scenario: A remote tool call is rejected in the controlling chat
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    Then a host without the repository plugins says so
+    When the remote agent asks to run a command with wider access
+    Then the remote approval opens in the controlling chat with its command
+    And the approval panel fits a phone
+    When the remote approval is rejected here
+    Then the remote command does not run
+
   @scenario:multi-host.remote-approval
   Scenario: A remote tool call is approved in the controlling chat
     Given a loopback SSH DSH pair is booted

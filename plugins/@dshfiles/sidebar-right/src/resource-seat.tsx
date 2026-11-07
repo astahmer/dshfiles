@@ -38,6 +38,7 @@ function AddressableTab({
   const shared = {
     renderSlot: props.renderSlot,
     occurrence: props.occurrence,
+    sessionId: props.sessionId,
     useTabTypes: props.useTabTypes,
     useTabNavigation: props.useTabNavigation,
     useStore: props.useStore,

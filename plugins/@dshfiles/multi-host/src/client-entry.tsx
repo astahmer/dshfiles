@@ -2,6 +2,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
@@ -16,12 +17,19 @@ import { watchRemoteInteractions } from './interaction-feed.js'
 import { RemoteApprovalPanel } from './remote-approval-panel.js'
 import { PendingRemoteApproval, RemoteApprovals } from './remote-approvals.js'
 import { RemoteHostFallback } from './remote-host-fallback.js'
+import { RemoteTerminalPanel, RemoteTerminalTitle } from './remote-terminal-panel.js'
+
+const REMOTE_TERMINAL_ENTRY = 'dshfiles-multi-host-remote-terminal'
+
+interface SidebarRightSubstitutes {
+  readonly substituteTab?: (kind: string, substitute: (sessionId: SessionId) => Promise<string | undefined>) => () => void
+}
 
 const HostsGlyph = (props: { readonly size?: number }): JSX.Element => <ServerIcon aria-hidden size={props.size ?? 18} strokeWidth={1.5} />
 
 export default defineClient({
   name: '@dshfiles/multi-host',
-  inject: ['slots', 'layout', 'uiWorkspace', 'sessions', 'uiSession'],
+  inject: ['slots', 'layout', 'uiWorkspace', 'sessions', 'uiSession', 'sidebarRight'],
   setup(ctx, decorate) {
     const openRemoteSession = (rawSessionId: string): void => {
       const sessionId = SessionId(rawSessionId)
@@ -70,6 +78,33 @@ export default defineClient({
         RemoteApprovalPanel,
       ),
     )
+    // A terminal belongs to a live agent, and a mirrored thread has none here. An older sidebar lacks this verb and keeps
+    // its own body, which reports the failure itself.
+    // SAFETY: only the owned sidebar has this verb; it is optional here, and stock DSH leaves it undefined.
+    const sidebarRight = ctx.sidebarRight as typeof ctx.sidebarRight & SidebarRightSubstitutes
+    if (sidebarRight.substituteTab !== undefined) {
+      ctx.effect(
+        () =>
+          sidebarRight.substituteTab?.('terminal', async sessionId => {
+            const owner = await api.sessionRuntime({ sessionId })
+            return owner.ok && owner.runtimeId !== null ? REMOTE_TERMINAL_ENTRY : undefined
+          }) ?? (() => undefined),
+        'multi-host: remote terminals go to the host',
+      )
+      ctx.slots.inject('sidebar.right.pane.tab', () =>
+        ctx.slots.register(
+          { name: 'sidebar.right.pane.tab', key: REMOTE_TERMINAL_ENTRY, inject: sessionId => ({ sessionId }) },
+          decorate((props: { readonly sessionId: SessionId }) => (
+            <PluginQueryProvider>
+              <RemoteTerminalPanel sessionId={props.sessionId} />
+            </PluginQueryProvider>
+          )),
+        ),
+      )
+      ctx.slots.inject('sidebar.right.pane.tab.title', () =>
+        ctx.slots.register({ name: 'sidebar.right.pane.tab.title', key: REMOTE_TERMINAL_ENTRY }, RemoteTerminalTitle),
+      )
+    }
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: 'dshfiles-multi-host-hosts', order: 8, label: 'Hosts' }, HostsGlyph),
     )

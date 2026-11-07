@@ -121,8 +121,11 @@ With a host chosen:
   command: **Allow once** and **Reject** (or Enter and Escape with the details
   focused) go to the runtime that owns the thread, which decides whether the
   request is still waiting. No agent can answer one; there is no tool for it.
+- A terminal belongs to the machine the thread runs on. **New terminal** on a
+  remote thread, however it is opened, shows **Open terminal on host**, which opens
+  that thread in the host's own DSH.
 - **Open on remote host** in the mirrored thread header opens the owner's DSH on
-  that same thread, for what the mirror does not reach (terminals).
+  that same thread.
 - The thread sidebar shows a **Remote** section: every thread started from
   here, badged with its host and whether its connection is open. A row opens the
   mirrored Session; a brand-new thread appears in the sidebar as soon as the host

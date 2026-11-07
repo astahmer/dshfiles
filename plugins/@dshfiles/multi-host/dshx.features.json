@@ -743,6 +743,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "multi-host.remote-approval-rejected",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "multi-host.local-path-refused",
           "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
         },
@@ -816,6 +821,41 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "remote-terminal-handoff",
+      "title": "Open a remote thread's terminal on its host",
+      "summary": "A terminal tab on a mirrored thread replaces the native body, which has no agent to run against here, with a button that opens that thread in the host's own DSH. Every route into a terminal lands on it: the start page, the shortcut and a restored tab.",
+      "surfaces": ["client"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "right sidebar: Terminal tab of a mirrored thread",
+      "configuration": [],
+      "states": ["resolving-owner", "offered", "opening", "popup-blocked", "host-unreachable"],
+      "failureModes": [
+        "A blocked pop-up says to allow pop-ups for this page, and the button stays.",
+        "A host that cannot be reached says to check the Hosts page, and the button stays."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "click button \"Sidebar settings\"",
+        "click checkbox \"Show remote threads in a separate group\"",
+        "click button \"Remote threads started from this DSH\"",
+        "expect heading \"Remote threads\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-terminal-handoff",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: it reads the owner and opens the host through Host APIs that record their own spans."
         }
       ]
     }
