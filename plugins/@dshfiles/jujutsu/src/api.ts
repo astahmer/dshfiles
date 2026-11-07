@@ -276,7 +276,9 @@ export const jujutsuApi = defineApi({
       input: Schema.Struct({
         repoId: repoIdSchema,
         limit: SchemaHelpers.withDecodedDefault(
-          Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(REVISION_PAGE_SIZE)),
+          Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(REVISION_PAGE_SIZE)).annotate({
+            description: `Revisions in the first page, 1 to ${String(REVISION_PAGE_SIZE)}; omit it for the default page. Use jj_graph_page to continue.`,
+          }),
           () => REVISION_PAGE_SIZE,
         ),
       }),
