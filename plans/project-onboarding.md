@@ -201,7 +201,7 @@ controls you were missing.
 - [x] Add `projectInspect` to `@dshfiles/workspace-folder-picker` (read-only, tool
       `project_inspect`): resolve the folder's real path, then report
       `{ kind: 'none' | 'git' | 'jujutsu', repositoryRoot, remoteUrl, bookmark, workingCopy,
-    nestedGitBoundary, brokenJjMetadata, canEnableJujutsu, reason }`. Reuse
+  nestedGitBoundary, brokenJjMetadata, canEnableJujutsu, reason }`. Reuse
       `registerRepositories` from `@dshfiles/jujutsu` for jj detection instead of a second
       marker check, and `git rev-parse --show-toplevel` / `git remote get-url origin` through
       the existing `ProjectCommands` service.
@@ -336,7 +336,7 @@ Goal: projects look like projects and say where they are.
 - [ ] Cleanup parity leftovers: a `merged` kind (only when the PR merged and every revision is
       on the target line), protection tiers stated in the settings copy, and a reasons report
       on the cleanup result (`kept because: unlanded revisions | live session | queued
-    integration | recent use`).
+  integration | recent use`).
 
 Acceptance: a repo with `assets/icon.svg` shows it without configuration; a monogram appears
 otherwise; two checkouts of one origin group together; cleanup reports one reason per kept
