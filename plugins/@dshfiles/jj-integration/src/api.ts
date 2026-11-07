@@ -80,7 +80,7 @@ export const threadWorkspaceName = threadWorkspaceNameEffect
 const cleanupRequestSchema = Schema.Struct({
   path: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
   olderThanHours: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(24 * 90)),
-  kinds: Schema.Array(cleanupKindSchema).check(Schema.isMinLength(1), Schema.isMaxLength(4)),
+  kinds: Schema.Array(cleanupKindSchema).check(Schema.isMinLength(1), Schema.isMaxLength(5)),
   targets: Schema.optional(Schema.Array(cleanupTargetSchema).check(Schema.isMaxLength(500))),
 })
 
@@ -97,7 +97,7 @@ const cleanupWorkspaceSchema = Schema.Struct({
   repoRoot: Schema.String,
   name: Schema.String,
   path: Schema.String,
-  kind: Schema.Literals(['empty', 'integrated', 'secondary']),
+  kind: Schema.Literals(['empty', 'integrated', 'merged', 'secondary']),
   lastUsedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   missing: Schema.Boolean,
   /** Other bookmarks that each hold all of this workspace's work: why a workspace with revisions is removable. */
@@ -110,6 +110,8 @@ const cleanupSkippedSchema = Schema.Struct({
   repoRoot: Schema.String,
   name: Schema.String,
   reason: Schema.Literals(['has-work', 'busy', 'activity-unknown', 'queued', 'too-recent', 'kind-excluded', 'working-copy-dirty', 'workspace-state-unknown']),
+  /** The same reason in words, so a report says why one workspace was kept without decoding an enum. */
+  message: Schema.optional(Schema.String.check(Schema.isMaxLength(200))),
 })
 
 const cleanupUntrackedSchema = Schema.Struct({
@@ -180,6 +182,7 @@ const renderCleanup = (output: CleanupResult): string => {
       ? undefined
       : `${verb} ${String(output.untracked.length)} untracked entr(ies): ${output.untracked.map(entry => (entry.outcome === 'failed' ? `${entry.name} (failed)` : entry.name)).join(', ')}.`,
     `${output.applied ? 'Abandoned' : 'Would abandon'} ${String(output.emptyRevisions.length)} dangling empty revision(s).`,
+    ...output.skipped.slice(0, 12).map(row => `${row.name}: ${row.message ?? row.reason}`),
     CleanupJobModel.skippedSummary(output),
   ]
     .filter(line => line !== undefined)

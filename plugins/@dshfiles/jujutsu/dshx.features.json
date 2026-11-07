@@ -24,7 +24,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "destinationSection",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph › landmarks",
+      "currentSurface": "left-nav: Revision graph \u203a landmarks",
       "configuration": [],
       "states": ["resolved", "missing", "ambiguous", "same", "ancestor", "descendant", "diverged", "filtered", "truncated"],
       "failureModes": [
@@ -221,7 +221,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "detail",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph › revision detail",
+      "currentSurface": "left-nav: Revision graph \u203a revision detail",
       "configuration": [
         {
           "key": "fileView",
@@ -408,7 +408,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "rowAction",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph › revision menu",
+      "currentSurface": "left-nav: Revision graph \u203a revision menu",
       "configuration": [],
       "states": ["previewed", "confirmed", "cancelled", "expired", "stale", "failed"],
       "failureModes": [
@@ -471,7 +471,7 @@
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph › workspace overflow chip",
+      "currentSurface": "left-nav: Revision graph \u203a workspace overflow chip",
       "configuration": [],
       "states": ["collapsed", "expanded"],
       "failureModes": ["A failed workspace move is reported by the existing preview flow."],
@@ -483,7 +483,12 @@
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         }
       ],
-      "telemetry": [{ "kind": "not-applicable", "reason": "Client-only presentation of workspaces already loaded by the graph." }]
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only presentation of workspaces already loaded by the graph."
+        }
+      ]
     },
     {
       "id": "workspace-at-revision",
@@ -504,7 +509,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph › New workspace here",
+      "currentSurface": "left-nav: Revision graph \u203a New workspace here",
       "configuration": [
         {
           "key": "headerToggle",
@@ -653,15 +658,24 @@
         }
       ],
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" },
-        { "kind": "automatic", "source": "jj" }
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "jj"
+        }
       ]
     },
     {
       "id": "workspace-cleanup",
       "title": "Clean up idle JJ workspaces",
-      "summary": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for all ages, or 1h, 6h, 24h, or 7d inactivity windows. A managed thread or secondary workspace whose checkout folder is missing is marked in the list and can be explicitly selected; the Host checks unlanded work and Session activity, forgets only a missing secondary's JJ registration, and never removes its path. Untracked folders remain protected for their first hour. Users can expand categories, select individual rows or all candidates, and start a background job that only removes the selected rows after rechecking eligibility. Unlanded work and uncommitted changes stay protected; empty undescribed revisions are also abandoned by the cleanup job. Other JJ workspaces remain manual-only and require explicit selection.",
+      "summary": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for all ages, or 1h, 6h, 24h, or 7d inactivity windows. A managed thread or secondary workspace whose checkout folder is missing is marked in the list and can be explicitly selected; the Host checks unlanded work and Session activity, forgets only a missing secondary's JJ registration, and never removes its path. Untracked folders remain protected for their first hour. Users can expand categories, select individual rows or all candidates, and start a background job that only removes the selected rows after rechecking eligibility. Unlanded work and uncommitted changes stay protected; empty undescribed revisions are also abandoned by the cleanup job. A workspace whose pull request merged and whose revisions are all on the bookmark is offered as Merged pull request, and every preview names why each kept workspace was kept. Other JJ workspaces remain manual-only and require explicit selection.",
       "reach": [
         "click tab \"Land\"",
         "click button \"History\"",
@@ -679,9 +693,9 @@
       "surfaces": ["client", "host"],
       "surface": "command",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph › Clean up workspaces",
+      "currentSurface": "left-nav: Revision graph \u203a Clean up workspaces",
       "configuration": [],
-      "states": ["preset-threshold", "preview", "row-selection", "category-selection", "queued", "running", "done", "failed"],
+      "states": ["preset-threshold", "preview", "row-selection", "category-selection", "queued", "running", "done", "failed", "merged"],
       "failureModes": [
         "A workspace with unlanded work, a busy Session or a queued integration is kept.",
         "A second click on the same scope attaches to the job already running instead of queuing it twice.",
@@ -689,7 +703,8 @@
         "Other JJ workspaces are manual-only and opt-in; automatic cleanup never includes them.",
         "A workspace with uncommitted changes, unverifiable state, unknown last-use time, or a nested JJ workspace stays. Missing checkout folders are visibly marked; unlanded work remains protected, and a secondary path recreated after preview is never deleted.",
         "If the Host cannot enumerate Sessions to verify secondary workspace activity, cleanup preview fails closed.",
-        "Normal jj status can snapshot unsnapshotted changes into the workspace working-copy revision while preserving their files."
+        "Normal jj status can snapshot unsnapshotted changes into the workspace working-copy revision while preserving their files.",
+        "Merged pull request is a manual choice only: an automatic run never reads the pull-request links, so such a workspace falls back to Already landed."
       ],
       "externalDependencies": [
         {
@@ -738,7 +753,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "land",
-      "currentSurface": "left-nav: Revision graph › Remove workspace",
+      "currentSurface": "left-nav: Revision graph \u203a Remove workspace",
       "configuration": [],
       "states": ["thread-workspace", "plain-workspace", "removed", "refused"],
       "failureModes": [
@@ -782,7 +797,7 @@
     {
       "id": "source-control",
       "title": "Describe and review the working copy in Source Control",
-      "summary": "Source control is its own panel in navigation, the main view and the Workbench: a describe box for @, then the working copy and @-1 … @-N groups with their changed files, under the same repository, Fetch, Push, refresh, view settings and repository actions toolbar as the revision graph.",
+      "summary": "Source control is its own panel in navigation, the main view and the Workbench: a describe box for @, then the working copy and @-1 \u2026 @-N groups with their changed files, under the same repository, Fetch, Push, refresh, view settings and repository actions toolbar as the revision graph.",
       "reach": [
         "click tab \"Land\"",
         "click button \"Source control\"",
@@ -855,7 +870,7 @@
       "surfaces": ["client", "storage", "integration"],
       "surface": "infrastructure",
       "destination": "none",
-      "currentSurface": "left-nav: Revision graph › per-tab repository",
+      "currentSurface": "left-nav: Revision graph \u203a per-tab repository",
       "configuration": [],
       "states": ["default-panel", "main-tab", "thread-side-panel", "dock", "restored"],
       "failureModes": [
