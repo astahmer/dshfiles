@@ -18,6 +18,7 @@ import { ThreadRouteModel } from './thread-route.js'
 import { useNearViewport } from './use-near-viewport.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view'
+import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
 import { RemoteThreadItem, RemoteThreadsSection, type RemoteThreadRowLabels } from './remote-threads-section.js'
@@ -1786,6 +1787,27 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     () => new Map<string, string>(workspaceState.items.map(workspace => [workspace.workspaceId, workspace.path])),
     [workspaceState.items],
   )
+  const identityPaths = useMemo(() => [...new Set([...workspacePathById.values()])].sort(), [workspacePathById])
+  const lifecycleApi = useApi(projectLifecycleApi)
+  const projectIdentities = useQuery({
+    queryKey: ['workspace-folder-picker', 'project-identities', identityPaths.join('\n')],
+    enabled: identityPaths.length > 0,
+    queryFn: ({ signal }) => lifecycleApi.projectIdentities({ paths: identityPaths }, { signal }),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+  /**
+   * Repository identity per workspace id, so two checkouts of one repository are one project row. The Host answers from
+   * a cached inspection; a workspace the read does not know falls back to its own id and stays its own row.
+   */
+  const projectKeys = useMemo(() => {
+    const keys = new Map<string, string>()
+    for (const identity of projectIdentities.data?.identities ?? []) {
+      const workspace = workspaceState.items.find(item => item.path === identity.path)
+      if (workspace !== undefined) keys.set(workspace.workspaceId, identity.key)
+    }
+    return keys
+  }, [projectIdentities.data, workspaceState.items])
   /** Titles by workspace id, so a row does not rescan every workspace on each render. */
   const workspaceTitleById = useMemo(() => new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title])), [displayWorkspaces])
   const workspaceNameById = useMemo(
@@ -3926,6 +3948,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         label: tSidebar(statusGroupLabelKeys[group.group]),
         showHeader: true,
         projectId: undefined,
+        checkoutCount: 1,
         threads: group.threads,
       }))
     }
@@ -3937,6 +3960,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       groupBy: threadView.groupBy,
       entries,
       workspaceTitles,
+      projectKeys,
       localProjectIds: new Set(displayWorkspaces.map(workspace => workspace.id)),
       unassignedTitle: tSidebar('threadSidebarUnassigned'),
       dateTitles: {
@@ -5474,13 +5498,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       {showHeader ? (
                         <ThreadGroupHeader
                           icon={
-                            group.key.startsWith('project:')
-                              ? (() => {
-                                  const projectPath = workspacePathById.get(group.key.slice('project:'.length))
-                                  return projectPath === undefined ? undefined : <ProjectIcon path={projectPath} title={groupLabel} />
-                                })()
-                              : undefined
+                            group.projectId === undefined ? undefined : (() => {
+                              const projectPath = workspacePathById.get(group.projectId)
+                              return projectPath === undefined ? undefined : <ProjectIcon path={projectPath} title={groupLabel} />
+                            })()
                           }
+                          checkoutCount={group.checkoutCount}
                           label={groupLabel}
                           count={group.threads.length}
                           collapsed={groupCollapsed}

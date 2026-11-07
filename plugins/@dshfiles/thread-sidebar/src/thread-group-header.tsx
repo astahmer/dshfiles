@@ -19,9 +19,11 @@ interface ThreadGroupHeaderProps {
   readonly action?: ReactNode
   /** The project's own mark, before its name; absent for groups that are not a project. */
   readonly icon?: ReactNode
+  /** Local checkouts this row stands for; above one, the row names the repository rather than a path. */
+  readonly checkoutCount?: number
 }
 
-export const ThreadGroupHeader = ({ label, count, collapsed, projectId, className, onToggle, startProjectSession, t, action, icon }: ThreadGroupHeaderProps) => {
+export const ThreadGroupHeader = ({ label, count, collapsed, projectId, className, onToggle, startProjectSession, t, action, icon, checkoutCount }: ThreadGroupHeaderProps) => {
   const createLabel = t('threadSidebarNewChatInProject', { project: label })
   return (
     <div className={cn(className, 'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-2.5')}>
@@ -34,6 +36,11 @@ export const ThreadGroupHeader = ({ label, count, collapsed, projectId, classNam
       >
         {icon}
         <span className="dshx:min-w-0 dshx:truncate">{label}</span>
+        {checkoutCount === undefined || checkoutCount < 2 ? null : (
+          <span className="dshx:shrink-0 dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:text-[10px] dshx:font-medium dshx:text-muted-foreground">
+            {checkoutCount} checkouts
+          </span>
+        )}
         <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums">({count})</span>
         <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
         <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">

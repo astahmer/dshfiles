@@ -197,6 +197,27 @@ export const projectLifecycleApi = defineApi({
             : `${output.path} · workspace ${output.config.defaultThreadWorkspace ?? 'inherit'} · ${String(output.config.checks?.length ?? 0)} check(s)`,
       },
     }),
+    projectIdentities: WorkspaceFolderPickerSchema.method({
+      input: Schema.Struct({ paths: Schema.Array(parentPathSchema).check(Schema.isMinLength(1), Schema.isMaxLength(100)) }),
+      output: Schema.Struct({
+        identities: Schema.Array(
+          Schema.Struct({
+            path: Schema.String.check(Schema.isMinLength(1)),
+            /** Stable across checkouts of one repository: its origin, else the repository root, else the folder. */
+            key: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
+            remoteUrl: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_048))),
+            repositoryRoot: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_048))),
+          }),
+        ).check(Schema.isMaxLength(100)),
+      }),
+      description:
+        'The repository identity behind each project folder: the Git/Jujutsu origin when there is one, else the repository root, else the folder itself, so two checkouts of one repository can group as one project. Cached on the Host. Read-only.',
+      tool: {
+        name: 'project_identities',
+        readOnly: true,
+        render: output => output.identities.map(identity => `${identity.path} → ${identity.key}`).join('\n'),
+      },
+    }),
     icon: WorkspaceFolderPickerSchema.method({
       input: Schema.Struct({ path: parentPathSchema, title: Schema.optional(Schema.String.check(Schema.isMaxLength(200))) }),
       output: Schema.Struct({

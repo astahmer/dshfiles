@@ -55,6 +55,25 @@ export default DshxPlugin.make({
       inspect: input => FolderInspector.use(inspector => inspector.inspect(input.path)),
       initProject: input => ProjectCreator.use(creator => creator.initialize(input)),
       publishProject: input => ProjectCreator.use(creator => creator.publish(input)),
+      projectIdentities: input =>
+        Effect.gen(function* () {
+          const inspector = yield* FolderInspector
+          const identities = yield* Effect.forEach(
+            input.paths,
+            path =>
+              inspector.inspect(path).pipe(
+                Effect.map(inspection => ({
+                  path,
+                  key: inspection.remoteUrl ?? inspection.repositoryRoot ?? inspection.path,
+                  remoteUrl: inspection.remoteUrl,
+                  repositoryRoot: inspection.repositoryRoot,
+                })),
+                Effect.catch(() => Effect.succeed({ path, key: path, remoteUrl: null, repositoryRoot: null })),
+              ),
+            { concurrency: 4 },
+          )
+          return { identities }
+        }),
       icon: input =>
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem

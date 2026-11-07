@@ -5,7 +5,16 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ThreadGroupHeader } from './thread-group-header.js'
 
-const mount = (options: { collapsed?: boolean; projectId?: string; label?: string; action?: ReactNode; icon?: ReactNode } = {}) => {
+const mount = (
+  options: {
+    collapsed?: boolean
+    projectId?: string
+    label?: string
+    action?: ReactNode
+    icon?: ReactNode
+    checkoutCount?: number
+  } = {},
+) => {
   const onToggle = vi.fn()
   const startProjectSession = vi.fn()
   const props: Parameters<typeof ThreadGroupHeader>[0] = {
@@ -20,9 +29,10 @@ const mount = (options: { collapsed?: boolean; projectId?: string; label?: strin
   }
   const withAction = options.action === undefined ? props : { ...props, action: options.action }
   const withIcon = options.icon === undefined ? withAction : { ...withAction, icon: options.icon }
+  const withCheckouts = options.checkoutCount === undefined ? withIcon : { ...withIcon, checkoutCount: options.checkoutCount }
   const view = render(
     <TooltipProvider>
-      <ThreadGroupHeader {...withIcon} />
+      <ThreadGroupHeader {...withCheckouts} />
     </TooltipProvider>,
   )
   return { ...view, onToggle, startProjectSession }
@@ -98,6 +108,14 @@ describe('ThreadGroupHeader', () => {
     const toggle = screen.getByRole('button', { name: /^R repo \(12\)$/u })
     expect(mark).not.toBeNull()
     expect(toggle.contains(mark)).toBe(true)
+  })
+
+  it('names how many local checkouts a repository row stands for', () => {
+    const header = mount({ label: 'repo', projectId: 'project-1', checkoutCount: 2 })
+    expect(screen.getByText('2 checkouts')).toBeTruthy()
+    cleanup()
+    mount({ label: 'repo', projectId: 'project-1', checkoutCount: 1 })
+    expect(screen.queryByText(/checkouts/u)).toBeNull()
   })
 
   it('truncates long project names without shrinking or hover-hiding creation at narrow widths', () => {
