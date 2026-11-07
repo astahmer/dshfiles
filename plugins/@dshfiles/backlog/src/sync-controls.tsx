@@ -29,6 +29,7 @@ import {
   ArrowUpIcon,
   CircleCheckIcon,
   CloudIcon,
+  CopyIcon,
   DownloadIcon,
   ExternalLinkIcon,
   LinkIcon,
@@ -346,6 +347,13 @@ const LinkedDetails = (props: { readonly linked: BacklogSyncItemView }): JSX.Ele
   )
 }
 
+/** What signing a provider in looks like on the Host, shown next to a create that could not reach its tracker. */
+const signInHintOf = (providerKind: string): { readonly text: string; readonly command?: string } | undefined => {
+  if (providerKind === 'github') return { text: 'Sign the gh CLI in on the Host, or set GITHUB_TOKEN for the Host.', command: 'gh auth login' }
+  if (providerKind === 'linear') return { text: 'Set LINEAR_API_KEY for the Host, or save a secret:ALIAS reference in Remote sync.' }
+  return undefined
+}
+
 const createThrough = (actions: ReturnType<typeof useSyncActions>, input: { readonly itemId: number; readonly view: BacklogSyncBindingView }): void =>
   actions.linkRemote.mutate(
     { id: input.itemId, binding: input.view.binding.id, create: true },
@@ -360,13 +368,67 @@ const createThrough = (actions: ReturnType<typeof useSyncActions>, input: { read
     },
   )
 
+/** A create that failed where it was clicked: the reason, how to fix the key, and a retry, instead of a toast. */
+const CreateFailure = (props: {
+  readonly providerKind: string
+  readonly text: string
+  readonly retry: () => void
+  readonly pending: boolean
+}): JSX.Element => {
+  const hint = signInHintOf(props.providerKind)
+  const [copied, setCopied] = useState(false)
+  return (
+    <div role="alert" className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-destructive/40 dshx:bg-destructive/5 dshx:p-2">
+      <span className="dshx:text-destructive">{props.text}</span>
+      {hint === undefined ? null : <span className="dshx:text-muted-foreground">{hint.text}</span>}
+      <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
+        <Button size="xs" variant="outline" disabled={props.pending} onClick={props.retry}>
+          <RefreshCwIcon aria-hidden className={cn('dshx:size-3', props.pending && 'dshx:animate-spin')} />
+          Retry
+        </Button>
+        {hint?.command === undefined ? null : (
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => {
+              void navigator.clipboard?.writeText(hint.command ?? '').catch(() => undefined)
+              setCopied(true)
+            }}
+          >
+            <CopyIcon aria-hidden className="dshx:size-3" />
+            {copied ? 'Copied' : hint.command}
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /** An item's external refs in its header row, one chip each, and a way to link one more. */
 const SyncChips = (props: { readonly itemId: number; readonly itemLabel: string; readonly project?: string | null | undefined }): JSX.Element | null => {
   const status = useSyncStatus()
   const actions = useSyncActions()
   const [linkBinding, setLinkBinding] = useState<string | null>(null)
+  const [createFailure, setCreateFailure] = useState<{ readonly bindingId: string; readonly text: string } | null>(null)
   const linked = (status.data?.items ?? []).filter(candidate => candidate.itemId === props.itemId)
   const available = bindingsFor(status.data, props.project).filter(view => !linked.some(entry => entry.bindingId === view.binding.id))
+  const connectionOf = (view: BacklogSyncBindingView): BacklogSyncConnectionView | undefined =>
+    status.data?.connections?.find(candidate => candidate.connection.instanceId === view.binding.connectionId)
+  const create = (view: BacklogSyncBindingView): void => {
+    setCreateFailure(null)
+    actions.linkRemote.mutate(
+      { id: props.itemId, binding: view.binding.id, create: true },
+      {
+        onSuccess: output =>
+          BacklogNotices.show({
+            text: `Created ${output.item?.remoteKey ?? 'the remote item'} in ${bindingLabel(view)}.`,
+            kind: 'success',
+            sessionId: null,
+          }),
+        onError: error => setCreateFailure({ bindingId: view.binding.id, text: failureText(error, `Could not create the item in ${bindingLabel(view)}.`) }),
+      },
+    )
+  }
   if (linked.length === 0 && available.length === 0) return null
   return (
     <>
@@ -405,21 +467,25 @@ const SyncChips = (props: { readonly itemId: number; readonly itemLabel: string;
             {available.map(view => (
               <div key={view.binding.id} className="dshx:flex dshx:flex-col dshx:gap-1">
                 <span className="dshx:font-medium">{bindingLabel(view)}</span>
+                <span className="dshx:text-muted-foreground">Key: {credentialLabels[connectionOf(view)?.credential ?? 'none']}</span>
                 <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
                   <Button size="sm" variant="outline" onClick={() => setLinkBinding(view.binding.id)}>
                     <LinkIcon aria-hidden className="dshx:size-3.5" />
                     Link…
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={actions.linkRemote.isPending}
-                    onClick={() => createThrough(actions, { itemId: props.itemId, view })}
-                  >
+                  <Button size="sm" variant="outline" disabled={actions.linkRemote.isPending} onClick={() => create(view)}>
                     <PlusIcon aria-hidden className="dshx:size-3.5" />
                     Create
                   </Button>
                 </div>
+                {createFailure?.bindingId === view.binding.id ? (
+                  <CreateFailure
+                    providerKind={view.providerKind}
+                    text={createFailure.text}
+                    pending={actions.linkRemote.isPending}
+                    retry={() => create(view)}
+                  />
+                ) : null}
               </div>
             ))}
           </PopoverContent>
