@@ -19,6 +19,7 @@ import {
   type ErrorInfo,
   type ReactNode,
 } from 'react'
+import { createReportOnce } from './report-once.js'
 
 /**
  * Where a text run sits. `prose` is ordinary Markdown text; `code` is the text of an inline code span (fenced blocks
@@ -129,12 +130,7 @@ export type InlineReferencePiece =
   | { readonly kind: 'text'; readonly text: string }
   | { readonly kind: 'reference'; readonly id: string; readonly start: number; readonly end: number; readonly text: string; readonly render: () => ReactNode }
 
-const reportedFailures = new Set<string>()
-const reportOnce = (key: string, message: string, error: unknown): void => {
-  if (reportedFailures.has(key)) return
-  reportedFailures.add(key)
-  console.error(`@dshfiles/chat inline references: ${message}`, error)
-}
+const reportOnce = createReportOnce('@dshfiles/chat inline references')
 
 /**
  * Split one text run into plain text and claimed references. Every provider offered this surface proposes ranges;
