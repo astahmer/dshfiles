@@ -40,13 +40,17 @@ describe('project lifecycle inputs', () => {
     }),
   )
 
-  it.effect('reads the last git progress line', () =>
+  it.effect('reads the last git progress line, its stage and its percent', () =>
     Effect.sync(() => {
-      expect(ProjectLifecycleModel.readProgress('Receiving objects:  33% (1/3)\rReceiving objects:  66% (2/3)\r')).toEqual({
+      expect(ProjectLifecycleModel.readProgress('Cloning into x...\rReceiving objects:  33% (1/3)\rReceiving objects:  66% (2/3)\r')).toEqual({
         percent: 66,
+        stage: 'receiving',
         message: 'Receiving objects:  66% (2/3)',
       })
-      expect(ProjectLifecycleModel.readProgress('Cloning into x...\n')).toEqual({ percent: null, message: 'Cloning into x...' })
+      expect(ProjectLifecycleModel.readProgress('Cloning into x...\n')?.stage).toBe('connecting')
+      expect(ProjectLifecycleModel.readProgress('Resolving deltas: 100% (3/3), done.\n')?.stage).toBe('resolving')
+      expect(ProjectLifecycleModel.readProgress('Checking out files: 100% (3/3)\n')?.stage).toBe('checkout')
+      expect(ProjectLifecycleModel.readProgress('Cloning into x...\n')).toEqual({ percent: null, stage: 'connecting', message: 'Cloning into x...' })
       expect(ProjectLifecycleModel.readProgress('\r\n')).toBeUndefined()
     }),
   )
@@ -318,6 +322,24 @@ describe.skipIf(!toolsAvailable)('project lifecycle against real git and jj', ()
         expect(log.trim()).toBe('chore: initialize existing')
         const bookmarks = execFileSync('jj', ['bookmark', 'list', '--template', 'self.name()'], { cwd: folder, encoding: 'utf8' })
         expect(bookmarks.trim()).toBe('main')
+      }),
+    ),
+  )
+
+  it.live('retries a failed clone into the same destination as a new job and refuses other states', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { root, origin, jobs } = yield* lifecycle({ installed: ['git', 'jj'] })
+        const failed = yield* settled(jobs, (yield* jobs.start({ repositoryUrl: `file://${join(root, 'missing')}`, parentPath: root, name: 'retried' })).id)
+        expect(failed.state).toBe('failed')
+        expect((yield* Effect.flip(jobs.retry('clone-unknown')))._tag).toBe('JobMissing')
+        const retried = yield* jobs.retry(failed.id)
+        expect(retried).toMatchObject({ path: failed.path, state: 'running' })
+        expect(retried.id).not.toBe(failed.id)
+        expect((yield* settled(jobs, retried.id)).state).toBe('failed')
+        const succeeded = yield* settled(jobs, (yield* jobs.start({ repositoryUrl: `file://${origin}`, parentPath: root, name: 'succeeded' })).id)
+        expect(succeeded.state).toBe('succeeded')
+        expect((yield* Effect.flip(jobs.retry(succeeded.id)))._tag).toBe('CloneNotRetryable')
       }),
     ),
   )

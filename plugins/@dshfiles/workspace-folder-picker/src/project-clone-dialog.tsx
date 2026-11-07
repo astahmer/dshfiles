@@ -5,7 +5,7 @@ import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import * as Schema from 'effect/Schema'
 import { useEffect, useRef, useState } from 'react'
-import { localCloneUrlSchema, projectFolderNameSchema, type CloneJob, type ProjectLifecycleClient } from './project-lifecycle-api.js'
+import { localCloneUrlSchema, projectFolderNameSchema, type CloneJob, type CloneStage, type ProjectLifecycleClient } from './project-lifecycle-api.js'
 import { WorkspaceFolderPickerSchema, type FormFieldErrors } from './schema.js'
 import { TextInput } from './text-input.js'
 
@@ -34,6 +34,14 @@ const phaseLabels = {
   done: 'Done',
 } satisfies Record<CloneJob['phase'], string>
 
+const stageLabels = {
+  connecting: 'Connecting',
+  counting: 'Counting objects',
+  receiving: 'Receiving objects',
+  resolving: 'Resolving deltas',
+  checkout: 'Checking out files',
+} satisfies Record<CloneStage, string>
+
 export const ProjectCloneDialog = (props: {
   readonly api: ProjectLifecycleClient
   readonly home: string | undefined
@@ -56,6 +64,10 @@ export const ProjectCloneDialog = (props: {
   })
   const job = jobs.data?.jobs.find(candidate => candidate.id === jobId) ?? start.data
   const cancel = useMutation({ mutationFn: (id: string) => props.api.cancelClone({ jobId: id, confirm: true }) })
+  const retry = useMutation({
+    mutationFn: (id: string) => props.api.retryClone({ jobId: id }),
+    onSuccess: job => setJobId(job.id),
+  })
 
   const onCloned = useRef(props.onCloned)
   onCloned.current = props.onCloned
@@ -122,7 +134,10 @@ export const ProjectCloneDialog = (props: {
           {job !== undefined && job.state !== 'failed' && (
             <div aria-live="polite" className="dshx:flex dshx:flex-col dshx:gap-2">
               <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:text-sm">
-                <span>{job.state === 'cancelled' ? 'Cancelled' : phaseLabels[job.phase]}</span>
+                <span>
+                  {job.state === 'cancelled' ? 'Cancelled' : phaseLabels[job.phase]}
+                  {job.state === 'running' && job.progress.stage !== null ? ` · ${stageLabels[job.progress.stage]}` : ''}
+                </span>
                 <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{job.progress.message}</span>
               </div>
               <Progress value={job.progress.percent ?? 0} />
@@ -141,6 +156,11 @@ export const ProjectCloneDialog = (props: {
             ) : (
               <Button onClick={props.onClose} type="button" variant="outline">
                 Close
+              </Button>
+            )}
+            {job !== undefined && (job.state === 'failed' || job.state === 'cancelled') && (
+              <Button disabled={retry.isPending} onClick={() => retry.mutate(job.id)} type="button" variant="outline">
+                Retry clone
               </Button>
             )}
             <Button disabled={running || start.isPending} type="submit">

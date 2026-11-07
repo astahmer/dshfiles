@@ -225,10 +225,10 @@ checkout, enables Jujutsu, starts a thread and asserts an isolated workspace.
 
 Goal: the clone owns its progress, its failure and its retry, on every client.
 
-- [ ] Parse git's stages (`connecting`/`counting`/`receiving`/`resolving`/`checkout`) into
+- [x] Parse git's stages (`connecting`/`counting`/`receiving`/`resolving`/`checkout`) into
       `CloneJob.progress` alongside percent and detail, so a client renders the same summary
       t3code does; derive the display name from the URL (`owner/repo`) until the folder exists.
-- [ ] Add `projectCloneRetry` (tool `project_clone_retry`) reusing the same destination and
+- [x] Add `projectCloneRetry` (tool `project_clone_retry`) reusing the same destination and
       the same admission lock; a failed job keeps its path and error until retried, cancelled
       or pruned.
 - [ ] Keep the failed clone's intent: do not delete the whole folder when the failure is
@@ -386,7 +386,8 @@ Filled as tasks land; empty means unverified.
 | P1 | project inspect method | `src/folder-inspection.test.ts` 6 tests green; `project_inspect` + `project_init` bound in `src/host.ts` |
 | P1 | Enable Jujutsu action | `repository-setup-contract` provided by `@dshfiles/jujutsu`; `project-folder-setup.tsx` renders it; gherkin `workspace-folder-picker.folder-setup` added (run pending) |
 | P1 | jj-integration non-repo state | — (open) |
-| P2 | clone stages + retry | — |
+| P2 | clone stages + retry | 15 tests in `project-lifecycle.test.ts`; retry refuses running/succeeded jobs |
+| P2 | clone surface outside the dialog | — (open: needs a global slot owner) |
 | P3 | project_publish | — |
 | P4 | dsh.project.json | — |
 | P5 | setup on workspace create | — |

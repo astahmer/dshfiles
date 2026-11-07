@@ -44,6 +44,7 @@ export default DshxPlugin.make({
       startClone: input => CloneJobs.use(jobs => jobs.start(input)),
       cloneJobs: () => CloneJobs.use(jobs => Effect.map(jobs.list, list => ({ jobs: list }))),
       cancelClone: input => CloneJobs.use(jobs => jobs.cancel(input.jobId)),
+      retryClone: input => CloneJobs.use(jobs => jobs.retry(input.jobId)),
       createProject: input => ProjectCreator.use(creator => creator.create(input)),
       inspect: input => FolderInspector.use(inspector => inspector.inspect(input.path)),
       initProject: input => ProjectCreator.use(creator => creator.initialize(input)),

@@ -32,6 +32,11 @@ export const projectFolderNameSchema = WorkspaceFolderPickerSchema.trimmedText.c
 const cloneJobStateSchema = Schema.Literals(['running', 'succeeded', 'failed', 'cancelled'])
 const clonePhaseSchema = Schema.Literals(['cloning', 'colocating', 'registering', 'done'])
 
+/** Git's own clone stages, in the order it reports them. */
+export const cloneStageSchema = Schema.Literals(['connecting', 'counting', 'receiving', 'resolving', 'checkout'])
+
+export type CloneStage = typeof cloneStageSchema.Type
+
 export const cloneJobSchema = Schema.Struct({
   id: Schema.String,
   repositoryUrl: Schema.String,
@@ -40,6 +45,7 @@ export const cloneJobSchema = Schema.Struct({
   phase: clonePhaseSchema,
   progress: Schema.Struct({
     percent: Schema.NullOr(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(100))),
+    stage: Schema.NullOr(cloneStageSchema),
     message: Schema.String.check(Schema.isMaxLength(400)),
   }),
   startedAt: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
@@ -126,6 +132,13 @@ export const projectLifecycleApi = defineApi({
       description:
         'Cancel one running clone job and delete the partly cloned folder it created; a finished job is returned unchanged. confirm: true is required. Call only when the user asked to cancel that clone.',
       tool: { name: 'project_clone_cancel', render: compact },
+    }),
+    retryClone: WorkspaceFolderPickerSchema.method({
+      input: Schema.Struct({ jobId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)) }),
+      output: cloneJobSchema,
+      description:
+        'Retry a failed or cancelled clone into the same folder, as a new job; a running or succeeded job is refused. Follow it with project_clone_jobs. Call only when the user asked to retry that clone.',
+      tool: { name: 'project_clone_retry', render: compact },
     }),
     createProject: WorkspaceFolderPickerSchema.method({
       input: Schema.Struct({

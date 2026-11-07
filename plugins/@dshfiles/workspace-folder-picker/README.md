@@ -61,9 +61,17 @@ and deletes the partial folder, then `jj git init --colocate` runs when jj is
 installed and the clone is registered as a project and selected. Closing the
 dialog leaves the job running; it still registers the project when it ends.
 
+The progress row follows git's own stages (connecting, counting, receiving,
+resolving, checkout) next to the percent, and a failed or cancelled clone shows
+**Retry clone**, which starts a fresh job for the same repository and folder.
+
+A failed clone never leaves a partial checkout: the folder it made is removed,
+so a retry (or the form again) finds the destination free.
+
 The same jobs are agent tools: `project_clone` (URL, parent folder, folder
-name), `project_clone_jobs` (read-only trail, newest first) and
-`project_clone_cancel` (requires `confirm: true`). An existing destination is
+name), `project_clone_jobs` (read-only trail, newest first),
+`project_clone_cancel` (requires `confirm: true`) and `project_clone_retry` (a
+failed or cancelled job only). An existing destination is
 refused, a second start for the same folder returns the running job, and each
 clone leaves one `project clone` span with its final state and phase. Jobs live
 in Host memory, so a Host restart drops the trail. `multi_host_clone_project`

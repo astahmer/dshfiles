@@ -12,10 +12,7 @@
         "click menuitem \"Add workspace*\"",
         "expect textbox \"Enter a folder path\""
       ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Add workspace",
@@ -112,7 +109,7 @@
     {
       "id": "project-clone",
       "title": "Add a project by cloning a repository",
-      "summary": "New → Clone repository… in the Add workspace flow clones an https, ssh or file:// repository into a new folder in the background with git progress and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. The project_clone, project_clone_jobs and project_clone_cancel agent tools drive the same jobs.",
+      "summary": "New → Clone repository… in the Add workspace flow clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. A failed or cancelled job can be retried into the same folder as a new job. The project_clone, project_clone_jobs, project_clone_cancel and project_clone_retry agent tools drive the same jobs.",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose workspace\"",
@@ -121,24 +118,12 @@
         "click menuitem \"Clone repository…\"",
         "expect textbox \"Repository URL\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "tool"
-      ],
+      "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Add workspace › Clone repository",
       "configuration": [],
-      "states": [
-        "form",
-        "cloning",
-        "colocating",
-        "registering",
-        "succeeded",
-        "failed",
-        "cancelled"
-      ],
+      "states": ["form", "cloning", "colocating", "registering", "succeeded", "failed", "cancelled", "retrying"],
       "failureModes": [
         "An existing destination folder is refused before anything runs; a second start for the same folder returns the running job.",
         "A failed or cancelled clone deletes the folder it created and registers nothing; a failed jj colocation keeps the clone and names the command to finish it.",
@@ -168,6 +153,12 @@
           "kind": "gherkin",
           "id": "workspace-folder-picker.clone-repository",
           "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.clone-retry",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "retries a failed clone into the same destination as a new job and refuses other states"
         }
       ],
       "telemetry": [
@@ -191,25 +182,13 @@
       "id": "project-registration-removal",
       "title": "Remove a project registration",
       "summary": "Remove a project from the New thread picker without deleting its folder or files; threads lose their project grouping.",
-      "reach": [
-        "click button \"Choose workspace\"",
-        "expect textbox \"Search projects or enter a folder path\""
-      ],
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "reach": ["click button \"Choose workspace\"", "expect textbox \"Search projects or enter a folder path\""],
+      "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Remove",
       "configuration": [],
-      "states": [
-        "listed",
-        "confirmation",
-        "removed",
-        "failed"
-      ],
+      "states": ["listed", "confirmation", "removed", "failed"],
       "failureModes": [
         "Removal requires explicit confirmation.",
         "The folder and files stay on disk; project threads lose their grouping.",
@@ -242,22 +221,12 @@
         "click menuitem \"New project…\"",
         "expect textbox \"Project name\""
       ],
-      "surfaces": [
-        "client",
-        "host",
-        "tool"
-      ],
+      "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Add workspace › New project",
       "configuration": [],
-      "states": [
-        "form",
-        "creating",
-        "created",
-        "created-with-warning",
-        "failed"
-      ],
+      "states": ["form", "creating", "created", "created-with-warning", "failed"],
       "failureModes": [
         "An existing folder, a missing parent or a missing jj is refused before anything is written.",
         "A failure before registration removes the folder it created, so the same request can be retried.",
@@ -315,16 +284,9 @@
       "id": "registered-project-search",
       "title": "Search projects and browse folder paths",
       "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host (drive and UNC paths too on a Windows Host), automatically enter one unique matching folder, open on a Projects scope that leaves JJ thread workspaces out, offer Everything (recents, then projects, then workspaces), Recents and Workspaces scopes, and preserve project identity in returned choices.",
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "configuration": [],
-      "states": [
-        "empty",
-        "matched",
-        "selected"
-      ],
+      "states": ["empty", "matched", "selected"],
       "failureModes": [
         "An empty result remains selectable-safe.",
         "Home-relative paths resolve against the Host-reported home before listing.",
@@ -392,19 +354,10 @@
       "id": "keyboard-folder-selection",
       "title": "Select project folders with keyboard navigation",
       "summary": "Move through result rows with wrapped selection and handle empty lists without selecting an invalid row.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "configuration": [],
-      "states": [
-        "focused",
-        "next",
-        "previous",
-        "empty"
-      ],
-      "failureModes": [
-        "Keyboard actions on an empty list do not invent a selection."
-      ],
+      "states": ["focused", "next", "previous", "empty"],
+      "failureModes": ["Keyboard actions on an empty list do not invent a selection."],
       "externalDependencies": [],
       "verification": [
         {
@@ -433,20 +386,10 @@
       "id": "unregistered-recent-folders",
       "title": "Offer recent folders not yet registered as projects",
       "summary": "List recent folders in order on their own scope and first on Everything (before projects, then JJ thread workspaces, each folder once), show a registered recent as its project, and keep an unregistered folder's canonical path distinct from registered project identity.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "registered-match",
-        "recent-unregistered",
-        "selected"
-      ],
-      "failureModes": [
-        "Recent directory selection cannot claim an existing project ID until Host registration succeeds."
-      ],
+      "states": ["registered-match", "recent-unregistered", "selected"],
+      "failureModes": ["Recent directory selection cannot claim an existing project ID until Host registration succeeds."],
       "externalDependencies": [],
       "verification": [
         {
@@ -481,19 +424,10 @@
       "id": "directory-only-mode",
       "title": "Start directly in the Host folder browser",
       "summary": "Consumers can open the picker with directory browsing active while omitting registered-project choices and registration actions.",
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "configuration": [],
-      "states": [
-        "projects-default",
-        "directory-browsing"
-      ],
-      "failureModes": [
-        "The default project mode remains unchanged for existing consumers.",
-        "Directory-only mode begins at the Host home listing."
-      ],
+      "states": ["projects-default", "directory-browsing"],
+      "failureModes": ["The default project mode remains unchanged for existing consumers.", "Directory-only mode begins at the Host home listing."],
       "externalDependencies": [],
       "verification": [
         {

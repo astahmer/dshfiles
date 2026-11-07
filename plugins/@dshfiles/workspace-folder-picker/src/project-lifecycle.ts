@@ -2,7 +2,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, join, parse } from 'node:path'
 import { Clock, Context, Duration, Effect, FiberMap, FileSystem, Layer, Option, Ref, Schema, Semaphore, Stream } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
-import type { CloneJob, CreatedProject } from './project-lifecycle-api.js'
+import type { CloneJob, CloneStage, CreatedProject } from './project-lifecycle-api.js'
 
 export type ProjectCommand = 'git' | 'jj' | 'gh'
 
@@ -142,7 +142,20 @@ const excerpt = (text: string, limit = 1_000): string => text.trim().split('\n')
 const expandHome = (path: string, home: string): string => (path.startsWith('~/') ? join(home, path.slice(2)) : path)
 
 /** The last git progress line (`Receiving objects:  45% (450/1000)`), split on carriage returns as a terminal would draw it. */
-const readProgress = (text: string): { readonly percent: number | null; readonly message: string } | undefined => {
+const STAGE_ORDER: readonly CloneStage[] = ['connecting', 'counting', 'receiving', 'resolving', 'checkout']
+
+/** Git prints one stage label per progress line, so the stage comes from the last line rather than a parser per command. */
+const stageOf = (line: string): CloneStage | null => {
+  if (/^Cloning into\b/u.test(line)) return 'connecting'
+  if (/\bCounting objects/u.test(line)) return 'counting'
+  if (/\bReceiving objects/u.test(line)) return 'receiving'
+  if (/\bResolving deltas/u.test(line)) return 'resolving'
+  if (/\b(?:Updating files|Checking out files)/u.test(line)) return 'checkout'
+  return null
+}
+
+/** The last git progress line (`Receiving objects:  45% (450/1000)`), split on carriage returns as a terminal would draw it. */
+const readProgress = (text: string): CloneProgress | undefined => {
   const line = text
     .split(/[\r\n]/u)
     .map(part => part.trim())
@@ -151,7 +164,7 @@ const readProgress = (text: string): { readonly percent: number | null; readonly
   if (line === undefined) return undefined
   const match = /(\d{1,3})%/u.exec(line)
   const percent = match?.[1] === undefined ? null : Math.min(100, Number(match[1]))
-  return { percent, message: line.slice(0, 400) }
+  return { percent, stage: stageOf(line), message: line.slice(0, 400) }
 }
 
 export interface CommandInput {
@@ -252,6 +265,17 @@ const runningState = (phase: ClonePhase, progress: CloneProgress): Extract<Clone
   progress,
 })
 
+/** The stage only moves forward and a line without a percent keeps the last one, so a progress row never rewinds. */
+const mergeProgress = (current: CloneProgress, next: CloneProgress): CloneProgress => {
+  const currentStage = current.stage === null ? -1 : STAGE_ORDER.indexOf(current.stage)
+  const nextStage = next.stage === null ? -1 : STAGE_ORDER.indexOf(next.stage)
+  return {
+    percent: next.percent ?? current.percent,
+    stage: nextStage >= currentStage ? next.stage : current.stage,
+    message: next.message,
+  }
+}
+
 /** The wire job the API and its tools answer with, projected from the tracked state. */
 const cloneJobOf = (job: TrackedCloneJob): CloneJob => ({
   id: job.id,
@@ -266,6 +290,16 @@ const cloneJobOf = (job: TrackedCloneJob): CloneJob => ({
   error: job.state.state === 'failed' ? job.state.error : null,
 })
 
+export class CloneNotRetryable extends Schema.TaggedError<CloneNotRetryable>()(
+  'CloneNotRetryable',
+  { jobId: Schema.String, state: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'clone-not-retryable' },
+) {
+  override get message(): string {
+    return `Clone ${this.jobId} is ${this.state}; only a failed or cancelled clone can be retried.`
+  }
+}
+
 /** Background clones on this Host: a bounded newest-first trail, one job per destination, cancellable until it registers. */
 export class CloneJobs extends Context.Service<
   CloneJobs,
@@ -277,6 +311,10 @@ export class CloneJobs extends Context.Service<
     }) => Effect.Effect<CloneJob, ParentMissing | DestinationExists | GitMissing | ProjectFolderFailed>
     /** Returns the job as it was when the cancel was asked for, once the clone stopped. */
     readonly cancel: (jobId: string) => Effect.Effect<CloneJob, JobMissing>
+    /** Starts a fresh job for a failed or cancelled clone's repository and destination. */
+    readonly retry: (
+      jobId: string,
+    ) => Effect.Effect<CloneJob, JobMissing | CloneNotRetryable | ParentMissing | DestinationExists | GitMissing | ProjectFolderFailed>
     readonly list: Effect.Effect<CloneJob[]>
     readonly get: (jobId: string) => Effect.Effect<Option.Option<CloneJob>>
   }
@@ -326,7 +364,7 @@ export class CloneJobs extends Context.Service<
           yield* finish((current, at) => ({
             ...current,
             finishedAt: at,
-            state: { state: 'cancelled', phase: current.state.phase, progress: { percent: current.state.progress.percent, message: 'Cancelled' } },
+            state: { state: 'cancelled', phase: current.state.phase, progress: { ...current.state.progress, message: 'Cancelled' } },
           }))
         })
 
@@ -337,7 +375,9 @@ export class CloneJobs extends Context.Service<
               cwd: home,
               onStderr: text => {
                 const progress = readProgress(text)
-                return progress === undefined ? Effect.void : transition(job.id, current => ({ ...current, state: { ...current.state, progress } }))
+                return progress === undefined
+                  ? Effect.void
+                  : transition(job.id, current => ({ ...current, state: { ...current.state, progress: mergeProgress(current.state.progress, progress) } }))
               },
             })
             .pipe(Effect.timeoutOption(CLONE_TIMEOUT))
@@ -360,7 +400,7 @@ export class CloneJobs extends Context.Service<
           if (Option.isSome(input.jj)) {
             yield* transition(job.id, current => ({
               ...current,
-              state: { state: 'running', phase: 'colocating', progress: { percent: 100, message: 'Colocating jj' } },
+              state: { state: 'running', phase: 'colocating', progress: { percent: 100, stage: current.state.progress.stage, message: 'Colocating jj' } },
             }))
             const colocated = yield* commands.run({ argv: [input.jj.value, 'git', 'init', '--colocate'], cwd: job.path })
             if (colocated.exitCode !== 0) {
@@ -377,13 +417,18 @@ export class CloneJobs extends Context.Service<
           }
           yield* transition(job.id, current => ({
             ...current,
-            state: { state: 'running', phase: 'registering', progress: { percent: 100, message: 'Adding the project' } },
+            state: { state: 'running', phase: 'registering', progress: { percent: 100, stage: current.state.progress.stage, message: 'Adding the project' } },
           }))
           const registered = yield* registry.register(job.path)
           yield* finish((current, at) => ({
             ...current,
             finishedAt: at,
-            state: { state: 'succeeded', phase: 'done', workspaceId: registered.workspaceId, progress: { percent: 100, message: 'Cloned' } },
+            state: {
+              state: 'succeeded',
+              phase: 'done',
+              workspaceId: registered.workspaceId,
+              progress: { percent: 100, stage: current.state.progress.stage, message: 'Cloned' },
+            },
           }))
         }).pipe(
           Effect.catchTags({
@@ -415,7 +460,7 @@ export class CloneJobs extends Context.Service<
               path: target,
               startedAt: now,
               finishedAt: null,
-              state: runningState('cloning', { percent: null, message: 'Starting' }),
+              state: runningState('cloning', { percent: null, stage: null, message: 'Starting' }),
             }
             yield* Ref.update(jobs, current => new Map(current).set(job.id, job))
             yield* prune
@@ -433,9 +478,20 @@ export class CloneJobs extends Context.Service<
         return cloneJobOf(found)
       })
 
+      /** A failed or cancelled job keeps its repository and destination, so a retry only needs the folder it named. */
+      const retry = Effect.fn('project clone retry')(function* (jobId: string) {
+        const found = yield* Effect.map(Ref.get(jobs), current => current.get(jobId))
+        if (found === undefined) return yield* new JobMissing({ jobId })
+        if (found.state.state === 'running' || found.state.state === 'succeeded') {
+          return yield* new CloneNotRetryable({ jobId, state: found.state.state })
+        }
+        return yield* start({ repositoryUrl: found.repositoryUrl, parentPath: dirname(found.path), name: basename(found.path) })
+      })
+
       return CloneJobs.of({
         start,
         cancel,
+        retry,
         list: Effect.map(Ref.get(jobs), current => [...current.values()].reverse().map(cloneJobOf)),
         get: viewOf,
       })
