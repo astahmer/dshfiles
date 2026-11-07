@@ -59,6 +59,16 @@ Disabled saved accounts stay in the sidebar preview with their measured percenta
 
 Disabling is not hiding: **Hide** in the context menu still removes a card from the preview until **Show** or **Show all hidden** is used. Quota visibility is separate from routing availability: measured windows remain visible while OFF, but the account is not used for model routing or chosen as the most critical enabled account. Missing quota still shows its ordinary unavailable status rather than an invented percentage. Enabling does not sign in, send a message, change the thread model or resume work. Agent parity remains the existing `ai_accounts_save_account` tool; there is no separate enable-state store.
 
+## Usage freshness and refresh
+
+![A failed provider keeps its last reading, says why and offers Retry](docs/screenshots/usage-refresh-failure.png)
+
+Every quota card says how current it is. **Updated 3m ago** is the time that provider last answered, per card: a failed read keeps the last good figures under their original time, names the provider's reason, and offers **Retry**. If the whole sweep fails, the popover, Usage › Quota views and the account page show a notice with the reason and **Retry** beside the last reading.
+
+**Refresh** always bypasses the Host's 30-second sweep cache. Claude's usage endpoint rate-limits after a few calls a minute, so one Claude reading is deliberately shared for two minutes, and a 429 waits for `Retry-After` (or 10 minutes). A refresh inside either hold reuses that reading: the card keeps its real age and shows **Next reading in 1m**, and a 429 replaces **Retry** with that time, because a retry could not reach the provider.
+
+The page polls in the background on the configured interval and reads again when it returns to the foreground; that read uses the Host's shared sweep, so it can be up to 30 seconds old.
+
 ## Quick setup and account workspace
 
 The small **AI account settings** button beside **+** in the sidebar account strip opens the AI Accounts page. It closes an open quota popover without starting sign-in or changing the active chat.

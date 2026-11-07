@@ -1,4 +1,4 @@
-import type { AccountKind, AccountsUsage } from './api.js'
+import type { AccountKind, AccountsUsage, UsageCard } from './api.js'
 import { AccountDraftModel } from './account-draft.js'
 import { KIND_GROUPS } from './account-labels.js'
 
@@ -245,11 +245,39 @@ export class UsageOverviewModel {
     return short === 'now' ? 'Resetting now' : `Resets in ${short}`
   }
 
-  /** Snapshot age as hh:mm:ss, the reference footer's ticking clock. */
-  static formatAge = (readAt: number, now: number): string => {
-    const seconds = Math.max(0, Math.floor((now - readAt) / 1000))
-    const pad = (value: number): string => String(value).padStart(2, '0')
-    return `${pad(Math.floor(seconds / 3_600))}:${pad(Math.floor((seconds % 3_600) / 60))}:${pad(seconds % 60)}`
+  /** How long ago a reading was taken: "just now", "9m ago", "1h 11m ago", "2d ago". */
+  static formatReadAge = (readAt: number, now: number): string => {
+    const minutes = Math.floor((now - readAt) / 60_000)
+    if (minutes < 1) return 'just now'
+    if (minutes < 60) return `${String(minutes)}m ago`
+    if (minutes < 1_440) return `${String(Math.floor(minutes / 60))}h ${String(minutes % 60)}m ago`
+    return `${String(Math.floor(minutes / 1_440))}d ago`
+  }
+
+  /** When a card's content was read; a Host older than per-card read times only knows its sweep. */
+  static cardReadAt = (usage: UsageCard, sweepReadAt: number): number => usage.readAt ?? sweepReadAt
+
+  /** "Next reading in 4m" while the Host holds reads back, so a refresh that changes nothing explains itself. */
+  static nextReading = (usage: UsageCard, now: number): string | null => {
+    if (usage.nextReadAt === undefined || usage.nextReadAt <= now) return null
+    return `Next reading in ${UsageOverviewModel.formatResetShort(usage.nextReadAt, now) ?? 'a moment'}`
+  }
+
+  /** Why a card shows an older reading than the latest read attempt, or null when it does not. */
+  static readFailureReason = (usage: UsageCard): string | null =>
+    usage.readFailure === undefined ? null : (usage.readFailure.message ?? 'The provider did not return usage.')
+
+  /** Every shown figure is as old as its oldest card. */
+  static oldestReadAt = (usage: AccountsUsage): number =>
+    Math.min(usage.readAt, ...usage.cards.map(card => UsageOverviewModel.cardReadAt(card.usage, usage.readAt)))
+
+  /** One line for a surface that has no per-card status: which accounts kept an older reading, and why. */
+  static staleSummary = (usage: AccountsUsage | null): string | null => {
+    const stale = (usage?.cards ?? []).filter(card => card.enabled && card.usage.readFailure !== undefined)
+    const [first] = stale
+    if (first === undefined) return null
+    if (stale.length > 1) return `${String(stale.length)} accounts kept their last reading because a new one failed.`
+    return `${first.displayName}: ${UsageOverviewModel.readFailureReason(first.usage) ?? ''}`
   }
 
   /** Banked reset expiries, soonest first, unknown last. */

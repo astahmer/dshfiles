@@ -9,6 +9,7 @@ import { aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi } from './api.js'
 import { AccountUsageSlot } from './account-usage-view.js'
 import { CurrentQuota, LabelledSelect } from './usage-history-panel.js'
+import { UsageRefreshNotice } from './usage-read-status.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 
 /**
@@ -23,7 +24,7 @@ export const QuotaAccountsView = (props: {
   readonly onOpenHistory: (accountId: string) => void
 }): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
-  const { usage, refresh, refreshing } = useAccountsUsage()
+  const { usage, refresh, refreshing, failure } = useAccountsUsage()
   const fileQuery = useQuery(aiAccountsQueries.file(accounts))
   const [chosenId, setChosenId] = useState(props.accountId ?? '')
   const options = useMemo(() => {
@@ -67,8 +68,9 @@ export const QuotaAccountsView = (props: {
           Manage accounts
         </Button>
       </div>
+      <UsageRefreshNotice failure={failure} hasReading={usage !== null} onRetry={() => void refresh()} refreshing={refreshing} />
       <PageSection heading="Current limits" description="Provider-reported subscription allowance, separate from recorded requests and list-price estimates.">
-        <CurrentQuota accountId={selectedId} usage={usage} />
+        <CurrentQuota accountId={selectedId} onRetry={() => void refresh()} refreshing={refreshing} usage={usage} />
       </PageSection>
       <AccountUsageSlot accountId={selectedId} displayName={selected.label} onOpenUsageHistory={() => props.onOpenHistory(selectedId)} />
     </div>

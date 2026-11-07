@@ -294,6 +294,102 @@ describe('popover account availability', () => {
   })
 })
 
+describe('usage popover refresh', () => {
+  const refreshButton = (): HTMLButtonElement => {
+    const button = overview().querySelector<HTMLButtonElement>('button[aria-label="Refresh usage"]')
+    if (button === null) throw new Error('Missing Refresh usage button')
+    return button
+  }
+  const retryButton = (within: HTMLElement): HTMLButtonElement => {
+    const button = [...within.querySelectorAll('button')].find(candidate => candidate.textContent?.trim() === 'Retry')
+    if (button === undefined) throw new Error('Missing Retry button')
+    return button
+  }
+  const dated = (card: Card, readAt: number, extra: Partial<Card['usage']> = {}): Card => ({ ...card, usage: { ...card.usage, readAt, ...extra } })
+
+  it('shows when each card was read, per card, ticking from its own time', async () => {
+    const now = Date.now()
+    await mount({ usage: snapshot([dated(healthy('work', 'Work'), now), dated(healthy('home', 'Home'), now - 12 * 60_000)]) })
+    await click(quotaButton('Work'))
+    expect(overviewCard('Work').textContent).toContain('Updated just now')
+    expect(overviewCard('Home').textContent).toContain('Updated 12m ago')
+  })
+
+  it('keeps the reading through a failed refresh, explains it, and recovers from Retry', async () => {
+    await mount({ usage: snapshot([healthy('work', 'Work')]) })
+    await click(quotaButton('Work'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000)
+    })
+    host.refreshUsage.mockRejectedValueOnce(new Error('Account usage read timed out after 30000 ms.'))
+    await click(refreshButton())
+    const notice = overview().querySelector<HTMLElement>('[role="alert"]')
+    if (notice === null) throw new Error('Missing refresh failure notice')
+    expect(notice.textContent).toContain('Usage could not be refreshed')
+    expect(notice.textContent).toContain('Account usage read timed out after 30000 ms.')
+    expect(notice.textContent).toContain('last successful read')
+    expect(overviewCard('Work').textContent).toContain('42% left')
+
+    host.refreshUsage.mockResolvedValueOnce(snapshot([healthy('work', 'Work', 30)]))
+    await click(retryButton(notice))
+    expect(overview().querySelector('[role="alert"]')).toBeNull()
+    expect(overviewCard('Work').textContent).toContain('30% left')
+  })
+
+  it('names a failed provider on its own card, with its old figures dated and a retry', async () => {
+    const now = Date.now()
+    await mount({ usage: snapshot([dated(healthy('work', 'Work'), now - 5 * 60_000)]) })
+    await click(quotaButton('Work'))
+    host.refreshUsage.mockResolvedValueOnce(
+      snapshot([{ ...unavailableAccount('error', 'Codex returned 502 for usage.'), instanceId: 'work', displayName: 'Work' }]),
+    )
+    await click(refreshButton())
+    expect(overviewCard('Work').textContent).toContain('42% left')
+    expect(overviewCard('Work').textContent).toContain('Codex returned 502 for usage.')
+    expect(overviewCard('Work').textContent).toContain('Last good reading 5m ago')
+
+    host.refreshUsage.mockResolvedValueOnce(snapshot([healthy('work', 'Work', 30)]))
+    await click(retryButton(overviewCard('Work')))
+    expect(overviewCard('Work').textContent).toContain('30% left')
+    expect(overviewCard('Work').textContent).not.toContain('Codex returned 502')
+  })
+
+  it('says when the next reading can happen instead of offering a retry that cannot reach the provider', async () => {
+    const now = Date.now()
+    const held = dated(healthy('work', 'Work'), now - 12 * 60_000, {
+      nextReadAt: now + 6 * 60_000 + 30_000,
+      readFailure: { status: 'rate-limited', message: 'Claude asked to wait before the next usage reading.' },
+    })
+    await mount({ usage: snapshot([held]) })
+    await click(quotaButton('Work'))
+    const card = overviewCard('Work')
+    expect(card.textContent).toContain('Claude asked to wait before the next usage reading.')
+    expect(card.textContent).toContain('Last good reading 12m ago')
+    expect(card.textContent).toContain('Next reading in 6m')
+    expect([...card.querySelectorAll('button')].some(button => button.textContent?.trim() === 'Retry')).toBe(false)
+  })
+
+  it('explains a shared reading that a refresh could not replace yet, without calling it a failure', async () => {
+    const now = Date.now()
+    await mount({ usage: snapshot([dated(healthy('work', 'Work'), now - 60_000, { nextReadAt: now + 60_000 })]) })
+    await click(quotaButton('Work'))
+    expect(overviewCard('Work').textContent).toContain('Updated 1m ago')
+    expect(overviewCard('Work').textContent).toContain('Next reading in 1m')
+  })
+
+  it('offers a retry when nothing has been read yet', async () => {
+    await mount({ usage: snapshot([healthy('work', 'Work')]) })
+    await click(quotaButton('Work'))
+    host.refreshUsage.mockResolvedValueOnce(
+      snapshot([{ ...unavailableAccount('error', 'Synthetic quota read failed.'), instanceId: 'other', displayName: 'Other' }]),
+    )
+    await click(refreshButton())
+    expect(overviewCard('Other').textContent).toContain('Synthetic quota read failed.')
+    expect(overviewCard('Other').textContent).toContain('Last tried just now')
+    expect(retryButton(overviewCard('Other'))).toBeDefined()
+  })
+})
+
 describe('uniform sidebar account card surfaces', () => {
   it('keeps a small vertical gap around full-height preview cards', async () => {
     await mount({ usage: snapshot([healthy('work', 'Work')]) })

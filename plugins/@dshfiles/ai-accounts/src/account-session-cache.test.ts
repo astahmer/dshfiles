@@ -44,7 +44,7 @@ describe('sign-out cache invalidation', () => {
       old.complete(new Response(JSON.stringify({ five_hour: { utilization: 10 } })))
       expect((await before).status).toBe('ok')
       expect((await service.readUsage(home)).status).toBe('unauthenticated')
-      expect(await service.readUsage(other)).toBe(otherCard)
+      expect(await service.readUsage(other)).toEqual(otherCard)
       expect(fetch).toHaveBeenCalledTimes(2)
     } finally {
       await rm(root, { recursive: true, force: true })

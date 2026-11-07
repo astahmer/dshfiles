@@ -95,6 +95,53 @@ describe('ai-accounts queries', () => {
     expect(usage).toBeNull()
   })
 
+  it('dates a kept reading by when it was read, not by the sweep that failed to replace it', () => {
+    const goodCard = { ...usageCard, status: 'ok' as const, windows: [{ label: 'Weekly limit', percentRemaining: 40, resetsAt: 9 }] }
+    const sweep = (readAt: number, usage: unknown) =>
+      aiAccountsQueries.keepLastGoodUsage(
+        null,
+        overTheWire({ readAt, hostName: 'mac', cards: [{ instanceId: 'work', displayName: 'Work', kind: 'claude', enabled: true, usage }] }),
+      )
+    const merged = aiAccountsQueries.keepLastGoodUsage(
+      // An older Host sends no card time, so the sweep that carried the reading dates it.
+      sweep(1_000, goodCard),
+      sweep(2_000, { ...usageCard, status: 'rate-limited', message: 'Claude rate-limited the usage request.', nextReadAt: 9_000 }),
+    )
+    expect(merged?.readAt).toBe(2_000)
+    expect(merged?.cards[0]?.usage).toMatchObject({
+      status: 'ok',
+      readAt: 1_000,
+      nextReadAt: 9_000,
+      readFailure: { status: 'rate-limited', message: 'Claude rate-limited the usage request.' },
+    })
+
+    const recovered = aiAccountsQueries.keepLastGoodUsage(merged, sweep(3_000, { ...goodCard, readAt: 3_000 }))
+    expect(recovered?.cards[0]?.usage.readAt).toBe(3_000)
+    expect(recovered?.cards[0]?.usage.readFailure).toBeUndefined()
+    expect(recovered?.cards[0]?.usage.nextReadAt).toBeUndefined()
+  })
+
+  it('marks every kept reading when the Host answer cannot be read', () => {
+    const previous = overTheWire({
+      readAt: 1_000,
+      hostName: 'mac',
+      cards: [{ instanceId: 'work', displayName: 'Work', kind: 'codex', enabled: true, usage: { ...usageCard, readAt: 900 } }],
+    })
+    const kept = aiAccountsQueries.keepLastGoodUsage(previous, null)
+    expect(kept?.cards[0]?.usage).toMatchObject({ readAt: 900, readFailure: { status: 'error', message: expect.stringContaining('Reload the page') } })
+  })
+
+  it('shows a throttled card that carries its own windows instead of the older reading', () => {
+    const sweep = (usage: unknown) =>
+      aiAccountsQueries.keepLastGoodUsage(
+        null,
+        overTheWire({ readAt: 1, hostName: 'mac', cards: [{ instanceId: 'work', displayName: 'Work', kind: 'mistral', enabled: true, usage }] }),
+      )
+    const windows = [{ label: 'Monthly limit', percentRemaining: 0, resetsAt: null }]
+    const merged = aiAccountsQueries.keepLastGoodUsage(sweep(usageCard), sweep({ ...usageCard, status: 'rate-limited', windows }))
+    expect(merged?.cards[0]?.usage).toMatchObject({ status: 'rate-limited', windows })
+  })
+
   it('keeps the last good quota of each account through a failed or unreadable poll', async () => {
     const goodCard = { ...usageCard, windows: [{ label: 'Weekly limit', percentRemaining: 40, resetsAt: 9 }] }
     const answers = [

@@ -16,6 +16,7 @@ import { ExtraUsageMeter } from './extra-usage-view.js'
 import { useQuotaClock } from './quota-clock.js'
 import { usePreferences } from './use-preferences.js'
 import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
+import { UsageReadStatus, UsageRefreshNotice } from './usage-read-status.js'
 import { ArrangeableAccount, useUsageLayout, type UsageArrangement } from './usage-arrangement.js'
 import { UsageOverviewModel, type OverviewCard, type ProviderTab } from './usage-overview-model.js'
 
@@ -52,6 +53,8 @@ const AccountUsageCard = (props: {
   readonly hostName: string
   readonly readAt: number
   readonly now: number
+  readonly refreshing: boolean
+  readonly onRefresh: () => void
   readonly onConnectAccount: (accountId: string) => void
 }): JSX.Element => {
   const usage = props.card.usage
@@ -127,7 +130,7 @@ const AccountUsageCard = (props: {
                 )}
                 value={Math.max(0, Math.min(100, window.percentRemaining))}
               />
-              <div className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
+              <div className="dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className={props.card.enabled && spent ? 'dshx:font-semibold dshx:text-destructive' : undefined}>
@@ -138,17 +141,12 @@ const AccountUsageCard = (props: {
                   </TooltipTrigger>
                   {window.resetsAt === null ? null : <TooltipContent>{new Date(window.resetsAt).toLocaleString()}</TooltipContent>}
                 </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>Age {UsageOverviewModel.formatAge(props.readAt, props.now)}</span>
-                  </TooltipTrigger>
-                  <TooltipContent>Age of this usage snapshot</TooltipContent>
-                </Tooltip>
               </div>
             </div>
           )
         })}
         {extraUsage === undefined ? null : <ExtraUsageMeter extra={extraUsage} muted={!props.card.enabled} now={props.now} />}
+        <UsageReadStatus onRetry={props.onRefresh} refreshing={props.refreshing} sweepReadAt={props.readAt} usage={usage} />
         {usage.bankedResets > 0 ? <BankedResets count={usage.bankedResets} expiries={usage.bankedResetExpiries} /> : null}
         {limited && usage.bankedResets > 0 && props.card.kind === 'codex' ? (
           <p className="dshx:text-[11px] dshx:text-muted-foreground">Spend a banked reset with “Reset usage” in the Codex app; it is not used automatically.</p>
@@ -294,7 +292,7 @@ const ResizeGrip = (props: {
  */
 export const UsageOverview = (props: {
   readonly usage: AccountsUsage | null
-  readonly failed: boolean
+  readonly failure: string | null
   readonly refreshing: boolean
   readonly onRefresh: () => void
   readonly onOpenHistory: () => void
@@ -384,11 +382,16 @@ export const UsageOverview = (props: {
             <TooltipContent>Refresh usage</TooltipContent>
           </Tooltip>
         </header>
+        {props.failure === null ? null : (
+          <div className="dshx:shrink-0 dshx:px-2 dshx:pt-2">
+            <UsageRefreshNotice failure={props.failure} hasReading={props.usage !== null} onRetry={props.onRefresh} refreshing={props.refreshing} />
+          </div>
+        )}
         <div className="dshx:grid dshx:min-h-0 dshx:flex-1 dshx:grid-cols-[repeat(auto-fill,minmax(min(340px,100%),1fr))] dshx:content-start dshx:gap-2 dshx:overflow-y-auto dshx:overscroll-contain dshx:p-2">
           {props.usage === null ? (
-            <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
-              {props.failed ? 'The account host did not answer.' : 'Reading usage…'}
-            </p>
+            props.failure === null ? (
+              <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">Reading usage…</p>
+            ) : null
           ) : visibleCards.length === 0 ? (
             <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
               {sections.unavailable.length + sections.hidden.length === 0 ? 'No saved account for this provider.' : 'No account with quota to show.'}
@@ -410,6 +413,8 @@ export const UsageOverview = (props: {
                   hostName={props.usage?.hostName ?? ''}
                   now={now}
                   readAt={props.usage?.readAt ?? now}
+                  refreshing={props.refreshing}
+                  onRefresh={props.onRefresh}
                   onConnectAccount={props.onConnectAccount}
                 />
               </ArrangeableAccount>
