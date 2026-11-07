@@ -1,6 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { HostApis } from '@dshfiles/dshx/effect/host-apis'
-import { pullRequestApi } from '@dshfiles/pull-requests/api'
 import { Clock, Context, Effect, FileSystem, Layer, Option, Path } from 'effect'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { CleanupKindView, CleanupResult, CleanupTarget } from './api.js'
@@ -55,7 +53,6 @@ const make = Effect.gen(function* () {
   const log = yield* ActivityLog
   const path = yield* Path.Path
   const fileSystem = yield* FileSystem.FileSystem
-  const pullRequests = (yield* HostApis).client(pullRequestApi)
 
   const warnAndSkip = (what: string, repoRoot: string) => (error: { readonly message: string }) =>
     Effect.as(Effect.logWarning(`jj-integration: could not ${what} in ${repoRoot}: ${error.message}`), [])
@@ -81,32 +78,8 @@ const make = Effect.gen(function* () {
     return found
   })
 
-  /**
-   * Merged pull requests per thread session. A manual run that may remove `merged` workspaces asks the pull-requests
-   * plugin once for every link it holds; an absent plugin (or an unreadable one) simply marks nothing as merged, so the
-   * workspace falls back to `integrated` and is never removed for a reason nobody could verify.
-   */
-  const mergedPullRequestsBySession = Effect.fn('cleanup merged pull requests')(function* (input: {
-    readonly trigger: CleanupTrigger
-    readonly kinds: readonly CleanupKindView[]
-  }) {
-    const found = new Map<string, string[]>()
-    if (input.trigger !== 'manual' || !input.kinds.includes('merged')) return found
-    const links = yield* pullRequests.list({ all: true }).pipe(
-      Effect.map(listed => listed.links),
-      Effect.catch(error => Effect.logWarning(`jj-integration: could not read pull-request links for cleanup: ${String(error)}`).pipe(Effect.as([]))),
-    )
-    for (const link of links) {
-      if (link.lastKnownState?.state !== 'MERGED') continue
-      const key = `${link.repo}#${String(link.number)}`
-      found.set(link.sessionId, [...(found.get(link.sessionId) ?? []), key])
-    }
-    return found
-  })
-
   const scan = Effect.fn('cleanup scan')(function* (input: CleanupRequest & { readonly apply: boolean; readonly trigger: CleanupTrigger }) {
-    const kinds =
-      input.trigger === 'automatic' ? input.kinds.filter(kind => kind !== 'secondary' && kind !== 'merged') : input.kinds
+    const kinds = input.trigger === 'automatic' ? input.kinds.filter(kind => kind !== 'secondary') : input.kinds
     const scopedRepoRoot = input.path === undefined ? undefined : (yield* threads.locate(input.path)).repoRoot
     yield* views.invalidate
     const [registeredRepositories, currentActivity, sessionRecords] = yield* Effect.all(
@@ -129,7 +102,6 @@ const make = Effect.gen(function* () {
             },
           ]
     const archived = yield* registry.archivedSessionIds
-    const mergedPullRequests = yield* mergedPullRequestsBySession({ trigger: input.trigger, kinds })
     const now = yield* Clock.currentTimeMillis
     const olderThanMs = input.olderThanHours * HOUR_MS
     const repoRoots: string[] = []
@@ -155,7 +127,6 @@ const make = Effect.gen(function* () {
             integratedInto: bookmarks,
             rebasedAt: thread.rebasedAt,
             sessionIds: thread.sessionIds,
-            mergedPullRequests: [...new Set(thread.sessionIds.flatMap(sessionId => mergedPullRequests.get(sessionId) ?? []))],
             integrationQueued: (yield* requests.get(thread.path)) !== undefined,
             usedAt: [changedAt.get(thread.name), thread.rebasedAt, createdAt === undefined ? undefined : Date.parse(createdAt)],
           },

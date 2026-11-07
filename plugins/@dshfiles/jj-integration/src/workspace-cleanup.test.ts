@@ -19,7 +19,7 @@ const decide = (
   options: {
     readonly archived?: readonly string[]
     readonly running?: boolean | undefined
-    readonly kinds?: readonly ('empty' | 'integrated' | 'merged' | 'secondary' | 'untracked')[]
+    readonly kinds?: readonly ('empty' | 'integrated' | 'secondary' | 'untracked')[]
   } = {},
 ) =>
   WorkspaceCleanupModel.decide({
@@ -73,22 +73,6 @@ describe('WorkspaceCleanupModel.decide', () => {
       action: 'remove',
       kind: 'integrated',
       lastUsedAt: now - 7 * HOUR,
-    })
-  })
-
-  it('names a merged pull request as the merged kind once the work is on the bookmark', () => {
-    expect(decide(idleThread({ rebasedAt: now - 7 * HOUR, mergedPullRequests: ['owner/repo#42'] }), { kinds: ['merged', 'integrated'] })).toEqual({
-      action: 'remove',
-      kind: 'merged',
-      lastUsedAt: now - 10 * HOUR,
-    })
-  })
-
-  it('does not call it merged while its revisions are still unlanded', () => {
-    expect(decide(idleThread({ rebasedAt: now - 7 * HOUR, unlandedCount: 2, mergedPullRequests: ['owner/repo#42'] }))).toEqual({
-      action: 'skip',
-      reason: 'has-work',
-      lastUsedAt: now - 10 * HOUR,
     })
   })
 

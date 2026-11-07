@@ -21,12 +21,26 @@
         "click combobox \"Choose revision target\"",
         "expect combobox \"Search loaded revisions\""
       ],
-      "surfaces": ["client", "host", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "integration"
+      ],
       "surface": "destinationSection",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph \u203a landmarks",
       "configuration": [],
-      "states": ["resolved", "missing", "ambiguous", "same", "ancestor", "descendant", "diverged", "filtered", "truncated"],
+      "states": [
+        "resolved",
+        "missing",
+        "ambiguous",
+        "same",
+        "ancestor",
+        "descendant",
+        "diverged",
+        "filtered",
+        "truncated"
+      ],
       "failureModes": [
         "Missing or ambiguous landmarks cannot be guessed.",
         "Older Hosts show an unavailable notice without breaking the graph.",
@@ -83,7 +97,12 @@
         "click menuitemradio \"Workspaces\"",
         "expect text \"JJ workspace\""
       ],
-      "surfaces": ["client", "host", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
       "surface": "destinationSection",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph",
@@ -92,65 +111,114 @@
           "key": "defaultView",
           "defaultValue": "graph",
           "constraints": "One of graph or source.",
-          "choices": ["graph", "source"],
-          "coveredBy": ["jujutsu.graph-filters"]
+          "choices": [
+            "graph",
+            "source"
+          ],
+          "coveredBy": [
+            "jujutsu.graph-filters"
+          ]
         },
         {
           "key": "ancestorCount",
           "defaultValue": "5",
           "constraints": "Integer from 1 to 20 ancestors.",
-          "coveredBy": ["jujutsu.graph-filters"]
+          "coveredBy": [
+            "jujutsu.graph-filters"
+          ]
         },
         {
           "key": "hideImmutable",
           "defaultValue": "false",
           "constraints": "Boolean; hide immutable revisions.",
-          "choices": ["true", "false"],
-          "coveredBy": ["jujutsu.graph-filters"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "jujutsu.graph-filters"
+          ]
         },
         {
           "key": "mineOnly",
           "defaultValue": "false",
           "constraints": "Boolean; filter revisions to the current author.",
-          "choices": ["true", "false"],
-          "coveredBy": ["jujutsu.graph-filters"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "jujutsu.graph-filters"
+          ]
         },
         {
           "key": "dateHeadings",
           "defaultValue": "false",
           "constraints": "Boolean; group graph rows under headings for the day they were last rewritten.",
-          "choices": ["true", "false"],
-          "coveredBy": ["jujutsu.graph-filters"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "jujutsu.graph-filters"
+          ]
         },
         {
           "key": "revisionDate",
           "defaultValue": "edited",
           "constraints": "One of edited (last content change, ignoring rebases and descriptions), created, or both.",
-          "choices": ["edited", "created", "both"],
-          "coveredBy": ["jujutsu.revision-date"]
+          "choices": [
+            "edited",
+            "created",
+            "both"
+          ],
+          "coveredBy": [
+            "jujutsu.revision-date"
+          ]
         },
         {
           "key": "refreshMode",
           "defaultValue": "interval",
           "constraints": "One of interval or manual.",
-          "choices": ["interval", "manual"],
-          "coveredBy": ["jujutsu.refresh-behavior"]
+          "choices": [
+            "interval",
+            "manual"
+          ],
+          "coveredBy": [
+            "jujutsu.refresh-behavior"
+          ]
         },
         {
           "key": "refreshIntervalSeconds",
           "defaultValue": "60",
           "constraints": "Integer of at least 10 seconds.",
-          "coveredBy": ["jujutsu.refresh-behavior"]
+          "coveredBy": [
+            "jujutsu.refresh-behavior"
+          ]
         },
         {
           "key": "refreshOnVisible",
           "defaultValue": "true",
           "constraints": "Boolean; refresh when the panel becomes visible.",
-          "choices": ["true", "false"],
-          "coveredBy": ["jujutsu.refresh-behavior"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "jujutsu.refresh-behavior"
+          ]
         }
       ],
-      "states": ["current", "immutable", "empty", "conflicted", "divergent", "evolved", "filtered", "pushed-boundary"],
+      "states": [
+        "current",
+        "immutable",
+        "empty",
+        "conflicted",
+        "divergent",
+        "evolved",
+        "filtered",
+        "pushed-boundary"
+      ],
       "failureModes": [
         "Invalid repositories and replaced filesystem identities are rejected.",
         "A missing registered path offers direct repository selection from the error alert.",
@@ -218,7 +286,12 @@
         "click button \"Sample project*\"",
         "expect button \"Full diff\""
       ],
-      "surfaces": ["client", "host", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
       "surface": "detail",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph \u203a revision detail",
@@ -227,25 +300,48 @@
           "key": "fileView",
           "defaultValue": "tree",
           "constraints": "One of tree or flat.",
-          "choices": ["tree", "flat"],
-          "coveredBy": ["jujutsu.diff-review"]
+          "choices": [
+            "tree",
+            "flat"
+          ],
+          "coveredBy": [
+            "jujutsu.diff-review"
+          ]
         },
         {
           "key": "diffExpanded",
           "defaultValue": "false",
           "constraints": "Boolean; expand diffs by default.",
-          "choices": ["true", "false"],
-          "coveredBy": ["jujutsu.diff-review"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "jujutsu.diff-review"
+          ]
         },
         {
           "key": "diffLayout",
           "defaultValue": "auto",
           "constraints": "One of auto, unified, or split.",
-          "choices": ["auto", "unified", "split"],
-          "coveredBy": ["jujutsu.diff-review"]
+          "choices": [
+            "auto",
+            "unified",
+            "split"
+          ],
+          "coveredBy": [
+            "jujutsu.diff-review"
+          ]
         }
       ],
-      "states": ["summary", "full-diff", "tree-files", "flat-files", "reviewed", "unreviewed"],
+      "states": [
+        "summary",
+        "full-diff",
+        "tree-files",
+        "flat-files",
+        "reviewed",
+        "unreviewed"
+      ],
       "failureModes": [
         "Paths containing spaces, Unicode, or shell metacharacters remain literal file identities.",
         "Missing review or diff data is reported rather than guessed.",
@@ -281,12 +377,19 @@
       "id": "review-selection",
       "title": "Select revisions in the graph to review them together",
       "summary": "Cmd/Ctrl-click toggles a revision, Shift-click extends the visible range and the revision menu offers Select for review for touch and keyboard; a plain click keeps opening the row's details. Review together hands the selection to the Changes contract, so the plugin that owns review opens it, and the graph stays usable without that plugin.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "surface": "destinationSection",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph \u203a selection strip",
       "configuration": [],
-      "states": ["empty", "one-selected", "several-selected", "open-failed"],
+      "states": [
+        "empty",
+        "one-selected",
+        "several-selected",
+        "open-failed"
+      ],
       "failureModes": [
         "Without a review provider the selection gestures stay off and a modifier click opens the row as usual.",
         "A selection the review cannot open says to select at most 30 revisions and names the plugin to add.",
@@ -317,8 +420,17 @@
       "id": "composer-context",
       "title": "See project and Jujutsu workspace context in the composer",
       "summary": "The change bar labels the net file diff as changes since branching from the selected base, reports revisions present only on @ or only on that base, and lets the base be a local or remote bookmark.",
-      "reach": ["seed rebase-ready-thread", "click button \"Changes since branching from main*\"", "expect text \"seeded-work.md\""],
-      "surfaces": ["client", "host", "settings", "integration"],
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"Changes since branching from main*\"",
+        "expect text \"seeded-work.md\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
       "surface": "threadFacet",
       "destination": "thread-panel",
       "currentSurface": "composer: Changes since branching from main",
@@ -327,22 +439,40 @@
           "key": "composerBar",
           "defaultValue": "true",
           "constraints": "Boolean; show the composer change bar.",
-          "choices": ["true", "false"],
-          "coveredBy": ["jujutsu.composer-context"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "jujutsu.composer-context"
+          ]
         },
         {
           "key": "composerChips",
           "defaultValue": "true",
           "constraints": "Boolean; show the project, JJ workspace and bookmark chip.",
-          "choices": ["true", "false"],
-          "coveredBy": ["jujutsu.composer-context"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "jujutsu.composer-context"
+          ]
         },
         {
           "key": "composerBarBase",
           "defaultValue": "main",
           "constraints": "Parent, trunk, or a local or remote bookmark; invalid input falls back to main.",
-          "choices": ["main", "parent", "trunk", "local bookmark", "remote bookmark"],
-          "coveredBy": ["jujutsu.composer-context"]
+          "choices": [
+            "main",
+            "parent",
+            "trunk",
+            "local bookmark",
+            "remote bookmark"
+          ],
+          "coveredBy": [
+            "jujutsu.composer-context"
+          ]
         }
       ],
       "states": [
@@ -405,12 +535,24 @@
         "click menuitem \"New change here\"",
         "expect group \"Confirm new change\""
       ],
-      "surfaces": ["client", "host", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
       "surface": "rowAction",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph \u203a revision menu",
       "configuration": [],
-      "states": ["previewed", "confirmed", "cancelled", "expired", "stale", "failed"],
+      "states": [
+        "previewed",
+        "confirmed",
+        "cancelled",
+        "expired",
+        "stale",
+        "failed"
+      ],
       "failureModes": [
         "A changed named revision, bookmark or remote, an expired or used preview, or an unsafe fileset rejects confirmation with its own message.",
         "A failed operation refreshes status and never implies a remote push succeeded."
@@ -468,13 +610,20 @@
         "click button \"Show 2 more workspaces\"",
         "expect text \"review-05\""
       ],
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "surface": "rowAction",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph \u203a workspace overflow chip",
       "configuration": [],
-      "states": ["collapsed", "expanded"],
-      "failureModes": ["A failed workspace move is reported by the existing preview flow."],
+      "states": [
+        "collapsed",
+        "expanded"
+      ],
+      "failureModes": [
+        "A failed workspace move is reported by the existing preview flow."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -506,7 +655,11 @@
         "click menuitem \"New workspace here\u2026\"",
         "expect group \"Create workspace at this revision\""
       ],
-      "surfaces": ["client", "host", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "integration"
+      ],
       "surface": "rowAction",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph \u203a New workspace here",
@@ -515,11 +668,20 @@
           "key": "headerToggle",
           "defaultValue": "false",
           "constraints": "Boolean; show the panel header toggle.",
-          "choices": ["true", "false"],
-          "coveredBy": ["jujutsu.workspace-session"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "jujutsu.workspace-session"
+          ]
         }
       ],
-      "states": ["workspace-created", "session-not-launched", "session-launched"],
+      "states": [
+        "workspace-created",
+        "session-not-launched",
+        "session-launched"
+      ],
       "failureModes": [
         "Existing workspace, ancestor, or symlink target is rejected.",
         "A failed session launch stays in the panel as an error and leaves the workspace in place."
@@ -576,7 +738,11 @@
         "expect text \"Commit ID:*\"",
         "expect text \"Change ID:*\""
       ],
-      "surfaces": ["client", "settings", "tool"],
+      "surfaces": [
+        "client",
+        "settings",
+        "tool"
+      ],
       "surface": "entityProvider",
       "destination": "land",
       "currentSurface": "transcript: jj: reference links",
@@ -585,18 +751,35 @@
           "key": "chatReferenceLinks",
           "defaultValue": "true",
           "constraints": "Boolean; link explicit inline-code revision ids, repository bookmarks and `jj:`-prefixed names in chat.",
-          "choices": ["true", "false"],
-          "coveredBy": ["jujutsu.chat-reference-tokens"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "jujutsu.chat-reference-tokens"
+          ]
         },
         {
           "key": "chatReferenceClickBehavior",
           "defaultValue": "focus",
           "constraints": "One of focus or path; path compares against main/default and shows ancestry.",
-          "choices": ["focus", "path"],
-          "coveredBy": ["jujutsu.chat-reference-tokens"]
+          "choices": [
+            "focus",
+            "path"
+          ],
+          "coveredBy": [
+            "jujutsu.chat-reference-tokens"
+          ]
         }
       ],
-      "states": ["linked", "focused", "path", "disabled", "not-a-reference", "unresolved"],
+      "states": [
+        "linked",
+        "focused",
+        "path",
+        "disabled",
+        "not-a-reference",
+        "unresolved"
+      ],
       "failureModes": [
         "Ordinary inline code and another thread's conversation are never rewritten.",
         "A reference that is not in the loaded graph page falls back to the graph search.",
@@ -675,7 +858,7 @@
     {
       "id": "workspace-cleanup",
       "title": "Clean up idle JJ workspaces",
-      "summary": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for all ages, or 1h, 6h, 24h, or 7d inactivity windows. A managed thread or secondary workspace whose checkout folder is missing is marked in the list and can be explicitly selected; the Host checks unlanded work and Session activity, forgets only a missing secondary's JJ registration, and never removes its path. Untracked folders remain protected for their first hour. Users can expand categories, select individual rows or all candidates, and start a background job that only removes the selected rows after rechecking eligibility. Unlanded work and uncommitted changes stay protected; empty undescribed revisions are also abandoned by the cleanup job. A workspace whose pull request merged and whose revisions are all on the bookmark is offered as Merged pull request, and every preview names why each kept workspace was kept. Other JJ workspaces remain manual-only and require explicit selection.",
+      "summary": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for all ages, or 1h, 6h, 24h, or 7d inactivity windows. A managed thread or secondary workspace whose checkout folder is missing is marked in the list and can be explicitly selected; the Host checks unlanded work and Session activity, forgets only a missing secondary's JJ registration, and never removes its path. Untracked folders remain protected for their first hour. Users can expand categories, select individual rows or all candidates, and start a background job that only removes the selected rows after rechecking eligibility. Unlanded work and uncommitted changes stay protected; empty undescribed revisions are also abandoned by the cleanup job. Every preview names why each kept workspace was kept. Other JJ workspaces remain manual-only and require explicit selection.",
       "reach": [
         "click tab \"Land\"",
         "click button \"History\"",
@@ -690,12 +873,24 @@
         "expect text \"No workspace qualifies.\"",
         "expect text \"0 empty revisions will be abandoned.\""
       ],
-      "surfaces": ["client", "host"],
+      "surfaces": [
+        "client",
+        "host"
+      ],
       "surface": "command",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph \u203a Clean up workspaces",
       "configuration": [],
-      "states": ["preset-threshold", "preview", "row-selection", "category-selection", "queued", "running", "done", "failed", "merged"],
+      "states": [
+        "preset-threshold",
+        "preview",
+        "row-selection",
+        "category-selection",
+        "queued",
+        "running",
+        "done",
+        "failed"
+      ],
       "failureModes": [
         "A workspace with unlanded work, a busy Session or a queued integration is kept.",
         "A second click on the same scope attaches to the job already running instead of queuing it twice.",
@@ -703,8 +898,7 @@
         "Other JJ workspaces are manual-only and opt-in; automatic cleanup never includes them.",
         "A workspace with uncommitted changes, unverifiable state, unknown last-use time, or a nested JJ workspace stays. Missing checkout folders are visibly marked; unlanded work remains protected, and a secondary path recreated after preview is never deleted.",
         "If the Host cannot enumerate Sessions to verify secondary workspace activity, cleanup preview fails closed.",
-        "Normal jj status can snapshot unsnapshotted changes into the workspace working-copy revision while preserving their files.",
-        "Merged pull request is a manual choice only: an automatic run never reads the pull-request links, so such a workspace falls back to Already landed."
+        "Normal jj status can snapshot unsnapshotted changes into the workspace working-copy revision while preserving their files."
       ],
       "externalDependencies": [
         {
@@ -750,12 +944,21 @@
         "click menuitem \"Remove workspace thread-*\"",
         "expect group \"Confirm removing workspace*\""
       ],
-      "surfaces": ["client", "host", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "integration"
+      ],
       "surface": "rowAction",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph \u203a Remove workspace",
       "configuration": [],
-      "states": ["thread-workspace", "plain-workspace", "removed", "refused"],
+      "states": [
+        "thread-workspace",
+        "plain-workspace",
+        "removed",
+        "refused"
+      ],
       "failureModes": [
         "The default workspace is never offered, and a repository keeps at least one workspace.",
         "A thread workspace that gained revisions after the confirmation opened is kept instead of being removed unseen.",
@@ -809,12 +1012,20 @@
         "expect button \"Jujutsu view settings\"",
         "expect button \"Repository actions\""
       ],
-      "surfaces": ["client", "host", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "integration"
+      ],
       "surface": "destinationSection",
       "destination": "land",
       "currentSurface": "left-nav: Source control",
       "configuration": [],
-      "states": ["working-copy", "ancestors", "no-repository"],
+      "states": [
+        "working-copy",
+        "ancestors",
+        "no-repository"
+      ],
       "failureModes": [
         "Without a selected repository the panel offers the repository picker instead of empty groups.",
         "An invalid repository shows the registration error with a control to choose another repository."
@@ -867,12 +1078,22 @@
         "click tab \"Jujutsu \u00b7 sample*\"",
         "expect button \"Locate Current\""
       ],
-      "surfaces": ["client", "storage", "integration"],
+      "surfaces": [
+        "client",
+        "storage",
+        "integration"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "left-nav: Revision graph \u203a per-tab repository",
       "configuration": [],
-      "states": ["default-panel", "main-tab", "thread-side-panel", "dock", "restored"],
+      "states": [
+        "default-panel",
+        "main-tab",
+        "thread-side-panel",
+        "dock",
+        "restored"
+      ],
       "failureModes": [
         "A thread whose project is not a Jujutsu repository shows the registration error and offers another repository.",
         "A scope remembering a repository that no longer exists opens on the empty prompt.",
