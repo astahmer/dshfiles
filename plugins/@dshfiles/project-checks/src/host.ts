@@ -22,6 +22,7 @@ import { ProjectChecksActivityModel } from './receipt-activity.js'
 import { ReceiptStore } from './receipt-store.js'
 import { ReceiptViewModel } from './receipt-view.js'
 import { storedReceiptSchema, type StoredReceipt } from './store.js'
+import { preparationActionsFor } from './workspace-setup.js'
 
 const PACKAGE_NAME = '@dshfiles/project-checks'
 
@@ -247,6 +248,18 @@ const handlers = Api.handlers(projectChecksApi, {
       options: { automatic: false, attempt: 0, verificationTurn: null, verificationStage: 'manual', requireRevision: false },
     })
     return receiptView(receipt, ProjectChecksModel.receiptFreshness(receiptRevision(receipt), yield* currentRevision(sessionId, action.value)))
+  }),
+  setupActions: Effect.fn('project-checks setup actions')(function* (input) {
+    const config = yield* ChecksHost.use(host => host.config)
+    return preparationActionsFor({ actions: config.actions, workspace: { workspacePath: input.workspacePath, repoRoot: input.repoRoot } }).map(
+      action => ({
+        id: action.id,
+        label: action.label,
+        runOnWorkspaceCreate: action.runOnWorkspaceCreate,
+        awaitBeforeFirstTurn: action.awaitBeforeFirstTurn,
+        onSettle: action.onSettle,
+      }),
+    )
   }),
   dispatch: Effect.fn('project-checks dispatch')(function* (input, call) {
     const sessionId = yield* targetSessionId(input.sessionId, call.caller)

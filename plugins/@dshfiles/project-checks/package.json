@@ -22,6 +22,10 @@
     "./completion-event": {
       "types": "./src/completion-event.ts",
       "default": "./dist/completion-event.js"
+    },
+    "./workspace-setup": {
+      "types": "./src/workspace-setup.ts",
+      "default": "./dist/workspace-setup.js"
     }
   },
   "scripts": {

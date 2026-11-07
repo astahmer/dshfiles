@@ -80,6 +80,9 @@ const actionView = (action: ProjectAction): ProjectActionView => ({
   timeoutMs: action.timeoutMs,
   verifyBeforeComplete: action.verifyBeforeComplete,
   replayPolicy: action.replayPolicy,
+  runOnWorkspaceCreate: action.runOnWorkspaceCreate,
+  awaitBeforeFirstTurn: action.awaitBeforeFirstTurn,
+  onSettle: action.onSettle,
   execution: { target: action.execution.target, remoteId: action.execution.remote ?? null, onRemoteFailure: action.execution.onRemoteFailure },
 })
 
