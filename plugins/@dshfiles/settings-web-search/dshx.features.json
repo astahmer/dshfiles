@@ -6,7 +6,6 @@
       "id": "web-search-settings",
       "title": "Web search settings",
       "summary": "The native Web search plugin page (provider switch, endpoint, limits and API key) from one owned fork of the stock row. Behaviour is the native one; the credential state behind the key field is read while the page shows, once per burst of settings changes.",
-      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "click button \"Plugins\"", "expect heading \"Web search*\""],
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",

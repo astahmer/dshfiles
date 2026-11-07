@@ -98,8 +98,10 @@
     },
     "plugins/@dshfiles/backlog": {
       // devDependency copy of the jj-integration peer the Host provides; listed in docs/guardrails.md for review.
+      // @effect/sql-sqlite-node is imported by the bundled @dshfiles/sqlite-store, so the Host entry keeps it external
+      // and the bundle needs it at runtime; no source file of this plugin names it.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
-      "ignoreDependencies": ["@dshfiles/usage", "@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@dshfiles/jj-integration"],
+      "ignoreDependencies": ["@dshfiles/usage", "@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@dshfiles/jj-integration", "@effect/sql-sqlite-node"],
     },
     "plugins/@dshfiles/chat": {
       // dshx.config.ts bundles util-crypto into the client by name, so no module import references it.
