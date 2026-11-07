@@ -101,10 +101,10 @@ enabling JJ writes. The mirrored thread header offers **Open on remote host**, w
 the exact thread since fleet-dx 6: `runtimeOpenView` takes an optional Session id and
 returns a token-free `threadUrl`, the client fetches the launch URL to set the host's
 cookie, then opens `?thread=` (when page and host have different machine names the tab
-opens the host home). Native questions/approvals remain host-owned: the local mirror does
-not receive the remote waterfall request/answer capability, and continued root-only question
-APIs cannot safely answer open waterfall, child-session, stopped-session, or approval
-requests. Per-session JJ path operations, workspace mutations, landing, terminal access, and
+opens the host home). Native questions now reach the controlling chat through the owner's event stream, answered
+on the owner (see
+[Questions](../../plugins/@dshfiles/multi-host/docs/remote-thread-architecture.md#questions)).
+Per-session JJ path operations, workspace mutations, landing, terminal access, and
 session handoff remain unavailable locally. See the multi-host README for exact fallback and
 limits.
 
@@ -119,4 +119,5 @@ response was lost as `gateway-unreachable` (safe-to-retry) instead of
 
 ## Resume here
 
-Build the remaining M6 native question/approval path.
+Bring approvals into the controlling chat over the same event stream, then proxy the
+path-scoped JJ actions.

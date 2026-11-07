@@ -14,7 +14,7 @@ import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
 import { Api, DshxPlugin, HostContext, hostServiceChanges } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
-import { fileUploadValueSchema, jjRepositoriesEffectSchema, multiHostApi, type ModelSelection } from './api.js'
+import { fileUploadValueSchema, jjRepositoriesEffectSchema, multiHostApi, type ModelSelection, type RemoteInteraction, type RemoteQuestionAnswer } from './api.js'
 import type { ConnectionTestStep } from './api.js'
 import { Connectors } from './connectors/connectors.js'
 import { Loopback } from './connectors/loopback.js'
@@ -31,6 +31,7 @@ import {
   NoOfficialNode,
   OriginPortExhausted,
   RemoteHomeUnknown,
+  RemoteRequestFailed,
   SessionCursorUnavailable,
   SessionUnavailable,
   type TaggedFailure,
@@ -49,6 +50,7 @@ import { RemoteDelegation, type DelegationProgress } from './remote-delegation.j
 import { RemoteDoctor, type RemoteFacts } from './remote-doctor.js'
 import { RemoteExec } from './remote-exec.js'
 import { RemoteIdentity } from './remote-identity.js'
+import { interactionGone, RemoteInteractions } from './remote-interactions.js'
 import { RemotePromptGuard } from './remote-prompt-guard.js'
 import { RemoteProvision } from './remote-provision.js'
 import { RemoteReferenceContext } from './remote-reference-context.js'
@@ -66,7 +68,7 @@ import { ViewLeases } from './view-leases.js'
 import { threadViewUrl } from './thread-launch-url.js'
 import { RemoteRuntime } from './remote-runtime.js'
 import { createLocalProjectCopyCommand } from './local-project-copy-command.js'
-import type { Gateway } from './connectors/gateway.js'
+import type { Gateway, RemoteEventOutcome } from './connectors/gateway.js'
 
 const profileSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
 const configSchema = Schema.Struct({ profile: Schema.optional(profileSchema) })
@@ -141,6 +143,7 @@ const decodeCursorFrame = Schema.decodeUnknownOption(sessionCursorFrameSchema)
 const decodeFileReferences = Schema.decodeUnknownEffect(fileReferenceCandidatesSchema)
 const decodeUploadValue = Schema.decodeUnknownEffect(fileUploadValueSchema)
 const decodeJjRepositories = Schema.decodeUnknownEffect(jjRepositoriesEffectSchema)
+const decodeAccepted = Schema.decodeUnknownEffect(Schema.Boolean)
 const decodeCreatedPath = Schema.decodeUnknownEffect(Schema.Struct({ path: Schema.String }))
 const decodeConnector = Schema.decodeUnknownEffect(hostConnectorSchema, { onExcessProperty: 'error' })
 const decodeLocator = Schema.decodeUnknownEffect(runtimeLocatorSchema, { onExcessProperty: 'error' })
@@ -413,6 +416,53 @@ const fetchBeforeThread = Effect.fn('multi-host fetch before thread')(function* 
     ),
     Effect.catch(error => Effect.succeed({ ok: false, detail: `jj git fetch could not run on the host: ${failed(error).message}` })),
   )
+})
+
+/** The runtime that owns a mirrored Session, as the Session controller authorizes it; a local Session has none. */
+const sessionOwner = Effect.fn('multi-host session owner')(function* (sessionId: string) {
+  const threads = yield* RemoteThreads
+  const owners = yield* SessionOwners
+  const recordedSessions = yield* threads.list
+  const recorded = recordedSessions.find(thread => thread.sessionId === sessionId)
+  const runtimeId = recorded?.runtimeId ?? (yield* owners.knownRuntime(sessionId))
+  if (runtimeId === null) return { ok: false as const, code: 'session/not-remote', message: 'This Session has no known remote owner.' }
+  const authorization = yield* owners.authorize({ sessionId, runtimeId, recordedSessions })
+  return authorization.ok ? { ok: true as const, runtimeId } : authorization
+})
+
+const interactionKindMismatch = { ok: false as const, code: 'interaction-kind-mismatch', message: 'This request needs a different kind of answer.' }
+
+/** One held request, once the Session controller agrees its Session belongs to the runtime that sent it. */
+const heldInteraction = (input: { readonly sessionId: string; readonly id: string }) =>
+  Effect.gen(function* () {
+    const interactions = yield* RemoteInteractions
+    const interaction = yield* interactions.find(input)
+    if (interaction === undefined) return interactionGone
+    const threads = yield* RemoteThreads
+    const owners = yield* SessionOwners
+    const authorization = yield* owners.authorize({ sessionId: input.sessionId, runtimeId: interaction.runtimeId, recordedSessions: yield* threads.list })
+    return authorization.ok ? { ok: true as const, interaction } : authorization
+  }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
+
+/** Answer the owner; a reply lost after sending may hide an applied answer, so it is never reported as safe to repeat. */
+const settleHeld = (input: { readonly interaction: RemoteInteraction; readonly outcome: RemoteEventOutcome }) =>
+  Effect.flatMap(RemoteInteractions, interactions => interactions.settle(input)).pipe(
+    Effect.catch(error =>
+      Effect.succeed(
+        error instanceof RemoteRequestFailed
+          ? { ok: false as const, ...failed(error) }
+          : {
+              ok: false as const,
+              code: 'unknown-mutation-outcome',
+              message: 'The connection failed after the answer was sent, so it may have reached the host. Check the thread before answering again.',
+            },
+      ),
+    ),
+  )
+
+/** The answer batch as lossless wire JSON: an absent `custom` stays absent. */
+const answerValue = (answer: RemoteQuestionAnswer) => ({
+  answers: answer.answers.map(item => ({ id: item.id, selected: [...item.selected], ...(item.custom !== undefined && { custom: item.custom }) })),
 })
 
 /** Sent outside the composer, a message to a remote thread obeys the same rule as one the Session source forwards. */
@@ -1054,28 +1104,54 @@ const handlers = Api.handlers(multiHostApi, {
       return { ok: true as const, runtimeId }
     }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
   }),
+  sessionInteractions: Effect.fn('multi-host session interactions')(function* (input) {
+    const interactions = yield* RemoteInteractions
+    const rows = yield* interactions.list
+    return { ok: true as const, interactions: rows.filter(row => input.sessionId === undefined || row.sessionId === input.sessionId) }
+  }),
+  sessionQuestionAnswer: Effect.fn('multi-host session question answer')(function* (input) {
+    if (input.interactionId !== undefined) {
+      const held = yield* heldInteraction({ sessionId: input.sessionId, id: input.interactionId })
+      if (!held.ok) return held
+      if (held.interaction.request.kind !== 'question') return interactionKindMismatch
+      const settled = yield* settleHeld({ interaction: held.interaction, outcome: { kind: 'result', value: answerValue(input.answer) } })
+      return settled.ok ? { ok: true as const, accepted: true } : settled
+    }
+    if (input.callId === undefined) return { ok: false as const, code: 'question-unknown', message: 'Name the waiting question or its tool call.' }
+    const callId = input.callId
+    return yield* Effect.gen(function* () {
+      const owner = yield* sessionOwner(input.sessionId)
+      if (!owner.ok) return owner
+      const accepted = yield* withRuntime(
+        owner.runtimeId,
+        gateway =>
+          Effect.flatMap(gateway.run({ namespace: 'userQuestions', method: 'answer', args: { agentId: input.sessionId, callId, answer: answerValue(input.answer) } }), decodeAccepted),
+        { mutation: true },
+      )
+      return { ok: true as const, accepted }
+    }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
+  }),
+  sessionQuestionDecline: Effect.fn('multi-host session question decline')(function* (input) {
+    const held = yield* heldInteraction({ sessionId: input.sessionId, id: input.interactionId })
+    if (!held.ok) return held
+    if (held.interaction.request.kind !== 'question') return interactionKindMismatch
+    const rejection =
+      input.reason === 'cancelled'
+        ? { code: 'ASK_CANCELLED', message: 'the user cancelled ask_user_question' }
+        : { code: 'ASK_TIMED_OUT', message: 'ask_user_question timed out before the user answered' }
+    return yield* settleHeld({ interaction: held.interaction, outcome: { kind: 'rejected', error: { name: 'UserQuestionError', ...rejection } } })
+  }),
   sessionJjRepositories: Effect.fn('multi-host session jj repositories')(function* (input) {
     return yield* Effect.gen(function* () {
-      const threads = yield* RemoteThreads
-      const recordedSessions = yield* threads.list
-      const recorded = recordedSessions.find(thread => thread.sessionId === input.sessionId)
-      return yield* Effect.gen(function* () {
-        const owners = yield* SessionOwners
-        const runtimeId = recorded?.runtimeId ?? (yield* owners.knownRuntime(input.sessionId))
-        if (runtimeId === null) return { ok: false as const, code: 'session/not-remote', message: 'This Session has no known remote owner.' }
-        const authorization = yield* owners.authorize({ sessionId: input.sessionId, runtimeId, recordedSessions })
-        if (!authorization.ok) return authorization
-        const repositories = yield* withRuntime(
-          runtimeId,
-          gateway =>
-            Effect.flatMap(
-              gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })('repositories', {}),
-              decodeJjRepositories,
-            ),
-          { mutation: false },
-        )
-        return { ok: true as const, repositories }
-      })
+      const owner = yield* sessionOwner(input.sessionId)
+      if (!owner.ok) return owner
+      const repositories = yield* withRuntime(
+        owner.runtimeId,
+        gateway =>
+          Effect.flatMap(gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })('repositories', {}), decodeJjRepositories),
+        { mutation: false },
+      )
+      return { ok: true as const, repositories }
     }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
   }),
   runtimeFileReferences: Effect.fn('multi-host runtime file references')(function* (input) {
@@ -1397,6 +1473,32 @@ const RemoteSessionsLive = Layer.effectDiscard(
         )
       }),
     ).pipe(Effect.forkScoped)
+    const interactions = yield* RemoteInteractions
+    yield* Stream.runForEach(interactions.projections, update =>
+      Effect.flatMap(owners.registry, registry =>
+        Effect.sync(() => {
+          // An older Session controller has no such verb: its mirrored Sessions keep their opening values.
+          if (Option.isSome(registry)) registry.value.publishProjection?.({ ...update, sessionId: SessionId(update.sessionId) })
+        }),
+      ),
+    ).pipe(DshxPlugin.detached, Effect.forkScoped)
+  }),
+)
+
+/** Tell browsers to read what remote threads wait on again; a burst of frames becomes one read. */
+const InteractionEvents = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const interactions = yield* RemoteInteractions
+    yield* interactions.changes.pipe(
+      Stream.groupedWithin(Number.MAX_SAFE_INTEGER, '100 millis'),
+      Stream.runForEach(() =>
+        Api.publish({ contract: multiHostApi, event: 'interactionsChanged', payload: {} }).pipe(
+          Effect.catchTag('PublishEventError', error => Effect.logWarning('multi-host: interaction change event refused', error.message)),
+        ),
+      ),
+      DshxPlugin.detached,
+      Effect.forkScoped,
+    )
   }),
 )
 
@@ -1411,12 +1513,13 @@ const domainLayer = (input: { readonly configuredProfile: string | undefined }) 
 
 /** The pooled runtimes and the services above them; `RemoteSessionsLive` registers the Session source built from them. */
 const runtimeLayer = Layer.mergeAll(RuntimeStatus.layer, ResourcePool.layer, ViewLeases.layer, RemoteSessions.layer).pipe(
+  Layer.provideMerge(RemoteInteractions.layer),
   Layer.provideMerge(RuntimePool.layer),
   Layer.provideMerge(Connectors.layer.pipe(Layer.provide(FetchHttpClient.layer), Layer.provideMerge(Ssh.layer), Layer.provide(DshChildProcessSpawner.layer))),
 )
 
 const pluginLayer = (config: Schema.Schema.Type<typeof configSchema>) =>
-  Layer.mergeAll(RemoteSessionsLive, LaunchFilePublisher, referenceMiddlewareLayer).pipe(
+  Layer.mergeAll(RemoteSessionsLive, LaunchFilePublisher, InteractionEvents, referenceMiddlewareLayer).pipe(
     Layer.provideMerge(runtimeLayer),
     Layer.provideMerge(SessionOwners.layer),
     Layer.provideMerge(domainLayer({ configuredProfile: config?.profile })),

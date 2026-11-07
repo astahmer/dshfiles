@@ -99,8 +99,7 @@ With a host chosen:
   this Host mirrors the remote Session, so the native chat, its live transcript,
   and this machine's own composer (commands, references, attachments, queue,
   stop) work on it. **Open on remote host** opens the host's own DSH in a new tab
-  on a stable loopback origin, on that same thread, for what the mirror cannot
-  answer yet (approvals, terminals). If the host drops, the composer keeps its draft and the message is
+  on a stable loopback origin, on that same thread. If the host drops, the composer keeps its draft and the message is
   refused until the host is back.
 - The **Remote threads** list shows every thread on every registered host,
   grouped by host and newest first: threads started from here keep their title,
@@ -109,17 +108,13 @@ With a host chosen:
   thread in this client like any other. Status is polled only while that list is
   open. An offline host shows one muted "unavailable" line and still lists the
   threads started here.
-- While a remote turn waits, the open-thread view says what it waits on:
-  **The agent ... is asking a question** when the last tool call is
-  `ask_user_question` (or `ask_parent_question`), and **Waiting on <tool>**
-  when any other call has stayed open for more than a minute, since the log
-  cannot tell a slow command from a pending approval. Both offer **Host UI**;
-  answering and approving stay in the host's own DSH. The mirrored thread header
-  offers **Open on remote host**; it opens the owner's DSH home in a new tab, and
-  you select the thread there. The current runtime view API cannot deep-link to a
-  Session, so it does not open the exact conversation automatically. The mirror
-  sees an open tool call, not the native waterfall payload or approval request; it
-  never fabricates a question, submits an inferred answer, or approves a tool call.
+- While a thread is open here, a question its remote agent asks opens in this
+  client's own question card, with the same countdown, **Take time** and plan
+  review, and the answer goes to the runtime that owns the thread. A question
+  that outlives its wait stays answerable as usual. The first answer from any
+  client wins, including the host's own UI, and the other card closes.
+- **Open on remote host** in the mirrored thread header opens the owner's DSH on
+  that same thread, for what the mirror does not reach (terminals, approvals).
 - The thread sidebar shows a **Remote** section: every thread started from
   here, badged with its host and whether its connection is open. A row opens the
   mirrored Session; a brand-new thread appears in the sidebar as soon as the host
@@ -250,14 +245,10 @@ title}` for threads started here, so the sidebar and view can list them.
   list, not the sidebar.
 - The remote transcript is polled (1.5 s while a turn runs, 8 s idle), not
   streamed; the conversation is still written and read on the host.
-- DSH writes no question-request or approval-request event, so a pending
-  question is only visible as an open `tool/call`. The host-local
-  `user-questions/request` waterfall and answer RPC are not delivered to this
-  mirror. The `agent-questions` API only supports continued forms on live root
-  Sessions; it cannot answer open waterfalls, child Sessions, or stopped
-  Sessions, and is not a general approval API. There is no safe generic proxy
-  for these interactions: **Host UI** opens the owning runtime's DSH, where
-  questions and approvals must be completed.
+- Questions reach this client only while the thread is open here: following it
+  is what opens the owner's event stream. Elsewhere the row shows nothing until
+  you open it; the request stays on the owner meanwhile. A child Session's
+  question is not offered, because the owner refuses to ask from one.
 - Remote JJ data can be read through the read-only
   `sessionJjRepositories(sessionId)` API, which resolves the Session's owner and
   reads that runtime's repository/workspace status. It sends no path and cannot

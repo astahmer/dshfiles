@@ -12,6 +12,7 @@ import { canOpenNativePath, nativeFileManager, nativeFileApplications, openNativ
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionInspection } from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
+import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { Remote, RemoteError, TypertRemoteService, principalOf } from '@deepseek-ai/dsh-typert-protocol'
 import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
@@ -187,6 +188,14 @@ export class SessionController extends TypertRemoteService {
     this.listState = new ApiSessionList(ctx, resolved.listWorkSliceMs)
     this.mirrored = new MirroredSessions(ctx)
     this.mirrored.provide()
+    ctx.effect(
+      () =>
+        this.mirrored.registry.onProjection(update => {
+          // SAFETY: the owning runtime's control stream carried this value over the same JSON wire.
+          this.controlState.publishMirrored({ sessionId: update.sessionId, key: update.key, value: update.value as JsonValue, seq: update.seq })
+        }),
+      'session-controller.mirrored-projections',
+    )
     this.fileApplications = internals.fileApplications ?? nativeFileApplications
     this.openFileApplication = internals.openFileApplication ?? openNativeFileApplication
     this.openPath = internals.openPath ?? openNativeAssociatedPath

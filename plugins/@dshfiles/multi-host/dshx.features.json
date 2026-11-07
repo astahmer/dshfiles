@@ -648,7 +648,7 @@
     {
       "id": "remote-host-fallback",
       "title": "Open a mirrored thread on its host",
-      "summary": "The mirrored-thread header resolves its remote owner and opens that runtime's DSH home for native questions, approvals, terminals, and JJ tools. The remote DSH does not consume a Session deep link, so the user locates the thread there.",
+      "summary": "The mirrored-thread header resolves its remote owner and opens that runtime's own DSH on the same thread, for what the mirror does not reach.",
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "threads",
@@ -683,6 +683,71 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "remote-interactions",
+      "title": "Answer a remote agent's question in this client",
+      "summary": "While a mirrored thread is followed, this Host opens the owning runtime's forwarded-event stream as an owner client, holds what the runtime waits on, and shows it in the native question card. Answers go back to that runtime, which stays the authority; the first answer from any client wins and nothing is delegated away from the owner's own UI.",
+      "surfaces": ["client", "host", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "conversation composer seat of a mirrored thread",
+      "configuration": [],
+      "states": ["held", "claiming", "counting-down", "answered", "continued", "owner-withdrew", "stream-reconnecting"],
+      "failureModes": [
+        "A request the owner withdrew is refused here with a message to check the thread, and the card closes.",
+        "An answer the owner refuses stays a failed attempt on the card, and the request stays held.",
+        "A connection lost after an answer was sent reports an unknown outcome and is never retried automatically.",
+        "A runtime that refuses the wait claim keeps its own timer and the card shows no countdown.",
+        "A dropped event stream forgets what it held; the owner delivers it again on the next stream."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "click button \"Sidebar settings\"",
+        "click checkbox \"Show remote threads in a separate group\"",
+        "click button \"Remote threads started from this DSH\"",
+        "expect heading \"Remote threads\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-question",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-question-timed",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-question-dismissed",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.local-path-refused",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.interaction-hold-and-answer",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-interactions.test.ts",
+          "testName": "holds a question and an approval the owner delivered, and answers each on that client"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "multi-host remote interaction settle",
+          "file": "plugins/@dshfiles/multi-host/tests/remote-interactions.test.ts",
+          "testName": "records one span per answer, naming no question text"
         }
       ]
     }

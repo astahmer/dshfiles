@@ -20,7 +20,8 @@ import { RuntimeLaunchFile } from '../../../../../plugins/@dshfiles/multi-host/s
 
 const { launchFilePaths, parseRuntimeLaunch } = RuntimeLaunchFile
 import { mergeInventory } from '../../../../../plugins/@dshfiles/multi-host/src/inventory.js'
-import { startFakeCommandCode } from '../fake-command-code.js'
+import { fakeCommandCodeFor, startFakeCommandCode } from '../fake-command-code.js'
+import { seedPresetRow } from './agent-questions-timed.steps.js'
 import { openGlobalPanel } from '../plugin-view-names.js'
 
 const multiHostPackageId = '@dshfiles/multi-host'
@@ -355,16 +356,20 @@ const startScratchGitServer = async (input: { readonly projectPath: string; read
   }
 }
 
-Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Page }) => {
+const bootLoopbackPair = async (
+  page: Page,
+  remote_: { readonly cordisPatch?: string; readonly packageIds?: readonly string[] } = {},
+): Promise<void> => {
   const fakeCommandCode = await startFakeCommandCode(page)
   const sshd = await startLoopbackSshd({ gitSslNoVerify: true })
   let remote: BootedProfile | undefined
   let manager: BootedProfile | undefined
   try {
     remote = await bootComposedPluginProfile({
-      packageIds: ['@dshfiles/multi-host', '@dshfiles/ai-accounts'],
+      packageIds: ['@dshfiles/multi-host', '@dshfiles/ai-accounts', ...(remote_.packageIds ?? [])],
       profileLabel: 'multi-host-remote',
-      hostEnv: { DSH_E2E_REMOTE_KEY: 'e2e-fake-key-ALPHA1' },
+      ...(remote_.cordisPatch !== undefined && { cordisPatch: remote_.cordisPatch }),
+      hostEnv: { DSH_E2E_REMOTE_API_KEY: 'e2e-fake-key-ALPHA1' },
       seedHome: async homeRoot => {
         const accountsPath = join(homeRoot, 'plugins', 'ai-accounts', 'accounts.json')
         await mkdir(dirname(accountsPath), { recursive: true })
@@ -383,7 +388,7 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
                   enabled: true,
                   homePath: '',
                   shadowHomePath: '',
-                  apiKeyEnv: 'DSH_E2E_REMOTE_KEY',
+                  apiKeyEnv: 'DSH_E2E_REMOTE_API_KEY',
                   apiBaseUrl: fakeCommandCode.baseUrl,
                   badge: '',
                   accentColor: '',
@@ -409,6 +414,7 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
         '@dshfiles/rich-composer',
         '@dshfiles/session-controller',
         '@dshfiles/model-effort-picker',
+        '@dshfiles/user-questions',
       ],
       profileLabel: 'multi-host-manager',
       seedHome: async homeRoot => {
@@ -435,6 +441,15 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
     }
     throw error
   }
+}
+
+Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Page }) => {
+  await bootLoopbackPair(page)
+})
+
+Given('a loopback SSH DSH pair with timed questions is booted', async ({ page }: { readonly page: Page }) => {
+  await bootLoopbackPair(page, { cordisPatch: await seedPresetRow(), packageIds: ['@dshfiles/tool-ask-user'] })
+})
 })
 
 When('the scratch remote is added from the host UI', async ({ page }: { readonly page: Page }) => {
@@ -535,10 +550,10 @@ When('the remote model picker selects its model', async ({ page }: { readonly pa
   // The picker lists one row per model and account; its Use button names both.
   const models = page.getByRole('list', { name: 'Models and accounts', exact: true })
   await expect(models).toBeVisible()
-  const model = models.getByRole('button', { name: /^Use GPT-6 Luna \(/u })
+  const model = models.getByRole('button', { name: 'Use gpt-6-luna (Command Code 1)', exact: true })
   await expect(model).toBeVisible()
   await model.click()
-  await expect(page.locator('[data-model-picker-text]')).toHaveText('GPT-6 Luna')
+  await expect(page.locator('[data-model-picker-text]')).toHaveText('gpt-6-luna')
 })
 
 const pickedAttachments = new WeakMap<Page, { readonly name: string; readonly content: string }>()
@@ -591,6 +606,91 @@ When('the native composer sends a prompt to the remote Session', async ({ page }
   await expect(send).toBeEnabled()
   await send.click()
   autoDestinationObservations.set(page, { ...observation, prompt })
+})
+
+const REMOTE_QUESTION = 'Which environment should the remote fixture deploy to?'
+const remoteQuestionCard = (page: Page) => page.locator('[data-question-key]').filter({ hasText: REMOTE_QUESTION })
+const remoteComposer = (page: Page) => page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/u })
+
+const askOnRemote = async (page: Page, timeout?: number): Promise<void> => {
+  const directive = `[[title Remote question fixture]] [[once call ask_user_question ${JSON.stringify({
+    questions: [{ id: 'deploy-target', header: 'Deploy', question: REMOTE_QUESTION, options: [{ label: 'Staging' }, { label: 'Production' }] }],
+    ...(timeout !== undefined && { timeout }),
+  })}]]`
+  await remoteComposer(page).fill(directive)
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+}
+
+When('the remote agent asks a question', async ({ page }: { readonly page: Page }) => {
+  await askOnRemote(page)
+})
+
+When('the remote agent asks a timed question lasting {int} seconds', async ({ page }: { readonly page: Page }, seconds: number) => {
+  await askOnRemote(page, seconds)
+})
+
+Then('the remote question opens in the controlling chat', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-question-card', async () => {
+    await expect(remoteQuestionCard(page)).toBeVisible({ timeout: 45_000 })
+    await expect(remoteQuestionCard(page).getByRole('radio', { name: 'Production', exact: true })).toBeVisible()
+  })
+})
+
+Then('the remote question counts down with what its owner reports', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-question-countdown', async () => {
+    await expect(remoteQuestionCard(page).locator('header span').filter({ hasText: /^Continuing in \d+s$/u })).toBeVisible({ timeout: 15_000 })
+  })
+})
+
+Then('the remote question stays answerable after its wait ends', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-question-continued', async () => {
+    await expect(remoteQuestionCard(page).getByText('Work continued — you can still answer', { exact: true })).toBeVisible({ timeout: 45_000 })
+  })
+})
+
+When('the remote question is answered {string} here', async ({ page }: { readonly page: Page }, option: string) => {
+  const card = remoteQuestionCard(page)
+  await card.getByRole('radio', { name: option, exact: true }).click()
+  await card.getByRole('button', { name: 'Submit', exact: true }).click()
+})
+
+Then('the remote agent receives the answer {string}', async ({ page }: { readonly page: Page }, option: string) => {
+  await recordAssertion(page, 'multi-host-remote-question-answered', async () => {
+    const fake = fakeCommandCodeFor(page)
+    await expect
+      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.text.includes(option) && message.text.includes('deploy-target')), {
+        timeout: 30_000,
+      })
+      .toBe(true)
+    await expect(remoteQuestionCard(page)).toHaveCount(0, { timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the remote question is dismissed here', async ({ page }: { readonly page: Page }) => {
+  await remoteQuestionCard(page).getByRole('button', { name: 'Dismiss all questions', exact: true }).click()
+})
+
+Then('the remote agent learns the question was dismissed', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-question-dismissed', async () => {
+    const fake = fakeCommandCodeFor(page)
+    await expect
+      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.role === 'tool' && /cancel/iu.test(message.text)), { timeout: 30_000 })
+      .toBe(true)
+    await expect(remoteQuestionCard(page).getByRole('button', { name: 'Submit', exact: true })).toHaveCount(0, { timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('a message naming this machine is refused and keeps its draft', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-local-path-refused', async () => {
+    const draft = 'please read @~/notes-on-this-machine.md'
+    await remoteComposer(page).fill(draft)
+    await page.getByRole('button', { name: 'Send message', exact: true }).click()
+    await expect(page.getByText('points to this machine', { exact: false })).toBeVisible({ timeout: 15_000 })
+    await expect(remoteComposer(page)).toContainText('notes-on-this-machine')
+    await remoteComposer(page).clear()
+  })
 })
 
 When('the Hosts page is opened', async ({ page }: { readonly page: Page }) => {

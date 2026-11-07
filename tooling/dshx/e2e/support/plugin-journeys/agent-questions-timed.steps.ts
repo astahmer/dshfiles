@@ -35,7 +35,7 @@ const askDirective = (timeout: number): string =>
  * patch replaces the preset's whole config. The journey copies that exact row from the seed instead of restating it, so
  * the scratch Agent runs the same preset the web profile ships.
  */
-const seedPresetRow = async (): Promise<string> => {
+export const seedPresetRow = async (): Promise<string> => {
   const source = await readFile(join(DSHFILES_ROOT, 'profiles/web/cordis.patch.yml'), 'utf8')
   const lines = source.split('\n')
   const start = lines.findIndex(line => line === '- id: preset-standard')

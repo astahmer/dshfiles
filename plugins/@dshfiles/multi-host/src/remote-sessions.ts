@@ -23,6 +23,7 @@ import { Clock, Context, Effect, Fiber, FiberMap, Layer, Option, Ref, Stream } f
 import { homedir } from 'node:os'
 import { RemoteRequestFailed, SessionOwnerMissing } from './errors.js'
 import { HostDirectory } from './host-directory.js'
+import { RemoteInteractions } from './remote-interactions.js'
 import { RemotePromptGuard, type StagedUpload } from './remote-prompt-guard.js'
 import { RemoteThreads, type RemoteThread } from './remote-threads.js'
 import { RuntimePool } from './runtime-pool.js'
@@ -66,6 +67,7 @@ export class RemoteSessions extends Context.Service<
       const pool = yield* RuntimePool
       const directory = yield* HostDirectory
       const threads = yield* RemoteThreads
+      const interactions = yield* RemoteInteractions
       const discoveries = yield* FiberMap.make<string, RuntimeTarget | undefined, never>()
       const remembered = yield* Ref.make(new Map<string, RuntimeTarget>())
       const recent = yield* Ref.make<{ readonly key: string; readonly at: number; readonly rows: readonly SessionSummary[] } | undefined>(undefined)
@@ -337,7 +339,11 @@ export class RemoteSessions extends Context.Service<
         follow: (request: SessionFollowRequest): Stream.Stream<SessionFollowFrame, unknown> =>
           Stream.flatMap(Stream.fromEffect(requireRuntime(ownedSessionOf(request.address))), runtime =>
             Stream.unwrap(
-              pool.use(runtime.id, gateway => Effect.succeed(gateway.stream({ endpoint: 'session/follow', args: { request } })), { mutation: false }),
+              // Following a thread is what keeps its questions and approvals in reach of this Host's clients.
+              Effect.andThen(
+                interactions.hold(runtime.id),
+                pool.use(runtime.id, gateway => Effect.succeed(gateway.stream({ endpoint: 'session/follow', args: { request } })), { mutation: false }),
+              ),
             ),
           ).pipe(Stream.mapEffect(SessionPayload.followFrame)),
         page: (request: SessionPageRequest): Effect.Effect<SessionPage, unknown> =>
