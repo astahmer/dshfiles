@@ -263,8 +263,8 @@ title}` for threads started here, so the sidebar and view can list them.
   here are not followed. When no browser is reading, the connections close after
   about a minute, and an unreachable host is retried at most once a minute. A
   child Session's question is not offered, because the owner refuses to ask from
-  one. An approval from a child Session opens under that child Session, not its
-  parent.
+  one. A child agent's request for wider access is refused by the owner without
+  asking anyone, as it is on that host.
 - A remote thread's repository works from here: the workspace control, the
   integrate offer, the JJ side panel (graph, details, diffs, prepared actions) and
   the composer's changes bar all read from the runtime that owns the thread.

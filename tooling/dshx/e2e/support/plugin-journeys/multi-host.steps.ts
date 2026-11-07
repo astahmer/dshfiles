@@ -950,6 +950,36 @@ Then('the remote command runs on its owning host', async ({ page }: { readonly p
   await finishJourneyAssertions(page)
 })
 
+When('a child agent on the remote asks for an approval', async ({ page }: { readonly page: Page }) => {
+  const child = `[[once call bash ${JSON.stringify({ command: `echo ${APPROVAL_MARKER}-child`, description: 'Echo', sandbox_permissions: 'danger-full-access', justification: 'child' })}]]`
+  // The directive ends at the first closing brace, so the child's own directive travels as JSON string escapes.
+  const escaped = JSON.stringify({ description: 'child work', prompt: child })
+    .replace(/^\{/u, 'OPEN')
+    .replace(/\}$/u, 'CLOSE')
+    .replaceAll('{', '\\u007b')
+    .replaceAll('}', '\\u007d')
+    .replaceAll('[', '\\u005b')
+    .replaceAll(']', '\\u005d')
+    .replace('OPEN', '{')
+    .replace('CLOSE', '}')
+  const directive = `[[title Child fixture]] [[once call subagent ${escaped}]]`
+  await remoteComposer(page).fill(directive)
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+})
+
+Then('the owner refuses the child agent without asking anyone', async ({ page }: { readonly page: Page }) => {
+  await recordAssertion(page, 'multi-host-remote-child-approval', async () => {
+    const fake = fakeCommandCodeFor(page)
+    await expect
+      .poll(() => fake.requests.flatMap(request => request.messages).some(message => message.role === 'tool' && message.text.includes('rejected escalating')), { timeout: 45_000 })
+      .toBe(true)
+    const call = await hostApi(pairFor(page).manager)
+    expect(Schema.decodeUnknownSync(withUnknownProperties({ interactions: Schema.Array(Schema.Unknown) }))(await call('sessionInteractions', {})).interactions).toEqual([])
+    await expect(remoteApproval(page)).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the remote approval is rejected here', async ({ page }: { readonly page: Page }) => {
   await remoteApproval(page).getByRole('button', { name: 'Reject', exact: true }).click()
 })

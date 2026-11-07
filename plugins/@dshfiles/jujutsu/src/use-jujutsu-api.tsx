@@ -13,22 +13,24 @@ export const JujutsuPanelSession = (props: { readonly sessionId: SessionId | nul
   <PanelSession.Provider value={props.sessionId}>{props.children}</PanelSession.Provider>
 )
 
-const useOwnerPort = (): OwnerPort => {
+export const useOwnerPort = (): OwnerPort => {
   const multiHost = useApi(multiHostApi)
   // SAFETY: the two shapes differ only in that the port leaves `method` to the Host, which validates it.
   return multiHost as never as OwnerPort
 }
 
-/** The jujutsu API of the panel's thread, on whichever Host owns it. */
-export const useJujutsuApi = () => {
+/** The jujutsu API of one thread, on whichever Host owns it. */
+export const useThreadJujutsuApi = (sessionId: SessionId | null) => {
   const local = useApi(jujutsuApi)
   const owner = useOwnerPort()
-  const sessionId = useContext(PanelSession)
   return useMemo(
     () => (sessionId === null ? local : OwnerRouting.api({ local, api: 'jujutsu', methods: jujutsuApi.methods, owner, sessionId })),
     [local, owner, sessionId],
   )
 }
+
+/** The jujutsu API of the panel's thread, on whichever Host owns it. */
+export const useJujutsuApi = () => useThreadJujutsuApi(useContext(PanelSession))
 
 /** The composer context API of one thread, on whichever Host owns it. */
 export const useComposerContextApi = (sessionId: SessionId | undefined) => {

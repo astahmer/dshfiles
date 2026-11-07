@@ -748,6 +748,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "multi-host.remote-child-approval",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "multi-host.local-path-refused",
           "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
         },
