@@ -76,6 +76,113 @@ Then('the composer draft holds the annotation block', async ({ page }: { page: P
   await finishJourneyAssertions(page)
 })
 
+const peek = (page: Page) => page.getByRole('complementary', { name: 'Item detail' })
+const replyBox = (page: Page) => peek(page).getByRole('textbox', { name: 'Comment', exact: true })
+const bodyBox = (page: Page) => peek(page).getByRole('textbox', { name: 'Body', exact: true })
+const addToDraft = (page: Page) => page.getByRole('button', { name: /^Add( \d+)? to draft$/ })
+// The description box sits above the reply box, which is always there.
+const toolIn = (page: Page, field: 'Comment' | 'Body') => {
+  const tools = peek(page).getByRole('button', { name: 'Annotate an element', exact: true })
+  return field === 'Body' ? tools.first() : tools.last()
+}
+
+// Picks the tool's own button, as the conversation journey does: its class resolves to a source file.
+const annotateFrom = async (page: Page, field: 'Comment' | 'Body', note: string): Promise<void> => {
+  await toolIn(page, field).click()
+  await page.getByRole('button', { name: 'Pick element', exact: true }).click()
+  await expect(page.getByText('Click an element', { exact: false }).first()).toBeVisible()
+  await toolIn(page, field).click()
+  await noteField(page).fill(note)
+  // The capture box's send button is also named Add.
+  await page.locator('[data-annotations-ui="form"]').getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(noteField(page)).toHaveCount(0)
+}
+
+Given('the annotations profile is booted beside the Backlog', async ({ page }: { page: Page }) => {
+  const profile = await bootComposedPluginProfile({ packageIds: ['@dshfiles/annotations', '@dshfiles/backlog'], profileLabel: '@dshfiles/annotations+backlog' })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
+When('an element is annotated from the reply box with {string}', async ({ page }: { page: Page }, note: string) => {
+  await annotateFrom(page, 'Comment', note)
+})
+
+Then('the reply box lists the annotation with {string}', async ({ page }: { page: Page }, note: string) => {
+  await recordAssertion(page, 'annotations-backlog-list', async () => {
+    await toolIn(page, 'Comment').click()
+    await expect(page.getByText(note, { exact: false }).first()).toBeVisible({ timeout: 15_000 })
+    await page.keyboard.press('Escape')
+    await expect(addToDraft(page)).toHaveCount(0)
+  })
+})
+
+Then('the capture box lists no annotation of that item', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'annotations-backlog-scope', async () => {
+    const capture = page.locator('[data-composer-card]').getByRole('button', { name: 'Annotate an element', exact: true })
+    await capture.click()
+    await expect(page.getByText('None yet in this draft', { exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(addToDraft(page)).toHaveCount(0)
+  })
+})
+
+When('the annotations are added to the reply draft', async ({ page }: { page: Page }) => {
+  await toolIn(page, 'Comment').click()
+  await addToDraft(page).click()
+})
+
+Then('the reply draft holds the annotation block with {string}', async ({ page }: { page: Page }, note: string) => {
+  await recordAssertion(page, 'annotations-backlog-draft', async () => {
+    await expect(replyBox(page)).toContainText('Annotated UI feedback (1)')
+    await expect(replyBox(page)).toContainText(`note: ${note}`)
+  })
+})
+
+When('the reply is sent', async ({ page }: { page: Page }) => {
+  await peek(page).getByRole('button', { name: 'Reply', exact: true }).click()
+})
+
+Then('the item conversation shows the annotation block with {string}', async ({ page }: { page: Page }, note: string) => {
+  await recordAssertion(page, 'annotations-backlog-sent', async () => {
+    const conversation = peek(page).getByRole('list', { name: 'Conversation' })
+    await expect(conversation).toContainText('Annotated UI feedback (1)', { timeout: 15_000 })
+    await expect(conversation).toContainText(note)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('an element is annotated from the description box with {string}', async ({ page }: { page: Page }, note: string) => {
+  await peek(page).getByRole('button', { name: 'Edit description', exact: true }).click()
+  await expect(bodyBox(page)).toBeVisible()
+  await annotateFrom(page, 'Body', note)
+})
+
+Then('the description box is still open', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'annotations-backlog-hold', async () => {
+    await expect(bodyBox(page)).toBeVisible()
+    await expect(bodyBox(page)).toBeFocused()
+  })
+})
+
+When('the annotations are added to the description draft', async ({ page }: { page: Page }) => {
+  await toolIn(page, 'Body').click()
+  await addToDraft(page).click()
+  await expect(bodyBox(page)).toContainText('Annotated UI feedback (1)')
+})
+
+When('focus leaves the description box', async ({ page }: { page: Page }) => {
+  await replyBox(page).click()
+})
+
+Then('the saved description shows the annotation block with {string}', async ({ page }: { page: Page }, note: string) => {
+  await recordAssertion(page, 'annotations-backlog-description-saved', async () => {
+    await expect(bodyBox(page)).toHaveCount(0)
+    await expect(peek(page)).toContainText('Annotated UI feedback (1)')
+    await expect(peek(page)).toContainText(note)
+  })
+  await finishJourneyAssertions(page)
+})
+
 const FIXTURE = 'tooling/dshx/e2e/fixtures/annotations/sample.html'
 
 /** The extension id is derived from its committed key, so the test trusts the same origin the Host does. */
