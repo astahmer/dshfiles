@@ -341,6 +341,28 @@ describe('checkout rebuild selection', () => {
 
   afterEach(() => rmSync(root, { recursive: true, force: true }))
 
+  it('tracks library exports without treating them as Host bundles', () => {
+    const directory = join(root, 'plugins/@dshfiles/library')
+    writeFile(
+      join(directory, 'package.json'),
+      JSON.stringify({
+        name: '@dshfiles/library',
+        scripts: { build: 'tsc -p tsconfig.build.json' },
+        exports: { '.': { default: './dist/library.js' }, './other': { default: './dist/other.js' } },
+      }),
+    )
+    writeFile(join(directory, 'dist/library.js'), 'export {}\n')
+    writeFile(join(directory, 'dist/other.js'), 'export {}\n')
+    expect(CheckoutRebuild.plan({ root, changedFiles: [] }).plugins).toEqual([])
+    rmSync(join(directory, 'dist/other.js'))
+    expect(CheckoutRebuild.plan({ root, changedFiles: [] }).plugins).toEqual([{ name: '@dshfiles/library', host: false, client: false }])
+    plugin('consumer', { '@dshfiles/library': 'workspace:*' }, { index: ['../src/host.ts'] })
+    expect(CheckoutRebuild.plan({ root, changedFiles: ['plugins/@dshfiles/library/src/library.ts'] }).plugins.map(item => item.name)).toEqual([
+      '@dshfiles/consumer',
+      '@dshfiles/library',
+    ])
+  })
+
   it('selects missing bundle outputs without rebuilding dependants', () => {
     rmSync(join(root, 'plugins/@dshfiles/panel/dist/client.js'))
     const plan = CheckoutRebuild.plan({ root, changedFiles: [] })
