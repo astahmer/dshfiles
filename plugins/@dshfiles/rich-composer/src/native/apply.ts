@@ -411,6 +411,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       'conversation.hero.workspace': { kind: 'single', scope: 'root' },
       'conversation.hero.agentPreset': { kind: 'single', scope: 'session-maybe' },
       'conversation.hero.options': { kind: 'list', scope: 'session' },
+      'conversation.composer.location': { kind: 'list', scope: 'session' },
     },
     slots: {
       views: { scope: 'session' },

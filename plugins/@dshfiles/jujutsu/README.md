@@ -73,7 +73,9 @@ Two panels in navigation, the main view and the Workbench chooser: **Revision gr
   discard (`jj restore`), move to parent/child (`jj squash` with literal
   filesets), split by selected files, and group describe/new/edit/squash.
 - One-click toggle of the right-panel Jujutsu page on the current thread's
-  repository: the composer chips, a conversation-header button (setting
+  repository: the workspace and bookmark reading that continues Rich
+  Composer's `project · host` run summary chip below the composer (slot
+  `conversation.composer.location`), a conversation-header button (setting
   `headerToggle`, **off by default** so the header keeps thread state; the page
   also opens from its own rail), and the `jujutsu.toggleSessionRepository`
   command, unbound by default under Settings › Shortcuts. It opens the page on

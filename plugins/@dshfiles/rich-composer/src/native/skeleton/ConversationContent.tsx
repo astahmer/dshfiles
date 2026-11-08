@@ -170,16 +170,22 @@ export function ConversationContent(props: ConversationContentProps) {
   // Once the thread has started, the run row collapses to one summary chip leading the meter line. Memoized on its
   // text so streaming Session updates keep the memoized bar from re-rendering.
   const summaryHost = remoteWorkspaceCwd === undefined ? t('runRow.summaryLocal') : t('runRow.summaryRemote')
+  // An occupant of conversation.composer.location (the jj workspace and bookmark) continues the same chip, so the
+  // meter line names where the thread runs once.
+  const runLocation = sessionId === undefined ? null : renderSlot('conversation.composer.location', {})
   const runSummary = useMemo(() => chipTitle === undefined ? undefined : (
-    <Tooltip label={t('runRow.summary', { project: chipTitle, host: summaryHost })} side="top" delayMs={400}>
-      <span className={css.runSummary} tabIndex={0} data-run-summary="">
-        <IconFolderOpenRegular size={13} aria-hidden />
-        <span className={css.runSummaryText}>{chipTitle}</span>
-        <span aria-hidden>·</span>
-        <span className={css.runSummaryText}>{summaryHost}</span>
-      </span>
-    </Tooltip>
-  ), [chipTitle, summaryHost, t])
+    <span className={css.runSummary} data-run-summary="">
+      <Tooltip label={t('runRow.summary', { project: chipTitle, host: summaryHost })} side="top" delayMs={400}>
+        <span className={css.runSummaryHead} tabIndex={0}>
+          <IconFolderOpenRegular size={13} aria-hidden />
+          <span className={css.runSummaryText}>{chipTitle}</span>
+          <span aria-hidden>·</span>
+          <span className={css.runSummaryText}>{summaryHost}</span>
+        </span>
+      </Tooltip>
+      {runLocation}
+    </span>
+  ), [chipTitle, summaryHost, runLocation, t])
 
   // The placeholder chip ("Choose workspace") and Workspace-trigger input travel
   // together for a cold start or an unowned blank Session. Confirmed remote

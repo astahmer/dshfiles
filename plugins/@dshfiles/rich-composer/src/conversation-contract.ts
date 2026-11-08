@@ -13,3 +13,14 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
     ): DraftInitializationResult
   }
 }
+
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface SlotMap {
+    /**
+     * Where the started thread's run summary chip (project · host) continues: an occupant adds its own location
+     * reading (a version-control workspace and bookmark) inside that one chip instead of a second chip on the meter line.
+     * It renders its own leading separator.
+     */
+    'conversation.composer.location': { kind: 'list'; scope: 'session' }
+  }
+}

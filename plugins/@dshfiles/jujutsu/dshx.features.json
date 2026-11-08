@@ -333,7 +333,7 @@
         {
           "key": "composerChips",
           "defaultValue": "true",
-          "constraints": "Boolean; show the project, JJ workspace and bookmark chip.",
+          "constraints": "Boolean; show the JJ workspace and bookmark inside the composer run summary chip (project · host · workspace / bookmark).",
           "choices": ["true", "false"],
           "coveredBy": ["jujutsu.composer-context"]
         },

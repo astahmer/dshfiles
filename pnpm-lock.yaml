@@ -3687,6 +3687,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/rich-composer':
+        specifier: workspace:*
+        version: link:../rich-composer
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -4423,7 +4426,7 @@ importers:
         version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
-        version: 0.2.1-rc.2(aa2eabd231061407f0aceb3cedf5b539)
+        version: 0.2.1-rc.2(dbbc032c9895bff35b74e9a5d27e3426)
       '@deepseek-ai/dsh-client-connection':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2)
@@ -4575,7 +4578,7 @@ importers:
         version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
-        version: 0.2.1-rc.2(7b39ad14a19c5dbaeecd7746331021bb)
+        version: 0.2.1-rc.2(c35379bf962a9fe3ef9ac8c7f5837978)
       '@deepseek-ai/dsh-api-remotes':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2)

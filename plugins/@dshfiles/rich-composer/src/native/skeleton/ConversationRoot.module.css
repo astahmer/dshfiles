@@ -611,14 +611,18 @@ button.crumbEditable {
   display: none;
 }
 
-/* The collapsed run row: one quiet chip leading the meter line. */
+/* The collapsed run row: one quiet chip leading the meter line. Its head is
+   project · host; conversation.composer.location occupants (jj workspace and
+   bookmark) continue it, so the line never repeats the project. */
 .runSummary {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   flex: 0 1 auto;
+  /* No percentage cap: the meter line shrink-wraps its items, so a share of
+     it would truncate the chip on a roomy line. It shrinks only when the line
+     reaches the composer width. */
   min-width: 0;
-  max-width: 40%;
   padding: 1px 8px;
   border-radius: var(--dsw-radius-sm);
   color: var(--dsw-alias-label-tertiary);
@@ -628,8 +632,17 @@ button.crumbEditable {
   cursor: default;
 }
 
+.runSummaryHead {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  outline: none;
+}
+
 .runSummary:hover,
-.runSummary:focus-visible {
+.runSummary:focus-within {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-secondary);
 }

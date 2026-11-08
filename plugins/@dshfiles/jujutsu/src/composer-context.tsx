@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, FileCodeIcon, FileDiffIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, FileCodeIcon, FileDiffIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useQuery } from '@dshfiles/plugin-ui/query'
@@ -384,7 +384,7 @@ const Chip = (props: { readonly tooltip: string; readonly onClick: () => void; r
   </Tooltip>
 )
 
-/** One contextual chip below the composer; it opens the Jujutsu panel for this repository. */
+/** The jj workspace and bookmark inside the composer's run summary chip; it opens the Jujutsu panel for this repository. */
 export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
   const context = useComposerContext(props, 'composerChips')
   const repository = context.repository
@@ -421,6 +421,7 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
   const label = location.length === 0 ? `@ ${repository.changeId}` : location
   const title = [
     'Toggle Jujutsu on ' + repository.root,
+    'Project: ' + project,
     repository.workspace === null ? undefined : 'Workspace: ' + repository.workspace,
     bookmark === undefined ? undefined : 'Bookmark: ' + bookmark + (ownBookmark === undefined ? ' (nearest ancestor)' : ''),
     'Working copy: @ ' + repository.changeId + ' (' + repository.commitId + ')',
@@ -428,19 +429,20 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
   ]
     .filter((value): value is string => value !== undefined)
     .join('\n')
+  // Rich Composer's run summary chip already names the project and host: this continues it with the location.
   return (
     <TooltipProvider delayDuration={500}>
-      <div
-        className="dshx-root dshx:flex dshx:w-80 dshx:max-w-full dshx:min-w-0 dshx:shrink dshx:items-center dshx:justify-center dshx:overflow-hidden dshx:text-xs dshx:text-muted-foreground"
+      <span
+        className="dshx-root dshx:flex dshx:min-w-0 dshx:shrink dshx:items-center dshx:gap-1 dshx:overflow-hidden"
         ref={context.ref}
+        data-jujutsu-location=""
       >
-        <Chip className="dshx:max-w-full dshx:shrink" onClick={toggle} tooltip={title}>
-          <FolderIcon />
-          <span className="dshx:min-w-0 dshx:truncate">{project}</span>
-          <span className="dshx:min-w-0 dshx:truncate dshx:text-foreground">({label})</span>
+        <span aria-hidden="true">·</span>
+        <Chip className="dshx:max-w-full dshx:shrink dshx:px-1 dshx:py-0" onClick={toggle} tooltip={title}>
+          <span className="dshx:min-w-0 dshx:truncate">{label}</span>
           {repository.conflict && <span className="dshx:shrink-0 dshx:text-destructive">conflict</span>}
         </Chip>
-      </div>
+      </span>
     </TooltipProvider>
   )
 }
