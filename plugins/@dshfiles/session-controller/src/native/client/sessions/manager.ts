@@ -52,6 +52,17 @@ const LIST_PROJECTIONS = [
 ] as const
 
 /**
+ * Full projection state stays resident for the last few viewed Sessions. A Session's
+ * history baseline carries every registered key (turn outlines, goals, todos, usage);
+ * keeping that for every thread ever opened grows the tab with the browsing session.
+ * The rest keeps only what its list row reads (see LIST_ROW_STATE_KEYS).
+ */
+const RESIDENT_SESSION_STATE_LIMIT = 3
+
+/** Values a list row still reads after its Session's history state is released. */
+const LIST_ROW_STATE_KEYS = ['title', 'sessionListMetadata'] as const
+
+/**
  * The generated Remote client type still describes the native list request.
  * The fork's Host accepts the selector, so this boundary adapter widens only
  * that one call.
@@ -174,6 +185,8 @@ export class SessionManager {
   private readonly provisional = new Map<SessionId, ProvisionalRecord>()
   private readonly hostNonblank = new Set<SessionId>()
   private readonly hostKnown = new Set<SessionId>()
+  /** Viewed Session ids, oldest first: bounds how much history projection state stays resident. */
+  private readonly viewedSessions: SessionId[] = []
 
 
   private listSnapshotCache: SessionListSnapshot
@@ -258,6 +271,7 @@ export class SessionManager {
     this.sessions.delete(sessionId)
     this.addresses.delete(sessionId)
     this.pruneEngagement(sessionId, this.retainedIds(this.summaries))
+    this.releaseStaleSessionState()
     return this.startSessionDisposal(session)
   }
 
@@ -309,6 +323,7 @@ export class SessionManager {
     if (session === undefined) {
       session = this.createSession(sessionId)
       this.sessions.set(sessionId, session)
+      this.markViewed(sessionId)
       // Sync the running and blank bits from the list snapshot into the new
       // instance (consistency when the list precedes open).
       const summary = this.summaries.find(s => s.sessionId === sessionId)
@@ -389,6 +404,31 @@ export class SessionManager {
    */
   private pruneEngagement(sessionId: SessionId, retained: ReadonlySet<SessionId>): void {
     if (!retained.has(sessionId)) this.engagedSessions.delete(sessionId)
+  }
+
+  /** Record one Session as viewed (most recent last), bounding resident history state. */
+  private markViewed(sessionId: SessionId): void {
+    const previous = this.viewedSessions.indexOf(sessionId)
+    if (previous !== -1) this.viewedSessions.splice(previous, 1)
+    this.viewedSessions.push(sessionId)
+    this.releaseStaleSessionState()
+  }
+
+  /**
+   * Release history projection values for viewed Sessions past the resident limit.
+   * A Session still mounted here (or a provisional blank) keeps everything; an evicted
+   * one keeps only the keys its list row reads, so reopening it refetches the rest.
+   */
+  private releaseStaleSessionState(): void {
+    let resident = this.viewedSessions.length
+    for (const sessionId of [...this.viewedSessions]) {
+      if (resident <= RESIDENT_SESSION_STATE_LIMIT) return
+      if (this.sessions.has(sessionId) || this.provisional.has(sessionId)) continue
+      this.viewedSessions.splice(this.viewedSessions.indexOf(sessionId), 1)
+      this.projectionStores.get(sessionId)?.retainOnly(LIST_ROW_STATE_KEYS)
+      this.projectionLoads.delete(sessionId)
+      resident -= 1
+    }
   }
 
   /** Resident per-session projection store (create-on-demand; outlives instantiation). */
