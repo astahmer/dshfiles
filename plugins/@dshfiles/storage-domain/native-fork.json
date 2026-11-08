@@ -1,0 +1,15 @@
+{
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change. The delta adds the lazy-hydration seed path (per-record keys indexed at open, one record read per cache miss behind a 64-row LRU), the optional `hydration` spec field, and an async legacy-bootstrap fallback; every event, error, and write-chain behaviour is upstream.",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "package": "@deepseek-ai/dsh-storage-domain",
+    "version": "0.2.1-rc.2",
+    "ref": "dsh-v0.2.1-rc.2",
+    "path": "packages/storage/storage-domain"
+  },
+  "files": [
+    { "upstream": "src", "local": "src/native" },
+    { "upstream": "locale", "local": "locale" }
+  ],
+  "delta": ["src/native/domain.ts", "src/native/index.ts", "src/native/spec.ts"]
+}
