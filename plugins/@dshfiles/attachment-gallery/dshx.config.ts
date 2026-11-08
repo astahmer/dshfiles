@@ -4,6 +4,6 @@ import { defineConfig } from '@dshfiles/dshx'
 export default defineConfig({
   name: '@dshfiles/attachment-gallery',
   host: { entry: 'src/host.ts' },
-  client: { entry: 'src/client-entry.tsx', vite: { plugins: [pluginUiVite()] } },
+  client: { shared: '@dshfiles/shared-runtime', entry: 'src/client-entry.tsx', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },
 })

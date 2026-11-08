@@ -12,6 +12,7 @@ export default defineConfig({
     'inline-reference-markdown': 'src/inline-reference-markdown.tsx',
   },
   client: {
+    shared: '@dshfiles/shared-runtime',
     entry: 'src/client-entry.tsx',
     // Not browser-roster packages, so the native plugin's build inlines them too.
     bundleDependencies: [

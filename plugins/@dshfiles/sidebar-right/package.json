@@ -31,6 +31,7 @@
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
+    "@dshfiles/shared-runtime": "workspace:*",
     "picomatch": "4.0.3",
     "zod": "catalog:"
   },
@@ -95,7 +96,8 @@
       ],
       "external": [
         "@deepseek-ai/dsh-client-store",
-        "@deepseek-ai/dsh-client-ui-dockkit"
+        "@deepseek-ai/dsh-client-ui-dockkit",
+        "@dshfiles/shared-runtime"
       ]
     }
   },

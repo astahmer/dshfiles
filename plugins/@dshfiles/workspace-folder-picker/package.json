@@ -63,6 +63,7 @@
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
     "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },
@@ -124,7 +125,9 @@
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-api-workspace-controller"
       ],
-      "external": [],
+      "external": [
+        "@dshfiles/shared-runtime"
+      ],
       "immediately": false
     }
   },

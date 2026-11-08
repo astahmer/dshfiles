@@ -4,7 +4,7 @@ import { defineConfig } from '@dshfiles/dshx'
 export default defineConfig({
   name: '@dshfiles/secret-catalog',
   modules: { setup: 'src/setup.tsx' },
-  host: { entry: 'src/host.ts', bundleDependencies: ['@dshfiles/credential-port', 'effect'] },
+  host: { entry: 'src/host.ts', bundleDependencies: ['@dshfiles/credential-port'] },
   client: {
     entry: 'src/client.tsx',
     shared: '@dshfiles/shared-runtime',

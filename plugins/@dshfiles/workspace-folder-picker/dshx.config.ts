@@ -13,7 +13,7 @@ export default defineConfig({
     'repository-setup-contract': 'src/repository-setup-contract.ts',
   },
   host: { entry: 'src/host.ts' },
-  client: { entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } },
+  client: { shared: '@dshfiles/shared-runtime', entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } },
   build: {
     sourcemap: true,
     declarations: true,
