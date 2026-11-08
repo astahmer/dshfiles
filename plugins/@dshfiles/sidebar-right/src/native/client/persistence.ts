@@ -53,8 +53,8 @@ const tab = Schema.Struct({
   contentId: Schema.NonEmptyString,
   title: Schema.String,
 })
-const keyedBy = (pattern: RegExp) =>
-  Schema.makeFilter<Record<string, unknown>>(entries =>
+const keyedBy = <Value>(pattern: RegExp) =>
+  Schema.makeFilter<Record<string, Value>>(entries =>
     (Object.keys(entries).every(key => pattern.test(key)) ? true : rejectsInvalidReferences))
 const layout = Schema.Struct({
   nodes: Schema.Record(Schema.String, node).check(keyedBy(nodeIdPattern)),
