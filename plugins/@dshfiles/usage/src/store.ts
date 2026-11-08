@@ -283,7 +283,21 @@ const COST_SQL = `CASE WHEN rr.provider IS NULL OR r.input IS NULL THEN NULL
 
 const TOKENS_SQL = 'COALESCE(r.input, 0) + COALESCE(r.cache_read, 0) + COALESCE(r.cache_write, 0) + COALESCE(r.output, 0)'
 
-const FROM_SQL = `requests r
+/** The cold archive is created on demand: a migration step would rewrite every existing usage.db's version. */
+const ARCHIVE_DDL = `CREATE TABLE IF NOT EXISTS requests_archive (
+  id TEXT PRIMARY KEY, session_id TEXT NOT NULL, seq INTEGER, message_id TEXT, turn INTEGER, step INTEGER,
+  purpose TEXT NOT NULL, source TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL, started_at INTEGER NOT NULL,
+  ended_at INTEGER, ttft_ms INTEGER, input INTEGER, cache_read INTEGER, cache_write INTEGER, output INTEGER,
+  reasoning INTEGER, band INTEGER NOT NULL, status TEXT NOT NULL, stop_reason TEXT, error_code TEXT, merged_into TEXT,
+  settled INTEGER NOT NULL
+) STRICT`
+
+/**
+ * Reports read the hot table and the cold archive as one: rows older than the retention window move to
+ * `requests_archive` (no indexes, never written again) instead of being deleted, so a month or year filter keeps
+ * answering while the hot table stays small.
+ */
+const FROM_SQL = `(SELECT * FROM requests UNION ALL SELECT * FROM requests_archive) r
   LEFT JOIN sessions s ON s.id = r.session_id
   LEFT JOIN route_rates rr ON rr.provider = r.provider AND rr.model = r.model AND rr.band = r.band`
 
@@ -707,6 +721,8 @@ export class UsageRepo extends Context.Service<
       const failed = (operation: string) => (cause: unknown) => new UsageStoreFailed({ operation, cause })
 
       const run = (text: string, params: ReadonlyArray<SqlParam> = []) => Effect.asVoid(sql.unsafe(text, params))
+      // Reports read the hot table and the cold archive as one, so the archive exists before the first report runs.
+      yield* run(ARCHIVE_DDL)
       const read = <A>(decodeRows: (input: unknown) => Effect.Effect<A, Schema.SchemaError>, text: string, params: ReadonlyArray<SqlParam> = []) =>
         Effect.flatMap(sql.unsafe(text, params), decodeRows)
       const readFirst = <A>(decodeRow: (input: unknown) => Effect.Effect<A, Schema.SchemaError>, text: string, params: ReadonlyArray<SqlParam> = []) =>
@@ -737,6 +753,7 @@ export class UsageRepo extends Context.Service<
         Effect.all(
           [
             run('DELETE FROM tools WHERE started_at < ?', [now - TOOL_RETENTION_MS]),
+            run('INSERT OR IGNORE INTO requests_archive SELECT * FROM requests WHERE started_at < ?', [now - REQUEST_RETENTION_MS]),
             run('DELETE FROM requests WHERE started_at < ?', [now - REQUEST_RETENTION_MS]),
             run("UPDATE tools SET outcome = 'unknown' WHERE outcome = 'pending' AND started_at < ?", [now - MAX_PENDING_MS]),
           ],
