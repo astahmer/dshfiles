@@ -4,6 +4,7 @@
   "dependencies": {
     "@dshfiles/activity-timeline": "link:../../plugins/@dshfiles/activity-timeline",
     "@dshfiles/agent-communication": "link:../../plugins/@dshfiles/agent-communication",
+    "@dshfiles/agent-loop": "link:../../plugins/@dshfiles/agent-loop",
     "@dshfiles/agent-plan": "link:../../plugins/@dshfiles/agent-plan",
     "@dshfiles/agent-preset": "link:../../plugins/@dshfiles/agent-preset",
     "@dshfiles/agent-questions": "link:../../plugins/@dshfiles/agent-questions",
@@ -115,6 +116,7 @@
         "@dshfiles/rich-composer",
         "@dshfiles/chat",
         "@dshfiles/context-compaction",
+        "@dshfiles/agent-loop",
         "@dshfiles/session-controller",
         "@dshfiles/mcp-endpoint",
         "@dshfiles/model-selection",

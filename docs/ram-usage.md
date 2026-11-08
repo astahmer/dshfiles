@@ -34,13 +34,27 @@ async stacks that hold an `events` array. So the Host retains **every streamed a
 before an event reaches a client, which is why the wire is small while the Host copy is not.
 
 Module source, schemas and Effect are minor in comparison; the 3 GB log corpus only matters once something decodes
-it. Two owners follow:
+it. What the fork in `plugins/@dshfiles/agent-loop` removes, measured on `session-6b9ec57a` (760 assistant messages,
+19 MB of events, 2026-11-09):
 
-- The Host copy is not a leak to trim blindly: `@deepseek-ai/dsh-session` treats `assistant/message`'s embedded
-  `stream` as durable event data ("assistant/message embeds its source stream"), and the format migrator reads it. So
-  dropping the blocks needs an owner-side change: keep full replay state for the live attempt and the newest settled
-  one, and trim older settled attempts in the session store once nothing replays them. That is a native session
-  contract, so it is an upstream ask (drafted below) rather than a plugin patch.
+| Part of `assistant/message`                               | Bytes   |
+| --------------------------------------------------------- | ------- |
+| Whole event data                                          | 4.55 MB |
+| `message.source.replayState.blocks`                       | 433 KB  |
+| `stream[].chunk.replayState.blocks` (dropped by the fork) | 433 KB  |
+| `data.stream` in total                                    | 2.85 MB |
+
+That is ~9.5 % of that Session's `assistant/message` bytes and ~2.3 % of its whole log — a genuine duplicate removed,
+but **not** the explanation for the multi-GB live heap. The same log shows where the rest of a Session's bytes sit:
+`request/header` 8.87 MB (34 events, mostly the 455-tool catalog), `assistant/message` 4.45 MB, `tool/result` 2.51 MB.
+A 2.82 GB live set over a handful of live Sessions therefore still means those events are held several times over, not
+that one event is huge; a per-client or per-consumer copy is the next thing to attribute before trimming further.
+
+Two owners follow:
+
+- **Host:** the per-block replay duplicate is fixed by the
+  [`@dshfiles/agent-loop`](../plugins/@dshfiles/agent-loop/README.md) fork (see the table above); the `request/header`
+  tool catalog and the multi-copy question are separate and unattributed.
 - **Browser:** one renderer held 3.3 GB for this tab, with a second at 1.7 GB. Its own copy is already block-stripped,
   so the cost is resident per-thread client state. The client store is the owned
   [session-controller fork](../plugins/@dshfiles/session-controller/README.md#local-delta): history projections stay
