@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, type Response, type TestInfo } from '@playwright/test'
+import { expect, type Locator, type Page, type Request, type Response, type TestInfo } from '@playwright/test'
 import { openGlobalPanel, viewNamePattern } from '../plugin-view-names.js'
 import { DEFAULT_PREFERENCES } from '../../../../../plugins/@dshfiles/thread-sidebar/src/organization.js'
 import { existsSync } from 'node:fs'
@@ -9,6 +9,7 @@ import * as Schema from 'effect/Schema'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion, reloadPastProviderSetup, settingsPage, settingsNavEntry } from '../steps.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
+import { ApiChannelModel } from '../../../packages/dshx/src/api/channel.js'
 import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 import { materializeNonblankThread } from '../thread-composer.js'
 import { ThreadSidebarJourney } from '../thread-list-grouping.js'
@@ -2432,13 +2433,31 @@ const sidebarExpandControl = (page: Page) => page.getByRole('button', { name: /^
 
 const jjInventoryRequests = new WeakMap<Page, { count: number }>()
 
+/** The inventory read as the transport names it: batched entries carry its per-channel route, a retry its own path. */
+const JJ_INVENTORY_ENDPOINT = `${ApiChannelModel.apiChannel('@dshfiles/jj-integration', 'jj-threads').slice(1)}/repositories`
+const JJ_INVENTORY_PATH = `/api/${JJ_INVENTORY_ENDPOINT}`
+const batchReadsSchema = Schema.Struct({
+  entries: Schema.Array(Schema.Struct({ endpoint: Schema.String })),
+})
+
+/** Reads share the one `/api/dshx-batch` route, one NDJSON line per entry, so the endpoint is in the body, not the URL. */
+const batchedInventoryReads = (request: Request): number => {
+  if (!request.url().endsWith('/api/dshx-batch')) return 0
+  const body = request.postData()
+  if (body === null) return 0
+  const batch = Schema.decodeUnknownOption(Schema.fromJsonString(batchReadsSchema))(body)
+  if (Option.isNone(batch)) return 0
+  return batch.value.entries.filter(entry => entry.endpoint === JJ_INVENTORY_ENDPOINT).length
+}
+
 /** Counts the JJ inventory reads the page makes, so a journey can prove a hidden surface bought none. */
 const countJjInventoryRequests = (page: Page): { count: number } => {
   const existing = jjInventoryRequests.get(page)
   if (existing !== undefined) return existing
   const entry = { count: 0 }
   page.on('request', request => {
-    if (/\/api\/dshx-[0-9a-f]+\/repositories$/.test(new URL(request.url()).pathname)) entry.count += 1
+    entry.count += batchedInventoryReads(request)
+    if (new URL(request.url()).pathname === JJ_INVENTORY_PATH) entry.count += 1
   })
   jjInventoryRequests.set(page, entry)
   return entry

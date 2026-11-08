@@ -274,7 +274,7 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.jj-inventory-pauses-while-collapsed
   Scenario: A collapsed sidebar stops reading the JJ inventory
-    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/jj-integration" is booted
     And the provider onboarding prompt is dismissed
     And the browser counts JJ inventory requests
     When the sidebar inventory pane is collapsed
