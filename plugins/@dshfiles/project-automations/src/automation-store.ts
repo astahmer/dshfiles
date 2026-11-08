@@ -73,10 +73,9 @@ const make = Effect.gen(function* () {
   /** Runs newest first: of one automation, or of every automation. */
   const runs = Effect.fn('automation store runs')(function* (input: { readonly automationId?: string | undefined; readonly limit: number }) {
     const entries = yield* listEntries(input.automationId === undefined ? RUN_PREFIX : runPrefix(input.automationId))
-    // The key starts with the zero-padded start time, so the newest runs are the last keys: history older than the
-    // requested rows is never decoded.
-    const newest = entries.toSorted((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0)).slice(0, input.limit)
-    return decodeAll(newest, entry => decodeRun(entry.value)).toSorted((a, b) => b.startedAt - a.startedAt)
+    return decodeAll(entries, entry => decodeRun(entry.value))
+      .toSorted((a, b) => b.startedAt - a.startedAt)
+      .slice(0, input.limit)
   })
 
   const recordRun = Effect.fn('automation store record run')(function* (run: RunRecord) {
