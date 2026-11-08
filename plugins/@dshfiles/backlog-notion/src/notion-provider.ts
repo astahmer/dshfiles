@@ -294,9 +294,11 @@ export const makeNotionProvider = Effect.fn('backlog notion provider')(function*
     readonly layout: NotionLayout
     readonly fields: readonly ProviderField[]
     readonly comments: boolean
+    /** The page a write just returned, so reading the record back needs no extra request. */
+    readonly page?: NotionPage
   }) =>
     Effect.gen(function* () {
-      const page = yield* pageById(input.scope.connection, input.id)
+      const page = input.page ?? (yield* pageById(input.scope.connection, input.id))
       const body = input.fields.includes('body') ? (yield* markdownOf(input.scope.connection, input.id)).markdown : ''
       const comments = input.comments ? yield* commentsOf(input.scope.connection, input.id) : undefined
       return toCanonical({ page, layout: input.layout, body, comments })
@@ -370,17 +372,25 @@ export const makeNotionProvider = Effect.fn('backlog notion provider')(function*
     Effect.gen(function* () {
       const { layout } = yield* layoutOf(scope)
       const properties = fromCanonical(layout, scope.patch)
-      if (Object.keys(properties).length > 0)
-        yield* client.request({
-          connection: scope.connection,
-          method: 'PATCH',
-          path: `/pages/${scope.key}`,
-          body: { properties },
-          operation: 'update-page',
-          reference: scope.key,
-        })
+      const patched =
+        Object.keys(properties).length === 0
+          ? undefined
+          : yield* Effect.result(
+              Effect.flatMap(
+                client.request({
+                  connection: scope.connection,
+                  method: 'PATCH',
+                  path: `/pages/${scope.key}`,
+                  body: { properties },
+                  operation: 'update-page',
+                  reference: scope.key,
+                }),
+                response => decode(NotionMapping.pageSchema, 'update-page')(response),
+              ),
+            )
       if (scope.patch.body !== undefined) yield* writeBody(scope, scope.key, scope.patch.body)
-      return yield* recordOf({ scope, id: scope.key, layout, fields: allFields, comments: false })
+      const page = scope.patch.body === undefined && patched?._tag === 'Success' ? patched.success : undefined
+      return yield* recordOf({ scope, id: scope.key, layout, fields: allFields, comments: false, ...(page !== undefined && { page }) })
     })
 
   const create = (scope: Scope & { readonly patch: RemotePatch }) =>
@@ -402,7 +412,7 @@ export const makeNotionProvider = Effect.fn('backlog notion provider')(function*
         }),
         decode(NotionMapping.pageSchema, 'create-page'),
       )
-      return yield* recordOf({ scope, id: created.id, layout, fields: allFields, comments: false })
+      return yield* recordOf({ scope, id: created.id, layout, fields: allFields, comments: false, page: created })
     })
 
   const comment = (scope: Scope & { readonly key: string; readonly body: string }) =>
