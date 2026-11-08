@@ -49,8 +49,8 @@ it. Two owners follow:
   are dropped and refetched on the next open. The remaining growth is the resident window of threads still mounted or
   recently viewed; a per-thread LRU below that needs a rather different ownership change.
 
-Both asks are filed as [discussion #12693](https://github.com/deepseek-ai/deepseek-harness/discussions/12693) (the
-repository has issues disabled). Re-measure the tab after a refresh: open a dozen threads, return to one, settle
+Both asks are drafted in this file for the moment the user decides to file them: the repository has issues disabled,
+and publishing is their call. Re-measure the tab after a refresh: open a dozen threads, return to one, settle
 110 s, then compare against the 3.3 GB baseline with the same `heapUsed`-after-GC protocol.
 
 Measured composition of a 610 MB Host with the web profile, no client attached. The rows come from different ablation

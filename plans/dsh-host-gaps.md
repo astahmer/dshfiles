@@ -319,9 +319,7 @@ One ask, with the 2026-11-09 measurement in [RAM usage](../docs/ram-usage.md#wha
    migrator reads it too. Please expose either a supported post-settlement trim (keep the live and newest settled
    attempt, drop per-block replay state from older ones) or a documented "safe to drop after settle" guarantee, so a
    Host plugin does not have to mutate frozen Session events. A client-side per-thread bound is the matching ask for
-   the browser tab, measured at 3.3 GB in one renderer. Filed as
-   [discussion #12693](https://github.com/deepseek-ai/deepseek-harness/discussions/12693) — the repository has issues
-   disabled, so the asks went to Discussions.
+   the browser tab, measured at 3.3 GB in one renderer. Not filed: publishing is the user's call.
 
 ## Triage, 2026-10-19
 
