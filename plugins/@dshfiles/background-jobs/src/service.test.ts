@@ -145,6 +145,54 @@ const makeBoard = Effect.fn(function* (input: {
 
 describe('background jobs board', () => {
   it.layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))(it => {
+    it.effect('refreshes every row when one job changes between two reads', () =>
+      Effect.gen(function* () {
+        const registry = registryStub()
+        const fixture = yield* makeBoard({ jobs: [historyJob({ id: 'bash-history', label: 'cd /x && jj log' })], registry })
+        yield* fixture.emit(registry, { type: 'registered', job: liveView({ id: JobId('bash-a') }) })
+        yield* fixture.emit(registry, { type: 'registered', job: liveView({ id: JobId('bash-b') }) })
+
+        const snapshot = (board: { readonly rows: readonly { id: string; status: string; outputTotal: number }[] }) =>
+          board.rows.map(row => [row.id, row.status, row.outputTotal])
+
+        expect(snapshot(yield* fixture.board.board({ scope: 'all' }))).toEqual([
+          ['bash-a', 'running', 0],
+          ['bash-b', 'running', 0],
+          ['bash-history', 'completed', 0],
+        ])
+
+        yield* fixture.emit(registry, { type: 'output', id: JobId('bash-a'), owner: SessionId('session-bbbb'), total: 7 })
+        expect(snapshot(yield* fixture.board.board({ scope: 'all' }))).toEqual([
+          ['bash-a', 'running', 7],
+          ['bash-b', 'running', 0],
+          ['bash-history', 'completed', 0],
+        ])
+
+        yield* fixture.emit(registry, {
+          type: 'settled',
+          job: liveView({ id: JobId('bash-b'), status: 'completed', finishedAt: 4_000 }),
+          cause: 'producer',
+          awaited: false,
+        })
+        const settled = yield* fixture.board.board({ scope: 'all' })
+        expect(snapshot(settled)).toEqual([
+          ['bash-a', 'running', 7],
+          ['bash-b', 'completed', 0],
+          ['bash-history', 'completed', 0],
+        ])
+        expect(settled.rows.map(row => row.category)).toEqual(['tests', 'tests', 'vcs'])
+
+        yield* fixture.board.refresh
+        expect(snapshot(yield* fixture.board.board({ scope: 'all' }))).toEqual(snapshot(settled))
+
+        yield* fixture.emit(registry, { type: 'removed', job: liveView({ id: JobId('bash-a') }) })
+        expect(snapshot(yield* fixture.board.board({ scope: 'all' }))).toEqual([
+          ['bash-b', 'completed', 0],
+          ['bash-history', 'completed', 0],
+        ])
+      }),
+    )
+
     it.effect('lists running jobs before finished ones and pages with a cursor', () =>
       Effect.gen(function* () {
         const registry = registryStub()
