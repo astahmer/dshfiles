@@ -365,7 +365,10 @@ export const createQueueEditMachine = <DraftId extends string, Attachment>() =>
           onDone: { target: '#queueEdit.editing' },
           onError: {
             target: '#queueEdit.editing',
-            actions: assign({ notice: "Could not reload this message's attachments into the composer; Cancel still puts the original back." }),
+            actions: assign({
+              notice: ({ event }) =>
+                `Could not reload this message's attachments into the composer (${QueueEditModel.messageOf(event.error)}); Cancel still puts the original back.`,
+            }),
           },
         },
       },
