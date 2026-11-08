@@ -213,8 +213,12 @@ describe('native preset seat with canonical Session drafts', () => {
     await b.seat.load()
     const settled = b.seat.store.getSnapshot()
     let notifications = 0
-    const stopNotifications = b.seat.store.subscribe(() => { notifications += 1 })
-    const stopApply = b.list.subscribe(() => { void b.seat.apply() })
+    const stopNotifications = b.seat.store.subscribe(() => {
+      notifications += 1
+    })
+    const stopApply = b.list.subscribe(() => {
+      void b.seat.apply()
+    })
     b.list.set({ ...b.list.getSnapshot(), [b.sessionId]: { sessionId: b.sessionId, local: true, preview: 'hello' } })
     await b.seat.apply()
     expect(b.seat.store.getSnapshot()).toBe(settled)
