@@ -76,3 +76,5 @@ module.
 - Sibling packages resolve `@dshfiles/<x>/dist`; a fresh thread workspace must run
   `pnpm exec turbo run build --filter='./plugins/@dshfiles/*'` once before per-plugin verification is meaningful.
 - The machine is shared: judge by paired A/B and medians, not single wall-clock runs.
+| workspace-nav | optimized | `reconcileManualOrder` rebuilt the archived-session Set once per Workspace (`220 x 2079` inserts) on every snapshot change in manual order | `orderedWorkspaces` 7.87 → 0.20 ms (39×), manual-order bundle 8.14 → 0.59 ms; 400 differential cases, 0 mismatches |
+| sidebar-right | optimized | `AddressableSeat` subscribed to the whole targets array, so one panel's visibility change re-rendered every panel | body renders per switch 16 → 4; switch median 2.17 → 0.96 ms (min 1.96 → 0.85) |
