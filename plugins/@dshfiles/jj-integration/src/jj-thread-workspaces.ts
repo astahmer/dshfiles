@@ -130,9 +130,24 @@ const knownCommitRevset = (commitId: string): string => `commit_id(${JSON.string
 
 const lines = (stdout: string): readonly string[] => stdout.split('\n').filter(line => line.length > 0)
 
-const parseRevisions = (stdout: string): Effect.Effect<readonly ThreadRevision[], JjFailed> => {
+/**
+ * Split the marked output of the merged workspace read back into its two halves, or undefined when a line carries
+ * neither mark. Pure, so the surrounding Effect program never branches inside a loop.
+ */
+const classifyMarkedRevisions = (marked: readonly string[]): { readonly unlanded: string[]; readonly behind: string[] } | undefined => {
+  const unlanded: string[] = []
+  const behind: string[] = []
+  for (const line of marked) {
+    if (line.startsWith('U\t')) unlanded.push(line.slice(2))
+    else if (line.startsWith('B\t')) behind.push(line.slice(2))
+    else return undefined
+  }
+  return { unlanded, behind }
+}
+
+const parseRevisionLines = (revisionLines: readonly string[]): Effect.Effect<readonly ThreadRevision[], JjFailed> => {
   const revisions: ThreadRevision[] = []
-  for (const line of lines(stdout)) {
+  for (const line of revisionLines) {
     const [changeId = '', commitId = '', conflict = '', ...description] = line.split('\t')
     if (changeId.length === 0 || !isCommitId(commitId) || (conflict !== 'true' && conflict !== 'false'))
       return Effect.fail(jjFailed('JJ returned incomplete revision metadata; refusing to continue.'))
@@ -140,6 +155,8 @@ const parseRevisions = (stdout: string): Effect.Effect<readonly ThreadRevision[]
   }
   return Effect.succeed(revisions)
 }
+
+const parseRevisions = (stdout: string): Effect.Effect<readonly ThreadRevision[], JjFailed> => parseRevisionLines(lines(stdout))
 
 interface LandRevision {
   readonly revision: ThreadRevision
@@ -334,6 +351,30 @@ const make = Effect.gen(function* () {
       ],
       cwd,
     ).pipe(Effect.flatMap(parseRevisions))
+
+  /**
+   * Both halves of a workspace's state from one `jj log`: the two revsets are disjoint, so the template marks each line
+   * with the half it came from. `latest(...)` keeps the behind count capped the way `-n` did without truncating the
+   * unlanded list, and one jj process per workspace instead of two, which halves the cost of a cold repository scan.
+   */
+  const threadRevisions = Effect.fnUntraced(function* (input: { readonly unlanded: string; readonly behind: string; readonly cwd: string }) {
+    const asTemplateString = (revset: string) => revset.replaceAll('\\', '\\\\').replaceAll('"', '\\"')
+    const output = yield* jj(
+      [
+        '--ignore-working-copy',
+        'log',
+        '--no-graph',
+        '-r',
+        `(${input.unlanded}) | latest(${input.behind}, ${MAX_BEHIND_REVISIONS + 1})`,
+        '-T',
+        `if(self.contained_in("${asTemplateString(input.unlanded)}"), "U\\t", "B\\t") ++ ${REVISION_TEMPLATE}`,
+      ],
+      input.cwd,
+    )
+    const classified = classifyMarkedRevisions(lines(output))
+    if (classified === undefined) return yield* jjFailed('JJ returned incomplete revision metadata; refusing to continue.')
+    return { unlanded: yield* parseRevisionLines(classified.unlanded), behind: yield* parseRevisionLines(classified.behind) }
+  })
 
   const readAtOperation = (args: readonly string[], cwd: string, operationId: string) => jj(['--at-operation', operationId, ...args], cwd)
 
@@ -659,17 +700,16 @@ const make = Effect.gen(function* () {
           const workspacePath = path.join(directory, name)
           const present = yield* exists(path.join(workspacePath, '.jj'))
           if (!present && !name.startsWith('thread-')) return undefined
-          const unlanded = yield* revisions(unlandedRevset(name, target), repoRoot, { observe: true })
-          const behind = yield* revisions(behindRevset(`${name}@`, target), repoRoot, { observe: true, maxRevisions: MAX_BEHIND_REVISIONS + 1 })
+          const state = yield* threadRevisions({ unlanded: unlandedRevset(name, target), behind: behindRevset(`${name}@`, target), cwd: repoRoot })
           return withRebaseMetadata(
             {
               name,
               path: workspacePath,
               repoRoot,
               missing: !present,
-              unlanded,
-              behind: behind.length > 0,
-              behindCount: Math.min(behind.length, MAX_BEHIND_REVISIONS),
+              unlanded: state.unlanded,
+              behind: state.behind.length > 0,
+              behindCount: Math.min(state.behind.length, MAX_BEHIND_REVISIONS),
             },
             rebaseMetadata[name],
           )
@@ -692,12 +732,8 @@ const make = Effect.gen(function* () {
   const status = Effect.fn('thread workspaces status')(function* (repoRoot: string, name: string) {
     const workspacePath = path.join(yield* threadsDirectory(repoRoot), name)
     const target = yield* targetRevset(workspacePath)
-    const [unlanded, behind, rebaseMetadata] = yield* Effect.all(
-      [
-        revisions(`(::@ ~ ::${target}) ~ empty()`, workspacePath, { observe: true }),
-        revisions(behindRevset('@', target), workspacePath, { observe: true, maxRevisions: MAX_BEHIND_REVISIONS + 1 }),
-        readRebaseMetadata(repoRoot),
-      ],
+    const [state, rebaseMetadata] = yield* Effect.all(
+      [threadRevisions({ unlanded: `(::@ ~ ::${target}) ~ empty()`, behind: behindRevset('@', target), cwd: workspacePath }), readRebaseMetadata(repoRoot)],
       { concurrency: 'unbounded' },
     )
     return withRebaseMetadata(
@@ -706,9 +742,9 @@ const make = Effect.gen(function* () {
         path: workspacePath,
         repoRoot,
         missing: !(yield* exists(path.join(workspacePath, '.jj'))),
-        unlanded,
-        behind: behind.length > 0,
-        behindCount: Math.min(behind.length, MAX_BEHIND_REVISIONS),
+        unlanded: state.unlanded,
+        behind: state.behind.length > 0,
+        behindCount: Math.min(state.behind.length, MAX_BEHIND_REVISIONS),
       },
       rebaseMetadata[name],
     )

@@ -523,7 +523,8 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
 
     expect(status).toMatchObject({ name: target.name, path: target.path, unlanded: [{ description: 'feat: target only' }] })
     expect(status).toEqual((await threads.list(repo)).find(thread => thread.name === target.name))
-    expect(invocations).toHaveLength(3)
+    // The bookmark's target and one `jj log` carrying both the unlanded and behind revsets, all inside the workspace.
+    expect(invocations).toHaveLength(2)
     expect(invocations.every(invocation => invocation.cwd === target.path && invocation.command === 'log')).toBe(true)
   })
 
