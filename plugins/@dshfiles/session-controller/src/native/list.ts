@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import { SessionQueryError, type SessionRecord, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import * as Schema from 'effect/Schema'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
@@ -109,6 +110,9 @@ export class ApiSessionList {
 
   /** Bumped on every invalidation so a read that started earlier cannot cache a corpus it predates. */
   private persistedGeneration = 0
+  private lastInvalidation: 'none' | 'created' | 'disposed' = 'none'
+  private createdInvalidations = 0
+  private disposedInvalidations = 0
 
   private readonly lifetime = new AbortController()
 
@@ -118,13 +122,15 @@ export class ApiSessionList {
    */
   constructor(private readonly ctx: Context, private readonly workSliceMs: number) {
     const forgetProjections = (session: Session): void => { this.coldProjections.delete(session.id) }
-    const forgetSession = (session: Session): void => {
+    ctx.on('session/created', session => {
       forgetProjections(session)
-      this.invalidatePersisted()
-    }
-    ctx.on('session/created', forgetSession)
+      this.invalidatePersisted('created')
+    })
     ctx.on('session/event', forgetProjections)
-    ctx.on('session/disposed', forgetSession)
+    ctx.on('session/disposed', session => {
+      forgetProjections(session)
+      this.invalidatePersisted('disposed')
+    })
     ctx.effect(() => () => { this.lifetime.abort() }, 'session-controller.list: stop a background corpus read')
     ctx.sessionProjections.register<'sessionListMetadata', SessionListMetadata>({
       key: 'sessionListMetadata',
@@ -176,6 +182,14 @@ export class ApiSessionList {
    * @returns visible Session summaries ordered by activity.
    */
   async list(request: SessionListRequest = {}, signal?: AbortSignal): Promise<SessionSummary[]> {
+    return withSpan('session list read', {}, async span => {
+    const cache = this.persisted !== undefined ? 'hit' : this.persistedRead !== undefined ? 'shared' : 'miss'
+    span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: {
+      corpus_cache: cache,
+      last_invalidation: this.lastInvalidation,
+      created_invalidations: this.createdInvalidations,
+      disposed_invalidations: this.disposedInvalidations,
+    } }))
     const selection = projectionSelectionOf(request.projections)
     signal?.throwIfAborted()
     const records = await this.persistedSessions(signal)
@@ -208,7 +222,9 @@ export class ApiSessionList {
     }
     signal?.throwIfAborted()
     items.sort((left, right) => right.updatedAt - left.updatedAt)
+    span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { records: records.length, cold_records: cold.length } }))
     return items
+    })
   }
 
   /**
@@ -226,8 +242,11 @@ export class ApiSessionList {
 
   private startPersistedRead(): Promise<readonly SessionRecord[]> {
     const generation = this.persistedGeneration
-    const read = this.ctx.sessionQuery.listSessions(this.lifetime.signal).then(records => {
-      if (this.persistedGeneration === generation) this.persisted = records
+    const read = withSpan('session corpus read', {}, async span => {
+      const records = await this.ctx.sessionQuery.listSessions(this.lifetime.signal)
+      const current = this.persistedGeneration === generation
+      if (current) this.persisted = records
+      span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { records: records.length, current } }))
       return records
     })
     this.persistedRead = read
@@ -240,7 +259,10 @@ export class ApiSessionList {
     return read
   }
 
-  private invalidatePersisted(): void {
+  private invalidatePersisted(reason: 'created' | 'disposed'): void {
+    this.lastInvalidation = reason
+    if (reason === 'created') this.createdInvalidations += 1
+    else this.disposedInvalidations += 1
     this.persisted = undefined
     this.persistedRead = undefined
     this.persistedGeneration += 1
