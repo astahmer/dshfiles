@@ -5,7 +5,7 @@
     {
       "id": "one-shared-stylesheet",
       "title": "One shared plugin stylesheet",
-      "summary": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner.",
+      "summary": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner. It also carries the touch platform baseline: no tap highlight or landscape text inflation, touch-action manipulation on controls, no long-press selection on control labels, and a 16px floor on fields under a coarse pointer so iOS never zooms into the composer.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",

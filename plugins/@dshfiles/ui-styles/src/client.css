@@ -9,6 +9,40 @@
 @source not '../../*/src/**/*.spec.tsx';
 @source not '../../*/**/*.md';
 
+/* Touch platform baseline: the tells that make the page feel like a website on a phone. Rules gate by capability,
+   never by width, so a touchscreen laptop and an iPad with a trackpad get what their input can do. */
+html {
+  /* iOS and Android paint a grey box over any tapped element with a click handler, on top of our own press states. */
+  -webkit-tap-highlight-color: transparent;
+  /* No font inflation when the phone turns to landscape. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* No double-tap-zoom wait before click, so a tap answers at once. */
+:where(button, a[href], summary, label, [role='button'], [role='tab'], [role='menuitem'], [role='option']) {
+  touch-action: manipulation;
+}
+
+/* A long press on a control must not select its label or open the link callout; content text stays selectable. */
+:where(button, [role='button'], [role='tab'], [role='menuitem']) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* iOS Safari zooms the page into any field under 16px and never zooms back out (the composer is 14px). The fix is
+   the size, never maximum-scale. !important because component sheets set field sizes with equal or higher
+   specificity, and this floor only applies to touch input. */
+@media (pointer: coarse) {
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
+  textarea,
+  select,
+  [contenteditable='true'] {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
 /* Shiki highlights with its `css-variables` theme: each token colour is `var(--shiki-token-*)`
    with no fallback, and the Web shell defines none of those variables, so every token inherited
    the plain text colour. Map every scope the theme emits onto the palette for both schemes;
