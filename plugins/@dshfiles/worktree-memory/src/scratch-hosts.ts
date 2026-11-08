@@ -126,9 +126,6 @@ const guardStop = (input: {
   return row.pgid === row.pid ? 'signal-group' : 'signal-tree'
 }
 
-export class ScratchHostDetector {
-  static readonly parsePs = ProcessTable.parsePs
-  static readonly decodeRecord = (text: string): Option.Option<ScratchRecord> => decodeRecordJson(text)
-  static readonly detect = detect
-  static readonly guardStop = guardStop
-}
+export const parsePs = ProcessTable.parsePs
+export const decodeRecord = (text: string): Option.Option<ScratchRecord> => decodeRecordJson(text)
+export { detect, guardStop }
