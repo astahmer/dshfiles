@@ -344,9 +344,11 @@ Then('the compact model picker stages its selection without creating an empty ch
       const trigger = page.getByRole('button').filter({ has: page.locator('[data-model-picker-text]') })
       await expect(trigger).toBeVisible()
       await trigger.click()
-      const alternate = page.getByRole('list', { name: 'Models grouped by provider' }).getByRole('button', { pressed: false }).first()
+      // The installed compact picker lists every account and model in one flat list; the chosen row is the pressed one.
+      const models = page.getByRole('list', { name: 'Models and accounts', exact: true })
+      const alternate = models.locator('[data-model-picker-option][aria-pressed="false"]').first()
       await expect(alternate).toBeVisible()
-      const chosenLabel = await alternate.locator('span').first().innerText()
+      const chosenLabel = await alternate.locator('[data-model-picker-name]').innerText()
       await alternate.click()
       await expect(page.locator('[data-model-picker-text]')).toHaveText(chosenLabel)
       await page.keyboard.press('Escape')
