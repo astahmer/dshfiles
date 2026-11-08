@@ -1,5 +1,5 @@
 import { SqliteClient, SqliteMigrator } from '@effect/sql-sqlite-node'
-import { type Context, Duration, Effect, FileSystem, Layer, Path, Schema, Semaphore } from 'effect'
+import { Context, Duration, Effect, Exit, FileSystem, Layer, Path, Schema, Scope, Semaphore } from 'effect'
 import { Reactivity } from 'effect/reactivity'
 import { Migrator, SqlClient, SqlSchema } from 'effect/sql'
 import { SqliteMigrationFailed, SqliteStoreOpenFailed, type SqliteStoreError, SqliteStoreVersionUnsupported } from './errors.ts'
@@ -179,6 +179,38 @@ const layerAs = <Self>(
 const layer = (options: SqliteStoreOptions): Layer.Layer<SqlClient.SqlClient, SqliteStoreError, FileSystem.FileSystem | Path.Path> =>
   layerAs(SqlClient.SqlClient, options)
 
+/**
+ * Defers one store on a plugin's own service until the first call needs it. `layer` opens the SQLite file, migrates
+ * it and builds the service; building that layer one activation earlier is what costs the Host its store heap before
+ * anything reads it. The deferred layer builds it inside the plugin's scope, so the connection closes when the plugin
+ * unloads, and a failed build is retried on the next call instead of caching the failure.
+ *
+ * The service must expose methods only: a property read cannot start the build, and a non-method property dies with
+ * a message naming it rather than silently resolving to a wrapper function.
+ */
+const deferred = <Self, Shape extends object, E, R>(service: Context.Service<Self, Shape>, layer: Layer.Layer<Self, E, R>): Layer.Layer<Self, E, R> =>
+  Layer.effect(
+    service,
+    Effect.gen(function* () {
+      const scope = yield* Effect.scope
+      const built = yield* Effect.cachedWithTTL(Layer.build(layer).pipe(Scope.provide(scope)), exit =>
+        Exit.isSuccess(exit) ? Duration.infinity : Duration.zero,
+      )
+      return new Proxy({} as Shape, {
+        get:
+          (_target, key) =>
+          (...args: ReadonlyArray<unknown>) =>
+            Effect.flatMap(built, context => {
+              const instance = Context.get(context, service)
+              const member: unknown = Reflect.get(instance as object, key)
+              if (typeof member !== 'function')
+                return Effect.die(new Error(`sqlite-store: ${service.key}.${String(key)} is not a method, so a deferred store cannot forward it`))
+              return (member as (...values: Array<unknown>) => Effect.Effect<unknown, E>).apply(instance, [...args])
+            }),
+      }) as Shape
+    }),
+  )
+
 export const SqliteStore = {
   /** Open, configure and migrate one SQLite file; the connection closes with the surrounding scope. */
   make,
@@ -186,4 +218,6 @@ export const SqliteStore = {
   layer,
   /** Provide the store under a plugin-owned service key, so one plugin can hold several databases. */
   layerAs,
+  /** Build a plugin's store service on the first call that needs it, instead of at activation. */
+  deferred,
 } as const

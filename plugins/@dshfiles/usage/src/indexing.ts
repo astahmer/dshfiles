@@ -88,7 +88,7 @@ export class Indexer extends Context.Service<
           touch: Ref.set(demand, Date.now()),
           demanded: Ref.get(demand).pipe(Effect.map(at => Date.now() - at <= DEMAND_WINDOW_MS)),
           status: Effect.gen(function* () {
-            const counts = yield* repo.counts
+            const counts = yield* repo.counts()
             const current = yield* Ref.get(outcome)
             const indexing = Option.isSome(yield* FiberHandle.get(running))
             return {

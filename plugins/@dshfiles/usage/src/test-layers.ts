@@ -7,9 +7,12 @@ import { UsageRepo } from './store.js'
 
 export const PlatformTest = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)
 
-/** A UsageRepo (and its SqlClient) over a fresh `:memory:` database per provide, or over `filename` when given. */
-export const usageRepoTest = (filename = ':memory:') =>
-  UsageRepo.layer.pipe(
+/** The production repo layer, opening a fresh `:memory:` database on its first read, or `filename` when given. */
+export const usageRepoTest = (filename = ':memory:') => UsageRepo.layerAt(filename)
+
+/** An eagerly opened client as well, for a test that also asserts raw rows. */
+export const usageRepoTestWithSql = (filename = ':memory:') =>
+  UsageRepo.layerOverClient.pipe(
     Layer.provideMerge(SqliteStore.layer({ filename, migrations: usageMigrations, legacyUserVersion: LEGACY_USER_VERSION })),
     Layer.provide(PlatformTest),
   )

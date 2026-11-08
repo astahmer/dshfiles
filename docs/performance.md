@@ -762,5 +762,27 @@ exploit; the session-log corpus is only 25 MB of the fixed heap; more transcript
 DOM is already windowed); hidden plugin panels are 300–700 nodes.
 
 Still open, with the measured size: lazy storage-domain hydration (67 MB, needs a fork of `dsh-storage-json`), lazy
-plugin SQLite (60.9 MB), per-session client state LRU (100–110 MB per tab), lazy Host halves for panel rows (80 MB,
-needs a dshx primitive or the plugin-manager facade), one shared Effect `HostContext` per activation (20–40 MB, est.).
+plugin SQLite (measured at 0.5 MB of heap per store, so ~2 MB across the four owned stores; see
+[Plugin SQLite opens](#plugin-sqlite-opens-measured-2026-11-08)), per-session client state LRU (100–110 MB per tab),
+lazy Host halves for panel rows (80 MB, needs a dshx primitive or the plugin-manager facade), one shared Effect
+`HostContext` per activation (20–40 MB, est.).
+
+### Plugin SQLite opens, measured (2026-11-08)
+
+The 60.9 MB attributed to lazy plugin SQLite does not reproduce as opening the files. Opening one store in isolation,
+with the same `@dshfiles/sqlite-store` layer, its migrations and its repository construction, costs **0.5 MB of heap**
+and 1.4–1.6 MB of RSS per store on this corpus: usage 0.5, traces 0.5, alerts 0.5, backlog 0.9 (including its item
+hydration), and the 173 MB session-search index 0.1 MB of heap / 1.1 MB of RSS because `node:sqlite` keeps its pages
+in native memory. Scratch boots from a pristine copy of the same 3.6 GB home agree: traces off 597 MB, usage off
+587 MB, backlog off 590 MB against 586 MB all on — inside the ±15 MB boot-to-boot noise.
+
+`session-search` is the only one of the four whose activation moves the needle: 495 MB of heap with it disabled against
+586 MB all on. That is **not** its SQLite store: the Host bundle (`dist/index.js`) contains no `node:sqlite` import and
+no `DatabaseSync`, and only `dist/search-worker.js` opens `index.sqlite`. The 90 MB is what registering the
+`sessionQuery` engine enables downstream, so attribute that separately before treating it as a store cost.
+
+`usage` is the one target whose store opened at activation with nothing reading it, so its repo now builds the store on
+the first read (`SqliteStore.deferred`, `usage/src/store.ts`): activation dropped from 0.5 MB to 0.1 MB of heap, and the
+first read pays 0.6 MB. `traces` stays eager on purpose: `RetentionWorker` prunes at boot, a write that needs the
+store. `backlog` hydrates every item, alias and lease into its in-memory view at activation (`BacklogStore.layer`), and
+`session-search`'s Host half never opens its index at all.

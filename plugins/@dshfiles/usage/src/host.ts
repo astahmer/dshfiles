@@ -7,7 +7,6 @@ import { dshxRegistryApi } from '@dshfiles/dshx/api'
 import { Api, DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { localOtlpEndpoint } from '@dshfiles/dshx/tracing'
-import { SqliteStore } from '@dshfiles/sqlite-store'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Clock, Effect, Layer, Option, Schedule, Schema } from 'effect'
 import { FetchHttpClient } from 'effect/http'
@@ -16,7 +15,6 @@ import { SessionLogFiles, SessionLogIndex } from './indexer.js'
 import { Indexer, ToolRegistry } from './indexing.js'
 import { recordJevUsage } from './jev-usage-recorder.js'
 import { observeLiveCall } from './live-calls.js'
-import { LEGACY_USER_VERSION, usageMigrations } from './migrations.js'
 import { OtlpExporter, OtlpMetricsExporter } from './otel-exporter.js'
 import { AccountKinds, Pricing } from './pricing.js'
 import { UsageRepo } from './store.js'
@@ -115,12 +113,7 @@ const UsageLive = Layer.unwrap(
       Layer.provideMerge(Indexer.layer({ sessionsRoot: root })),
       Layer.provideMerge(Layer.mergeAll(SessionLogIndex.layer, Pricing.layer({ catalogPath: DEFAULT_PRICING_PATH }))),
       Layer.provideMerge(UsageRepo.layer),
-      Layer.provide([
-        SessionLogFiles.layer,
-        ToolRegistryLive,
-        AccountKindsLive,
-        SqliteStore.layer({ filename: dshHomePath('plugins', 'usage', 'usage.db'), migrations: usageMigrations, legacyUserVersion: LEGACY_USER_VERSION }),
-      ]),
+      Layer.provide([SessionLogFiles.layer, ToolRegistryLive, AccountKindsLive]),
       Layer.provide([HostApis.layer, NodeFileSystem.layer, NodePath.layer]),
     ),
   ),
