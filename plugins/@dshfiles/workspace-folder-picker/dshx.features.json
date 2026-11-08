@@ -134,7 +134,7 @@
     {
       "id": "project-clone",
       "title": "Add a project by cloning a repository",
-      "summary": "New → Clone repository… in the Add workspace flow clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. A failed or cancelled job can be retried into the same folder as a new job. The project_clone, project_clone_jobs, project_clone_cancel and project_clone_retry agent tools drive the same jobs.",
+      "summary": "New → Clone repository… in the Add workspace flow clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. A failed or cancelled job can be retried into the same folder as a new job; a clone that failed after git started checking files out keeps that partial tree, and its retry clears it first. Closing the dialog does not hide a running or failed clone: a shell overlaid notice keeps its phase, Cancel and Retry on screen. The project_clone, project_clone_jobs, project_clone_cancel and project_clone_retry agent tools drive the same jobs.",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose workspace\"",
@@ -151,7 +151,7 @@
       "states": ["form", "cloning", "colocating", "registering", "succeeded", "failed", "cancelled", "retrying"],
       "failureModes": [
         "An existing destination folder is refused before anything runs; a second start for the same folder returns the running job.",
-        "A failed or cancelled clone deletes the folder it created and registers nothing; a failed jj colocation keeps the clone and names the command to finish it.",
+        "A failed clone before git checks files out deletes the folder it created and registers nothing; a clone that failed during or after checkout keeps its partial tree and names the retry that clears it, and a failed jj colocation keeps the clone and names the command to finish it.",
         "Clone jobs live in Host memory: a Host restart drops the trail, and a clone it interrupted leaves its partial folder."
       ],
       "externalDependencies": [
@@ -184,6 +184,18 @@
           "id": "workspace-folder-picker.clone-retry",
           "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
           "testName": "retries a failed clone into the same destination as a new job and refuses other states"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.clone-keeps-partial-checkout",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "keeps a checkout that failed after it started, then retries clean into the same folder"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.clone-notice",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/clone-jobs-notice.test.ts",
+          "testName": "announces running and undismissed failed clones, newest first and at most three"
         }
       ],
       "telemetry": [

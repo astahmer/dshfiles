@@ -12,6 +12,7 @@ import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { createWorkspacePickerPorts, ProjectFolderPicker, type DirectoryPickerPort, type WorkspacePickerPorts } from './picker/index.js'
 import { useState } from 'react'
 import { workspaceFolderBrowserApi } from './directory-browser-api.js'
+import { CloneJobsNoticeHost } from './clone-jobs-notice.js'
 import { ProjectCloneDialog } from './project-clone-dialog.js'
 import { ProjectCreateDialog } from './project-create-dialog.js'
 import { ProjectFolderSetup } from './project-folder-setup.js'
@@ -134,6 +135,17 @@ export default defineClient({
   inject: ['slots', 'remote', 'remote.directoryPicker', 'remote.workspace'],
   setup(ctx, decorate) {
     const ports = createWorkspacePickerPorts(ctx.remote)
+    // A clone outlives the dialog that started it; the shell overlay keeps its phase and retry on screen.
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register(
+        { name: 'shell.overlay', id: 'dshfiles-workspace-folder-picker-clones', order: 118 },
+        decorate(() => (
+          <PluginQueryProvider>
+            <CloneJobsNoticeHost />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
     ctx.slots.inject('settings.section', () =>
       ctx.slots.register(
         {

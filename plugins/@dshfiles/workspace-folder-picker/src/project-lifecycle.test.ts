@@ -208,6 +208,40 @@ describe.skipIf(!toolsAvailable)('project lifecycle against real git and jj', ()
     ),
   )
 
+  it.live('keeps a checkout that failed after it started, then retries clean into the same folder', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        let attempts = 0
+        const failAfterCheckout = (command: CommandInput) => {
+          if (command.argv[1] !== 'clone') return Option.none()
+          attempts += 1
+          if (attempts > 1) return Option.none()
+          return Option.some(
+            Effect.gen(function* () {
+              const fs = yield* FileSystem.FileSystem
+              const destination = command.argv.at(-1) ?? ''
+              yield* fs.makeDirectory(destination).pipe(Effect.orDie)
+              yield* fs.writeFileString(join(destination, 'half.txt'), 'partial').pipe(Effect.orDie)
+              yield* command.onStderr?.('Checking out files:  50% (1/2)\r') ?? Effect.void
+              return { exitCode: 1, stdout: '', stderr: 'fatal: the remote end hung up unexpectedly' }
+            }).pipe(Effect.provide(NodeServices.layer)),
+          )
+        }
+        const { root, origin, registered, jobs, fs } = yield* lifecycle({ installed: ['git', 'jj'], fakeCommand: failAfterCheckout })
+        const failed = yield* settled(jobs, (yield* jobs.start({ repositoryUrl: `file://${origin}`, parentPath: root, name: 'kept' })).id)
+        expect(failed.state).toBe('failed')
+        expect(failed.error).toMatch(/partial checkout is kept/u)
+        expect(yield* fs.exists(join(root, 'kept', 'half.txt'))).toBe(true)
+        expect(registered).toEqual([])
+        const retried = yield* jobs.retry(failed.id)
+        const succeeded = yield* settled(jobs, retried.id)
+        expect(succeeded.state).toBe('succeeded')
+        expect(yield* fs.exists(join(root, 'kept', 'half.txt'))).toBe(false)
+        expect(registered).toEqual([join(root, 'kept')])
+      }),
+    ),
+  )
+
   it.live('cancels a running clone, deletes its partial folder and never registers it', () =>
     Effect.scoped(
       Effect.gen(function* () {

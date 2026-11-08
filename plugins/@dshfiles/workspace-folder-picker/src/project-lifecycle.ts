@@ -367,6 +367,23 @@ export class CloneJobs extends Context.Service<
             state: { state: 'cancelled', phase: current.state.phase, progress: { ...current.state.progress, message: 'Cancelled' } },
           }))
         })
+        // Git's checkout stage is the point where the destination holds a real (if incomplete) tree: keep it so the
+        // user can look at what landed, and let retry clear and reuse the same destination.
+        const failClone = (error: string) =>
+          Effect.gen(function* () {
+            const stored = (yield* Ref.get(jobs)).get(job.id)
+            const keptPartial = stored?.state.progress.stage === 'checkout'
+            if (!keptPartial) yield* discardFolder
+            yield* finish((current, at) => ({
+              ...current,
+              finishedAt: at,
+              state: {
+                ...current.state,
+                state: 'failed',
+                error: keptPartial ? `${error} The partial checkout is kept at ${current.path}; retrying this clone clears it and starts again.` : error,
+              },
+            }))
+          })
 
         return Effect.gen(function* () {
           const cloned = yield* commands
@@ -381,22 +398,8 @@ export class CloneJobs extends Context.Service<
               },
             })
             .pipe(Effect.timeoutOption(CLONE_TIMEOUT))
-          if (Option.isNone(cloned)) {
-            yield* discardFolder
-            return yield* finish((current, at) => ({
-              ...current,
-              finishedAt: at,
-              state: { ...current.state, state: 'failed', error: 'The clone took longer than 30 minutes and was stopped.' },
-            }))
-          }
-          if (cloned.value.exitCode !== 0) {
-            yield* discardFolder
-            return yield* finish((current, at) => ({
-              ...current,
-              finishedAt: at,
-              state: { ...current.state, state: 'failed', error: excerpt(cloned.value.stderr) || 'git clone failed.' },
-            }))
-          }
+          if (Option.isNone(cloned)) return yield* failClone('The clone took longer than 30 minutes and was stopped.')
+          if (cloned.value.exitCode !== 0) return yield* failClone(excerpt(cloned.value.stderr) || 'git clone failed.')
           if (Option.isSome(input.jj)) {
             yield* transition(job.id, current => ({
               ...current,
@@ -485,6 +488,8 @@ export class CloneJobs extends Context.Service<
         if (found.state.state === 'running' || found.state.state === 'succeeded') {
           return yield* new CloneNotRetryable({ jobId, state: found.state.state })
         }
+        // A failure after checkout kept git's incomplete tree; it is this job's own destination, so a retry clears it.
+        if (found.state.progress.stage === 'checkout') yield* fs.remove(found.path, { recursive: true, force: true }).pipe(Effect.ignore)
         return yield* start({ repositoryUrl: found.repositoryUrl, parentPath: dirname(found.path), name: basename(found.path) })
       })
 

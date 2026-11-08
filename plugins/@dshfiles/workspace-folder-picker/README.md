@@ -37,6 +37,10 @@ picker learns the Host's style from the capability read, or else from the home
 folder the Host lists. On macOS and Linux, and before the style is known, drive,
 UNC and `~\` text stays a project search, as it always was.
 
+The cross-plugin onboarding behavior, its trust boundary and the full
+verification list live in
+[project onboarding](../../../docs/project-onboarding.md).
+
 ## Inspect a folder before adding it
 
 Choosing a folder opens one step that says what it is, instead of registering it blind:
@@ -61,14 +65,17 @@ folder `<parent>/<name>` on this machine. The clone runs as a background Host
 job: `git clone --progress` feeds the progress bar, **Cancel clone** stops it
 and deletes the partial folder, then `jj git init --colocate` runs when jj is
 installed and the clone is registered as a project and selected. Closing the
-dialog leaves the job running; it still registers the project when it ends.
+dialog does not hide the job: a shell notice keeps its phase, **Cancel clone**
+and **Retry clone** on screen, and it still registers the project when it ends.
 
 The progress row follows git's own stages (connecting, counting, receiving,
 resolving, checkout) next to the percent, and a failed or cancelled clone shows
 **Retry clone**, which starts a fresh job for the same repository and folder.
 
-A failed clone never leaves a partial checkout: the folder it made is removed,
-so a retry (or the form again) finds the destination free.
+A failure before Git checks files out removes the folder it made, so a retry
+(or the form again) finds the destination free. A failure during or after
+checkout keeps the partial tree, says that retrying clears it, and **Retry
+clone** removes only that incomplete checkout before starting again.
 
 The same jobs are agent tools: `project_clone` (URL, parent folder, folder
 name), `project_clone_jobs` (read-only trail, newest first),
