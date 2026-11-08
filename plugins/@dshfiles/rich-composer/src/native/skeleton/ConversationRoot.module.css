@@ -227,42 +227,75 @@ button.crumbEditable {
 }
 
 /* Phone shell (thread-sidebar marks the document with data-shell-phone-nav):
-   secondary thread controls marked data-phone-thread-tool (the view tabs, the
-   right-panel opener, the composer's annotation picker and change ribbon) fold
-   behind one toggle so the narrow header and composer stop overlapping. The
-   toggle sets data-phone-thread-tools on the document (phone-thread-tools.ts). */
-.phoneToolsToggle {
-  display: none;
+   the title row keeps only a menu button. Opening it drops a drawer under the
+   title with the view tabs, header actions, utilities and the right-panel
+   opener, and reveals the controls other plugins mark data-phone-thread-tool
+   (the composer's annotation picker and change ribbon). The button sets
+   data-phone-thread-tools on the document (phone-thread-tools.ts). */
+.phoneMenuToggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: 8px;
+  margin-right: -16px;
+  padding: 0;
+  border: none;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.phoneMenuToggle[aria-expanded='true'] {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.phoneMenu {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 8px;
+  padding-bottom: 10px;
+}
+
+.phoneMenu .tabs {
+  gap: 24px;
+  margin-top: 0;
+  padding-bottom: 0;
+  overflow-x: auto;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.phoneMenuRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.phoneMenuRow > .headerUtilities {
+  flex-wrap: wrap;
+  margin-left: 0;
+}
+
+.phoneMenuRow > .headerActions {
+  flex-wrap: wrap;
+}
+
+.phoneMenuRow > .headerCorner {
+  margin: 0 0 0 auto;
 }
 
 @media (max-width: 639.98px) {
-  :global(html[data-shell-phone-nav]) .phoneToolsToggle {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    margin-left: auto;
-    padding: 0;
-    border: none;
-    border-radius: var(--dsw-radius-md);
-    background: transparent;
-    color: var(--dsw-alias-label-tertiary);
-    cursor: pointer;
-  }
-
-  :global(html[data-shell-phone-nav]) .phoneToolsToggle[aria-expanded='true'] {
-    color: var(--dsw-alias-state-business-primary);
-  }
-
   :global(html[data-shell-phone-nav]:not([data-phone-thread-tools])) :global([data-phone-thread-tool]) {
     display: none !important;
-  }
-
-  :global(html[data-shell-phone-nav]:not([data-phone-thread-tools])) .header:has(.tabs[data-phone-thread-tool]) {
-    min-height: 0;
-    padding-bottom: 10px;
   }
 }
 

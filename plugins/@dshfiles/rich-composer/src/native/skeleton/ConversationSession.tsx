@@ -9,7 +9,7 @@ import type {
 } from '../contract/slots.ts'
 import { resolveActiveView } from '../view-selection.ts'
 import { DefaultConversationViews } from './DefaultConversationViews.tsx'
-import { togglePhoneThreadTools, usePhoneThreadToolsOpen } from './phone-thread-tools.ts'
+import { togglePhoneThreadTools, usePhoneShell, usePhoneThreadToolsOpen } from './phone-thread-tools.ts'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the strict session body contract. */
@@ -124,6 +124,7 @@ export function ConversationSessionHeader({
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
+  const phone = usePhoneShell()
   const phoneToolsOpen = usePhoneThreadToolsOpen()
   const [renaming, setRenaming] = useState(false)
   const [renameError, setRenameError] = useState<string>()
@@ -143,8 +144,42 @@ export function ConversationSessionHeader({
     }
   }
   const showTabs = !hideChrome && tabs.length > 1
-  // A view other than the first stays reachable on a phone: its strip never folds away while it is selected.
-  const foldTabs = active === undefined || active.id === tabs[0]?.id
+  const phoneMenu = phone && !hideChrome
+  // A selected view other than the first keeps its strip on a phone, so the way back to it is never hidden.
+  const secondaryViewActive = active !== undefined && active.id !== tabs[0]?.id
+  const tabStrip = (
+    // data-conversation-tabs: marks the tab strip, which the window-chrome
+    // geometry and the browser coverage lane anchor on.
+    <div className={css.tabs} role="tablist" data-conversation-tabs="">
+      {tabs.map(viewTab => (
+        <button
+          key={viewTab.id}
+          type="button"
+          role="tab"
+          aria-selected={viewTab.id === active?.id}
+          className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
+          onClick={() => { selectView(viewTab.id) }}
+        >
+          {viewTab.label}
+        </button>
+      ))}
+    </div>
+  )
+  const headerActions = (
+    <div className={css.headerActions}>
+      {renderSlot('conversation.session.header.actions', {})}
+    </div>
+  )
+  const headerUtilities = (
+    <div className={css.headerUtilities}>
+      {renderSlot('conversation.session.header.utilities', {})}
+    </div>
+  )
+  const headerCorner = (
+    <div className={css.headerCorner} data-conversation-header-corner="">
+      {renderSlot('conversation.session.header.corner', {})}
+    </div>
+  )
   return (
     <>
       <div className={css.titleRow}>
@@ -231,53 +266,45 @@ export function ConversationSessionHeader({
                 })}
                 {ancestry.length === 0 && <span className={css.crumbCurrent}>{sessionId}</span>}
               </nav>
-              <div className={css.headerActions}>
-                {renderSlot('conversation.session.header.actions', {})}
-              </div>
+              {!phoneMenu && headerActions}
             </div>
-            <div className={css.headerUtilities}>
-              {renderSlot('conversation.session.header.utilities', {})}
-            </div>
+            {!phoneMenu && headerUtilities}
           </>
         )}
-        {!hideChrome && (
-          <button
-            type="button"
-            className={css.phoneToolsToggle}
-            aria-label={t('session.phoneTools')}
-            aria-expanded={phoneToolsOpen}
-            data-phone-thread-tools-toggle=""
-            onClick={togglePhoneThreadTools}
-          >
-            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
-              <path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none" />
-              <circle cx="10.5" cy="4.5" r="1.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
-              <circle cx="5.5" cy="11.5" r="1.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
-            </svg>
-          </button>
-        )}
-        <div className={css.headerCorner} data-conversation-header-corner="" data-phone-thread-tool="">
-          {renderSlot('conversation.session.header.corner', {})}
-        </div>
-      </div>
-      {showTabs && (
-        // data-conversation-tabs: marks the tab strip, which the window-chrome
-        // geometry and the browser coverage lane anchor on.
-        <div className={css.tabs} role="tablist" data-conversation-tabs="" data-phone-thread-tool={foldTabs ? '' : undefined}>
-          {tabs.map(viewTab => (
+        {phoneMenu
+          ? (
             <button
-              key={viewTab.id}
               type="button"
-              role="tab"
-              aria-selected={viewTab.id === active?.id}
-              className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-              onClick={() => { selectView(viewTab.id) }}
+              className={css.phoneMenuToggle}
+              aria-label={t('session.phoneTools')}
+              aria-expanded={phoneToolsOpen}
+              data-phone-thread-tools-toggle=""
+              onClick={togglePhoneThreadTools}
             >
-              {viewTab.label}
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
+                <path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none" />
+              </svg>
             </button>
-          ))}
-        </div>
-      )}
+          )
+          : !phone && headerCorner}
+      </div>
+      {phoneMenu
+        ? (
+          <>
+            {showTabs && secondaryViewActive && !phoneToolsOpen && tabStrip}
+            {phoneToolsOpen && (
+              <div className={css.phoneMenu} role="group" aria-label={t('session.phoneTools')} data-phone-thread-menu="">
+                {showTabs && tabStrip}
+                <div className={css.phoneMenuRow}>
+                  {headerActions}
+                  {headerUtilities}
+                  {headerCorner}
+                </div>
+              </div>
+            )}
+          </>
+        )
+        : showTabs && tabStrip}
     </>
   )
 }

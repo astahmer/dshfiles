@@ -12,6 +12,8 @@
 
 ![The same run row when it cannot hold the model seat: the chips keep one line and the model sits in the input card beside Send](docs/screenshots/composer-run-row-tool-row.png)
 
+![On a phone the thread header keeps one menu button; opening it shows the view tabs, header actions, utilities and the right-panel opener](docs/screenshots/phone-thread-menu.png)
+
 Owned fork of DSH's native Conversation client plugin. It preserves the full native shell, services, Slots and composer, while recognizing canonical session-reference wire text on paste and inserting it as a structured reference chip. Plain text is preferred; when only HTML is available, session-link anchors are converted to canonical mention text and other markup is reduced to safe text.
 
 ## Conversation header in Workbench
@@ -111,3 +113,7 @@ pnpm --dir plugins/@dshfiles/rich-composer build
 ```
 
 The web profile seed includes this package. Its patch replaces the loaded native plugin, so only the user's restart of the live `web` profile can activate the change. Do not restart it from plugin work.
+
+## Phone thread menu
+
+In the phone shell (thread-sidebar marks the document with `data-shell-phone-nav`), the conversation title row keeps only a menu button. Opening it shows a drawer under the title with the Chat / Trajectory / Traces / Requests tabs, `conversation.session.header.actions`, `conversation.session.header.utilities` and the corner (right-panel opener). Controls owned by other plugins opt in with `data-phone-thread-tool` and stay hidden on a phone until the menu is open: the jujutsu change ribbon and the annotations picker use it. When a view other than Chat is selected, its tab strip stays visible with the menu closed so Chat is always one tap away. The open state is the `data-phone-thread-tools` attribute on the document, shared by every mounted header ([phone-thread-tools.ts](src/native/skeleton/phone-thread-tools.ts)).

@@ -309,37 +309,54 @@ describe('fixed Conversation content factory composition', () => {
     expect(titleInput()).toBeNull()
   })
 
-  it('folds secondary thread tools behind the phone toggle, but never the strip of a selected secondary view', () => {
-    const chat = fixture('tools-chat')
-    const other = fixture('tools-other', 'other')
+  it('moves the header controls into a phone menu, but keeps the strip of a selected secondary view', async () => {
+    const slotMarker: ConversationSessionHeaderSlotProps['renderSlot'] = name => <span data-test-slot={name} />
+    const chat = fixture('menu-chat')
+    const other = fixture('menu-other', 'other')
     const element = document.createElement('div')
     document.body.append(element)
     const root = createRoot(element)
     dispose.push(() => act(() => root.unmount()))
-    dispose.push(() => document.documentElement.removeAttribute('data-phone-thread-tools'))
+    dispose.push(() => {
+      document.documentElement.removeAttribute('data-shell-phone-nav')
+      document.documentElement.removeAttribute('data-phone-thread-tools')
+    })
     act(() =>
       root.render(
         <>
-          <section data-bound-session="tools-chat">
-            <ConversationSessionHeader {...chat.header} />
+          <section data-bound-session="menu-chat">
+            <ConversationSessionHeader {...chat.header} renderSlot={slotMarker} />
           </section>
-          <section data-bound-session="tools-other">
-            <ConversationSessionHeader {...other.header} />
+          <section data-bound-session="menu-other">
+            <ConversationSessionHeader {...other.header} renderSlot={slotMarker} />
           </section>
         </>,
       ),
     )
-    const tabs = (session: string) => element.querySelector(`[data-bound-session="${session}"] [data-conversation-tabs]`)
-    expect(tabs('tools-chat')?.hasAttribute('data-phone-thread-tool')).toBe(true)
-    expect(tabs('tools-other')?.hasAttribute('data-phone-thread-tool')).toBe(false)
-    expect(element.querySelector('[data-bound-session="tools-chat"] [data-conversation-header-corner]')?.hasAttribute('data-phone-thread-tool')).toBe(true)
-    const toggles = element.querySelectorAll<HTMLButtonElement>('[data-phone-thread-tools-toggle]')
-    expect(Array.from(toggles, toggle => toggle.getAttribute('aria-expanded'))).toEqual(['false', 'false'])
-    act(() => toggles[0]?.click())
+    const inChat = (selector: string) => element.querySelector(`[data-bound-session="menu-chat"] ${selector}`)
+    const inOther = (selector: string) => element.querySelector(`[data-bound-session="menu-other"] ${selector}`)
+    const utilities = '[data-test-slot="conversation.session.header.utilities"]'
+    expect(inChat(utilities)).not.toBeNull()
+    expect(inChat('[data-phone-thread-tools-toggle]')).toBeNull()
+
+    await act(async () => document.documentElement.setAttribute('data-shell-phone-nav', ''))
+    expect(inChat(utilities)).toBeNull()
+    expect(inChat('[data-test-slot="conversation.session.header.corner"]')).toBeNull()
+    expect(inChat('[data-conversation-tabs]')).toBeNull()
+    expect(inOther('[data-conversation-tabs]')).not.toBeNull()
+
+    const toggle = inChat('[data-phone-thread-tools-toggle]')
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false')
+    act(() => (toggle instanceof HTMLButtonElement ? toggle.click() : undefined))
     expect(document.documentElement.hasAttribute('data-phone-thread-tools')).toBe(true)
-    expect(Array.from(toggles, toggle => toggle.getAttribute('aria-expanded'))).toEqual(['true', 'true'])
-    act(() => toggles[1]?.click())
-    expect(document.documentElement.hasAttribute('data-phone-thread-tools')).toBe(false)
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true')
+    for (const slot of ['actions', 'utilities', 'corner'])
+      expect(inChat(`[data-phone-thread-menu] [data-test-slot="conversation.session.header.${slot}"]`)).not.toBeNull()
+    expect(inChat('[data-phone-thread-menu] [data-conversation-tabs]')).not.toBeNull()
+    expect(element.querySelectorAll('[data-bound-session="menu-other"] [data-conversation-tabs]')).toHaveLength(1)
+
+    act(() => (toggle instanceof HTMLButtonElement ? toggle.click() : undefined))
+    expect(inChat('[data-phone-thread-menu]')).toBeNull()
   })
 
   it('selects native child views independently in two fixed Sessions without replacing either editor', () => {

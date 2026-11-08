@@ -5,7 +5,7 @@
     {
       "id": "workbench-conversation-views",
       "title": "Dock an independently bound Conversation view",
-      "summary": "Restore existing independently bound Conversation views without an extra composer. Per-thread occurrences remain addressable for saved layouts but are excluded from reusable view pickers. Fixed conversations also render the original authorized header through the owned public Factory: a single native header declaration, original session-targeted controls and native per-session child-view selection over the same resident editor. Native main mode shares the renderer; the Workbench-only host-corner clearance prevents row recovery from covering the original toolbar. In the phone shell (data-shell-phone-nav) one Thread tools toggle folds the controls marked data-phone-thread-tool (Chat-view tabs, the right-panel opener, the composer annotation picker and change ribbon) until it is opened; a selected secondary view keeps its tab strip.",
+      "summary": "Restore existing independently bound Conversation views without an extra composer. Per-thread occurrences remain addressable for saved layouts but are excluded from reusable view pickers. Fixed conversations also render the original authorized header through the owned public Factory: a single native header declaration, original session-targeted controls and native per-session child-view selection over the same resident editor. Native main mode shares the renderer; the Workbench-only host-corner clearance prevents row recovery from covering the original toolbar. In the phone shell (data-shell-phone-nav) the title row keeps one menu button: opening it shows the view tabs, header actions, utilities and the right-panel opener, and reveals controls other plugins mark data-phone-thread-tool (the composer annotation picker and change ribbon); a selected secondary view keeps its tab strip.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -43,9 +43,9 @@
         },
         {
           "kind": "unit-test",
-          "id": "rich-composer.phone-thread-tools",
+          "id": "rich-composer.phone-thread-menu",
           "file": "plugins/@dshfiles/rich-composer/src/conversation-composition.test.tsx",
-          "testName": "folds secondary thread tools behind the phone toggle, but never the strip of a selected secondary view"
+          "testName": "moves the header controls into a phone menu, but keeps the strip of a selected secondary view"
         },
         {
           "kind": "unit-test",
