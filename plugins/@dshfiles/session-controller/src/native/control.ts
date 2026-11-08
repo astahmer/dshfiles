@@ -79,7 +79,13 @@ export class SessionControlController {
   }
 }
 
-class ControlQueue {
+export class ControlQueue {
+  /**
+   * A control frame is a replacement, so a client that reads slowly must not make the Host keep every change it missed:
+   * the queue holds a bounded window and drops the oldest frames, and the newest value for a cell always survives.
+   * Measured on the live Host: a connected client held gigabytes of queued frames while a long turn streamed updates.
+   */
+  private static readonly MAX_PENDING = 4_096
   private readonly buffer = new Deque<SessionControlFrame>()
   private wake: (() => void) | undefined
   private done = false
@@ -87,6 +93,7 @@ class ControlQueue {
   push(frame: SessionControlFrame): void {
     if (this.done) return
     this.buffer.pushBack(frame)
+    while (this.buffer.size > ControlQueue.MAX_PENDING) this.buffer.popFront()
     const wake = this.wake
     this.wake = undefined
     wake?.()
