@@ -12,6 +12,7 @@ import { MAX_PROMPTS, MAX_PROMPT_TEXT_LENGTH, type SavedPrompt } from './library
 import { usePromptLibrary, type PromptLibraryClient } from './library-client.js'
 import { PromptEditorForm, type PromptEditorSubmission } from './prompt-editor-form.js'
 import { promptLibraryMachine, type PromptLibraryWorkflowClient } from './prompt-library-machine.js'
+import { promptSearchFilter } from './prompt-search.js'
 import { useDraftAttachmentRetention, type DraftAttachmentKeeper } from './draft-attachment-retention.js'
 
 const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeeper: DraftAttachmentKeeper<PromptActionProps['sessionId']> }): JSX.Element => {
@@ -188,7 +189,7 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
             {recentPrompts.length === 0 ? (
               emptyLine('No sent text prompts are loaded from this conversation.')
             ) : (
-              <Command className="dshx:rounded-none dshx:bg-transparent">
+              <Command className="dshx:rounded-none dshx:bg-transparent" filter={promptSearchFilter}>
                 <CommandInput placeholder="Search recent messages" />
                 <CommandList className="dshx:max-h-80 dshx:p-1">
                   <CommandEmpty className="dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">No matches.</CommandEmpty>
@@ -217,7 +218,7 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
               prompts.length === 0 ? (
                 emptyLine('Save a text prompt to reuse it later.')
               ) : (
-                <Command className="dshx:rounded-none dshx:bg-transparent">
+                <Command className="dshx:rounded-none dshx:bg-transparent" filter={promptSearchFilter}>
                   <CommandInput placeholder="Search saved prompts" />
                   <CommandList className="dshx:max-h-80 dshx:p-1">
                     <CommandEmpty className="dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">No matches.</CommandEmpty>
