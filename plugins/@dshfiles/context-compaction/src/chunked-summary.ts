@@ -17,7 +17,8 @@ export interface SummarizeInput {
 
 const budgetMessages = {
   'unmatched-tool-call': 'Compaction input ends with an unmatched tool call.',
-  'prefix-too-large': 'The system prompt and tools exceed the safe compaction request budget.',
+  'prefix-too-large':
+    'The system prompt and tools exceed the safe compaction request budget. Choose a model route with a larger declared context window, or reduce the enabled tools.',
   'unit-too-large': 'One indivisible conversation or tool-call unit exceeds the safe compaction request budget.',
   'overflow-merge-too-large': 'The overflow summaries exceed the safe request budget and cannot be merged.',
   'summaries-irreducible': 'Compaction summaries cannot be reduced within the safe request budget.',
