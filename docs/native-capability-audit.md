@@ -23,6 +23,10 @@ The following observations are from the `dsh-v0.2.2-rc.1` tag, not master. They 
 - Its [OTel contract](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/telemetry/otel/README.md) describes consumer-owned redaction and best-effort, memory-only reporting without a durable outbox.
 - Its [session controller](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/api/session-controller/src/index.ts) exposes separate event, state and projection observation. That alone does not prove parity with the local bounded history or browser filtering.
 
+### Candidate: native session wait
+
+The installed [0.2.1 controller](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.2/packages/api/session-controller/src/index.ts) does not expose the newer wait method. The [0.2.2 candidate](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-rc.1/packages/api/session-controller/src/state/controller.ts) is not a drop-in replacement for our [wait adapter](../plugins/@dshfiles/session-controller/src/sessions-host.ts): it can return immediately for input-required, observes cold sessions and has different missing-session and timeout semantics. The local API waits for both agent idleness and empty inboxes and permits timeout zero. Its [MCP consumer](../plugins/@dshfiles/mcp-endpoint/src/mcp-tools.ts) relies on this contract. Any migration needs queue, question, timeout, cold-session, cancellation and agent-replacement tests; a naive retry on input-required could spin. No reduction is established.
+
 ## Upgrade gates
 
 The [0.2.2-rc.1 release notes](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.2-rc.1) describe Node and Cordis changes, async projection registration, tool execution changes and a changed SSH helper protocol. They also describe changed file-observation and Web Fetch defaults. Verify equivalent protection and deployment egress policy rather than assuming security defaults match. The release summary starts after our pinned release; inspect intermediate changes too.
