@@ -55,6 +55,7 @@
     "src/native/input/machine.test.ts",
     "src/native/input/retained-send.test.ts",
     "src/native/input/retained-send.ts",
-    "src/native/skeleton/run-row-placement.ts"
+    "src/native/skeleton/run-row-placement.ts",
+    "src/native/skeleton/phone-thread-tools.ts"
   ]
 }
