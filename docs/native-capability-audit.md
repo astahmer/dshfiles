@@ -1,6 +1,6 @@
 # Native DSH capability audit
 
-Snapshot: 2026-11-08. This is a partial source-and-document review, not runtime certification. The configured baseline is DSH 0.2.1-rc.2. The npm `latest` response was 0.2.2-rc.1, a prerelease; the upstream source references below are pinned to master commit `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159`, not necessarily that release. Latest stable and intermediate releases were not verified. No code removal or measured performance improvement follows from this review alone.
+Snapshot: 2026-11-08. This is a partial source-and-document review, not runtime certification. The configured baseline is DSH 0.2.1-rc.2. The npm `latest` response was 0.2.2-rc.1, a prerelease; the upstream source references below are pinned to master commit `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159`, not necessarily that release. GitHub's [latest stable release endpoint](https://api.github.com/repos/deepseek-ai/deepseek-harness/releases/latest) returned 404 on this date; that does not establish that no stable package or tag exists. No code removal or measured performance improvement follows from this review alone.
 
 ## Findings
 
@@ -35,7 +35,7 @@ The installed [conversation registry](https://github.com/deepseek-ai/deepseek-ha
 
 ## Upgrade gates
 
-The [0.2.2-rc.1 release notes](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.2-rc.1) describe Node and Cordis changes, async projection registration, tool execution changes and a changed SSH helper protocol. They also describe changed file-observation and Web Fetch defaults. Verify equivalent protection and deployment egress policy rather than assuming security defaults match. The release summary starts after our pinned release; inspect intermediate changes too.
+The [0.2.2-rc.1 release notes](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.2-rc.1) describe Node and Cordis changes, async projection registration, tool execution changes and a changed SSH helper protocol. They also describe changed file-observation and Web Fetch defaults. Verify equivalent protection and deployment egress policy rather than assuming security defaults match. The release summary starts after our pinned release: [0.2.1-rc.3](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.3), [rc.4](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.4) and [rc.5](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.5) also require review for migration-relevant changes.
 
 Before removing a local implementation, boot an isolated profile with the exact candidate release and no private state; compare authorization, replay and ordering, queue limits, cold history, crash recovery, browser interactions and representative latency. Change one adapter at a time and retain a tested rollback path. Concrete upstream requests include bounded browser-safe session events and projections, additive chat/tool slots, off-thread incremental search and explicit durable delivery/lease contracts.
 
