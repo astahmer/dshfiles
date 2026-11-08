@@ -11,7 +11,5 @@ export const sameThreadRows = (left: readonly ThreadRow[], right: readonly Threa
   left.length === right.length &&
   left.every((row, index) => {
     const other = right[index]
-    return (
-      other !== undefined && row.id === other.id && row.displayTitle === other.displayTitle && row.cwd === other.cwd && row.updatedAt === other.updatedAt
-    )
+    return other !== undefined && row.id === other.id && row.displayTitle === other.displayTitle && row.cwd === other.cwd && row.updatedAt === other.updatedAt
   })

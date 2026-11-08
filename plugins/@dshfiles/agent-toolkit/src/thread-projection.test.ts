@@ -8,7 +8,12 @@ const rows: readonly ThreadRow[] = [
 
 describe('toolkit thread projection equality', () => {
   it('accepts the same rows in the same order', () => {
-    expect(sameThreadRows(rows, rows.map(row => ({ ...row })))).toBe(true)
+    expect(
+      sameThreadRows(
+        rows,
+        rows.map(row => ({ ...row })),
+      ),
+    ).toBe(true)
     expect(sameThreadRows([], [])).toBe(true)
   })
 
