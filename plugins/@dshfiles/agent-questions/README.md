@@ -42,7 +42,9 @@ for a root Agent, or filters to one exact `sessionId`. It also lists durable
 pending questions from the caller's own direct children. Non-root Agents see only
 their direct-child questions and cannot scan native Sessions; root Agents can
 inspect native forms in child Sessions. The inventory uses SessionQuery
-projections and the parent-question store, not transcripts. It reports options and recommendation markers, open
+projections and the parent-question store, not transcripts. Live Sessions come
+from the Session store, so the default live-only inventory never lists the
+persisted corpus; only `includeStopped` reads it. It reports options and recommendation markers, open
 versus continued state, blocking/timed mode, answerability, and a page of results
 (`offset`/`limit`). Root inventory scans Session projections with bounded
 concurrency before paginating. Reading every Session is the expensive part — a

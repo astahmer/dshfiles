@@ -53,7 +53,10 @@ const mountedQuestions = Effect.gen(function* () {
       roots: () => [root],
       isOwnedBy: (childId: string, parent: TestAgent) => parentOf.get(childId) === parent.id,
     },
-    sessions: { get: (id: string) => (agents.has(id) ? { header: { cwd: workspace, parentSession: parentOf.get(id) } } : undefined) },
+    sessions: {
+      list: () => [...agents.values()],
+      get: (id: string) => (agents.has(id) ? { header: { cwd: workspace, parentSession: parentOf.get(id) } } : undefined),
+    },
     sessionProjections: { register: () => () => undefined },
     sessionQuery: { listSessions: async () => [], observeSession: async () => Promise.reject(new Error('no session log in this test')) },
     subagents: {
