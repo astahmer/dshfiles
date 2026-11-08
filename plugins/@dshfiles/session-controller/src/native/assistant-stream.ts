@@ -20,6 +20,9 @@ interface MutableAttempt {
 
 const EMPTY_BASELINE: SessionAssistantStreamBaseline = { revision: 0 }
 
+/** Chunks one in-flight attempt keeps for a reconnecting follower. */
+const MAX_ATTEMPT_CHUNKS = 4_096
+
 /**
  * Folds dense Agent frames and materializes one shared immutable reconnect
  * baseline per accepted revision.
@@ -64,6 +67,14 @@ export class SessionAssistantStreamAccumulator {
           || attempt.attemptId !== frame.attemptId
           || frame.index !== attempt.nextIndex) {
           this.activeAttempt = undefined
+          break
+        }
+        // One attempt's chunks are kept so a reconnecting follower can resume mid-stream. A long turn streams tens of
+        // thousands of them, which is the class the 650k-chunk census counted, so past the cap the baseline is dropped
+        // instead: the follower then shows settled blocks until the next attempt rather than the Host holding them.
+        if (attempt.nextIndex >= MAX_ATTEMPT_CHUNKS) {
+          this.activeAttempt = undefined
+          this.dirty = true
           break
         }
         attempt.stream.push({ time: frame.time, chunk: frame.chunk })
