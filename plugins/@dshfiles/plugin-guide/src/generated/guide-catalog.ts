@@ -894,7 +894,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "InlineReferences",
       "importFrom": "@dshfiles/chat/inline-references",
       "owner": "@dshfiles/chat",
-      "source": "plugins/@dshfiles/chat/src/inline-references.tsx:94",
+      "source": "plugins/@dshfiles/chat/src/inline-references.tsx:95",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/chat.inline-reference",
@@ -916,7 +916,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "key": "module:@dshfiles/chat/inline-reference-markdown",
       "kind": "module",
       "title": "@dshfiles/chat/inline-reference-markdown",
-      "summary": "The native Markdown renderer with the inline-reference registry applied (see `./inline-references.tsx`). A separate module so a provider that only defines references never loads the native renderer.",
+      "summary": "The native Markdown renderer with the inline-reference registry (see `./inline-references.tsx`) and the code-fence registry (see `./code-fences.tsx`) applied. A separate module so a provider that only defines references or fences never loads the native renderer.",
       "publicSymbol": "InlineReferenceMarkdown",
       "importFrom": "@dshfiles/chat/inline-reference-markdown",
       "owner": "@dshfiles/chat",
@@ -929,6 +929,48 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/chat/src/inline-reference-markdown.tsx",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "CodeFences",
+      "importFrom": "@dshfiles/chat/code-fences",
+      "owner": "@dshfiles/chat",
+      "source": "plugins/@dshfiles/chat/src/code-fences.tsx:37",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/chat.code-fence",
+      "kind": "registry",
+      "title": "CodeFences",
+      "summary": "Add one with `plugin.add(CodeFences, { id, languages: ['mermaid'], Component })`.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(CodeFences, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/chat renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/chat.code-fence"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/chat/fenced-markdown",
+      "kind": "module",
+      "title": "@dshfiles/chat/fenced-markdown",
+      "summary": "The native Markdown renderer with only the code-fence registry applied (see `./code-fences.tsx`): for Markdown that is not an assistant answer (reasoning, compaction summaries, question text) and should not grow inline-reference links, yet should show a ```` ```mermaid ```` fence the way the answer does.",
+      "publicSymbol": "FencedMarkdown",
+      "importFrom": "@dshfiles/chat/fenced-markdown",
+      "owner": "@dshfiles/chat",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/chat/src/fenced-markdown.tsx",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2684,7 +2726,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 25 catalog feature(s)",
+        "Used by 26 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2880,7 +2922,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › auxiliary-and-wait-spans"
       ],
       "details": [
-        "Used by 99 catalog feature(s)",
+        "Used by 100 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

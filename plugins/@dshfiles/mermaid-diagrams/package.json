@@ -1,0 +1,83 @@
+{
+  "name": "@dshfiles/mermaid-diagrams",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Renders ```mermaid fences in the chat transcript as themed diagrams, loading the renderer only when a diagram first shows.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "NOTICE",
+    "README.md",
+    "dshx.features.json"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "dshx build && node scripts/copy-renderer.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
+    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
+  },
+  "dependencies": {
+    "@dshfiles/dshx": "workspace:*",
+    "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
+    "@effect/platform-node": "catalog:",
+    "dompurify": "3.4.17",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "catalog:",
+    "@deepseek-ai/dsh": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-connection": "catalog:",
+    "@deepseek-ai/dsh-client-ui-primitives": "catalog:",
+    "@deepseek-ai/dsh-host-webserver": "catalog:",
+    "@dshfiles/chat": "workspace:*",
+    "@testing-library/dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/node": "22.20.5",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "katex": "0.16.47",
+    "pele": "1.13.0",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-host-webserver": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-connection"
+      ],
+      "external": [
+        "@dshfiles/shared-runtime"
+      ],
+      "immediately": false
+    }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}

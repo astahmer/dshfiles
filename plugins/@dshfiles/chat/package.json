@@ -46,6 +46,14 @@
     "./inline-reference-markdown": {
       "types": "./src/inline-reference-markdown.tsx",
       "default": "./dist/inline-reference-markdown.js"
+    },
+    "./code-fences": {
+      "types": "./src/code-fences.tsx",
+      "default": "./dist/code-fences.js"
+    },
+    "./fenced-markdown": {
+      "types": "./src/fenced-markdown.tsx",
+      "default": "./dist/fenced-markdown.js"
     }
   },
   "scripts": {

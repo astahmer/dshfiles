@@ -10,6 +10,8 @@ export default defineConfig({
     'message-images': 'src/message-images.ts',
     'inline-references': 'src/inline-references.tsx',
     'inline-reference-markdown': 'src/inline-reference-markdown.tsx',
+    'code-fences': 'src/code-fences.tsx',
+    'fenced-markdown': 'src/fenced-markdown.tsx',
   },
   client: {
     shared: '@dshfiles/shared-runtime',

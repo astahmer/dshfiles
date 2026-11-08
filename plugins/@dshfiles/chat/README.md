@@ -71,6 +71,8 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/pinned-tool-calls.ts` | new: the published `@dshfiles/chat/pinned-tool-calls` registry token |
 | `src/pinned-tool-names.ts` | new: the registered names, set from `client-entry.tsx` and read synchronously while tool nodes build |
 | `src/inline-references.tsx`, `src/inline-reference-markdown.tsx` | new: the published `@dshfiles/chat/inline-references` registry and `@dshfiles/chat/inline-reference-markdown` renderer (below) |
+| `src/code-fences.tsx`, `src/code-fence-transform.tsx`, `src/fenced-markdown.tsx`, `src/report-once.ts` | new: the published `@dshfiles/chat/code-fences` registry, the transform `InlineReferenceMarkdown` applies, the published `@dshfiles/chat/fenced-markdown` renderer (below), and the log-once reporter both registries use |
+| `src/native/chat/ReasoningContent.tsx`, `CompactionItem.tsx` | reasoning and the compaction summary render through `FencedMarkdown`, so a claimed fence renders there too |
 | `src/native/chat/AssistantMarkdown.tsx` (also), `UserContent.tsx`, `ChatView.tsx` (also) | text blocks render through `InlineReferenceMarkdown`, the Referenced-session line through `InlineReferenceText`, and the transcript sits in an `InlineReferenceScope` naming its Session |
 
 ### Focus a Turn, Step or tool call from another plugin
@@ -124,6 +126,31 @@ keep their rendered references. A throwing matcher or renderer shows the written
 messages are rich-composer's: they use the native `conversation.user.text` rules and `conversation.user.text.node` slot
 instead. Another plugin's own Markdown can apply the same providers with `InlineReferenceMarkdown` from
 `@dshfiles/chat/inline-reference-markdown` (backlog item text does).
+
+### Render fenced code from another plugin
+
+A ` ```mermaid ` fence is a diagram because `@dshfiles/mermaid-diagrams` adds a renderer to the `CodeFences`
+registry from `@dshfiles/chat/code-fences`:
+
+```ts
+plugin.add(CodeFences, { id: 'mermaid-diagrams', languages: ['mermaid'], Component: MermaidFence })
+```
+
+Chat swaps each native `CodeBlock` element whose language (the first word of the info string, case-insensitive) a
+renderer claims for its `Component`, which receives `code` (without the trailing newline), `lang`, `streaming`,
+`fallback` (the native card) and `source` (the same card without its header, for a renderer that draws its own).
+`streaming` is per fence, not per message: the native root holds one child per top-level block, and a fence in any
+block but the last is complete, so it arrives with `streaming: false` while the rest of the message is still written.
+Fences inside lists and quotes count; the first renderer registered for a language wins. Transformed elements are
+cached by identity, so a streaming message's frozen blocks render their fence once. A throwing renderer shows
+`fallback` and logs once; new source tries again. Without renderers the native tree is returned unchanged. The
+contract module imports nothing from the native renderer, so a renderer plugin bundles only the registry token; the
+transform takes the native `CodeBlock` from its caller.
+
+Assistant answers apply it through `InlineReferenceMarkdown`. Markdown that should not grow inline-reference links —
+reasoning, compaction summaries, and other plugins' Markdown such as `ask_user_question` text in
+`@dshfiles/user-questions` — renders through `FencedMarkdown` from `@dshfiles/chat/fenced-markdown`, which takes
+`MarkdownText`'s props and applies only the fence registry.
 
 ### Build
 
