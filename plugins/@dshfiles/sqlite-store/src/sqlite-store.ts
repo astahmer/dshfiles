@@ -61,10 +61,20 @@ const restrictFiles = Effect.fnUntraced(function* (input: { readonly fs: FileSys
   for (const file of sidecarsOf(input.filename)) if (yield* input.fs.exists(file)) yield* input.fs.chmod(file, privateFileMode)
 })
 
+/**
+ * A WAL that no connection checkpoints grows with every write: measured 246 MB beside a 245 MB usage
+ * database, 160 MB beside traces and 102 MB beside memory. The limit keeps it at 32 MB and an automatic
+ * checkpoint folds it back into the database.
+ */
+const WAL_SIZE_LIMIT_BYTES = 32 * 1024 * 1024
+const WAL_AUTOCHECKPOINT_PAGES = 1_000
+
 const pragmaStatements = (pragmas: SqliteStorePragmas): ReadonlyArray<string> => [
   ...(pragmas.journalMode === 'delete' ? ['PRAGMA journal_mode = DELETE'] : []),
   `PRAGMA synchronous = ${(pragmas.synchronous ?? 'normal').toUpperCase()}`,
   ...(pragmas.foreignKeys === undefined ? [] : [`PRAGMA foreign_keys = ${pragmas.foreignKeys ? 'ON' : 'OFF'}`]),
+  `PRAGMA journal_size_limit = ${String(WAL_SIZE_LIMIT_BYTES)}`,
+  `PRAGMA wal_autocheckpoint = ${String(WAL_AUTOCHECKPOINT_PAGES)}`,
 ]
 
 type MigrationStepError = Migrator.MigrationError | { readonly _tag: 'SqlError' | 'SchemaError' | 'NoSuchElementError' }
