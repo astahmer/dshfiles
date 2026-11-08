@@ -193,7 +193,7 @@ export const WorkspaceCleanupDialog = (props: {
           {preview.isError && (
             <p className="dshx:px-5 dshx:py-3 dshx:text-sm dshx:text-destructive">{errorMessage(preview.error, 'The cleanup preview failed.')}</p>
           )}
-          <div className="dshx:flex dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:bg-muted/30 dshx:px-5 dshx:py-3">
+          <div className="dshx:flex dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:bg-muted/30 dshx:px-5 dshx:py-2">
             <Checkbox
               aria-label="Select all eligible items"
               checked={allSelected ? true : partiallySelected ? 'indeterminate' : false}
@@ -212,11 +212,11 @@ export const WorkspaceCleanupDialog = (props: {
             const isExpanded = expanded.has(choice.kind)
             return (
               <section className="dshx:border-b dshx:border-border dshx:last:border-b-0" key={choice.kind}>
-                <div className="dshx:flex dshx:min-h-12 dshx:items-center dshx:gap-3 dshx:px-5 dshx:py-2">
+                <div className="dshx:flex dshx:items-center dshx:gap-3 dshx:px-5 dshx:py-1.5">
                   <Checkbox aria-label={`Select ${choice.label}`} checked={checked} onCheckedChange={value => toggleRows(groupRows, value === true)} />
                   <Button
                     aria-expanded={isExpanded}
-                    className="dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-2 dshx:px-0 dshx:text-left"
+                    className="dshx:h-7 dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-2 dshx:px-0 dshx:text-left"
                     onClick={() => toggleExpanded(choice.kind)}
                     size="sm"
                     type="button"
@@ -228,13 +228,14 @@ export const WorkspaceCleanupDialog = (props: {
                       <ChevronRightIcon aria-hidden="true" className="dshx:size-3" />
                     )}
                     <span className="dshx:truncate">{choice.label}</span>
-                    <span className="dshx:rounded dshx:bg-muted dshx:px-2 dshx:py-1 dshx:text-xs dshx:text-muted-foreground">{groupRows.length}</span>
+                    <span className="dshx:rounded dshx:bg-muted dshx:px-1.5 dshx:py-0.5 dshx:text-xs dshx:text-muted-foreground">{groupRows.length}</span>
                   </Button>
                   {groupSelected > 0 && <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{groupSelected} selected</span>}
                 </div>
                 {isExpanded && (
                   <BulkSelectList
-                    className="dshx:mx-5 dshx:mb-3 dshx:ml-12 dshx:rounded-xl dshx:p-1 dshx:shadow-none"
+                    className="dshx:mx-5 dshx:mb-2 dshx:ml-12 dshx:gap-0 dshx:rounded-lg dshx:p-1 dshx:shadow-none"
+                    density="compact"
                     heading={choice.label}
                     items={groupRows.map(row => ({
                       id: row.key,

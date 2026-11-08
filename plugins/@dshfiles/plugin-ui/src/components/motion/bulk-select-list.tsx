@@ -39,7 +39,14 @@ export interface BulkSelectListProps extends Omit<React.HTMLAttributes<HTMLEleme
   readonly noun?: string
   /** `false` drops the count/Delete header, for a list nested under a header the caller owns. */
   readonly showHeader?: boolean
+  /**
+   * `compact` sizes each row to its text: the tag becomes an inline chip instead of a 40px tile, so a title-only row
+   * is one line tall and a title + meta row is two, with the same padding. For dense lists inside dialogs.
+   */
+  readonly density?: BulkSelectDensity
 }
+
+export type BulkSelectDensity = 'comfortable' | 'compact'
 
 const tileTone = {
   destructive: 'dshx:bg-destructive/10 dshx:text-destructive',
@@ -68,6 +75,7 @@ export function BulkSelectList({
   headerAction,
   noun = 'files',
   showHeader = true,
+  density = 'comfortable',
   className,
   ...props
 }: BulkSelectListProps) {
@@ -205,7 +213,15 @@ export function BulkSelectList({
     const isStaged = stagedSet.has(item.id)
     const rowIndex = isStaged ? -1 : visibleIndex++
     rowNodes.push(
-      <Row key={item.id} item={item} index={rowIndex} selected={!isStaged && selected.has(item.id)} staged={isStaged} onToggle={() => toggle(item.id)} />,
+      <Row
+        key={item.id}
+        item={item}
+        index={rowIndex}
+        density={density}
+        selected={!isStaged && selected.has(item.id)}
+        staged={isStaged}
+        onToggle={() => toggle(item.id)}
+      />,
     )
   })
 
@@ -294,12 +310,14 @@ function HeaderSwapInner({ children }: { readonly children: React.ReactNode }) {
 function Row({
   item,
   index,
+  density,
   selected,
   staged,
   onToggle,
 }: {
   readonly item: BulkSelectItem
   readonly index: number
+  readonly density: BulkSelectDensity
   readonly selected: boolean
   readonly staged: boolean
   readonly onToggle: () => void
@@ -312,10 +330,12 @@ function Row({
     const c = animate(box.current, { transform: ['scale(0.8)', 'scale(1)'] }, motionSafe(springs.bouncy))
     return () => c.complete()
   }, [selected])
+  const compact = density === 'compact'
   return (
     <div
       data-row-id={item.id}
       data-row-index={staged ? undefined : index}
+      data-density={density}
       role="option"
       aria-selected={selected}
       aria-hidden={staged || undefined}
@@ -327,7 +347,8 @@ function Row({
         }
       }}
       className={cn(
-        'dshx:flex dshx:cursor-default dshx:items-center dshx:gap-4 dshx:rounded-2xl dshx:px-3 dshx:py-2.5 dshx:outline-none dshx:transition-colors dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:@max-pane-narrow:gap-3',
+        'dshx:flex dshx:cursor-default dshx:items-center dshx:outline-none dshx:transition-colors dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+        compact ? 'dshx:gap-3 dshx:rounded-lg dshx:px-2 dshx:py-1.5' : 'dshx:gap-4 dshx:rounded-2xl dshx:px-3 dshx:py-2.5 dshx:@max-pane-narrow:gap-3',
         selected ? 'dshx:bg-muted' : 'dshx:hover:bg-muted/50',
       )}
     >
@@ -335,25 +356,39 @@ function Row({
         ref={box}
         aria-hidden
         className={cn(
-          'dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:border-2 dshx:transition-colors',
+          'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:justify-center dshx:transition-colors',
+          compact ? 'dshx:size-4 dshx:rounded-[4px] dshx:border' : 'dshx:size-5 dshx:rounded-md dshx:border-2',
           selected ? 'dshx:border-foreground dshx:bg-foreground dshx:text-background' : 'dshx:border-border dshx:bg-card',
         )}
       >
-        {selected ? <CheckIcon className="dshx:size-3.5" strokeWidth={3} /> : null}
+        {selected ? <CheckIcon className={compact ? 'dshx:size-3' : 'dshx:size-3.5'} strokeWidth={3} /> : null}
       </span>
-      <span
-        aria-hidden
-        className={cn(
-          'dshx:inline-flex dshx:size-10 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-xl dshx:text-[11px] dshx:font-semibold dshx:tracking-wide',
-          tileTone[item.tone ?? 'muted'],
-        )}
-      >
-        {item.tag}
-      </span>
+      {compact ? null : (
+        <span
+          aria-hidden
+          className={cn(
+            'dshx:inline-flex dshx:size-10 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-xl dshx:text-[11px] dshx:font-semibold dshx:tracking-wide',
+            tileTone[item.tone ?? 'muted'],
+          )}
+        >
+          {item.tag}
+        </span>
+      )}
       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
         <span className="dshx:truncate dshx:text-sm dshx:font-medium">{item.title}</span>
         {item.meta ? <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{item.meta}</span> : null}
       </span>
+      {compact ? (
+        <span
+          aria-hidden
+          className={cn(
+            'dshx:shrink-0 dshx:rounded dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:leading-none dshx:font-semibold dshx:tracking-wide',
+            tileTone[item.tone ?? 'muted'],
+          )}
+        >
+          {item.tag}
+        </span>
+      ) : null}
     </div>
   )
 }
