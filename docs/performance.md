@@ -736,3 +736,31 @@ composer-mount long task is not attributed to a single owned plugin without a br
   `limit 5` and 3,532 ms at `limit 50`, so the fold count is no longer the lever (same owner as Host gap `b:17rs`).
 - The 0.5–1.4 s composer-mount long task behind thread switch and New thread is unowned: attribute it with a browser CPU
   profile before changing a plugin, rather than guessing from the plugin list.
+
+## RAM sweep (2026-11-08)
+
+Measured on the live Host (pid changes per restart; `heapUsed` after a full GC via SIGUSR1 + CDP on 127.0.0.1:9229)
+and on scratch Hosts booted from a copy of the same home. A scratch read before ~100 s of settle scatters ±90 MB, so
+every number below is taken after 110 s.
+
+| Change | Before | After | Where |
+| --- | --- | --- | --- |
+| session-search index (un-merged FTS5 postings) | 2,010 MB | 182 MB | `optimize` + VACUUM in the worker; searches 15–47 ms → 1–2 ms |
+| projection cache (derived per-Session checkpoints) | 325 MB / 202.8 MB heap | 17 MB / ~15 MB heap | 14-day prune at startup and hourly |
+| WAL beside usage / traces / memory | 246 / 160 / 102 MB | ≤ 32 MB each | `journal_size_limit` + `wal_autocheckpoint` in sqlite-store |
+| job history index | 20,000 rows / 13.2 MB | 1 day / 8.9 MB | settled jobs leave after 24 h |
+| quota history JSON | 12.6 MB, 90 days | ~4 MB, 30 days | the panel's longest window |
+| raw usage requests | unbounded, +7.3 MB/day | 90 days hot, older rows cold | `requests_archive`, reports read both |
+| traces spans / metric points | 100 k / 200 k | 30 k / 60 k | defaults lowered; the 72 h window was unreachable |
+| per-client stream buffers | unbounded (650 k chunks retained) | 4,096 frames + 8 MB follower, 1 MB events, 4,096 chunks per attempt | control queue, `follow()`, dshx events, assistant attempt, hmr-gate backpressure |
+| worker isolates | Host's 4 GB limit | 512 MB search, 256 MB fff | `resourceLimits` |
+| browser query cache | 5 min | 1 min | +133 MB across 20 threads measured before |
+| `~/.dsh` | 11 GB | 4.3 GB | all of the above plus 874 MB dead index and 570 MB fff stores |
+
+What the measurement ruled out: Effect schemas are 3.6 % of the fixed heap (~22 MB) and 4.1 has no compile step to
+exploit; the session-log corpus is only 25 MB of the fixed heap; more transcript virtualisation is not a lever (the
+DOM is already windowed); hidden plugin panels are 300–700 nodes.
+
+Still open, with the measured size: lazy storage-domain hydration (67 MB, needs a fork of `dsh-storage-json`), lazy
+plugin SQLite (60.9 MB), per-session client state LRU (100–110 MB per tab), lazy Host halves for panel rows (80 MB,
+needs a dshx primitive or the plugin-manager facade), one shared Effect `HostContext` per activation (20–40 MB, est.).
