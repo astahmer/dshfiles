@@ -33,7 +33,12 @@ describe('DurableTaskStore', () => {
     Effect.gen(function* () {
       const root = yield* temporaryRoot
       const session = (index: number, sessionId: string, createdAt: number) =>
-        DurableTestLayers.queuedTask({ id: index.toString(16).padStart(64, '0'), idempotencyKey: `00000000-0000-4000-8000-00000000000${index}`, sessionId, createdAt })
+        DurableTestLayers.queuedTask({
+          id: index.toString(16).padStart(64, '0'),
+          idempotencyKey: `00000000-0000-4000-8000-00000000000${index}`,
+          sessionId,
+          createdAt,
+        })
       yield* Effect.gen(function* () {
         const store = yield* DurableTaskStore
         yield* Effect.forEach(
