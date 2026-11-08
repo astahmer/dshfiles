@@ -5,38 +5,32 @@
  */
 import type { Writable } from 'node:stream'
 import { relative, resolve as resolvePath } from 'node:path'
-import { isCancel, select, text } from '@clack/prompts'
-import { buildClient } from '../compiler/client/build.js'
-import { buildHost } from '../compiler/host/build.js'
-import { buildModule } from '../compiler/module/build.js'
+/*
+ * Command implementations load at dispatch (see runCli), and each handler loads the modules it
+ * alone needs (builders, dev session, toolchain, scaffolding, runtime inspection). A dshx
+ * invocation therefore pays one module graph, not every command's.
+ */
 import { StagedOutput } from '../compiler/staged-output.js'
 import { resolveDshxConfig } from '../config/resolve.js'
-import { startDevSession } from '../dev/orchestrator.js'
+import type { startDevSession } from '../dev/orchestrator.js'
 import type { DevEvent, DevSession } from '../dev/types.js'
 import { relative as relativePath } from 'node:path'
-import { packageProject, previewPublish, testProject } from '../toolchain/index.js'
+import type { testProject } from '../toolchain/index.js'
 import type { TestProjectOptions } from '../toolchain/index.js'
 import { packageTargets } from '../project/package-targets.js'
 import { DshxError } from '../diagnostics.js'
-import { ProfileOrchestrator } from '../profile/orchestrator.js'
 import type { PreparedProjectProfile, ProjectProfileLink, ResolvedDshInstallation } from '../profile/types.js'
 import { checkMigrationDiagnostics } from '../project/migrations.js'
 import { checkPackageTargets } from '../project/package-targets.js'
 import { checkProjectManifest } from '../project/manifest.js'
-import { ManifestRepairService } from '../project/repair.js'
+import type { ManifestRepairService } from '../project/repair.js'
 import { typecheckProject } from '../project/typecheck.js'
 import type { ProjectTypecheckResult } from '../project/typecheck.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
-import { inspectProjectComposition } from '../inspect/provider.js'
 import type { InspectResult, InspectTarget } from '../inspect/types.js'
-import { inspectBridgeStatus } from '../inspect/bridge.js'
 import type { InspectBridgeStatus } from '../inspect/bridge.js'
-import { inspectRuntimePlugins } from '../runtime-status.js'
+import type { inspectRuntimePlugins } from '../runtime-status.js'
 import type { RuntimePluginReport } from '../runtime-status.js'
-import { createCommandScaffold } from '../scaffold/command.js'
-import { createHookScaffold } from '../scaffold/hook.js'
-import { createToolScaffold } from '../scaffold/tool.js'
-import { createUiScaffold } from '../scaffold/ui.js'
 import type { AddPresetOptions, AddPresetResult } from '../scaffold/preset.js'
 import type { AddCommandOptions, AddCommandResult } from '../scaffold/command.js'
 import type { AddHookOptions, AddHookResult } from '../scaffold/hook.js'
@@ -258,7 +252,8 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
   // The typecheck runs in its own compiler process and stays idle while TypeScript reads and
   // resolves the project, so it overlaps the face builds instead of delaying them. Its
   // diagnostics are still reported first and still block publishing.
-  const typecheck = (runtime.typecheckProject ?? typecheckProject)(project.root)
+  const typecheck = args.typecheck === false ? undefined : (runtime.typecheckProject ?? typecheckProject)(project.root)
+  if (typecheck === undefined) write(io.stdout, `${paint(io.stdout, 'gray', 'Typecheck:')} skipped (--no-typecheck)\n`)
   const jobs: Array<{
     readonly fallback: string
     readonly task: Promise<unknown>
@@ -267,9 +262,10 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
   // explicit Client-only package. The compiler's undefined entry is a
   // deliberate no-op Host module that satisfies that loader contract without
   // enabling the Host face in DSHX config or scaffold commands.
+  const buildHostFace = runtime.buildHost ?? (await import('../compiler/host/build.js')).buildHost
   jobs.push({
     fallback: resolvePath(project.outDir, 'index.js'),
-    task: (runtime.buildHost ?? buildHost)({
+    task: buildHostFace({
       packageId: project.packageId,
       logicalName: project.name,
       root: project.root,
@@ -290,9 +286,10 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
         : undefined
     const external = Array.isArray(client?.external) && client.external.every(value => typeof value === 'string') ? (client.external as string[]) : []
     const inject = Array.isArray(client?.inject) && client.inject.every(value => typeof value === 'string') ? (client.inject as string[]) : []
+    const buildClientFace = runtime.buildClient ?? (await import('../compiler/client/build.js')).buildClient
     jobs.push({
       fallback: resolvePath(project.outDir, 'client.js'),
-      task: (runtime.buildClient ?? buildClient)({
+      task: buildClientFace({
         packageId: project.packageId,
         logicalName: project.name,
         root: project.root,
@@ -311,23 +308,26 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
       }),
     })
   }
-  for (const shared of project.modules ?? []) {
-    jobs.push({
-      fallback: resolvePath(project.outDir, `${shared.name}.js`),
-      task: (runtime.buildModule ?? buildModule)({
-        packageId: project.packageId,
-        root: project.root,
-        name: shared.name,
-        entry: shared.entry,
-        outDir: staged.directory,
-        sourcemap: project.build.sourcemap,
-      }),
-    })
+  if ((project.modules ?? []).length > 0) {
+    const buildModuleFace = runtime.buildModule ?? (await import('../compiler/module/build.js')).buildModule
+    for (const shared of project.modules ?? []) {
+      jobs.push({
+        fallback: resolvePath(project.outDir, `${shared.name}.js`),
+        task: buildModuleFace({
+          packageId: project.packageId,
+          root: project.root,
+          name: shared.name,
+          entry: shared.entry,
+          outDir: staged.directory,
+          sourcemap: project.build.sourcemap,
+        }),
+      })
+    }
   }
   const results = await Promise.allSettled(jobs.map(job => job.task))
-  const typechecked = await typecheck
-  for (const item of typechecked.diagnostics) printDiagnostic(io, item)
-  let failed = hasErrors(typechecked.diagnostics)
+  const typechecked = typecheck === undefined ? undefined : await typecheck
+  for (const item of typechecked?.diagnostics ?? []) printDiagnostic(io, item)
+  let failed = hasErrors(typechecked?.diagnostics ?? [])
   const artifacts: string[] = []
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
@@ -406,9 +406,15 @@ async function collectCheck(options: CliRunOptions, project: ResolvedDshxConfig,
   let bridge: InspectBridgeStatus = { state: 'disabled', diagnostics: [] }
   if (requireRuntime) {
     try {
-      dsh = await (runtime.resolveDsh ?? ProfileOrchestrator.resolveDshInstallation)(project)
+      const resolveDsh =
+        runtime.resolveDsh ??
+        (async (target: ResolvedDshxConfig) => (await import('../profile/orchestrator.js')).ProfileOrchestrator.resolveDshInstallation(target))
+      dsh = await resolveDsh(project)
       runtimeDiagnostics.push(...dsh.diagnostics)
-      profile = await (runtime.inspectProfile ?? ProfileOrchestrator.inspectProjectProfile)(project)
+      const inspectProfile =
+        runtime.inspectProfile ??
+        (async (target: ResolvedDshxConfig) => (await import('../profile/orchestrator.js')).ProfileOrchestrator.inspectProjectProfile(target))
+      profile = await inspectProfile(project)
       if (profile.state === 'absent')
         runtimeDiagnostics.push({
           code: 'DSHX4305',
@@ -442,8 +448,14 @@ async function collectCheck(options: CliRunOptions, project: ResolvedDshxConfig,
           status: 'available',
         }
   if (requireRuntime) {
-    runtimePlugins = await (runtime.inspectRuntimePlugins ?? inspectRuntimePlugins)(project, compatibility)
-    bridge = await (runtime.inspectBridgeStatus ?? inspectBridgeStatus)(project)
+    const inspectPlugins =
+      runtime.inspectRuntimePlugins ??
+      (async (target: ResolvedDshxConfig, targetCompatibility: Parameters<typeof inspectRuntimePlugins>[1]) =>
+        (await import('../runtime-status.js')).inspectRuntimePlugins(target, targetCompatibility))
+    runtimePlugins = await inspectPlugins(project, compatibility)
+    const inspectBridge =
+      runtime.inspectBridgeStatus ?? (async (target: ResolvedDshxConfig) => (await import('../inspect/bridge.js')).inspectBridgeStatus(target))
+    bridge = await inspectBridge(project)
     runtimePlugins = mergeRuntimePluginStatus(runtimePlugins, bridge)
     runtimeDiagnostics.push(...runtimePlugins.diagnostics, ...bridge.diagnostics)
   }
@@ -503,7 +515,11 @@ async function runCheck(args: CliArgs, options: CliRunOptions, project: Resolved
 
   if (args.fix) {
     const compatibility = result.compatibility.compatibility
-    const plan = await (runtime.createRepairPlan ?? ManifestRepairService.createPlan)(project, { compatibility })
+    const createRepairPlan =
+      runtime.createRepairPlan ??
+      (async (target: ResolvedDshxConfig, repairOptions: Parameters<typeof ManifestRepairService.createPlan>[1]) =>
+        (await import('../project/repair.js')).ManifestRepairService.createPlan(target, repairOptions))
+    const plan = await createRepairPlan(project, { compatibility })
     const fixDiagnostics: DshxDiagnostic[] = [...plan.diagnostics]
     if (plan.diagnostics.some(item => item.severity === 'error')) {
       fixDiagnostics.push({
@@ -514,10 +530,17 @@ async function runCheck(args: CliArgs, options: CliRunOptions, project: Resolved
         hint: 'Resolve the repair plan diagnostics manually before retrying --fix.',
       })
     }
+    const applyRepairPlan =
+      runtime.applyRepairPlan ??
+      (async (target: Parameters<typeof ManifestRepairService.applyPlan>[0]) => (await import('../project/repair.js')).ManifestRepairService.applyPlan(target))
+    const rollbackRepairPlan =
+      runtime.rollbackRepairPlan ??
+      (async (target: Parameters<typeof ManifestRepairService.rollbackPlan>[0]) =>
+        (await import('../project/repair.js')).ManifestRepairService.rollbackPlan(target))
     let applied = false
     if (!args.dryRun && plan.files.length > 0 && !plan.diagnostics.some(item => item.severity === 'error')) {
       try {
-        await (runtime.applyRepairPlan ?? ManifestRepairService.applyPlan)(plan)
+        await applyRepairPlan(plan)
         applied = true
       } catch (error) {
         if (error instanceof DshxError && error.code === 'DSHX4144') fixDiagnostics.push(diagnosticFromError(error, project.packageFile))
@@ -537,7 +560,7 @@ async function runCheck(args: CliArgs, options: CliRunOptions, project: Resolved
           })
           const manifestDiagnostics = await (runtime.checkManifest ?? checkProjectManifest)(refreshed, { compatibility })
           if (manifestDiagnostics.some(item => item.severity === 'error')) {
-            await (runtime.rollbackRepairPlan ?? ManifestRepairService.rollbackPlan)(plan)
+            await rollbackRepairPlan(plan)
             applied = false
             fixDiagnostics.push({
               code: 'DSHX4146',
@@ -551,7 +574,7 @@ async function runCheck(args: CliArgs, options: CliRunOptions, project: Resolved
             result = await collectCheck(options, refreshed, args.runtime)
           }
         } catch (error) {
-          await (runtime.rollbackRepairPlan ?? ManifestRepairService.rollbackPlan)(plan)
+          await rollbackRepairPlan(plan)
           applied = false
           fixDiagnostics.push({
             code: 'DSHX4146',
@@ -620,7 +643,11 @@ async function runInspect(args: CliArgs, options: CliRunOptions, project: Resolv
   // The parser guarantees this in normal CLI use; retaining the guard keeps the
   // injected runtime API safe for callers that construct CliArgs themselves.
   if (target === undefined) throw new CliUsageError('Inspect requires a target: slots, tools, services, or events.')
-  const result = await (runtime.inspectComposition ?? inspectProjectComposition)(project, target, args.root === undefined ? {} : { slotRoot: args.root })
+  const inspectComposition =
+    runtime.inspectComposition ??
+    (async (target: ResolvedDshxConfig, inspectTarget: InspectTarget, inspectOptions: { readonly slotRoot?: string }) =>
+      (await import('../inspect/provider.js')).inspectProjectComposition(target, inspectTarget, inspectOptions))
+  const result = await inspectComposition(project, target, args.root === undefined ? {} : { slotRoot: args.root })
   if (args.json) {
     write(io.stdout, `${JSON.stringify(inspectSummary(project, result), null, 2)}\n`)
   } else {
@@ -671,6 +698,7 @@ async function runInspect(args: CliArgs, options: CliRunOptions, project: Resolv
 
 async function selectSlotInteractively(io: CliIO, items: readonly { readonly name: string }[]): Promise<string | undefined> {
   if (items.length === 0) return undefined
+  const { isCancel, select } = await import('@clack/prompts')
   const answer = await select({
     message: 'Select a Slot',
     options: items.map(item => ({ value: item.name, label: item.name })),
@@ -720,7 +748,7 @@ async function runAddUi(args: CliArgs, options: CliRunOptions, project: Resolved
   const add =
     runtime.addUi ??
     (async (value: AddUiOptions) =>
-      createUiScaffold(value, {
+      (await import('../scaffold/ui.js')).createUiScaffold(value, {
         ...(runtime.inspectComposition !== undefined && { inspectComposition: runtime.inspectComposition }),
         ...(runtime.checkManifest !== undefined && { checkManifest: runtime.checkManifest }),
         ...(args.slot === undefined && {
@@ -763,6 +791,7 @@ function toolSummary(project: ResolvedDshxConfig, result: AddToolResult) {
 }
 
 async function promptLine(io: CliIO, question: string): Promise<string> {
+  const { isCancel, text } = await import('@clack/prompts')
   const answer = await text({
     message: question.replace(/:\s*$/, ''),
     input: io.stdin,
@@ -803,7 +832,9 @@ async function runAddTool(args: CliArgs, options: CliRunOptions, project: Resolv
   try {
     result =
       runtime.addTool === undefined
-        ? await createToolScaffold(toolOptions, runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest })
+        ? await (
+            await import('../scaffold/tool.js')
+          ).createToolScaffold(toolOptions, runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest })
         : await runtime.addTool(toolOptions)
   } catch (error) {
     const item = diagnosticFromError(error, project.packageFile)
@@ -860,7 +891,9 @@ async function runAddCommand(args: CliArgs, options: CliRunOptions, project: Res
   try {
     result =
       runtime.addCommand === undefined
-        ? await createCommandScaffold(commandOptions, runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest })
+        ? await (
+            await import('../scaffold/command.js')
+          ).createCommandScaffold(commandOptions, runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest })
         : await runtime.addCommand(commandOptions)
   } catch (error) {
     const item = diagnosticFromError(error, project.packageFile)
@@ -1252,7 +1285,9 @@ async function runAddHook(args: CliArgs, options: CliRunOptions, project: Resolv
   try {
     result =
       runtime.addHook === undefined
-        ? await createHookScaffold(hookOptions, runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest })
+        ? await (
+            await import('../scaffold/hook.js')
+          ).createHookScaffold(hookOptions, runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest })
         : await runtime.addHook(hookOptions)
   } catch (error) {
     const item = diagnosticFromError(error, project.packageFile)
@@ -1308,7 +1343,10 @@ async function runDev(args: CliArgs, options: CliRunOptions, project: ResolvedDs
   }
   let profile: PreparedProjectProfile
   try {
-    profile = await (runtime.ensureProfile ?? ProfileOrchestrator.ensureProjectProfile)(project)
+    const ensureProfile =
+      runtime.ensureProfile ??
+      (async (target: ResolvedDshxConfig) => (await import('../profile/orchestrator.js')).ProfileOrchestrator.ensureProjectProfile(target))
+    profile = await ensureProfile(project)
   } catch (error) {
     const item = diagnosticFromError(error, project.packageFile)
     printDiagnostic(io, item)
@@ -1327,7 +1365,11 @@ async function runDev(args: CliArgs, options: CliRunOptions, project: ResolvedDs
   printCompatibilitySummary(io, assessment, options.version ?? VERSION, args.verbose)
   let session: DevSession
   try {
-    session = await (runtime.startDev ?? startDevSession)(project, {
+    const startDev =
+      runtime.startDev ??
+      (async (target: ResolvedDshxConfig, devOptions: Parameters<typeof startDevSession>[1]) =>
+        (await import('../dev/orchestrator.js')).startDevSession(target, devOptions))
+    session = await startDev(project, {
       preparedProfile: profile,
       inspectBridge: true,
       dshArgs: [...(args.port === undefined ? [] : ['--port', String(args.port)]), ...(args.open ? ['--open'] : [])],
@@ -1392,7 +1434,10 @@ export async function runProjectCommand(args: CliArgs, options: CliRunOptions, i
     if (args.command === 'build') return await runBuild(args, options, project)
     if (args.command === 'test') {
       const testOutput: TestProjectOptions = { stdout: io.stdout, stderr: io.stderr }
-      return await (runtime.testProject ?? testProject)(project.root, args.file === undefined ? testOutput : { ...testOutput, file: args.file })
+      const runTests =
+        runtime.testProject ??
+        (async (root: string, testOptions: Parameters<typeof testProject>[1]) => (await import('../toolchain/index.js')).testProject(root, testOptions))
+      return await runTests(project.root, args.file === undefined ? testOutput : { ...testOutput, file: args.file })
     }
     if (args.command === 'publish' && !args.dryRun) {
       write(io.stderr, 'error: dshx publish only validates and never uploads; run "dshx publish --dry-run".\n')
@@ -1412,7 +1457,7 @@ export async function runProjectCommand(args: CliArgs, options: CliRunOptions, i
       ]
       if (project.clientEntry) required.push(relativePath(project.root, resolvePath(project.outDir, 'client.js')))
       if (args.command === 'publish') {
-        const preview = await previewPublish(project.root, project.manifest, required)
+        const preview = await (await import('../toolchain/index.js')).previewPublish(project.root, project.manifest, required)
         for (const item of preview.diagnostics) printDiagnostic(io, item)
         const label = `${preview.name ?? 'unnamed'}@${preview.version ?? 'unversioned'}`
         if (hasErrors(preview.diagnostics)) {
@@ -1422,7 +1467,9 @@ export async function runProjectCommand(args: CliArgs, options: CliRunOptions, i
         write(io.stdout, `Would publish ${label} as ${preview.filename} (${String(preview.files)} files); nothing was uploaded.\n`)
         return 0
       }
-      const tarball = await (runtime.packageProject ?? packageProject)(project.root, required)
+      const packProject =
+        runtime.packageProject ?? (async (root: string, targets: readonly string[]) => (await import('../toolchain/index.js')).packageProject(root, targets))
+      const tarball = await packProject(project.root, required)
       write(io.stdout, `Packaged ${relativePath(project.root, tarball)}\n`)
       return 0
     }
