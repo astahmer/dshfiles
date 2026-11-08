@@ -1,6 +1,6 @@
 # Native DSH capability audit
 
-Snapshot: 2026-11-08. This is a partial source-and-document review, not runtime certification. The configured baseline is DSH 0.2.1-rc.2. The npm `latest` response was 0.2.2-rc.1, a prerelease; the upstream source references below are pinned to master commit `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159`, not necessarily that release. GitHub's [latest stable release endpoint](https://api.github.com/repos/deepseek-ai/deepseek-harness/releases/latest) returned 404 on this date; that does not establish that no stable package or tag exists. No code removal or measured performance improvement follows from this review alone.
+Snapshot: 2026-11-08. This is a partial source-and-document review, not runtime certification. The configured baseline is DSH 0.2.1-rc.2. The npm `latest` response was 0.2.2-rc.1, a prerelease; the upstream source references below are pinned to master commit `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159`, not necessarily that release. GitHub's [latest stable release endpoint](https://api.github.com/repos/deepseek-ai/deepseek-harness/releases/latest) returned 404 on this date. The [npm package version list](https://registry.npmjs.org/%40deepseek-ai%2Fdsh) contained 42 versions, none matching a stable `major.minor.patch` version; this does not rule out an unpublished or non-npm stable tag. No code removal or measured performance improvement follows from this review alone.
 
 ## Findings
 
