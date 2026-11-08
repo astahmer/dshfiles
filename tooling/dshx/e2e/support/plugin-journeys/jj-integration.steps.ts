@@ -8,7 +8,7 @@ import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsNavEntry, settingsPage } from '../steps.js'
-import { createScratchDirectory, selectModelForNewThread } from '../threads.js'
+import { confirmFolderSetupStep, createScratchDirectory, selectModelForNewThread } from '../threads.js'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
@@ -300,6 +300,7 @@ const chooseProjectPath = async (page: Page, path: string): Promise<void> => {
   await search.press('Enter')
   await expect(picker.locator('p').filter({ hasText: path }).first()).toBeVisible()
   await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
+  await confirmFolderSetupStep(page, path)
   await expect(picker).toBeHidden()
 }
 
@@ -567,6 +568,7 @@ When('a disposable jj repository is chosen by its home-relative path', async ({ 
   await search.press('Enter')
   await expect(picker.locator('p').filter({ hasText: homeRelativeRepositoryPath }).first()).toBeVisible()
   await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
+  await confirmFolderSetupStep(page, homeRelativeRepositoryPath)
   await expect(picker).toBeHidden()
   await expect(projectButton(page)).toHaveText('repo')
 })
@@ -1069,7 +1071,11 @@ When('a disposable jj repository with an asset icon is chosen as the New thread 
 Then('the project row shows the icon the repository ships', async ({ page }: { page: Page }) => {
   // Project rows only exist while the thread list groups by project.
   await page.getByRole('button', { name: /^Group: /u }).click()
-  await page.getByRole('menuitemradio', { name: /^Project$/u }).or(page.getByRole('option', { name: /^Project$/u })).first().click()
+  await page
+    .getByRole('menuitemradio', { name: /^Project$/u })
+    .or(page.getByRole('option', { name: /^Project$/u }))
+    .first()
+    .click()
   await recordAssertion(page, 'jj-integration-project-icon-comes-from-the-repository', async () => {
     await expect(page.locator('[data-project-icon-source="assets/icon.svg"]')).toBeVisible({ timeout: 30_000 })
   })

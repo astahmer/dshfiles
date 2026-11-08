@@ -44,19 +44,19 @@ export const registerWorkspaceFolder = async (page: Page, path: string, open: (p
  */
 export const confirmFolderSetupStep = async (page: Page, path: string): Promise<void> => {
   const setup = page.getByRole('dialog', { name: `Add ${basename(path)}`, exact: true })
-  const asked = await setup
-    .waitFor({ state: 'visible', timeout: 10_000 })
-    .then(() => true)
-    .catch(() => false)
-  if (!asked) return
-  for (const name of ['Add project', 'Add without a repository', 'Enable Jujutsu and add']) {
-    const button = setup.getByRole('button', { name, exact: true })
-    if ((await button.count()) === 0) continue
-    await button.click()
-    await expect(setup).toBeHidden()
-    return
-  }
-  throw new Error(`The setup step offered no way to register ${path}.`)
+  await expect(setup).toBeVisible({ timeout: 30_000 })
+  // The inspection is async: before it lands the footer still holds a disabled "Add project", so wait until one of the
+  // choices its real kind offers is enabled instead of racing that placeholder.
+  await expect(async () => {
+    for (const name of ['Add project', 'Add without a repository', 'Enable Jujutsu and add']) {
+      const button = setup.getByRole('button', { name, exact: true })
+      if ((await button.count()) === 0 || !(await button.isEnabled())) continue
+      await button.click()
+      return
+    }
+    throw new Error(`The setup step for ${path} is still inspecting.`)
+  }).toPass({ timeout: 20_000 })
+  await expect(setup).toBeHidden()
 }
 
 /** Send a message from whichever composer is on screen and wait until that turn settles. */
@@ -115,3 +115,5 @@ export const startThreadWithModel = async (page: Page, input: { readonly project
   await expect(projectButton).toHaveText(expectedProject)
   await selectModelForNewThread(page, input.model)
 }
+
+// marker-1794103637

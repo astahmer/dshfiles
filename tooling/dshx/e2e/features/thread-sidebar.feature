@@ -39,6 +39,12 @@ Feature: Thread sidebar journeys
     When a nonblank Host thread is continued in another registered project from its context menu
     Then the continuation opens in that project with the conversation and the original thread is settled
 
+  @scenario:thread-sidebar.turn-into-project
+  Scenario: Turn a No folder thread into its own project
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/jj-integration, @dshfiles/workspace-folder-picker" is booted
+    When a No folder thread is started and turned into a project from its row menu
+    Then the thread sits under its own project and its scratch folder exists
+
   @scenario:thread-sidebar.section-order
   Scenario: Keep remote threads with view groups by default or separate them
     Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host" is booted

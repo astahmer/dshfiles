@@ -1,5 +1,6 @@
 import { expect, type Page, type TestInfo } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
+import { confirmFolderSetupStep } from './threads.js'
 
 /** M0 materializes a Host Session only after a real first submit. No step registration or profile side effects. */
 export const materializeNonblankThread = async (page: Page, prompt: string, testInfo: TestInfo): Promise<string> => {
@@ -23,6 +24,7 @@ export const materializeNonblankThread = async (page: Page, prompt: string, test
       await mkdir(workspace, { recursive: true })
       await picker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true }).fill(workspace)
       await picker.getByRole('button', { name: 'Register project', exact: true }).first().click()
+      await confirmFolderSetupStep(page, workspace)
     }
     await expect(picker).toBeHidden()
   }
