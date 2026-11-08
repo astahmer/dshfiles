@@ -13,7 +13,10 @@ const hostWith = (ctx: CordisContext, archived: readonly string[]) => {
 }
 
 const liveThreadsOf = (ctx: CordisContext, archived: readonly string[]) =>
-  Effect.provide(UndoSessions.use(sessions => sessions.liveThreads), Layer.provide(undoSessionsLayer, hostWith(ctx, archived)))
+  Effect.provide(
+    UndoSessions.use(sessions => sessions.liveThreads),
+    Layer.provide(undoSessionsLayer, hostWith(ctx, archived)),
+  )
 
 describe('undo sessions', () => {
   it.effect('reads the shared-directory guard from the attached Sessions only', () =>
@@ -58,9 +61,7 @@ describe('undo sessions', () => {
         yield* Effect.promise(() => ctx.plugin(SessionStore))
         const session = ctx.sessions.create(SessionId('session-live'), { meta: { cwd: '/workspace/shared' } })
         session.append('turn/start', { turn: 1 })
-        expect(yield* liveThreadsOf(ctx, [])).toEqual([
-          { sessionId: 'session-live', cwd: '/workspace/shared', parentSessionId: null },
-        ])
+        expect(yield* liveThreadsOf(ctx, [])).toEqual([{ sessionId: 'session-live', cwd: '/workspace/shared', parentSessionId: null }])
       }),
     ),
   )
