@@ -226,6 +226,46 @@ button.crumbEditable {
   display: none;
 }
 
+/* Phone shell (thread-sidebar marks the document with data-shell-phone-nav):
+   secondary thread controls marked data-phone-thread-tool (the view tabs, the
+   right-panel opener, the composer's annotation picker and change ribbon) fold
+   behind one toggle so the narrow header and composer stop overlapping. The
+   toggle sets data-phone-thread-tools on the document (phone-thread-tools.ts). */
+.phoneToolsToggle {
+  display: none;
+}
+
+@media (max-width: 639.98px) {
+  :global(html[data-shell-phone-nav]) .phoneToolsToggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-left: auto;
+    padding: 0;
+    border: none;
+    border-radius: var(--dsw-radius-md);
+    background: transparent;
+    color: var(--dsw-alias-label-tertiary);
+    cursor: pointer;
+  }
+
+  :global(html[data-shell-phone-nav]) .phoneToolsToggle[aria-expanded='true'] {
+    color: var(--dsw-alias-state-business-primary);
+  }
+
+  :global(html[data-shell-phone-nav]:not([data-phone-thread-tools])) :global([data-phone-thread-tool]) {
+    display: none !important;
+  }
+
+  :global(html[data-shell-phone-nav]:not([data-phone-thread-tools])) .header:has(.tabs[data-phone-thread-tool]) {
+    min-height: 0;
+    padding-bottom: 10px;
+  }
+}
+
 /* figma Tab_Group 34:11441: 35px strip, gap 36, pad-left 8, tabs bottom-aligned.
    Positioned above the header's own paint, so the active bar covers the rule. */
 .tabs {

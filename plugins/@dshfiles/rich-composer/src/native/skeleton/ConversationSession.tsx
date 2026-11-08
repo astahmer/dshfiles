@@ -9,6 +9,7 @@ import type {
 } from '../contract/slots.ts'
 import { resolveActiveView } from '../view-selection.ts'
 import { DefaultConversationViews } from './DefaultConversationViews.tsx'
+import { togglePhoneThreadTools, usePhoneThreadToolsOpen } from './phone-thread-tools.ts'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the strict session body contract. */
@@ -123,6 +124,7 @@ export function ConversationSessionHeader({
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
+  const phoneToolsOpen = usePhoneThreadToolsOpen()
   const [renaming, setRenaming] = useState(false)
   const [renameError, setRenameError] = useState<string>()
   useEffect(() => {
@@ -141,6 +143,8 @@ export function ConversationSessionHeader({
     }
   }
   const showTabs = !hideChrome && tabs.length > 1
+  // A view other than the first stays reachable on a phone: its strip never folds away while it is selected.
+  const foldTabs = active === undefined || active.id === tabs[0]?.id
   return (
     <>
       <div className={css.titleRow}>
@@ -236,14 +240,30 @@ export function ConversationSessionHeader({
             </div>
           </>
         )}
-        <div className={css.headerCorner} data-conversation-header-corner="">
+        {!hideChrome && (
+          <button
+            type="button"
+            className={css.phoneToolsToggle}
+            aria-label={t('session.phoneTools')}
+            aria-expanded={phoneToolsOpen}
+            data-phone-thread-tools-toggle=""
+            onClick={togglePhoneThreadTools}
+          >
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
+              <path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none" />
+              <circle cx="10.5" cy="4.5" r="1.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
+              <circle cx="5.5" cy="11.5" r="1.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
+            </svg>
+          </button>
+        )}
+        <div className={css.headerCorner} data-conversation-header-corner="" data-phone-thread-tool="">
           {renderSlot('conversation.session.header.corner', {})}
         </div>
       </div>
       {showTabs && (
         // data-conversation-tabs: marks the tab strip, which the window-chrome
         // geometry and the browser coverage lane anchor on.
-        <div className={css.tabs} role="tablist" data-conversation-tabs="">
+        <div className={css.tabs} role="tablist" data-conversation-tabs="" data-phone-thread-tool={foldTabs ? '' : undefined}>
           {tabs.map(viewTab => (
             <button
               key={viewTab.id}

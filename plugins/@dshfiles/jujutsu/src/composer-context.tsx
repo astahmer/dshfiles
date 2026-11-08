@@ -242,7 +242,12 @@ const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null
 
   return (
     <TooltipProvider delayDuration={500}>
-      <div className="dshx-root dshx:mb-1.5 dshx:rounded-lg dshx:border dshx:bg-background/90 dshx:text-xs" ref={context.ref} style={ABOVE_STYLE}>
+      <div
+        className="dshx-root dshx:mb-1.5 dshx:rounded-lg dshx:border dshx:bg-background/90 dshx:text-xs"
+        data-phone-thread-tool=""
+        ref={context.ref}
+        style={ABOVE_STYLE}
+      >
         <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:px-1 dshx:py-0.5">
           <Button
             aria-expanded={expanded}

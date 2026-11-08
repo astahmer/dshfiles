@@ -309,6 +309,39 @@ describe('fixed Conversation content factory composition', () => {
     expect(titleInput()).toBeNull()
   })
 
+  it('folds secondary thread tools behind the phone toggle, but never the strip of a selected secondary view', () => {
+    const chat = fixture('tools-chat')
+    const other = fixture('tools-other', 'other')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    dispose.push(() => document.documentElement.removeAttribute('data-phone-thread-tools'))
+    act(() =>
+      root.render(
+        <>
+          <section data-bound-session="tools-chat">
+            <ConversationSessionHeader {...chat.header} />
+          </section>
+          <section data-bound-session="tools-other">
+            <ConversationSessionHeader {...other.header} />
+          </section>
+        </>,
+      ),
+    )
+    const tabs = (session: string) => element.querySelector(`[data-bound-session="${session}"] [data-conversation-tabs]`)
+    expect(tabs('tools-chat')?.hasAttribute('data-phone-thread-tool')).toBe(true)
+    expect(tabs('tools-other')?.hasAttribute('data-phone-thread-tool')).toBe(false)
+    expect(element.querySelector('[data-bound-session="tools-chat"] [data-conversation-header-corner]')?.hasAttribute('data-phone-thread-tool')).toBe(true)
+    const toggles = element.querySelectorAll<HTMLButtonElement>('[data-phone-thread-tools-toggle]')
+    expect(Array.from(toggles, toggle => toggle.getAttribute('aria-expanded'))).toEqual(['false', 'false'])
+    act(() => toggles[0]?.click())
+    expect(document.documentElement.hasAttribute('data-phone-thread-tools')).toBe(true)
+    expect(Array.from(toggles, toggle => toggle.getAttribute('aria-expanded'))).toEqual(['true', 'true'])
+    act(() => toggles[1]?.click())
+    expect(document.documentElement.hasAttribute('data-phone-thread-tools')).toBe(false)
+  })
+
   it('selects native child views independently in two fixed Sessions without replacing either editor', () => {
     vi.stubGlobal(
       'ResizeObserver',
