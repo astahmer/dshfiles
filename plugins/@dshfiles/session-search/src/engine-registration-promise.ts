@@ -36,13 +36,12 @@ export class SessionQueryOwnership extends Context.Service<
           searchEvents: yield* DshxPlugin.callback(worker.searchEvents),
           health: yield* DshxPlugin.callback(() => worker.health),
         })
+        const cacheSize = options.preparedSessionCacheSize
+        const engineOptions: { readonly client: SearchWorkerPort; readonly preparedSessionCacheSize?: number } =
+          cacheSize === undefined ? { client: port } : { client: port, preparedSessionCacheSize: cacheSize }
         const engine = yield* Effect.acquireRelease(
           Effect.tryPromise({
-            try: () =>
-              host.ctx.plugin(SessionSearchEngine, {
-                client: port,
-                ...(options.preparedSessionCacheSize === undefined ? {} : { preparedSessionCacheSize: options.preparedSessionCacheSize }),
-              }),
+            try: () => host.ctx.plugin(SessionSearchEngine, engineOptions),
             catch: cause => new EngineStartFailed({ cause }),
           }),
           registered => Effect.sync(() => registered.dispose()),
