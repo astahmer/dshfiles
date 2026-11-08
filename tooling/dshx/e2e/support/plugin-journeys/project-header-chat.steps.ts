@@ -36,6 +36,45 @@ const openRow = async (page: Page, id: string): Promise<void> => {
   await expect.poll(() => selectedThread(page)).toBe(id)
 }
 
+/**
+ * The frame eases a sidebar width change, so a box read right after one reports the pane mid-transition (squeezed, not
+ * the layout the next assertion is about). Wait for the frame to stop animating, then for the box to hold still.
+ */
+const waitForSidebarLayout = async (page: Page): Promise<void> => {
+  await expect(page.locator('[data-animating]')).toHaveCount(0, { timeout: 10_000 })
+  await expect(async () => {
+    const settled = await sidebar(page).boundingBox()
+    await page.waitForTimeout(150)
+    expect(await sidebar(page).boundingBox()).toEqual(settled)
+  }).toPass({ timeout: 10_000 })
+}
+
+/**
+ * The thread list at any width. On a desktop it is the sidebar's own panel, opened by its "Expand sidebar" toggle when
+ * collapsed; on a phone the frame hides that column and its toggle, and the list is the phone stack's Threads page,
+ * opened from the Destinations tab bar.
+ */
+const openThreadList = async (page: Page): Promise<void> => {
+  if (!(await sidebar(page).isVisible())) {
+    const phoneThreads = page.getByRole('navigation', { name: 'Destinations', exact: true }).getByRole('button', { name: 'Threads', exact: true })
+    if (await phoneThreads.isVisible()) await phoneThreads.click()
+    else {
+      const expandSidebar = page.getByRole('button', { name: 'Expand sidebar', exact: true })
+      if (await expandSidebar.isVisible()) await expandSidebar.click()
+    }
+  }
+  await waitForSidebarLayout(page)
+}
+
+/**
+ * A resize re-renders the frame and the phone stack a frame later, so a control read straight after it still belongs to
+ * the previous width. Wait for the phone mark the sidebar publishes (`< 640px`) before reading either layout.
+ */
+const resizeTo = async (page: Page, width: number): Promise<void> => {
+  await page.setViewportSize({ width, height: 838 })
+  await expect(page.locator('html[data-shell-phone-nav]')).toHaveCount(width < 640 ? 1 : 0)
+}
+
 const createFromHeader = async (page: Page, button: Locator, key?: 'Enter' | 'Space'): Promise<string> => {
   const previous = selectedThread(page)
   if (key === undefined) await button.click()
@@ -105,14 +144,13 @@ Then('the project header plus works with keyboard activation and a narrow sideba
   const journey = journeys.get(page)
   if (journey === undefined) throw new Error('The project-header journey was not prepared.')
   await recordAssertion(page, 'project-header-chat-keyboard-and-narrow-layout', async () => {
-    await page.setViewportSize({ width: 480, height: 838 })
-    const expandSidebar = page.getByRole('button', { name: 'Expand sidebar', exact: true })
-    await expandSidebar.click()
+    await resizeTo(page, 480)
+    await openThreadList(page)
     const group = projectHeader(page, 'Beta project')
     const create = group.getByRole('button', { name: 'New chat in Beta project', exact: true })
     for (const key of ['Enter', 'Space'] as const) {
       const sessionId = await createFromHeader(page, create, key)
-      if (await expandSidebar.isVisible()) await expandSidebar.click()
+      await openThreadList(page)
       await expect(group.getByRole('button', { expanded: true })).toBeVisible()
       await expect(row(page, sessionId)).toContainText('New chat')
       expect(Schema.decodeUnknownSync(listedSchema)(await journey.call('list', {})).threads.some(thread => thread.sessionId === sessionId)).toBe(false)
@@ -120,10 +158,10 @@ Then('the project header plus works with keyboard activation and a narrow sideba
     const longTitle = 'Beta project with a very long title that should truncate instead of hiding the new chat button'
     await journey.call('projectRename', { projectId: journey.beta, title: longTitle })
     for (const width of [360, 480, 768, 1024]) {
-      await page.setViewportSize({ width, height: 838 })
+      await resizeTo(page, width)
       const longCreate = sidebar(page).getByRole('button', { name: `New chat in ${longTitle}`, exact: true })
       await expect(async () => {
-        if (await expandSidebar.isVisible()) await expandSidebar.click()
+        await openThreadList(page)
         await expect(longCreate).toBeVisible({ timeout: 1_000 })
       }).toPass({ timeout: 15_000 })
       const buttonBox = await longCreate.boundingBox()

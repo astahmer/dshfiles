@@ -6,7 +6,7 @@ Feature: Project header chat creation
 
   @scenario:thread-sidebar.project-header-chat
   Scenario: Create a chat in a collapsed project while another project is open
-    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/frame-layout" is booted
     When two local projects have conversations and the sidebar is grouped by project
     Then the project header plus creates in its own project without toggling collapse
     And the project header plus works with keyboard activation and a narrow sidebar
