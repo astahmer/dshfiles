@@ -5,6 +5,7 @@
  * service, and silently leaves content search on the read path that freezes the Host.
  */
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
+import { pruneProjectionCache } from './projection-cache-prune.js'
 import { Api, DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer, Option, Schema, Stream } from 'effect'
@@ -85,6 +86,14 @@ const main = Effect.gen(function* () {
     yield* sendArchived()
     yield* Effect.forever(Effect.andThen(Effect.sleep('10 seconds'), sendArchived())).pipe(Effect.forkChild)
     yield* worker.startIngest(root).pipe(Effect.catchCause(cause => Effect.logWarning('session-search: ingest could not start', cause)))
+    // The projection cache is derived and the core domain loads all of it at boot, so a stale record costs heap for
+    // nothing; a Session opened again rebuilds its checkpoint from the log.
+    const pruneCheckpoints = Effect.sync(() => pruneProjectionCache({ now: Date.now() })).pipe(
+      Effect.tap(removed => (removed > 0 ? Effect.logInfo('session-search: dropped stale projection checkpoints', { removed }) : Effect.void)),
+      Effect.catchCause(cause => Effect.logWarning('session-search: projection checkpoints could not be pruned', cause)),
+    )
+    yield* pruneCheckpoints
+    yield* Effect.forever(Effect.andThen(Effect.sleep('1 hour'), pruneCheckpoints)).pipe(Effect.forkChild)
   }
   yield* HostEvents.stream('session/event').pipe(
     Stream.debounce(NUDGE_DEBOUNCE),
