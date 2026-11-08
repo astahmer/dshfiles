@@ -231,6 +231,18 @@ export class ModelDirectory {
     }
   }
 
+  /**
+   * Publish only a snapshot whose content differs: subscribing projections
+   * (context pressure, drafts, the catalog lifecycle) notify far more often
+   * than the picker's rows change, and every redundant publish re-renders the
+   * whole model list.
+   * @param next - the snapshot derived from the current inputs.
+   */
+  private publish(next: ModelDirectoryState): void {
+    if (sameSnapshot(this.store.getSnapshot(), next)) return
+    this.store.set(next)
+  }
+
   private setSelection(selection: SelectionState): void {
     this.selection = selection
     this.syncInputs()
@@ -250,7 +262,7 @@ export class ModelDirectory {
     const retainedEffort = effort === undefined ? undefined
       : reasoning?.efforts.find(level => level.id === effort)?.name ?? effort
     if (catalog.status !== 'ready' || catalog.value === null || (!local && projected === undefined)) {
-      this.store.set({
+      this.publish({
         current: local ? intended ?? this.store.getSnapshot().current
           : catalog.value === null ? null : this.store.getSnapshot().current,
         ...retainedEffort === undefined ? {} : { retainedEffort },
@@ -266,7 +278,7 @@ export class ModelDirectory {
     const selection = intended ?? catalog.value.default
     const routable = catalog.value.groups.some(group => group.id === selection.provider
       && group.models.some(model => model.id === selection.model))
-    this.store.set({
+    this.publish({
       current: selection,
       ...retainedEffort === undefined ? {} : { retainedEffort },
       routable,
@@ -278,6 +290,16 @@ export class ModelDirectory {
     })
   }
 }
+
+const sameSnapshot = (left: ModelDirectoryState, right: ModelDirectoryState): boolean =>
+  left.current === right.current
+  && left.retainedEffort === right.retainedEffort
+  && left.routable === right.routable
+  && left.groups === right.groups
+  && left.failures === right.failures
+  && left.status === right.status
+  && left.pending === right.pending
+  && left.error === right.error
 
 function modelSelectionProjection(value: unknown): ModelSelectionProjection | undefined {
   return value === undefined ? undefined : value as ModelSelectionProjection
