@@ -167,23 +167,33 @@ export class SessionHistoryController {
      * follower ends and the client resyncs from a fresh snapshot instead of the Host queueing frames nobody read.
      */
     const MAX_BUFFERED_FRAMES = 4_096
+    // A frame count alone is not a memory bound: a durable Session event reaches 314 KB here, so 4,096 of them would be
+    // over a gigabyte. The follower also carries a byte budget, and a lagging client resyncs from a fresh snapshot.
+    const MAX_BUFFERED_BYTES = 8 * 1024 * 1024
+    let bufferedBytes = 0
+    const bytesOf = (item: { readonly type: 'event' | 'assistant-stream' }): number =>
+      item.type === 'assistant-stream' ? 1_024 : Buffer.byteLength(JSON.stringify(item))
+    const full = (item: { readonly type: 'event' | 'assistant-stream' }): boolean =>
+      buffered.size >= MAX_BUFFERED_FRAMES || bufferedBytes + bytesOf(item) > MAX_BUFFERED_BYTES
     const pushBack = (item: Parameters<typeof buffered.pushBack>[0]): void => {
       if (follower.closed) return
-      if (buffered.size >= MAX_BUFFERED_FRAMES) {
+      if (full(item)) {
         follower.closed = true
         notify()
         return
       }
+      bufferedBytes += bytesOf(item)
       buffered.pushBack(item)
       notify()
     }
     const pushFront = (item: Parameters<typeof buffered.pushFront>[0]): void => {
       if (follower.closed) return
-      if (buffered.size >= MAX_BUFFERED_FRAMES) {
+      if (full(item)) {
         follower.closed = true
         notify()
         return
       }
+      bufferedBytes += bytesOf(item)
       buffered.pushFront(item)
       notify()
     }
