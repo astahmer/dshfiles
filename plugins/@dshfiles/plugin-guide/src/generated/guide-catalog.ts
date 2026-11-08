@@ -1211,6 +1211,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/jj-integration/no-folder",
+      "kind": "module",
+      "title": "@dshfiles/jj-integration/no-folder",
+      "summary": "The scratch workspace every \"No folder\" thread starts in. Shared with the thread sidebar, which offers to promote one into a project, so both halves agree on the folder marker and on the title a scratch workspace still carries.",
+      "publicSymbol": "NoFolderWorkspace",
+      "importFrom": "@dshfiles/jj-integration/no-folder",
+      "owner": "@dshfiles/jj-integration",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/jj-integration/src/no-folder.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/loopback-access/startup",
       "kind": "module",
       "title": "@dshfiles/loopback-access/startup",
@@ -1861,7 +1881,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadActionsApi",
       "importFrom": "@dshfiles/thread-sidebar/thread-actions-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.ts:70",
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.ts:71",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-actions",
@@ -2356,7 +2376,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "projectLifecycleApi",
       "importFrom": "@dshfiles/workspace-folder-picker/project-lifecycle-api",
       "owner": "@dshfiles/workspace-folder-picker",
-      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle-api.ts:120",
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle-api.ts:130",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/workspace-folder-picker:workspace-folder-picker.project-lifecycle",
@@ -2369,10 +2389,30 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/workspace-folder-picker owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: tools, startClone, cloneJobs, cancelClone, retryClone, createProject, inspect, initProject, readProjectConfig, icon, publishProject, removeProject",
-        "Agent tools: project_tools_status (read-only), project_clone, project_clone_jobs (read-only), project_clone_cancel, project_clone_retry, project_create, project_inspect (read-only), project_init, project_config_read (read-only), project_icon (read-only), project_publish"
+        "Methods: tools, startClone, cloneJobs, cancelClone, retryClone, createProject, inspect, initProject, readProjectConfig, projects, projectIdentities, icon, publishProject, removeProject",
+        "Agent tools: project_tools_status (read-only), project_clone, project_clone_jobs (read-only), project_clone_cancel, project_clone_retry, project_create, project_inspect (read-only), project_init, project_config_read (read-only), project_projects (read-only), project_identities (read-only), project_icon (read-only), project_publish"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/workspace-folder-picker/project-folder-setup",
+      "kind": "module",
+      "title": "@dshfiles/workspace-folder-picker/project-folder-setup",
+      "summary": "Public module of @dshfiles/workspace-folder-picker.",
+      "publicSymbol": "ProjectFolderSetup",
+      "importFrom": "@dshfiles/workspace-folder-picker/project-folder-setup",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-folder-setup.tsx",
+      "docs": "docs/plugin-boundaries.md",
       "command": null
     },
     {
@@ -2584,10 +2624,11 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Catalog metadata only; features:check validates the surface/destination pair.",
       "occupancy": "static",
       "occupants": [
-        "@dshfiles/multi-host › logical-project-grouping"
+        "@dshfiles/multi-host › logical-project-grouping",
+        "@dshfiles/thread-sidebar › thread-subscriptions"
       ],
       "details": [
-        "Used by 1 catalog feature(s)",
+        "Used by 2 catalog feature(s)",
         "Destinations in use: threads"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2615,7 +2656,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › inline-title-edit"
       ],
       "details": [
-        "Used by 30 catalog feature(s)",
+        "Used by 31 catalog feature(s)",
         "Destinations in use: inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2671,7 +2712,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agents › agent-mentions"
       ],
       "details": [
-        "Used by 58 catalog feature(s)",
+        "Used by 59 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2727,7 +2768,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 52 catalog feature(s)",
+        "Used by 53 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

@@ -6,6 +6,7 @@ export default defineConfig({
   modules: {
     'directory-browser-api': 'src/directory-browser-api.ts',
     'project-lifecycle-api': 'src/project-lifecycle-api.ts',
+    'project-folder-setup': 'src/project-folder-setup.tsx',
     picker: 'src/picker/index.ts',
     'project-icon-view': 'src/project-icon-view.tsx',
     'project-config': 'src/project-config.ts',

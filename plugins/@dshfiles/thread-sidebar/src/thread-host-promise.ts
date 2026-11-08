@@ -8,6 +8,7 @@ import { HostCommands } from '@dshfiles/dshx/effect/host-commands'
 import { createHostApiClient, type CommandResult } from '@dshfiles/dshx/host'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { NoFolderWorkspace } from '@dshfiles/jj-integration/no-folder'
+import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { continuationApi } from '@dshfiles/session-controller/continuation-api'
 import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
 import { Context, Effect, Layer } from 'effect'
@@ -31,6 +32,7 @@ export class ThreadActions extends Context.Service<ThreadActions, ThreadActionSe
       const sessions = createHostApiClient(ctx, sessionsApi, packageId)
       const continuation = createHostApiClient(ctx, continuationApi, packageId)
       const jj = createHostApiClient(ctx, jjIntegrationApi, packageId)
+      const picker = createHostApiClient(ctx, projectLifecycleApi, packageId)
 
       const unpin = (sessionId: string) => host(() => ctx.workspaceController.unpinSession({ sessionId: SessionId(sessionId) }))
 
@@ -150,6 +152,13 @@ export class ThreadActions extends Context.Service<ThreadActions, ThreadActionSe
               model: selected.model,
               ...(selected.reasoningEffort === undefined ? undefined : { reasoningEffort: selected.reasoningEffort }),
             })),
+          ),
+        inspectProject: path =>
+          host(signal => picker.inspect({ path }, { signal })).pipe(
+            // A Host without the folder picker still registers; the caller then gets no inspection instead of a failure.
+            Effect.catchTag('ThreadHostCallFailed', error =>
+              error.cause instanceof Error && isApiOwnerMissing(error.cause) ? Effect.succeed(null) : Effect.fail(error),
+            ),
           ),
         registerProject: (path, title) =>
           host(async () => {

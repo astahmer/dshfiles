@@ -1,6 +1,7 @@
 import { encodeSessionReferenceUri } from '@deepseek-ai/dsh-session-reference'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
+import type { FolderInspection } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { Effect, Option, Schedule, Schema } from 'effect'
 import { ThreadHostCallFailed } from './sidebar-errors.js'
 import { ThreadReferencesModel, type ThreadReferenceMention, type ThreadReferenceThread } from './thread-references.js'
@@ -68,6 +69,8 @@ export interface ThreadActionDeps {
     readonly model: string
     readonly reasoningEffort?: string
   }) => HostEffect<{ readonly provider: string; readonly model: string; readonly reasoningEffort?: string }>
+  /** What the folder is before it is registered, so no surface adds a project blind; null without the picker's read. */
+  readonly inspectProject: (path: string) => HostEffect<FolderInspection | null>
   readonly registerProject: (
     path: string,
     title: string | undefined,
@@ -583,7 +586,9 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
     })).pipe(Effect.withSpan('thread actions project list')),
 
   projectRegister: Effect.fn('thread actions project register')(function* ({ input }: ThreadActionContext<ProjectRegisterInput>) {
-    return yield* attempt(deps.registerProject(input.path, input.title), `Could not register ${input.path} as a project.`)
+    const inspection = yield* Effect.option(attempt(deps.inspectProject(input.path), `Could not inspect ${input.path}.`))
+    const registered = yield* attempt(deps.registerProject(input.path, input.title), `Could not register ${input.path} as a project.`)
+    return { ...registered, inspection: Option.getOrNull(inspection) }
   }),
 
   projectRename: Effect.fn('thread actions project rename')(function* ({ input }: ThreadActionContext<ProjectRenameInput>) {

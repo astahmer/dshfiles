@@ -502,7 +502,7 @@ interface RowActions {
   readonly followUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
   readonly continueIn: (sessionId: SessionSummary['id'], projectId: string) => void
   /** Turn a scratch thread's own folder into a project, so the thread stops being a No folder thread. */
-  readonly turnIntoProject: (session: SessionSummary) => void
+  readonly turnIntoProject: (session: SessionSummary, folder: string | undefined) => void
   readonly resume: (sessionId: SessionSummary['id']) => void
   readonly dismissRecovery: (sessionId: SessionSummary['id']) => void
   readonly beginRename: (sessionId: SessionSummary['id']) => void
@@ -555,6 +555,8 @@ interface ThreadRowProps {
   readonly parentTitle: string | undefined
   readonly workspaceId: string | undefined
   readonly workspaceTitle: string | undefined
+  /** The project folder behind the workspace id, for a thread whose Session summary carries no cwd. */
+  readonly workspacePath: string | undefined
   readonly workspaceName: string | undefined
   readonly machine: string | undefined
   readonly age: string
@@ -824,6 +826,7 @@ type ThreadContextMenuProps = Pick<
   | 'section'
   | 'workspaceId'
   | 'workspaceTitle'
+  | 'workspacePath'
   | 'actions'
   | 'notifyTarget'
 > & { readonly children: JSX.Element }
@@ -895,6 +898,10 @@ const RegisteredThreadRowActions = (props: { readonly target: ThreadRowActionTar
   )
 }
 
+/** A scratch thread's own folder is its Session cwd, or its project folder when the summary carries none. */
+const scratchThread = (session: SessionSummary, workspacePath: string | undefined, workspaceTitle: string | undefined): boolean =>
+  NoFolderWorkspace.isScratchWorkspace({ path: session.cwd ?? workspacePath ?? '', title: workspaceTitle ?? '' })
+
 const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   const { session, unread, archived, pinned, parked, settled, notifyTarget } = props
   const t = props.actions.translate
@@ -922,8 +929,8 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
           </ContextMenuSubContent>
         </ContextMenuSub>
       )}
-      {NoFolderWorkspace.isScratchWorkspace({ path: session.cwd ?? '', title: props.workspaceTitle ?? '' }) ? (
-        <ContextMenuItem onSelect={() => props.actions.turnIntoProject(session)}>{t('threadSidebarTurnIntoProject')}</ContextMenuItem>
+      {scratchThread(session, props.workspacePath, props.workspaceTitle) ? (
+        <ContextMenuItem onSelect={() => props.actions.turnIntoProject(session, props.workspacePath)}>{t('threadSidebarTurnIntoProject')}</ContextMenuItem>
       ) : null}
       <ContextMenuItem onSelect={() => props.actions.beginRename(session.id)}>{t('threadSidebarRenameThread')}</ContextMenuItem>
       <ContextMenuSeparator />
@@ -1238,6 +1245,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       section={props.section}
       workspaceId={props.workspaceId}
       workspaceTitle={props.workspaceTitle}
+      workspacePath={props.workspacePath}
       actions={props.actions}
       notifyTarget={props.notifyTarget}
     >
@@ -1759,8 +1767,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
    * A scratch thread's own folder becomes a project: the Session already lives there, so registering it gives the row a
    * project title of its own instead of the shared No folder label. The Host chooses a title no other project holds.
    */
-  const turnThreadIntoProject = async (session: SessionSummary): Promise<void> => {
-    const cwd = session.cwd
+  const turnThreadIntoProject = async (session: SessionSummary, folder: string | undefined): Promise<void> => {
+    const cwd = session.cwd ?? folder
     if (cwd === undefined) return
     try {
       const project = await props.projectRegister({ path: cwd, title: session.title?.trim() || session.displayTitle })
@@ -4394,7 +4402,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       },
       followUp: (sessionId, workspaceId) => latestRowActions.current.startFollowUp(sessionId, workspaceId),
       continueIn: (sessionId, projectId) => void latestRowActions.current.continueThreadIn(sessionId, projectId),
-      turnIntoProject: session => void latestRowActions.current.turnThreadIntoProject(session),
+      turnIntoProject: (session, folder) => void latestRowActions.current.turnThreadIntoProject(session, folder),
       resume: sessionId => void latestRowActions.current.resumeRecoverySession(sessionId),
       dismissRecovery: sessionId => void latestRowActions.current.dismissRecoverySession(sessionId),
       beginRename: sessionId => latestRowActions.current.beginRename(sessionId),
@@ -4578,6 +4586,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         parentTitle={lineage.parentTitle}
         workspaceId={workspaceId}
         workspaceTitle={workspaceId === undefined ? undefined : workspaceTitleById.get(workspaceId)}
+        workspacePath={workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)}
         workspaceName={realWorkspaceId === undefined || realWorkspaceId === workspaceId ? undefined : workspaceNameById.get(realWorkspaceId)}
         machine={machine}
         age={formatAge(session.updatedAt)}
@@ -5300,6 +5309,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   settled={settledSessionIds.has(session.id)}
                   workspaceId={workspaceId}
                   workspaceTitle={workspaceId === undefined ? undefined : workspaceTitleById.get(workspaceId)}
+                  workspacePath={workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)}
                   actions={rowActions}
                 >
                   {row}

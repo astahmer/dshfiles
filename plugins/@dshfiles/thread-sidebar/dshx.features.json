@@ -2,6 +2,58 @@
   "schemaVersion": 1,
   "features": [
     {
+      "id": "no-folder-promotion",
+      "title": "Turn a No folder thread into a project",
+      "summary": "A thread started in No folder runs in its own dated scratch folder. Its row menu offers Turn into project, which registers that folder as a project with a title no other project holds and moves the thread under its own project group; the folder and its revisions stay where they were. A thread that is already a project is never offered the row action.",
+      "reach": [
+        "click button \"New session\"",
+        "click button \"Choose workspace\"",
+        "click option \"No folder*\"",
+        "click button \"Send message\"",
+        "click button \"Thread actions\"",
+        "click menuitem \"Turn into project\"",
+        "expect text \"Turned into project*\""
+      ],
+      "surfaces": ["client", "host", "integration"],
+      "surface": "rowAction",
+      "destination": "threads",
+      "currentSurface": "thread-list: No folder row › Turn into project",
+      "configuration": [],
+      "states": ["scratch-thread", "promoted", "title-collision"],
+      "failureModes": [
+        "Promotion registers the thread's recorded cwd; a thread without one has no row action.",
+        "The row action appears only for a workspace still under the .dsh/no-folder marker with the No folder title.",
+        "A taken title becomes Name 2 instead of replacing another project.",
+        "A failed registration leaves the thread in No folder and reports the failure in the sidebar notice."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.turn-into-project",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.scratch-workspace-promotes-once",
+          "file": "plugins/@dshfiles/jj-integration/src/no-folder.test.ts",
+          "testName": "stops counting a scratch folder once it was turned into a project"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.promotion-title-collision",
+          "file": "plugins/@dshfiles/thread-sidebar/src/project-titles.test.ts",
+          "testName": "suffixes a title that is already taken"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
       "id": "multi-model-fan-out",
       "title": "Send one prompt to several models",
       "surface": "command",

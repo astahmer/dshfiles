@@ -35,6 +35,7 @@ const actionsLayer = (input: { readonly settled: Ref.Ref<ReadonlyArray<string>>;
     ownWorkspaceFor: unused,
     stop: unused,
     selectModel: unused,
+    inspectProject: unused,
     registerProject: unused,
     renameProject: unused,
     deleteProject: unused,

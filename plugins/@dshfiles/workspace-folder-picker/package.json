@@ -43,6 +43,10 @@
     "./project-icon-view": {
       "types": "./src/project-icon-view.tsx",
       "default": "./dist/project-icon-view.js"
+    },
+    "./project-folder-setup": {
+      "types": "./src/project-folder-setup.tsx",
+      "default": "./dist/project-folder-setup.js"
     }
   },
   "scripts": {

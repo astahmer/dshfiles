@@ -1,4 +1,5 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
+import { folderInspectionSchema } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import * as Schema from 'effect/Schema'
 
 const sessionIdSchema = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256))
@@ -318,11 +319,18 @@ export const threadActionsApi = defineApi({
         path: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(1024)),
         title: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(200))),
       }),
-      output: Schema.Struct({ projectId: Schema.String, title: Schema.String, path: Schema.String, created: Schema.Boolean }),
-      description: `Register an existing directory as a project so threads can live in it. ${ONLY_WHEN_ASKED}`,
+      output: Schema.Struct({
+        projectId: Schema.String,
+        title: Schema.String,
+        path: Schema.String,
+        created: Schema.Boolean,
+        inspection: Schema.NullOr(folderInspectionSchema),
+      }),
+      description: `Register an existing directory as a project so threads can live in it, and report what the folder is. It registers only: it never clones and never enables Jujutsu — read project_inspect, then project_init or jj_open_repository for that. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'project_register',
-        render: output => `${output.created ? 'Registered' : 'Already registered'} project ${output.title} (${output.projectId}) at ${output.path}.`,
+        render: output =>
+          `${output.created ? 'Registered' : 'Already registered'} project ${output.title} (${output.projectId}) at ${output.path}${output.inspection === null ? '' : ` · ${output.inspection.kind === 'none' ? 'no repository' : output.inspection.kind}`}.`,
       },
     }),
     projectRename: method({

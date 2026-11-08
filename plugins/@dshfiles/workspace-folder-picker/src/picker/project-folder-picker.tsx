@@ -61,6 +61,8 @@ export interface ProjectFolderPickerProps {
   readonly onRemoveProject?: (project: RegisteredProject) => Promise<void>
   /** Receives an absolute path before Host canonicalization; the caller must validate it before use. */
   readonly onUseAbsolutePath?: (absolutePath: string) => void
+  /** Shows the folder's setup step instead of registering it: what it is, plus Enable Jujutsu or Initialize. */
+  readonly onInspectFolder?: (absolutePath: string) => void
   readonly onSelect: (selection: ProjectFolderSelection) => void
   readonly onClose: () => void
   readonly mode?: 'projects' | 'directories'
@@ -232,6 +234,10 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   }
 
   const registerWorkspacePath = (path: string): void => {
+    if (props.onInspectFolder !== undefined) {
+      props.onInspectFolder(path)
+      return
+    }
     registerMutation.mutate(path, {
       onSuccess: project => props.onSelect(ProjectFolderPickerModel.workspaceSelection(project)),
     })

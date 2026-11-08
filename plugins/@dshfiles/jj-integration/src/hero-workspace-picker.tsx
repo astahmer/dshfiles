@@ -10,6 +10,7 @@ import {
   type WorkspacePickerPorts,
 } from '@dshfiles/workspace-folder-picker/picker'
 import { useApi } from '@dshfiles/dshx/client'
+import { ProjectFolderSetup } from '@dshfiles/workspace-folder-picker/project-folder-setup'
 import { workspaceFolderBrowserApi } from '@dshfiles/workspace-folder-picker/directory-browser-api'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { hostDestination, multiHostApi, multiHostQueries, RemoteSessionBootstrap, shouldBootstrapRemoteSession } from '@dshfiles/multi-host/destination'
@@ -59,6 +60,7 @@ export const HeroWorkspacePicker = (
   const multiHost = useApi(multiHostApi)
   const destination = hostDestination.useValue()
   const [remotePickerOpen, setRemotePickerOpen] = useState(false)
+  const [inspecting, setInspecting] = useState<string | null>(null)
   const directory = useQuery({ ...multiHostQueries.directory(multiHost), enabled: destination.kind === 'runtime' })
   const currentSessionId = mainViewSessionId(services.sessions.list.getSnapshot())
   const currentSessionOwner = useQuery({
@@ -187,28 +189,52 @@ export const HeroWorkspacePicker = (
   return (
     <>
       {bar}
-      <ProjectFolderPicker
-        projects={registered}
-        recentFolders={recentFolders}
-        pinnedWorkspaceIds={pinnedWorkspaceIds}
-        directoryPicker={directoryPicker}
-        onRegisterWorkspace={async path => {
-          const project = await props.ports.registerWorkspace(path)
-          await projects.refetch()
-          return project
-        }}
-        onRemoveProject={async project => {
-          await lifecycleApi.removeProject({ workspaceId: project.workspaceId })
-          await projects.refetch()
-        }}
-        onSelect={selection => void choose(selection).catch(() => props.onClose())}
-        onClose={props.onClose}
-        showNativePicker={pickerCapabilities.data?.nativePicker === true}
-        pathStyle={pickerCapabilities.data?.pathStyle}
-        disabled={projects.isLoading}
-        loading={projects.isLoading}
-        heading={props.t('chooseProject')}
-      />
+      {inspecting === null ? null : (
+        <ProjectFolderSetup
+          api={lifecycleApi}
+          path={inspecting}
+          onAdded={path => {
+            setInspecting(null)
+            void choose({
+              kind: 'directory',
+              canonicalPath: path,
+              title:
+                path
+                  .split(/[/\\]/u)
+                  .filter(part => part.length > 0)
+                  .at(-1) ?? path,
+            })
+          }}
+          onClose={() => setInspecting(null)}
+        />
+      )}
+      {inspecting === null ? (
+        <ProjectFolderPicker
+          projects={registered}
+          recentFolders={recentFolders}
+          pinnedWorkspaceIds={pinnedWorkspaceIds}
+          directoryPicker={directoryPicker}
+          onRegisterWorkspace={async path => {
+            const project = await props.ports.registerWorkspace(path)
+            await projects.refetch()
+            return project
+          }}
+          onInspectFolder={path => setInspecting(path)}
+          onRemoveProject={async project => {
+            await lifecycleApi.removeProject({ workspaceId: project.workspaceId })
+            await projects.refetch()
+          }}
+          onSelect={selection =>
+            selection.kind === 'workspace' ? void choose(selection).catch(() => props.onClose()) : setInspecting(selection.canonicalPath)
+          }
+          onClose={props.onClose}
+          showNativePicker={pickerCapabilities.data?.nativePicker === true}
+          pathStyle={pickerCapabilities.data?.pathStyle}
+          disabled={projects.isLoading}
+          loading={projects.isLoading}
+          heading={props.t('chooseProject')}
+        />
+      ) : null}
     </>
   )
 }

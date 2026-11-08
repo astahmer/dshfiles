@@ -8197,7 +8197,7 @@
     },
     {
       "name": "project_register",
-      "description": "Register an existing directory as a project so threads can live in it. Call only when the user asked for this.",
+      "description": "Register an existing directory as a project so threads can live in it, and report what the folder is. It registers only: it never clones and never enables Jujutsu — read project_inspect, then project_init or jj_open_repository for that. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {
