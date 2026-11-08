@@ -1,10 +1,8 @@
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PendingRestartSources } from '@dshfiles/thread-sidebar/restart-sources'
-import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
-import { Option } from 'effect'
-import * as Schema from 'effect/Schema'
 import { useSyncExternalStore } from 'react'
+import { decodeFrame, type DeferredPackage } from './frames.js'
 import { createPendingReread } from './reread.js'
 
 /**
@@ -25,16 +23,6 @@ const RECOVERY_INTERVAL_MS = 30_000
 const RECOVERY_DELAY_MS = 1_500
 // A probe stream the Host never answers must not stay open past one connect round trip.
 const REREAD_TIMEOUT_MS = 10_000
-
-const deferredPackageSchema = Schema.Struct({ id: Schema.NonEmptyString, reason: Schema.NonEmptyString })
-
-const frameSchema = Schema.Union([
-  Schema.Struct({ type: Schema.Literal('graph'), graph: Schema.Unknown }),
-  Schema.Struct({ type: Schema.Literal('rebuilt'), id: Schema.NonEmptyString, rev: Schema.NonEmptyString }),
-  Schema.Struct({ type: Schema.Literal('deferred'), packages: Schema.Array(deferredPackageSchema).check(Schema.isMaxLength(64)) }),
-])
-
-type DeferredPackage = typeof deferredPackageSchema.Type
 
 let current: readonly DeferredPackage[] = []
 let currentIds: readonly string[] = []
@@ -109,28 +97,21 @@ export default defineClient({
     }
     /** Handles one frame; returns true when it moved the deferred notice. */
     const receive = (data: string): boolean => {
-      let decoded: JsonValue
-      try {
-        decoded = decodeJson(jsonValueSchema, data)
-      } catch {
-        return false
-      }
-      const frame = Schema.decodeUnknownOption(frameSchema)(decoded)
-      if (Option.isNone(frame)) return false
-      const frameValue = frame.value
-      if (frameValue.type === 'graph') {
-        void ctx.modules.entries.sync(frameValue.graph).catch((error: unknown) => {
+      const frame = decodeFrame(data)
+      if (frame === undefined) return false
+      if (frame.type === 'graph') {
+        void ctx.modules.entries.sync(frame.graph).catch((error: unknown) => {
           ctx.logger.warn(error)
         })
         return false
       }
-      if (frameValue.type === 'rebuilt') {
-        void ctx.modules.entries.reload(frameValue.id, frameValue.rev).catch((error: unknown) => {
+      if (frame.type === 'rebuilt') {
+        void ctx.modules.entries.reload(frame.id, frame.rev).catch((error: unknown) => {
           ctx.logger.warn(error)
         })
         return false
       }
-      publish(frameValue.packages)
+      publish(frame.packages)
       return true
     }
 

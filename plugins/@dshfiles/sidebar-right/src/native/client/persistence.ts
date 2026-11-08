@@ -2,12 +2,7 @@
 import * as Schema from 'effect/Schema'
 import { Effect } from 'effect'
 import type { Branded } from '@deepseek-ai/dsh-brand'
-import {
-  EMPTY_HISTORY,
-  type PaneId,
-  type SplitId,
-  type TabId,
-} from '@deepseek-ai/dsh-client-ui-dockkit'
+import { EMPTY_HISTORY, type PaneId, type SplitId, type TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { SurfaceState } from './stores.ts'
 
 const persistencePrefix = 'dsh.sidebar-right.v1'
@@ -19,9 +14,7 @@ const rejectsInvalidReferences = 'Invalid saved sidebar layout references'
 
 /** A compile-time brand applied after the pattern already admitted the value. */
 const brandedId = <Id extends Branded<string>>(pattern: RegExp): Schema.Codec<Id, string> =>
-  Schema.String.check(Schema.isPattern(pattern)).pipe(
-    Schema.decodeTo(Schema.declare<Id>((value): value is Id => typeof value === 'string')),
-  )
+  Schema.String.check(Schema.isPattern(pattern)).pipe(Schema.decodeTo(Schema.declare<Id>((value): value is Id => typeof value === 'string')))
 
 const paneId = brandedId<PaneId>(paneIdPattern)
 const splitId = brandedId<SplitId>(splitIdPattern)
@@ -53,12 +46,13 @@ const tab = Schema.Struct({
   contentId: Schema.NonEmptyString,
   title: Schema.String,
 })
-const keyedBy = <Value>(pattern: RegExp) =>
-  Schema.makeFilter<Record<string, Value>>(entries =>
-    (Object.keys(entries).every(key => pattern.test(key)) ? true : rejectsInvalidReferences))
 const layout = Schema.Struct({
-  nodes: Schema.Record(Schema.String, node).check(keyedBy(nodeIdPattern)),
-  tabs: Schema.Record(Schema.String, tab).check(keyedBy(tabIdPattern)),
+  nodes: Schema.Record(Schema.String, node).check(
+    Schema.makeFilter(nodes => (Object.keys(nodes).every(key => nodeIdPattern.test(key)) ? true : rejectsInvalidReferences)),
+  ),
+  tabs: Schema.Record(Schema.String, tab).check(
+    Schema.makeFilter(tabs => (Object.keys(tabs).every(key => tabIdPattern.test(key)) ? true : rejectsInvalidReferences)),
+  ),
   rootId: nodeId,
   floats: Schema.Array(paneId),
   activePaneId: paneId,

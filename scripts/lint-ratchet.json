@@ -7,7 +7,7 @@
     "antislop(no-unknown-parameters)": 228,
     "antislop(no-unknown-returns)": 116,
     "antislop(no-unsafe-dictionary-type)": 184,
-    "antislop(require-safety-comment-for-type-assertion)": 310,
+    "antislop(require-safety-comment-for-type-assertion)": 307,
     "react(purity)": 0,
     "react-hooks(exhaustive-deps)": 0,
     "ui-guidance(no-native-title)": 66
