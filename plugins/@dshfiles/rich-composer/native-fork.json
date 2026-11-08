@@ -23,6 +23,7 @@
     "src/native/locales.ts",
     "src/native/skeleton/InputBar.tsx",
     "src/native/skeleton/InputBar.module.css",
+    "src/native/skeleton/control-row-layout.ts",
     "src/native/input/editor/keymap.ts",
     "src/native/input/editor/ComposerContentEditable.tsx",
     "src/native/input/editor/view-binding.ts",
@@ -56,6 +57,7 @@
     "src/native/input/machine.test.ts",
     "src/native/input/retained-send.test.ts",
     "src/native/input/retained-send.ts",
+    "src/native/skeleton/control-row-layout.test.ts",
     "src/native/skeleton/run-row-placement.ts"
   ]
 }
