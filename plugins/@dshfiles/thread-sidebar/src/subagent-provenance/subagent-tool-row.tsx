@@ -11,11 +11,14 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { JsonText } from '../json-text.js'
 import { SubagentFeedModel } from './subagent-feed.js'
 import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
+import { subagentLabel } from './subagent-label.js'
 import { subagentName } from './subagent-name.js'
 import { providerModelLabel } from './route-label.js'
 
 const subagentArgumentsSchema = Schema.StructWithRest(
   Schema.Struct({
+    description: Schema.optional(Schema.String),
+    label: Schema.optional(Schema.String),
     prompt: Schema.optional(Schema.String),
     provider: Schema.optional(Schema.String),
     model: Schema.optional(Schema.String),
@@ -60,9 +63,14 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
     running,
     lastTurnCompleted: feedTurn ?? listedTurn,
   })
-  const name = subagentName({ sessionId: props.sessionId, callId: props.callId })
-  const heading = routeLabel === undefined ? `${props.t('tool.title.subagent')} · ${name}` : `${props.t('tool.title.subagent')} · ${name} · ${routeLabel}`
-  const title = childId === undefined ? heading : `${heading} · ${subagentStateLabel(props.preview.t, state)}`
+  // What the child does, from the call itself. The subagent glyph already names the kind, so a labelled row
+  // leads with its label; the generated name, with the kind spelled out, stands in until any text arrives.
+  // Narrow panes truncate from the end, so the child's state comes before the route.
+  const label = subagentLabel(args)
+  const name = label ?? `${props.t('tool.title.subagent')} · ${subagentName({ sessionId: props.sessionId, callId: props.callId })}`
+  const title = [name, childId === undefined ? undefined : subagentStateLabel(props.preview.t, state), routeLabel]
+    .filter((part): part is string => part !== undefined)
+    .join(' · ')
   const disclosure = props.useDisclosure()
   const prompt = args?.prompt?.trim()
   const expandable = (prompt !== undefined && prompt !== '') || output !== undefined || childId !== undefined

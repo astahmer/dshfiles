@@ -45,64 +45,69 @@ const props = ({
   provider,
   model,
   prompt = 'Review this change',
+  description,
   expanded = false,
 }: {
   provider: string
   model: string
   prompt?: string
+  description?: string
   expanded?: boolean
-}): Props => ({
-  phase: 'start',
-  // SAFETY: fixture id only needs SessionId's brand; no Host validates it.
-  sessionId: 'session-1' as SessionId,
-  block: {
+}): Props => {
+  const argsRaw = JSON.stringify({ prompt, provider, model, ...(description === undefined ? {} : { description }) })
+  return {
     phase: 'start',
+    // SAFETY: fixture id only needs SessionId's brand; no Host validates it.
+    sessionId: 'session-1' as SessionId,
+    block: {
+      phase: 'start',
+      callId: 'call-1',
+      name: 'subagent',
+      turn: 1,
+      step: 1,
+      time: 1,
+      subCalls: [],
+      argsRaw,
+      args: PartialArguments.fromText(argsRaw),
+    },
     callId: 'call-1',
-    name: 'subagent',
-    turn: 1,
-    step: 1,
-    time: 1,
-    subCalls: [],
-    argsRaw: JSON.stringify({ prompt, provider, model }),
-    args: PartialArguments.fromText(JSON.stringify({ prompt, provider, model })),
-  },
-  callId: 'call-1',
-  toolName: 'subagent',
-  cwd: '/workspace',
-  home: '/home/test',
-  openFile: unused,
-  loadImage: unused,
-  useDisclosure: () => ({ expanded, setExpanded: unused, toggle: unused }),
-  useAccess: unused,
-  useRemoteAccess: unused,
-  useSessionAccess: unused,
-  useWorkspaceAccess: unused,
-  useWorkspaces: unused,
-  usePanelInfo: unused,
-  useResource: unused,
-  // SAFETY: the row reads only `byId` of the session list.
-  useSessions: selector => selector({ byId: {} } as never),
-  // SAFETY: an empty status map holds nothing to misread.
-  useSessionStatus: selector => selector(new Map<string, never>() as never),
-  useSessionRetainInfo: unused,
-  useChat: unused,
-  useConversation: unused,
-  useInput: unused,
-  inputActions: {
-    captureInsertion: unused,
-    insertText: unused,
-    setDraft: unused,
-    persistDraft: unused,
-    addAttachments: unused,
-    removeAttachment: unused,
-    pruneAttachments: unused,
-    submit: unused,
-  },
-  useSession: unused,
-  useProjection: unused,
-  t: translate,
-  preview: previewBindings(),
-})
+    toolName: 'subagent',
+    cwd: '/workspace',
+    home: '/home/test',
+    openFile: unused,
+    loadImage: unused,
+    useDisclosure: () => ({ expanded, setExpanded: unused, toggle: unused }),
+    useAccess: unused,
+    useRemoteAccess: unused,
+    useSessionAccess: unused,
+    useWorkspaceAccess: unused,
+    useWorkspaces: unused,
+    usePanelInfo: unused,
+    useResource: unused,
+    // SAFETY: the row reads only `byId` of the session list.
+    useSessions: selector => selector({ byId: {} } as never),
+    // SAFETY: an empty status map holds nothing to misread.
+    useSessionStatus: selector => selector(new Map<string, never>() as never),
+    useSessionRetainInfo: unused,
+    useChat: unused,
+    useConversation: unused,
+    useInput: unused,
+    inputActions: {
+      captureInsertion: unused,
+      insertText: unused,
+      setDraft: unused,
+      persistDraft: unused,
+      addAttachments: unused,
+      removeAttachment: unused,
+      pruneAttachments: unused,
+      submit: unused,
+    },
+    useSession: unused,
+    useProjection: unused,
+    t: translate,
+    preview: previewBindings(),
+  }
+}
 
 const CHILD = 'child-session'
 
@@ -142,8 +147,18 @@ const previewRoot = () => document.querySelector('[data-dshfiles-live-preview="a
 afterEach(cleanup)
 
 describe('SubagentProvenanceToolRow', () => {
-  it('shows a readable subagent name and the requested provider/model', () => {
-    render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna' })} />)
+  it('leads with the delegation description, then the requested provider/model', () => {
+    render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna', description: 'Review parser' })} />)
+    expect(screen.getByText('Review parser · openai/gpt-6.1-luna')).not.toBeNull()
+  })
+
+  it('falls back to the first prompt line when the call has no description', () => {
+    render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna', prompt: 'Fix the flaky test\nThen report.' })} />)
+    expect(screen.getByText('Fix the flaky test · openai/gpt-6.1-luna')).not.toBeNull()
+  })
+
+  it('keeps a readable generated name while the call has no text yet', () => {
+    render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna', prompt: '' })} />)
     expect(screen.getByText(/^Create subagent · [A-Z][a-z]+ [A-Z][a-z]+ · openai\/gpt-6\.1-luna$/)).not.toBeNull()
   })
 
@@ -162,14 +177,15 @@ describe('SubagentProvenanceToolRow', () => {
 
   it('omits email-like route values from the visible tool card', () => {
     render(<SubagentProvenanceToolRow {...props({ provider: 'alex@example.com', model: 'gpt-6.1-luna' })} />)
-    expect(screen.getByText(/^Create subagent · [A-Z][a-z]+ [A-Z][a-z]+$/)).not.toBeNull()
+    expect(screen.getByText('Review this change')).not.toBeNull()
     expect(screen.queryByText(/alex@example\.com/)).toBeNull()
   })
 
   it('reports the child in agent terms, never the job lifecycle', () => {
     const { rerender } = render(<SubagentProvenanceToolRow {...settled({ running: true })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('working')
-    expect(screen.getByText(/subagentPreviewWorking$/)).not.toBeNull()
+    // The child's state comes before the route, so a narrow pane truncates the route first.
+    expect(screen.getByText('Review this change · subagentPreviewWorking · openai/gpt-6.1-luna')).not.toBeNull()
     rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: true })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('finished')
     rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: false })} />)

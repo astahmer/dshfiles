@@ -132,6 +132,10 @@
 .content > :not([hidden]):not(:empty) ~ :not([hidden]):not(:empty) {
   margin-top: var(--dsh-chat-flow-gap, 6px);
 }
+/* dshfiles: a run of consecutive subagent rows under its own count header. */
+.runBody {
+  --dsh-chat-flow-gap: 6px;
+}
 .expandedBody {
   max-height: none;
   overflow: visible;

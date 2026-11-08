@@ -361,6 +361,53 @@
           "reason": "Client-only: swapping a fence's element while a message renders reads browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "subagent-runs",
+      "title": "Fold consecutive subagent rows into one block",
+      "summary": "Two or more consecutive subagent rows in one process group sit under one count header (\"3 subagents · 2 working\") with a chevron, like the queue dock's count header. The block is open while any delegation works and folds once all have finished; the reader's own toggle wins from then on. A focus request for a folded row reveals it.",
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"commands, @ files or sessions*\" \"[[once call subagent {\\\"description\\\":\\\"Review the parser\\\",\\\"prompt\\\":\\\"Check parser edge cases\\\\n\\\\u005b\\\\u005bhold]]\\\"}]] [[once call subagent {\\\"prompt\\\":\\\"Audit the flaky timeline tests and report which ones fail\\\\n\\\\u005b\\\\u005bhold]]\\\"}]] [[once call subagent {\\\"description\\\":\\\"Summarize docs\\\",\\\"prompt\\\":\\\"Summarize the docs\\\"}]]\"",
+        "press Enter",
+        "expect text \"3 subagents*\""
+      ],
+      "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: process group",
+      "configuration": [],
+      "states": ["working", "all-finished", "reader-toggled"],
+      "failureModes": [
+        "A lone subagent row stays a plain row: a block needs two or more consecutive delegations.",
+        "A child whose Session status is unknown counts as not working, so the block may fold while it still runs; its row still reports the child's own state."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: folding subagent rows is presentation state and starts no Host work of its own."
+        }
+      ],
+      "verification": [
+        {
+          "id": "chat.subagent-runs",
+          "kind": "unit-test",
+          "file": "plugins/@dshfiles/chat/tests/subagent-runs.test.ts",
+          "testName": "folds two or more consecutive delegations and leaves lone ones as rows"
+        },
+        {
+          "id": "chat.subagent-run-block",
+          "kind": "unit-test",
+          "file": "plugins/@dshfiles/chat/tests/subagent-run-block.test.tsx",
+          "testName": "opens while any works, folds when all finish, and keeps the reader toggle"
+        },
+        {
+          "id": "chat.subagent-runs-browser",
+          "kind": "not-applicable",
+          "reason": "Walked in a scratch DSH through this feature's reach (three fake-provider delegations, two held working) and captured in WebKit at 1440x900 and 390x844: header, working count, open and folded states; screenshot in docs/screenshots. No Gherkin scenario yet."
+        }
+      ]
     }
   ]
 }

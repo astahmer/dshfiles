@@ -37,6 +37,7 @@
     "src/native/chat/AssistantMarkdown.tsx",
     "src/native/chat/AssistantNodeView.tsx",
     "src/native/chat/ChatFlow.tsx",
+    "src/native/chat/ChatGroupSeat.module.css",
     "src/native/chat/ChatGroupSeat.tsx",
     "src/native/chat/ChatNodeSeat.tsx",
     "src/native/chat/ChatView.module.css",
@@ -78,6 +79,7 @@
     "src/native/chat/markdown-image-links.ts",
     "src/native/chat/session-sidebar.test.ts",
     "src/native/chat/session-sidebar.ts",
+    "src/native/chat/subagent-runs.ts",
     "src/native/chat/user-image-references.ts",
     "src/native/image-gallery-scope.ts",
     "src/native/settings/ImageGalleryScopeRow.tsx"

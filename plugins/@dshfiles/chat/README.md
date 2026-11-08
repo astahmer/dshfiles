@@ -8,6 +8,8 @@
 
 ![Quote a message into the composer](docs/screenshots/quote-message.png)
 
+![Fold consecutive subagent rows into one block](docs/screenshots/subagent-runs.png)
+
 Owned fork of DSH's native Chat client plugin. It keeps the native transcript, its Slots, renderers, settings and
 scroll behaviour, and mounts only the newest transcript rows plus the ones the reader scrolls up to (see Local delta):
 on the live profile a single thread used to mount up to 42k DOM nodes on open.
@@ -78,6 +80,8 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/native/chat/AssistantMarkdown.tsx` (also), `UserContent.tsx`, `ChatView.tsx` (also) | text blocks render through `InlineReferenceMarkdown`, the Referenced-session line through `InlineReferenceText`, and the transcript sits in an `InlineReferenceScope` naming its Session |
 | `src/native/chat/MessageIconActions.tsx` (also), `MessageItem.tsx` (also), `TurnTailNodeView.tsx` (also), `src/native/locale.ts` (also) | a **Quote in composer** action beside Copy on durable user messages and completed assistant replies (below) |
 | `src/message-quote.ts` | new: the quote text (one `> ` per line, blank lines kept as `>`, an existing `>` nested one level), its source line and the selection scope of one message |
+| `src/native/chat/ChatGroupSeat.tsx` (also), `ChatGroupSeat.module.css`, `ChatFlow.tsx`, `src/native/locale.ts` (also) | two or more consecutive subagent rows in a process group sit under one count header (below); the flow hands the group `useSessionStatus` for the children's running state |
+| `src/native/chat/subagent-runs.ts` | new: which members are delegations (`subagent`, `subagent_*`), their child Session from `started subagent <id>`, the run segmentation and the working count |
 
 ### Quote a message into the composer
 
@@ -88,6 +92,15 @@ reaches outside it quotes the whole message. Nothing is sent: the quote is ordin
 like any draft. The write goes through the dshx `Composer` contract, so Chat imports nothing from Rich Composer and the
 action hides while no composer provides it. It has no agent tool: it only edits the user's own unsent draft, which
 AGENTS.md treats as presentation-only state; an agent that wants to quote writes the text in its own reply.
+
+### Subagent rows fold into one block
+
+Two or more consecutive subagent rows in one process group sit under one header, like the composer's queue dock:
+`3 subagents · 1 working` with the process chevron. The block is open by default while any delegation works (its call
+has not returned, or its child Session runs a turn) and folds once all have finished; the reader's own toggle wins from
+then on, and a focus request for a folded row (`chat-focus`) reveals it. A lone subagent row stays a plain row. The
+rows themselves, and the label each one shows, belong to thread-sidebar's subagent tool row. Open state is
+presentation-only, so the block has no agent tool.
 
 ### Focus a Turn, Step or tool call from another plugin
 
