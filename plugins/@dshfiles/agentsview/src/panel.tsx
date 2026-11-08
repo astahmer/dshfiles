@@ -12,7 +12,7 @@ import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ArrowLeftIcon, CopyIcon, RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { type JSX, useMemo, useState } from 'react'
+import { type JSX, memo, useCallback, useMemo, useState } from 'react'
 import { agentSessionsApi } from './api.js'
 import { SessionFormat } from './format.js'
 import { AgentLogs } from './parsers.js'
@@ -79,13 +79,19 @@ const TokenLine = (props: { readonly session: SessionSummary; readonly t: Agents
   )
 }
 
-const SessionRow = (props: {
+interface SessionSelection {
+  readonly key: string
+  readonly startAt: number | null
+}
+
+const SessionRow = memo((props: {
   readonly session: SessionSummary
   readonly selected: boolean
   readonly snippet?: string | undefined
+  readonly startAt?: number | null
   readonly now: number
   readonly t: AgentsviewTranslate
-  readonly onOpen: () => void
+  readonly onOpen: (selection: SessionSelection) => void
 }): JSX.Element => {
   const { session, t } = props
   return (
@@ -94,7 +100,7 @@ const SessionRow = (props: {
         type="button"
         data-agent-session={session.key}
         aria-current={props.selected ? 'true' : undefined}
-        onClick={props.onOpen}
+        onClick={() => props.onOpen({ key: session.key, startAt: props.startAt ?? null })}
         className={cn(
           'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-transparent dshx:px-3 dshx:py-2 dshx:text-left dshx:hover:bg-accent',
           props.selected && 'dshx:border-border dshx:bg-accent',
@@ -121,7 +127,7 @@ const SessionRow = (props: {
       </button>
     </li>
   )
-}
+})
 
 const ItemCard = (props: { readonly item: TranscriptItem; readonly t: AgentsviewTranslate }): JSX.Element => {
   const { item, t } = props
@@ -299,7 +305,8 @@ export const AgentSessionsPanel = (props: { readonly t: AgentsviewTranslate }): 
   const [text, setText] = useState('')
   const [submitted, setSubmitted] = useState<string | null>(null)
   const [limit, setLimit] = useState(PAGE)
-  const [selected, setSelected] = useState<{ readonly key: string; readonly startAt: number | null } | null>(null)
+  const [selected, setSelected] = useState<SessionSelection | null>(null)
+  const openSession = useCallback((selection: SessionSelection) => setSelected(selection), [])
   const filter = useDebouncedValue({ value: text.trim(), delayMs: 200 })
 
   const sources = useQuery({
@@ -371,9 +378,10 @@ export const AgentSessionsPanel = (props: { readonly t: AgentsviewTranslate }): 
                 session={hit.session}
                 snippet={hit.itemIndex === null ? `${t('matchInTitle')}: ${hit.snippet}` : `${t(KIND_KEY[hit.kind ?? 'user'])}: ${hit.snippet}`}
                 selected={selected?.key === hit.session.key}
+                startAt={hit.itemIndex}
                 now={now}
                 t={t}
-                onOpen={() => setSelected({ key: hit.session.key, startAt: hit.itemIndex })}
+                onOpen={openSession}
               />
             ))}
           </ul>
@@ -409,7 +417,7 @@ export const AgentSessionsPanel = (props: { readonly t: AgentsviewTranslate }): 
               selected={selected?.key === session.key}
               now={now}
               t={t}
-              onOpen={() => setSelected({ key: session.key, startAt: null })}
+              onOpen={openSession}
             />
           ))}
         </ul>
