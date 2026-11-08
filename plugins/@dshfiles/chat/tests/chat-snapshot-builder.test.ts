@@ -1,6 +1,4 @@
-import type {
-  ConversationTimelineSnapshot, TurnLocation,
-} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ConversationTimelineSnapshot, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it } from 'vitest'
 import type { ChatNode } from '../src/native/contract/chat-nodes.ts'
@@ -67,9 +65,8 @@ const tailNode = (input: {
 })
 
 /** Every turn's rail item, derived from the snapshot alone the way a rebuild would. */
-const railItems = (timeline: ConversationTimelineSnapshot, snapshot: ChatSnapshot) => timeline.turnOrder
-  .map(turn => turnNavigationItem(turn, snapshot.locations, snapshot.nodes))
-  .filter(item => item !== undefined)
+const railItems = (timeline: ConversationTimelineSnapshot, snapshot: ChatSnapshot) =>
+  timeline.turnOrder.map(turn => turnNavigationItem(turn, snapshot.locations, snapshot.nodes)).filter(item => item !== undefined)
 
 describe('ChatSnapshotBuilder', () => {
   it('keeps the visible order and Turn rail a full recomputation would produce while a Turn streams', () => {
@@ -77,7 +74,10 @@ describe('ChatSnapshotBuilder', () => {
     const openTurn = turnLocation(2, 30, 'open')
     const timeline: ConversationTimelineSnapshot = {
       turnOrder: [1, 2],
-      turns: new Map([[1, closingTurn], [2, openTurn]]),
+      turns: new Map([
+        [1, closingTurn],
+        [2, openTurn],
+      ]),
     }
     const builder = new ChatSnapshotBuilder()
     let snapshot = builder.replace({

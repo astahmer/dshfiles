@@ -9,6 +9,7 @@ import { createSnapshotStore, type SnapshotSelectorHook, type SnapshotStore } fr
 import type { ComposerBarProps, ConversationContentProps, ConversationSessionHeaderSlotProps, ConversationSessionSlotProps } from './native/contract/slots.ts'
 import { ConversationSessionHeader } from './native/skeleton/ConversationSession.tsx'
 import type { InputState } from './native/contract/input.ts'
+import type { InputZone } from './native/contract/slots.ts'
 import { EMPTY_CONVERSATION_SNAPSHOT } from './native/contract/snapshot.ts'
 import { ConversationContent } from './native/skeleton/ConversationContent.tsx'
 import { ConversationWidthControls } from './native/skeleton/ConversationWidthControls.tsx'
@@ -48,12 +49,8 @@ interface FixtureOptions {
   readonly renderView?: () => ReactNode
 }
 
-const draftOfZone = (zone: unknown): string => {
-  if (typeof zone !== 'object' || zone === null || !('draft' in zone)) return ''
-  return typeof zone.draft === 'string' ? zone.draft : ''
-}
-
-const storeBackedInput = (store: SnapshotStore<InputState>): SnapshotSelectorHook<InputState> =>
+const storeBackedInput =
+  (store: SnapshotStore<InputState>): SnapshotSelectorHook<InputState> =>
   <S,>(selector: (state: InputState) => S): S =>
     useSyncExternalStore(store.subscribe, () => selector(store.getSnapshot()))
 
@@ -135,11 +132,12 @@ const fixture = (id: string, initialView = 'chat', fixtureOptions: FixtureOption
     useInspectCall: selected(undefined),
     bindDraftPersistence: () => () => undefined,
     openView: vi.fn(),
-    renderSlot: (name, _owner, options) => (
-      name === 'conversation.view' && fixtureOptions.renderView !== undefined
-        ? fixtureOptions.renderView()
-        : <output data-chat-session={sessionId}>{options?.only}</output>
-    ),
+    renderSlot: (name, _owner, options) =>
+      name === 'conversation.view' && fixtureOptions.renderView !== undefined ? (
+        fixtureOptions.renderView()
+      ) : (
+        <output data-chat-session={sessionId}>{options?.only}</output>
+      ),
     SessionProvider: props => props.children,
   }
   const barProps: ComposerBarProps = {
@@ -380,11 +378,16 @@ describe('fixed Conversation content factory composition', () => {
     )
     Object.defineProperty(document, 'fonts', { configurable: true, value: new EventTarget() })
     const inputStore = createSnapshotStore<InputState>({
-      draft: '', attachmentIds: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [],
+      draft: '',
+      attachmentIds: [],
+      draftRev: 0,
+      phase: 'plain',
+      occurrences: [],
+      queue: [],
     })
-    let viewRenders = 0
+    const viewRenders = { count: 0 }
     const CountingView = () => {
-      viewRenders += 1
+      viewRenders.count += 1
       return <output data-chat-session="dock-live" />
     }
     const { props } = fixture('dock-live', 'chat', { inputStore, renderView: () => <CountingView /> })
@@ -399,20 +402,21 @@ describe('fixed Conversation content factory composition', () => {
           {...props}
           renderSlot={(name, owner) => {
             if (name !== 'conversation.input.dock' || !('input' in owner)) return null
-            const draft = draftOfZone(owner.input)
+            // SAFETY: the slot map declares `conversation.input.dock` with one owner shape, `InputZone`; the name check above is that correlation.
+            const draft = (owner as unknown as InputZone).input.draft
             dockDrafts.push(draft)
             return <output data-dock-draft={draft} />
           }}
         />,
       ),
     )
-    const mountedViewRenders = viewRenders
+    const mountedViewRenders = viewRenders.count
     expect(dockDrafts.at(-1)).toBe('')
     act(() => inputStore.set({ ...inputStore.getSnapshot(), draft: 'typed', draftRev: 1 }))
     expect(dockDrafts.at(-1)).toBe('typed')
     expect(element.querySelector('[data-dock-draft]')?.getAttribute('data-dock-draft')).toBe('typed')
     // The composer publishes on every content change; a draft keystroke must not
     // reach the Conversation body, whose View re-render costs the transcript.
-    expect(viewRenders).toBe(mountedViewRenders)
+    expect(viewRenders.count).toBe(mountedViewRenders)
   })
 })

@@ -190,11 +190,7 @@ const standardSchemaOf = (jsonSchema: Record<string, Schema.Schema.Type<typeof S
   }
 }
 
-const tailOf = async (
-  runtime: typeof SessionControllerHostRuntime.Service,
-  id: SessionId,
-  signal: AbortSignal,
-): Promise<TailLog | undefined> => {
+const tailOf = async (runtime: typeof SessionControllerHostRuntime.Service, id: SessionId, signal: AbortSignal): Promise<TailLog | undefined> => {
   try {
     return await TailLog.open({ ctx: runtime.ctx, sessionId: id, signal })
   } catch (error: unknown) {
@@ -208,12 +204,7 @@ const tailOf = async (
  * The newest spoken entries of one Session: a live Session folds its resident events, and a cold log decodes only the
  * frames the count needs. Anything the tail cannot serve exactly reads the whole log, as before.
  */
-const transcriptOf = async (
-  runtime: typeof SessionControllerHostRuntime.Service,
-  id: SessionId,
-  limit: number,
-  signal: AbortSignal,
-) => {
+const transcriptOf = async (runtime: typeof SessionControllerHostRuntime.Service, id: SessionId, limit: number, signal: AbortSignal) => {
   const live = runtime.ctx.agents.get(id)
   if (live !== undefined) return recentTranscript({ events: live.session.snapshotEvents(), limit })
   const tail = await tailOf(runtime, id, signal)
