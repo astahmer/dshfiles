@@ -5,7 +5,7 @@
  */
 import { mkdirSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import { DatabaseSync, type SQLOutputValue, type StatementSync } from 'node:sqlite'
 import * as Schema from 'effect/Schema'
 import * as SchemaGetter from 'effect/SchemaGetter'
 import { withoutUndefined } from './optional-fields.js'
@@ -129,6 +129,23 @@ export interface SessionCursor {
   readonly mtimeNs: string
 }
 
+const CURSOR_SELECT = 'SELECT id, log_path, log_dev, log_ino, log_offset, log_size, log_mtime_ns FROM sessions'
+const CURSOR_BY_ID = `${CURSOR_SELECT} WHERE id = ?`
+
+const cursorOf = (row: Record<string, SQLOutputValue> | undefined): SessionCursor | undefined => {
+  const parsed = Schema.decodeUnknownResult(cursorRowSchema)(row)
+  if (parsed._tag === 'Failure') return undefined
+  return {
+    id: parsed.success.id,
+    logPath: parsed.success.log_path,
+    dev: parsed.success.log_dev,
+    ino: parsed.success.log_ino,
+    offset: parsed.success.log_offset,
+    size: parsed.success.log_size,
+    mtimeNs: parsed.success.log_mtime_ns,
+  }
+}
+
 export interface DocumentRow {
   readonly sessionId: string
   readonly seq: number
@@ -250,6 +267,8 @@ const backfillRowSchema = Schema.Struct({
 export class SearchIndex {
   readonly #database: DatabaseSync
   readonly #path: string
+  // Constant SQL only: node:sqlite compiles on every prepare, and the write path prepared per document.
+  readonly #statements = new Map<string, StatementSync>()
 
   constructor(path: string) {
     this.#path = path
@@ -264,35 +283,40 @@ export class SearchIndex {
     this.#database.exec(SCHEMA)
   }
 
-  cursor(sessionId: string): SessionCursor | undefined {
-    const value = this.#database.prepare('SELECT id, log_path, log_dev, log_ino, log_offset, log_size, log_mtime_ns FROM sessions WHERE id = ?').get(sessionId)
-    const parsed = Schema.decodeUnknownResult(cursorRowSchema)(value)
-    if (parsed._tag === 'Failure') return undefined
-    return {
-      id: parsed.success.id,
-      logPath: parsed.success.log_path,
-      dev: parsed.success.log_dev,
-      ino: parsed.success.log_ino,
-      offset: parsed.success.log_offset,
-      size: parsed.success.log_size,
-      mtimeNs: parsed.success.log_mtime_ns,
+  #prepare(sql: string): StatementSync {
+    let statement = this.#statements.get(sql)
+    if (statement === undefined) {
+      statement = this.#database.prepare(sql)
+      this.#statements.set(sql, statement)
     }
+    return statement
+  }
+
+  cursor(sessionId: string): SessionCursor | undefined {
+    return cursorOf(this.#prepare(CURSOR_BY_ID).get(sessionId))
+  }
+
+  /** Every stored cursor in one read: an ingest pass compares each log with its cursor, and one query per log cost 85 ms on 2,800 Sessions. */
+  cursors(): ReadonlyMap<string, SessionCursor> {
+    const cursors = new Map<string, SessionCursor>()
+    for (const row of this.#prepare(CURSOR_SELECT).all()) {
+      const cursor = cursorOf(row)
+      if (cursor !== undefined) cursors.set(cursor.id, cursor)
+    }
+    return cursors
   }
 
   /** Store the session header plus the newest cursor after a committed batch. */
   commitBatch(input: BatchInput): void {
     const { header, cursor, documents, replace, now } = input
-    this.#database.exec('BEGIN IMMEDIATE')
-    try {
+    this.#write(() => {
       if (replace) {
         this.#deleteSessionRows(header.id)
-        this.#database.prepare('DELETE FROM sessions WHERE id = ?').run(header.id)
+        this.#prepare('DELETE FROM sessions WHERE id = ?').run(header.id)
       }
       if (documents.length > 0) {
-        const insert = this.#database.prepare(
-          'INSERT INTO session_documents (text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        )
-        const remember = this.#database.prepare('INSERT INTO session_document_rows (session_id, document_rowid) VALUES (?, ?)')
+        const insert = this.#prepare('INSERT INTO session_documents (text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        const remember = this.#prepare('INSERT INTO session_document_rows (session_id, document_rowid) VALUES (?, ?)')
         for (const document of documents) {
           const inserted = insert.run(
             document.text,
@@ -305,24 +329,23 @@ export class SearchIndex {
           )
           remember.run(header.id, Number(inserted.lastInsertRowid))
           if (isConversation(document))
-            this.#database
-              .prepare('INSERT INTO conversation_documents (rowid, text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-              .run(
-                inserted.lastInsertRowid,
-                document.text,
-                document.sessionId,
-                document.seq,
-                document.type,
-                document.time,
-                document.surface,
-                document.truncated ? 1 : 0,
-              )
+            this.#prepare(
+              'INSERT INTO conversation_documents (rowid, text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            ).run(
+              inserted.lastInsertRowid,
+              document.text,
+              document.sessionId,
+              document.seq,
+              document.type,
+              document.time,
+              document.surface,
+              document.truncated ? 1 : 0,
+            )
         }
       }
       const truncated = documents.reduce((total, document) => total + (document.truncated ? 1 : 0), 0)
-      this.#database
-        .prepare(
-          `INSERT INTO sessions (id, version, created_at, cwd, parent_session, seed_length, delegation_depth, agent_preset,
+      this.#prepare(
+        `INSERT INTO sessions (id, version, created_at, cwd, parent_session, seed_length, delegation_depth, agent_preset,
              log_path, log_dev, log_ino, log_offset, log_size, log_mtime_ns, indexed_at, documents_count, truncated_documents)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (id) DO UPDATE SET
@@ -331,26 +354,49 @@ export class SearchIndex {
              log_path = excluded.log_path, log_dev = excluded.log_dev, log_ino = excluded.log_ino, log_offset = excluded.log_offset,
              log_size = excluded.log_size, log_mtime_ns = excluded.log_mtime_ns, indexed_at = excluded.indexed_at,
              documents_count = sessions.documents_count + excluded.documents_count, truncated_documents = sessions.truncated_documents + excluded.truncated_documents`,
-        )
-        .run(
-          header.id,
-          header.version,
-          header.createdAt,
-          header.cwd ?? null,
-          header.parentSession ?? null,
-          header.isSeeded ? 0 : null,
-          header.delegationDepth ?? null,
-          header.agentPreset ?? null,
-          cursor.logPath,
-          cursor.dev,
-          cursor.ino,
-          cursor.offset,
-          cursor.size,
-          cursor.mtimeNs,
-          now,
-          documents.length,
-          truncated,
-        )
+      ).run(
+        header.id,
+        header.version,
+        header.createdAt,
+        header.cwd ?? null,
+        header.parentSession ?? null,
+        header.isSeeded ? 0 : null,
+        header.delegationDepth ?? null,
+        header.agentPreset ?? null,
+        cursor.logPath,
+        cursor.dev,
+        cursor.ino,
+        cursor.offset,
+        cursor.size,
+        cursor.mtimeNs,
+        now,
+        documents.length,
+        truncated,
+      )
+    })
+  }
+
+  /**
+   * Run one session's write: its own transaction, or a savepoint inside an open group so a failure undoes only that
+   * session. Grouping is what bounds write amplification: FTS5 flushes a new segment per transaction and merges them
+   * again, so committing 2,800 Sessions one by one wrote 285 MB for an 8.6 MB index.
+   */
+  #write(write: () => void): void {
+    if (this.#database.isTransaction) {
+      this.#database.exec('SAVEPOINT session_write')
+      try {
+        write()
+        this.#database.exec('RELEASE session_write')
+      } catch (error) {
+        this.#database.exec('ROLLBACK TO session_write')
+        this.#database.exec('RELEASE session_write')
+        throw error
+      }
+      return
+    }
+    this.#database.exec('BEGIN IMMEDIATE')
+    try {
+      write()
       this.#database.exec('COMMIT')
     } catch (error) {
       this.#database.exec('ROLLBACK')
@@ -358,17 +404,25 @@ export class SearchIndex {
     }
   }
 
+  /** Open a group that later session writes join; `commitGroup` makes them durable together. */
+  beginGroup(): void {
+    if (!this.#database.isTransaction) this.#database.exec('BEGIN IMMEDIATE')
+  }
+
+  commitGroup(): void {
+    if (this.#database.isTransaction) this.#database.exec('COMMIT')
+  }
+
+  rollbackGroup(): void {
+    if (this.#database.isTransaction) this.#database.exec('ROLLBACK')
+  }
+
   /** Forget a session whose log was rewritten, so the next pass indexes it from the start. */
   forget(sessionId: string): void {
-    this.#database.exec('BEGIN IMMEDIATE')
-    try {
+    this.#write(() => {
       this.#deleteSessionRows(sessionId)
-      this.#database.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId)
-      this.#database.exec('COMMIT')
-    } catch (error) {
-      this.#database.exec('ROLLBACK')
-      throw error
-    }
+      this.#prepare('DELETE FROM sessions WHERE id = ?').run(sessionId)
+    })
   }
 
   /**
@@ -378,35 +432,33 @@ export class SearchIndex {
    * it takes the one scanning delete, and everything indexed afterwards stays on the rowid path.
    */
   #deleteSessionRows(sessionId: string): void {
-    const mapped = this.#database.prepare('SELECT document_rowid FROM session_document_rows WHERE session_id = ?').all(sessionId)
+    const mapped = this.#prepare('SELECT document_rowid FROM session_document_rows WHERE session_id = ?').all(sessionId)
     if (mapped.length === 0) {
       // Nothing indexed means nothing to delete; only a Session indexed before the rowid map (see `backfillRowMap`)
       // still takes the scanning delete, ~15 s on this index while the worker serves no search.
-      const counted = Schema.decodeUnknownResult(countRowSchema)(
-        this.#database.prepare('SELECT documents_count AS count FROM sessions WHERE id = ?').get(sessionId),
-      )
+      const counted = Schema.decodeUnknownResult(countRowSchema)(this.#prepare('SELECT documents_count AS count FROM sessions WHERE id = ?').get(sessionId))
       if (counted._tag === 'Failure' || counted.success.count === 0) return
-      this.#database.prepare('DELETE FROM session_documents WHERE session_id = ?').run(sessionId)
-      this.#database.prepare('DELETE FROM conversation_documents WHERE session_id = ?').run(sessionId)
+      this.#prepare('DELETE FROM session_documents WHERE session_id = ?').run(sessionId)
+      this.#prepare('DELETE FROM conversation_documents WHERE session_id = ?').run(sessionId)
       return
     }
-    const remove = this.#database.prepare('DELETE FROM session_documents WHERE rowid = ?')
-    const removeConversation = this.#database.prepare('DELETE FROM conversation_documents WHERE rowid = ?')
+    const remove = this.#prepare('DELETE FROM session_documents WHERE rowid = ?')
+    const removeConversation = this.#prepare('DELETE FROM conversation_documents WHERE rowid = ?')
     for (const row of mapped) {
       const rowid = Schema.decodeUnknownSync(documentRowidSchema)(row).document_rowid
       remove.run(rowid)
       removeConversation.run(rowid)
     }
-    this.#database.prepare('DELETE FROM session_document_rows WHERE session_id = ?').run(sessionId)
+    this.#prepare('DELETE FROM session_document_rows WHERE session_id = ?').run(sessionId)
   }
 
   #meta(key: string): string | undefined {
-    const parsed = Schema.decodeUnknownResult(metaValueSchema)(this.#database.prepare('SELECT value FROM meta WHERE key = ?').get(key))
+    const parsed = Schema.decodeUnknownResult(metaValueSchema)(this.#prepare('SELECT value FROM meta WHERE key = ?').get(key))
     return parsed._tag === 'Success' ? parsed.success.value : undefined
   }
 
   #setMeta(key: string, value: string): void {
-    this.#database.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(key, value)
+    this.#prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(key, value)
   }
 
   /** Whether `conversation_documents` holds every conversation document, so searches may use it. */
@@ -425,19 +477,17 @@ export class SearchIndex {
     try {
       let until = Number(this.#meta('conversation_backfill_until') ?? Number.NaN)
       if (Number.isNaN(until)) {
-        until = Schema.decodeUnknownSync(numberLike)(
-          this.#database.prepare('SELECT coalesce(max(rowid), 0) AS value FROM session_documents').get()?.['value'] ?? 0,
-        )
+        until = Schema.decodeUnknownSync(numberLike)(this.#prepare('SELECT coalesce(max(rowid), 0) AS value FROM session_documents').get()?.['value'] ?? 0)
         this.#setMeta('conversation_backfill_until', String(until))
       }
       const from = Number(this.#meta('conversation_backfill_from') ?? '0')
       const to = Math.min(until, from + rowids)
-      const copy = this.#database.prepare(
+      const copy = this.#prepare(
         'INSERT OR REPLACE INTO conversation_documents (rowid, text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       )
-      for (const raw of this.#database
-        .prepare('SELECT rowid, text, session_id, seq, type, time, surface, truncated FROM session_documents WHERE rowid > ? AND rowid <= ?')
-        .all(from, to)) {
+      for (const raw of this.#prepare(
+        'SELECT rowid, text, session_id, seq, type, time, surface, truncated FROM session_documents WHERE rowid > ? AND rowid <= ?',
+      ).all(from, to)) {
         const row = Schema.decodeUnknownSync(backfillRowSchema)(raw)
         if (isConversation(row)) copy.run(row.rowid, row.text, row.session_id, row.seq, row.type, row.time, row.surface, row.truncated)
       }
@@ -463,18 +513,14 @@ export class SearchIndex {
     try {
       let until = Number(this.#meta('row_map_backfill_until') ?? Number.NaN)
       if (Number.isNaN(until)) {
-        until = Schema.decodeUnknownSync(numberLike)(
-          this.#database.prepare('SELECT coalesce(max(rowid), 0) AS value FROM session_documents').get()?.['value'] ?? 0,
-        )
+        until = Schema.decodeUnknownSync(numberLike)(this.#prepare('SELECT coalesce(max(rowid), 0) AS value FROM session_documents').get()?.['value'] ?? 0)
         this.#setMeta('row_map_backfill_until', String(until))
       }
       const from = Number(this.#meta('row_map_backfill_from') ?? '0')
       const to = Math.min(until, from + rowids)
-      this.#database
-        .prepare(
-          'INSERT OR IGNORE INTO session_document_rows (session_id, document_rowid) SELECT session_id, rowid FROM session_documents WHERE rowid > ? AND rowid <= ?',
-        )
-        .run(from, to)
+      this.#prepare(
+        'INSERT OR IGNORE INTO session_document_rows (session_id, document_rowid) SELECT session_id, rowid FROM session_documents WHERE rowid > ? AND rowid <= ?',
+      ).run(from, to)
       this.#setMeta('row_map_backfill_from', String(to))
       if (to >= until) this.#setMeta('row_map_ready', '1')
       this.#database.exec('COMMIT')
@@ -553,9 +599,9 @@ export class SearchIndex {
   }
 
   sessionHeader(sessionId: string): SessionHeaderRow | null {
-    const value = this.#database
-      .prepare('SELECT id, version, created_at, cwd, parent_session, seed_length, delegation_depth, agent_preset FROM sessions WHERE id = ?')
-      .get(sessionId)
+    const value = this.#prepare(
+      'SELECT id, version, created_at, cwd, parent_session, seed_length, delegation_depth, agent_preset FROM sessions WHERE id = ?',
+    ).get(sessionId)
     const parsed = Schema.decodeUnknownResult(sessionRowSchema)(value)
     return parsed._tag === 'Success' ? headerOf(parsed.success) : null
   }
@@ -654,7 +700,7 @@ export class SearchIndex {
 
   /** Bytes the file holds per indexed document; an FTS5 index that keeps pruned postings rises after deletes. */
   bytesPerDocument(): number {
-    const documents = Schema.decodeUnknownSync(countRowSchema)(this.#database.prepare('SELECT COALESCE(SUM(documents_count), 0) AS count FROM sessions').get()).count
+    const documents = Schema.decodeUnknownSync(countRowSchema)(this.#prepare('SELECT COALESCE(SUM(documents_count), 0) AS count FROM sessions').get()).count
     if (documents === 0) return 0
     let bytes = 0
     for (const suffix of ['', '-wal', '-shm']) bytes += statSize(`${this.#path}${suffix}`)
@@ -674,9 +720,9 @@ export class SearchIndex {
 
   /** Share of the index file that is free pages after deletes, 0 when the file holds nothing yet. */
   freePageRatio(): number {
-    const pages = Schema.decodeUnknownSync(pageCountRowSchema)(this.#database.prepare('PRAGMA page_count').get()).page_count
+    const pages = Schema.decodeUnknownSync(pageCountRowSchema)(this.#prepare('PRAGMA page_count').get()).page_count
     if (pages === 0) return 0
-    return Schema.decodeUnknownSync(freelistRowSchema)(this.#database.prepare('PRAGMA freelist_count').get()).freelist_count / pages
+    return Schema.decodeUnknownSync(freelistRowSchema)(this.#prepare('PRAGMA freelist_count').get()).freelist_count / pages
   }
 
   health(input: {
@@ -689,12 +735,10 @@ export class SearchIndex {
     readonly slowestSearchMs: number
     readonly lastError: string | null
   }): IndexHealth {
-    const sessions = Schema.decodeUnknownSync(countRowSchema)(this.#database.prepare('SELECT count(*) AS count FROM sessions').get()).count
+    const sessions = Schema.decodeUnknownSync(countRowSchema)(this.#prepare('SELECT count(*) AS count FROM sessions').get()).count
     // `commitBatch` maintains `documents_count` on every append, replace and forget, so the sum is the
     // FTS5 row count without scanning the virtual table (measured 572 ms per `count(*)` at 982 MB).
-    const documents = Schema.decodeUnknownSync(countRowSchema)(
-      this.#database.prepare('SELECT COALESCE(SUM(documents_count), 0) AS count FROM sessions').get(),
-    ).count
+    const documents = Schema.decodeUnknownSync(countRowSchema)(this.#prepare('SELECT COALESCE(SUM(documents_count), 0) AS count FROM sessions').get()).count
     let indexBytes = 0
     for (const suffix of ['', '-wal', '-shm']) indexBytes += statSize(`${this.#path}${suffix}`)
     return { sessions, documents, indexBytes, ...input }

@@ -9,10 +9,11 @@ import { setImmediate } from 'node:timers/promises'
 import { buildSessionEventSearchDocuments, extractSessionEventText } from '@deepseek-ai/dsh-session-query'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
+import * as Duration from 'effect/Duration'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { FrameLog, type SessionLogFile } from './frame-log.js'
-import type { DocumentRow, SearchIndex } from './index-db.js'
+import type { DocumentRow, SearchIndex, SessionCursor } from './index-db.js'
 import { withoutUndefined } from './optional-fields.js'
 import { sessionHeaderSchema, type SessionHeaderRow } from './protocol.js'
 import { DocumentText } from './text.js'
@@ -39,6 +40,24 @@ export interface IngestPassOptions {
   readonly archived?: ReadonlySet<string>
 }
 
+const GROUP_SESSIONS = 64
+const GROUP_MS = 250
+
+/**
+ * Every committed Session event already wakes the loop (the Host nudges it), so the idle poll only catches logs written
+ * behind the Host's back. A pass that finds nothing doubles the next wait up to a minute; a wake starts over at 5 s.
+ * On 2,800 Sessions an idle pass costs ~35 ms of CPU, so a fixed 5 s poll was a permanent tax for no fresher results.
+ */
+export class IdleBackoff {
+  static readonly first = Duration.seconds(5)
+  static readonly longest = Duration.seconds(60)
+
+  /** The wait after `idlePasses` consecutive passes that found nothing to index. */
+  static after(idlePasses: number): Duration.Duration {
+    return Duration.min(Duration.times(IdleBackoff.first, 2 ** Math.max(0, Math.min(idlePasses - 1, 4))), IdleBackoff.longest)
+  }
+}
+
 const parseEvents = (text: string, skipHeader: boolean): readonly SessionEvent[] => {
   const events: SessionEvent[] = []
   const lines = text.split('\n')
@@ -62,30 +81,35 @@ const toHeader = (raw: unknown, sessionId: string): SessionHeaderRow => {
   return Option.isSome(parsed) ? withoutUndefined(parsed.value) : fallbackHeader(sessionId)
 }
 
-/** Read only the byte window a pass needs: the whole 69 MB log used to be read to slice it, on every pass. */
-const readWindow = async (path: string, from: number, windowBytes: number): Promise<Buffer> => {
+/**
+ * Read only the byte window a pass needs: the whole 69 MB log used to be read to slice it, on every pass. The buffer is
+ * sized to what the file still holds, not to the window: zero-filling a 2 MiB buffer per small log was 13 % of a first
+ * build's CPU.
+ */
+const readWindow = async (path: string, from: number, windowBytes: number, fileSize: number): Promise<Buffer> => {
+  const length = Math.max(0, Math.min(windowBytes, fileSize - from))
+  if (length === 0) return Buffer.alloc(0)
   const handle = await open(path, 'r')
   try {
-    const buffer = Buffer.alloc(windowBytes)
-    const { bytesRead } = await handle.read(buffer, 0, windowBytes, from)
+    const buffer = Buffer.allocUnsafe(length)
+    const { bytesRead } = await handle.read(buffer, 0, length, from)
     return buffer.subarray(0, bytesRead)
   } finally {
     await handle.close()
   }
 }
 
-const ingestSession = async (options: IngestPassOptions & { readonly log: SessionLogFile }): Promise<number> => {
-  const { index, log, windowBytes, now } = options
-  const cursor = index.cursor(log.sessionId)
+const ingestSession = async (options: IngestPassOptions & { readonly log: SessionLogFile; readonly cursor: SessionCursor | undefined }): Promise<number> => {
+  const { index, log, cursor, windowBytes, now } = options
   const replace = cursor === undefined || cursor.dev !== log.dev || cursor.ino !== log.ino || log.size < cursor.offset
   const from = replace ? 0 : cursor.offset
   // A frame larger than the window decodes nothing; widen until one fits or the rest of the log is read.
   let size = windowBytes
-  let window = await readWindow(log.path, from, size)
+  let window = await readWindow(log.path, from, size, log.size)
   let decoded = FrameLog.decodeFrom(window, 0)
   while (decoded.offset === 0 && from + size < log.size) {
     size *= 2
-    window = await readWindow(log.path, from, size)
+    window = await readWindow(log.path, from, size, log.size)
     decoded = FrameLog.decodeFrom(window, 0)
   }
   const events = parseEvents(decoded.text, replace)
@@ -128,41 +152,60 @@ const ingestSession = async (options: IngestPassOptions & { readonly log: Sessio
 export const runIngestPass = async (options: IngestPassOptions): Promise<IngestPassResult> => {
   const startedAt = options.now()
   const logs = await FrameLog.list(options.root)
+  const cursors = options.index.cursors()
   let ingested = 0
   let documents = 0
   let behindSessions = 0
   let behindBytes = 0
   let pruned = 0
   let complete = true
-  for (const log of logs) {
-    if (options.archived?.has(log.sessionId) === true) {
-      // Cold by the user's own decision: keep no documents for it, and index it again only for a targeted search.
-      if (options.index.cursor(log.sessionId) !== undefined) {
-        options.index.forget(log.sessionId)
-        pruned += 1
+  // Sessions commit in groups of up to GROUP_SESSIONS or GROUP_MS; searches still run between sessions inside a group.
+  let grouped = 0
+  let groupStartedAt = 0
+  try {
+    for (const log of logs) {
+      if (options.archived?.has(log.sessionId) === true) {
+        // Cold by the user's own decision: keep no documents for it, and index it again only for a targeted search.
+        if (cursors.has(log.sessionId)) {
+          options.index.forget(log.sessionId)
+          pruned += 1
+        }
+        continue
       }
-      continue
+      const cursor = cursors.get(log.sessionId)
+      const unchanged =
+        cursor !== undefined &&
+        cursor.dev === log.dev &&
+        cursor.ino === log.ino &&
+        cursor.size === log.size &&
+        cursor.mtimeNs === log.mtimeNs &&
+        cursor.offset >= log.size
+      if (unchanged) continue
+      behindSessions += 1
+      behindBytes += Math.max(0, log.size - (cursor?.offset ?? 0))
+      if (!complete) continue
+      if (options.now() - startedAt >= options.budgetMs && ingested > 0) {
+        complete = false
+        continue
+      }
+      if (grouped === 0) {
+        options.index.beginGroup()
+        groupStartedAt = options.now()
+      }
+      documents += await ingestSession({ ...options, log, cursor })
+      ingested += 1
+      grouped += 1
+      if (grouped >= GROUP_SESSIONS || options.now() - groupStartedAt >= GROUP_MS) {
+        options.index.commitGroup()
+        grouped = 0
+      }
+      // Searches queue on this thread's message port; let them run between sessions.
+      await setImmediate()
     }
-    const cursor = options.index.cursor(log.sessionId)
-    const unchanged =
-      cursor !== undefined &&
-      cursor.dev === log.dev &&
-      cursor.ino === log.ino &&
-      cursor.size === log.size &&
-      cursor.mtimeNs === log.mtimeNs &&
-      cursor.offset >= log.size
-    if (unchanged) continue
-    behindSessions += 1
-    behindBytes += Math.max(0, log.size - (cursor?.offset ?? 0))
-    if (!complete) continue
-    if (options.now() - startedAt >= options.budgetMs && ingested > 0) {
-      complete = false
-      continue
-    }
-    documents += await ingestSession({ ...options, log })
-    ingested += 1
-    // Searches queue on this thread's message port; let them run between sessions.
-    await setImmediate()
+    options.index.commitGroup()
+  } catch (error) {
+    options.index.rollbackGroup()
+    throw error
   }
   return { scanned: logs.length, ingested, documents, behindSessions, behindBytes, pruned, complete }
 }
@@ -178,7 +221,7 @@ export const indexSessions = async (options: IngestPassOptions, sessionIds: read
   let documents = 0
   for (const log of logs) {
     if (!wanted.delete(log.sessionId)) continue
-    documents += await ingestSession({ ...options, log })
+    documents += await ingestSession({ ...options, log, cursor: undefined })
     if (wanted.size === 0) break
   }
   return documents
